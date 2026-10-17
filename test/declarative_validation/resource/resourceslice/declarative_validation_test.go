@@ -24,10 +24,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
@@ -39,9 +42,15 @@ import (
 )
 
 func TestDeclarativeValidate(t *testing.T) {
+	// Re-initialize the scheme once the feature gate override below gets
+	// reverted, so later tests don't see a stale, test-only scheme state.
+	t.Cleanup(func() { utilruntime.Must(legacyscheme.Scheme.Init(klog.Background())) })
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.DRANodeAllocatableResources: true,
+		// v1beta1 is tested here too, so the scheme must have it registered.
+		features.DRAResourceV1beta1API: true,
 	})
+	utilruntime.Must(legacyscheme.Scheme.Init(klog.Background()))
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -592,9 +601,15 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	// Re-initialize the scheme once the feature gate override below gets
+	// reverted, so later tests don't see a stale, test-only scheme state.
+	t.Cleanup(func() { utilruntime.Must(legacyscheme.Scheme.Init(klog.Background())) })
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.DRANodeAllocatableResources: true,
+		// v1beta1 is tested here too, so the scheme must have it registered.
+		features.DRAResourceV1beta1API: true,
 	})
+	utilruntime.Must(legacyscheme.Scheme.Init(klog.Background()))
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{

@@ -22,7 +22,16 @@ import (
 )
 
 var (
-	// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
+	// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered,
+	// with a few exceptions: some entries might depend on feature gates and only get registered when
+	// [runtime.Scheme.Init] is called.
+	//
+	// Scheme keeps its identity for the lifetime of the process: Init
+	// mutates it in place instead of replacing it, so anything that captured
+	// a pointer to Scheme (for example a package-level variable initialized
+	// at import time, before Init ever runs) observes the result once Init
+	// runs.
+	//
 	// NOTE: If you are copying this file to start a new api group, STOP! Copy the
 	// extensions group instead. This Scheme is special and should appear ONLY in
 	// the api group, unless you really know what you're doing.

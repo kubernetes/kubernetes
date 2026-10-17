@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/randfill"
 )
 
 func TestConverter_byteSlice(t *testing.T) {
@@ -283,5 +286,112 @@ func TestConverter_meta(t *testing.T) {
 	}
 	if checks != 1 {
 		t.Errorf("Registered functions did not get called.")
+	}
+}
+
+// TestConverterClone verifies that Converter.Clone produces a copy that
+// behaves the same as the original but shares no mutable state with it,
+// including for fields added to Converter or ConversionFuncs after this
+// test was written.
+func TestConverterClone(t *testing.T) {
+	// Fuzz every field via reflection so that a field added in the future
+	// automatically gets a non-zero value here too, without having to
+	// remember to update this test.
+	f := randfill.NewWithSeed(1).
+		NilChance(0).
+		NumElements(1, 3).
+		AllowUnexportedFields(true).
+		Funcs(
+			// Converter contains values of type reflect.Type.
+			// randfill cannot generate values for it, so
+			// here we fill that gap by randomly picking
+			// among a few different types. We need more than one
+			// because several maps are indexed by reflect.Type
+			// instances and we want to generate non-trivial maps
+			// with more than one entry.
+			func(v *reflect.Type, c randfill.Continue) {
+				candidates := []reflect.Type{
+					reflect.TypeOf(0),
+					reflect.TypeOf(""),
+					reflect.TypeOf(false),
+					reflect.TypeOf(int64(0)),
+					reflect.TypeOf(struct{ X int }{}),
+				}
+				*v = candidates[c.Intn(len(candidates))]
+			},
+			// Each function type that appears in Converter must
+			// be handled here (test panics otherwise).
+			func(v *ConversionFunc, c randfill.Continue) {
+				*v = func(a, b interface{}, s Scope) error { return nil }
+			},
+		)
+
+	c := NewConverter(nil)
+	f.Fill(c)
+
+	clone := c.Clone()
+
+	// cmp.Diff walks both values field by field (including unexported
+	// ones), so it catches a field Clone forgot to copy (left at its zero
+	// value) without this test having to list the fields itself. The
+	// independenceReporter piggybacks on the same walk to additionally
+	// flag maps/slices/pointers that Clone copied by reference instead of
+	// by value.
+	ir := &independenceReporter{}
+	opts := []cmp.Option{
+		cmp.AllowUnexported(Converter{}, ConversionFuncs{}),
+		cmp.Comparer(func(a, b reflect.Type) bool { return a == b }),
+		cmp.Comparer(func(a, b ConversionFunc) bool { return true }), // funcs are intentionally shared, not deep-copied
+		cmp.Reporter(ir),
+	}
+	if diff := cmp.Diff(c, clone, opts...); diff != "" {
+		t.Errorf("clone is not semantically equal to the original (-orig +clone):\n%s", diff)
+	}
+	ir.check(t)
+}
+
+// independenceReporter is a cmp.Reporter that, alongside whatever equality
+// check cmp.Diff is already doing, additionally flags pointers, maps, and
+// slices that a clone shares with the original instead of copying. Pass it
+// to cmp.Diff/cmp.Equal via cmp.Reporter, then call check once comparison
+// is done.
+type independenceReporter struct {
+	path   cmp.Path
+	errors []string
+}
+
+func (r *independenceReporter) PushStep(ps cmp.PathStep) {
+	r.path = append(r.path, ps)
+
+	switch ps.Type().Kind() {
+	case reflect.Pointer:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same pointer as the original")
+		}
+	case reflect.Map:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Len() > 0 && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same map as the original")
+		}
+	case reflect.Slice:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Len() > 0 && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same backing array as the original")
+		}
+	}
+}
+
+func (r *independenceReporter) Report(cmp.Result) {}
+
+func (r *independenceReporter) PopStep() {
+	r.path = r.path[:len(r.path)-1]
+}
+
+// check fails t with every independence violation found during the compare.
+func (r *independenceReporter) check(t *testing.T) {
+	t.Helper()
+	for _, msg := range r.errors {
+		t.Error(msg)
 	}
 }

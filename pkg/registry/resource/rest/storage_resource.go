@@ -26,9 +26,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
 	devicetaintrulestore "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
@@ -39,7 +41,10 @@ import (
 
 // The REST storage registers resource kinds also without the corresponding
 // feature gate because it might be useful to provide access to these resources
-// while their feature is off to allow cleaning them up.
+// while their feature is off to allow cleaning them up. The exception is
+// resource.k8s.io/v1beta1, which is only installed in the scheme when the
+// DRAResourceV1beta1API feature gate is enabled (see pkg/apis/resource/install),
+// so its REST storage must not be registered without that feature gate either.
 
 type RESTStorageProvider struct {
 	NamespaceClient v1.NamespaceInterface
@@ -63,10 +68,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha3.SchemeGroupVersion.Version] = storageMap
 	}
 
-	if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter, p.NamespaceClient); err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[resourcev1beta1.SchemeGroupVersion.Version] = storageMap
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceV1beta1API) {
+		if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter, p.NamespaceClient); err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		} else if len(storageMap) > 0 {
+			apiGroupInfo.VersionedResourcesStorageMap[resourcev1beta1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
 	if storageMap, err := p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter, p.NamespaceClient); err != nil {
