@@ -208,9 +208,9 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				}
 				var l int
 				if s, ok := cell.(string); ok {
-					l = len(s)
+					l = cellPrintWidth(s)
 				} else {
-					l = len(fmt.Sprint(cell))
+					l = cellPrintWidth(fmt.Sprint(cell))
 				}
 				if l > maxCellWidths[i] {
 					maxCellWidths[i] = l
@@ -306,7 +306,7 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				default:
 					cellStr = fmt.Sprint(val)
 				}
-				cellLen = len(cellStr)
+				cellLen = cellPrintWidth(cellStr)
 				rowBuf = appendCellValue(output, rowBuf, cellStr)
 			}
 			if padFirstRow && ri == 0 && i != lastVisibleCol && i < len(maxCellWidths) {
@@ -323,6 +323,19 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 		}
 	}
 	return nil
+}
+
+// cellPrintWidth returns the number of bytes appendCellValue writes for val,
+// which is not len(val): a value is truncated at its first break character and
+// terminal-unsafe characters are escaped into longer replacements.
+func cellPrintWidth(val string) int {
+	if !strings.ContainsAny(val, cellSpecialChars) {
+		return len(val)
+	}
+	if breakchar := strings.IndexAny(val, cellBreakChars); breakchar >= 0 {
+		return len(EscapeTerminal(val[:breakchar])) + len("...")
+	}
+	return len(EscapeTerminal(val))
 }
 
 // appendCellValue appends a cell's display text to rowBuf. For the common
