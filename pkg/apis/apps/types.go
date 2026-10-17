@@ -23,6 +23,15 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+const (
+	ControllerRevisionHashLabelKey = "controller-revision-hash"
+	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
+	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
+	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
+	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
+	PodIndexLabel                  = "apps.kubernetes.io/pod-index"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -107,7 +116,8 @@ type RollingUpdateStatefulSetStrategy struct {
 	// for updates. During a rolling update, all pods from ordinal Replicas-1 to
 	// Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
 	// This is helpful in being able to do a canary based deployment. The default value is 0.
-	Partition int32
+	// +optional
+	Partition *int32
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down. This can not be 0.
@@ -178,7 +188,7 @@ type StatefulSetSpec struct {
 	// If unspecified, defaults to 1.
 	// TODO: Consider a rename of this field.
 	// +optional
-	Replicas int32
+	Replicas *int32
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
@@ -262,7 +272,7 @@ type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
 	// StatefulSet's generation, which is updated on mutation by the API Server.
 	// +optional
-	ObservedGeneration *int64
+	ObservedGeneration int64
 
 	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32
@@ -388,8 +398,10 @@ type Deployment struct {
 
 // DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods.
-	Replicas int32
+	// Number of desired pods. This is a pointer to distinguish between explicit
+	// zero and not specified. Defaults to 1.
+	// +optional
+	Replicas *int32
 
 	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
@@ -421,11 +433,6 @@ type DeploymentSpec struct {
 	// deployment controller.
 	// +optional
 	Paused bool
-
-	// DEPRECATED.
-	// The config this deployment is rolling back to. Will be cleared after rollback is done.
-	// +optional
-	RollbackTo *RollbackConfig
 
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
@@ -507,7 +514,7 @@ type RollingUpdateDeployment struct {
 	// that at least 70% of original number of pods are available at all times
 	// during the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable *intstr.IntOrString
 
 	// The maximum number of pods that can be scheduled above the original number of
 	// pods.
@@ -520,7 +527,7 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is at most 130% of original pods.
 	// +optional
-	MaxSurge intstr.IntOrString
+	MaxSurge *intstr.IntOrString
 }
 
 // DeploymentStatus holds information about the observed status of a deployment.
@@ -658,7 +665,7 @@ type RollingUpdateDaemonSet struct {
 	// 70% of original number of DaemonSet pods are available at all times during
 	// the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable *intstr.IntOrString
 
 	// The maximum number of nodes with an existing available DaemonSet pod that
 	// can have an updated DaemonSet pod during during an update.
@@ -679,7 +686,7 @@ type RollingUpdateDaemonSet struct {
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
 	// +optional
-	MaxSurge intstr.IntOrString
+	MaxSurge *intstr.IntOrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -709,12 +716,6 @@ type DaemonSetSpec struct {
 	// is ready).
 	// +optional
 	MinReadySeconds int32
-
-	// DEPRECATED.
-	// A sequence number representing a specific generation of the template.
-	// Populated by the system. It can be set only during the creation.
-	// +optional
-	TemplateGeneration int64
 
 	// The number of old history to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
@@ -871,7 +872,11 @@ type ReplicaSetList struct {
 // a Template set.
 type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int32
+	// This is a pointer to distinguish between explicit zero and unspecified.
+	// Defaults to 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+	// +optional
+	Replicas *int32
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.

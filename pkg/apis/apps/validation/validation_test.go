@@ -106,7 +106,7 @@ func tweakPodManagementPolicy(policy apps.PodManagementPolicyType) statefulSetTw
 
 func tweakReplicas(replicas int32) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
-		ss.Spec.Replicas = replicas
+		ss.Spec.Replicas = new(replicas)
 	}
 }
 
@@ -161,7 +161,7 @@ func tweakRollingUpdatePartition(partition int32) statefulSetTweak {
 		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
 			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
 		}
-		ss.Spec.UpdateStrategy.RollingUpdate.Partition = partition
+		ss.Spec.UpdateStrategy.RollingUpdate.Partition = new(partition)
 	}
 }
 
@@ -170,7 +170,7 @@ func tweakMaxUnavailable(mu intstr.IntOrString) statefulSetTweak {
 		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
 			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
 		}
-		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(mu)
+		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = new(mu)
 	}
 }
 
@@ -880,7 +880,7 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 		PodManagementPolicy: "OrderedReady",
 		Selector:            &metav1.LabelSelector{MatchLabels: labels},
 		Template:            podTemplate.Template,
-		Replicas:            3,
+		Replicas:            new(int32(3)),
 		UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		MinReadySeconds:     minSeconds,
 	}
@@ -934,7 +934,7 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		currentReplicas    int32
 		updatedReplicas    int32
 		availableReplicas  int32
-		observedGeneration *int64
+		observedGeneration int64
 		collisionCount     *int32
 		expectedErr        bool
 	}{{
@@ -978,7 +978,7 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		readyReplicas:      3,
 		currentReplicas:    2,
 		updatedReplicas:    1,
-		observedGeneration: &observedGenerationMinusOne,
+		observedGeneration: observedGenerationMinusOne,
 		expectedErr:        true,
 	}, {
 		name:            "invalid collisionCount",
@@ -2077,9 +2077,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2088,9 +2087,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2101,9 +2099,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 3,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2112,9 +2109,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 4,
-					Template:           validPodTemplateNodeSelector.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateNodeSelector.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2125,9 +2121,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2136,9 +2131,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2149,9 +2143,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 4,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2160,25 +2153,23 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 4,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &apps.RollingUpdateDaemonSet{
-							MaxUnavailable: intstr.FromInt32(1),
+							MaxUnavailable: new(intstr.FromInt32(1)),
 						},
 					},
 				},
 			},
 		},
-		"unchanged templateGeneration upon semantically equal template update": {
+		"semantically equal template update": {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 4,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2187,13 +2178,12 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 4,
-					Template:           validPodTemplateAbcSemanticallyEqual.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbcSemanticallyEqual.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &apps.RollingUpdateDaemonSet{
-							MaxUnavailable: intstr.FromInt32(1),
+							MaxUnavailable: new(intstr.FromInt32(1)),
 						},
 					},
 				},
@@ -2203,9 +2193,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2214,9 +2203,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           readWriteVolumePodTemplate.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: readWriteVolumePodTemplate.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2246,9 +2234,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2257,9 +2244,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2271,9 +2257,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2282,9 +2267,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
-					TemplateGeneration: 2,
-					Template:           validPodTemplateDef.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector2},
+					Template: validPodTemplateDef.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2296,9 +2280,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2307,9 +2290,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: invalidSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2321,9 +2303,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2332,9 +2313,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           invalidPodTemplate.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: invalidPodTemplate.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2346,9 +2326,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2357,86 +2336,10 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
+					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: "Random",
-					},
-				},
-			},
-			expectedErrNum: 1,
-		},
-		"negative templateGeneration": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: -1,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: -1,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			expectedErrNum: 1,
-		},
-		"decreased templateGeneration": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					TemplateGeneration: 2,
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					TemplateGeneration: 1,
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			expectedErrNum: 1,
-		},
-		"unchanged templateGeneration upon template update": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					TemplateGeneration: 2,
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					TemplateGeneration: 2,
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:           validPodTemplateNodeSelector.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
 				},
 			},
@@ -2689,8 +2592,8 @@ func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -2702,9 +2605,6 @@ func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
 					},
 				},
 				Spec: podtest.MakePodSpec(),
-			},
-			RollbackTo: &apps.RollbackConfig{
-				Revision: 1,
 			},
 		},
 	}
@@ -2771,7 +2671,7 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxSurgeDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxSurge: intstr.FromString("20Percent"),
+			MaxSurge: new(intstr.FromString("20Percent")),
 		},
 	}
 	errorCases["a valid percent string must be"] = invalidMaxSurgeDeployment
@@ -2781,8 +2681,8 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRollingUpdateDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxSurge:       intstr.FromString("0%"),
-			MaxUnavailable: intstr.FromInt32(0),
+			MaxSurge:       new(intstr.FromString("0%")),
+			MaxUnavailable: new(intstr.FromInt32(0)),
 		},
 	}
 	errorCases["may not be 0 when `maxSurge` is 0"] = invalidRollingUpdateDeployment
@@ -2792,15 +2692,10 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxUnavailableDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxUnavailable: intstr.FromString("110%"),
+			MaxUnavailable: new(intstr.FromString("110%")),
 		},
 	}
 	errorCases["must not be greater than 100%"] = invalidMaxUnavailableDeployment
-
-	// Rollback.Revision must be non-negative
-	invalidRollbackRevisionDeployment := validDeployment()
-	invalidRollbackRevisionDeployment.Spec.RollbackTo.Revision = -3
-	errorCases["must be greater than or equal to 0"] = invalidRollbackRevisionDeployment
 
 	// ProgressDeadlineSeconds should be greater than MinReadySeconds
 	invalidProgressDeadlineDeployment := validDeployment()
@@ -3097,7 +2992,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			update: apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DeploymentSpec{
-					Replicas: 1,
+					Replicas: new(int32(1)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3116,7 +3011,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			update: apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DeploymentSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3154,7 +3049,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: 2,
+						Replicas: new(int32(2)),
 						Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 						Template: validPodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3174,7 +3069,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: 2,
+						Replicas: new(int32(2)),
 						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 						Template: invalidPodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3194,7 +3089,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: -1,
+						Replicas: new(int32(-1)),
 						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 						Template: readWriteVolumePodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3243,6 +3138,10 @@ func TestValidateDeploymentRollback(t *testing.T) {
 	invalidNoName := validDeploymentRollback()
 	invalidNoName.Name = ""
 	errorCases["name: Required value"] = invalidNoName
+
+	invalidRevision := validDeploymentRollback()
+	invalidRevision.RollbackTo.Revision = -3
+	errorCases["must be greater than or equal to 0"] = invalidRevision
 
 	for k, v := range errorCases {
 		errs := ValidateDeploymentRollback(v)
@@ -3421,7 +3320,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 		update: apps.ReplicaSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: 3,
+				Replicas: new(int32(3)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
@@ -3453,7 +3352,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3517,7 +3416,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 3,
+					Replicas: new(int32(3)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3534,7 +3433,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 3,
+					Replicas: new(int32(3)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
@@ -3571,7 +3470,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3589,7 +3488,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: invalidPodTemplate.Template,
 				},
@@ -3607,7 +3506,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: -1,
+					Replicas: new(int32(-1)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3701,7 +3600,7 @@ func TestValidateReplicaSet(t *testing.T) {
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: 1,
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			Template: readWriteVolumePodTemplate.Template,
 		},
@@ -3750,7 +3649,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		"read-write persistent disk with > 1 pod": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: 2,
+				Replicas: new(int32(2)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: readWriteVolumePodTemplate.Template,
 			},
@@ -3758,7 +3657,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		"negative_replicas": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: -1,
+				Replicas: new(int32(-1)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
@@ -3866,140 +3765,140 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 		},
 		"invalid: zero percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("0%"),
+				MaxUnavailable: new(intstr.FromString("0%")),
 			},
 			expectError: true,
 		},
 		"invalid: zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(0),
+				MaxUnavailable: new(intstr.FromInt32(0)),
 			},
 			expectError: true,
 		},
 		"valid: one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(1),
+				MaxUnavailable: new(intstr.FromInt32(1)),
 			},
 		},
 		"valid: one percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("1%"),
+				MaxUnavailable: new(intstr.FromString("1%")),
 			},
 		},
 		"valid: 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("100%"),
+				MaxUnavailable: new(intstr.FromString("100%")),
 			},
 		},
 		"invalid: greater than 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("101%"),
+				MaxUnavailable: new(intstr.FromString("101%")),
 			},
 			expectError: true,
 		},
 
 		"valid: surge and unavailable set": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("1%"),
-				MaxSurge:       intstr.FromString("1%"),
+				MaxUnavailable: new(intstr.FromString("1%")),
+				MaxSurge:       new(intstr.FromString("1%")),
 			},
 			expectError: true,
 		},
 
 		"invalid: surge enabled, unavailable zero percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("0%"),
+				MaxUnavailable: new(intstr.FromString("0%")),
 			},
 			expectError: true,
 		},
 		"invalid: surge enabled, unavailable zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(0),
+				MaxUnavailable: new(intstr.FromInt32(0)),
 			},
 			expectError: true,
 		},
 		"valid: surge enabled, unavailable one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(1),
+				MaxUnavailable: new(intstr.FromInt32(1)),
 			},
 		},
 		"valid: surge enabled, unavailable one percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("1%"),
+				MaxUnavailable: new(intstr.FromString("1%")),
 			},
 		},
 		"valid: surge enabled, unavailable 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("100%"),
+				MaxUnavailable: new(intstr.FromString("100%")),
 			},
 		},
 		"invalid: surge enabled, unavailable greater than 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("101%"),
+				MaxUnavailable: new(intstr.FromString("101%")),
 			},
 			expectError: true,
 		},
 
 		"invalid: surge enabled, surge zero percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromString("0%"),
+				MaxSurge: new(intstr.FromString("0%")),
 			},
 			expectError: true,
 		},
 		"invalid: surge enabled, surge zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromInt32(0),
+				MaxSurge: new(intstr.FromInt32(0)),
 			},
 			expectError: true,
 		},
 		"valid: surge enabled, surge one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromInt32(1),
+				MaxSurge: new(intstr.FromInt32(1)),
 			},
 		},
 		"valid: surge enabled, surge one percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromString("1%"),
+				MaxSurge: new(intstr.FromString("1%")),
 			},
 		},
 		"valid: surge enabled, surge 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromString("100%"),
+				MaxSurge: new(intstr.FromString("100%")),
 			},
 		},
 		"invalid: surge enabled, surge greater than 100%": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromString("101%"),
+				MaxSurge: new(intstr.FromString("101%")),
 			},
 			expectError: true,
 		},
 
 		"invalid: surge enabled, surge and unavailable set": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("1%"),
-				MaxSurge:       intstr.FromString("1%"),
+				MaxUnavailable: new(intstr.FromString("1%")),
+				MaxSurge:       new(intstr.FromString("1%")),
 			},
 			expectError: true,
 		},
 
 		"invalid: surge enabled, surge and unavailable zero percent": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromString("0%"),
-				MaxSurge:       intstr.FromString("0%"),
+				MaxUnavailable: new(intstr.FromString("0%")),
+				MaxSurge:       new(intstr.FromString("0%")),
 			},
 			expectError: true,
 		},
 		"invalid: surge enabled, surge and unavailable zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(0),
-				MaxSurge:       intstr.FromInt32(0),
+				MaxUnavailable: new(intstr.FromInt32(0)),
+				MaxSurge:       new(intstr.FromInt32(0)),
 			},
 			expectError: true,
 		},
 		"invalid: surge enabled, surge and unavailable mixed zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt32(0),
-				MaxSurge:       intstr.FromString("0%"),
+				MaxUnavailable: new(intstr.FromInt32(0)),
+				MaxSurge:       new(intstr.FromString("0%")),
 			},
 			expectError: true,
 		},

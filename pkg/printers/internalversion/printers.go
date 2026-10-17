@@ -1259,7 +1259,7 @@ func printReplicaSet(obj *apps.ReplicaSet, options printers.GenerateOptions) ([]
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
@@ -1597,7 +1597,7 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.GenerateOptions) (
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	readyReplicas := obj.Status.ReadyReplicas
 	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), createTime)
@@ -2500,7 +2500,7 @@ func printDeployment(obj *apps.Deployment, options printers.GenerateOptions) ([]
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	updatedReplicas := obj.Status.UpdatedReplicas
 	readyReplicas := obj.Status.ReadyReplicas
 	availableReplicas := obj.Status.AvailableReplicas
