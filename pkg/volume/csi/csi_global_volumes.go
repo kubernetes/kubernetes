@@ -93,7 +93,7 @@ func (p *csiPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
 			if !vol.IsDir() {
 				continue
 			}
-			if gv, ok := p.describeGlobalVolume(filepath.Join(driverDir, vol.Name())); ok {
+			if gv, ok := p.loadGlobalVolume(filepath.Join(driverDir, vol.Name())); ok {
 				found = append(found, gv)
 			}
 		}
@@ -101,9 +101,9 @@ func (p *csiPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
 	return append(found, p.listGlobalBlockVolumes(blockDir)...), nil
 }
 
-// describeGlobalVolume turns one staged volume directory into a GlobalVolume,
+// loadGlobalVolume turns one staged volume directory into a GlobalVolume,
 // reporting whether it could be described at all.
-func (p *csiPlugin) describeGlobalVolume(volDir string) (volume.GlobalVolume, bool) {
+func (p *csiPlugin) loadGlobalVolume(volDir string) (volume.GlobalVolume, bool) {
 	// A volume directory with no globalmount in it holds no staged volume, as
 	// when an unstage stopped after removing globalmount but before removing
 	// vol_data.json. The entry is looked up in a listing of the volume
@@ -153,8 +153,12 @@ func (p *csiPlugin) describeGlobalVolume(volDir string) (volume.GlobalVolume, bo
 	// volume would therefore be unstaged at a path that is not this one, which
 	// reports success while leaving this mount in place.
 	expected, err := makeDeviceMountPath(p, spec)
-	if err != nil || expected != deviceMountPath {
-		klog.V(4).Info(log("skipping %s, volume data belongs to another volume: %v", volDir, err))
+	if err != nil {
+		klog.V(4).Info(log("skipping %s, cannot compute its device mount path: %v", volDir, err))
+		return volume.GlobalVolume{}, false
+	}
+	if expected != deviceMountPath {
+		klog.V(4).Info(log("skipping %s, volume data belongs to another volume", volDir))
 		return volume.GlobalVolume{}, false
 	}
 
@@ -191,22 +195,22 @@ func (p *csiPlugin) listGlobalBlockVolumes(blockDir string) []volume.GlobalVolum
 	for _, entry := range entries {
 		// staging and publish sit beside the volume directories, but a volume
 		// can be named either, so they are not left out by name. Neither holds
-		// data/vol_data.json naming it, which is what describeGlobalBlockVolume
+		// data/vol_data.json naming it, which is what loadGlobalBlockVolume
 		// checks, so they are passed over there.
 		name := entry.Name()
 		if !entry.IsDir() {
 			continue
 		}
-		if gv, ok := p.describeGlobalBlockVolume(blockDir, name); ok {
+		if gv, ok := p.loadGlobalBlockVolume(blockDir, name); ok {
 			found = append(found, gv)
 		}
 	}
 	return found
 }
 
-// describeGlobalBlockVolume turns one raw block volume directory into a
+// loadGlobalBlockVolume turns one raw block volume directory into a
 // GlobalVolume, reporting whether it could be described at all.
-func (p *csiPlugin) describeGlobalBlockVolume(blockDir, name string) (volume.GlobalVolume, bool) {
+func (p *csiPlugin) loadGlobalBlockVolume(blockDir, name string) (volume.GlobalVolume, bool) {
 	volDir := filepath.Join(blockDir, name)
 
 	// The staging directory is what says the volume is still staged, and it is

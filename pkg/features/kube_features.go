@@ -117,6 +117,7 @@ const (
 	//
 	// Enables using streaming RPCs for CRI list operations.
 	CRIListStreaming featuregate.Feature = "CRIListStreaming"
+
 	// owner: @cniackz
 	// kep: https://kep.k8s.io/6058
 	//

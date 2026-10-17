@@ -567,9 +567,11 @@ type ReconstructedVolume struct {
 // GlobalVolume describes one global mount found by ListGlobalVolumes.
 type GlobalVolume struct {
 	ReconstructedVolume
-	// DeviceMountPath is where the plugin has the volume staged. It is
-	// advisory: the unmount path recomputes it from Spec, so Spec must carry
-	// whatever identity the plugin derives that path from.
+	// DeviceMountPath is where the plugin has the volume staged. For a
+	// filesystem volume, UnmountDevice recomputes it from Spec and uses this
+	// value only when that fails, so Spec must carry whatever identity the
+	// plugin derives that path from. For a raw block volume it is the global
+	// map path, which UnmapDevice takes as it is.
 	DeviceMountPath string
 	// VolumeMode says whether the volume is staged as a filesystem or as a raw
 	// block device. The two reach the actual state of world by different paths,

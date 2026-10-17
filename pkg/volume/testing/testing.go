@@ -225,6 +225,7 @@ var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.NodeExpandableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.GlobalVolumeListerPlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	if list != nil {
@@ -1766,5 +1767,3 @@ func MetricsEqualIgnoreTimestamp(a *volume.Metrics, b *volume.Metrics) bool {
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	return slices.Contains(modes, mode)
 }
-
-var _ volume.GlobalVolumeListerPlugin = &FakeVolumePlugin{}
