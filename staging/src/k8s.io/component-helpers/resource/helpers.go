@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -58,10 +59,16 @@ type PodResourcesOptions struct {
 	// from the calculation. If pod-level resources are not set in PodSpec,
 	// pod-level resources will always be skipped.
 	SkipPodLevelResources bool
-	// SkipContainerLevelResources
+	// SkipContainerLevelResources controls whether container-level resources are skipped
+	// from the calculation, leaving only pod-level resources.
 	SkipContainerLevelResources bool
 	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
 	UseDRANodeAllocatableResourceClaimStatus bool
+	// PreferActuatedPodLevelResources makes pod-level requests resolve per resource to
+	// pod.status.resources.requests[r] when present, falling back to pod.spec.resources.requests[r].
+	// Takes precedence over UseStatusResources for pod-level requests; container-level
+	// aggregation is unaffected.
+	PreferActuatedPodLevelResources bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -157,7 +164,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.PreferActuatedPodLevelResources {
+			effectiveReqs = actuatedPodLevelRequests(pod)
+		} else if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
 			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
 		}
 
@@ -178,6 +187,22 @@ func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
 			result[resourceName] = quantity
 		}
 	}
+}
+
+// actuatedPodLevelRequests returns the spec requests, with each resource overridden by its
+// actuated value from pod.status.resources.requests when one is reported.
+// Resources the status doesn't report yet keep the spec value.
+func actuatedPodLevelRequests(pod *v1.Pod) v1.ResourceList {
+	if pod.Status.Resources == nil || len(pod.Status.Resources.Requests) == 0 {
+		return pod.Spec.Resources.Requests
+	}
+	result := maps.Clone(pod.Spec.Resources.Requests)
+	for name, quantity := range pod.Status.Resources.Requests {
+		if _, ok := result[name]; ok {
+			result[name] = quantity
+		}
+	}
+	return result
 }
 
 func effectivePodLevelResources(pod *v1.Pod, spec v1.ResourceList, statuses ...v1.ResourceList) v1.ResourceList {
@@ -212,6 +237,14 @@ func containerActuatedRequests(container *v1.Container, containerStatus *v1.Cont
 		return nil
 	}
 	return container.Resources.Requests
+}
+
+// ContainerActuatedRequests returns the requests the container is running with:
+// status.resources if reported, then allocatedResources, then the spec. If a pending
+// resize is infeasible the spec is not trusted and nil is returned.
+// container must belong to pod.
+func ContainerActuatedRequests(pod *v1.Pod, container *v1.Container) v1.ResourceList {
+	return containerActuatedRequests(container, findContainerStatus(pod, container.Name), IsPodResizeInfeasible(pod))
 }
 
 func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {

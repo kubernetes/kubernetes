@@ -468,6 +468,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
 	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	inPlacePodLevelResourcesVerticalScalingEnabled := feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		var request int64
@@ -481,7 +482,7 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 			container == ""
 
 		if usePodLevelRequests {
-			request, err = calculatePodLevelRequests(pod, resource)
+			request, err = calculatePodLevelRequests(pod, resource, inPlacePodLevelResourcesVerticalScalingEnabled)
 		} else {
 			request, err = calculatePodRequestsFromContainers(pod, container, resource)
 		}
@@ -494,14 +495,22 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 }
 
 // calculatePodLevelRequests computes the requests for the specific resource at
-// the pod level.
-func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+// the pod level. With in-place pod-level resize enabled, the actuated value from
+// pod status is preferred over the spec, since that is what the pod is running with.
+// Pod-level requests may cover only some resources (e.g. CPU at the pod level while
+// memory stays per container). A resource that is not set at the pod level is still
+// defined by the containers, so it is summed from them like for any other pod.
+// The caller must already have checked that IsPodLevelRequestsSet(pod) is true.
+func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName, inPlacePodLevelResourcesVerticalScalingEnabled bool) (int64, error) {
 	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
+		SkipContainerLevelResources:                    true,
+		ExcludeOverhead:                                true,
+		PreferActuatedPodLevelResources:                true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
-		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
+		return calculatePodRequestsFromContainers(pod, "", resource)
 	}
 	return podRequest.MilliValue(), nil
 }
@@ -520,7 +529,10 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	request := int64(0)
 	for _, c := range containers {
 		if container == "" || container == c.Name {
-			containerRequest, ok := c.Resources.Requests[resource]
+			containerRequest, ok := resourcehelpers.ContainerActuatedRequests(pod, &c)[resource]
+			if !ok {
+				containerRequest, ok = c.Resources.Requests[resource]
+			}
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
