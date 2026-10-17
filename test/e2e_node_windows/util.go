@@ -38,7 +38,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	remote "k8s.io/cri-client/pkg"
@@ -52,6 +51,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -386,7 +386,7 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
+	useStreaming := e2eskipper.IsFeatureGateEnabled(features.CRIListStreaming)
 	r, err := remote.NewRemoteRuntimeServiceBuilder().
 		WithEndpoint(runtimeEndpoint).
 		WithConnectionTimeout(connectionTimeout).

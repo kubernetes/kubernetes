@@ -27,12 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -640,7 +640,7 @@ func recordSystemCgroupProcesses(ctx context.Context) {
 }
 
 func psiExpectation() types.GomegaMatcher {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+	if !e2eskipper.IsFeatureGateEnabled(features.KubeletPSI) {
 		return gomega.BeNil()
 	}
 	psiDataExpectation := gstruct.MatchAllFields(gstruct.Fields{
@@ -656,7 +656,7 @@ func psiExpectation() types.GomegaMatcher {
 }
 
 func ioExpectation(maxStatsAge time.Duration) types.GomegaMatcher {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+	if !e2eskipper.IsFeatureGateEnabled(features.KubeletPSI) {
 		return gomega.BeNil()
 	}
 	return gomega.Or(gomega.BeNil(),

@@ -32,7 +32,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/pkg/util/rlimit"
@@ -129,7 +128,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
-	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
+	if err := e2eskipper.InitFeatureGates(framework.DefaultFeatureGate(), featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
