@@ -276,6 +276,35 @@ func TestSync(t *testing.T) {
 			expectedEstablishedCondition:  installingCondition,
 		},
 		{
+			name: "no conflict on self, shortName equal to own singular",
+			in: newCRD("alfa.bravo.com").
+				SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "delta-singular").
+				StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				NewOrDie(),
+			existing: []*apiextensionsv1.CustomResourceDefinition{
+				newCRD("alfa.bravo.com").
+					SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "delta-singular").
+					StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+					NewOrDie(),
+			},
+			expectedNames:                 names("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "delta-singular"),
+			expectedNameConflictCondition: acceptedCondition,
+			expectedEstablishedCondition:  installingCondition,
+		},
+		{
+			name: "conflict on shortName to other CRD singular",
+			in: newCRD("alfa.bravo.com").
+				SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "indias").
+				StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				NewOrDie(),
+			existing: []*apiextensionsv1.CustomResourceDefinition{
+				newCRD("india.bravo.com").StatusNames("india", "indias", "", "").NewOrDie(),
+			},
+			expectedNames:                 names("alfa", "delta-singular", "echo-kind", "foxtrot-listkind"),
+			expectedNameConflictCondition: nameConflictCondition("ShortNamesConflict", `"indias" is already in use`),
+			expectedEstablishedCondition:  notEstablishedCondition,
+		},
+		{
 			name:     "installing before with true condition",
 			in:       newCRD("alfa.bravo.com").Condition(acceptedCondition).NewOrDie(),
 			existing: []*apiextensionsv1.CustomResourceDefinition{},
