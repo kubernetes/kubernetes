@@ -93,6 +93,46 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 	}
 }
 
+func TestLabelSelectorMatches(t *testing.T) {
+	fooExists := []LabelSelectorRequirement{{Key: "foo", Operator: LabelSelectorOpExists}}
+	invalidOp := []LabelSelectorRequirement{{Key: "foo", Operator: "bogus"}}
+
+	tests := []struct {
+		name     string
+		selector *LabelSelector
+		labels   labels.Set
+		want     bool
+	}{
+		{"nil selector", nil, labels.Set{"foo": "bar"}, false},
+		{"empty selector", &LabelSelector{}, labels.Set{"foo": "bar"}, true},
+		{"empty selector, no labels", &LabelSelector{}, nil, true},
+		{"matchLabels match", &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, labels.Set{"foo": "bar", "x": "y"}, true},
+		{"matchLabels wrong value", &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, labels.Set{"foo": "baz"}, false},
+		{"matchLabels missing key", &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, labels.Set{"x": "y"}, false},
+		{"matchLabels empty value", &LabelSelector{MatchLabels: map[string]string{"foo": ""}}, labels.Set{"foo": ""}, true},
+		{"matchLabels empty value, missing key", &LabelSelector{MatchLabels: map[string]string{"foo": ""}}, nil, false},
+		{"matchExpressions match", &LabelSelector{MatchExpressions: fooExists}, labels.Set{"foo": "bar"}, true},
+		{"matchExpressions no match", &LabelSelector{MatchExpressions: fooExists}, labels.Set{"x": "y"}, false},
+		{"matchLabels and matchExpressions match", &LabelSelector{MatchLabels: map[string]string{"x": "y"}, MatchExpressions: fooExists}, labels.Set{"foo": "bar", "x": "y"}, true},
+		{"matchLabels match, matchExpressions don't", &LabelSelector{MatchLabels: map[string]string{"x": "y"}, MatchExpressions: fooExists}, labels.Set{"x": "y"}, false},
+		{"invalid operator", &LabelSelector{MatchExpressions: invalidOp}, labels.Set{"foo": "bar"}, false},
+		{"matchLabels match, invalid operator", &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}, MatchExpressions: invalidOp}, labels.Set{"foo": "bar"}, false},
+		{"invalid label value", &LabelSelector{MatchLabels: map[string]string{"foo": "bar baz"}}, labels.Set{"foo": "bar baz"}, false},
+		{"invalid label key", &LabelSelector{MatchLabels: map[string]string{"bad key": "x"}}, labels.Set{"bad key": "x"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := LabelSelectorMatches(tc.selector, tc.labels); got != tc.want {
+				t.Errorf("LabelSelectorMatches() = %v, want %v", got, tc.want)
+			}
+			s, err := LabelSelectorAsSelector(tc.selector)
+			if ref := err == nil && s.Matches(tc.labels); ref != tc.want {
+				t.Errorf("LabelSelectorAsSelector().Matches() = %v, want %v", ref, tc.want)
+			}
+		})
+	}
+}
+
 func BenchmarkLabelSelectorAsSelector(b *testing.B) {
 	selector := &LabelSelector{
 		MatchLabels: map[string]string{
