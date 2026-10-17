@@ -149,7 +149,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 
 			gomega.Expect(drop).To(
 				gomega.BeNumerically("<", margin),
-				"memory.available should NOT decrease by the full hugepage reservation when feature gate is disabled")
+				"memory.available + workingSet should not drop when feature gate is disabled")
 		})
 	})
 })
