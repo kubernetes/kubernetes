@@ -817,3 +817,66 @@ func TestPodSandboxByCreatedThenID(t *testing.T) {
 		})
 	}
 }
+
+func TestContainerStatusByCreated(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name     string
+		input    []*kubecontainer.Status
+		expected []string
+	}{
+		{
+			name: "sort by CreatedAt when RestartCount is equal",
+			input: []*kubecontainer.Status{
+				{ID: kubecontainer.ContainerID{ID: "old"}, RestartCount: 3, CreatedAt: now.Add(-5 * time.Minute)},
+				{ID: kubecontainer.ContainerID{ID: "new"}, RestartCount: 3, CreatedAt: now},
+			},
+			expected: []string{"new", "old"},
+		},
+		{
+			name: "higher RestartCount wins even with older CreatedAt",
+			input: []*kubecontainer.Status{
+				{ID: kubecontainer.ContainerID{ID: "future-timestamp"}, RestartCount: 9, CreatedAt: now.Add(2 * time.Minute)},
+				{ID: kubecontainer.ContainerID{ID: "correct-timestamp"}, RestartCount: 10, CreatedAt: now},
+			},
+			expected: []string{"correct-timestamp", "future-timestamp"},
+		},
+		{
+			name: "clock skew: terminated container with future CreatedAt does not hide running one",
+			input: []*kubecontainer.Status{
+				{ID: kubecontainer.ContainerID{ID: "skewed-exited"}, RestartCount: 9, CreatedAt: now.Add(98 * time.Second)},
+				{ID: kubecontainer.ContainerID{ID: "actual-newest"}, RestartCount: 10, CreatedAt: now},
+			},
+			expected: []string{"actual-newest", "skewed-exited"},
+		},
+		{
+			name:     "empty slice",
+			input:    []*kubecontainer.Status{},
+			expected: []string{},
+		},
+		{
+			name: "single container",
+			input: []*kubecontainer.Status{
+				{ID: kubecontainer.ContainerID{ID: "only"}, RestartCount: 0, CreatedAt: now},
+			},
+			expected: []string{"only"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			statuses := make([]*kubecontainer.Status, len(tt.input))
+			copy(statuses, tt.input)
+
+			sort.Sort(containerStatusByCreated(statuses))
+
+			actualIDs := make([]string, len(statuses))
+			for i, s := range statuses {
+				actualIDs[i] = s.ID.ID
+			}
+
+			assert.Equal(t, tt.expected, actualIDs, "sorting order mismatch")
+		})
+	}
+}
