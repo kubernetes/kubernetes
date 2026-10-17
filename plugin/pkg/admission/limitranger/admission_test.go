@@ -992,6 +992,81 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "unchanged over-max limit is not checked when only the request changes",
+			limitRange: containerMaxCPUAndMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        pod(cpuAndMemory("500m", "500m", "800Mi", "2Gi")),
+		},
+		{
+			name:       "a request that itself exceeds the max is rejected even though the limit is unchanged",
+			limitRange: containerMaxCPUAndMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        pod(cpuAndMemory("500m", "500m", "2Gi", "2Gi")),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged under-min request is not checked when only the limit changes",
+			limitRange: containerMinCPU,
+			old:        new(pod(cpu("100m", "1"))),
+			pod:        pod(cpu("100m", "2")),
+		},
+		{
+			// The request is unchanged, so its under-min value is skipped, but the
+			// limit changed and lands below the min: that side must still be checked.
+			name:       "a limit lowered below the min is rejected even though the under-min request is unchanged",
+			limitRange: containerMinCPU,
+			old:        new(pod(cpu("100m", "1"))),
+			pod:        pod(cpu("100m", "200m")),
+			wantErr:    true,
+		},
+		{
+			// Only the request moves, which alone pushes the limit-to-request ratio
+			// past the max: the ratio must be checked when either side changes.
+			name:       "a request-only resize that pushes the limit-to-request ratio above the max is rejected",
+			limitRange: containerCPURatio,
+			old:        new(pod(cpu("500m", "1"))),
+			pod:        pod(cpu("100m", "1")),
+			wantErr:    true,
+		},
+		{
+			// Same request-only shape at the pod level: the aggregated request moves,
+			// the aggregated limit does not, and the ratio must still be checked.
+			name:       "a request-only resize that pushes the pod limit-to-request ratio above the max is rejected",
+			limitRange: podCPURatio,
+			old:        new(pod(cpu("500m", "1"))),
+			pod:        pod(cpu("100m", "1")),
+			wantErr:    true,
+		},
+		{
+			// Neither side has a request, so the request side is unchanged and its
+			// "no request specified" check is not repeated; only the changed limit is
+			// checked, and it meets the min. The API never stores this shape: a
+			// missing request is defaulted from the limit (SetDefaults_Pod for
+			// containers, PrepareForCreate/PrepareForUpdate for pod-level
+			// resources), so over the API this resize carries an unchanged
+			// request equal to the old limit and was admitted before as well.
+			// The pair pins the plugin's contract for direct callers.
+			name:       "a limit-only resize with no request on either side is admitted when the new limit meets the min",
+			limitRange: containerMinCPU,
+			old:        new(pod(api.ResourceRequirements{Limits: getComputeResourceList("1", "")})),
+			pod:        pod(api.ResourceRequirements{Limits: getComputeResourceList("2", "")}),
+		},
+		{
+			// The same shape with the new limit below the min: the limit side is
+			// still checked even though the request side is skipped.
+			name:       "a limit-only resize with no request on either side is rejected when the new limit is below the min",
+			limitRange: containerMinCPU,
+			old:        new(pod(api.ResourceRequirements{Limits: getComputeResourceList("1", "")})),
+			pod:        pod(api.ResourceRequirements{Limits: getComputeResourceList("200m", "")}),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged pod-level over-max memory limit is not checked when only the pod-level request changes",
+			limitRange: podMaxMemory,
+			old:        new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpuAndMemory("500m", "500m", "800Mi", "2Gi")),
+		},
+		{
 			name:       "create is checked in full",
 			limitRange: containerMaxCPU,
 			pod:        pod(cpu("2", "2")),
