@@ -398,6 +398,75 @@ func TestControllerSync(t *testing.T) {
 	}
 }
 
+// TestIsVolumeReleased covers the three claim states that decide whether the
+// volume's backing storage may be deleted: cached, genuinely gone, and absent
+// from the cache but still live.
+func TestIsVolumeReleased(t *testing.T) {
+	const claimUID = "uid-is-released-1"
+	const claimName = "claim-is-released-1"
+
+	tests := []struct {
+		name string
+		// claimCached: the claim is present in ctrl.claims.
+		claimCached bool
+		// claimLive: a claim with the same UID exists on the API server.
+		claimLive        bool
+		expectedReleased bool
+	}{
+		{
+			name:             "claim is cached and still bound, volume is not released",
+			claimCached:      true,
+			claimLive:        true,
+			expectedReleased: false,
+		},
+		{
+			name:             "claim is genuinely gone from cache and API server, volume is released",
+			claimCached:      false,
+			claimLive:        false,
+			expectedReleased: true,
+		},
+		{
+			name:             "claim missing only from ctrl.claims but still live, volume must not be released",
+			claimCached:      false,
+			claimLive:        true,
+			expectedReleased: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			claim := newClaim(claimName, claimUID, "1Gi", "", v1.ClaimBound, nil)
+			pv := newVolume("volume-is-released-1", "1Gi", claimUID, claimName, v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
+
+			client := fake.NewSimpleClientset()
+			_, ctx := ktesting.NewTestContext(t)
+			if test.claimLive {
+				if _, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create live claim: %v", err)
+				}
+			}
+
+			ctrl, err := newTestController(ctx, client, nil, false)
+			if err != nil {
+				t.Fatalf("Failed to create controller: %v", err)
+			}
+			if test.claimCached {
+				if err := ctrl.claims.Indexer().Add(claim); err != nil {
+					t.Fatalf("Failed to seed claim cache: %v", err)
+				}
+			}
+
+			released, err := ctrl.isVolumeReleased(ctx, pv)
+			if err != nil {
+				t.Fatalf("isVolumeReleased returned unexpected error: %v", err)
+			}
+			if released != test.expectedReleased {
+				t.Errorf("isVolumeReleased() = %v, want %v", released, test.expectedReleased)
+			}
+		})
+	}
+}
+
 func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
