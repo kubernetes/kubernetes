@@ -94,7 +94,7 @@ func (c *CordonHelper) PatchOrReplaceWithContext(clientCtx context.Context, clie
 		return err, nil
 	}
 
-	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldData, newData, c.node)
+	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldData, newData, c.node, strategicpatch.WithDuplicateMergeKeySupport(true))
 	if patchErr == nil {
 		patchOptions := metav1.PatchOptions{}
 		if serverDryRun {
