@@ -1030,9 +1030,7 @@ func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredi
 	if err := s.versioner.UpdateList(listObj, rev, continueValue, remainingItemCount); err != nil {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		pred.SetShardInfoOnList(listObj)
-	}
+	pred.SetShardInfoOnList(listObj)
 	return nil
 }
 

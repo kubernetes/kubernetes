@@ -3453,20 +3453,39 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.
 
 func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	registry := k8smetrics.NewKubeRegistry()
+	metrics.WatchFilteredEventsTotal.Reset()
+	require.NoError(t, registry.Register(metrics.WatchFilteredEventsTotal))
+
 	uid := "test-uid-3"
 	pod := makeExamplePod("pod3", "default", uid, map[string]string{"app": "web"})
 	gr := schema.GroupResource{Resource: "pods"}
 
 	pred := storage.SelectionPredicate{
-		Label:         labels.Everything(),
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
 		Field:         fields.Everything(),
 		ShardSelector: selectorExcludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
 	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
 
+	if filter("/pods/default/pod3", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: neither labels nor shard match")
+	}
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(""), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("expected no shard-filtered metric when label selector rejects first: %v", err)
+	}
+
 	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard does not match")
+	}
+	expectedMetric := `
+# HELP apiserver_watch_filtered_events_total [ALPHA] Counter of events filtered out by shard selector during watch dispatch, broken by resource type.
+# TYPE apiserver_watch_filtered_events_total counter
+apiserver_watch_filtered_events_total{group="",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetric), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("unexpected metric error: %v", err)
 	}
 }
 
@@ -3796,5 +3815,49 @@ func TestOptimisticConcurrency(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func BenchmarkShardedWatchFilter(b *testing.B) {
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	const (
+		totalShards = 16
+		numEvents   = 500
+	)
+	pods := shardTestPods(numEvents)
+	keys := make([]string, numEvents)
+	fSets := make([]fields.Set, numEvents)
+	for i := range pods {
+		keys[i] = "/pods/default/" + pods[i].Name
+		fSets[i] = fields.Set{"metadata.name": pods[i].Name, "metadata.namespace": pods[i].Namespace}
+	}
+	gr := schema.GroupResource{Resource: "pods"}
+	filters := make([]filterWithAttrsFunc, totalShards)
+	for i := range totalShards {
+		start := fmt.Sprintf("0x%016x", uint64(i)<<60)
+		end := "0x10000000000000000"
+		if i+1 < totalShards {
+			end = fmt.Sprintf("0x%016x", uint64(i+1)<<60)
+		}
+		sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: start,
+			End:   end,
+		})
+		filters[i] = filterWithAttrsAndPrefixFunction("/pods/", storage.SelectionPredicate{
+			Label:         labels.Everything(),
+			Field:         fields.Everything(),
+			ShardSelector: sel,
+			GetAttrs:      storage.DefaultNamespaceScopedAttr,
+		}, gr)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		for i := range pods {
+			for s := range filters {
+				filters[s](keys[i], labels.Set{}, fSets[i], &pods[i])
+			}
+		}
 	}
 }
