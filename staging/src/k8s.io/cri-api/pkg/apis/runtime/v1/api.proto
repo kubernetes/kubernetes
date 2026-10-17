@@ -429,6 +429,16 @@ message UserNamespace {
     repeated IDMapping gids = 3;
 }
 
+// CgroupNamespace describes the intended cgroup namespace configuration for a container.
+message CgroupNamespace {
+    // Mode is the NamespaceMode for this CgroupNamespace.
+    // Note: NamespaceMode for CgroupNamespace currently supports only CONTAINER and NODE, not POD or TARGET.
+    // CONTAINER creates a new cgroup namespace for each container, rooted at the container's own cgroup.
+    // POD is not supported, as a cgroup namespace shared by all containers in a pod would be rooted at
+    // the cgroup of one of the containers, not at the cgroup of each container.
+    NamespaceMode mode = 1;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -454,6 +464,14 @@ message NamespaceOption {
     // must be assumed.  This is done for backward compatibility with older Kubelet versions that
     // do not set a user namespace.
     UserNamespace userns_options = 5;
+    // CgroupnsOptions for this container.
+    // The struct must be nil for LinuxSandboxSecurityContext.
+    // If the struct is nil for LinuxContainerSecurityContext,then the following mode must be assumed:
+    //   CONTAINER for non-privileged containers on cgroup v2 nodes.
+    //   NODE for other cases.
+    // This is done for backward compatibility with older Kubelet versions that
+    // do not support explicitly configuring a cgroup namespace.
+    CgroupNamespace cgroupns_options = 6;
 }
 
 // SupplementalGroupsPolicy defines how supplemental groups 
@@ -1882,6 +1900,10 @@ message RuntimeHandlerFeatures {
     // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
     // in Kubernetes. This means support for both, user namespaces and idmap mounts.
     bool user_namespaces = 2;
+
+    // cgroup_namespaces is set to true if the runtime handler supports cgroup namespaces as implemented
+    // in Kubernetes.
+    bool cgroup_namespaces = 3;
 }
 
 message RuntimeHandler {
