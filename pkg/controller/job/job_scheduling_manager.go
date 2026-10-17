@@ -294,7 +294,7 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	if parentWorkload == nil {
 		logger.V(2).Info("Parent-owned Workload not found yet for delegated Job, will retry",
 			"job", klog.KObj(job))
-		return nil, nil
+		return nil, fmt.Errorf("Parent-owned Workload not found yet")
 	}
 
 	templateName := job.Annotations[apischeduling.GroupTemplateNameAnnotation]
