@@ -84,6 +84,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 		name     string
 		workload string
 		template string
+		uid      types.UID
 		want     func(t *testing.T, generated string)
 	}{
 		{
@@ -127,7 +128,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: strings.Repeat("workload", 40),
 			template: strings.Repeat("template", 40),
 			want: func(t *testing.T, generated string) {
-				if generated != GeneratePodGroupName(strings.Repeat("workload", 40), strings.Repeat("template", 40)) {
+				if generated != GeneratePodGroupName(strings.Repeat("workload", 40), strings.Repeat("template", 40), "") {
 					t.Fatal("generated name is not deterministic")
 				}
 			},
@@ -137,8 +138,39 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: strings.Repeat("workload", 40),
 			template: strings.Repeat("template", 40),
 			want: func(t *testing.T, generated string) {
-				if generated == GeneratePodGroupName(strings.Repeat("workload", 40), "other-template") {
+				if generated == GeneratePodGroupName(strings.Repeat("workload", 40), "other-template", "") {
 					t.Fatal("different templates should produce different names")
+				}
+			},
+		},
+		{
+			name:     "different owner UIDs produce different names",
+			workload: "workload",
+			template: "template",
+			uid:      "uid-1",
+			want: func(t *testing.T, generated string) {
+				if generated == GeneratePodGroupName("workload", "template", "uid-2") {
+					t.Fatal("different owner UIDs should produce different names")
+				}
+				if generated == GeneratePodGroupName("workload", "template") {
+					t.Fatal("an owner UID should change the name")
+				}
+				if GeneratePodGroupName("workload", "template") != GeneratePodGroupName("workload", "template", "") {
+					t.Fatal("an omitted and an empty owner UID should produce the same name")
+				}
+				if !strings.HasPrefix(generated, "workload-template-") {
+					t.Fatalf("generated name should retain both names: %q", generated)
+				}
+			},
+		},
+		{
+			name:     "owner UID with long names stays within the maximum length",
+			workload: strings.Repeat("workload", 40),
+			template: strings.Repeat("template", 40),
+			uid:      "uid-1",
+			want: func(t *testing.T, generated string) {
+				if len(generated) > validation.DNS1123SubdomainMaxLength {
+					t.Fatalf("generated name is too long: %d", len(generated))
 				}
 			},
 		},
@@ -196,7 +228,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.want(t, GeneratePodGroupName(tc.workload, tc.template))
+			tc.want(t, GeneratePodGroupName(tc.workload, tc.template, tc.uid))
 		})
 	}
 }
