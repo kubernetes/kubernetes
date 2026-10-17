@@ -358,6 +358,34 @@ func TestPrepareRun(t *testing.T) {
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
+// TestNewAppliesMaxPooledEncodeBufferSize verifies that building a server
+// configures the process-wide encode buffer pool bound when the
+// AllocatorPoolBufferCap gate is enabled, and leaves it unbounded when
+// the gate is disabled.
+func TestNewAppliesMaxPooledEncodeBufferSize(t *testing.T) {
+	t.Cleanup(func() { runtime.SetMaxPooledBufferCapacity(0) })
+	for _, tc := range []struct {
+		name        string
+		gateEnabled bool
+		want        int
+	}{
+		{name: "gate enabled", gateEnabled: true, want: DefaultMaxPooledEncodeBufferSize},
+		{name: "gate disabled", gateEnabled: false, want: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllocatorPoolBufferCap, tc.gateEnabled)
+			runtime.SetMaxPooledBufferCapacity(-1)
+			config, _ := setUp(t)
+			if _, err := config.Complete(nil).New("test", NewEmptyDelegate()); err != nil {
+				t.Fatal(err)
+			}
+			if got := runtime.MaxPooledBufferCapacity(); got != tc.want {
+				t.Fatalf("got pool bound %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestUpdateOpenAPISpec(t *testing.T) {
 	for _, lazyBuild := range []bool{false, true} {
 		t.Run(fmt.Sprintf("OpenAPIV2LazyBuild=%v", lazyBuild), func(t *testing.T) {
