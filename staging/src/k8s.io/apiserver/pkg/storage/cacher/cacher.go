@@ -711,9 +711,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	if err != nil {
 		return err
 	}
-	if opts.ResourceVersion == "" {
-		return storage.NewInternalError(fmt.Errorf("cacher doesn't support consistent Get"))
-	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
 	if err != nil {

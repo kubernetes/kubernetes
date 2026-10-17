@@ -18,9 +18,22 @@ package delegator
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
+
+func ShouldDelegateGet(opts storage.GetOptions) Result {
+	// Consistent Read
+	if opts.ResourceVersion == "" {
+		return Result{
+			ShouldDelegate: !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentGetFromCache) || !ConsistentReadSupported(),
+			ConsistentRead: true,
+		}
+	}
+	return Result{ShouldDelegate: false}
+}
 
 func ShouldDelegateListMeta(opts *metav1.ListOptions, cache Helper) (Result, error) {
 	return ShouldDelegateList(
