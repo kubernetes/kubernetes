@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	apiserver "k8s.io/apiserver/pkg/server"
+	apiserver "k8s.io/apiserver/pkg/server/serving"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
