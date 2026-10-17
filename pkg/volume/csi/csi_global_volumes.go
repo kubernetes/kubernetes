@@ -29,12 +29,10 @@ import (
 )
 
 const (
-	// blockStagingDirName and blockPublishDirName are siblings of the
-	// per-volume directories under volumeDevices rather than volumes, so the
-	// block walk has to step over them by name. They are the literals
-	// csiBlockMapper.GetStagingPath and getPublishDir build their paths from.
+	// blockStagingDirName is the sibling of the per-volume directories under
+	// volumeDevices that holds the staged volumes. It is the literal
+	// csiBlockMapper.GetStagingPath builds its path from.
 	blockStagingDirName = "staging"
-	blockPublishDirName = "publish"
 	// blockVolumeDataDirName holds a block volume's vol_data.json, the way
 	// getVolumeDeviceDataDir lays it out. The listing needs it before it knows
 	// which volume the directory belongs to, so it cannot use that helper.
@@ -191,10 +189,12 @@ func (p *csiPlugin) listGlobalBlockVolumes(blockDir string) []volume.GlobalVolum
 
 	var found []volume.GlobalVolume
 	for _, entry := range entries {
+		// staging and publish sit beside the volume directories, but a volume
+		// can be named either, so they are not left out by name. Neither holds
+		// data/vol_data.json naming it, which is what describeGlobalBlockVolume
+		// checks, so they are passed over there.
 		name := entry.Name()
-		// staging and publish sit beside the volume directories and are not
-		// volumes, so they are left out by name.
-		if !entry.IsDir() || name == blockStagingDirName || name == blockPublishDirName {
+		if !entry.IsDir() {
 			continue
 		}
 		if gv, ok := p.describeGlobalBlockVolume(blockDir, name); ok {

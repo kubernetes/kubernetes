@@ -19,6 +19,7 @@ package csi
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -392,13 +393,14 @@ func TestListGlobalBlockVolumes(t *testing.T) {
 		}
 	})
 
-	t.Run("leaves the staging and publish siblings out", func(t *testing.T) {
+	t.Run("lists volumes named staging and publish", func(t *testing.T) {
 		plug, blockDir := setup(t)
 
-		// staging and publish sit beside the volume directories. This dresses
-		// each of them as a volume of that name, identity file and all, so that
-		// only the check on the name can keep them out of the listing.
-		for _, sibling := range []string{blockStagingDirName, blockPublishDirName} {
+		// staging and publish sit beside the volume directories, and both are
+		// valid PersistentVolume names. A volume with either name keeps its
+		// identity file inside that sibling, so the sibling is listed when,
+		// and only when, it holds one naming it.
+		for _, sibling := range []string{blockStagingDirName, "publish"} {
 			stageBlock(t, blockDir, sibling, blockData(sibling, "handle-of-"+sibling), true)
 		}
 		stageBlock(t, blockDir, "block-pv", blockData("block-pv", "handle-of-the-block-pv"), true)
@@ -407,15 +409,13 @@ func TestListGlobalBlockVolumes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ListGlobalVolumes: %v", err)
 		}
-		if len(found) != 1 {
-			names := make([]string, 0, len(found))
-			for _, gv := range found {
-				names = append(names, gv.Spec.Name())
-			}
-			t.Fatalf("got %v, want only the real volume", names)
+		names := make([]string, 0, len(found))
+		for _, gv := range found {
+			names = append(names, gv.Spec.Name())
 		}
-		if got, want := found[0].Spec.Name(), "block-pv"; got != want {
-			t.Errorf("spec name: got %q, want %q", got, want)
+		slices.Sort(names)
+		if want := []string{"block-pv", "publish", blockStagingDirName}; !slices.Equal(names, want) {
+			t.Fatalf("got %v, want %v", names, want)
 		}
 	})
 
