@@ -17,12 +17,14 @@ limitations under the License.
 package devicemanager
 
 import (
+	"cmp"
 	"context"
 	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -1194,6 +1196,16 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 				status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
 			}
 		}
+
+		cs := &status.ContainerStatuses[i]
+		for j := range cs.AllocatedResourcesStatus {
+			slices.SortFunc(cs.AllocatedResourcesStatus[j].Resources, func(a, b v1.ResourceHealth) int {
+				return cmp.Compare(a.ResourceID, b.ResourceID)
+			})
+		}
+		slices.SortFunc(cs.AllocatedResourcesStatus, func(a, b v1.ResourceStatus) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
 	}
 }
 
