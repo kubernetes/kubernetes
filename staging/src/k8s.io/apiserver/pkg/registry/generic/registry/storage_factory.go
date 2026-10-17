@@ -70,6 +70,8 @@ func StorageWithCacher() generic.StorageDecorator {
 			IndexerFuncs:        triggerFuncs,
 			Indexers:            indexers,
 			Codec:               storageConfig.Codec,
+
+			MaxAverageObjectSizeBytes: storageConfig.WatchCacheMaxAverageObjectSize,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {
