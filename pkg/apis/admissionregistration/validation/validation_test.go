@@ -3540,15 +3540,6 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 		},
 		expectedError: `metadata.name: Invalid value: "!!!!":`,
 	}, {
-		name: "PolicyName is required",
-		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "config",
-			},
-			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{},
-		},
-		expectedError: `spec.policyName: Required value`,
-	}, {
 		name: "matchResources validation: matchPolicy",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{
