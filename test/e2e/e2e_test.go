@@ -37,6 +37,7 @@ import (
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
@@ -76,6 +77,7 @@ func handleFlags() {
 	config.CopyFlags(config.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
+	e2eservice.RegisterFlags(flag.CommandLine)
 	logcheck.RegisterFlags(flag.CommandLine)
 	flag.Parse()
 }
