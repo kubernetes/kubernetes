@@ -119,6 +119,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 	}, {
+		name: "invalid CgroupDriver",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.CgroupDriver = "systemd"
+			conf.FeatureGates = map[string]bool{string(features.DisableCgroupDriverFallback): true}
+			return conf
+		},
+		errMsg: "invalid configuration: cgroupDriver (--cgroup-driver) must be empty when DisableCgroupDriverFallback is enabled",
+	}, {
 		name: "invalid NodeLeaseDurationSeconds",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.NodeLeaseDurationSeconds = 0

@@ -191,8 +191,13 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
 
-	if len(kc.config.CgroupDriver) == 0 {
-		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
-		kc.config.CgroupDriver = constants.CgroupDriverSystemd
+	// kubeadm previously defaulted cgroupDriver to systemd, which is invalid when the fallback is unavailable.
+	// TODO: remove this block once the kubelet feature gate is removed.
+	// https://github.com/kubernetes/kubeadm/issues/3229
+	if kc.config.CgroupDriver != "" {
+		if enabled, ok := kc.config.FeatureGates["DisableCgroupDriverFallback"]; !ok || enabled {
+			klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is %q, but it is invalid when the fallback is disabled; setting it to an empty string", kc.config.CgroupDriver)
+			kc.config.CgroupDriver = ""
+		}
 	}
 }
