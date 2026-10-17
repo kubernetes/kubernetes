@@ -45,10 +45,13 @@ func NewDialer(dial DialFunc) *Dialer {
 // NewDialerWithTracker creates a new Dialer instance.
 //
 // If dial is not nil, it will be used to create new underlying connections.
-// Otherwise net.DialContext is used.
+// Otherwise net.Dialer.DialContext is used.
 // If tracker is not nil, it will be used to track new underlying connections.
 // Otherwise NewConnectionTracker() is used.
 func NewDialerWithTracker(dial DialFunc, tracker *ConnectionTracker) *Dialer {
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
 	if tracker == nil {
 		tracker = NewConnectionTracker()
 	}
