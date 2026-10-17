@@ -148,9 +148,9 @@ func TestMicroTimeUnmarshalCBOR(t *testing.T) {
 		errMessage string
 	}{
 		{name: "null", in: []byte{0xf6}, out: MicroTime{}}, // null
-		{name: "valid", in: []byte("\x58\x1b1998-05-05T05:05:05.000000Z"), out: MicroTime{Time: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},                                    // '1998-05-05T05:05:05.000000Z'
-		{name: "invalid cbor type", in: []byte{0x07}, out: MicroTime{}, errMessage: "cbor: cannot unmarshal positive integer into Go value of type string"},                                // 7
-		{name: "malformed timestamp", in: []byte("\x45hello"), out: MicroTime{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05.000000Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
+		{name: "valid", in: []byte("\x58\x1b1998-05-05T05:05:05.000000Z"), out: MicroTime{Time: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},                             // '1998-05-05T05:05:05.000000Z'
+		{name: "invalid cbor type", in: []byte{0x07}, out: MicroTime{}, errMessage: "cbor: cannot unmarshal positive integer into Go value of type string"},                         // 7
+		{name: "malformed timestamp", in: []byte("\x45hello"), out: MicroTime{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got MicroTime
@@ -397,6 +397,70 @@ func TestMicroTimeRoundtripCBOR(t *testing.T) {
 				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
 			}
 			t.Errorf("expected equal: %v, %v (cbor was '%s')", initial, final, diag)
+		}
+	}
+}
+
+func TestMicroTimeUnmarshalFlexiblePrecision(t *testing.T) {
+	// MicroTime must accept any valid RFC3339 instant, like Time, not only the
+	// canonical 6-digit form, through every decoder that parses a string:
+	// JSON, CBOR and URL query parameters. Regression for MicroTime rejecting
+	// millisecond (JavaScript Date.toISOString()), second, and nanosecond
+	// precision.
+	decoders := []struct {
+		name   string
+		decode func(in string, mt *MicroTime) error
+	}{
+		{"JSON", func(in string, mt *MicroTime) error {
+			b, err := json.Marshal(in)
+			if err != nil {
+				return err
+			}
+			return json.Unmarshal(b, mt)
+		}},
+		{"CBOR", func(in string, mt *MicroTime) error {
+			b, err := cbor.Marshal(in)
+			if err != nil {
+				return err
+			}
+			return mt.UnmarshalCBOR(b)
+		}},
+		{"QueryParameter", func(in string, mt *MicroTime) error {
+			return mt.UnmarshalQueryParameter(in)
+		}},
+	}
+	for _, tc := range []struct {
+		in   string
+		want string // canonical microsecond marshal
+	}{
+		{"2024-01-02T03:04:05Z", `"2024-01-02T03:04:05.000000Z"`},
+		{"2024-01-02T03:04:05.123Z", `"2024-01-02T03:04:05.123000Z"`},
+		{"2024-01-02T03:04:05.123456Z", `"2024-01-02T03:04:05.123456Z"`},
+		{"2024-01-02T03:04:05.123456789Z", `"2024-01-02T03:04:05.123456Z"`},
+		{"2024-01-02T05:04:05.123+02:00", `"2024-01-02T03:04:05.123000Z"`},
+	} {
+		for _, d := range decoders {
+			t.Run(d.name+"/"+tc.in, func(t *testing.T) {
+				var mt MicroTime
+				if err := d.decode(tc.in, &mt); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				var tm Time
+				if err := tm.UnmarshalQueryParameter(tc.in); err != nil {
+					t.Errorf("Time rejected an input MicroTime accepted: %v", err)
+				}
+				got, err := json.Marshal(mt)
+				if err != nil {
+					t.Fatalf("marshal error: %v", err)
+				}
+				if string(got) != tc.want {
+					t.Errorf("got %s, want %s", got, tc.want)
+				}
+				var rt MicroTime
+				if err := json.Unmarshal(got, &rt); err != nil || !rt.Equal(&mt) {
+					t.Errorf("round-trip failed: %s err=%v", got, err)
+				}
+			})
 		}
 	}
 }
