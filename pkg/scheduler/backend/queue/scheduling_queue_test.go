@@ -3280,7 +3280,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	// Attempt to nominate a pod that was already scheduled in the informer cache.
 	// Nothing should change.
 	scheduledPodCopy := scheduledPodInfo.Pod.DeepCopy()
-	scheduledPodInfo.Pod.Spec.NodeName = ""
+	scheduledPodCopy.Spec.NodeName = ""
 	q.AddNominatedPod(logger, mustNewTestPodInfo(t, scheduledPodCopy), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after nominating a scheduled pod (-want, +got):\n%s", diff)
