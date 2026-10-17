@@ -1551,6 +1551,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerVIPs() {
+				if svcInfo.LoadBalancerIPModeRouter(lbip) {
+					continue
+				}
 				proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
 					Map: noEndpointServicesMap,
 					Key: []string{

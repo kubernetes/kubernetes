@@ -9126,9 +9126,7 @@ func ValidatePodLogOptions(opts *core.PodLogOptions, allowStreamSelection bool) 
 	return allErrs
 }
 
-var (
-	supportedLoadBalancerIPMode = sets.New(core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy)
-)
+var supportedLoadBalancerIPMode = sets.New(core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy, core.LoadBalancerIPModeRouter)
 
 // ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
 func ValidateLoadBalancerStatus(status, oldStatus *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
@@ -9160,6 +9158,8 @@ func ValidateLoadBalancerStatus(status, oldStatus *core.LoadBalancerStatus, fldP
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be specified when `ip` is not set"))
 			} else if ingress.IPMode != nil && !supportedLoadBalancerIPMode.Has(*ingress.IPMode) {
 				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, sets.List(supportedLoadBalancerIPMode)))
+			} else if ingress.IPMode != nil && *ingress.IPMode == core.LoadBalancerIPModeRouter && !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPModeRouter) {
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, sets.List(sets.New(core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy))))
 			}
 
 			if len(ingress.Hostname) > 0 {
