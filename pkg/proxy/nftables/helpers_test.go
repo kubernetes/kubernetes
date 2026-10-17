@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -275,6 +276,10 @@ var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 var endpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to numgen random mod \d+ map \{(.*)\}$`)
 var endpointDNATEntryRegexp = regexp.MustCompile(`\d+ : (\S+) \. (\d+)`)
 var singleEndpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to (\S+) \. (\d+)$`)
+
+// Shared "dispatch-N" bucket chains: DNAT via the per-protocol endpoints map
+// keyed by "[destIP .] destPort . slot", where slot is a random number.
+var endpointsMapDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to (ip6* daddr \. )?(tcp|udp|sctp) dport \. numgen random mod (\d+) map @(\S+)$`)
 
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
@@ -571,6 +576,33 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
 				}
 				return true
+
+			case endpointsMapDNATRegexp.MatchString(rule):
+				// Explore every slot of the service-IP or NodePort map.
+				match := endpointsMapDNATRegexp.FindStringSubmatch(rule)
+				proto, mapName := match[2], match[4]
+				key := []string{destPort}
+				if match[1] != "" {
+					key = []string{destIP, destPort}
+				}
+				if proto != protocol {
+					rule = ""
+					break
+				}
+				numEndpoints, _ := strconv.Atoi(match[3])
+				matched := false
+				for _, element := range tracer.nft.Table.Maps[mapName].Elements {
+					slot, err := strconv.Atoi(element.Key[len(element.Key)-1])
+					if err == nil && slot >= 0 && slot < numEndpoints && joinNFTSlice(element.Key[:len(element.Key)-1]) == joinNFTSlice(key) {
+						tracer.matches = append(tracer.matches, ruleObj.Rule)
+						tracer.outputs = append(tracer.outputs, net.JoinHostPort(element.Value[0], element.Value[1]))
+						matched = true
+					}
+				}
+				if matched {
+					return true
+				}
+				rule = ""
 
 			case singleEndpointDNATRegexp.MatchString(rule):
 				// `^dnat ip6* addr \. port to (\S+) \. (\d+)$`
