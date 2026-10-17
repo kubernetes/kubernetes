@@ -30,9 +30,11 @@ import (
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
+	origPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"k": "v"}}}
 	decorator := func(obj runtime.Object) {
 		if pod, ok := obj.(*example.Pod); ok {
 			pod.Annotations = map[string]string{"decorated": "true"}
+			pod.Labels["k"] = "mutated"
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,11 +43,11 @@ func TestDecoratedWatcher(t *testing.T) {
 
 	go func() {
 		w.Error(&metav1.Status{Status: "Failure"})
-		w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Add(origPod)
 		w.Error(&metav1.Status{Status: "Failure"})
-		w.Modify(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Modify(origPod)
 		w.Error(&metav1.Status{Status: "Failure"})
-		w.Delete(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Delete(origPod)
 	}()
 
 	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
@@ -54,6 +56,13 @@ func TestDecoratedWatcher(t *testing.T) {
 	expectPodEvent(t, dw, watch.Modified)
 	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
 	expectPodEvent(t, dw, watch.Deleted)
+
+	if origPod.Annotations != nil {
+		t.Errorf("expected original pod annotations to be untouched, got %v", origPod.Annotations)
+	}
+	if origPod.Labels["k"] != "v" {
+		t.Errorf("expected original pod labels to be untouched, got %v", origPod.Labels)
+	}
 
 	// cancel the passed-in context to simulate request timeout
 	cancel()

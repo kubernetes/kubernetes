@@ -19,11 +19,14 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"maps"
+	"reflect"
 	"sync"
 	"time"
 
 	"k8s.io/utils/clock"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -354,6 +357,22 @@ func (c *cacheWatcher) isDoneChannelClosedLocked() bool {
 	return false
 }
 
+func getShallowCopyObject(object runtime.Object) runtime.Object {
+	if _, ok := object.(*cachingObject); ok {
+		return object
+	}
+	if u, ok := object.(*unstructured.Unstructured); ok {
+		return &unstructured.Unstructured{Object: maps.Clone(u.Object)}
+	}
+	v := reflect.ValueOf(object)
+	if v.Kind() == reflect.Pointer && v.Elem().Kind() == reflect.Struct {
+		cp := reflect.New(v.Type().Elem())
+		cp.Elem().Set(v.Elem())
+		return cp.Interface().(runtime.Object)
+	}
+	return object.DeepCopyObject()
+}
+
 func getMutableObject(object runtime.Object) runtime.Object {
 	if _, ok := object.(*cachingObject); ok {
 		// It is safe to return without deep-copy, because the underlying
@@ -394,9 +413,9 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
+		return &watch.Event{Type: watch.Added, Object: getShallowCopyObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
+		return &watch.Event{Type: watch.Modified, Object: getShallowCopyObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := getMutableObject(event.PrevObject)
