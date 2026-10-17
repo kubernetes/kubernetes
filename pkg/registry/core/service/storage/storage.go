@@ -127,6 +127,7 @@ func NewREST(
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
+	statusStore.Decorator = genericStore.defaultOnRead
 	// users can patch the status to remove the finalizer,
 	// hence statusStore must participate on the AfterDelete
 	// hook to release the allocated resources
