@@ -1031,6 +1031,103 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	}
 }
 
+func TestNodeAuthorizerMixedDirectAndPVSecret(t *testing.T) {
+	g := NewGraph()
+	g.destinationEdgeThreshold = 2
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
+	node3 := &user.DefaultInfo{Name: "system:node:node3", Groups: []string{"system:nodes"}}
+	node4 := &user.DefaultInfo{Name: "system:node:node4", Groups: []string{"system:nodes"}}
+
+	// pod1 on node1 mounts mixed-secret directly AND mounts pvc1 (bound to pv1 -> mixed-secret)
+	g.AddPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1", UID: types.UID("uid1")},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+			Volumes: []corev1.Volume{
+				{Name: "sec", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "mixed-secret"}}},
+				{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc1"}}},
+			},
+		},
+	})
+	// pod2 on node2 mounts mixed-secret directly
+	g.AddPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1", UID: types.UID("uid2")},
+		Spec: corev1.PodSpec{
+			NodeName: "node2",
+			Volumes: []corev1.Volume{
+				{Name: "sec", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "mixed-secret"}}},
+			},
+		},
+	})
+	// pod3 on node3 only mounts pvc2 (bound to pv2 -> mixed-secret)
+	g.AddPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1", UID: types.UID("uid3")},
+		Spec: corev1.PodSpec{
+			NodeName: "node3",
+			Volumes: []corev1.Volume{
+				{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc2"}}},
+			},
+		},
+	})
+	// pod4 on node4 is unrelated
+	g.AddPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod4-node4", Namespace: "ns1", UID: types.UID("uid4")},
+		Spec:       corev1.PodSpec{NodeName: "node4"},
+	})
+
+	for _, tc := range []struct {
+		pvName, pvcName string
+	}{
+		{"pv1", "pvc1"},
+		{"pv2", "pvc2"},
+	} {
+		g.AddPV(&corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: tc.pvName},
+			Spec: corev1.PersistentVolumeSpec{
+				ClaimRef: &corev1.ObjectReference{Namespace: "ns1", Name: tc.pvcName},
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					CSI: &corev1.CSIPersistentVolumeSource{
+						NodePublishSecretRef: &corev1.SecretReference{Namespace: "ns1", Name: "mixed-secret"},
+					},
+				},
+			},
+		})
+	}
+
+	assertSecretDecision := func(u user.Info, want authorizer.Decision) {
+		t.Helper()
+		got, _, err := authz.Authorize(context.Background(), authorizer.AttributesRecord{
+			User: u, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "mixed-secret",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != want {
+			t.Errorf("user %s: got %v, want %v", u.GetName(), got, want)
+		}
+	}
+
+	// node1 (direct + PV), node2 (direct), and node3 (PV only) are allowed; node4 is denied.
+	assertSecretDecision(node1, authorizer.DecisionAllow)
+	assertSecretDecision(node2, authorizer.DecisionAllow)
+	assertSecretDecision(node3, authorizer.DecisionAllow)
+	assertSecretDecision(node4, authorizer.DecisionNoOpinion)
+
+	// Deleting pv1 leaves node1 authorized via its direct pod secret mount.
+	g.DeletePV("pv1")
+	assertSecretDecision(node1, authorizer.DecisionAllow)
+
+	// Deleting pv2 revokes node3's access while keeping mixed-secret indexed (degree 2 >= threshold 2).
+	g.DeletePV("pv2")
+	assertSecretDecision(node3, authorizer.DecisionNoOpinion)
+	assertSecretDecision(node1, authorizer.DecisionAllow)
+	assertSecretDecision(node2, authorizer.DecisionAllow)
+}
+
 type testGraphPopulator struct {
 	*graphPopulator
 	indexer cache.Indexer
