@@ -18,6 +18,7 @@ package topology
 
 import (
 	"fmt"
+	"slices"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
@@ -234,6 +235,31 @@ func (d CPUDetails) SocketsInNUMANodes(ids ...int) cpuset.CPUSet {
 	return cpuset.New(socketIDs...)
 }
 
+// CPUsByCore groups the logical CPUs present in d by core ID.
+// CPU IDs within each group are unordered.
+// Say we have
+//
+//	CPUDetails{
+//		0: {CoreID: 0},
+//		1: {CoreID: 1},
+//		2: {CoreID: 0},
+//		3: {CoreID: 1},
+//	}
+//
+// One possible result is:
+//
+//	map[int][]int{
+//		0: {0, 2},
+//		1: {1, 3},
+//	}
+func (d CPUDetails) CPUsByCore() map[int][]int {
+	cpusByCore := make(map[int][]int)
+	for cpuID, info := range d {
+		cpusByCore[info.CoreID] = append(cpusByCore[info.CoreID], cpuID)
+	}
+	return cpusByCore
+}
+
 // Cores returns all of the core IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Cores() cpuset.CPUSet {
@@ -244,32 +270,32 @@ func (d CPUDetails) Cores() cpuset.CPUSet {
 	return cpuset.New(coreIDs...)
 }
 
+// filterCoresMatching return a set of all the coreIDs matching by the given function
+func (d CPUDetails) filterCoresMatching(matches func(CPUInfo) bool) cpuset.CPUSet {
+	var coreIDs []int
+	for _, info := range d {
+		if !matches(info) {
+			continue
+		}
+		coreIDs = append(coreIDs, info.CoreID)
+	}
+	return cpuset.New(coreIDs...)
+}
+
 // CoresInNUMANodes returns all of the core IDs associated with the given
 // NUMANode IDs in this CPUDetails.
 func (d CPUDetails) CoresInNUMANodes(ids ...int) cpuset.CPUSet {
-	var coreIDs []int
-	for _, id := range ids {
-		for _, info := range d {
-			if info.NUMANodeID == id {
-				coreIDs = append(coreIDs, info.CoreID)
-			}
-		}
-	}
-	return cpuset.New(coreIDs...)
+	return d.filterCoresMatching(func(info CPUInfo) bool {
+		return slices.Contains(ids, info.NUMANodeID)
+	})
 }
 
 // CoresInSockets returns all of the core IDs associated with the given socket
 // IDs in this CPUDetails.
 func (d CPUDetails) CoresInSockets(ids ...int) cpuset.CPUSet {
-	var coreIDs []int
-	for _, id := range ids {
-		for _, info := range d {
-			if info.SocketID == id {
-				coreIDs = append(coreIDs, info.CoreID)
-			}
-		}
-	}
-	return cpuset.New(coreIDs...)
+	return d.filterCoresMatching(func(info CPUInfo) bool {
+		return slices.Contains(ids, info.SocketID)
+	})
 }
 
 // CPUs returns all of the logical CPU IDs in this CPUDetails.
