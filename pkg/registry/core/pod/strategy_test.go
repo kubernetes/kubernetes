@@ -722,6 +722,27 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/142212: an
+			// ephemeral container (e.g. attached via `kubectl debug`) must not affect pod-level
+			// limit defaulting, since ephemeral containers cannot specify resources.
+			name:                "single container limit defaulting unaffected by ephemeral container",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debugger", Image: "busybox"}},
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
 			name:                "pod requests defaulted from container requests when limits set",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
