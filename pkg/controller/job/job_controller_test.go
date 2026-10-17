@@ -7699,7 +7699,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			existingWorkload:  twoTemplateWorkload,
 			wantErr:           true,
 			wantCreations:     0,
-			wantStatusUpdates: ptr.To(1),
+			wantStatusUpdates: new(1),
 			wantSchedulingBlocked: &batch.JobCondition{
 				Type:    batch.JobSchedulingBlocked,
 				Status:  v1.ConditionTrue,
@@ -7751,7 +7751,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			existingWorkload:  twoTemplateWorkload,
 			wantErr:           true,
 			wantCreations:     0,
-			wantStatusUpdates: ptr.To(0),
+			wantStatusUpdates: new(0),
 		},
 		"already blocked with unset Ready and Terminating writes the counters": {
 			job: gangJob,
@@ -7802,7 +7802,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			existingWorkload: gangWorkload,
 			existingPodGroup: func() *schedulingv1beta1.PodGroup {
 				pg := gangPodGroup.DeepCopy()
-				pg.DeletionTimestamp = ptr.To(metav1.Now())
+				pg.DeletionTimestamp = new(metav1.Now())
 				pg.Finalizers = []string{"scheduling.k8s.io/podgroup-protection"}
 				return pg
 			}(),
