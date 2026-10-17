@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"context"
 	stderrs "errors"
 	"net/http"
 	"reflect"
@@ -42,6 +43,12 @@ func TestBadStatusErrorToAPIStatus(t *testing.T) {
 
 func TestAPIStatus(t *testing.T) {
 	cases := map[error]metav1.Status{
+		context.Canceled: {
+			Status:  metav1.StatusFailure,
+			Code:    http.StatusRequestTimeout,
+			Reason:  metav1.StatusReasonUnknown,
+			Message: context.Canceled.Error(),
+		},
 		errors.NewNotFound(schema.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
 			Status:  metav1.StatusFailure,
 			Code:    http.StatusNotFound,
