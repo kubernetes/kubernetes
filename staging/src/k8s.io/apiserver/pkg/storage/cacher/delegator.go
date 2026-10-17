@@ -106,9 +106,8 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 }
 
 func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
-	if opts.ResourceVersion == "" {
-		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility).
+	result := delegator.ShouldDelegateGet(opts)
+	if result.ShouldDelegate {
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
@@ -117,13 +116,36 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 		// as described in https://kep.k8s.io/4568
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
-	// If resourceVersion is specified, serve it from cache.
-	// It's guaranteed that the returned value is at least that
-	// fresh as the given resourceVersion.
 	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
 	}
-	return c.cacher.Get(ctx, key, opts, objPtr)
+	err := c.cacher.Get(ctx, key, opts, objPtr)
+	success := "true"
+	fallback := "false"
+	if err != nil {
+		if result.ConsistentRead {
+			// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
+			// and cache hasn't caught up within the timeout period.
+			if storage.IsTooLargeResourceVersion(err) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+					fallback = "skipped"
+					err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
+				} else {
+					fallback = "true"
+					err = c.storage.Get(ctx, key, opts, objPtr)
+				}
+			}
+			if err != nil && !storage.IsNotFound(err) {
+				success = "false"
+			}
+			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+		}
+		return err
+	}
+	if result.ConsistentRead {
+		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+	}
+	return nil
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {

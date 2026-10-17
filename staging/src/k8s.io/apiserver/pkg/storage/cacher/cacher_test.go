@@ -115,25 +115,15 @@ func TestCreateWithKeyExist(t *testing.T) {
 	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
 }
 
-type cacherGetWrapper struct {
-	*CacheDelegator
-}
-
-func (c *cacherGetWrapper) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
-	return c.cacher.Get(ctx, key, opts, objPtr)
-}
-
 func TestGet(t *testing.T) {
-	t.Run("delegator", func(t *testing.T) {
-		ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-		t.Cleanup(terminate)
-		storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
-	})
-	t.Run("cacher", func(t *testing.T) {
-		ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-		t.Cleanup(terminate)
-		storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), &cacherGetWrapper{CacheDelegator: cacher})
-	})
+	for _, consistentGetFromCache := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
+			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
+		})
+	}
 }
 
 func TestUnconditionalDelete(t *testing.T) {
@@ -867,7 +857,12 @@ func BenchmarkStoreStats(b *testing.B) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
+	for _, consistentGetFromCache := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
+			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
+		})
+	}
 }

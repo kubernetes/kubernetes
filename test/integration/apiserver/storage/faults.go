@@ -50,12 +50,22 @@ func hasUnaryTimeoutError(ops []correctness.Operation) bool {
 	return false
 }
 
-// hasConsistentListFallback checks whether any consistent List (ResourceVersion == "")
+// hasConsistentReadFallback checks whether any consistent Get or List (ResourceVersion == "")
 // waited for cacher's 3s blockTimeout before falling back to etcd and succeeding.
-func hasConsistentListFallback(ops []correctness.Operation) bool {
+func hasConsistentReadFallback(ops []correctness.Operation) bool {
 	for _, op := range ops {
-		if op.Request.Op == correctness.OpList && op.Request.List.Options.ResourceVersion == "" && op.Response.Err == nil && op.End.Sub(op.Start) >= 3*time.Second {
-			return true
+		if op.End.Sub(op.Start) < 3*time.Second {
+			continue
+		}
+		switch op.Request.Op {
+		case correctness.OpGet:
+			if op.Request.Get.Options.ResourceVersion == "" && (op.Response.Err == nil || storage.IsNotFound(op.Response.Err)) {
+				return true
+			}
+		case correctness.OpList:
+			if op.Request.List.Options.ResourceVersion == "" && op.Response.Err == nil {
+				return true
+			}
 		}
 	}
 	return false

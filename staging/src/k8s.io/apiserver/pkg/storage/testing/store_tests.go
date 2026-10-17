@@ -4949,7 +4949,7 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.NoError(t, store.GetList(ctx, "/pods/namespace/name", recursiveListOpts, listOut))
 
 	getOut := &example.Pod{}
-	getOpts := storage.GetOptions{}
+	getOpts := storage.GetOptions{IgnoreNotFound: true}
 	require.ErrorContains(t, store.Get(ctx, "", getOpts, getOut), "empty key")
 	require.ErrorContains(t, store.Get(ctx, "/", getOpts, getOut), "empty key")
 	require.ErrorContains(t, store.Get(ctx, ".", getOpts, getOut), "invalid key")
