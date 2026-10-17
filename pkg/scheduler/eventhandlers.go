@@ -502,7 +502,7 @@ func (sched *Scheduler) addPodGroup(obj any) {
 
 func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
@@ -515,9 +515,16 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 		return
 	}
 
+	if oldPG.UID != newPG.UID {
+		sched.deletePodGroup(oldPG)
+		sched.addPodGroup(newPG)
+		return
+	}
 	if oldPG.ResourceVersion == newPG.ResourceVersion {
 		return
 	}
+
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	gpg := fwk.NewGenericPodGroup(newPG)
@@ -576,7 +583,7 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 
 func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldCPG, ok := oldObj.(*schedulingv1alpha3.CompositePodGroup)
 	if !ok {
@@ -589,9 +596,16 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 		return
 	}
 
+	if oldCPG.UID != newCPG.UID {
+		sched.deleteCompositePodGroup(oldCPG)
+		sched.addCompositePodGroup(newCPG)
+		return
+	}
 	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
 		return
 	}
+
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	gpg := fwk.NewGenericCompositePodGroup(newCPG)
