@@ -50,6 +50,7 @@ func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tc
 		typeConverterManager: tcm,
 	}
 	res.Dispatcher = generic.NewPolicyDispatcher[*Policy, *PolicyBinding, PolicyEvaluator](
+		PluginName,
 		NewMutatingAdmissionPolicyAccessor,
 		NewMutatingAdmissionPolicyBindingAccessor,
 		m,

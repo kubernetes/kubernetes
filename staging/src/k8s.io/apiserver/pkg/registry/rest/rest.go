@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/admission"
 )
 
 //TODO:
@@ -392,6 +393,17 @@ type ResetFieldsStrategy interface {
 // implement if it wishes to provide a fields filter reset by its strategies.
 type ResetFieldsFilterStrategy interface {
 	GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter
+}
+
+// AdmissionEquivalentsProvider is an optional interface for REST storage. Storage that implements
+// it declares that every dynamic admission hook (webhook or admission policy) that applies to any
+// of the returned endpoints must also apply to requests served by this storage; requests for which
+// that does not hold are rejected. See admission.Equivalent.
+//
+// AdmissionEquivalents is called once when the endpoint is installed. The returned slice must not
+// be modified afterwards. An invalid declaration fails installation.
+type AdmissionEquivalentsProvider interface {
+	AdmissionEquivalents() []admission.Equivalent
 }
 
 // CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy

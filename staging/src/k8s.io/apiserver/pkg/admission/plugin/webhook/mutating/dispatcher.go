@@ -135,6 +135,13 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			return statusErr
 		}
 		if invocation == nil {
+			// Coverage was checked before any mutation. A skipped hook's selectors may match the
+			// mutated object.
+			if v.versionedAttr != nil {
+				if err := a.plugin.CheckAdmissionEquivalents(ctx, attrForCheck, o, []webhook.WebhookAccessor{hook}); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 

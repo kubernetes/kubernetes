@@ -35,6 +35,7 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/equivalents"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
@@ -52,6 +53,8 @@ import (
 // Webhook is an abstract admission plugin with all the infrastructure to define Admit or Validate on-top.
 type Webhook struct {
 	*admission.Handler
+
+	pluginName string
 
 	// Factories for creating webhook sources.
 	apiSourceInformers  informers.SharedInformerFactory
@@ -119,7 +122,7 @@ type ReloadableSource interface {
 type StaticSourceFactory func(manifestsDir string) (ReloadableSource, error)
 
 // NewWebhook creates a new generic admission webhook.
-func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
+func NewWebhook(pluginName string, handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
 	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
@@ -146,6 +149,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 
 	return &Webhook{
 		Handler:                    handler,
+		pluginName:                 pluginName,
 		apiSourceFactory:           sourceFactory,
 		staticManifestsDir:         cfg.StaticManifestsDir,
 		clientManager:              &cm,
@@ -293,9 +297,9 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
-// or an error if an error was encountered during evaluation.
-func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
+// matchHook returns invocation details if h's selectors and rules (but not its matchConditions)
+// select attr, nil if they do not, or an error if they could not be evaluated.
+func (a *Webhook) matchHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
 	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
 	if !matches && matchNsErr == nil {
@@ -361,6 +365,16 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	if matchObjErr != nil {
 		return nil, matchObjErr
 	}
+	return invocation, nil
+}
+
+// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// or an error if an error was encountered during evaluation.
+func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
+	invocation, err := a.matchHook(h, attr, o)
+	if err != nil || invocation == nil {
+		return nil, err
+	}
 	matchConditions := h.GetMatchConditions()
 	if len(matchConditions) > 0 {
 		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
@@ -390,6 +404,38 @@ type attrWithResourceOverride struct {
 }
 
 func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { return a.resource }
+
+// CheckAdmissionEquivalents returns a Forbidden error listing every hook that applies to an
+// admission equivalent of the request but not to the request, or nil. Dispatch calls it before
+// calling any hook. The mutating dispatcher also calls it for hooks it skips after a mutation,
+// since their selectors may match the mutated object.
+func (a *Webhook) CheckAdmissionEquivalents(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
+	targets := equivalents.Targets(attr, o)
+	if targets == nil {
+		return nil
+	}
+	var violations []equivalents.Violation
+	for _, h := range hooks {
+		hook := equivalents.Hook{Plugin: a.pluginName, Name: h.GetName(), Configuration: h.GetConfigurationName()}
+		v, ok := equivalents.Check(attr, targets, hook, func(attr admission.Attributes) (bool, error) {
+			// matchHook defers selector errors until the rules match, so rules that don't cover
+			// attr yield a clean non-match, as Check requires. The bool is ignored on error.
+			// Returning err directly would turn a nil *apierrors.StatusError into a non-nil error.
+			invocation, err := a.matchHook(h, attr, o)
+			if err != nil {
+				return false, err
+			}
+			return invocation != nil, nil
+		})
+		if ok {
+			violations = append(violations, v)
+		}
+	}
+	if len(violations) > 0 {
+		return equivalents.Reject(ctx, attr, violations)
+	}
+	return nil
+}
 
 // isExcludedFromAllHooks returns true for non-persisted virtual resources (auth/authz reviews)
 // that must not be intercepted by any webhook, static or REST-based. It returns false (no-op)
@@ -421,7 +467,7 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 				return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 			}
 			hooks := a.staticSource.Webhooks()
-			return a.dispatcher.Dispatch(ctx, attr, o, hooks)
+			return a.dispatch(ctx, attr, o, hooks)
 		}
 		return nil
 	}
@@ -429,5 +475,15 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
+	return a.dispatch(ctx, attr, o, hooks)
+}
+
+// dispatch checks admission-equivalent coverage for all hooks before calling any, so that a
+// violation is reported before any webhook side effect. This is the only check for validating
+// webhooks: they do not mutate, so their selectors cannot start matching during dispatch.
+func (a *Webhook) dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
+	if err := a.CheckAdmissionEquivalents(ctx, attr, o, hooks); err != nil {
+		return err
+	}
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

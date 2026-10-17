@@ -70,6 +70,10 @@ func (c *dispatcher) Start(ctx context.Context) error {
 
 // Dispatch implements generic.Dispatcher.
 func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook) error {
+	if err := generic.CheckAdmissionEquivalents(ctx, PluginName, a, o, c.matcher, hooks, NewValidatingAdmissionPolicyAccessor, NewValidatingAdmissionPolicyBindingAccessor); err != nil {
+		return err
+	}
+
 	var deniedDecisions []policyDecisionWithMetadata
 	var validationFailures []ValidationFailureValue
 
