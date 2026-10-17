@@ -144,6 +144,9 @@ func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema
 	case "s":
 		return kind.GroupVersion().WithResource(singularName + "es"), singular
 	case "y":
+		if len(singularName) > 1 && strings.ContainsRune("aeiou", rune(singularName[len(singularName)-2])) {
+			return kind.GroupVersion().WithResource(singularName + "s"), singular
+		}
 		return kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies"), singular
 	}
 
