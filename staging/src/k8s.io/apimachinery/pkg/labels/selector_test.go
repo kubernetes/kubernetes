@@ -129,6 +129,15 @@ func TestSelectorMatches(t *testing.T) {
 	expectNoMatch(t, "!x", Set{"x": "z"})
 	expectNoMatch(t, "x>1", Set{"x": "0"})
 	expectNoMatch(t, "x<1", Set{"x": "2"})
+	// Gt/Lt compare an integer label value outside the int64 range correctly:
+	// it lies beyond every (int64) operand on the side of its sign.
+	expectMatch(t, "x>1", Set{"x": "18446744073709551615"})
+	expectMatch(t, "x>9223372036854775807", Set{"x": "9223372036854775808"})
+	expectNoMatch(t, "x>9223372036854775807", Set{"x": "9223372036854775807"})
+	expectNoMatch(t, "x<1", Set{"x": "18446744073709551615"})
+	expectMatch(t, "x<1", Set{"x": "-18446744073709551615"})
+	expectNoMatch(t, "x>1", Set{"x": "18446744073709551615a"})
+	expectNoMatch(t, "x<1", Set{"x": "1e30"})
 
 	labelset := Set{
 		"foo": "bar",
