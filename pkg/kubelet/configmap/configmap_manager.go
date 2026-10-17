@@ -81,7 +81,8 @@ type configMapManager struct {
 }
 
 func (c *configMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
-	object, err := c.manager.GetObject(namespace, name)
+	// The ConfigMap manager interface does not receive the caller's context.
+	object, err := c.manager.GetObject(context.TODO(), namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +158,6 @@ func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval 
 	}
 	gr := corev1.Resource("configmap")
 	return &configMapManager{
-		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
+		manager: manager.NewWatchBasedManager(context.TODO(), listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
 	}
 }

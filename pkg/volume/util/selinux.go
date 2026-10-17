@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -173,10 +174,10 @@ func IsSELinuxLabelTranslationError(err error) bool {
 }
 
 // SupportsSELinuxContextMount checks if the given volumeSpec supports with mount -o context
-func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
+func SupportsSELinuxContextMount(logger klog.Logger, volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
 	plugin, _ := volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if plugin != nil {
-		return plugin.SupportsSELinuxContextMount(volumeSpec)
+		return plugin.SupportsSELinuxContextMount(logger, volumeSpec)
 	}
 
 	return false, nil
@@ -254,7 +255,7 @@ type SELinuxLabelInfo struct {
 // if container's SELinuxOptions are nil.
 // It does not evaluate the volume access mode! It's up to the caller to check SELinuxMount feature gate,
 // it may need to bump different metrics based on feature gates / access modes / label anyway.
-func GetMountSELinuxLabel(volumeSpec *volume.Spec, effectiveSELinuxContainerLabels []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext, volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator SELinuxLabelTranslator) (SELinuxLabelInfo, error) {
+func GetMountSELinuxLabel(logger klog.Logger, volumeSpec *volume.Spec, effectiveSELinuxContainerLabels []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext, volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator SELinuxLabelTranslator) (SELinuxLabelInfo, error) {
 	info := SELinuxLabelInfo{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return info, nil
@@ -264,7 +265,7 @@ func GetMountSELinuxLabel(volumeSpec *volume.Spec, effectiveSELinuxContainerLabe
 		return info, nil
 	}
 
-	pluginSupportsSELinuxContextMount, err := SupportsSELinuxContextMount(volumeSpec, volumePluginMgr)
+	pluginSupportsSELinuxContextMount, err := SupportsSELinuxContextMount(logger, volumeSpec, volumePluginMgr)
 	if err != nil {
 		return info, err
 	}

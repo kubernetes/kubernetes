@@ -30,6 +30,7 @@ import (
 )
 
 func TestTokenCachingAndExpiration(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	type suite struct {
 		clock *testingclock.FakeClock
 		tg    *fakeTokenGetter
@@ -46,7 +47,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 			exp:  time.Hour,
 			f: func(t *testing.T, s *suite) {
 				s.clock.SetTime(s.clock.Now().Add(50 * time.Minute))
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", getTokenRequest()); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", getTokenRequest()); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if s.tg.count != 2 {
@@ -59,7 +60,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 			exp:  40 * time.Hour,
 			f: func(t *testing.T, s *suite) {
 				s.clock.SetTime(s.clock.Now().Add(25 * time.Hour))
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", getTokenRequest()); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", getTokenRequest()); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if s.tg.count != 2 {
@@ -76,7 +77,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					err: fmt.Errorf("err"),
 				}
 				s.mgr.getToken = tg.getToken
-				tr, err := s.mgr.GetServiceAccountToken("a", "b", getTokenRequest())
+				tr, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", getTokenRequest())
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -105,7 +106,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 				}
 
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", tr1); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", tr1); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if s.tg.count != 2 { // First call from setup + this call
@@ -128,7 +129,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 				}
 
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", tr2); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", tr2); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if s.tg.count != 3 { // Should be 3 calls total (no cache hit)
@@ -156,11 +157,11 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 				}
 
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", tr); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", tr); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 
-				if _, err := s.mgr.GetServiceAccountToken("a", "b", tr); err != nil {
+				if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", tr); err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 
@@ -177,7 +178,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 			expSecs := int64(c.exp.Seconds())
 			s := &suite{
 				clock: clock,
-				mgr:   NewManager(nil),
+				mgr:   NewManager(tCtx, nil),
 				tg: &fakeTokenGetter{
 					tr: &authenticationv1.TokenRequest{
 						Spec: authenticationv1.TokenRequestSpec{
@@ -192,14 +193,14 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 			}
 			s.mgr.getToken = s.tg.getToken
 			s.mgr.clock = s.clock
-			if _, err := s.mgr.GetServiceAccountToken("a", "b", getTokenRequest()); err != nil {
+			if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", getTokenRequest()); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if s.tg.count != 1 {
 				t.Fatalf("unexpected client call, got: %d, want: 1", s.tg.count)
 			}
 
-			if _, err := s.mgr.GetServiceAccountToken("a", "b", getTokenRequest()); err != nil {
+			if _, err := s.mgr.GetServiceAccountToken(tCtx, "a", "b", getTokenRequest()); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if s.tg.count != 1 {
@@ -267,7 +268,7 @@ func TestRequiresRefresh(t *testing.T) {
 				c.requestTweaks(tr)
 			}
 
-			mgr := NewManager(nil)
+			mgr := NewManager(tCtx, nil)
 			mgr.clock = clock
 
 			rr := mgr.requiresRefresh(tCtx, tr)
@@ -279,6 +280,7 @@ func TestRequiresRefresh(t *testing.T) {
 }
 
 func TestDeleteServiceAccountToken(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	type request struct {
 		name, namespace string
 		tr              authenticationv1.TokenRequest
@@ -421,7 +423,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 					shouldFail: false,
 				},
 			}
-			testMgr := NewManager(nil)
+			testMgr := NewManager(tCtx, nil)
 			testMgr.clock = testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 
 			successGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
@@ -441,7 +443,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 				} else {
 					testMgr.getToken = successGetToken
 				}
-				testMgr.GetServiceAccountToken(req.namespace, req.name, &req.tr)
+				testMgr.GetServiceAccountToken(tCtx, req.namespace, req.name, &req.tr)
 			}
 
 			for _, uid := range c.deletePodUID {
@@ -473,6 +475,7 @@ func (ftg *fakeTokenGetter) getToken(name, namespace string, tr *authenticationv
 }
 
 func TestCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cases := []struct {
 		name              string
 		relativeExp       time.Duration
@@ -492,7 +495,7 @@ func TestCleanup(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clock := testingclock.NewFakeClock(time.Time{}.Add(24 * time.Hour))
-			mgr := NewManager(nil)
+			mgr := NewManager(tCtx, nil)
 			mgr.clock = clock
 
 			mgr.set("key", &authenticationv1.TokenRequest{
@@ -509,6 +512,7 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestKeyFunc(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	type tokenRequestUnit struct {
 		name      string
 		namespace string
@@ -816,7 +820,7 @@ func TestKeyFunc(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			mgr := NewManager(nil)
+			mgr := NewManager(tCtx, nil)
 			mgr.clock = testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 			for _, tru := range c.trus {
 				mgr.set(getKeyFunc(tru), &authenticationv1.TokenRequest{
@@ -836,7 +840,8 @@ func TestKeyFunc(t *testing.T) {
 }
 
 func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
-	mgr := NewManager(nil)
+	tCtx := ktesting.Init(t)
+	mgr := NewManager(tCtx, nil)
 	mgr.clock = testingclock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 
 	callCount := 0
@@ -866,7 +871,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 		},
 	}
 
-	token1, err := mgr.GetServiceAccountToken("test-ns", "test-sa", originalTR)
+	token1, err := mgr.GetServiceAccountToken(tCtx, "test-ns", "test-sa", originalTR)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -878,7 +883,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 	}
 
 	// 2. Request same token again - should be cache hit
-	token2, err := mgr.GetServiceAccountToken("test-ns", "test-sa", originalTR)
+	token2, err := mgr.GetServiceAccountToken(tCtx, "test-ns", "test-sa", originalTR)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -900,7 +905,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 		},
 	}
 
-	token3, err := mgr.GetServiceAccountToken("test-ns", "test-sa", recreatedTR)
+	token3, err := mgr.GetServiceAccountToken(tCtx, "test-ns", "test-sa", recreatedTR)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -912,7 +917,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 	}
 
 	// 4. Request for recreated SA again - should be cache hit
-	token4, err := mgr.GetServiceAccountToken("test-ns", "test-sa", recreatedTR)
+	token4, err := mgr.GetServiceAccountToken(tCtx, "test-ns", "test-sa", recreatedTR)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

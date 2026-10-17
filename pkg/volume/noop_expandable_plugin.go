@@ -17,9 +17,12 @@ limitations under the License.
 package volume
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 type noopExpandableVolumePluginInstance struct {
@@ -48,11 +51,11 @@ func (n *noopExpandableVolumePluginInstance) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (n *noopExpandableVolumePluginInstance) RequiresRemount(spec *Spec) bool {
+func (n *noopExpandableVolumePluginInstance) RequiresRemount(logger klog.Logger, spec *Spec) bool {
 	return false
 }
 
-func (n *noopExpandableVolumePluginInstance) NewMounter(spec *Spec, podRef *v1.Pod) (Mounter, error) {
+func (n *noopExpandableVolumePluginInstance) NewMounter(ctx context.Context, spec *Spec, podRef *v1.Pod) (Mounter, error) {
 	return nil, nil
 }
 
@@ -72,6 +75,6 @@ func (n *noopExpandableVolumePluginInstance) RequiresFSResize() bool {
 	return true
 }
 
-func (n *noopExpandableVolumePluginInstance) SupportsSELinuxContextMount(spec *Spec) (bool, error) {
+func (n *noopExpandableVolumePluginInstance) SupportsSELinuxContextMount(logger klog.Logger, spec *Spec) (bool, error) {
 	return false, nil
 }

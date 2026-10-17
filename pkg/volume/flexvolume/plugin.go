@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -102,7 +103,7 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *flexVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *flexVolumePlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -153,7 +154,7 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 // RequiresRemount is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *flexVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -166,7 +167,7 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 }
 
 // NewMounter is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *api.Pod) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
 }
 
@@ -256,7 +257,7 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 	return plugin.NewDetacher()
 }
 
-func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *flexVolumeAttachablePlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
@@ -290,7 +291,7 @@ func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.unsupportedCommands = append(plugin.unsupportedCommands, commands...)
 }
 
-func (plugin *flexVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *flexVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

@@ -472,7 +472,7 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 					// This volume type doesn't support the attachable interface, so we can skip our check.
 					continue
 				}
-				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
+				if attachablePlugin.VerifyExhaustedResource(logger, volumeToMount.VolumeSpec) {
 					// Return error to the kubelet, which will then trigger the pod termination logic.
 					return &VolumeAttachLimitExceededError{
 						UnmountedVolumes:  unmountedVolumes,

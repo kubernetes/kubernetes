@@ -30,12 +30,14 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/utils/clock"
 )
 
 func checkObject(t *testing.T, store manager.Store, ns, name string, shouldExist bool) {
-	_, err := store.Get(ns, name)
+	tCtx := ktesting.Init(t)
+	_, err := store.Get(tCtx, ns, name)
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}

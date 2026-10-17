@@ -747,7 +747,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		}
 
 		if plugin == nil {
-			plugin, err = volumeutil.FindDetachablePluginBySpec(volumeSpec, &adc.volumePluginMgr)
+			plugin, err = volumeutil.FindDetachablePluginBySpec(logger, volumeSpec, &adc.volumePluginMgr)
 			if err != nil || plugin == nil {
 				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
 				logger.Info("Skipping processing the volume on node, no attacher interface found", "node", klog.KRef("", string(nodeName)), "PV", klog.KRef("", *pvName), "err", err)
@@ -825,7 +825,7 @@ func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 	return adc.kubeClient
 }
 
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (adc *attachDetachController) NewWrapperMounter(ctx context.Context, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
@@ -837,7 +837,7 @@ func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (adc *attachDetachController) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
@@ -857,8 +857,8 @@ func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name strin
 	}
 }
 
-func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (adc *attachDetachController) GetServiceAccountTokenFunc() func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in attachDetachController")
 	}
 }

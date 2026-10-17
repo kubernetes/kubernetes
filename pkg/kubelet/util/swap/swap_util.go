@@ -42,10 +42,7 @@ var (
 
 const TmpfsNoswapOption = "noswap"
 
-func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) bool {
-	// TODO: it needs to be replaced by a proper context in the future
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
+func IsTmpfsNoswapOptionSupported(logger klog.Logger, mounter mount.Interface, mountPath string) bool {
 	isTmpfsNoswapOptionSupportedHelper := func() bool {
 		if sysruntime.GOOS == "windows" {
 			return false

@@ -30,6 +30,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"go.opentelemetry.io/otel/trace"
 	grpcstatus "google.golang.org/grpc/status"
+	authenticationv1 "k8s.io/api/authentication/v1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -315,7 +316,16 @@ func NewKubeGenericRuntimeManager(
 		"apiVersion", typedVersion.RuntimeApiVersion)
 
 	if imageCredentialProviderConfigPath != "" || imageCredentialProviderBinDir != "" {
-		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigPath, imageCredentialProviderBinDir, tokenManager.GetServiceAccountToken, getServiceAccount); err != nil {
+		// TODO: Remove this adapter once RegisterCredentialProviderPlugins accepts a
+		// context-aware token callback and passes the caller's context to it.
+		getServiceAccountToken := func(
+			namespace, name string,
+			tr *authenticationv1.TokenRequest,
+		) (*authenticationv1.TokenRequest, error) {
+			// The credential-provider callback does not receive the caller's context.
+			return tokenManager.GetServiceAccountToken(ctx, namespace, name, tr)
+		}
+		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigPath, imageCredentialProviderBinDir, getServiceAccountToken, getServiceAccount); err != nil {
 			logger.Error(err, "Failed to register CRI auth plugins")
 			os.Exit(1)
 		}

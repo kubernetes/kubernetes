@@ -200,6 +200,10 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 
 	attached := make(map[*volume.Spec]bool)
 
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+
 	for _, spec := range specs {
 		if spec == nil {
 			klog.Error(log("attacher.VolumesAreAttached missing volume.Spec"))
@@ -214,7 +218,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 		driverName := pvSrc.Driver
 		volumeHandle := pvSrc.VolumeHandle
 
-		skip, err := c.plugin.skipAttach(driverName)
+		skip, err := c.plugin.skipAttach(logger, driverName)
 		if err != nil {
 			klog.Error(log("Failed to check CSIDriver for %s: %s", driverName, err))
 		} else {
@@ -296,9 +300,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return err
 	}
 
+	logger := klog.FromContext(ctx)
+
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
-	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+	publishContext, err := c.plugin.getPublishContext(logger, c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(err.Error())
@@ -323,7 +329,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	var seLinuxSupported bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		support, err := c.plugin.SupportsSELinuxContextMount(spec)
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+		support, err := c.plugin.SupportsSELinuxContextMount(klog.TODO(), spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}

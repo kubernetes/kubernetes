@@ -17,6 +17,7 @@ limitations under the License.
 package selinuxwarning
 
 import (
+	"context"
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -63,7 +64,7 @@ func (c *Controller) GetKubeClient() clientset.Interface {
 	return c.kubeClient
 }
 
-func (c *Controller) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (c *Controller) NewWrapperMounter(ctx context.Context, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by SELinux controller VolumeHost implementation")
 }
 
@@ -75,7 +76,7 @@ func (c *Controller) GetMounter() mount.Interface {
 	return nil
 }
 
-func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
+func (c *Controller) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
@@ -95,8 +96,8 @@ func (c *Controller) GetConfigMapFunc() func(namespace, name string) (*v1.Config
 	}
 }
 
-func (c *Controller) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (c *Controller) GetServiceAccountTokenFunc() func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in SELinux controller")
 	}
 }
