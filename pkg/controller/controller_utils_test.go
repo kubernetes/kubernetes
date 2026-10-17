@@ -330,6 +330,12 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 	generateName := "hello-"
 	controllerSpec := newReplicationController(1)
 	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
+	podGroupRef := metav1.OwnerReference{
+		APIVersion: "scheduling.k8s.io/v1beta1",
+		Kind:       "PodGroup",
+		Name:       "pg",
+		UID:        "pg-uid",
+	}
 
 	type test struct {
 		name            string
@@ -361,6 +367,20 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 					Labels:          controllerSpec.Spec.Template.Labels,
 					GenerateName:    generateName,
 					OwnerReferences: []metav1.OwnerReference{*controllerRef},
+				},
+				Spec: controllerSpec.Spec.Template.Spec,
+			},
+		},
+		{
+			name: "Create pod with additional ownerReferences",
+			podCreationFunc: func(podControl RealPodControl) error {
+				return podControl.CreatePodsWithOwnerReferences(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName, []metav1.OwnerReference{podGroupRef})
+			},
+			wantPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:          controllerSpec.Spec.Template.Labels,
+					GenerateName:    generateName,
+					OwnerReferences: []metav1.OwnerReference{*controllerRef, podGroupRef},
 				},
 				Spec: controllerSpec.Spec.Template.Spec,
 			},
