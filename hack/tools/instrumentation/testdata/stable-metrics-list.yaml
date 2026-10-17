@@ -38,6 +38,45 @@
   labels:
   - apiserver_id_hash
   - status
+- name: webhook_duration_seconds
+  subsystem: authorization
+  namespace: apiserver
+  help: Request latency in seconds.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: webhook_evaluations_fail_open_total
+  subsystem: authorization
+  namespace: apiserver
+  help: NoOpinion results due to webhook timeout or error.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
+- name: webhook_evaluations_total
+  subsystem: authorization
+  namespace: apiserver
+  help: Round-trips to authorization webhooks.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
 - name: compilation_duration_seconds
   subsystem: cel
   namespace: apiserver
