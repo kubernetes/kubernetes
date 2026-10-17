@@ -371,7 +371,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	req = req.WithContext(ctx)
 	defer func() {
 		if s.MemoryAllocator != nil {
-			runtime.AllocatorPool.Put(s.MemoryAllocator)
+			runtime.PutAllocator(s.MemoryAllocator)
 		}
 	}()
 
@@ -487,7 +487,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 	defer func() {
 		if s.MemoryAllocator != nil {
-			runtime.AllocatorPool.Put(s.MemoryAllocator)
+			runtime.PutAllocator(s.MemoryAllocator)
 		}
 	}()
 
