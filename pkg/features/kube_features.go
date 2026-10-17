@@ -1262,8 +1262,8 @@ const (
 	// owner: @helayoty @mm4tt @wojtek-t
 	// kep: https://kep.k8s.io/5547
 	//
-	// Enables the Job controller to automatically create Workload and PodGroup
-	// objects for Jobs that qualify for gang scheduling.
+	// Enables the Job controller to compile Workload and PodGroup objects from
+	// Job.spec.scheduling.
 	WorkloadWithJob featuregate.Feature = "WorkloadWithJob"
 )
 
@@ -2185,6 +2185,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WorkloadWithJob: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		// Default stays false until GenericWorkload is enabled by default.
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {
