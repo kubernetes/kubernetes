@@ -2172,14 +2172,14 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 			}
 			for _, hintfn := range hintfns {
 				if hintfn.PreQueueingHintFn == nil {
-					// if current plugin doesn't register PreQueueingHints, we will treat it as AllPods
+					// If current plugin doesn't register PreQueueingHints, we will treat it as AllPods
 					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultNoPreQFn)
 					result.evaluateAllPods = true
 					continue
 				}
 				hintResult, err := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
 				if err != nil {
-					// we will set evaluateAllPods to true but still continue to evaluate other fns
+					// We will set evaluateAllPods to true but still continue to evaluate other fns
 					// because we can still skip pods for other plugins
 					utilruntime.HandleErrorWithLogger(logger, err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
 					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultPreQFnError)
@@ -2188,7 +2188,7 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 				}
 				if hintResult.AllPods {
 					// This plugin wants all pods evaluated; we cannot narrow.
-					// Same here, we still continue to evaluate other plugins's PreQHints.
+					// Same here, we still continue to evaluate other plugins' PreQHints.
 					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultAllPods)
 					result.evaluateAllPods = true
 					continue

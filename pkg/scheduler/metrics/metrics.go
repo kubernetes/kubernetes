@@ -407,7 +407,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pre_queueing_hint_evaluations_total",
-			Help:           "Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods or narrowed).",
+			Help:           "Number of PreQueueingHint evaluations by plugin and result (narrowed, all_pods, no_prequeueing_hint_fn, or prequeueing_hint_fn_error).",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "result"})
