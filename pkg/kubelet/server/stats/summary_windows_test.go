@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/randfill"
 
@@ -54,6 +55,7 @@ func TestSummaryProvider(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil).Maybe()
+	mockStatsProvider.EXPECT().GetCachedMachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).Maybe()
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).Maybe()
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
