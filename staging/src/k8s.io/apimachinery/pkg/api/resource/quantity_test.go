@@ -495,7 +495,16 @@ func quantityTestcases() []parseQuantityTestcase {
 		{".0001k", decQuantity(100, -3, DecimalSI), "100m"},
 		{"1.", decQuantity(1, 0, DecimalSI), "1."},
 		{"1.G", decQuantity(1, 9, DecimalSI), "1.G"},
+
+		{"1e309", decQuantity(1, 309, DecimalExponent), "1e309"},
+		{"0e309", decQuantity(0, 309, DecimalExponent), "0"},
+		{"1e-324", decQuantity(1, -324, DecimalExponent), "1e-9"},
+		{"0e-324", decQuantity(0, -324, DecimalExponent), "0"},
+		{"1" + strings.Repeat("0", 100) + "e-2147483648", bigDecQuantity(new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil), math.MinInt32, DecimalExponent), "1" + strings.Repeat("0", 100) + "e-2147483648"},
+		{"1" + strings.Repeat("0", 100) + "e1000", bigDecQuantity(new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil), 1000, DecimalExponent), "1" + strings.Repeat("0", 100) + "e1000"},
+		// {"1" + strings.Repeat("0", 100) + "e2147483647", bigDecQuantity(new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil), math.MaxInt32, DecimalExponent), "1" + strings.Repeat("0", 100) + "e2147483647"},
 	}
+
 }
 
 func TestQuantityParse(t *testing.T) {
@@ -504,6 +513,7 @@ func TestQuantityParse(t *testing.T) {
 	}
 
 	for _, item := range quantityTestcases() {
+		t.Log(item.input)
 		got, err := ParseQuantity(item.input)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", item.input, err)
@@ -4641,8 +4651,7 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{bigDecQuantity(new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil), -400, DecimalSI), 0, nil},
 
 		{intQuantity(5, math.MinInt32, DecimalSI), 0, nil},
-		// TODO: Should be +Inf
-		{*NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), 0, new(math.Inf(1))},
+		{*NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), math.Inf(1), nil},
 	}
 
 	for i, item := range table {
@@ -4756,10 +4765,8 @@ func TestQuantityAsFloat64Slow(t *testing.T) {
 		// 10^100 * 10^-400 is within range even though 10^-400 is not.
 		{bigDecQuantity(new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil), -400, DecimalSI), 1e-300, nil},
 
-		// TODO: Should be 0
-		{intQuantity(5, math.MinInt32, DecimalSI), 5, new(0.0)},
-		// TODO: Should be +Inf
-		{*NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), 5, new(math.Inf(1))},
+		{intQuantity(5, math.MinInt32, DecimalSI), 0, nil},
+		{*NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), math.Inf(1), nil},
 	}
 
 	for i, item := range table {
