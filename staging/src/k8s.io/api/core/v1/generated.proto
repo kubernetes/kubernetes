@@ -4737,6 +4737,7 @@ message PodSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +k8s:alpha(since: "1.38")=+k8s:required
   repeated Container containers = 2;
 
   // ephemeralContainers is the list of ephemeral containers run in this pod. Ephemeral containers may be run in an existing

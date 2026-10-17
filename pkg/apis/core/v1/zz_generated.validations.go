@@ -1321,7 +1321,36 @@ func Validate_PodSpec(
 
 	// field corev1.PodSpec.Volumes has no validation
 	// field corev1.PodSpec.InitContainers has no validation
-	// field corev1.PodSpec.Containers has no validation
+
+	{ // field corev1.PodSpec.Containers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Container,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.Container {
+				return oldObj.Containers
+			})
+		errs = append(errs, fn(fldPath.Child("containers"), obj.Containers, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.EphemeralContainers has no validation
 	// field corev1.PodSpec.RestartPolicy has no validation
 	// field corev1.PodSpec.TerminationGracePeriodSeconds has no validation

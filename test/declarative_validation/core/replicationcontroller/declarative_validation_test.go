@@ -42,10 +42,11 @@ func TestDeclarativeValidate(t *testing.T) {
 		IsResourceRequest: true,
 		Verb:              "create",
 	})
-	testCases := map[string]struct {
+	type testCase struct {
 		input        api.ReplicationController
 		expectedErrs field.ErrorList
-	}{
+	}
+	testCases := map[string]testCase{
 		// baseline
 		"empty resource": {
 			input: mkValidReplicationController(),
@@ -227,6 +228,14 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkValidReplicationController(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
@@ -369,5 +378,17 @@ func setSpecMinReadySeconds(val int32) func(rc *api.ReplicationController) {
 func setSpecTolerations(tolerations ...api.Toleration) func(rc *api.ReplicationController) {
 	return func(rc *api.ReplicationController) {
 		rc.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		pod := &api.Pod{
+			Spec: rc.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		rc.Spec.Template.Spec = pod.Spec
 	}
 }

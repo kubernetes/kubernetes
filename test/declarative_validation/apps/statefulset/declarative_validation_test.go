@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -79,11 +80,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		apitesting.VerifyValidationEquivalence(t, ctx, &objWithEmptyVCTName, registry.Strategy, expectedErrs)
 	})
 
-	testCases := map[string]struct {
+	type testCase struct {
 		input apps.StatefulSet
 
 		expectedErrs field.ErrorList
-	}{
+	}
+
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkValidStatefulSet(),
 		},
@@ -127,6 +130,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkValidStatefulSet(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
@@ -352,5 +363,17 @@ func tweakVolumeClaimTemplate(name, storage string) func(obj *apps.StatefulSet) 
 				},
 			},
 		}}
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.StatefulSet) {
+	return func(ss *apps.StatefulSet) {
+		pod := &api.Pod{
+			Spec: ss.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		ss.Spec.Template.Spec = pod.Spec
 	}
 }
