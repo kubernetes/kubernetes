@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -320,6 +321,26 @@ func TestExtractResourceValue(t *testing.T) {
 			pod:   getPod(containerName, resources{memoryRequest: "10Mi", memoryLimit: "100Mi"}),
 
 			expectedValue: "104857600",
+		},
+		{
+			// 2^53+1 is the first integer float64 cannot represent, so dividing
+			// through float64 used to round this down by one byte.
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.memory",
+			},
+			cName:         containerName,
+			pod:           getPod(containerName, resources{memoryRequest: "9007199254740993"}),
+			expectedValue: "9007199254740993",
+		},
+		{
+			// Does not fit in an int64. Value() saturates at the rail, which used to
+			// be reported as a real byte count; the checked accessor surfaces it.
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.memory",
+			},
+			cName:         containerName,
+			pod:           getPod(containerName, resources{memoryRequest: "100E"}),
+			expectedError: fmt.Errorf("value 100E is too large to be represented at scale 0"),
 		},
 	}
 	as := assert.New(t)
