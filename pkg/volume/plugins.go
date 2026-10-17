@@ -153,7 +153,7 @@ type VolumePlugin interface {
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
 	// this to update the contents of the volume.
-	RequiresRemount(spec *Spec) bool
+	RequiresRemount(logger klog.Logger, spec *Spec) bool
 
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
@@ -177,7 +177,7 @@ type VolumePlugin interface {
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports
 	// mount -o context=XYZ for a given volume.
-	SupportsSELinuxContextMount(spec *Spec) (bool, error)
+	SupportsSELinuxContextMount(logger klog.Logger, spec *Spec) (bool, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -230,8 +230,8 @@ type AttachableVolumePlugin interface {
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
 	// CanAttach tests if provided volume spec is attachable
-	CanAttach(spec *Spec) (bool, error)
-	VerifyExhaustedResource(spec *Spec) bool
+	CanAttach(logger klog.Logger, spec *Spec) (bool, error)
+	VerifyExhaustedResource(logger klog.Logger, spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -311,7 +311,7 @@ type KubeletVolumeHost interface {
 	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-	WaitForCacheSync() error
+	WaitForCacheSync(logger klog.Logger) error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
 
@@ -388,7 +388,7 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperMounter(volName string, spec Spec, pod *v1.Pod) (Mounter, error)
+	NewWrapperMounter(logger klog.Logger, volName string, spec Spec, pod *v1.Pod) (Mounter, error)
 
 	// NewWrapperUnmounter finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperMounter for more
@@ -399,25 +399,25 @@ type VolumeHost interface {
 	GetMounter() mount.Interface
 
 	// Returns node allocatable.
-	GetNodeAllocatable() (v1.ResourceList, error)
+	GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error)
 
 	// Returns a function that returns a secret.
-	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+	GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 
 	// Returns a function that returns a configmap.
-	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
 
 	// Returns the labels on the node
-	GetNodeLabels() (map[string]string, error)
+	GetNodeLabels(ctx context.Context) (map[string]string, error)
 
 	// Returns the name of the node
 	GetNodeName() types.NodeName
 
-	GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error)
+	GetAttachedVolumesFromNodeStatus(ctx context.Context) (map[v1.UniqueVolumeName]string, error)
 
 	// Returns the event recorder of kubelet.
 	GetEventRecorder() record.EventRecorder
@@ -807,13 +807,13 @@ func (pm *VolumePluginMgr) FindDeletablePluginByName(name string) (DeletableVolu
 // Unlike the other "FindPlugin" methods, this does not return error if no
 // plugin is found.  All volumes require a mounter and unmounter, but not
 // every volume will have an attacher/detacher.
-func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVolumePlugin, error) {
+func (pm *VolumePluginMgr) FindAttachablePluginBySpec(logger klog.Logger, spec *Spec) (AttachableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
 	if attachableVolumePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
-		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
+		if canAttach, err := attachableVolumePlugin.CanAttach(logger, spec); err != nil {
 			return nil, err
 		} else if canAttach {
 			return attachableVolumePlugin, nil
