@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -175,11 +176,16 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 		return
 	}
 
+	// Counted alongside the pod directory walk in the same metric: both are
+	// reconstruction attempts, and a rollback below shows up as an error.
+	metrics.ReconstructVolumeOperationsTotal.Inc()
+
 	// devicePath is left empty on purpose: it is filled in later from
 	// node.status.volumesAttached, the same way reconstructed pod volumes are.
 	if err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 		logger, volumeName, globalVolume.Spec, rc.nodeName, ""); err != nil {
 		logger.Error(err, "Could not add global mount to actual state of world", "volumeName", volumeName)
+		metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
 		return
 	}
 	// Marked as found during reconstruction, like the device of a reconstructed
@@ -195,6 +201,7 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 		if err := rc.actualStateOfWorld.DeleteVolume(volumeName); err != nil {
 			logger.Error(err, "Could not remove the global mount from the actual state of world", "volumeName", volumeName)
 		}
+		metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
 		return
 	}
 

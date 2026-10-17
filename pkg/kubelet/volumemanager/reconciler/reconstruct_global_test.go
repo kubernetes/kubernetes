@@ -27,8 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	basemetrics "k8s.io/component-base/metrics"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	volmetrics "k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -167,6 +170,28 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		// reported unused while the global mount is still in place.
 		if volumeName := uniqueName(t, plugin, staged); !rc.actualStateOfWorld.IsVolumeDeviceReconstructed(volumeName) {
 			t.Errorf("volume %q is not marked as found during reconstruction", volumeName)
+		}
+	})
+
+	t.Run("counts a registered global mount as a reconstruction", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		// Register to a throwaway registry so the lazily created counter starts
+		// recording; the pod directory walk shares this same metric.
+		basemetrics.NewKubeRegistry().MustRegister(volmetrics.ReconstructVolumeOperationsTotal)
+		before, err := metricstestutil.GetCounterMetricValue(volmetrics.ReconstructVolumeOperationsTotal)
+		if err != nil {
+			t.Fatalf("read reconstruct_volume_operations_total before: %v", err)
+		}
+		rc, _ := setup(t, stagedVolume("staged-pv", "fake-device1"))
+
+		rc.reconstructGlobalVolumes(logger)
+
+		after, err := metricstestutil.GetCounterMetricValue(volmetrics.ReconstructVolumeOperationsTotal)
+		if err != nil {
+			t.Fatalf("read reconstruct_volume_operations_total after: %v", err)
+		}
+		if after-before != 1 {
+			t.Errorf("reconstruct_volume_operations_total rose by %v, want 1", after-before)
 		}
 	})
 
