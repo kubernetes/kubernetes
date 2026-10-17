@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -30,9 +31,9 @@ import (
 // It abstracts individual Pods and PodGroup, ensuring that
 // atomic entities are treated as a single unit during eviction.
 type Victim interface {
-	// Priority returns the priority of the preemption unit.
-	// For a single Pod, this is the Pod's priority.
-	// For a PodGroup, this is the priority of the PodGroup.
+	// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+	// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+	// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 	Priority() int32
 
 	// Pods returns the list of all Pods that belong to this preemption unit.
@@ -64,9 +65,9 @@ func (v *victim) Pods() []fwk.PodInfo {
 	return v.pods
 }
 
-// Priority returns the priority of the preemption unit.
-// For a single Pod, this is the Pod's priority.
-// For a PodGroup, this is the priority of the PodGroup.
+// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 func (v *victim) Priority() int32 {
 	return v.priority
 }
@@ -82,7 +83,6 @@ func (v *victim) Type() fwk.EntityKeyType {
 }
 
 // NewPodVictim creates a new Victim representing a single Pod.
-// It calculates the priority of the pod, taking into account its scheduling group if applicable.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
 // TODO: what we do below is not ideal:
 //   - From the victim's importance POV, individual Pods should always have the PodKeyType.
@@ -92,13 +92,13 @@ func (v *victim) Type() fwk.EntityKeyType {
 //     Pod belongs to.
 //
 // We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
-func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
-	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
+func NewPodVictim(podInfo fwk.PodInfo) Victim {
+	pod := podInfo.GetPod()
 	keyType := fwk.PodKeyType
-	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
+	if pod.Spec.SchedulingGroup != nil {
 		keyType = fwk.PodGroupKeyType
 	}
-	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, keyType)
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(pod), keyType)
 	return vi
 }
 
