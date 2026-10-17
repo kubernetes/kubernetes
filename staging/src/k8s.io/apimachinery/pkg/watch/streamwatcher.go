@@ -126,7 +126,7 @@ func (sw *StreamWatcher) receive() {
 					case <-sw.done:
 					case sw.result <- Event{
 						Type:   Error,
-						Object: sw.reporter.AsObject(fmt.Errorf("unable to decode an event from the watch stream: %v", err)),
+						Object: sw.reporter.AsObject(fmt.Errorf("unable to decode an event from the watch stream: %w", err)),
 					}:
 					}
 				}
