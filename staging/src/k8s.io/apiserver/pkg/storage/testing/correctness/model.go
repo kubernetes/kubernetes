@@ -124,6 +124,9 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
 		if !reflect.DeepEqual(expected, output) {
+			if (input.Op == OpUpdate || input.Op == OpDelete) && storage.IsNotFound(expected.Err) && reflect.DeepEqual(Response{Err: storage.NewKeyNotFoundError(input.Key, int64(s.ResourceVersion))}, output) {
+				return true, next, change
+			}
 			return false, s, nil
 		}
 		return true, next, change

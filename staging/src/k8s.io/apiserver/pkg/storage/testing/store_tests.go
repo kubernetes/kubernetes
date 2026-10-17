@@ -4161,7 +4161,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 		err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
 			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 				pod := obj.(*example.Pod)
-				pod.Name = "foo-1"
+				pod.Spec.NodeName = "node-1"
 				secondToEnter.Wait()
 				return pod, nil
 			}), nil)
@@ -4178,7 +4178,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 			}
 			updateCount++
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-2"
+			pod.Spec.NodeName = "node-2"
 			return pod, nil
 		}), nil)
 	if err != nil {
@@ -4928,9 +4928,9 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.ErrorContains(t, store.Create(ctx, "/pods.apps", createObj, createOut, 0), "lacks resource prefix")
 	require.ErrorContains(t, store.Create(ctx, "/foo/", createObj, createOut, 0), "lacks resource prefix")
 	require.NoError(t, store.Create(ctx, "/pods/", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/name", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/namespace", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/namespace/name", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/name", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "namespace"}}, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace/name", &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "namespace", Name: "name"}}, createOut, 0))
 
 	listOut := &example.PodList{}
 	recursiveListOpts := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
@@ -4949,7 +4949,7 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.NoError(t, store.GetList(ctx, "/pods/namespace/name", recursiveListOpts, listOut))
 
 	getOut := &example.Pod{}
-	getOpts := storage.GetOptions{IgnoreNotFound: true}
+	getOpts := storage.GetOptions{}
 	require.ErrorContains(t, store.Get(ctx, "", getOpts, getOut), "empty key")
 	require.ErrorContains(t, store.Get(ctx, "/", getOpts, getOut), "empty key")
 	require.ErrorContains(t, store.Get(ctx, ".", getOpts, getOut), "invalid key")
@@ -4990,10 +4990,9 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.NoError(t, err)
 	w.Stop()
 
-	updateIn := &example.Pod{}
 	updateOut := &example.Pod{}
 	updateFunc := func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return updateIn, nil, nil
+		return input, nil, nil
 	}
 	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "", updateOut, false, nil, updateFunc, nil), "empty key")
 	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/", updateOut, false, nil, updateFunc, nil), "empty key")

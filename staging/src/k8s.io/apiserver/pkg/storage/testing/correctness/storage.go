@@ -88,6 +88,10 @@ func (s *ModelStorage) GuaranteedUpdate(ctx context.Context, key string, destina
 	}, destination)
 }
 
+func (s *ModelStorage) Update(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	return s.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+}
+
 func (s *ModelStorage) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	return s.execute(Request{
 		Op:  OpGet,

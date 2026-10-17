@@ -3854,10 +3854,12 @@ func TestOptimisticConcurrency(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Run("Delete", func(t *testing.T) {
+			t.Run("Delete with ConsistentGetFromCache disabled", func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, false)
 				var gotDeleteCached runtime.Object
 				deleteCalled := false
-				backingStorage.DeleteFn = func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, cachedExistingObject runtime.Object, _ storage.DeleteOptions) error {
+				backingStorage.DeleteFn = func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+					require.False(t, opts.FailOnConflict)
 					deleteCalled = true
 					gotDeleteCached = cachedExistingObject
 					return nil
@@ -3871,7 +3873,8 @@ func TestOptimisticConcurrency(t *testing.T) {
 				}
 			})
 
-			t.Run("GuaranteedUpdate", func(t *testing.T) {
+			t.Run("GuaranteedUpdate with ConsistentGetFromCache disabled", func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, false)
 				var gotUpdateCached runtime.Object
 				updateCalled := false
 				backingStorage.GuaranteedUpdateFn = func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, cachedExistingObject runtime.Object) error {
@@ -3889,4 +3892,170 @@ func TestOptimisticConcurrency(t *testing.T) {
 			})
 		})
 	}
+
+	t.Run("ConsistentGetFromCache enabled", func(t *testing.T) {
+		forceRequestWatchProgressSupport(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
+		key := "/pods/ns/pod-1"
+
+		backingStorage.GetFn = func(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+			t.Fatalf("unexpected backingStorage.Get call")
+			return nil
+		}
+		backingStorage.GuaranteedUpdateFn = func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
+			t.Fatalf("unexpected backingStorage.GuaranteedUpdate call")
+			return nil
+		}
+
+		t.Run("GuaranteedUpdate failed precondition waits for watch cache without etcd Get", func(t *testing.T) {
+			updatedPod := cachedPod.DeepCopy()
+			updatedPod.UID = "uid-2"
+			updatedPod.ResourceVersion = "102"
+
+			getRVCalled := false
+			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+				getRVCalled = true
+				require.NoError(t, cacher.watchCache.Update(updatedPod))
+				return 102, nil
+			}
+
+			var seenCached []*example.Pod
+			backingStorage.UpdateFn = func(_ context.Context, k string, _ runtime.Object, _ bool, pre *storage.Preconditions, _ storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+				require.NotNil(t, cachedExistingObject)
+				seenCached = append(seenCached, cachedExistingObject.(*example.Pod))
+				return pre.Check(k, cachedExistingObject)
+			}
+
+			err := delegator.GuaranteedUpdate(context.Background(), key, &example.Pod{}, false, &storage.Preconditions{UID: &uidMismatch}, nil, nil)
+			require.NoError(t, err)
+			require.True(t, getRVCalled)
+			require.Equal(t, []*example.Pod{cachedPod, updatedPod}, seenCached)
+		})
+
+		t.Run("GuaranteedUpdate tryUpdate conflict on stale cache falls back to consistent Get from cache", func(t *testing.T) {
+			updatedPod := cachedPod.DeepCopy()
+			updatedPod.UID = "uid-2"
+			updatedPod.ResourceVersion = "103"
+
+			getRVCalled := false
+			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+				getRVCalled = true
+				require.NoError(t, cacher.watchCache.Update(updatedPod))
+				return 103, nil
+			}
+
+			var seenCached []*example.Pod
+			backingStorage.UpdateFn = func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+				require.NotNil(t, cachedExistingObject)
+				pod := cachedExistingObject.(*example.Pod)
+				seenCached = append(seenCached, pod)
+				if pod.ResourceVersion != "103" {
+					return apierrors.NewConflict(example.Resource("pods"), pod.Name, errors.New("stale RV in tryUpdate"))
+				}
+				return nil
+			}
+
+			err := delegator.GuaranteedUpdate(context.Background(), key, &example.Pod{}, false, nil, nil, nil)
+			require.NoError(t, err)
+			require.True(t, getRVCalled)
+			require.Len(t, seenCached, 2)
+			require.Equal(t, "102", seenCached[0].ResourceVersion)
+			require.Equal(t, updatedPod, seenCached[1])
+		})
+
+		t.Run("GuaranteedUpdate conflict reads RV from error and waits for watch cache without etcd Get or GetCurrentResourceVersion", func(t *testing.T) {
+			conflictPod := cachedPod.DeepCopy()
+			conflictPod.UID = "uid-2"
+			conflictPod.ResourceVersion = "104"
+
+			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+				t.Fatalf("unexpected backingStorage.GetCurrentResourceVersion call on conflict")
+				return 0, nil
+			}
+
+			attempts := 0
+			var seenCached []*example.Pod
+			backingStorage.UpdateFn = func(_ context.Context, k string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+				require.NotNil(t, cachedExistingObject)
+				seenCached = append(seenCached, cachedExistingObject.(*example.Pod))
+				attempts++
+				if attempts == 1 {
+					go func() {
+						_ = cacher.watchCache.Update(conflictPod)
+					}()
+					return storage.NewResourceVersionConflictsError(k, 104)
+				}
+				return nil
+			}
+
+			err := delegator.GuaranteedUpdate(context.Background(), key, &example.Pod{}, false, nil, nil, nil)
+			require.NoError(t, err)
+			require.Equal(t, 2, attempts)
+			require.Len(t, seenCached, 2)
+			require.Equal(t, "103", seenCached[0].ResourceVersion)
+			require.Equal(t, conflictPod, seenCached[1])
+		})
+
+		t.Run("Delete failed precondition waits for watch cache without etcd Get", func(t *testing.T) {
+			updatedPod := cachedPod.DeepCopy()
+			updatedPod.UID = "uid-1"
+			updatedPod.ResourceVersion = "105"
+
+			getRVCalled := false
+			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+				getRVCalled = true
+				require.NoError(t, cacher.watchCache.Update(updatedPod))
+				return 105, nil
+			}
+
+			var seenCached []*example.Pod
+			backingStorage.DeleteFn = func(_ context.Context, k string, _ runtime.Object, pre *storage.Preconditions, _ storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+				require.True(t, opts.FailOnConflict)
+				require.NotNil(t, cachedExistingObject)
+				seenCached = append(seenCached, cachedExistingObject.(*example.Pod))
+				return pre.Check(k, cachedExistingObject)
+			}
+
+			err := delegator.Delete(context.Background(), key, &example.Pod{}, &storage.Preconditions{UID: &uidMatch}, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+			require.NoError(t, err)
+			require.True(t, getRVCalled)
+			require.Len(t, seenCached, 2)
+			require.Equal(t, "104", seenCached[0].ResourceVersion)
+			require.Equal(t, updatedPod, seenCached[1])
+		})
+
+		t.Run("Delete conflict reads RV from error and waits for watch cache without etcd Get or GetCurrentResourceVersion", func(t *testing.T) {
+			conflictPod := cachedPod.DeepCopy()
+			conflictPod.UID = "uid-1"
+			conflictPod.ResourceVersion = "106"
+
+			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+				t.Fatalf("unexpected backingStorage.GetCurrentResourceVersion call on conflict")
+				return 0, nil
+			}
+
+			attempts := 0
+			var seenCached []*example.Pod
+			backingStorage.DeleteFn = func(_ context.Context, k string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+				require.True(t, opts.FailOnConflict)
+				require.NotNil(t, cachedExistingObject)
+				seenCached = append(seenCached, cachedExistingObject.(*example.Pod))
+				attempts++
+				if attempts == 1 {
+					go func() {
+						_ = cacher.watchCache.Update(conflictPod)
+					}()
+					return storage.NewResourceVersionConflictsError(k, 106)
+				}
+				return nil
+			}
+
+			err := delegator.Delete(context.Background(), key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+			require.NoError(t, err)
+			require.Equal(t, 2, attempts)
+			require.Len(t, seenCached, 2)
+			require.Equal(t, "105", seenCached[0].ResourceVersion)
+			require.Equal(t, conflictPod, seenCached[1])
+		})
+	})
 }

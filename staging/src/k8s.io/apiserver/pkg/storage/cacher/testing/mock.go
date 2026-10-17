@@ -39,6 +39,7 @@ type MockStorage struct {
 	WatchFn            func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 	DeleteFn           func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error
 	GuaranteedUpdateFn func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error
+	UpdateFn           func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error
 
 	// use GetRequestWatchProgressCounter when reading
 	// the value of the counter
@@ -124,6 +125,12 @@ func (d *MockStorage) GetList(ctx context.Context, resPrefix string, opts storag
 func (d *MockStorage) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	if d.GuaranteedUpdateFn != nil {
 		return d.GuaranteedUpdateFn(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+	}
+	return fmt.Errorf("unimplemented")
+}
+func (d *MockStorage) Update(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	if d.UpdateFn != nil {
+		return d.UpdateFn(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 	}
 	return fmt.Errorf("unimplemented")
 }

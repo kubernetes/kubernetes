@@ -251,6 +251,11 @@ type Interface interface {
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
+	// Update updates key 'key' (of type 'destination') without retrying on storage transaction conflict.
+	Update(
+		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
+
 	// Stats returns storage stats.
 	Stats(ctx context.Context) (Stats, error)
 
@@ -367,6 +372,10 @@ type DeleteOptions struct {
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
 	ExpectTransformOrDecodeError bool
+
+	// FailOnConflict, if enabled, deletes the cachedExistingObject without
+	// retrying on storage transaction conflict.
+	FailOnConflict bool
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {

@@ -382,12 +382,15 @@ func (s *store) Delete(
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
 		expectTransformOrDecodeError = opts.ExpectTransformOrDecodeError
 	}
-	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, expectTransformOrDecodeError)
+	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, expectTransformOrDecodeError, !opts.FailOnConflict)
 }
 
 func (s *store) conditionalDelete(
 	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, expectTransformOrDecodeError bool) error {
+	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, expectTransformOrDecodeError, guaranteed bool) error {
+	if !guaranteed && cachedExistingObject == nil {
+		return fmt.Errorf("cachedExistingObject must not be nil for non-guaranteed delete")
+	}
 	getCurrentState := s.getCurrentState(ctx, "deleteGet", key, v, false, expectTransformOrDecodeError)
 
 	var origState *objState
@@ -395,6 +398,7 @@ func (s *store) conditionalDelete(
 	var origStateIsCurrent bool
 	if cachedExistingObject != nil && !expectTransformOrDecodeError {
 		origState, err = s.getStateFromObject(cachedExistingObject)
+		origStateIsCurrent = !guaranteed
 	} else {
 		origState, err = getCurrentState()
 		origStateIsCurrent = true
@@ -459,13 +463,20 @@ func (s *store) conditionalDelete(
 
 		startTime := time.Now()
 		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
-			GetOnFailure: true,
+			GetOnFailure: guaranteed,
 		})
 		metrics.RecordEtcdRequest("delete", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
 		if err != nil {
 			return err
 		}
 		if !txnResp.Succeeded {
+			if !guaranteed {
+				rev := txnResp.Revision
+				if rev <= 0 {
+					rev = origState.rev
+				}
+				return storage.NewResourceVersionConflictsError(key, rev)
+			}
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 			if err != nil {
@@ -490,11 +501,31 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	return s.update(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject, true)
+}
+
+// Update implements storage.Interface.Update.
+func (s *store) Update(
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	return s.update(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject, false)
+}
+
+func (s *store) update(
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object, guaranteed bool) error {
+	if !guaranteed && cachedExistingObject == nil {
+		return fmt.Errorf("cachedExistingObject must not be nil for non-guaranteed update")
+	}
 	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
-	ctx, span := tracing.Start(ctx, "GuaranteedUpdate etcd3",
+	spanName := "Update etcd3"
+	if guaranteed {
+		spanName = "GuaranteedUpdate etcd3"
+	}
+	ctx, span := tracing.Start(ctx, spanName,
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
 		attribute.String("type", getTypeName(destination)),
@@ -513,6 +544,7 @@ func (s *store) GuaranteedUpdate(
 	var origStateIsCurrent bool
 	if cachedExistingObject != nil {
 		origState, err = s.getStateFromObject(cachedExistingObject)
+		origStateIsCurrent = !guaranteed
 	} else {
 		origState, err = getCurrentState()
 		origStateIsCurrent = true
@@ -621,7 +653,7 @@ func (s *store) GuaranteedUpdate(
 		startTime := time.Now()
 
 		txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.rev, kubernetes.PutOptions{
-			GetOnFailure: true,
+			GetOnFailure: guaranteed,
 			LeaseID:      lease,
 		})
 		metrics.RecordEtcdRequest("update", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
@@ -632,6 +664,13 @@ func (s *store) GuaranteedUpdate(
 		span.AddEvent("Txn call completed")
 		span.AddEvent("Transaction committed")
 		if !txnResp.Succeeded {
+			if !guaranteed {
+				rev := txnResp.Revision
+				if rev <= 0 {
+					rev = origState.rev
+				}
+				return storage.NewResourceVersionConflictsError(preparedKey, rev)
+			}
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
 			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 			if err != nil {
@@ -1269,15 +1308,17 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 
 	// Compute the serialized form - for that we need to temporarily clean
 	// its resource version field (those are not stored in etcd).
-	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
-		return nil, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
-	}
-	state.data, err = runtime.Encode(s.codec, obj)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.versioner.UpdateObject(state.obj, uint64(rv)); err != nil {
-		klog.Errorf("failed to update object version: %v", err)
+	if rv > 0 {
+		if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
+			return nil, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+		}
+		state.data, err = runtime.Encode(s.codec, obj)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.versioner.UpdateObject(state.obj, uint64(rv)); err != nil {
+			klog.Errorf("failed to update object version: %v", err)
+		}
 	}
 	return state, nil
 }

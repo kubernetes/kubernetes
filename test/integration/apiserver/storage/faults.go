@@ -350,6 +350,16 @@ func (s *bookmarkDroppingStore) GuaranteedUpdate(ctx context.Context, key string
 	return err
 }
 
+func (s *bookmarkDroppingStore) Update(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	s.writeMu.RLock()
+	defer s.writeMu.RUnlock()
+	err := s.Interface.Update(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+	if err == nil {
+		s.writesSeen.Add(1)
+	}
+	return err
+}
+
 func (s *bookmarkDroppingStore) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 	if s.stallDuration > 0 && s.writesSeen.Load() >= 100 && s.stalled.CompareAndSwap(false, true) {
 		ready := make(chan struct{})

@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -78,17 +79,76 @@ func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) err
 }
 
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
-	// Ignore the suggestion and try to pass down the current version of the object
-	// read from cache.
-	if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
-		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists && preconditions.Check(key, obj) == nil {
-		// DeepCopy the object since we modify resource version when serializing the
-		// current object.
-		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, obj.DeepCopyObject(), opts)
+	if !c.cacher.Ready() || opts.ExpectTransformOrDecodeError {
+		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
 	}
-	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
+	if delegator.ShouldDelegateGet(storage.GetOptions{}).ShouldDelegate {
+		// Ignore the suggestion and try to pass down the current version of the object
+		// read from cache.
+		if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
+			klog.Errorf("GetByKey returned error: %v", err)
+		} else if exists && preconditions.Check(key, obj) == nil {
+			// DeepCopy the object since we modify resource version when serializing the
+			// current object.
+			return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, obj.DeepCopyObject(), opts)
+		}
+		// If we couldn't get the object, fallback to no-suggestion.
+		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
+	}
+
+	key, err := c.cacher.prepareKey(key, false)
+	if err != nil {
+		return err
+	}
+	deleteOpts := opts
+	deleteOpts.FailOnConflict = true
+	fresh := false
+	currObj, exists, readRV, err := c.cacher.get(ctx, key, "0")
+	for {
+		var cachedRV uint64
+		var hasCachedRV bool
+		if err == nil {
+			if !exists {
+				err = storage.NewKeyNotFoundError(key, int64(readRV))
+			} else {
+				if rv, rvErr := c.cacher.versioner.ObjectResourceVersion(currObj); rvErr == nil {
+					cachedRV = rv
+					hasCachedRV = true
+				}
+				err = c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj.DeepCopyObject(), deleteOpts)
+				if err == nil {
+					return nil
+				}
+			}
+		}
+		if rv, ok := storage.ResourceVersion(err); ok && storage.IsConflict(err) {
+			klog.V(4).Infof("Delete of %s conflicted, waiting for watch cache to reach revision %s", key, rv)
+			if currObj, exists, readRV, err = c.cacher.get(ctx, key, rv); err != nil {
+				if storage.IsTooLargeResourceVersion(err) {
+					return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
+				}
+				return err
+			}
+			fresh = true
+			continue
+		}
+		if !fresh {
+			fresh = true
+			var getErr error
+			currObj, exists, readRV, getErr = c.cacher.get(ctx, key, "")
+			if storage.IsTooLargeResourceVersion(getErr) {
+				return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
+			}
+			if getErr == nil && exists && hasCachedRV {
+				if freshRV, rvErr := c.cacher.versioner.ObjectResourceVersion(currObj); rvErr == nil && freshRV == cachedRV {
+					return err
+				}
+			}
+			err = getErr
+			continue
+		}
+		return err
+	}
 }
 
 func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
@@ -210,18 +270,101 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
+func (c *CacheDelegator) Update(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	return fmt.Errorf("cacher doesn't support Update")
+}
+
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	// Ignore the suggestion and try to pass down the current version of the object
-	// read from cache.
-	if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
-		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists && preconditions.Check(key, obj) == nil {
-		// DeepCopy the object since we modify resource version when serializing the
-		// current object.
-		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, obj.DeepCopyObject())
+	if !c.cacher.Ready() {
+		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 	}
-	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
+	if delegator.ShouldDelegateGet(storage.GetOptions{}).ShouldDelegate {
+		// Ignore the suggestion and try to pass down the current version of the object
+		// read from cache.
+		if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
+			klog.Errorf("GetByKey returned error: %v", err)
+		} else if exists && preconditions.Check(key, obj) == nil {
+			// DeepCopy the object since we modify resource version when serializing the
+			// current object.
+			return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, obj.DeepCopyObject())
+		}
+		// If we couldn't get the object, fallback to no-suggestion.
+		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
+	}
+
+	key, err := c.cacher.prepareKey(key, false)
+	if err != nil {
+		return err
+	}
+	fresh := false
+	currObj, exists, readRV, err := c.cacher.get(ctx, key, "0")
+	for {
+		var cachedRV uint64
+		var hasCachedRV bool
+		if err == nil {
+			if !exists {
+				if !ignoreNotFound {
+					err = storage.NewKeyNotFoundError(key, int64(readRV))
+				} else {
+					currObj = c.cacher.newFunc()
+				}
+			}
+			if err == nil {
+				if rv, rvErr := c.cacher.versioner.ObjectResourceVersion(currObj); rvErr == nil {
+					cachedRV = rv
+					hasCachedRV = true
+				}
+				var objToPass runtime.Object
+				if exists {
+					objToPass = currObj.DeepCopyObject()
+				} else {
+					objToPass = currObj
+				}
+				err = c.storage.Update(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, objToPass)
+				if err == nil {
+					if fresh {
+						return nil
+					}
+					destRV, destErr := c.cacher.versioner.ObjectResourceVersion(destination)
+					if hasCachedRV && destErr == nil && cachedRV != destRV {
+						return nil
+					}
+				}
+			}
+		}
+		if rv, ok := storage.ResourceVersion(err); ok && storage.IsConflict(err) {
+			klog.V(4).Infof("GuaranteedUpdate of %s conflicted, waiting for watch cache to reach revision %s", key, rv)
+			if currObj, exists, readRV, err = c.cacher.get(ctx, key, rv); err != nil {
+				if storage.IsTooLargeResourceVersion(err) {
+					return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
+				}
+				return err
+			}
+			fresh = true
+			continue
+		}
+		if !fresh {
+			fresh = true
+			var getErr error
+			currObj, exists, readRV, getErr = c.cacher.get(ctx, key, "")
+			if storage.IsTooLargeResourceVersion(getErr) {
+				return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
+			}
+			if getErr == nil && hasCachedRV {
+				if !exists && ignoreNotFound && cachedRV == 0 {
+					return err
+				}
+				if exists {
+					if freshRV, rvErr := c.cacher.versioner.ObjectResourceVersion(currObj); rvErr == nil && freshRV == cachedRV {
+						return err
+					}
+				}
+			}
+			err = getErr
+			continue
+		}
+		return err
+	}
 }
 
 func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {
