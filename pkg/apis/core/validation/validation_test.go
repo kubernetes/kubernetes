@@ -24749,6 +24749,12 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
 	}, {
+		name:        "pod with Ulimits",
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{Ulimits: &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](1024), Hard: ptr.To[int64](2048)}}}}}},
+		expectError: true,
+		errorMsg:    "cannot be set for a windows pod",
+		errorType:   "FieldValueForbidden",
+	}, {
 		name:        "pod with WindowsOptions, no error",
 		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}}}},
 		expectError: false,
@@ -24792,6 +24798,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.RunAsUser",
 		"Containers[*].SecurityContext.SELinuxOptions",
 		"Containers[*].SecurityContext.SeccompProfile",
+		"Containers[*].SecurityContext.Ulimits",
 		"Containers[*].SecurityContext.WindowsOptions",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
@@ -24803,6 +24810,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.RunAsUser",
 		"InitContainers[*].SecurityContext.SELinuxOptions",
 		"InitContainers[*].SecurityContext.SeccompProfile",
+		"InitContainers[*].SecurityContext.Ulimits",
 		"InitContainers[*].SecurityContext.WindowsOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
@@ -24814,6 +24822,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsUser",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SELinuxOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Ulimits",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
 		"OS",
 		"SecurityContext.AppArmorProfile",
@@ -25178,6 +25187,47 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 	}
 }
 
+func TestValidateMsgqueueUlimit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		soft       *int64
+		hard       *int64
+		errorType  field.ErrorType
+		errorField string
+	}{
+		{name: "zero", soft: ptr.To[int64](0), hard: ptr.To[int64](0)},
+		{name: "finite", soft: ptr.To[int64](819200), hard: ptr.To[int64](1048576)},
+		{name: "maximum", soft: ptr.To[int64](17179869184), hard: ptr.To[int64](17179869184)},
+		{name: "unlimited", soft: ptr.To[int64](-1), hard: ptr.To[int64](-1)},
+		{name: "unlimited hard", soft: ptr.To[int64](819200), hard: ptr.To[int64](-1)},
+		{name: "soft below minimum", soft: ptr.To[int64](-2), hard: ptr.To[int64](0), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "hard below minimum", soft: ptr.To[int64](-2), hard: ptr.To[int64](-2), errorType: field.ErrorTypeInvalid, errorField: "hard"},
+		{name: "soft above maximum", soft: ptr.To[int64](17179869185), hard: ptr.To[int64](-1), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "hard above maximum", soft: ptr.To[int64](0), hard: ptr.To[int64](17179869185), errorType: field.ErrorTypeInvalid, errorField: "hard"},
+		{name: "soft exceeds hard", soft: ptr.To[int64](1), hard: ptr.To[int64](0), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "unlimited soft with finite hard", soft: ptr.To[int64](-1), hard: ptr.To[int64](819200), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "missing soft", hard: ptr.To[int64](819200), errorType: field.ErrorTypeRequired, errorField: "soft"},
+		{name: "missing hard", soft: ptr.To[int64](819200), errorType: field.ErrorTypeRequired, errorField: "hard"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := &core.SecurityContext{Ulimits: &core.Ulimits{Msgqueue: &core.Ulimit{Soft: tc.soft, Hard: tc.hard}}}
+			errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false)
+			if tc.errorType == "" {
+				if len(errs) != 0 {
+					t.Fatalf("expected valid msgqueue limits, got %v", errs)
+				}
+				return
+			}
+			for _, err := range errs {
+				if err.Type == tc.errorType && err.Field == "securityContext.ulimits.msgqueue."+tc.errorField {
+					return
+				}
+			}
+			t.Errorf("expected %s error for msgqueue.%s, got %v", tc.errorType, tc.errorField, errs)
+		})
+	}
+}
+
 func TestValidateSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
@@ -25215,6 +25265,12 @@ func TestValidateSecurityContext(t *testing.T) {
 	defPmt := core.DefaultProcMount
 	procMountSet.ProcMount = &defPmt
 
+	ulimitsSet := fullValidSC()
+	ulimitsSet.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](1024), Hard: ptr.To[int64](2048)}}
+
+	ulimitsUnlimitedSet := fullValidSC()
+	ulimitsUnlimitedSet.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)}}
+
 	umPmt := core.UnmaskedProcMount
 	procMountUnmasked := fullValidSC()
 	procMountUnmasked.ProcMount = &umPmt
@@ -25237,6 +25293,8 @@ func TestValidateSecurityContext(t *testing.T) {
 		"proc mount set":                         {procMountSet, true, false},
 		"proc mount unmasked":                    {procMountUnmasked, false, false},
 		"sys admin without privilege escalation": {sysAdminPriv, false, true},
+		"ulimits set":                            {ulimitsSet, false, false},
+		"ulimits unlimited":                      {ulimitsUnlimitedSet, false, false},
 	}
 	for k, v := range successCases {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin); len(errs) != 0 {
@@ -25258,6 +25316,36 @@ func TestValidateSecurityContext(t *testing.T) {
 	capSysAdminWithoutEscalation := fullValidSC()
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
 	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
+
+	softExceedsHard := fullValidSC()
+	softExceedsHard.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](4096), Hard: ptr.To[int64](2048)}}
+
+	nofileOverMax := fullValidSC()
+	nofileOverMax.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](1024), Hard: ptr.To[int64](1048577)}}
+
+	nofileBelowMin := fullValidSC()
+	nofileBelowMin.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](255), Hard: ptr.To[int64](256)}}
+
+	niceBelowMin := fullValidSC()
+	niceBelowMin.Ulimits = &core.Ulimits{Nice: &core.Ulimit{Soft: ptr.To[int64](-2), Hard: ptr.To[int64](1)}}
+
+	niceAboveMax := fullValidSC()
+	niceAboveMax.Ulimits = &core.Ulimits{Nice: &core.Ulimit{Soft: ptr.To[int64](1), Hard: ptr.To[int64](41)}}
+
+	rtprioAboveMax := fullValidSC()
+	rtprioAboveMax.Ulimits = &core.Ulimits{Rtprio: &core.Ulimit{Soft: ptr.To[int64](10), Hard: ptr.To[int64](100)}}
+
+	stackBelowMin := fullValidSC()
+	stackBelowMin.Ulimits = &core.Ulimits{Stack: &core.Ulimit{Soft: ptr.To[int64](262143), Hard: ptr.To[int64](262144)}}
+
+	memlockBelowMin := fullValidSC()
+	memlockBelowMin.Ulimits = &core.Ulimits{Memlock: &core.Ulimit{Soft: ptr.To[int64](8191), Hard: ptr.To[int64](8192)}}
+
+	coreAboveMax := fullValidSC()
+	coreAboveMax.Ulimits = &core.Ulimits{Core: &core.Ulimit{Soft: ptr.To[int64](1024), Hard: ptr.To[int64](17179869185)}}
+
+	softUnlimitedWithFiniteHard := fullValidSC()
+	softUnlimitedWithFiniteHard.Ulimits = &core.Ulimits{Nofile: &core.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](4096)}}
 
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
@@ -25290,6 +25378,56 @@ func TestValidateSecurityContext(t *testing.T) {
 			sc:          procMountUnmasked,
 			errorType:   "FieldValueInvalid",
 			errorDetail: "`hostUsers` must be false to use `Unmasked`",
+		},
+		"ulimit soft exceeds hard": {
+			sc:          softExceedsHard,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be less than or equal to `hard`",
+		},
+		"nofile exceeds maximum value": {
+			sc:          nofileOverMax,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 256 and 65536 for `nofile`",
+		},
+		"nofile below minimum value": {
+			sc:          nofileBelowMin,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 256 and 65536 for `nofile`",
+		},
+		"nice below minimum value": {
+			sc:          niceBelowMin,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 0 and 40 for `nice`",
+		},
+		"nice above maximum value": {
+			sc:          niceAboveMax,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 0 and 40 for `nice`",
+		},
+		"rtprio above maximum value": {
+			sc:          rtprioAboveMax,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 0 and 99 for `rtprio`",
+		},
+		"stack below minimum value": {
+			sc:          stackBelowMin,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 262144 and 17179869184 for `stack`",
+		},
+		"memlock below minimum value": {
+			sc:          memlockBelowMin,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 8192 and 17179869184 for `memlock`",
+		},
+		"core above maximum value": {
+			sc:          coreAboveMax,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be -1 or between 0 and 17179869184 for `core`",
+		},
+		"soft unlimited with finite hard": {
+			sc:          softUnlimitedWithFiniteHard,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must not be -1 when `hard` is finite",
 		},
 	}
 	for k, v := range errorCases {
