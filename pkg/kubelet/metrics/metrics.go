@@ -79,6 +79,9 @@ const (
 	CgroupVersionKey           = "cgroup_version"
 	CRILosingSupportKey        = "cri_losing_support"
 
+	SecurityProfilePullDurationKey    = "security_profile_pull_duration_seconds"
+	SecurityProfilePullErrorsTotalKey = "security_profile_pull_errors_total"
+
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
@@ -1129,6 +1132,31 @@ var (
 		[]string{"image_size_in_bytes"},
 	)
 
+	// SecurityProfilePullDuration is a Histogram that tracks the duration (in seconds) of
+	// PullSecurityProfile calls, including the time spent in the waiting queue of the image puller.
+	// The cached label is true if the runtime served the profile from its storage.
+	SecurityProfilePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SecurityProfilePullDurationKey,
+			Help:           "Duration in seconds to pull a security profile.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 4, 10),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"cached"},
+	)
+
+	// SecurityProfilePullErrorsTotal counts failed PullSecurityProfile calls by reason.
+	SecurityProfilePullErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SecurityProfilePullErrorsTotalKey,
+			Help:           "Cumulative number of failed security profile pulls by the Kubelet.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
+
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1547,6 +1575,11 @@ func Register() {
 		)
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+			legacyregistry.MustRegister(SecurityProfilePullDuration)
+			legacyregistry.MustRegister(SecurityProfilePullErrorsTotal)
+		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
