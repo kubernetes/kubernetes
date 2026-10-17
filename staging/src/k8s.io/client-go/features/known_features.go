@@ -33,6 +33,7 @@ import (
 const (
 	// owner: @michaelasp
 	// beta: v1.36
+	// GA: v1.38
 	//
 	// Allow the client to process events atomically rather than a stream of
 	// events for items popped off the FIFO.
@@ -111,6 +112,7 @@ const (
 var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	AtomicFIFO: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: GA, LockToDefault: true},
 	},
 	ClientsAllowCARotation: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
