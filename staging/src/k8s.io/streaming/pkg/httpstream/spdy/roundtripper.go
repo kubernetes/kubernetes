@@ -414,6 +414,11 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
 	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
 		defer resp.Body.Close()
+		// Closing resp.Body does not close the raw connection dialed by RoundTrip, and
+		// no caller takes ownership of it on failure, so it would leak in CLOSE_WAIT.
+		if s.conn != nil {
+			defer s.conn.Close()
+		}
 		responseErrorBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("unable to upgrade connection: unable to read error from server response")
