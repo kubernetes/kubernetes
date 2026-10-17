@@ -115,10 +115,25 @@ func TestCreateWithKeyExist(t *testing.T) {
 	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
 }
 
+type cacherGetWrapper struct {
+	*CacheDelegator
+}
+
+func (c *cacherGetWrapper) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	return c.cacher.Get(ctx, key, opts, objPtr)
+}
+
 func TestGet(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGet(ctx, t, cacher)
+	t.Run("delegator", func(t *testing.T) {
+		ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
+	})
+	t.Run("cacher", func(t *testing.T) {
+		ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), &cacherGetWrapper{CacheDelegator: cacher})
+	})
 }
 
 func TestUnconditionalDelete(t *testing.T) {

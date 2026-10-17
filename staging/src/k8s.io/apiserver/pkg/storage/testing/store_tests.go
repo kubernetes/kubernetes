@@ -118,7 +118,7 @@ func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.
 	}
 }
 
-func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestGet(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
 	// create an object to test
 	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	// update the object once to allow get by exact resource version to be tested
@@ -133,15 +133,10 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
-	// create an additional object to increment the resource version for pods above the resource version of the foo object
-	secondObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test-ns"}}
-	lastUpdatedObj := &example.Pod{}
-	if err := store.Create(ctx, computePodKey(secondObj), secondObj, lastUpdatedObj, 0); err != nil {
-		t.Fatalf("Set failed: %v", err)
-	}
+	// Increase RV to test consistent Get.
+	lastUpdatedCurrentRV := int(increaseRV(ctx, t))
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
-	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
 	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("invalid")
 
 	// TODO(jpbetz): Add exact test cases
@@ -234,9 +229,12 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 				return
 			}
 			if tt.expectNotFoundErr {
-				if err == nil || !storage.IsNotFound(err) {
+				var storageErr *storage.StorageError
+				if !errors.As(err, &storageErr) || storageErr.Code != storage.ErrCodeKeyNotFound {
 					t.Errorf("expecting not found error, but get: %v", err)
+					return
 				}
+				assert.Equal(t, int64(lastUpdatedCurrentRV), storageErr.ResourceVersion)
 				return
 			}
 			if tt.expectRVTooLarge {
@@ -2686,6 +2684,12 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
+	}, {
+		name:                 "existing key, resourceVersionMatch=notOlderThan",
+		key:                  key,
+		pred:                 storage.Everything,
+		expectedAlternatives: [][]example.Pod{{}, {*prevStoredObj}, {*storedObj}},
+		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 	}, {
 		name:                 "existing key, resourceVersion=0",
 		key:                  key,

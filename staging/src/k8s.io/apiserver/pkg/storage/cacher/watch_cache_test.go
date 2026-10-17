@@ -586,28 +586,35 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 
 func TestWaitUntilFreshAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-	defer store.Stop()
+	for _, rv := range []string{"", "5"} {
+		t.Run(fmt.Sprintf("resourceVersion=%q", rv), func(t *testing.T) {
+			store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+			store.config.getCurrentRV = func(context.Context) (uint64, error) {
+				return 5, nil
+			}
 
-	// In background, update the store.
-	go func() {
-		store.Add(makeTestPod("foo", 2))
-		store.Add(makeTestPod("bar", 5))
-	}()
+			// In background, update the store.
+			go func() {
+				store.Add(makeTestPod("foo", 2))
+				store.Add(makeTestPod("bar", 5))
+			}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, "5", "/prefix/ns/bar")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
-	}
-	if !exists {
-		t.Fatalf("no results returned: %#v", obj)
-	}
-	expected := makeTestStoreElement(makeTestPod("bar", 5))
-	if !apiequality.Semantic.DeepEqual(expected, obj) {
-		t.Errorf("expected %v, got %v", expected, obj)
+			obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, rv, "/prefix/ns/bar")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resourceVersion != 5 {
+				t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+			}
+			if !exists {
+				t.Fatalf("no results returned: %#v", obj)
+			}
+			expected := makeTestStoreElement(makeTestPod("bar", 5))
+			if !apiequality.Semantic.DeepEqual(expected, obj) {
+				t.Errorf("expected %v, got %v", expected, obj)
+			}
+		})
 	}
 }
 
