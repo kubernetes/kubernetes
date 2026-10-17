@@ -17,6 +17,7 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,6 +36,7 @@ func TestValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name        string
 		expectError bool
+		wantErr     string
 		old, new    node.RuntimeClass
 	}{{
 		name: "valid metadata update",
@@ -60,9 +62,8 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead example.com/gpu 18446744073709551616m",
-		expectError: true,
+		expectError: false,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Handler:    "bar",
@@ -85,9 +86,8 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead hugepages-2Mi 18446744073709551616",
-		expectError: true,
+		expectError: false,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Handler:    "bar",
@@ -111,6 +111,61 @@ func TestValidateUpdate(t *testing.T) {
 				},
 			},
 		},
+	}, {
+		name:        "changed hugepages-2Mi value must not ratchet off a different stored indivisible one",
+		expectError: true,
+		wantErr:     "overhead.limits[hugepages-2Mi]",
+		old: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+				},
+			},
+		},
+		new: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+			Handler: "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("3Mi"),
+				},
+			},
+		},
+	}, {
+		name:        "new hugepages-1Gi entry must not ratchet off an unrelated stored indivisible hugepages-2Mi",
+		expectError: true,
+		wantErr:     "overhead.limits[hugepages-1Gi]",
+		old: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+				},
+			},
+		},
+		new: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+			Handler: "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("3Mi"),
+				},
+			},
+		},
 	}}
 
 	for _, test := range tests {
@@ -121,8 +176,40 @@ func TestValidateUpdate(t *testing.T) {
 			errs := Strategy.ValidateUpdate(ctx, &test.new, &test.old)
 			if test.expectError && len(errs) == 0 {
 				t.Errorf("expected error")
+			} else if test.wantErr != "" && !strings.Contains(errs.ToAggregate().Error(), test.wantErr) {
+				t.Errorf("expected an error at %s, got %v", test.wantErr, errs)
 			} else if !test.expectError && len(errs) != 0 {
 				t.Errorf("unexpected error: %v", errs)
+			}
+		})
+	}
+}
+
+// TestValidateCreateDoesNotRatchet checks that a create is validated with no stored quantities and
+// no hugepages allowance: an invalid overhead is rejected even though it is the object's own value.
+func TestValidateCreateDoesNotRatchet(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		overhead core.ResourceList
+		wantErr  string
+	}{{
+		name:     "fractional extended resource",
+		overhead: core.ResourceList{"example.com/gpu": resource.MustParse("18446744073709551616m")},
+		wantErr:  "must be an integer",
+	}, {
+		name:     "indivisible hugepages",
+		overhead: core.ResourceList{core.ResourceMemory: resource.MustParse("10G"), "hugepages-2Mi": resource.MustParse("3Mi")},
+		wantErr:  "not positive integer multiple of hugepages-2Mi",
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			rc := &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Overhead:   &node.Overhead{PodFixed: tc.overhead},
+			}
+			errs := Strategy.Validate(genericapirequest.NewContext(), rc)
+			if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+				t.Errorf("expected an error containing %q, got %v", tc.wantErr, errs)
 			}
 		})
 	}
