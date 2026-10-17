@@ -620,6 +620,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.MemoryManagerPolicy = in.MemoryManagerPolicy
+	out.MemoryManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.MemoryManagerPolicyOptions))
 	out.TopologyManagerPolicy = in.TopologyManagerPolicy
 	out.TopologyManagerScope = in.TopologyManagerScope
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
@@ -833,6 +834,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.MemoryManagerPolicy = in.MemoryManagerPolicy
+	out.MemoryManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.MemoryManagerPolicyOptions))
 	out.TopologyManagerPolicy = in.TopologyManagerPolicy
 	out.TopologyManagerScope = in.TopologyManagerScope
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
