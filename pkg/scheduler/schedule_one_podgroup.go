@@ -388,6 +388,7 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
 	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
+	state.SetRecordFrameworkExtensionPointMetrics(true)
 
 	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
 	podsToActivate := framework.NewPodsToActivate()
@@ -1005,6 +1006,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 	// For now, always record plugin metrics until we understand its impact on performance.
 	podGroupCycleState.SetRecordPluginMetrics(true)
+	podGroupCycleState.SetRecordFrameworkExtensionPointMetrics(true)
 	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo, allNodes)
 	if !status.IsSuccess() {
 		return &podGroupAlgorithmResult{
@@ -1148,6 +1150,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	// For now, always record plugin metrics until we understand its impact on performance.
 	podGroupCycleState.SetRecordPluginMetrics(true)
+	podGroupCycleState.SetRecordFrameworkExtensionPointMetrics(true)
 	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo, allNodes)
 	if !status.IsSuccess() {
 		return &podGroupAlgorithmResult{
@@ -1181,6 +1184,8 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			}, nil
 		}
 		placementCycleState := framework.NewCycleState()
+		placementCycleState.SetRecordFrameworkExtensionPointMetrics(true)
+		placementCycleState.SetRecordPluginMetrics(true)
 		placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 		subtreeResult := map[fwk.EntityKey]*podGroupAlgorithmResult{}
 		result, placementRevertFns := sched.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
