@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -718,18 +717,16 @@ func wrapTestWithInjectedOperation(ctx context.Context, toWrap testCall, injectB
 		// Run the tested function (typically syncClaim/syncVolume) in a
 		// separate goroutine.
 		var testError error
-		var testFinished int32
+		done := make(chan struct{})
 
 		go func() {
 			testError = toWrap(ctrl, reactor, test)
 			// Let the "main" test function know that syncVolume has finished.
-			atomic.StoreInt32(&testFinished, 1)
+			close(done)
 		}()
 
 		// Wait for the controller to finish the test function.
-		for atomic.LoadInt32(&testFinished) == 0 {
-			time.Sleep(time.Millisecond * 10)
-		}
+		<-done
 
 		return testError
 	}
