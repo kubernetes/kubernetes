@@ -44,6 +44,7 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -56,7 +57,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -456,6 +457,14 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 
 	errs = append(errs, s.ComponentGlobalsRegistry.Validate()...)
 	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
+	if s.Generic.LeaderElectionRecoveryDeadline.Duration != 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.LeaderElectionRecovery) {
+			errs = append(errs, fmt.Errorf("leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+			errs = append(errs, fmt.Errorf("leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"))
+		}
+	}
 	errs = append(errs, s.KubeCloudShared.Validate()...)
 	errs = append(errs, s.AttachDetachController.Validate()...)
 	errs = append(errs, s.CSRSigningController.Validate()...)

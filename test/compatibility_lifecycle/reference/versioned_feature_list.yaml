@@ -1119,6 +1119,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.38"
+- name: LeaderElectionRecovery
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
