@@ -44,7 +44,7 @@ func setupController(ctx context.Context, clientset kubernetes.Interface) {
 	controller := NewStorageVersionGC(ctx, clientset, leaseInformer, storageVersionInformer)
 	informerFactory.StartWithContext(ctx)
 	// Using this ensure informer caches are fully populated before starting the controller.
-	if !cache.WaitForCacheSync(ctx.Done(), controller.leasesSynced, controller.storageVersionSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, controller.leasesSynced, controller.storageVersionSynced) {
 		panic("timed out waiting for caches to sync")
 	}
 	go controller.Run(context.Background())
