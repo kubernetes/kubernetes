@@ -4630,6 +4630,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 	tests := []struct {
 		name                             string
 		totalPods                        int32
+		partition                        int32
 		maxUnavailable                   *intstr.IntOrString
 		updateStrategy                   apps.StatefulSetUpdateStrategyType
 		podManagementPolicy              apps.PodManagementPolicyType
@@ -4645,6 +4646,19 @@ func TestStatefulSetMetrics(t *testing.T) {
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              1,
 			expectedMaxUnavailableValue:      2,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			// unavailablePodCount makes ordinals [0, count) unavailable; with partition=2 that
+			// is only below the update range. Budget ignores them, but the metric must still report 1.
+			name:                             "partition nonzero: unavailable below partition still counted in UnavailableReplicas",
+			totalPods:                        5,
+			partition:                        2,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              1,
+			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 1,
 		},
 		{
@@ -4766,7 +4780,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			// Create StatefulSet
 			set := newStatefulSet(test.totalPods)
 			if test.updateStrategy == apps.RollingUpdateStatefulSetStrategyType {
-				var partition int32 = 0
+				partition := test.partition
 				set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 					Type: apps.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
