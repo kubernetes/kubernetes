@@ -18,6 +18,7 @@ package feature
 
 import (
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -58,6 +59,16 @@ type Features struct {
 	EnableInterPodAffinityHostnameFastPath             bool
 	EnablePodGroupPreemptionPolicy                     bool
 	EnableCompositePodGroup                            bool
+}
+
+// ResourceFeatures converts scheduler plugin Features to resource.Features.
+func (f Features) ResourceFeatures() resource.Features {
+	return resource.Features{
+		PodLevelResources:                       f.EnablePodLevelResources,
+		InPlacePodVerticalScaling:               f.EnableInPlacePodVerticalScaling,
+		InPlacePodLevelResourcesVerticalScaling: f.EnableInPlacePodLevelResourcesVerticalScaling,
+		DRANodeAllocatableResources:             f.EnableDRANodeAllocatableResources,
+	}
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.

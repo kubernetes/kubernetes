@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -399,9 +400,10 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseStatusResources: true,
+		// TODO(pravk03): Evaluate include DRANodeAllocatableResources in quota evaluation.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           v1resource.Features(),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

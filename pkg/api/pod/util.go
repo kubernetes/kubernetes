@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -2197,7 +2198,7 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 		podLims = make(api.ResourceList)
 	}
 
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, v1resource.PodResourcesOptions())
 	for key, aggrCtrLim := range aggrCtrLims {
 		coreKey := api.ResourceName(key)
 		// Only default hugepages here; non-hugepage resources (CPU/Memory) are overcommittable and defaulted in subsequent steps.
@@ -2234,7 +2235,7 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 		podReqs = make(api.ResourceList)
 	}
 
-	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, resourcehelper.PodResourcesOptions{})
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, v1resource.PodResourcesOptions())
 	for key, aggrCtrReq := range aggrCtrReqs {
 		coreKey := api.ResourceName(key)
 		if _, exists := podReqs[coreKey]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && helper.IsOvercommitAllowed(coreKey) {
@@ -2336,7 +2337,7 @@ func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.Resourc
 		return nil
 	}
 
-	return resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
+	return resourcehelper.AggregateContainerLimits(v1Pod, v1resource.PodResourcesOptions())
 }
 
 var initContainerAnnotations = map[string]struct{}{

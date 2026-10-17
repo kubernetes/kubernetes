@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-helpers/resource"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	fwk "k8s.io/kube-scheduler/framework"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -107,8 +108,8 @@ type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 // extractPodScaleDown interprets the update of a pod and returns PodRequestScaledDown event if any pod's resource request(s) is scaled down.
 func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		UseStatusResources: true,
+		Features:           v1resource.Features(),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)
@@ -132,8 +133,8 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 // extractPodScaleUp interprets the update of a pod and returns PodRequestScaledUp event if any pod's resource request(s) is scaled up.
 func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		UseStatusResources: true,
+		Features:           v1resource.Features(),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)

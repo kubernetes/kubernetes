@@ -378,7 +378,7 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(
-					st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(), ResourceRequestsOptions{})},
+					st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(), feature.Features{})},
 			},
 			expectedStatusCode: fwk.Success,
 		},
@@ -386,7 +386,7 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			pod:                        st.MakePod().Obj(),
 			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
-				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Obj(), ResourceRequestsOptions{})},
+				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Obj(), feature.Features{})},
 			},
 			expectedStatusCode: fwk.Success,
 		},
@@ -398,7 +398,7 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().
 					Container("container1").Req(cpuAndMemory("500m", "1000")).
-					Container("container2").Req(cpuAndMemory("1500m", "3000")).Obj(), ResourceRequestsOptions{})},
+					Container("container2").Req(cpuAndMemory("1500m", "3000")).Obj(), feature.Features{})},
 			},
 			expectedStatusCode: fwk.Success,
 		},
@@ -428,7 +428,7 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 						v1.ResourceCPU:                        "1000m",
 						v1.ResourceMemory:                     "2000",
 						v1.ResourceName(extendedResourceName): "1",
-					}).Obj(), ResourceRequestsOptions{})},
+					}).Obj(), feature.Features{})},
 			},
 			expectedStatusCode: fwk.Success,
 		},
