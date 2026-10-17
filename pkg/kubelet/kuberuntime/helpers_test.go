@@ -603,7 +603,7 @@ func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	assert.Equal(t, resCfg.Unified, lcr.Unified)
 }
 
-func TestContainerByCreatedThenID(t *testing.T) {
+func TestContainerSort(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
@@ -611,6 +611,31 @@ func TestContainerByCreatedThenID(t *testing.T) {
 		input    []*runtimeapi.Container
 		expected []*runtimeapi.Container
 	}{
+		{
+			name: "different Attempt higher Attempt first",
+			input: []*runtimeapi.Container{
+				{
+					Id:        "c1",
+					CreatedAt: now.Add(-30 * time.Minute).Unix(),
+					Metadata:  &runtimeapi.ContainerMetadata{Attempt: 0},
+				},
+				{
+					Id:        "c2",
+					CreatedAt: now.Unix(),
+					Metadata:  &runtimeapi.ContainerMetadata{Attempt: 1},
+				},
+				{
+					Id:        "c3",
+					CreatedAt: now.Add(-10 * time.Minute).Unix(),
+					Metadata:  &runtimeapi.ContainerMetadata{Attempt: 2},
+				},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "c3"},
+				{Id: "c2"},
+				{Id: "c1"},
+			},
+		},
 		{
 			name: "different CreatedAt sort by time desc (newest first)",
 			input: []*runtimeapi.Container{
@@ -689,7 +714,7 @@ func TestContainerByCreatedThenID(t *testing.T) {
 			containers := make([]*runtimeapi.Container, len(tt.input))
 			copy(containers, tt.input)
 
-			sort.Sort(containerByCreatedThenID(containers))
+			sort.Sort(containerSort(containers))
 
 			assert.Len(t, containers, len(tt.expected), "length mismatch")
 
@@ -700,7 +725,7 @@ func TestContainerByCreatedThenID(t *testing.T) {
 	}
 }
 
-func TestPodSandboxByCreatedThenID(t *testing.T) {
+func TestPodSandboxSort(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
@@ -804,7 +829,7 @@ func TestPodSandboxByCreatedThenID(t *testing.T) {
 			sandboxes := make([]*runtimeapi.PodSandbox, len(tt.input))
 			copy(sandboxes, tt.input)
 
-			sort.Sort(podSandboxByCreatedThenID(sandboxes))
+			sort.Sort(podSandboxSort(sandboxes))
 
 			assert.Len(t, sandboxes, len(tt.expected), "length mismatch")
 
@@ -814,6 +839,120 @@ func TestPodSandboxByCreatedThenID(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expected, actualIDs, "sorting order mismatch")
+		})
+	}
+}
+
+func TestContainerStatusSort(t *testing.T) {
+	// Helper to create test ContainerStatus instances
+	now := time.Now()
+	makeStatus := func(restartCount int, createdAt time.Time, id string) *kubecontainer.Status {
+		return &kubecontainer.Status{
+			RestartCount: restartCount,
+			CreatedAt:    createdAt,
+			ID:           kubecontainer.ContainerID{ID: id},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		c        containerStatusSort
+		i, j     int
+		wantLess bool // true if c[i] should be considered "less than" c[j] (i.e., i comes before j)
+	}{
+		{
+			name: "higher RestartCount should come first",
+			c: containerStatusSort{
+				makeStatus(5, now, "id1"),
+				makeStatus(3, now, "id2"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: true,
+		},
+		{
+			name: "lower RestartCount should not come first",
+			c: containerStatusSort{
+				makeStatus(2, now, "id1"),
+				makeStatus(4, now, "id2"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: false,
+		},
+		{
+			name: "same RestartCount, newer CreatedAt should come first",
+			c: containerStatusSort{
+				makeStatus(10, now.Add(10*time.Minute), "id1"), // newer
+				makeStatus(10, now, "id2"),                     // older
+			},
+			i:        0,
+			j:        1,
+			wantLess: true,
+		},
+		{
+			name: "same RestartCount and CreatedAt, smaller ID should come first",
+			c: containerStatusSort{
+				makeStatus(5, now, "aaa"),
+				makeStatus(5, now, "bbb"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: true, // "aaa" < "bbb"
+		},
+		{
+			name: "same RestartCount and CreatedAt, larger ID should not come first",
+			c: containerStatusSort{
+				makeStatus(5, now, "zzz"),
+				makeStatus(5, now, "xxx"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: false, // "zzz" > "xxx"
+		},
+		{
+			name: "identical elements should return false",
+			c: containerStatusSort{
+				makeStatus(7, now, "same"),
+				makeStatus(7, now, "same"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: false,
+		},
+		{
+			name: "RestartCount takes priority over CreatedAt",
+			c: containerStatusSort{
+				makeStatus(1, now.Add(1*time.Hour), "old-high-restart"),
+				makeStatus(10, now.Add(-1*time.Hour), "new-low-restart"),
+			},
+			i:        1, // higher RestartCount
+			j:        0,
+			wantLess: true,
+		},
+		{
+			name: "edge case: zero RestartCount with same timestamp",
+			c: containerStatusSort{
+				makeStatus(0, now, "id-a"),
+				makeStatus(0, now, "id-b"),
+			},
+			i:        0,
+			j:        1,
+			wantLess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.Less(tt.i, tt.j)
+			if got != tt.wantLess {
+				t.Errorf("containerStatusSort.Less(%d, %d) = %v, want %v", tt.i, tt.j, got, tt.wantLess)
+			}
+
+			// Optional: verify antisymmetry (if i < j, then j should not be < i)
+			if got && tt.c.Less(tt.j, tt.i) {
+				t.Error("Less() should not return true in both directions for unequal elements")
+			}
 		})
 	}
 }

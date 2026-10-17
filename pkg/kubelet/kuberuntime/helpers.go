@@ -36,37 +36,57 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
-type containerByCreatedThenID []*runtimeapi.Container
+type containerSort []*runtimeapi.Container
 
-func (b containerByCreatedThenID) Len() int      { return len(b) }
-func (b containerByCreatedThenID) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
-func (b containerByCreatedThenID) Less(i, j int) bool {
-	if b[i].CreatedAt != b[j].CreatedAt {
-		return b[i].CreatedAt > (b[j].CreatedAt)
+func (b containerSort) Len() int      { return len(b) }
+func (b containerSort) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+
+func (b containerSort) Less(i, j int) bool {
+	var attemptI, attemptJ uint32
+	if b[i].Metadata != nil && b[j].Metadata != nil {
+		attemptI = b[i].Metadata.Attempt
+		attemptJ = b[j].Metadata.Attempt
 	}
-	return b[i].Id < b[j].Id
+
+	return kubecontainer.SortContainersByAttributes(
+		attemptI, attemptJ,
+		b[i].CreatedAt, b[j].CreatedAt,
+		b[i].Id, b[j].Id,
+	)
 }
 
 // Newest first.
-type podSandboxByCreatedThenID []*runtimeapi.PodSandbox
+type podSandboxSort []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreatedThenID) Len() int      { return len(p) }
-func (p podSandboxByCreatedThenID) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreatedThenID) Less(i, j int) bool {
-	if p[i].Metadata == nil || p[j].Metadata == nil || (p[i].Metadata.Attempt == p[j].Metadata.Attempt) {
-		if p[i].CreatedAt != p[j].CreatedAt {
-			return p[i].CreatedAt > p[j].CreatedAt
-		}
-		return p[i].Id < p[j].Id
+func (p podSandboxSort) Len() int      { return len(p) }
+func (p podSandboxSort) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+func (p podSandboxSort) Less(i, j int) bool {
+	var attemptI, attemptJ uint32
+	if p[i].Metadata != nil && p[j].Metadata != nil {
+		attemptI = p[i].Metadata.Attempt
+		attemptJ = p[j].Metadata.Attempt
 	}
-	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
+
+	return kubecontainer.SortContainersByAttributes(
+		attemptI, attemptJ,
+		p[i].CreatedAt, p[j].CreatedAt,
+		p[i].Id, p[j].Id,
+	)
 }
 
-type containerStatusByCreated []*kubecontainer.Status
+type containerStatusSort []*kubecontainer.Status
 
-func (c containerStatusByCreated) Len() int           { return len(c) }
-func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
-func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+func (c containerStatusSort) Len() int      { return len(c) }
+func (c containerStatusSort) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+
+func (c containerStatusSort) Less(i, j int) bool {
+	return kubecontainer.SortContainersStatusByAttributes(
+		c[i].RestartCount, c[j].RestartCount,
+		c[i].CreatedAt, c[j].CreatedAt,
+		c[i].ID.ID, c[j].ID.ID,
+	)
+}
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
