@@ -90,7 +90,6 @@ func TestMatcher(t *testing.T) {
 
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 
-	// TODO write test cases for name matching and exclude matching
 	testcases := []struct {
 		name string
 
@@ -447,6 +446,97 @@ func TestMatcher(t *testing.T) {
 			},
 			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
+		},
+		{
+			name: "exclude resource with name match",
+			criteria: &v1.MatchResources{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []v1.NamedRuleWithOperations{{
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+					},
+				}},
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
+					ResourceNames: []string{"name"},
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}},
+			},
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches: false,
+		},
+		{
+			name: "exclude resource with name miss",
+			criteria: &v1.MatchResources{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []v1.NamedRuleWithOperations{{
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+					},
+				}},
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
+					ResourceNames: []string{"other-name"},
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}},
+			},
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
+		},
+		{
+			name: "exclude equivalent resource match",
+			criteria: &v1.MatchResources{
+				MatchPolicy:       &equivalentMatch,
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []v1.NamedRuleWithOperations{{
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+					},
+				}},
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}},
+			},
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches: false,
+		},
+		{
+			name: "exclude equivalent resource with name miss",
+			criteria: &v1.MatchResources{
+				MatchPolicy:       &equivalentMatch,
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []v1.NamedRuleWithOperations{{
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+					},
+				}},
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
+					ResourceNames: []string{"other-name"},
+					RuleWithOperations: v1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}},
+			},
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
 		},
 		{
 			name: "treat empty ResourceRules as match",
