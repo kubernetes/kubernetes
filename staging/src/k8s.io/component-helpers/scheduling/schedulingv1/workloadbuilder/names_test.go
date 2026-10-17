@@ -84,6 +84,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 		name     string
 		workload string
 		template string
+		uid      types.UID
 		want     func(t *testing.T, generated string)
 	}{
 		{
@@ -127,7 +128,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: strings.Repeat("workload", 40),
 			template: strings.Repeat("template", 40),
 			want: func(t *testing.T, generated string) {
-				if generated != GeneratePodGroupName(strings.Repeat("workload", 40), strings.Repeat("template", 40)) {
+				if generated != GeneratePodGroupName(strings.Repeat("workload", 40), strings.Repeat("template", 40), "") {
 					t.Fatal("generated name is not deterministic")
 				}
 			},
@@ -137,8 +138,50 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: strings.Repeat("workload", 40),
 			template: strings.Repeat("template", 40),
 			want: func(t *testing.T, generated string) {
-				if generated == GeneratePodGroupName(strings.Repeat("workload", 40), "other-template") {
+				if generated == GeneratePodGroupName(strings.Repeat("workload", 40), "other-template", "") {
 					t.Fatal("different templates should produce different names")
+				}
+			},
+		},
+		{
+			name:     "owner UID is part of the hash and the name is stable",
+			workload: "workload",
+			template: "template",
+			uid:      "uid-1",
+			want: func(t *testing.T, generated string) {
+				if generated != "workload-template-57db668b94" {
+					t.Fatalf("unexpected generated name: %q", generated)
+				}
+				if generated == GeneratePodGroupName("workload", "template", "uid-2") {
+					t.Fatal("different owner UIDs should produce different names")
+				}
+				if generated == GeneratePodGroupName("workload", "template", "") {
+					t.Fatal("an owner UID should change the name")
+				}
+			},
+		},
+		{
+			name:     "hash inputs are delimited",
+			workload: "foo",
+			template: "barbaz",
+			uid:      "uid-1",
+			want: func(t *testing.T, generated string) {
+				if hashOf(generated) == hashOf(GeneratePodGroupName("foobar", "baz", "uid-1")) {
+					t.Fatal("shifting characters between workload and template should change the hash")
+				}
+				if hashOf(generated) == hashOf(GeneratePodGroupName("foo", "barbazuid-1", "")) {
+					t.Fatal("shifting characters between template and owner UID should change the hash")
+				}
+			},
+		},
+		{
+			name:     "owner UID with long names stays within the maximum length",
+			workload: strings.Repeat("workload", 40),
+			template: strings.Repeat("template", 40),
+			uid:      "uid-1",
+			want: func(t *testing.T, generated string) {
+				if len(generated) > validation.DNS1123SubdomainMaxLength {
+					t.Fatalf("generated name is too long: %d", len(generated))
 				}
 			},
 		},
@@ -147,7 +190,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: "",
 			template: "",
 			want: func(t *testing.T, generated string) {
-				if generated != "65bb57b6b5" {
+				if generated != "6f6fd8cd5" {
 					t.Fatalf("unexpected generated name: %q", generated)
 				}
 			},
@@ -157,7 +200,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: "",
 			template: "template",
 			want: func(t *testing.T, generated string) {
-				if generated != "template-5cbb944dc9" {
+				if generated != "template-7865ccf4cf" {
 					t.Fatalf("unexpected generated name: %q", generated)
 				}
 			},
@@ -167,7 +210,7 @@ func TestGeneratePodGroupName(t *testing.T) {
 			workload: "workload",
 			template: "",
 			want: func(t *testing.T, generated string) {
-				if generated != "workload-c5546b9dd" {
+				if generated != "workload-76fc8fddcb" {
 					t.Fatalf("unexpected generated name: %q", generated)
 				}
 			},
@@ -196,7 +239,13 @@ func TestGeneratePodGroupName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.want(t, GeneratePodGroupName(tc.workload, tc.template))
+			tc.want(t, GeneratePodGroupName(tc.workload, tc.template, tc.uid))
 		})
 	}
+}
+
+// hashOf returns the trailing hash segment of a generated name so that
+// collision checks compare hashes rather than the human-readable prefixes.
+func hashOf(name string) string {
+	return name[strings.LastIndex(name, "-")+1:]
 }
