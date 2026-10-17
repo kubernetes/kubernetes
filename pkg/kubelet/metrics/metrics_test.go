@@ -51,7 +51,7 @@ func TestImagePullDurationMetric(t *testing.T) {
 			duration := dp[1]
 			t.Log(imageSize, duration)
 			t.Log(GetImageSizeBucket(uint64(imageSize)))
-			ImagePullDuration.WithLabelValues(GetImageSizeBucket(uint64(imageSize))).Observe(duration)
+			ImagePullDuration.WithLabelValues("test-image:latest", "Always", GetImageSizeBucket(uint64(imageSize))).Observe(duration)
 		}
 
 		wants, err := os.Open("testdata/image_pull_duration_metric")
@@ -74,4 +74,55 @@ func TestImagePullDurationMetric(t *testing.T) {
 
 func clearMetrics() {
 	ImagePullDuration.Reset()
+}
+
+func TestGetImageNameForMetrics(t *testing.T) {
+	tests := []struct {
+		name  string
+		image string
+		want  string
+	}{
+		{
+			name:  "tag only",
+			image: "alpine:3.20",
+			want:  "alpine",
+		},
+		{
+			name:  "no tag",
+			image: "alpine",
+			want:  "alpine",
+		},
+		{
+			name:  "digest only",
+			image: "gcr.io/project/app@sha256:abc123",
+			want:  "gcr.io/project/app",
+		},
+		{
+			name:  "tag and digest",
+			image: "gcr.io/project/app:v1@sha256:abc123",
+			want:  "gcr.io/project/app",
+		},
+		{
+			name:  "registry with port, tag and digest",
+			image: "localhost:5000/app:v1@sha256:abc123",
+			want:  "localhost:5000/app",
+		},
+		{
+			name:  "registry with port, no tag",
+			image: "localhost:5000/app",
+			want:  "localhost:5000/app",
+		},
+		{
+			name:  "nested path, registry with port",
+			image: "myregistry.example.com:5000/team/app:v2@sha256:xyz",
+			want:  "myregistry.example.com:5000/team/app",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetImageNameForMetrics(tt.image); got != tt.want {
+				t.Errorf("GetImageNameForMetrics(%q) = %q, want %q", tt.image, got, tt.want)
+			}
+		})
+	}
 }
