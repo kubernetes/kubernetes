@@ -18,6 +18,7 @@ package options
 
 import (
 	"context"
+	restclient "k8s.io/client-go/rest"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -1004,5 +1005,29 @@ profiles:
 				t.Errorf("expected server call with user %q, got %q", tc.expectedUsername, username)
 			}
 		})
+	}
+}
+
+func TestCreateClientsNoMutation(t *testing.T) {
+	kubeConfig := &restclient.Config{
+		Host:      "localhost:8080",
+		UserAgent: "original-agent",
+	}
+	originalHost := kubeConfig.Host
+	originalUserAgent := kubeConfig.UserAgent
+
+	_, _, _, err := createClients(kubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if kubeConfig.Host != originalHost {
+		t.Errorf("expected Host %q, got %q", originalHost, kubeConfig.Host)
+	}
+	if kubeConfig.UserAgent != originalUserAgent {
+		t.Errorf("expected UserAgent %q, got %q", originalUserAgent, kubeConfig.UserAgent)
+	}
+	if kubeConfig.RateLimiter != nil {
+		t.Errorf("expected RateLimiter to be nil, got %v", kubeConfig.RateLimiter)
 	}
 }

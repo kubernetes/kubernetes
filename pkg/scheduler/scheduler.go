@@ -147,6 +147,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	asyncClient                clientset.Interface
 }
 
 // Option configures a Scheduler
@@ -179,6 +180,13 @@ func WithComponentConfigVersion(apiVersion string) Option {
 func WithKubeConfig(cfg *restclient.Config) Option {
 	return func(o *schedulerOptions) {
 		o.kubeConfig = cfg
+	}
+}
+
+// WithAsyncClient sets the async client for Scheduler.
+func WithAsyncClient(client clientset.Interface) Option {
+	return func(o *schedulerOptions) {
+		o.asyncClient = client
 	}
 }
 
