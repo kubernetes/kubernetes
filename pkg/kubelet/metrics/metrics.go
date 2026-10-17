@@ -990,22 +990,22 @@ var (
 		},
 	)
 
-	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
+	// MemoryQoSNodeMemoryMinBytes tracks requested memory protected by cgroup v2 memory.min.
 	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           MemoryQoSNodeMemoryMinBytesKey,
-			Help:           "Total cgroup v2 memory.min in bytes for Guaranteed pods. This memory is hard-reserved and never reclaimed by the kernel.",
+			Help:           "Total requested memory in bytes protected by cgroup v2 memory.min. This memory is hard-reserved and never reclaimed by the kernel.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 
-	// MemoryQoSNodeMemoryLowBytes tracks total cgroup v2 memory.low (soft protection) for Burstable pods.
+	// MemoryQoSNodeMemoryLowBytes tracks requested memory protected by cgroup v2 memory.low.
 	MemoryQoSNodeMemoryLowBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           MemoryQoSNodeMemoryLowBytesKey,
-			Help:           "Total cgroup v2 memory.low in bytes for Burstable pods. This memory is soft-reserved and may be reclaimed under extreme pressure.",
+			Help:           "Total requested memory in bytes protected by cgroup v2 memory.low. This memory is soft-reserved and may be reclaimed under extreme pressure.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
