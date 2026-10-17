@@ -164,6 +164,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-label")
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.selector)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("selector", completion.LabelSelectorCompletionFunc(f, "")))
 
 	return cmd
 }
