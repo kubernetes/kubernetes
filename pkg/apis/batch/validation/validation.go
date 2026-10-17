@@ -288,6 +288,11 @@ func validateJobSpec(spec, oldSpec *batch.JobSpec, fldPath *field.Path, opts api
 	// no-op when spec.scheduling is unset.
 	allErrs = append(allErrs, validateGangMinCount(spec, fldPath.Child("scheduling"))...)
 
+	// Controllers treat a user-supplied schedulingGroup as authoritative, so
+	// spec.scheduling would have no effect. Reject the combination unless the
+	// old object already had both (v1.37 alpha carve-out).
+	allErrs = append(allErrs, validateSchedulingAndSchedulingGroup(spec, oldSpec, fldPath.Child("scheduling"))...)
+
 	// Controller-policy checks that declarative validation cannot express:
 	// the resolved scheduling policy and disruption mode must be in the Job's
 	// allow-lists, and the Basic policy cannot be combined with All disruption.
@@ -685,6 +690,20 @@ func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorL
 		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
 }
 
+// validateSchedulingAndSchedulingGroup rejects spec.scheduling when the pod
+// template also carries schedulingGroup. On update, the combination is allowed
+// only if oldSpec already had both fields set.
+func validateSchedulingAndSchedulingGroup(spec, oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil || spec.Template.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	if oldSpec != nil && oldSpec.Scheduling != nil && oldSpec.Template.Spec.SchedulingGroup != nil {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+		"must not be set together with template.spec.schedulingGroup")}
+}
+
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability
 // constraint that declarative validation cannot express: the basic/gang policy
 // variant is frozen after creation. Only schedulingPolicy.gang.minCount may change.
@@ -713,6 +732,11 @@ func validateJobSchedulingUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Pat
 // oldSpec is nil on create, non-nil on update.
 func validateJobScheduling(spec, oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	if spec.Scheduling == nil {
+		return nil
+	}
+	// an unchanged spec skips these checks so that tightening them
+	// later never invalidates already-persisted objects.
+	if apiequality.Semantic.DeepEqual(spec, oldSpec) {
 		return nil
 	}
 	// Build the same logical workload tree the Job controller compiles, so
