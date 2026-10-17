@@ -36,11 +36,9 @@ spec:
   disruptionMode:
     all: {}
     single: {}
-  podGroupTemplateRef:
-    workload:
-      podGroupTemplateName: podGroupTemplateNameValue
-      workloadName: workloadNameValue
-  priority: 7
+  parentCompositePodGroupName: parentCompositePodGroupNameValue
+  preemptionPolicy: preemptionPolicyValue
+  priority: 8
   priorityClassName: priorityClassNameValue
   resourceClaims:
   - name: nameValue
@@ -53,6 +51,9 @@ spec:
     basic: {}
     gang:
       minCount: 1
+  workloadRef:
+    templateName: templateNameValue
+    workloadName: workloadNameValue
 status:
   conditions:
   - lastTransitionTime: "2004-01-01T01:01:01Z"

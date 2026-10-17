@@ -30,6 +30,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/component-helpers/resource"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -40,9 +41,10 @@ import (
 
 // VolumeZone is a plugin that checks volume zone.
 type VolumeZone struct {
-	pvLister  corelisters.PersistentVolumeLister
-	pvcLister corelisters.PersistentVolumeClaimLister
-	scLister  storagelisters.StorageClassLister
+	pvLister                                           corelisters.PersistentVolumeLister
+	pvcLister                                          corelisters.PersistentVolumeClaimLister
+	scLister                                           storagelisters.StorageClassLister
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.FilterPlugin = &VolumeZone{}
@@ -116,6 +118,9 @@ func (pl *VolumeZone) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragm
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
 func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
@@ -195,6 +200,9 @@ func (pl *VolumeZone) PreFilterExtensions() fwk.PreFilterExtensions {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -402,5 +410,6 @@ func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Fea
 		pvLister:  pvLister,
 		pvcLister: pvcLister,
 		scLister:  scLister,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}, nil
 }

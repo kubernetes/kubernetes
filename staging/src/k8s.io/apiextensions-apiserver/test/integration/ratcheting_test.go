@@ -37,7 +37,6 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,13 +45,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/cel/environment"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/utils/ptr"
@@ -1947,135 +1943,38 @@ func BenchmarkRatcheting(b *testing.B) {
 
 	// For each pair, run the ratcheting algorithm on the update.
 	//
-	for _, ratchetingEnabled := range []bool{true, false} {
-		name := "RatchetingEnabled"
-		if !ratchetingEnabled {
-			name = "RatchetingDisabled"
-		}
-		b.Run(name, func(b *testing.B) {
-			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)
-			b.ResetTimer()
+	b.ResetTimer()
 
-			do := func(pairs []pair) {
-				for _, pair := range pairs {
-					// Create a validator for the GVK of the valid object.
-					validator, ok := validators[pair.old.GroupVersionKind()]
-					if !ok {
-						b.Log("No validator for GVK", pair.old.GroupVersionKind())
-						continue
-					}
-
-					// Run the ratcheting algorithm on the update.
-					// Don't care about result for benchmark
-					validator(pair.old, pair.new)
-				}
+	do := func(pairs []pair) {
+		for _, pair := range pairs {
+			// Create a validator for the GVK of the valid object.
+			validator, ok := validators[pair.old.GroupVersionKind()]
+			if !ok {
+				b.Log("No validator for GVK", pair.old.GroupVersionKind())
+				continue
 			}
 
-			b.Run("ValidXValid", func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					do(validXValidPairs)
-				}
-			})
-
-			b.Run("ValidXInvalid", func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					do(validXInvalidPairs)
-				}
-			})
-
-			b.Run("InvalidXInvalid", func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					do(invalidXInvalidPairs)
-				}
-			})
-		})
-	}
-}
-
-func TestRatchetingDropFields(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-	// Field dropping only takes effect when feature is disabled
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)
-	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
-
-	group := myCRDV1Beta1.Group
-	version := myCRDV1Beta1.Version
-	resource := myCRDV1Beta1.Resource
-	kind := fakeRESTMapper[myCRDV1Beta1]
-
-	myCRD := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: resource + "." + group},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: group,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
-				Name:    version,
-				Served:  true,
-				Storage: true,
-				Schema: &apiextensionsv1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						Type: "object",
-						Properties: map[string]apiextensionsv1.JSONSchemaProps{
-							"spec": {
-								Type: "object",
-								Properties: map[string]apiextensionsv1.JSONSchemaProps{
-									"field": {
-										Type: "string",
-										XValidations: []apiextensionsv1.ValidationRule{
-											{
-												// Results in error if field wasn't dropped
-												Rule:            "self == oldSelf",
-												OptionalOldSelf: ptr.To(true),
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}},
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural:   resource,
-				Kind:     kind,
-				ListKind: kind + "List",
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-		},
-	}
-
-	created, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), myCRD, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if created.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf != nil {
-		t.Errorf("Expected OpeiontalOldSelf field to be dropped for create when feature gate is disabled")
-	}
-
-	var updated *apiextensionsv1.CustomResourceDefinition
-	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		existing, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), created.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+			// Run the ratcheting algorithm on the update.
+			// Don't care about result for benchmark
+			validator(pair.old, pair.new)
 		}
-		existing.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf = ptr.To(true)
-		updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), existing, metav1.UpdateOptions{})
-		if err != nil {
-			if apierrors.IsConflict(err) {
-				return false, nil
-			}
-			return false, err
+	}
+
+	b.Run("ValidXValid", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			do(validXValidPairs)
 		}
-		return true, nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected error waiting for CRD update: %v", err)
-	}
 
-	if updated.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf != nil {
-		t.Errorf("Expected OpeiontalOldSelf field to be dropped for update when feature gate is disabled")
-	}
+	b.Run("ValidXInvalid", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			do(validXInvalidPairs)
+		}
+	})
+
+	b.Run("InvalidXInvalid", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			do(invalidXInvalidPairs)
+		}
+	})
 }

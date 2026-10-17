@@ -36,11 +36,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExternalJWTSigningAndAuth(t *testing.T) {
@@ -207,6 +207,9 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				t.Fatalf("failed to reset signer for the test %q: %v", tc.desc, err)
 			}
 			mockSigner.WaitForSupportedKeysFetch()
+			// Wait for the apiserver to process the refreshed keys so that
+			// token signing and verification use a consistent key set.
+			waitForDataTimestamp(t, client, time.Now())
 
 			// Adjust parameters on mock signer for the test.
 			tc.preTestSignerUpdate(t)

@@ -30,6 +30,64 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.template.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.template.spec.evictionResponders": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.template.spec.evictionResponders[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.template.spec.evictionResponders[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.evictionResponders[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.schedulingGroup": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
 			"spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},

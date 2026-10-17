@@ -25,13 +25,13 @@ package v1beta1
 // This information may be filled by drivers or other components to configure
 // or identify the device within a network context.
 type NetworkDeviceDataApplyConfiguration struct {
-	// InterfaceName specifies the name of the network interface associated with
+	// interfaceName specifies the name of the network interface associated with
 	// the allocated device. This might be the name of a physical or virtual
 	// network interface being configured in the pod.
 	//
 	// Must not be longer than 256 bytes.
 	InterfaceName *string `json:"interfaceName,omitempty"`
-	// IPs lists the network addresses assigned to the device's network interface.
+	// ips lists the network addresses assigned to the device's network interface.
 	// This can include both IPv4 and IPv6 addresses.
 	// The IPs are in the CIDR notation, which includes both the address and the
 	// associated subnet mask.
@@ -39,7 +39,7 @@ type NetworkDeviceDataApplyConfiguration struct {
 	//
 	// Must not contain more than 16 entries.
 	IPs []string `json:"ips,omitempty"`
-	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+	// hardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
 	// Must not be longer than 128 bytes.
 	HardwareAddress *string `json:"hardwareAddress,omitempty"`

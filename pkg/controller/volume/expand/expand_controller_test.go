@@ -34,6 +34,7 @@ import (
 	coretesting "k8s.io/client-go/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSyncHandler(t *testing.T) {

@@ -18,4 +18,4 @@ limitations under the License.
 
 package runtime_test
 
-const stdlibSupportsInlineTag = false
+const stdlibSupportsEmbedTag = false

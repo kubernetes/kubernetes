@@ -23,12 +23,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "env.go",
+        "io.go",
     ],
     importpath = "github.com/google/cel-go/common/env",
     deps = [
         "//common:go_default_library",
         "//common/decls:go_default_library",
         "//common/types:go_default_library",
+        "@in_yaml_go_yaml_v3//:go_default_library",
     ],
 )
 
@@ -37,6 +39,7 @@ go_test(
     size = "small",
     srcs = [
         "env_test.go",
+        "io_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
@@ -45,6 +48,7 @@ go_test(
         "//common/operators:go_default_library",
         "//common/overloads:go_default_library",
         "//common/types:go_default_library",
+        "@com_github_google_go_cmp//cmp:go_default_library",
         "@in_yaml_go_yaml_v3//:go_default_library",
     ],
 )

@@ -30,10 +30,10 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 
 	// reconfigure framework
+	_ "k8s.io/ktesting/format"
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 )
 
 func TestMain(m *testing.M) {

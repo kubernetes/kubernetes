@@ -17,6 +17,8 @@ limitations under the License.
 package schedulerapi
 
 import (
+	"strings"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -83,15 +85,24 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
 // This type is used in the scheduler and autoscaler contract.
 // AllocatedState packs information of allocated devices which is gathered from allocated resource claims.
 type AllocatedState struct {
-	AllocatedDevices         sets.Set[DeviceID]
-	AllocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-	AggregatedCapacity       ConsumedCapacityCollection
+	// AllocatedDevices contains device IDs that are exclusively allocated to a claim.
+	AllocatedDevices sets.Set[DeviceID]
+	// AllocatedSharedDeviceIDs contains device IDs that have one or more shared allocations
+	// when the DRAConsumableCapacity feature is enabled.
+	AllocatedSharedDeviceIDs sets.Set[DeviceID]
+	// AggregatedCapacity records the consumed capacity per device ID when
+	// the DRAConsumableCapacity feature is enabled.
+	AggregatedCapacity ConsumedCapacityCollection
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
 // This type is used in consumable capacity features and the scheduler.
-// ConsumedCapacity defines consumable capacity values
-type ConsumedCapacity map[resourceapi.QualifiedName]*resource.Quantity
+// ConsumedCapacity defines consumable capacity values.
+//
+// Keys are fully-qualified names, so capacity in different domains is never conflated
+// regardless of whether a name's domain was given explicitly or left implicit.
+// Values are pointers to support in-place updates, for example via Add.
+type ConsumedCapacity map[draapi.FullyQualifiedName]*resource.Quantity
 
 // NewConsumedCapacity creates a new ConsumedCapacity.
 // This function is used in consumable capacity features and the scheduler.
@@ -104,7 +115,7 @@ func NewConsumedCapacity() ConsumedCapacity {
 func (s ConsumedCapacity) Clone() ConsumedCapacity {
 	clone := make(ConsumedCapacity)
 	for name, quantity := range s {
-		q := quantity.DeepCopy()
+		q := *quantity
 		clone[name] = &q
 	}
 	return clone
@@ -114,7 +125,7 @@ func (s ConsumedCapacity) Clone() ConsumedCapacity {
 // and creates a new entry if no capacity created yet.
 func (s ConsumedCapacity) Add(addedCapacity ConsumedCapacity) {
 	for name, quantity := range addedCapacity {
-		val := quantity.DeepCopy()
+		val := *quantity
 		if _, found := s[name]; found {
 			s[name].Add(val)
 		} else {
@@ -192,17 +203,43 @@ type DeviceConsumedCapacity struct {
 	ConsumedCapacity
 }
 
-// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity.
-// This function is used in consumable capacity features and the scheduler.
-// NewDeviceConsumedCapacity creates DeviceConsumedCapacity instance from device ID and its consumed capacity.
+// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity for deviceID from
+// consumedCapacity as found in a DeviceRequestAllocationResult.
+// Each key is resolved against deviceID.Driver so that the returned
+// DeviceConsumedCapacity, like the rest of the internal ConsumedCapacity tracking, is
+// always keyed by fully-qualified names.
+//
+// consumedCapacity is not guaranteed to be free of names that resolve to the same
+// fully-qualified name: a 1.37 allocator could persist both "cap" and "<driver>/cap" for a
+// device that published both. Resolving each name independently and inserting it into
+// normalized would then make the outcome depend on map iteration order, whichever entry
+// is visited last would win. To make the result deterministic without iterating
+// consumedCapacity twice: an entry explicitly qualified with deviceID.Driver always
+// overwrites whatever is already recorded for its key, while an unqualified entry is
+// dropped if an entry (qualified or not) was already recorded for its key.
+//
+// Callers that already have a ConsumedCapacity (for example, the allocators
+// themselves, while computing what a request would consume) do not need this
+// conversion and can construct a DeviceConsumedCapacity directly instead.
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	allocatedCapacity := NewConsumedCapacity()
-	for name, quantity := range consumedCapacity {
-		allocatedCapacity[name] = &quantity
+	normalized := make(ConsumedCapacity, len(consumedCapacity))
+	driverPrefix := deviceID.Driver.String() + "/"
+	for name, val := range consumedCapacity {
+		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
+		if ok {
+			key := draapi.FullyQualifiedName{Domain: deviceID.Driver.String(), Identifier: identifier}
+			normalized[key] = new(val)
+			continue
+		}
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())
+		if _, alreadySet := normalized[key]; alreadySet {
+			continue
+		}
+		normalized[key] = new(val)
 	}
 	return DeviceConsumedCapacity{
 		DeviceID:         deviceID,
-		ConsumedCapacity: allocatedCapacity,
+		ConsumedCapacity: normalized,
 	}
 }
 

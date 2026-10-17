@@ -6,5 +6,6 @@ approvers:
 reviewers:
   - sig-scheduling
   - pohly
+  - nojnhuh
 labels:
   - sig/scheduling

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"strconv"
 )
 
 type fieldKey string
@@ -20,7 +21,13 @@ func (f FieldMap) resolve(key fieldKey) string {
 	return string(key)
 }
 
-// JSONFormatter formats logs into parsable json
+// JSONFormatter formats logs into parsable JSON.
+//
+// Fields from [Entry.Data] are included in the JSON object together with the
+// standard fields derived from the entry. If a field conflicts with a standard
+// field, it is prefixed with "fields.". Standard field names can be customized
+// through FieldMap. When DataKey is set, fields from [Entry.Data] are nested
+// under that key instead.
 type JSONFormatter struct {
 	// TimestampFormat sets the format used for marshaling timestamps.
 	// The format to use is the same than for time.Format or time.Parse from the standard
@@ -61,7 +68,8 @@ type JSONFormatter struct {
 
 // Format renders a single log entry
 func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
-	data := make(Fields, len(entry.Data)+4)
+	caller := entry.Caller
+	data := make(Fields, len(entry.Data)+defaultFields)
 	for k, v := range entry.Data {
 		switch v := v.(type) {
 		case error:
@@ -73,13 +81,14 @@ func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
 		}
 	}
 
-	if f.DataKey != "" {
-		newData := make(Fields, 4)
+	if f.DataKey != "" && len(entry.Data) > 0 {
+		newData := make(Fields, defaultFields+1)
 		newData[f.DataKey] = data
 		data = newData
 	}
 
-	prefixFieldClashes(data, f.FieldMap, entry.HasCaller())
+	hasCaller := caller != nil
+	prefixFieldClashes(data, f.FieldMap, hasCaller)
 
 	timestampFormat := f.TimestampFormat
 	if timestampFormat == "" {
@@ -94,11 +103,13 @@ func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
 	}
 	data[f.FieldMap.resolve(FieldKeyMsg)] = entry.Message
 	data[f.FieldMap.resolve(FieldKeyLevel)] = entry.Level.String()
-	if entry.HasCaller() {
-		funcVal := entry.Caller.Function
-		fileVal := fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
+	if caller != nil {
+		var funcVal, fileVal string
 		if f.CallerPrettyfier != nil {
-			funcVal, fileVal = f.CallerPrettyfier(entry.Caller)
+			funcVal, fileVal = f.CallerPrettyfier(caller)
+		} else {
+			funcVal = caller.Function
+			fileVal = caller.File + ":" + strconv.FormatInt(int64(caller.Line), 10)
 		}
 		if funcVal != "" {
 			data[f.FieldMap.resolve(FieldKeyFunc)] = funcVal
@@ -108,11 +119,9 @@ func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
 		}
 	}
 
-	var b *bytes.Buffer
-	if entry.Buffer != nil {
-		b = entry.Buffer
-	} else {
-		b = &bytes.Buffer{}
+	b := entry.Buffer
+	if b == nil {
+		b = new(bytes.Buffer)
 	}
 
 	encoder := json.NewEncoder(b)

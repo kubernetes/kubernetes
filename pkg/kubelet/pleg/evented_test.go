@@ -17,9 +17,8 @@ limitations under the License.
 package pleg
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -27,209 +26,249 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/apimachinery/pkg/util/wait"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	critest "k8s.io/cri-api/pkg/apis/testing"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
-func newTestEventedPLEG() *EventedPLEG {
-	return &EventedPLEG{
-		runtime:        &containertest.FakeRuntime{},
-		clock:          testingclock.NewFakeClock(time.Time{}),
-		cache:          kubecontainer.NewCache(),
-		runtimeService: critest.NewFakeRuntimeService(),
-		eventChannel:   make(chan *PodLifecycleEvent, 100),
-	}
+var _ podRelister = (*fakePodRelister)(nil)
+
+type fakePodRelister struct {
+	relistRequests []types.UID
 }
 
-func TestHealthyEventedPLEG(t *testing.T) {
-	metrics.Register()
-	pleg := newTestEventedPLEG()
-
-	_, _, events := createTestPodsStatusesAndEvents(100)
-	for _, event := range events[:5] {
-		pleg.eventChannel <- event
-	}
-
-	// test if healthy when event channel has 5 events
-	isHealthy, err := pleg.Healthy()
-	require.NoError(t, err)
-	assert.True(t, isHealthy)
-
-	// send remaining 95 events and make channel out of capacity
-	for _, event := range events[5:] {
-		pleg.eventChannel <- event
-	}
-	// pleg is unhealthy when channel is out of capacity
-	isHealthy, err = pleg.Healthy()
-	require.Error(t, err)
-	assert.False(t, isHealthy)
+func newFakePodRelister() *fakePodRelister {
+	return &fakePodRelister{}
 }
 
-func TestUpdateRunningPodMetric(t *testing.T) {
-	metrics.Register()
-	logger, _ := ktesting.NewTestContext(t)
-	pleg := newTestEventedPLEG()
+func (f *fakePodRelister) RequestRelist(logger klog.Logger, podUID types.UID) {
+	f.relistRequests = append(f.relistRequests, podUID)
+}
 
-	podStatuses := make([]*kubecontainer.PodStatus, 5)
-	for i := range podStatuses {
-		id := fmt.Sprintf("test-pod-%d", i)
-		podStatuses[i] = &kubecontainer.PodStatus{
-			ID: types.UID(id),
-			SandboxStatuses: []*v1.PodSandboxStatus{
-				{Id: id},
-			},
-			ContainerStatuses: []*kubecontainer.Status{
-				{ID: kubecontainer.ContainerID{ID: id}, State: kubecontainer.ContainerStateRunning},
-			},
+func newTestEventedPLEG(podRelister *fakePodRelister) *EventedPLEG {
+	return NewEventedPLEG(nil, podRelister, 5)
+}
+
+type erroringRuntimeService struct {
+	internalapi.RuntimeService
+	streamErrors []error
+	calls        int
+}
+
+func (f *erroringRuntimeService) GetContainerEvents(context.Context, chan *v1.ContainerEventResponse, func(v1.RuntimeService_GetContainerEventsClient)) error {
+	err := f.streamErrors[f.calls]
+	f.calls++
+	return err
+}
+
+func TestEventedPLEGRetryExhaustionClosesEventChannelAndLogsLastError(t *testing.T) {
+	firstErr := errors.New("first stream failure")
+	lastErr := errors.New("last stream failure")
+	runtimeService := &erroringRuntimeService{streamErrors: []error{firstErr, lastErr}}
+	pleg := newTestEventedPLEG(newFakePodRelister())
+	pleg.runtimeService = runtimeService
+	pleg.eventedPlegMaxStreamRetries = len(runtimeService.streamErrors)
+
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(0)))
+	ctx := klog.NewContext(t.Context(), logger)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pleg.watchEventsChannel(ctx)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("EventedPLEG did not stop after exhausting stream retries")
+	}
+
+	assert.Equal(t, len(runtimeService.streamErrors), runtimeService.calls)
+
+	var terminalLogs int
+	for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+		if entry.Message != "Evented PLEG: disabling container-termination fast path after exhausting event stream retries" {
+			continue
 		}
-
-		pleg.updateRunningPodMetric(logger, podStatuses[i])
-		pleg.cache.Set(podStatuses[i].ID, podStatuses[i], nil, time.Now())
-
+		terminalLogs++
+		require.ErrorIs(t, entry.Err, lastErr)
+		assert.Equal(t, []any{"retries", len(runtimeService.streamErrors)}, entry.ParameterKVList)
 	}
-	pleg.cache.UpdateTime(time.Now())
+	assert.Equal(t, 1, terminalLogs)
+}
 
-	expectedMetric := `
-# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
-# TYPE kubelet_running_pods gauge
-kubelet_running_pods 5
-`
-	testMetric(t, expectedMetric, metrics.RunningPodCount.FQName())
+func TestEventedPLEGWatcherRetriesWhenStreamClosesWithoutError(t *testing.T) {
+	runtimeService := &erroringRuntimeService{streamErrors: []error{nil}}
+	pleg := newTestEventedPLEG(newFakePodRelister())
+	pleg.runtimeService = runtimeService
+	pleg.eventedPlegMaxStreamRetries = len(runtimeService.streamErrors)
 
-	// stop sandbox containers for first 2 pods
-	for _, podStatus := range podStatuses[:2] {
-		podId := string(podStatus.ID)
-		newPodStatus := kubecontainer.PodStatus{
-			ID: podStatus.ID,
-			SandboxStatuses: []*v1.PodSandboxStatus{
-				{Id: podId},
-			},
-			ContainerStatuses: []*kubecontainer.Status{
-				// update state to container exited
-				{ID: kubecontainer.ContainerID{ID: podId}, State: kubecontainer.ContainerStateExited},
-			},
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(0)))
+	ctx := klog.NewContext(t.Context(), logger)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pleg.watchEventsChannel(ctx)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("EventedPLEG did not stop after the event stream closed without an error")
+	}
+
+	assert.Equal(t, 1, runtimeService.calls)
+	var terminalLogs int
+	for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+		if entry.Message != "Evented PLEG: disabling container-termination fast path after exhausting event stream retries" {
+			continue
 		}
-
-		pleg.updateRunningPodMetric(logger, &newPodStatus)
-		pleg.cache.Set(newPodStatus.ID, &newPodStatus, nil, time.Now())
+		terminalLogs++
+		require.ErrorIs(t, entry.Err, errEventedPLEGStreamClosed)
 	}
-	pleg.cache.UpdateTime(time.Now())
-
-	expectedMetric = `
-# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
-# TYPE kubelet_running_pods gauge
-kubelet_running_pods 3
-`
-	testMetric(t, expectedMetric, metrics.RunningPodCount.FQName())
+	assert.Equal(t, 1, terminalLogs)
 }
 
-func testMetric(t *testing.T, expectedMetric string, metricName string) {
-	err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(expectedMetric), metricName)
-	if err != nil {
-		t.Fatal(err)
+type blockingRuntimeService struct {
+	internalapi.RuntimeService
+	started chan struct{}
+}
+
+func (f *blockingRuntimeService) GetContainerEvents(ctx context.Context, _ chan *v1.ContainerEventResponse, _ func(v1.RuntimeService_GetContainerEventsClient)) error {
+	close(f.started)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestEventedPLEGWatcherStopsWhenContextIsCanceled(t *testing.T) {
+	runtimeService := &blockingRuntimeService{started: make(chan struct{})}
+	pleg := newTestEventedPLEG(newFakePodRelister())
+	pleg.runtimeService = runtimeService
+
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(0)))
+	ctx, cancel := context.WithCancel(klog.NewContext(t.Context(), logger))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pleg.watchEventsChannel(ctx)
+	}()
+
+	select {
+	case <-runtimeService.started:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("EventedPLEG did not start watching container events")
+	}
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("EventedPLEG did not stop after its context was canceled")
+	}
+
+	for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+		assert.NotEqual(t, "Evented PLEG: disabling container-termination fast path after exhausting event stream retries", entry.Message)
 	}
 }
 
-func TestEventedPLEG_getPodIPs(t *testing.T) {
-	cache := kubecontainer.NewCache()
-	type args struct {
-		pid    types.UID
-		status *kubecontainer.PodStatus
-	}
+func TestProcessCRIEventsRequestsRelistOnlyForStoppedEvents(t *testing.T) {
 	tests := []struct {
-		name      string
-		args      args
-		oldstatus *kubecontainer.PodStatus
-		expected  []string
+		name       string
+		event      *v1.ContainerEventResponse
+		wantRelist []types.UID
 	}{
 		{
-			name: "status ips is not empty",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					IPs: []string{"10.0.0.10", "10.23.0.1"},
-				},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: []string{"10.0.0.10", "10.23.0.1"},
+			name: "stopped non-zero exit requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 2,
+			}),
+			wantRelist: []types.UID{"pod1"},
 		},
 		{
-			name: "status ips is empty and SandboxStatuses has PodSandboxState_SANDBOX_READY state",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					SandboxStatuses: []*v1.PodSandboxStatus{
-						{
-							Id:       "sandboxID2",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
-							State:    v1.PodSandboxState_SANDBOX_READY,
-						},
-						{
-							Id:       "sandboxID1",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-					},
-				},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: nil,
+			name: "stopped OOMKilled requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 0,
+				Reason:   "OOMKilled",
+			}),
+			wantRelist: []types.UID{"pod1"},
 		},
 		{
-			name: "status and cache ips are empty",
-			args: args{
-				pid:    "62212",
-				status: &kubecontainer.PodStatus{},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{},
-			},
-			expected: nil,
+			name: "stopped clean exit requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 0,
+			}),
+			wantRelist: []types.UID{"pod1"},
 		},
 		{
-			name: "sandbox state is no PodSandboxState_SANDBOX_READY",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					SandboxStatuses: []*v1.PodSandboxStatus{
-						{
-							Id:       "sandboxID2",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-						{
-							Id:       "sandboxID1",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-					},
-				},
+			name: "started event waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STARTED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_RUNNING,
+				ExitCode: 2,
+			}),
+		},
+		{
+			name: "deleted event waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_DELETED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 2,
+			}),
+		},
+		{
+			name:       "stopped event without container status requests relist",
+			event:      newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT),
+			wantRelist: []types.UID{"pod1"},
+		},
+		{
+			name: "missing sandbox metadata waits for generic relist",
+			event: &v1.ContainerEventResponse{
+				ContainerId:        "container1",
+				ContainerEventType: v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+				CreatedAt:          time.Now().UnixNano(),
+				ContainersStatuses: []*v1.ContainerStatus{{
+					Id:       "container1",
+					State:    v1.ContainerState_CONTAINER_EXITED,
+					ExitCode: 2,
+				}},
 			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: []string{"192.168.0.10", "192.168.0.1"},
 		},
 	}
+
 	for _, test := range tests {
-		cache.Set(test.args.pid, test.oldstatus, nil, time.Time{})
-		e := &EventedPLEG{
-			cache: cache,
-		}
 		t.Run(test.name, func(t *testing.T) {
-			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
-				t.Errorf("EventedPLEG.getPodIPs() = %v, expected %v", got, test.expected)
-			}
+			podRelister := newFakePodRelister()
+			eventedPleg := newTestEventedPLEG(podRelister)
+			logger := ktesting.NewLogger(t, ktesting.DefaultConfig)
+			eventsCh := make(chan *v1.ContainerEventResponse, 1)
+			eventsCh <- test.event
+			close(eventsCh)
+
+			eventedPleg.processCRIEvents(logger, eventsCh)
+
+			assert.Equal(t, test.wantRelist, podRelister.relistRequests)
 		})
+	}
+}
+
+func newContainerEvent(podUID types.UID, containerID string, eventType v1.ContainerEventType, statuses ...*v1.ContainerStatus) *v1.ContainerEventResponse {
+	return &v1.ContainerEventResponse{
+		ContainerId:        containerID,
+		ContainerEventType: eventType,
+		CreatedAt:          time.Now().UnixNano(),
+		PodSandboxStatus: &v1.PodSandboxStatus{
+			Metadata: &v1.PodSandboxMetadata{
+				Uid: string(podUID),
+			},
+		},
+		ContainersStatuses: statuses,
 	}
 }

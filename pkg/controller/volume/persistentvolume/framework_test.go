@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -768,13 +769,13 @@ func runSyncTests(t *testing.T, ctx context.Context, tests []controllerTest, sto
 			if metav1.HasAnnotation(claim.ObjectMeta, annSkipLocalStore) {
 				continue
 			}
-			ctrl.claims.Add(claim)
+			require.NoError(t, ctrl.claims.Indexer().Add(claim))
 		}
 		for _, volume := range test.initialVolumes {
 			if metav1.HasAnnotation(volume.ObjectMeta, annSkipLocalStore) {
 				continue
 			}
-			ctrl.volumes.store.Add(volume)
+			require.NoError(t, ctrl.volumes.Indexer().Add(volume))
 		}
 		reactor.AddClaims(test.initialClaims)
 		reactor.AddVolumes(test.initialVolumes)
@@ -851,10 +852,10 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 
 		reactor := newVolumeReactor(ctx, client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
-			ctrl.claims.Add(claim)
+			require.NoError(t, ctrl.claims.Indexer().Add(claim))
 		}
 		for _, volume := range test.initialVolumes {
-			ctrl.volumes.store.Add(volume)
+			require.NoError(t, ctrl.volumes.Indexer().Add(volume))
 		}
 		reactor.AddClaims(test.initialClaims)
 		reactor.AddVolumes(test.initialVolumes)
@@ -901,12 +902,11 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 			time.Sleep(600 * time.Millisecond)
 
 			// There were some changes, process them
-			switch obj.(type) {
+			switch obj := obj.(type) {
 			case *v1.PersistentVolumeClaim:
-				claim := obj.(*v1.PersistentVolumeClaim)
 				// Simulate "claim updated" event
-				ctrl.claims.Update(claim)
-				err = ctrl.syncClaim(context.TODO(), claim)
+				require.NoError(t, ctrl.claims.Indexer().Update(obj))
+				err = ctrl.syncClaim(context.TODO(), obj)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
@@ -920,10 +920,9 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 				// Process generated changes
 				continue
 			case *v1.PersistentVolume:
-				volume := obj.(*v1.PersistentVolume)
 				// Simulate "volume updated" event
-				ctrl.volumes.store.Update(volume)
-				err = ctrl.syncVolume(context.TODO(), volume)
+				require.NoError(t, ctrl.volumes.Indexer().Update(obj))
+				err = ctrl.syncVolume(context.TODO(), obj)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors

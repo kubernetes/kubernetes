@@ -20,6 +20,8 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -32,5 +34,14 @@ func SetDefaults_PriorityClass(obj *v1beta1.PriorityClass) {
 	if obj.PreemptionPolicy == nil {
 		preemptLowerPriority := apiv1.PreemptLowerPriority
 		obj.PreemptionPolicy = &preemptLowerPriority
+	}
+}
+
+func SetDefaults_PodGroup(in *v1beta1.PodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		if in.Spec.PreemptionPolicy == nil {
+			preemptLowerPriority := v1beta1.PreemptLowerPriority
+			in.Spec.PreemptionPolicy = &preemptLowerPriority
+		}
 	}
 }

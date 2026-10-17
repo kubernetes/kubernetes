@@ -1187,34 +1187,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: priority_level_seat_utilization
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Observations, at the end of every nanosecond, of utilization of seats for
-    any stage of execution (but only initial stage for WATCHes)
-  type: TimingRatioHistogram
-  stabilityLevel: ALPHA
-  labels:
-  - priority_level
-  buckets:
-  - 0
-  - 0.1
-  - 0.2
-  - 0.3
-  - 0.4
-  - 0.5
-  - 0.6
-  - 0.7
-  - 0.8
-  - 0.9
-  - 0.95
-  - 0.99
-  - 1
-  constLabels:
-    phase: executing
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: read_vs_write_current_requests
   subsystem: flowcontrol
   namespace: apiserver
@@ -1241,33 +1213,6 @@
   - 0.95
   - 0.99
   - 1
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: request_concurrency_in_use
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Concurrency (number of seats) occupied by the currently executing (initial
-    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
-    subsystem
-  type: Gauge
-  deprecatedVersion: 1.31.0
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: request_concurrency_limit
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Nominal number of execution seats configured for each priority level
-  type: Gauge
-  deprecatedVersion: 1.30.0
-  stabilityLevel: ALPHA
-  labels:
-  - priority_level
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -1779,47 +1724,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: request_slo_duration_seconds
-  subsystem: apiserver
-  help: Response latency distribution (not counting webhook duration and priority
-    & fairness queue wait times) in seconds for each verb, group, version, resource,
-    subresource, scope and component.
-  type: Histogram
-  deprecatedVersion: 1.27.0
-  stabilityLevel: ALPHA
-  labels:
-  - component
-  - group
-  - resource
-  - scope
-  - subresource
-  - verb
-  - version
-  buckets:
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 1.25
-  - 1.5
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
-  - 8
-  - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: request_terminations_total
   subsystem: apiserver
   help: Number of requests which apiserver terminated in self-defense.
@@ -1875,21 +1779,8 @@
   - component: kube-apiserver
     endpoint: /metrics
 - name: apiserver_resource_objects
-  help: Number of stored objects at the time of last check split by kind. In case
-    of a fetching error, the value will be -1.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: apiserver_resource_size_estimate_bytes
-  help: Estimated size of stored objects in database. Estimate is based on sum of
-    last observed sizes of serialized objects. In case of a fetching error, the value
-    will be -1.
-  type: Gauge
+  help: Number of stored objects at the time of last check split by kind.
+  type: Custom
   stabilityLevel: ALPHA
   labels:
   - group
@@ -1956,17 +1847,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: storage_db_total_size_in_bytes
-  subsystem: apiserver
-  help: Total size of the storage database file physically allocated in bytes.
-  type: Gauge
-  deprecatedVersion: 1.28.0
-  stabilityLevel: ALPHA
-  labels:
-  - endpoint
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: storage_decode_errors_total
   namespace: apiserver
   help: Number of stored object decode errors split by object type
@@ -1984,6 +1864,43 @@
   help: Total number of cache misses while accessing key decryption key(KEK).
   type: Counter
   stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: storage_list_duration_seconds
+  namespace: apiserver
+  help: Latency of the storage layer GetList call in seconds, including object decode,
+    split by whether etcd RangeStream was used.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - streamed
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2088,28 +2005,6 @@
   - status
   - transformation_type
   - transformer_prefix
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: stream_translator_requests_total
-  subsystem: apiserver
-  help: Total number of requests that were handled by the StreamTranslatorProxy, which
-    processes streaming RemoteCommand/V5
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - code
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: stream_tunnel_requests_total
-  subsystem: apiserver
-  help: Total number of requests that were handled by the StreamTunnelProxy, which
-    processes streaming PortForward/V2
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - code
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2282,6 +2177,34 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: dispatch_duration_seconds
+  subsystem: watch_events
+  namespace: apiserver
+  help: Histogram of watch event dispatch latency broken by resource type and pipeline
+    stage. The 'total' stage is the end-to-end latency of a delivered event.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - stage
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watch_filtered_events_total
   namespace: apiserver
   help: Counter of events filtered out by shard selector during watch dispatch, broken
@@ -2302,19 +2225,6 @@
   labels:
   - group
   - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: websocket_streaming_requests_total
-  subsystem: apiserver
-  help: Total number of WebSocket streaming requests (exec/attach/portforward) routed
-    by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet
-    when the kubelet handles the request directly; otherwise translated_at_apiserver.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - proxy_type
-  - subresource
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2456,6 +2366,41 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: cloud_provider_calls_total
+  subsystem: cloud_node_lifecycle_controller
+  help: The total number of cloud provider API calls, labeled by operation and result.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - result
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+- name: monitor_nodes_duration_seconds
+  subsystem: cloud_node_lifecycle_controller
+  help: A metric measuring the duration in seconds of a single MonitorNodes loop execution.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
 - name: request_duration_seconds
   subsystem: cloud_provider_webhook
   help: Request latency in seconds. Broken down by status code.
@@ -2547,6 +2492,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics/resource
+- name: csi_node_storage_health_status
+  help: CSI node storage backend health conditions currently reported (1 = present).
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  - reason
+  - status
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: operations_seconds
   subsystem: csi
   help: Container Storage Interface operation duration with gRPC error code status
@@ -2644,6 +2600,28 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: node_prepare_skips_total
+  subsystem: dra
+  help: Cumulative number of times NodePrepareResources gRPC calls were skipped due
+    to SkipNodeOperations.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: node_unprepare_skips_total
+  subsystem: dra
+  help: Cumulative number of times NodeUnprepareResources gRPC calls were skipped
+    due to SkipNodeOperations.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: operations_duration_seconds
   subsystem: dra
   help: Latency histogram in seconds for the duration of handling all ResourceClaims
@@ -2703,12 +2681,14 @@
     endpoint: /metrics
 - name: resourceclaim_creates_total
   subsystem: dynamic_resource_allocation
-  help: Number of ResourceClaims creation requests, categorized by creation status
-    and admin access
+  help: Number of ResourceClaims creation requests, categorized by creation status,
+    admin access, and owning API group and kind (either Pod or scheduling.k8s.io/PodGroup)
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - admin_access
+  - owner_api_group
+  - owner_api_kind
   - status
   componentEndpoints:
   - component: kube-controller-manager
@@ -2716,6 +2696,17 @@
   - component: kube-scheduler
     endpoint: /metrics
 - name: changes
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes. Deprecated in favor of endpoint_slice_controller_changes_total.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+- name: changes_total
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
   type: Counter
@@ -2989,12 +2980,14 @@
   - component: kube-apiserver
     endpoint: /metrics
 - name: etcd_request_errors_total
-  help: Etcd failed request counts for each operation and object type.
+  help: Etcd failed request counts for each operation and object type. Reason response
+    to grpc status, or transaction conflict.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
   - operation
+  - reason
   - resource
   componentEndpoints:
   - component: kube-apiserver
@@ -3009,16 +3002,6 @@
   - resource
   componentEndpoints:
   - component: kube-apiserver
-    endpoint: /metrics
-- name: version_info
-  namespace: etcd
-  help: Etcd server's binary version
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - binary_version
-  componentEndpoints:
-  - component: etcd-version-monitor
     endpoint: /metrics
 - name: field_validation_request_duration_seconds
   help: Response latency distribution in seconds for each field validation value
@@ -3363,30 +3346,6 @@
   help: 'Total number of requests for pods/logs sliced by usage type: enforce_tls,
     skip_tls_allowed, skip_tls_denied'
   type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - usage
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: pods_logs_backend_tls_failure_total
-  subsystem: pod_logs
-  namespace: kube_apiserver
-  help: Total number of requests for pods/logs that failed due to kubelet server TLS
-    verification
-  type: Counter
-  deprecatedVersion: 1.27.0
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: pods_logs_insecure_backend_total
-  subsystem: pod_logs
-  namespace: kube_apiserver
-  help: 'Total number of requests for pods/logs sliced by usage type: enforce_tls,
-    skip_tls_allowed, skip_tls_denied'
-  type: Counter
-  deprecatedVersion: 1.27.0
   stabilityLevel: ALPHA
   labels:
   - usage
@@ -4167,6 +4126,38 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_deferred_resize_duration_seconds
+  subsystem: kubelet
+  help: 'Duration in seconds that a pod resize remains deferred before completion.
+    Label ''priority_bucket'' classifies the pod priority (system-critical: >=2000000000,
+    high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1,
+    very-low: <=-1000, unknown: nil pod). Label ''resolution'' describes how the deferred
+    resize was resolved (accepted, reverted, terminated).'
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - priority_bucket
+  - resolution
+  buckets:
+  - 5
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+  - 90
+  - 120
+  - 150
+  - 180
+  - 300
+  - 600
+  - 1200
+  - 1800
+  - 3600
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_in_progress_resizes
   subsystem: kubelet
   help: Number of in-progress resizes for pods.
@@ -4185,13 +4176,78 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_level_resources_admission_total
+  subsystem: kubelet
+  help: Total number of pods admitted during Kubelet admission, categorized by resource
+    configuration mode (pod_and_container_level, pod_level, container_level, or empty
+    for unconfigured/BestEffort) and QoS class.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - config_mode
+  - qos_class
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_pending_resizes
   subsystem: kubelet
-  help: Number of pending resizes for pods.
+  help: 'Number of pending resizes for pods. Label ''priority_bucket'' classifies
+    the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium:
+    1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod).
+    Label ''reason'' describes the state (deferred, infeasible).'
   type: Gauge
   stabilityLevel: ALPHA
   labels:
+  - priority_bucket
   - reason
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_get_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI Get endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_list_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI List endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_total
+  subsystem: kubelet
+  help: Cumulative number of requests to the PodsAPI endpoint. Broken down by server
+    api version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_watch_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI Watch endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
@@ -4498,6 +4554,39 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: resource_manager_allocation_errors_total
+  subsystem: kubelet
+  help: Number of errors encountered during exclusive resource allocation.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource_name
+  - source
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: resource_manager_allocations_total
+  subsystem: kubelet
+  help: Number of exclusive resource allocations performed by a resource manager.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource_name
+  - source
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: resource_manager_container_assignments_total
+  subsystem: kubelet
+  help: Number of containers with a specific type of resource assignment.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - assignment_type
+  - resource_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: restarted_pods_total
   subsystem: kubelet
   help: Number of pods that have been restarted because they were deleted and recreated
@@ -4793,17 +4882,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: kubelet_volume_stats_health_status_abnormal
-  help: Abnormal volume health status. The count is either 1 or 0. 1 indicates the
-    volume is unhealthy, 0 indicates volume is healthy
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - namespace
-  - persistentvolumeclaim
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: kubelet_volume_stats_inodes
   help: Maximum number of inodes in the volume
   type: Custom
@@ -4841,17 +4919,6 @@
   labels:
   - namespace
   - persistentvolumeclaim
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: websocket_streaming_requests_total
-  subsystem: kubelet
-  help: Total number of WebSocket streaming requests (exec/attach/portforward) received
-    by the kubelet.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - subresource
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
@@ -5008,6 +5075,37 @@
   - 240
   - 270
   - 300
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: nftables_localhost_nodeport_listener_creation_failures_total
+  subsystem: kubeproxy
+  help: Number of localhost NodePort userspace proxy listener creation failures.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: nftables_localhost_nodeport_listeners
+  subsystem: kubeproxy
+  help: Number of active localhost NodePort userspace proxy listeners.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: kubeproxy_nftables_localhost_nodeport_rejected_packets_total
+  help: Number of packets rejected on localhost NodePorts. UDP and SCTP are always
+    rejected; TCP is rejected when the localhost NodePort proxy is not running
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  - protocol
   componentEndpoints:
   - component: kube-proxy
     endpoint: /metrics
@@ -5686,36 +5784,6 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
-- name: resource_manager_allocation_errors_total
-  help: Number of errors encountered during exclusive resource allocation.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource_name
-  - source
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: resource_manager_allocations_total
-  help: Number of exclusive resource allocations performed by a resource manager.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource_name
-  - source
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: resource_manager_container_assignments
-  help: Number of containers with a specific type of resource assignment.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - assignment_type
-  - resource_name
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: request_processing_duration_seconds
   subsystem: resourcepoolstatusrequest_controller
   help: Time taken to process a ResourcePoolStatusRequest
@@ -6212,10 +6280,15 @@
     endpoint: /metrics
 - name: route_sync_total
   subsystem: route_controller
-  help: A metric counting the amount of times routes have been synced with the cloud
-    provider.
+  help: A metric counting the number of route reconciles with the cloud provider,
+    labeled by the trigger (periodic or node_change) and the outcome (error if the
+    reconcile failed, changed if at least one route was created or deleted, otherwise
+    noop).
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - outcome
+  - trigger
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics
@@ -6259,7 +6332,7 @@
     endpoint: /metrics
 - name: batch_attempts_total
   subsystem: scheduler
-  help: Counts of results when we attempt to use batching.
+  help: Counts of results when we attempt to use batching, by scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6270,12 +6343,45 @@
     endpoint: /metrics
 - name: batch_cache_flushed_total
   subsystem: scheduler
-  help: Counts of cache flushes by reason.
+  help: Counts of cache flushes by reason and scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - profile
   - reason
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: batch_rescore_attempts_total
+  subsystem: scheduler
+  help: Counts of rescore attempts during opportunistic batching, by scheduler profile.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: batch_rescore_duration_seconds
+  subsystem: scheduler
+  help: Latency for rescoring a node during opportunistic batching, by scheduler profile.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  buckets:
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6292,7 +6398,7 @@
 - name: dra_bindingconditions_allocations_total
   subsystem: scheduler
   help: Number of allocations using devices with BindingConditions, counted per driver
-    per scheduling attempt
+    per scheduling attempt, by scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6305,7 +6411,7 @@
 - name: dra_bindingconditions_wait_duration_seconds
   subsystem: scheduler
   help: Time in seconds spent waiting for BindingConditions to be satisfied during
-    PreBind.
+    PreBind, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6353,9 +6459,20 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: generated_placements_total
+  subsystem: scheduler
+  help: Number of candidate placements generated when scheduling pod groups, by scheduler
+    profile.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: get_node_hint_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a node hint.
+  help: Latency for getting a node hint, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6397,36 +6514,45 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
-- name: plugin_execution_duration_seconds
+- name: placement_evaluation_duration_seconds
   subsystem: scheduler
-  help: Duration for running a plugin at a specific extension point.
+  help: Latency in seconds of evaluating a single candidate placement when scheduling
+    pod groups, by result and scheduler profile. 'feasible' means the pod group fit
+    into the placement, while 'infeasible' means it did not.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - extension_point
-  - plugin
-  - status
+  - profile
+  - result
   buckets:
-  - 1e-05
-  - 1.5000000000000002e-05
-  - 2.2500000000000005e-05
-  - 3.375000000000001e-05
-  - 5.062500000000001e-05
-  - 7.593750000000002e-05
-  - 0.00011390625000000003
-  - 0.00017085937500000006
-  - 0.0002562890625000001
-  - 0.00038443359375000017
-  - 0.0005766503906250003
-  - 0.0008649755859375004
-  - 0.0012974633789062506
-  - 0.0019461950683593758
-  - 0.0029192926025390638
-  - 0.004378938903808595
-  - 0.006568408355712893
-  - 0.009852612533569338
-  - 0.014778918800354007
-  - 0.02216837820053101
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: placement_evaluations_total
+  subsystem: scheduler
+  help: Number of candidate placements evaluated when scheduling pod groups, by result
+    and scheduler profile. 'feasible' means the pod group fit into the placement,
+    while 'infeasible' means it did not.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6442,9 +6568,9 @@
     endpoint: /metrics
 - name: podgroup_schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pod group, by the result. 'unschedulable' means
-    a pod group could not be scheduled, while 'error' means an internal scheduler
-    problem.
+  help: Number of attempts to schedule pod group, by the result and scheduler profile.
+    'unschedulable' means a pod group could not be scheduled, while 'error' means
+    an internal scheduler problem.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6479,7 +6605,7 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Pod group scheduling attempt latency in seconds, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6504,10 +6630,81 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: pre_queueing_hint_evaluations_total
+  subsystem: scheduler
+  help: Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods
+    or narrowed).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin
+  - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_evaluation_duration_seconds
+  subsystem: scheduler
+  help: Duration in seconds for identifying the target preemption victims.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  - 32.768
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_execution_duration_seconds
+  subsystem: scheduler
+  help: Duration in seconds for preempting the target preemption victims. With async
+    preemption enabled, preemption execution does not block the scheduling of other
+    pods.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  - 32.768
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: preemption_goroutines_duration_seconds
   subsystem: scheduler
   help: Duration in seconds for running goroutines for the preemption.
   type: Histogram
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - result
@@ -6545,6 +6742,71 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: preemption_pdb_violations_total
+  subsystem: scheduler
+  help: Total number of pod disruption budget violations caused by preemption.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_workload_disruptions
+  subsystem: scheduler
+  help: Number of workload preemption units being preempted. A single preemption unit
+    can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all),
+    or a single pod (in case of DisruptionMode=single).
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: queue_incoming_entities_total
+  subsystem: scheduler
+  help: Number of scheduling entities added to scheduling queues by event, queue type,
+    and entity type. Entity types are 'pod' (for individual pods that are not members
+    of any podgroup), 'podgroup', or 'compositepodgroup'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - event
+  - queue
+  - type
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: queued_entities
+  subsystem: scheduler
+  help: Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup';
+    'pod' stands for individual pods that are not members of any podgroup) by the
+    queue type. 'active' means number of entities in activeQ; 'backoff' means number
+    of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities
+    that the scheduler attempted to schedule and failed; 'gated' is the number of
+    unschedulable entities that the scheduler never attempted to schedule because
+    they are gated.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - queue
+  - type
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: queueing_hint_execution_duration_seconds
   subsystem: scheduler
   help: Duration for running a queueing hint function of a plugin.
@@ -6578,33 +6840,10 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
-- name: scheduling_algorithm_duration_seconds
-  subsystem: scheduler
-  help: Scheduling algorithm latency in seconds
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
-  componentEndpoints:
-  - component: kube-scheduler
-    endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a no.
+  help: Latency for storing scheduling results for opportunistic batching, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6642,6 +6881,41 @@
   stabilityLevel: ALPHA
   labels:
   - operation
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: workload_preemption_attempts_total
+  subsystem: scheduler
+  help: Total preemption attempts initiated by workload (either pod groups or composite
+    pod groups) in the cluster till now.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: workload_preemption_victims
+  subsystem: scheduler
+  help: Number of pod preemption victims caused by workload preemption (either pod
+    groups or composite pod groups).
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6971,16 +7245,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: volume_operation_errors_total
-  help: Total volume operation errors
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation_name
-  - plugin_name
-  componentEndpoints:
-  - component: kube-controller-manager
-    endpoint: /metrics
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -7158,6 +7422,34 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: priority_level_seat_utilization
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: rejected_requests_total
   subsystem: flowcontrol
   namespace: apiserver
@@ -7198,6 +7490,17 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: apiserver_resource_size_estimate_bytes
+  help: Estimated size of stored objects in database. Estimate is based on sum of
+    last observed sizes of serialized objects.
+  type: Custom
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: storage_events_received_total
   subsystem: apiserver
   help: Number of etcd events received split by kind.
@@ -7206,6 +7509,28 @@
   labels:
   - group
   - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: stream_translator_requests_total
+  subsystem: apiserver
+  help: Total number of requests that were handled by the StreamTranslatorProxy, which
+    processes streaming RemoteCommand/V5
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: stream_tunnel_requests_total
+  subsystem: apiserver
+  help: Total number of requests that were handled by the StreamTunnelProxy, which
+    processes streaming PortForward/V2
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -7316,8 +7641,12 @@
   - 0.6
   - 0.8
   - 1
+  - 1.25
+  - 1.5
   - 2
+  - 3
   - 4
+  - 5
   - 6
   - 8
   - 10
@@ -7326,6 +7655,10 @@
   - 30
   - 45
   - 60
+  - 90
+  - 120
+  - 180
+  - 300
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -7348,6 +7681,19 @@
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
   stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: websocket_streaming_requests_total
+  subsystem: apiserver
+  help: Total number of WebSocket streaming requests (exec/attach/portforward) routed
+    by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet
+    when the kubelet handles the request directly; otherwise translated_at_apiserver.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - proxy_type
+  - subresource
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -7608,6 +7954,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: websocket_streaming_requests_total
+  subsystem: kubelet
+  help: Total number of WebSocket streaming requests (exec/attach/portforward) received
+    by the kubelet.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - subresource
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: kubernetes_build_info
   help: A metric with a constant '1' value labeled by major, minor, git version, git
     commit, git tree state, build date, Go version, and compiler from which Kubernetes
@@ -7754,13 +8111,46 @@
 - name: plugin_evaluation_total
   subsystem: scheduler
   help: Number of attempts to schedule pods by each plugin and the extension point
-    (available only in PreFilter, Filter, PreScore, and Score).
+    (available only in PreFilter, Filter, PreScore, and Score), by scheduler profile.
   type: Counter
   stabilityLevel: BETA
   labels:
   - extension_point
   - plugin
   - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: plugin_execution_duration_seconds
+  subsystem: scheduler
+  help: Duration for running a plugin at a specific extension point.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - extension_point
+  - plugin
+  - status
+  buckets:
+  - 1e-05
+  - 1.5000000000000002e-05
+  - 2.2500000000000005e-05
+  - 3.375000000000001e-05
+  - 5.062500000000001e-05
+  - 7.593750000000002e-05
+  - 0.00011390625000000003
+  - 0.00017085937500000006
+  - 0.0002562890625000001
+  - 0.00038443359375000017
+  - 0.0005766503906250003
+  - 0.0008649755859375004
+  - 0.0012974633789062506
+  - 0.0019461950683593758
+  - 0.0029192926025390638
+  - 0.004378938903808595
+  - 0.006568408355712893
+  - 0.009852612533569338
+  - 0.014778918800354007
+  - 0.02216837820053101
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -7796,11 +8186,35 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: scheduling_algorithm_duration_seconds
+  subsystem: scheduler
+  help: Scheduling algorithm latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: unschedulable_pods
   subsystem: scheduler
-  help: The number of unschedulable pods broken down by plugin name. A pod will increment
-    the gauge for all plugins that caused it to not schedule and so this metric have
-    meaning only when broken down by plugin.
+  help: The number of unschedulable pods broken down by plugin name and scheduler
+    profile. A pod will increment the gauge for all plugins that caused it to not
+    schedule and so this metric has meaning only when broken down by plugin.
   type: Gauge
   stabilityLevel: BETA
   labels:
@@ -7858,6 +8272,16 @@
   - 600
   componentEndpoints:
   - component: kubelet
+    endpoint: /metrics
+- name: volume_operation_errors_total
+  help: Total volume operation errors
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
+  componentEndpoints:
+  - component: kube-controller-manager
     endpoint: /metrics
 - name: volume_operation_total_seconds
   help: Storage operation end to end duration in seconds
@@ -8511,7 +8935,8 @@
     endpoint: /metrics/resource
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
-  help: Latency for running all plugins of a specific extension point.
+  help: Latency for running all plugins of a specific extension point, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
@@ -8540,7 +8965,8 @@
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
     of pods in unschedulableEntities that the scheduler attempted to schedule and
     failed; 'gated' is the number of unschedulable pods that the scheduler never attempted
-    to schedule because they are gated.
+    to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods;
+    'pending' means number of pods in pendingPodGroupPods.
   type: Gauge
   stabilityLevel: STABLE
   labels:
@@ -8572,7 +8998,8 @@
     endpoint: /metrics
 - name: preemption_victims
   subsystem: scheduler
-  help: Number of selected preemption victims
+  help: Number of selected preemption victims for preemption initiated by a single
+    pod
   type: Histogram
   stabilityLevel: STABLE
   buckets:
@@ -8599,8 +9026,9 @@
     endpoint: /metrics
 - name: schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
-    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  help: Number of attempts to schedule pods, by the result and scheduler profile.
+    'unschedulable' means a pod could not be scheduled, while 'error' means an internal
+    scheduler problem.
   type: Counter
   stabilityLevel: STABLE
   labels:
@@ -8611,7 +9039,8 @@
     endpoint: /metrics
 - name: scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding), by
+    scheduler profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:

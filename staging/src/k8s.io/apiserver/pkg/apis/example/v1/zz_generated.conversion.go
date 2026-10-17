@@ -24,7 +24,6 @@ package v1
 import (
 	unsafe "unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	example "k8s.io/apiserver/pkg/apis/example"
@@ -123,12 +122,7 @@ func Convert_example_Pod_To_v1_Pod(in *example.Pod, out *Pod, s conversion.Scope
 }
 
 func autoConvert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *example.PodCondition, s conversion.Scope) error {
-	out.Type = example.PodConditionType(in.Type)
-	out.Status = example.ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*example.PodCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -138,12 +132,7 @@ func Convert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *exam
 }
 
 func autoConvert_example_PodCondition_To_v1_PodCondition(in *example.PodCondition, out *PodCondition, s conversion.Scope) error {
-	out.Type = PodConditionType(in.Type)
-	out.Status = ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*PodCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -235,13 +224,7 @@ func Convert_example_PodSpec_To_v1_PodSpec(in *example.PodSpec, out *PodSpec, s 
 }
 
 func autoConvert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *example.PodStatus, s conversion.Scope) error {
-	out.Phase = example.PodPhase(in.Phase)
-	out.Conditions = *(*[]example.PodCondition)(unsafe.Pointer(&in.Conditions))
-	out.Message = in.Message
-	out.Reason = in.Reason
-	out.HostIP = in.HostIP
-	out.PodIP = in.PodIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	*out = *(*example.PodStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -251,13 +234,7 @@ func Convert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *example.PodSt
 }
 
 func autoConvert_example_PodStatus_To_v1_PodStatus(in *example.PodStatus, out *PodStatus, s conversion.Scope) error {
-	out.Phase = PodPhase(in.Phase)
-	out.Conditions = *(*[]PodCondition)(unsafe.Pointer(&in.Conditions))
-	out.Message = in.Message
-	out.Reason = in.Reason
-	out.HostIP = in.HostIP
-	out.PodIP = in.PodIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	*out = *(*PodStatus)(unsafe.Pointer(in))
 	return nil
 }
 

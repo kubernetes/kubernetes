@@ -26,6 +26,8 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/podtemplate"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func mkPodTemplate(tolerations ...api.Toleration) *api.PodTemplate {
@@ -41,8 +43,11 @@ func mkPodTemplate(tolerations ...api.Toleration) *api.PodTemplate {
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-			APIGroup:   "",
-			APIVersion: apiVersion,
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
 		})
 		testCases := map[string]struct {
 			input        *api.PodTemplate
@@ -63,11 +68,54 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: func() *api.PodTemplate {
+					pt := mkPodTemplate()
+					deadline := int64(0)
+					pt.Template.Spec.ActiveDeadlineSeconds = &deadline
+					return pt
+				}(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: func() *api.PodTemplate {
+					pt := mkPodTemplate()
+					deadline := int64(2147483648)
+					pt.Template.Spec.ActiveDeadlineSeconds = &deadline
+					return pt
+				}(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
+		obj := *mkPodTemplate()
+		meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+		poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("template", "spec"), mkPodTemplate(), func(baseObj *api.PodTemplate, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Template.Spec.EvictionResponders = responders
+			baseObj.Template.Spec.SchedulingGroup = schedulingGroup
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			Name:              "valid-obj",
+			IsResourceRequest: true,
+			Verb:              "update",
+		})
+		updateObj := *mkPodTemplate()
+		meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 	}
 }

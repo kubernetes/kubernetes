@@ -67,7 +67,7 @@ func WithChainUnaryServerInterceptor(interceptors ...UnaryServerInterceptor) Ser
 			ctx context.Context,
 			unmarshal Unmarshaler,
 			info *UnaryServerInfo,
-			method Method) (interface{}, error) {
+			method Method) (any, error) {
 			return interceptors[0](ctx, unmarshal, info,
 				chainUnaryServerInterceptors(info, method, interceptors[1:]))
 		}
@@ -79,7 +79,7 @@ func chainUnaryServerInterceptors(info *UnaryServerInfo, method Method, intercep
 	if len(interceptors) == 0 {
 		return method
 	}
-	return func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+	return func(ctx context.Context, unmarshal func(any) error) (any, error) {
 		return interceptors[0](ctx, unmarshal, info,
 			chainUnaryServerInterceptors(info, method, interceptors[1:]))
 	}

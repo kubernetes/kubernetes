@@ -25,17 +25,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
-func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	// Loop through all device resources and generate TopologyHints for them.
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
@@ -62,7 +60,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 				continue
 			}
 			logger.Info("Regenerating TopologyHints for resource already allocated to pod", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name)
-			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.Set[string]{}, requested)
+			deviceHints[resource] = m.generateDeviceTopologyHints(logger, resource, allocated, sets.Set[string]{}, requested)
 			continue
 		}
 
@@ -77,7 +75,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 
 		// Generate TopologyHints for this resource given the current
 		// request size and the list of available devices.
-		deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, reusable, requested)
+		deviceHints[resource] = m.generateDeviceTopologyHints(logger, resource, available, reusable, requested)
 	}
 
 	return deviceHints
@@ -85,12 +83,9 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
-func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getPodDeviceRequest(pod)
@@ -116,7 +111,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 				continue
 			}
 			logger.Info("Regenerating TopologyHints for resource already allocated to pod", "resourceName", resource, "pod", klog.KObj(pod), "allocated", allocated.Len())
-			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.Set[string]{}, requested)
+			deviceHints[resource] = m.generateDeviceTopologyHints(logger, resource, allocated, sets.Set[string]{}, requested)
 			continue
 		}
 
@@ -130,7 +125,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 
 		// Generate TopologyHints for this resource given the current
 		// request size and the list of available devices.
-		deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, sets.Set[string]{}, requested)
+		deviceHints[resource] = m.generateDeviceTopologyHints(logger, resource, available, sets.Set[string]{}, requested)
 	}
 
 	return deviceHints
@@ -151,7 +146,7 @@ func (m *ManagerImpl) getAvailableDevices(resource string) sets.Set[string] {
 	return m.healthyDevices[resource].Difference(m.allocatedDevices[resource])
 }
 
-func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.Set[string], reusable sets.Set[string], request int) []topologymanager.TopologyHint {
+func (m *ManagerImpl) generateDeviceTopologyHints(logger klog.Logger, resource string, available sets.Set[string], reusable sets.Set[string], request int) []topologymanager.TopologyHint {
 	// Narrow the bitmask iteration to NUMA nodes that actually host
 	// devices for this resource.  On platforms where the OS exposes many
 	// NUMA nodes that carry no devices (e.g. NVIDIA GB200 with 36 NUMA
@@ -161,7 +156,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 	// Because device-less nodes never contribute to devicesInMask,
 	// excluding them does not change minAffinitySize or Preferred
 	// flag computation.
-	numaNodes := m.deviceNUMANodes(resource)
+	numaNodes := m.deviceNUMANodes(logger, resource)
 	if len(numaNodes) == 0 {
 		numaNodes = m.numaNodes
 	}
@@ -211,12 +206,19 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 			return
 		}
 
+		// Calculate a utilization score for this hint based on how many devices
+		// in this NUMA mask are already allocated.  This provides a packing signal
+		// for utilization-aware policies.  We use a simple count-based approach:
+		// all devices are treated equally regardless of capability differences.
+		score := m.calculateDeviceScore(resource, mask)
+
 		// Otherwise, create a new hint from the NUMA mask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
 			NUMANodeAffinity: mask,
 			Preferred:        false,
+			Score:            score,
 		})
 	})
 
@@ -233,12 +235,39 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 	return hints
 }
 
+// calculateDeviceScore computes a utilization score for devices within the given
+// NUMA mask. The score represents the percentage of devices that are already
+// allocated; the shared UtilizationScore() keeps it on the same footing as the
+// CPU and memory manager scores, which the hint merge averages together.
+// The caller must hold m.mutex.
+func (m *ManagerImpl) calculateDeviceScore(resource string, mask bitmask.BitMask) int64 {
+	var allocatableInMask int
+	var allocatedInMask int
+
+	for deviceID, device := range m.allDevices[resource] {
+		// Only healthy devices are allocatable: getAvailableDevices() hands out
+		// healthy minus allocated, so counting unhealthy ones here would make a
+		// node that has lost hardware look emptier than it is.
+		if !m.healthyDevices[resource].Has(deviceID) {
+			continue
+		}
+		if mask.AnySet(m.getNUMANodeIds(device.Topology)) {
+			allocatableInMask++
+			if m.allocatedDevices[resource].Has(deviceID) {
+				allocatedInMask++
+			}
+		}
+	}
+
+	return topologymanager.UtilizationScore(int64(allocatableInMask), int64(allocatedInMask))
+}
+
 // deviceNUMANodes returns the sorted list of NUMA node IDs that host at least
 // one device for the given resource.  The returned set is guaranteed to be a
 // subset of m.numaNodes: any NUMA IDs reported by device plugins that are not
 // known to cadvisor are logged and dropped.
 // The caller must hold m.mutex.
-func (m *ManagerImpl) deviceNUMANodes(resource string) []int {
+func (m *ManagerImpl) deviceNUMANodes(logger klog.Logger, resource string) []int {
 	nodesWithDevices := sets.New[int]()
 	for _, device := range m.allDevices[resource] {
 		nodesWithDevices.Insert(m.getNUMANodeIds(device.Topology)...)
@@ -247,7 +276,7 @@ func (m *ManagerImpl) deviceNUMANodes(resource string) []int {
 	knownNodes := sets.New[int](m.numaNodes...)
 	unknown := nodesWithDevices.Difference(knownNodes)
 	if unknown.Len() > 0 {
-		klog.TODO().Info("Ignoring NUMA node IDs reported by device plugin that are unknown to cadvisor",
+		logger.Info("Ignoring NUMA node IDs reported by device plugin that are unknown to cadvisor",
 			"resource", resource, "unknownNodes", sets.List(unknown), "knownNodes", m.numaNodes)
 		nodesWithDevices = nodesWithDevices.Intersection(knownNodes)
 	}

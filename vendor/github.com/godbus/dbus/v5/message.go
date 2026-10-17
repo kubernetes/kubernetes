@@ -179,13 +179,16 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 		msg.Headers[HeaderField(v.Field)] = v.Variant
 	}
 
-	dec.align(8)
-	body := make([]byte, int(length))
-	if length != 0 {
-		_, err := io.ReadFull(rd, body)
-		if err != nil {
+	// Skip padding to 8-byte boundary before the body.
+	// Not using dec.align here as it panics on read errors.
+	if pad := (8 - dec.pos%8) % 8; pad > 0 {
+		if _, err := io.CopyN(io.Discard, rd, int64(pad)); err != nil {
 			return nil, err
 		}
+	}
+	body, err := readFull(rd, nil, int(length))
+	if err != nil {
+		return nil, err
 	}
 
 	if err = msg.validateHeader(); err != nil {

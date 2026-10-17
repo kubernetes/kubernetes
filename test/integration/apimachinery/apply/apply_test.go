@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/testapigroup/install"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -36,7 +37,6 @@ import (
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	testapigrouprest "k8s.io/kubernetes/pkg/registry/testapigroup/rest"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )

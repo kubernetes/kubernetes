@@ -17,7 +17,6 @@ limitations under the License.
 package debug
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -40,7 +39,6 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/utils/ptr"
 )
 
@@ -177,7 +175,6 @@ type resourceGatherWorker struct {
 	stopCh                      chan struct{}
 	dataSeries                  []ResourceUsagePerContainer
 	finished                    bool
-	inKubemark                  bool
 	resourceDataGatheringPeriod time.Duration
 	probeDuration               time.Duration
 	printVerboseLogs            bool
@@ -185,29 +182,15 @@ type resourceGatherWorker struct {
 
 func (w *resourceGatherWorker) singleProbe(ctx context.Context) {
 	data := make(ResourceUsagePerContainer)
-	if w.inKubemark {
-		kubemarkData := getKubemarkMasterComponentsResourceUsage(ctx)
-		if kubemarkData == nil {
-			return
-		}
-		for k, v := range kubemarkData {
-			data[k] = &ContainerResourceUsage{
-				Name:                    v.Name,
-				MemoryWorkingSetInBytes: v.MemoryWorkingSetInBytes,
-				CPUUsageInCores:         v.CPUUsageInCores,
-			}
-		}
-	} else {
-		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
-		if err != nil {
-			framework.Logf("Error while reading data from %v: %v", w.nodeName, err)
-			return
-		}
-		for k, v := range nodeUsage {
-			data[k] = v
-			if w.printVerboseLogs {
-				framework.Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
-			}
+	nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
+	if err != nil {
+		framework.Logf("Error while reading data from %v: %v", w.nodeName, err)
+		return
+	}
+	for k, v := range nodeUsage {
+		data[k] = v
+		if w.printVerboseLogs {
+			framework.Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
 		}
 	}
 	w.dataSeries = append(w.dataSeries, data)
@@ -351,7 +334,6 @@ type ContainerResourceGatherer struct {
 
 // ResourceGathererOptions is a struct to hold options for resource.
 type ResourceGathererOptions struct {
-	InKubemark                  bool
 	Nodes                       NodesSet
 	ResourceDataGatheringPeriod time.Duration
 	ProbeDuration               time.Duration
@@ -400,20 +382,6 @@ func NewResourceUsageGatherer(ctx context.Context, c clientset.Interface, option
 		stopCh:       make(chan struct{}),
 		containerIDs: make([]string, 0),
 		options:      options,
-	}
-
-	if options.InKubemark {
-		g.workerWg.Add(1)
-		g.workers = append(g.workers, resourceGatherWorker{
-			inKubemark:                  true,
-			stopCh:                      g.stopCh,
-			wg:                          &g.workerWg,
-			finished:                    false,
-			resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
-			probeDuration:               options.ProbeDuration,
-			printVerboseLogs:            options.PrintVerboseLogs,
-		})
-		return &g, nil
 	}
 
 	// Tracks kube-system pods if no valid PodList is passed in.
@@ -475,7 +443,6 @@ func NewResourceUsageGatherer(ctx context.Context, c clientset.Interface, option
 				containerIDs:                g.containerIDs,
 				stopCh:                      g.stopCh,
 				finished:                    false,
-				inKubemark:                  false,
 				resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
 				probeDuration:               options.ProbeDuration,
 				printVerboseLogs:            options.PrintVerboseLogs,
@@ -593,66 +560,4 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 		return &summary, errors.New(strings.Join(violatedConstraints, "\n"))
 	}
 	return &summary, nil
-}
-
-// kubemarkResourceUsage is a struct for tracking the resource usage of kubemark.
-type kubemarkResourceUsage struct {
-	Name                    string
-	MemoryWorkingSetInBytes uint64
-	CPUUsageInCores         float64
-}
-
-func getMasterUsageByPrefix(ctx context.Context, prefix string) (string, error) {
-	sshResult, err := e2essh.SSH(ctx, fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), framework.APIAddress()+":22", framework.TestContext.Provider)
-	if err != nil {
-		return "", err
-	}
-	return sshResult.Stdout, nil
-}
-
-// getKubemarkMasterComponentsResourceUsage returns the resource usage of kubemark which contains multiple combinations of cpu and memory usage for each pod name.
-func getKubemarkMasterComponentsResourceUsage(ctx context.Context) map[string]*kubemarkResourceUsage {
-	result := make(map[string]*kubemarkResourceUsage)
-	// Get kubernetes component resource usage
-	sshResult, err := getMasterUsageByPrefix(ctx, "kube")
-	if err != nil {
-		framework.Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
-		return nil
-	}
-	scanner := bufio.NewScanner(strings.NewReader(sshResult))
-	for scanner.Scan() {
-		var cpu float64
-		var mem uint64
-		var name string
-		fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%f %d /usr/local/bin/kube-%s", &cpu, &mem, &name)
-		if name != "" {
-			// Gatherer expects pod_name/container_name format
-			fullName := name + "/" + name
-			result[fullName] = &kubemarkResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
-		}
-	}
-	// Get etcd resource usage
-	sshResult, err = getMasterUsageByPrefix(ctx, "bin/etcd")
-	if err != nil {
-		framework.Logf("Error when trying to SSH to master machine. Skipping probe")
-		return nil
-	}
-	scanner = bufio.NewScanner(strings.NewReader(sshResult))
-	for scanner.Scan() {
-		var cpu float64
-		var mem uint64
-		var etcdKind string
-		fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%f %d /bin/sh -c /usr/local/bin/etcd", &cpu, &mem)
-		dataDirStart := strings.Index(scanner.Text(), "--data-dir")
-		if dataDirStart < 0 {
-			continue
-		}
-		fmt.Sscanf(scanner.Text()[dataDirStart:], "--data-dir=/var/%s", &etcdKind)
-		if etcdKind != "" {
-			// Gatherer expects pod_name/container_name format
-			fullName := "etcd/" + etcdKind
-			result[fullName] = &kubemarkResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
-		}
-	}
-	return result
 }

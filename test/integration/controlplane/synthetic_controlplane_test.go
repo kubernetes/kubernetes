@@ -42,11 +42,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -176,7 +176,7 @@ func TestStatus(t *testing.T) {
 			statusCode:    http.StatusForbidden,
 			reqPath:       "/apis",
 			reason:        "Forbidden",
-			message:       `forbidden: User "system:anonymous" cannot get path "/apis": Everything is forbidden.`,
+			message:       `forbidden: User "system:anonymous" cannot get path "/apis": alwaysdeny: Everything is forbidden.`,
 		},
 		{
 			name:          "401",

@@ -38,9 +38,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "devicetaintrules",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "devicetaintrules",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 
 	testCases := map[string]struct {
@@ -53,13 +55,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing taint.effect": {
 			input: mkValidDeviceTaintRule(tweakTaintEffect("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkBeta(),
 			},
 		},
 		"invalid taint.effect": {
 			input: mkValidDeviceTaintRule(tweakTaintEffect("BadEffect")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkAlpha(),
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -70,6 +72,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidDeviceTaintRule()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 
 	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &resource.DeviceTaintRule{}, registry.StatusStrategy, func(obj *resource.DeviceTaintRule, c []metav1.Condition) {
 		*obj = mkValidDeviceTaintRule(func(r *resource.DeviceTaintRule) { r.Status.Conditions = c })
@@ -86,9 +91,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "devicetaintrules",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "devicetaintrules",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 
 	testCases := map[string]struct {
@@ -108,14 +115,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidDeviceTaintRule(),
 			update: mkValidDeviceTaintRule(tweakTaintEffect("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkBeta(),
 			},
 		},
 		"invalid update with unsupported effect": {
 			old:    mkValidDeviceTaintRule(),
 			update: mkValidDeviceTaintRule(tweakTaintEffect("some-other-effect")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkAlpha(),
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -128,6 +135,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidDeviceTaintRule()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.DeviceTaintRule {

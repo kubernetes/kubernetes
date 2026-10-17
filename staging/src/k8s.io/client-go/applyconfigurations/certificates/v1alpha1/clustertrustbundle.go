@@ -40,7 +40,7 @@ import (
 // to a cluster can read ClusterTrustBundles by impersonating a serviceaccount
 // that they have access to.
 //
-// It can be optionally associated with a particular assigner, in which case it
+// It can be optionally associated with a particular signer, in which case it
 // contains one valid set of trust anchors for that signer. Signers may have
 // multiple associated ClusterTrustBundles; each is an independent set of trust
 // anchors for that signer. Admission control is used to enforce that only users

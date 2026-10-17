@@ -50,3 +50,93 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 		})
 	}
 }
+
+// Helper function to create a baseline valid ValidatingAdmissionPolicy with optional tweaks
+func mkValidatingAdmissionPolicy(tweaks ...func(*admissionregistration.ValidatingAdmissionPolicy)) admissionregistration.ValidatingAdmissionPolicy {
+	fp := admissionregistration.Fail
+	mp := admissionregistration.Equivalent
+	obj := admissionregistration.ValidatingAdmissionPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "valid-resource-name",
+		},
+		Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+			FailurePolicy: &fp,
+			MatchConstraints: &admissionregistration.MatchResources{
+				MatchPolicy:       &mp,
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []admissionregistration.NamedRuleWithOperations{
+					{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{
+								admissionregistration.Create,
+							},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"*"},
+								APIVersions: []string{"*"},
+								Resources:   []string{"*"},
+							},
+						},
+					},
+				},
+			},
+			Validations: []admissionregistration.Validation{
+				{
+					Expression: "true",
+				},
+			},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return obj
+}
+
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			strategy := registry.NewStrategy(nil, nil)
+			var namespace string
+			if strategy.NamespaceScoped() {
+				namespace = metav1.NamespaceDefault
+			}
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "admissionregistration.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "validatingadmissionpolicies",
+				Namespace:         namespace,
+				IsResourceRequest: true,
+				Verb:              "create",
+			})
+			obj := mkValidatingAdmissionPolicy(func(o *admissionregistration.ValidatingAdmissionPolicy) {
+				o.Namespace = namespace
+			})
+			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy)
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			strategy := registry.NewStrategy(nil, nil)
+			var namespace string
+			if strategy.NamespaceScoped() {
+				namespace = metav1.NamespaceDefault
+			}
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "admissionregistration.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "validatingadmissionpolicies",
+				Namespace:         namespace,
+				IsResourceRequest: true,
+				Verb:              "update",
+			})
+			obj := mkValidatingAdmissionPolicy(func(o *admissionregistration.ValidatingAdmissionPolicy) {
+				o.Namespace = namespace
+			})
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, strategy)
+		})
+	}
+}

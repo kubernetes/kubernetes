@@ -138,7 +138,7 @@ func Validate_AlphaStruct(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *AlphaStruct) *string { return obj.FieldA },
-		func(obj *AlphaStruct) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *AlphaStruct) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
@@ -166,7 +166,7 @@ func Validate_AlphaStruct(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 		func(obj *AlphaStruct) *string { return obj.FieldB },
-		func(obj *AlphaStruct) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *AlphaStruct) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
@@ -208,7 +208,7 @@ func Validate_BetaStruct(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *BetaStruct) *string { return obj.FieldA },
-		func(obj *BetaStruct) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *BetaStruct) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
@@ -236,7 +236,7 @@ func Validate_BetaStruct(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 		func(obj *BetaStruct) *string { return obj.FieldB },
-		func(obj *BetaStruct) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *BetaStruct) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
@@ -278,7 +278,7 @@ func Validate_CrossLevels(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "a",
 		func(obj *CrossLevels) *string { return obj.A },
-		func(obj *CrossLevels) string { return obj.Kind }, validate.DirectEqualPtr,
+		func(obj *CrossLevels) string { return obj.Kind }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
@@ -306,7 +306,7 @@ func Validate_CrossLevels(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "b",
 		func(obj *CrossLevels) *string { return obj.B },
-		func(obj *CrossLevels) string { return obj.Kind }, validate.DirectEqualPtr,
+		func(obj *CrossLevels) string { return obj.Kind }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
@@ -348,7 +348,7 @@ func Validate_MixedLevels(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "a",
 		func(obj *MixedLevels) *string { return obj.A },
-		func(obj *MixedLevels) string { return obj.Mode }, validate.DirectEqualPtr,
+		func(obj *MixedLevels) string { return obj.Mode }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
@@ -376,7 +376,7 @@ func Validate_MixedLevels(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "b",
 		func(obj *MixedLevels) *string { return obj.B },
-		func(obj *MixedLevels) string { return obj.Mode }, validate.DirectEqualPtr,
+		func(obj *MixedLevels) string { return obj.Mode }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
@@ -418,7 +418,7 @@ func Validate_SameFieldMixed(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "value",
 		func(obj *SameFieldMixed) *string { return obj.Value },
-		func(obj *SameFieldMixed) string { return obj.Mode }, validate.DirectEqualPtr,
+		func(obj *SameFieldMixed) string { return obj.Mode }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -475,7 +475,7 @@ func Validate_SameValueMixedPayloads(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "value",
 		func(obj *SameValueMixedPayloads) *string { return obj.Value },
-		func(obj *SameValueMixedPayloads) string { return obj.Mode }, validate.DirectEqualPtr,
+		func(obj *SameValueMixedPayloads) string { return obj.Mode }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)

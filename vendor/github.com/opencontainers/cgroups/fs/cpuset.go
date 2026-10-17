@@ -54,6 +54,11 @@ func (s *CpusetGroup) Name() string {
 	return "cpuset"
 }
 
+// ID returns the controller ID for cpuset subsystem.
+func (s *CpusetGroup) ID() cgroups.Controller {
+	return cgroups.CPUSet
+}
+
 func (s *CpusetGroup) Apply(path string, r *cgroups.Resources, pid int) error {
 	return s.ApplyDir(path, r, pid)
 }
@@ -82,7 +87,7 @@ func getCpusetStat(path string, file string) ([]uint16, error) {
 		return extracted, &parseError{Path: path, File: file, Err: errors.New("empty file")}
 	}
 
-	for _, s := range strings.Split(fileContent, ",") {
+	for s := range strings.SplitSeq(fileContent, ",") {
 		fromStr, toStr, ok := strings.Cut(s, "-")
 		if ok {
 			from, err := strconv.ParseUint(fromStr, 10, 16)

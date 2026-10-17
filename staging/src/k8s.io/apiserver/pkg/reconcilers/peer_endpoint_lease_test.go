@@ -144,7 +144,7 @@ func TestPeerEndpointLeaseReconciler(t *testing.T) {
 			// use the same base key used by the controlplane, but add a random
 			// prefix so we can reuse the etcd instance for subtests independently.
 			baseKey := "/" + uuid.New().String() + "/peerserverleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -248,7 +248,7 @@ func TestPeerLeaseRemoveEndpoints(t *testing.T) {
 			// use the same base key used by the controlplane, but add a random
 			// prefix so we can reuse the etcd instance for subtests independently.
 			baseKey := "/" + uuid.New().String() + "/peerserverleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}

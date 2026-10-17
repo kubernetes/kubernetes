@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -86,14 +85,14 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			func() { // cohort = "intField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "intField",
-					func(o *SubStruct) *int { return &o.IntField }, validate.DirectEqualPtr,
+					func(o *SubStruct) *int { return &o.IntField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field IntField")
 					}); len(e) != 0 {
@@ -102,7 +101,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "intPtrField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "intPtrField",
-					func(o *SubStruct) *int { return o.IntPtrField }, validate.DirectEqualPtr,
+					func(o *SubStruct) *int { return o.IntPtrField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field IntPtrField")
 					}); len(e) != 0 {
@@ -129,7 +128,7 @@ func Validate_StructWithSubfield(
 
 	func() { // cohort = "intField"
 		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "intField",
-			func(o *StructWithSubfield) *int { return &o.IntField }, validate.DirectEqualPtr,
+			func(o *StructWithSubfield) *int { return &o.IntField }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field IntField")
 			}); len(e) != 0 {
@@ -138,7 +137,7 @@ func Validate_StructWithSubfield(
 	}()
 	func() { // cohort = "intPtrField"
 		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "intPtrField",
-			func(o *StructWithSubfield) *int { return o.IntPtrField }, validate.DirectEqualPtr,
+			func(o *StructWithSubfield) *int { return o.IntPtrField }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field IntPtrField")
 			}); len(e) != 0 {

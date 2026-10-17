@@ -430,6 +430,7 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 		name                                string
 		enableRecoverVolumeExpansionFailure bool
 		enableVolumeAttributesClass         bool
+		enableCSIVolumeHealth               bool
 		pvc                                 *core.PersistentVolumeClaim
 		oldPVC                              *core.PersistentVolumeClaim
 		expected                            *core.PersistentVolumeClaim
@@ -570,6 +571,41 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 			oldPVC:                              withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
 			expected:                            withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
 		},
+		{
+			name:                  "for:newPVC=hasHealthStatus,oldPVC=nil,featuregate=CSIVolumeHealth=false; should drop field",
+			enableCSIVolumeHealth: false,
+			pvc:                   withHealthStatus(),
+			oldPVC:                nil,
+			expected:              getPVC(),
+		},
+		{
+			name:                  "for:newPVC=hasHealthStatus,oldPVC=doesnot,featuregate=CSIVolumeHealth=false; should drop field",
+			enableCSIVolumeHealth: false,
+			pvc:                   withHealthStatus(),
+			oldPVC:                getPVC(),
+			expected:              getPVC(),
+		},
+		{
+			name:                  "for:newPVC=hasHealthStatus,oldPVC=hasHealthStatus,featuregate=CSIVolumeHealth=false; should keep field",
+			enableCSIVolumeHealth: false,
+			pvc:                   withHealthStatus(),
+			oldPVC:                withHealthStatus(),
+			expected:              withHealthStatus(),
+		},
+		{
+			name:                  "for:newPVC=hasHealthStatus,oldPVC=nil,featuregate=CSIVolumeHealth=true; should keep field",
+			enableCSIVolumeHealth: true,
+			pvc:                   withHealthStatus(),
+			oldPVC:                nil,
+			expected:              withHealthStatus(),
+		},
+		{
+			name:                  "for:newPVC=hasHealthStatus,oldPVC=doesnot,featuregate=CSIVolumeHealth=true; should keep field",
+			enableCSIVolumeHealth: true,
+			pvc:                   withHealthStatus(),
+			oldPVC:                getPVC(),
+			expected:              withHealthStatus(),
+		},
 	}
 
 	for _, test := range tests {
@@ -577,6 +613,7 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.RecoverVolumeExpansionFailure: test.enableRecoverVolumeExpansionFailure,
 				features.VolumeAttributesClass:         test.enableVolumeAttributesClass,
+				features.CSIVolumeHealth:               test.enableCSIVolumeHealth,
 			})
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
@@ -616,6 +653,21 @@ func withVolumeAttributesClassName(vacName string) *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{
 		Status: core.PersistentVolumeClaimStatus{
 			CurrentVolumeAttributesClassName: &vacName,
+		},
+	}
+}
+
+func withHealthStatus() *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Status: core.PersistentVolumeClaimStatus{
+			HealthStatus: &core.VolumeHealthStatus{
+				HealthConditions: []core.VolumeHealthCondition{
+					{
+						Status: core.VolumeHealthDegraded,
+						Reason: "DiskSlow",
+					},
+				},
+			},
 		},
 	}
 }
@@ -689,6 +741,65 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: nil,
+		},
+		{
+			name: "large integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "large fractional warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808.001"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "9223372036854775808001m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "whole byte value whose milli projection overflows int64",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854776"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "fractional byte value within a milli of the next whole byte",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("1.9999"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "1999900u" is invalid, must be an integer`,
+			},
 		},
 		{
 			name: "storageclass annotations warning",

@@ -51,10 +51,10 @@ type CounterMetric interface {
 	Add(float64)
 }
 
-// CounterVecMetric is an interface which prometheus.CounterVec satisfies.
+// CounterVecMetric is an interface which CounterVec satisfies.
 type CounterVecMetric interface {
 	WithLabelValues(...string) CounterMetric
-	With(prometheus.Labels) CounterMetric
+	With(map[string]string) CounterMetric
 }
 
 // GaugeMetric is an interface which defines a subset of the interface provided by prometheus.Gauge

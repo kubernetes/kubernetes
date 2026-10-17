@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testPullRecordsAccessor struct {

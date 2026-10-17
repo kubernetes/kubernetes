@@ -47,18 +47,20 @@ func (alwaysAllowAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.
 }
 
 func (alwaysAllowAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
-	return []authorizer.ResourceRuleInfo{
-			&authorizer.DefaultResourceRuleInfo{
-				Verbs:     []string{"*"},
-				APIGroups: []string{"*"},
-				Resources: []string{"*"},
-			},
-		}, []authorizer.NonResourceRuleInfo{
-			&authorizer.DefaultNonResourceRuleInfo{
-				Verbs:           []string{"*"},
-				NonResourceURLs: []string{"*"},
-			},
-		}, false, nil
+	rrInfo := []authorizer.ResourceRuleInfo{
+		&authorizer.DefaultResourceRuleInfo{
+			Verbs:     []string{"*"},
+			APIGroups: []string{"*"},
+			Resources: []string{"*"},
+		},
+	}
+	nrrInfo := []authorizer.NonResourceRuleInfo{
+		&authorizer.DefaultNonResourceRuleInfo{
+			Verbs:           []string{"*"},
+			NonResourceURLs: []string{"*"},
+		},
+	}
+	return rrInfo, nrrInfo, false, nil
 }
 
 func NewAlwaysAllowAuthorizer() *alwaysAllowAuthorizer {

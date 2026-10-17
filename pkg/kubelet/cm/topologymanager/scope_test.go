@@ -22,11 +22,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tcases := []struct {
 		name          string
 		containerName string
@@ -42,7 +43,7 @@ func TestGetAffinity(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		scope := scope{}
-		actual := scope.GetAffinity(tc.podUID, tc.containerName)
+		actual := scope.GetAffinity(logger, tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}

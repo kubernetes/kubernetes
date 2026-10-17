@@ -297,4 +297,60 @@ func TestUpdateListTags(t *testing.T) {
 			field.Invalid(field.NewPath("eachValNoModifyList").Index(0), nil, "cannot be modified").WithOrigin("update"),
 		})
 	}
+
+	// Pointer Slice NoSet
+	{
+		old := base
+		old.PointerSliceNoSet = nil
+		cur := base
+		cur.PointerSliceNoSet = []*string{new("a")}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Invalid(field.NewPath("pointerSliceNoSet"), nil, "field cannot be set once created").WithOrigin("update"),
+		})
+
+		// nil -> nil is allowed
+		st.Value(&old).OldValue(&old).ExpectValid()
+	}
+
+	// Pointer listType=set + NoAddItem
+	{
+		old := base
+		old.PointerSetNoAdd = []*string{new("a"), new("b")}
+		cur := base
+		cur.PointerSetNoAdd = []*string{new("a"), new("b"), new("c")}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Forbidden(field.NewPath("pointerSetNoAdd").Index(2), "item may not be added").WithOrigin("update"),
+		})
+	}
+
+	// Pointer listType=map + NoRemoveItem
+	{
+		old := base
+		old.PointerMapListNoRemove = []*UpdateItem{
+			{Name: "alpha", Value: "1"},
+			{Name: "beta", Value: "2"},
+		}
+		cur := base
+		cur.PointerMapListNoRemove = []*UpdateItem{
+			{Name: "alpha", Value: "1"},
+		}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Forbidden(field.NewPath("pointerMapListNoRemove"), "item may not be removed").WithOrigin("update"),
+		})
+	}
+
+	// Nil element in pointer slice on update should trigger Required error from PtrSliceUpdate
+	{
+		old := base
+		old.PointerSetNoAdd = []*string{new("a")}
+		cur := base
+		cur.PointerSetNoAdd = []*string{nil}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Required(field.NewPath("pointerSetNoAdd").Index(0), ""),
+		})
+	}
 }

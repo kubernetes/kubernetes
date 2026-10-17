@@ -26,6 +26,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/storageclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -57,7 +58,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Provisioner = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("provisioner"), "").MarkAlpha(),
+				field.Required(field.NewPath("provisioner"), ""),
 			},
 		},
 		// TODO: Add more test cases
@@ -67,6 +68,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidStorageClass()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -78,6 +82,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "storage.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "storageclasses",
+		Name:              "valid-storage-class",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj       storage.StorageClass
 		updateObj    storage.StorageClass
@@ -91,78 +104,78 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakProvisioner("kubernetes.io/aws-ebs")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update provisioner unset to set": {
 			oldObj:    mkValidStorageClass(TweakProvisioner("")),
 			updateObj: mkValidStorageClass(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update provisioner set to unset": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakProvisioner("")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable").MarkAlpha(),
-				field.Required(field.NewPath("provisioner"), "").MarkAlpha(),
+				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable"),
+				field.Required(field.NewPath("provisioner"), ""),
 			},
 		},
 		"invalid update parameters changed": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"new": "value"})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update parameters unset to set": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"foo": "bar"})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update parameters set to unset": {
 			oldObj:    mkValidStorageClass(TweakParameters(map[string]string{"foo": "bar"})),
 			updateObj: mkValidStorageClass(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("parameters"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update reclaimPolicy changed": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakReclaimPolicy(api.PersistentVolumeReclaimRetain)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update reclaimPolicy unset to set": {
 			oldObj:    mkValidStorageClass(TweakReclaimPolicyNil()),
 			updateObj: mkValidStorageClass(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update reclaimPolicy set to unset": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakReclaimPolicyNil()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("reclaimPolicy"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update volumeBindingMode changed": {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakVolumeBindingMode(storage.VolumeBindingWaitForFirstConsumer)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update volumeBindingMode unset to set": {
 			oldObj:    mkValidStorageClass(TweakVolumeBindingModeNil()),
 			updateObj: mkValidStorageClass(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update volumeBindingMode set to unset": {
@@ -170,7 +183,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStorageClass(TweakVolumeBindingModeNil()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("volumeBindingMode"), "").MarkFromImperative(),
-				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable"),
 			},
 		},
 	}
@@ -178,18 +191,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "storage.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "storageclasses",
-				Name:              "valid-storage-class",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidStorageClass()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidStorageClass(tweaks ...func(obj *storage.StorageClass)) storage.StorageClass {

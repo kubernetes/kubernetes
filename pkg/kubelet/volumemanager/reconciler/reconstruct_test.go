@@ -66,6 +66,10 @@ func TestReconstructVolumes(t *testing.T) {
 				if reconstructed := rcInstance.actualStateOfWorld.IsVolumeReconstructed("fake-plugin/pvc-abcdef", "pod1"); !reconstructed {
 					t.Errorf("expected volume to be marked as reconstructed, got %v", reconstructed)
 				}
+				// Reconstructed volumes must be eligible for health probing.
+				if !rcInstance.actualStateOfWorld.IsVolumeMountAttempted("pod1", "fake-plugin/pvc-abcdef") {
+					t.Errorf("expected reconstructed volume to be marked as mount-attempted for health probing")
+				}
 				return nil
 			},
 		},

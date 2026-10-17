@@ -71,7 +71,8 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+	logger := klog.FromContext(ctx)
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -84,11 +85,17 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 		syncServiceAccountQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[serviceAccountQueueKey](),
-			workqueue.TypedRateLimitingQueueConfig[serviceAccountQueueKey]{Name: "serviceaccount_tokens_service"},
+			workqueue.TypedRateLimitingQueueConfig[serviceAccountQueueKey]{
+				Logger: &logger,
+				Name:   "serviceaccount_tokens_service",
+			},
 		),
 		syncSecretQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[secretQueueKey](),
-			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{Name: "serviceaccount_tokens_service"},
+			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{
+				Logger: &logger,
+				Name:   "serviceaccount_tokens_service",
+			},
 		),
 
 		maxRetries: maxRetries,
@@ -96,13 +103,16 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
-	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = serviceAccounts.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
 			DeleteFunc: e.queueServiceAccountSync,
 		},
-		options.ServiceAccountResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.ServiceAccountResync,
+		},
 	)
 
 	e.secrets = secrets.Lister()

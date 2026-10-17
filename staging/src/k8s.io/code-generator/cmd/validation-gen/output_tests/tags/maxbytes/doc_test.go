@@ -17,6 +17,7 @@ limitations under the License.
 package maxbytes
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -56,6 +57,8 @@ func Test(t *testing.T) {
 		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 10))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 10)),
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 10))),
+		Max10BytesField:                 bytes.Repeat([]byte("x"), 10),
+		Max10ValidatedTypedefBytesField: Max10BytesType(bytes.Repeat([]byte("x"), 10)),
 	}).ExpectValid()
 
 	testVal := &Struct{
@@ -71,6 +74,8 @@ func Test(t *testing.T) {
 		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10BytesField:                 bytes.Repeat([]byte("x"), 11),
+		Max10ValidatedTypedefBytesField: Max10BytesType(bytes.Repeat([]byte("x"), 11)),
 	}
 	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.TooLong(field.NewPath("max0Field"), "", 0),
@@ -85,6 +90,8 @@ func Test(t *testing.T) {
 		field.TooLong(field.NewPath("max0ValidatedTypedefPtrField"), "", 0),
 		field.TooLong(field.NewPath("max10ValidatedTypedefField"), "", 10),
 		field.TooLong(field.NewPath("max10ValidatedTypedefPtrField"), "", 10),
+		field.TooLong(field.NewPath("max10BytesField"), "", 10),
+		field.TooLong(field.NewPath("max10ValidatedTypedefBytesField"), "", 10),
 	})
 
 	// Test validation ratcheting
@@ -101,6 +108,8 @@ func Test(t *testing.T) {
 		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10BytesField:                 bytes.Repeat([]byte("x"), 11),
+		Max10ValidatedTypedefBytesField: Max10BytesType(bytes.Repeat([]byte("x"), 11)),
 	}).OldValue(&Struct{
 		Max0Field:                       strings.Repeat("x", 1),
 		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
@@ -114,5 +123,7 @@ func Test(t *testing.T) {
 		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10BytesField:                 bytes.Repeat([]byte("x"), 11),
+		Max10ValidatedTypedefBytesField: Max10BytesType(bytes.Repeat([]byte("x"), 11)),
 	}).ExpectValid()
 }

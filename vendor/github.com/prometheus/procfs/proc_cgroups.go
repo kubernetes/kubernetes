@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // CgroupSummary models one line from /proc/cgroups.
@@ -90,7 +90,7 @@ func parseCgroupSummary(data []byte) ([]CgroupSummary, error) {
 
 // CgroupSummarys returns information about current /proc/cgroups.
 func (fs FS) CgroupSummarys() ([]CgroupSummary, error) {
-	data, err := util.ReadFileNoStat(fs.proc.Path("cgroups"))
+	data, err := parsers.ReadFileNoStat(fs.proc.Path("cgroups"))
 	if err != nil {
 		return nil, err
 	}

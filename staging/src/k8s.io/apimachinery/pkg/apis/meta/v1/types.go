@@ -162,6 +162,8 @@ type ObjectMeta struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
 	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
@@ -176,6 +178,8 @@ type ObjectMeta struct {
 	// Read-only.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 
 	// An opaque value that represents the internal version of this object that can
@@ -194,6 +198,10 @@ type ObjectMeta struct {
 	// A sequence number representing a specific generation of the desired state.
 	// Populated by the system. Read-only.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:monotonic
+	// +k8s:alpha(since: "1.38")=+k8s:update=NoUnset
 	Generation int64 `json:"generation,omitempty" protobuf:"varint,7,opt,name=generation"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
@@ -205,6 +213,7 @@ type ObjectMeta struct {
 	// Null for lists.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	CreationTimestamp Time `json:"creationTimestamp,omitempty,omitzero" protobuf:"bytes,8,opt,name=creationTimestamp"`
 
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
@@ -226,6 +235,8 @@ type ObjectMeta struct {
 	// Read-only.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	DeletionTimestamp *Time `json:"deletionTimestamp,omitempty" protobuf:"bytes,9,opt,name=deletionTimestamp"`
 
 	// Number of seconds allowed for this object to gracefully terminate before
@@ -233,6 +244,8 @@ type ObjectMeta struct {
 	// May only be shortened.
 	// Read-only.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	DeletionGracePeriodSeconds *int64 `json:"deletionGracePeriodSeconds,omitempty" protobuf:"varint,10,opt,name=deletionGracePeriodSeconds"`
 
 	// Map of string keys and values that can be used to organize and categorize
@@ -258,6 +271,7 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=uid
+	// +k8s:alpha(since:"1.37")=+k8s:optional
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
@@ -292,6 +306,7 @@ type ObjectMeta struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
@@ -314,15 +329,19 @@ const (
 // +structType=atomic
 type OwnerReference struct {
 	// API version of the referent.
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
 	// Kind of the referent.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// If true, this reference points to the managing controller.
 	// +optional
@@ -1106,10 +1125,17 @@ const (
 	// This is similar to ErrorTypeInvalid, but the error will not include the
 	// too-long value.  See TooLong().
 	CauseTypeTooLong CauseType = "FieldValueTooLong"
+	// CauseTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid. See TooShort().
+	CauseTypeTooShort CauseType = "FieldValueTooShort"
 	// CauseTypeTooMany is used to report "too many". This is used to
 	// report that a given list has too many items. This is similar to FieldValueTooLong,
 	// but the error indicates quantity instead of length.
 	CauseTypeTooMany CauseType = "FieldValueTooMany"
+	// CauseTypeTooFew is used to report "too few". This is used to
+	// report that a given list has too few items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	CauseTypeTooFew CauseType = "FieldValueTooFew"
 	// CauseTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	CauseTypeInternal CauseType = "InternalError"
@@ -1394,6 +1420,7 @@ type ManagedFieldsEntry struct {
 	Manager string `json:"manager,omitempty" protobuf:"bytes,1,opt,name=manager"`
 	// Operation is the type of operation which lead to this ManagedFieldsEntry being created.
 	// The only valid values for this field are 'Apply' and 'Update'.
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Operation ManagedFieldsOperationType `json:"operation,omitempty" protobuf:"bytes,2,opt,name=operation,casttype=ManagedFieldsOperationType"`
 	// APIVersion defines the version of this resource that this field set
 	// applies to. The format is "group/version" just like the top-level
@@ -1429,6 +1456,7 @@ type ManagedFieldsEntry struct {
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
+// +k8s:alpha(since: "1.37")=+k8s:enum
 type ManagedFieldsOperationType string
 
 const (
@@ -1537,6 +1565,7 @@ const (
 	RowCompleted RowConditionType = "Completed"
 )
 
+// +k8s:alpha(since: "1.37")=+k8s:enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
@@ -1586,6 +1615,7 @@ type PartialObjectMetadata struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
 
@@ -1631,17 +1661,21 @@ type Condition struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 	// status of the condition, one of True, False, Unknown.
 	// +required
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=True;False;Unknown
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status"`
 	// observedGeneration represents the .metadata.generation that the condition was set based upon.
 	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
 	// with respect to the current state of the instance.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
 	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	// This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
@@ -1649,6 +1683,7 @@ type Condition struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Format=date-time
+	// +k8s:alpha(since: "1.37")=+k8s:customValidation
 	LastTransitionTime Time `json:"lastTransitionTime" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// reason contains a programmatic identifier indicating the reason for the condition's last transition.
 	// Producers of specific condition types may define expected values and meanings for this field,
@@ -1660,11 +1695,16 @@ type Condition struct {
 	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	Reason string `json:"reason" protobuf:"bytes,5,opt,name=reason"`
 	// message is a human readable message indicating details about the transition.
 	// This may be an empty string.
-	// +required
-	// +kubebuilder:validation:Required
+	// +optional
+	// +kubebuilder:validation:Optional
+	// +default=""
 	// +kubebuilder:validation:MaxLength=32768
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=32768
 	Message string `json:"message" protobuf:"bytes,6,opt,name=message"`
 }

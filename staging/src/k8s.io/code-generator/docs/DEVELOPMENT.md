@@ -94,6 +94,7 @@ Generates validation logic based on struct tags.
 *   **Root Types:** Processes types identified as roots (often having `TypeMeta`).
 *   **Plugin Architecture:** Uses a plugin system for tag validators. Some tags are "late tags" that depend on shared state from previous tags (e.g., `listMap` validation).
 *   **Strict Rules:** Enforces patterns like requiring pointers for `optional` fields.
+*   **Reusable:** Other projects can build their own generator on the `args`, `generators` and `validators` packages, with their own tag prefix (`--tag-prefix`, e.g. `+xyz:` instead of `+k8s:`) and their own tags. See `cmd/validation-gen/examples/custom-prefix`.
 
 ## Usage
 

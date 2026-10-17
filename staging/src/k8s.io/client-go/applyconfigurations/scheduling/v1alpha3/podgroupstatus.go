@@ -27,24 +27,29 @@ import (
 //
 // PodGroupStatus represents information about the status of a pod group.
 type PodGroupStatusApplyConfiguration struct {
-	// Conditions represent the latest observations of the PodGroup's state.
+	// conditions represent the latest observations of the PodGroup's state.
 	//
 	// Known condition types:
-	// - "PodGroupScheduled": Indicates whether the scheduling requirement has been satisfied.
+	// - "PodGroupInitiallyScheduled": Indicates whether the scheduling requirement has been satisfied.
+	// Once this condition transitions to True, it serves as a terminal state and will never revert to False,
+	// even if pods are subsequently evicted and group constraints are no longer met.
 	// - "DisruptionTarget": Indicates whether the PodGroup is about to be terminated
 	// due to disruption such as preemption.
 	//
-	// Known reasons for the PodGroupScheduled condition:
+	// Known reasons for the PodGroupInitiallyScheduled condition:
+	// - "Scheduled": All required pods in the PodGroup have been successfully scheduled.
 	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
 	// affinity/anti-affinity rules, or insufficient capacity for the gang.
 	// - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
 	// that happened during scheduling, for example due to nodeAffinity parsing errors.
+	// - "PodGroupError": The PodGroup cannot be scheduled due to an invalid group configuration
+	// detected during runtime validation (such as conflicting scheduler names, or priority/preemption policy conflicts).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
-	// higher-priority PodGroups or Pods.
+	// higher-priority CompositePodGroups, PodGroups or Pods.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	// Status of resource claims.
+	// resourceClaimStatuses is status of resource claims.
 	ResourceClaimStatuses []PodGroupResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 

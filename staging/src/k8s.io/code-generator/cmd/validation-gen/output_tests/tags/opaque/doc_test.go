@@ -124,4 +124,30 @@ func Test(t *testing.T) {
 		OpaqueMapField:            map[NoValidationString]NoValidationStruct{"a": {"foo"}},
 		IsolatedOpaqueStructField: NoValidationStruct{"foo"},
 	}).ExpectValid()
+
+	st.Value(&OpaqueStructWithValidation{
+		StringField: "foo",
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"": {"type OpaqueStructWithValidation"},
+	})
+
+	st.Value(&ParentWithOpaqueAliasWithValidation{
+		Field: OpaqueAliasWithValidation{
+			Field: "foo",
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"field": {"type OpaqueAliasWithValidation"},
+	})
+
+	st.Value(&OpaqueAliasWithValidation{
+		Field: "foo",
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"": {"type OpaqueAliasWithValidation"},
+	})
+
+	st.Value(&BaseStruct{
+		Field: "foo",
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"field": {"field BaseStruct.Field"},
+	})
 }

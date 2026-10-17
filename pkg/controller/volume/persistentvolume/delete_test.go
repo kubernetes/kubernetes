@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/component-helpers/storage/volume"
@@ -124,7 +125,7 @@ func TestDeleteSync(t *testing.T) {
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil)
 				reactor.AddClaimBoundToVolume(claim)
-				ctrl.claims.Add(claim)
+				require.NoError(t, ctrl.claims.Indexer().Add(claim))
 			}),
 		},
 		{

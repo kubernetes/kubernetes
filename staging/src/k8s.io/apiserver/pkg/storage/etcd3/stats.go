@@ -34,7 +34,7 @@ import (
 const sizerRefreshInterval = time.Minute
 
 func newResourceSizeEstimator(prefix string, getKeys storage.KeysFunc) *resourceSizeEstimator {
-	if prefix[len(prefix)-1] != '/' {
+	if !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
 	sc := &resourceSizeEstimator{
@@ -61,6 +61,8 @@ func newResourceSizeEstimator(prefix string, getKeys storage.KeysFunc) *resource
 // This approach may leak keys if delete events are not observed,
 // thus we run a background goroutine to periodically cleanup keys if needed.
 type resourceSizeEstimator struct {
+	// prefix is the backend prefix with a trailing '/' so key matching respects
+	// path boundaries. Unlike store.pathPrefix, it is '/' for the root.
 	prefix         string
 	stop           chan struct{}
 	wg             sync.WaitGroup

@@ -65,35 +65,43 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		storageVersionSynced: storageVersionInformer.Informer().HasSynced,
 		leaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_leases"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "storage_version_garbage_collector_leases",
+			},
 		),
 		storageVersionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_storageversions"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "storage_version_garbage_collector_storageversions",
+			},
 		),
 	}
 	logger := klog.FromContext(ctx)
-	leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := leaseInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			c.onDeleteLease(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	// use the default resync period from the informer
-	storageVersionInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = storageVersionInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.onAddStorageVersion(logger, obj)
 		},
 		UpdateFunc: func(old, newObj interface{}) {
 			c.onUpdateStorageVersion(logger, old, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return c
 }
 
 // Run starts one worker.
 func (c *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting storage version garbage collector")

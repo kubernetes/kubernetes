@@ -78,7 +78,7 @@ type MockBackoffManager_CalculateBackoff_Call struct {
 
 // CalculateBackoff is a helper method to define mock.On call
 //   - actualURL *url.URL
-func (_e *MockBackoffManager_Expecter) CalculateBackoff(actualURL interface{}) *MockBackoffManager_CalculateBackoff_Call {
+func (_e *MockBackoffManager_Expecter) CalculateBackoff(actualURL any) *MockBackoffManager_CalculateBackoff_Call {
 	return &MockBackoffManager_CalculateBackoff_Call{Call: _e.mock.On("CalculateBackoff", actualURL)}
 }
 
@@ -118,7 +118,7 @@ type MockBackoffManager_Sleep_Call struct {
 
 // Sleep is a helper method to define mock.On call
 //   - d time.Duration
-func (_e *MockBackoffManager_Expecter) Sleep(d interface{}) *MockBackoffManager_Sleep_Call {
+func (_e *MockBackoffManager_Expecter) Sleep(d any) *MockBackoffManager_Sleep_Call {
 	return &MockBackoffManager_Sleep_Call{Call: _e.mock.On("Sleep", d)}
 }
 
@@ -160,7 +160,7 @@ type MockBackoffManager_UpdateBackoff_Call struct {
 //   - actualURL *url.URL
 //   - err error
 //   - responseCode int
-func (_e *MockBackoffManager_Expecter) UpdateBackoff(actualURL interface{}, err interface{}, responseCode interface{}) *MockBackoffManager_UpdateBackoff_Call {
+func (_e *MockBackoffManager_Expecter) UpdateBackoff(actualURL any, err any, responseCode any) *MockBackoffManager_UpdateBackoff_Call {
 	return &MockBackoffManager_UpdateBackoff_Call{Call: _e.mock.On("UpdateBackoff", actualURL, err, responseCode)}
 }
 

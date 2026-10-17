@@ -25,7 +25,7 @@ import (
 
 var (
 	// OptionalType indicates the runtime type of an optional value.
-	OptionalType = NewOpaqueType("optional_type")
+	OptionalType = NewOpaqueType("optional_type", DynType)
 
 	// OptionalNone is a sentinel value which is used to indicate an empty optional value.
 	OptionalNone = &Optional{}
@@ -58,6 +58,9 @@ func (o *Optional) GetValue() ref.Val {
 func (o *Optional) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	if !o.HasValue() {
 		return nil, errors.New("optional.none() dereference")
+	}
+	if typeDesc == reflect.TypeFor[*Optional]() {
+		return o, nil
 	}
 	return o.value.ConvertToNative(typeDesc)
 }

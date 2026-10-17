@@ -66,5 +66,12 @@ UnixFD's to messages that are accompanied by the given file descriptors with the
 UnixFD values being substituted by the correct indices. Similarly, the indices
 of incoming messages are automatically resolved. It shouldn't be necessary to use
 UnixFDIndex.
+
+# Build tags
+
+The `godbus_no_tcp` build tag disables tcp and nonce-tcp transports. Since they
+use [net.Dial] with a host name, they make the DNS resolver from the net
+package reachable for the linker. If a program only uses unix transport,
+this tag makes the resulting binary smaller.
 */
 package dbus

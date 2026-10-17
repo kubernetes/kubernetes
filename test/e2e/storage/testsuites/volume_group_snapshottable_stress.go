@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -89,11 +88,11 @@ func (t *volumeGroupSnapshottableStressTestSuite) GetTestSuiteInfo() storagefram
 	return t.tsInfo
 }
 
-func (t *volumeGroupSnapshottableStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumeGroupSnapshottableStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	driverInfo := driver.GetDriverInfo()
 	var ok bool
 	if driverInfo.VolumeGroupSnapshotStressTestOptions == nil {
-		e2eskipper.Skipf("Driver %s doesn't specify volume group snapshot stress test options -- skipping", driverInfo.Name)
+		return fmt.Sprintf("Driver %s doesn't specify volume group snapshot stress test options", driverInfo.Name)
 	}
 	if driverInfo.VolumeGroupSnapshotStressTestOptions.NumPods <= 0 {
 		framework.Failf("NumPods in volume group snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeGroupSnapshotStressTestOptions.NumPods)
@@ -103,13 +102,14 @@ func (t *volumeGroupSnapshottableStressTestSuite) SkipUnsupportedTests(driver st
 	}
 	_, ok = driver.(storageframework.VolumeGroupSnapshottableTestDriver)
 	if !driverInfo.Capabilities[storageframework.CapVolumeGroupSnapshot] || !ok {
-		e2eskipper.Skipf("Driver %q doesn't implement VolumeGroupSnapshottableTestDriver - skipping", driverInfo.Name)
+		return fmt.Sprintf("Driver %q doesn't implement VolumeGroupSnapshottableTestDriver", driverInfo.Name)
 	}
 
 	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
-		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
+		return fmt.Sprintf("Driver %s doesn't implement DynamicPVTestDriver", driverInfo.Name)
 	}
+	return ""
 }
 
 func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -146,6 +146,11 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 		// Create volume resource which includes storage class
 		volumeResource := storageframework.CreateVolumeResource(ctx, driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 		stressTest.volumeResources = append(stressTest.volumeResources, volumeResource)
+
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		driverVolumeSizeRange := driverInfo.SupportedSizeRange
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 
 		// Create StatefulSet with volumeClaimTemplates
 		// StatefulSet name must be ≤52 chars so the auto-generated controller-revision-hash
@@ -205,7 +210,7 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 							},
 							Resources: v1.VolumeResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceStorage: resource.MustParse(t.GetTestSuiteInfo().SupportedSizeRange.Min),
+									v1.ResourceStorage: resource.MustParse(claimSize),
 								},
 							},
 							StorageClassName: &volumeResource.Sc.Name,
@@ -215,7 +220,6 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 			},
 		}
 
-		var err error
 		stressTest.statefulSet, err = cs.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, statefulSet, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create StatefulSet")
 

@@ -74,19 +74,27 @@ type fakeVolumeHost struct {
 var _ VolumeHost = &fakeVolumeHost{}
 var _ FakeVolumeHost = &fakeVolumeHost{}
 
-func NewFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
+// T is the subset of testing.T needed to construct fake volume hosts.
+type T interface {
+	Fatalf(format string, args ...any)
+}
+
+// This tells the vet printf checker that Fatalf in the interface must be checked.
+var _ T = &testing.T{}
+
+func NewFakeVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
 }
 
-func NewFakeVolumeHostWithCloudProvider(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
+func NewFakeVolumeHostWithCloudProvider(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
 }
 
-func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func NewFakeVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
 }
 
-func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func newFakeVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, nodeName: nodeName, csiDriverLister: driverLister, volumeAttachmentLister: volumeAttachLister}
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
@@ -229,11 +237,11 @@ type fakeAttachDetachVolumeHost struct {
 var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
 var _ FakeVolumeHost = &fakeAttachDetachVolumeHost{}
 
-func NewFakeAttachDetachVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func NewFakeAttachDetachVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
 }
 
-func newFakeAttachDetachVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func newFakeAttachDetachVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	host := &fakeAttachDetachVolumeHost{}
 	host.rootDir = rootDir
 	host.kubeClient = kubeClient
@@ -299,19 +307,19 @@ type fakeKubeletVolumeHost struct {
 var _ KubeletVolumeHost = &fakeKubeletVolumeHost{}
 var _ FakeVolumeHost = &fakeKubeletVolumeHost{}
 
-func NewFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeKubeletVolumeHost {
+func NewFakeKubeletVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeKubeletVolumeHost {
 	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
 }
 
-func NewFakeKubeletVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
+func NewFakeKubeletVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
 	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
 }
 
-func NewFakeKubeletVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeKubeletVolumeHost {
+func NewFakeKubeletVolumeHostWithMounterFSType(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeKubeletVolumeHost {
 	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, pathToTypeMap, "", nil, nil)
 }
 
-func newFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
+func newFakeKubeletVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
 	host := &fakeKubeletVolumeHost{}
 	host.rootDir = rootDir
 	host.kubeClient = kubeClient
@@ -401,8 +409,8 @@ func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return f.hostUtil
 }
 
-func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	ctb, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
+	ctb, err := f.kubeClient.CertificatesV1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while getting ClusterTrustBundle %s: %w", name, err)
 	}
@@ -411,8 +419,8 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing 
 }
 
 // Note: we do none of the deduplication and sorting that the real deal should do.
-func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	ctbList, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	ctbList, err := f.kubeClient.CertificatesV1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while listing all ClusterTrustBundles: %w", err)
 	}

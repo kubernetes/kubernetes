@@ -49,6 +49,7 @@ type recordAuthorizationMetricsFunc func(ctx context.Context, authorized authori
 
 // WithAuthorization passes all authorized requests on to handler, and returns a forbidden error otherwise.
 func WithAuthorization(hhandler http.Handler, auth authorizer.UnconditionalAuthorizer, s runtime.NegotiatedSerializer) http.Handler {
+	RegisterMetrics()
 	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics)
 }
 

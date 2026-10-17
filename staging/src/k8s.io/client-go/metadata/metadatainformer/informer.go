@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -40,6 +41,14 @@ type SharedInformerOption func(*metadataSharedInformerFactory) *metadataSharedIn
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector sharding.Selector) SharedInformerOption {
+	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -85,6 +94,7 @@ type metadataSharedInformerFactory struct {
 	defaultResync time.Duration
 	namespace     string
 	transform     cache.TransformFunc
+	shardSelector sharding.Selector
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -113,6 +123,9 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	informer.Informer().SetTransform(f.transform)
+	if f.shardSelector != nil {
+		_ = informer.Informer().SetShardSelector(f.shardSelector)
+	}
 	f.informers[key] = informer
 
 	return informer

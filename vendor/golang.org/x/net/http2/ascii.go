@@ -4,7 +4,9 @@
 
 package http2
 
-import "strings"
+import (
+	"strings"
+)
 
 // The HTTP protocols are defined in terms of ASCII, not Unicode. This file
 // contains helper functions which may use Unicode-aware functions which would
@@ -37,6 +39,16 @@ func lower(b byte) byte {
 func isASCIIPrint(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] < ' ' || s[i] > '~' {
+			return false
+		}
+	}
+	return true
+}
+
+// isASCII returns whether s is ASCII.
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > 0x7f {
 			return false
 		}
 	}

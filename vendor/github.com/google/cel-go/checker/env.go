@@ -74,6 +74,7 @@ type Env struct {
 	declarations        *Scopes
 	aggLitElemType      aggregateLiteralElementType
 	filteredOverloadIDs map[string]struct{}
+	jsonFieldNames      bool
 }
 
 // NewEnv returns a new *Env with the given parameters.
@@ -104,6 +105,7 @@ func NewEnv(container *containers.Container, provider types.Provider, opts ...Op
 		declarations:        declarations,
 		aggLitElemType:      aggLitElemType,
 		filteredOverloadIDs: filteredOverloadIDs,
+		jsonFieldNames:      envOptions.jsonFieldNames,
 	}, nil
 }
 
@@ -273,12 +275,31 @@ func (e *Env) setFunction(fn *decls.FunctionDecl) []errorMsg {
 	return errMsgs
 }
 
+func maybeMergeConstant(a *decls.VariableDecl, b *decls.VariableDecl) (*decls.VariableDecl, errorMsg) {
+	if b.Value() != nil {
+		if a.Value() == nil {
+			return b, ""
+		}
+		eq, ok := a.Value().Equal(b.Value()).Value().(bool)
+		if ok && eq {
+			return a, ""
+		}
+		return nil, constantConflictError(b.Name())
+	}
+	return a, ""
+}
+
 // addIdent adds the Decl to the declarations in the Env.
 // Returns a non-empty errorMsg if the identifier is already declared in the scope.
 func (e *Env) addIdent(decl *decls.VariableDecl) errorMsg {
 	current := e.declarations.FindIdentInScope(decl.Name())
 	if current != nil {
 		if current.DeclarationIsEquivalent(decl) {
+			decl, errMsg := maybeMergeConstant(current, decl)
+			if errMsg != "" {
+				return errMsg
+			}
+			e.declarations.AddIdent(decl)
 			return ""
 		}
 		return overlappingIdentifierError(decl.Name())
@@ -324,6 +345,10 @@ func (e *Env) exitScope() *Env {
 // errorMsg is a type alias meant to represent error-based return values which
 // may be accumulated into an error at a later point in execution.
 type errorMsg string
+
+func constantConflictError(name string) errorMsg {
+	return errorMsg(fmt.Sprintf("conflicting constant definitions for name '%s'", name))
+}
 
 func overlappingIdentifierError(name string) errorMsg {
 	return errorMsg(fmt.Sprintf("overlapping identifier for name '%s'", name))

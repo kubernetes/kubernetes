@@ -73,11 +73,16 @@ func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir s
 }
 
 // DeviceOpened determines if the device is in use elsewhere
+// Windows has no /dev device node tree: Node.status.volumesAttached[].devicePath
+// carries the CSI VolumeID on Windows rather than a block-device node, so this
+// check does not apply and always reports the device as not opened.
 func (hu *HostUtil) DeviceOpened(pathname string) (bool, error) {
 	return false, nil
 }
 
 // PathIsDevice determines if a path is a device.
+// Windows has no /dev device node tree: paths here are volume-GUID paths or CSI
+// VolumeIDs, never a unix-style block-device node, so this always reports false.
 func (hu *HostUtil) PathIsDevice(pathname string) (bool, error) {
 	return false, nil
 }

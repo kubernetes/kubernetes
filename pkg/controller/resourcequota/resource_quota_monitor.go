@@ -106,14 +106,18 @@ type QuotaMonitor struct {
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
-func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+func NewMonitor(ctx context.Context, informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+	logger := klog.FromContext(ctx)
 	return &QuotaMonitor{
 		informersStarted: informersStarted,
 		informerFactory:  informerFactory,
 		ignoredResources: ignoredResources,
 		resourceChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[*event](),
-			workqueue.TypedRateLimitingQueueConfig[*event]{Name: "resource_quota_controller_resource_changes"},
+			workqueue.TypedRateLimitingQueueConfig[*event]{
+				Logger: &logger,
+				Name:   "resource_quota_controller_resource_changes",
+			},
 		),
 		resyncPeriod:      resyncPeriod,
 		replenishmentFunc: replenishmentFunc,
@@ -134,7 +138,7 @@ type monitor struct {
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
 func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+	m.controller.RunWithContext(wait.ContextForChannel(m.stopCh))
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -173,7 +177,11 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		resyncPeriod := qm.resyncPeriod()
+		_, _ = shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &resyncPeriod,
+		})
 		return shared.Informer().GetController(), nil
 	}
 	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -60,7 +60,8 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.IntTypedefPtrField"
 	IntTypedefPtrField *IntType `json:"intTypedefPtrField"`
 
-	// non-pointer struct fields cannot be optional
+	// +k8s:optional
+	OtherStructField OtherStruct `json:"otherStructField"`
 
 	// +k8s:optional
 	// +k8s:validateFalse="field Struct.OtherStructPtrField"

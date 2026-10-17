@@ -39,6 +39,8 @@ type TestingT interface {
 }
 
 // Ensure that testing T & B satisfy the TestingT interface
+//
+//nolint:forbidigo
 var _ TestingT = &testing.T{}
 var _ TestingT = &testing.B{}
 

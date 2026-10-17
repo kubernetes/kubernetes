@@ -36,16 +36,15 @@ type TestDriver interface {
 	// information.
 	GetDriverInfo() *DriverInfo
 
-	// SkipUnsupportedTest skips test if Testpattern is not
+	// SkipUnsupportedTest returns the reason for skipping test if Testpattern is not
 	// suitable to test with the TestDriver. It gets called after
 	// parsing parameters of the test suite and before the
-	// framework is initialized. Cheap tests that just check
-	// parameters like the cloud provider can and should be
-	// done in SkipUnsupportedTest to avoid setting up more
-	// expensive resources like framework.Framework. Tests that
+	// framework is initialized.
+	//
+	// Tests that
 	// depend on a connection to the cluster can be done in
 	// PrepareTest once the framework is ready.
-	SkipUnsupportedTest(TestPattern)
+	SkipUnsupportedTest(TestPattern) string
 
 	// PrepareTest is called at test execution time each time a new test case is about to start.
 	// It sets up all necessary resources and returns the per-test configuration.
@@ -274,6 +273,8 @@ type DriverInfo struct {
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
 	// [Optional] Scale parameters for volume modify stress tests.
 	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
+	// [Optional] Scale parameters for snapshot metadata stress tests.
+	SnapshotMetadataStressTestOptions *SnapshotMetadataStressTestOptions
 	// [Optional] Parameters for performance tests
 	PerformanceTestOptions *PerformanceTestOptions
 	// [Optional] Scale parameters for volume group snapshot stress tests.
@@ -303,6 +304,14 @@ type VolumeModifyStressTestOptions struct {
 	// Number of pods to create in the test. This may also create
 	// up to 1 volume with volumeAttributesClass per pod.
 	NumPods int
+}
+
+// SnapshotMetadataStressTestOptions contains parameters for snapshot metadata stress tests.
+type SnapshotMetadataStressTestOptions struct {
+	// Number of pods to create in the test. Each pod gets its own PVC and snapshots.
+	NumPods int
+	// Number of snapshot pairs per pod for delta verification.
+	NumSnapshotPairs int
 }
 
 // Metrics to evaluate performance of an operation

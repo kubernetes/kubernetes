@@ -29,17 +29,17 @@ import (
 //
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentConditionApplyConfiguration struct {
-	// Type of deployment condition.
+	// type is the type of deployment condition.
 	Type *extensionsv1beta1.DeploymentConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
+	// status is the status of the condition, one of True, False, Unknown.
 	Status *v1.ConditionStatus `json:"status,omitempty"`
-	// The last time this condition was updated.
+	// lastUpdateTime is the last time this condition was updated.
 	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
+	// reason is the reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable message indicating details about the transition.
 	Message *string `json:"message,omitempty"`
 }
 

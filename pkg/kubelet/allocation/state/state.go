@@ -18,50 +18,33 @@ package state
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-// PodResourceInfo stores resource requirements for containers within a pod.
-type PodResourceInfo struct {
-	// ContainerResources maps container names to their respective ResourceRequirements.
-	ContainerResources map[string]v1.ResourceRequirements
-	PodLevelResources  *v1.ResourceRequirements
-}
-
-// PodResourceInfoMap maps pod UIDs to their corresponding PodResourceInfo,
-// tracking resource requirements for all containers within each pod.
-type PodResourceInfoMap map[types.UID]PodResourceInfo
-
-// Clone returns a copy of PodResourceInfoMap
-func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
-	prCopy := make(PodResourceInfoMap)
-	for podUID, podInfo := range pr {
-		prCopy[podUID] = PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			prCopy[podUID].ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-	}
-	return prCopy
-}
+// PodMap maps pod UIDs to their corresponding pods, tracking resource requirements
+// for all containers within each pod.
+type PodMap map[types.UID]*v1.Pod
 
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
-	GetPodResourceInfoMap() PodResourceInfoMap
-	GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool)
+	GetPodUIDs() []types.UID
+	GetPod(podUID types.UID) (*v1.Pod, bool)
+	HasPod(podUID types.UID) bool
 	GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool)
+	GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool)
 }
 
 type writer interface {
-	SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error
-	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
-	SetPodLevelResources(podUID types.UID, alloc *v1.ResourceRequirements) error
-	RemovePod(podUID types.UID) error
+	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error
+	SetPod(logger klog.Logger, pod *v1.Pod) error
+	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
+	SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error
+	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 }

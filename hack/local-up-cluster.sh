@@ -111,6 +111,24 @@ STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 ENABLE_TRACING=${ENABLE_TRACING:-false}
 
+# Enable ML-DSA post-quantum cryptography for all cluster certificates.
+# When true, generates ML-DSA CAs and certs, enables the CertificateSigningRequestMLDSA
+# feature gate, and configures the kubelet to use ML-DSA keys for certificate rotation.
+ENABLE_MLDSA=${ENABLE_MLDSA:-false}
+MLDSA_ALGORITHM=${MLDSA_ALGORITHM:-"ML-DSA-65"}
+if [[ "${ENABLE_MLDSA}" == "true" ]]; then
+  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true"
+  case "${MLDSA_ALGORITHM}" in
+    ML-DSA-44) KUBE_CERT_KEY_ALGO="mldsa44" ;;
+    ML-DSA-65) KUBE_CERT_KEY_ALGO="mldsa65" ;;
+    ML-DSA-87) KUBE_CERT_KEY_ALGO="mldsa87" ;;
+    *)
+      echo "Unsupported ML-DSA algorithm: ${MLDSA_ALGORITHM}" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
 
@@ -1049,6 +1067,13 @@ EOF
       # cpumanager policy options
       if [[ -n ${CPUMANAGER_POLICY_OPTIONS} ]]; then
 	parse_cpumanager_policy_options "${CPUMANAGER_POLICY_OPTIONS}"
+      fi
+
+      # ML-DSA key algorithm for certificate rotation
+      if [[ "${ENABLE_MLDSA}" == "true" ]]; then
+        echo "tlsMinVersion: \"VersionTLS13\""
+        echo "clientCertificateKeyAlgorithm: \"${MLDSA_ALGORITHM}\""
+        echo "serverCertificateKeyAlgorithm: \"${MLDSA_ALGORITHM}\""
       fi
 
     } >>"${TMP_DIR}"/kubelet.yaml

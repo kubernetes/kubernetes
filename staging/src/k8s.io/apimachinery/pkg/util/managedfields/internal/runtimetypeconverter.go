@@ -18,9 +18,11 @@ package internal
 
 import (
 	"fmt"
+
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 type schemeTypeConverter struct {

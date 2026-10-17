@@ -28,11 +28,10 @@ import (
 )
 
 type endpointMappingConfig struct {
-	CoreComponents       map[string][]string `yaml:"coreComponents"`
-	StandaloneComponents map[string][]string `yaml:"standaloneComponents"`
-	SharedPaths          []string            `yaml:"sharedPaths"`
-	EndpointMappings     []endpointMapping   `yaml:"endpointMappings"`
-	DefaultEndpoint      string              `yaml:"defaultEndpoint"`
+	CoreComponents   map[string][]string `yaml:"coreComponents"`
+	SharedPaths      []string            `yaml:"sharedPaths"`
+	EndpointMappings []endpointMapping   `yaml:"endpointMappings"`
+	DefaultEndpoint  string              `yaml:"defaultEndpoint"`
 }
 
 type endpointMapping struct {
@@ -60,14 +59,10 @@ func (c *endpointMappingConfig) inferComponentEndpoints(filePath string) []metri
 	endpoint := c.inferEndpoint(filePath)
 
 	if c.isSharedPath(filePath) {
-		// The assumption here is that none of the standalone components
-		// use the metrics under the path.
 		return c.allCoreComponentEndpoints(endpoint)
 	}
 
-	// Core and standalone components may explicitly share the same metrics through their path patterns.
 	components := c.inferComponents(filePath, c.CoreComponents)
-	components = append(components, c.inferComponents(filePath, c.StandaloneComponents)...)
 
 	var endpoints []metric.ComponentEndpoint
 	for _, component := range components {

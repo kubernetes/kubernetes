@@ -30,6 +30,42 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.maxReplicas": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
@@ -37,6 +73,12 @@ func init() {
 			"spec.minReplicas": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.scaleTargetRef.kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.scaleTargetRef.name": {
+				{ErrorType: "FieldValueRequired"},
 			},
 		},
 	)

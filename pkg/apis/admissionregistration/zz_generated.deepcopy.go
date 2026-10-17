@@ -842,11 +842,6 @@ func (in *ValidatingAdmissionPolicySpec) DeepCopyInto(out *ValidatingAdmissionPo
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.MatchConditions != nil {
-		in, out := &in.MatchConditions, &out.MatchConditions
-		*out = make([]MatchCondition, len(*in))
-		copy(*out, *in)
-	}
 	if in.FailurePolicy != nil {
 		in, out := &in.FailurePolicy, &out.FailurePolicy
 		*out = new(FailurePolicyType)
@@ -855,6 +850,11 @@ func (in *ValidatingAdmissionPolicySpec) DeepCopyInto(out *ValidatingAdmissionPo
 	if in.AuditAnnotations != nil {
 		in, out := &in.AuditAnnotations, &out.AuditAnnotations
 		*out = make([]AuditAnnotation, len(*in))
+		copy(*out, *in)
+	}
+	if in.MatchConditions != nil {
+		in, out := &in.MatchConditions, &out.MatchConditions
+		*out = make([]MatchCondition, len(*in))
 		copy(*out, *in)
 	}
 	if in.Variables != nil {

@@ -345,6 +345,44 @@ func TestExtractNodeFeaturesChange(t *testing.T) {
 	}
 }
 
+func TestNodeSchedulingPropertiesChange_NodeDeclaredFeatures(t *testing.T) {
+	tests := []struct {
+		name                        string
+		nodeDeclaredFeaturesEnabled bool
+		oldNode                     *v1.Node
+		newNode                     *v1.Node
+		wantEvents                  []fwk.ClusterEvent
+	}{
+		{
+			name:                        "scheduling properties changed with NodeDeclaredFeatures enabled",
+			nodeDeclaredFeaturesEnabled: true,
+			oldNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			wantEvents:                  []fwk.ClusterEvent{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}},
+		},
+		{
+			name:                        "scheduling properties changed with NodeDeclaredFeatures disabled",
+			nodeDeclaredFeaturesEnabled: false,
+			oldNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			wantEvents:                  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.nodeDeclaredFeaturesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
+			gotEvents := NodeSchedulingPropertiesChange(tt.newNode, tt.oldNode)
+			if diff := cmp.Diff(tt.wantEvents, gotEvents, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
+				t.Errorf("unexpected events (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_podSchedulingPropertiesChange(t *testing.T) {
 	podWithBigRequest := &v1.Pod{
 		Spec: v1.PodSpec{
@@ -434,7 +472,6 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 		newPod      *v1.Pod
 		oldPod      *v1.Pod
 		isTargetPod bool
-		draDisabled bool
 		want        []fwk.ClusterEvent
 	}{
 		{
@@ -459,7 +496,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "pod's resource request is scaled up",
 			newPod: podWithBigRequest,
 			oldPod: podWithSmallRequest,
-			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleUp}},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
@@ -498,15 +535,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}},
 		},
 		{
-			name:        "pod claim statuses change, feature disabled",
-			draDisabled: true,
-			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
-			oldPod:      st.MakePod().Obj(),
-			isTargetPod: true,
-			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.Update}},
-		},
-		{
-			name:        "pod claim statuses change, feature enabled",
+			name:        "pod claim statuses change",
 			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
 			isTargetPod: true,
@@ -520,15 +549,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
-			name:        "pod extended resource claim status change, feature disabled",
-			draDisabled: true,
-			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
-			oldPod:      st.MakePod().Obj(),
-			isTargetPod: true,
-			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.Update}},
-		},
-		{
-			name:        "pod extended resource claim status change, feature enabled",
+			name:        "pod extended resource claim status change",
 			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
 			isTargetPod: true,
@@ -551,10 +572,6 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.draDisabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tt.draDisabled)
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod, tt.isTargetPod)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)

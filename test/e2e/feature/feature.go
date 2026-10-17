@@ -29,12 +29,6 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 
-	// Owner: sig-lifecycle
-	// This label is used for tests which need the following controllers to be enabled:
-	// - bootstrap-signer-controller
-	// - token-cleaner-controller
-	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
-
 	// Owner: sig-auth
 	// TODO: document the feature (when to use this feature for a test)
 	BoundServiceAccountTokenVolume = framework.WithFeature(framework.ValidFeatures.Add("BoundServiceAccountTokenVolume"))
@@ -136,6 +130,10 @@ var (
 	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
+	// Owner: sig-storage
+	// EmptyDirVolumeMode is used for tests that require the EmptyDirVolumeMode feature gate.
+	EmptyDirVolumeMode = framework.WithFeature(framework.ValidFeatures.Add("EmptyDirVolumeMode"))
+
 	// Owner: sig-node
 	// EnvFiles is used for testing the EnvFiles feature (file-based environment variables).
 	EnvFiles = framework.WithFeature(framework.ValidFeatures.Add("EnvFiles"))
@@ -209,11 +207,6 @@ var (
 	// InPlacePodVerticalScaling is used for testing in-place pod vertical scaling (https://kep.k8s.io/1287).
 	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
-	// Owner: sig-network
-	// Marks tests that require a conforming implementation of
-	// Ingress.networking.k8s.io to be present.
-	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
-
 	// Owner: sig-storage
 	// Marks tests that only work with a sigs.k8s.io/kind cluster
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
@@ -221,18 +214,6 @@ var (
 	// Owner: sig-network
 	// Marks tests that require kube-dns-autoscaler
 	KubeDNSAutoscaler = framework.WithFeature(framework.ValidFeatures.Add("KubeDNSAutoscaler"))
-
-	// Owner: sig-network
-	// TODO: document the feature (when to use this feature for a test)
-	KubeProxyDaemonSetDowngrade = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetDowngrade"))
-
-	// Owner: sig-network
-	// TODO: document the feature (when to use this feature for a test)
-	KubeProxyDaemonSetMigration = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
-
-	// Owner: sig-network
-	// TODO: document the feature (when to use this feature for a test)
-	KubeProxyDaemonSetUpgrade = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetUpgrade"))
 
 	// Owner: sig-network
 	// Marks tests that require the kernel to have support for the nfacct subsystem.
@@ -246,6 +227,10 @@ var (
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
+
+	// Owner: sig-node
+	// Marks tests that require a cluster with KubeletInUserNamespace <https://kep.k8s.io/2033>
+	KubeletInUserNamespace = framework.WithFeature(framework.ValidFeatures.Add("KubeletInUserNamespace"))
 
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
@@ -265,6 +250,10 @@ var (
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
+
+	// Owner: sig-network
+	// Marks tests that require the service proxy to support localhost NodePort services
+	LocalhostNodePorts = framework.WithFeature(framework.ValidFeatures.Add("LocalhostNodePorts"))
 
 	// owning-sig: sig-node
 	// Marks a disruptive test for lock contention
@@ -317,10 +306,6 @@ var (
 	// Owner: sig-node
 	// Node Problem Detect e2e tests in tree.
 	NodeProblemDetector = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
-
-	// Owner: sig-node
-	// Tests aiming to verify oom_score functionality
-	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
@@ -416,13 +401,9 @@ var (
 	// Tests validating the behavior of kubelet when running without the API server.
 	StandaloneMode = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
 
-	// Owner: sig-apps
-	// TODO: document the feature (when to use this feature for a test)
-	StatefulSet = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
-
-	// Owner: sig-apps
-	// TODO: document the feature (when to use this feature for a test)
-	StatefulUpgrade = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))
+	// Owner: sig-storage
+	// Tests marked with this feature exercise scheduling behavior that scores nodes based on CSI storage capacity.
+	StorageCapacityScoring = framework.WithFeature(framework.ValidFeatures.Add("StorageCapacityScoring"))
 
 	// Owner: sig-storage
 	// TODO: document the feature (when to use this feature for a test)
@@ -460,11 +441,15 @@ var (
 	VolumeAttributesClass = framework.WithFeature(framework.ValidFeatures.Add("VolumeAttributesClass"))
 
 	// Owner: sig-storage
-	// Volume group snapshot tests
-	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("volumegroupsnapshot"))
+	// Volume group snapshot tests. Tests with this feature require a cluster
+	// with volume group snapshot support, i.e. with the external
+	// snapshot-controller deployed and the VolumeGroupSnapshot CRDs installed.
+	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeGroupSnapshotDataSource"))
 
 	// Owner: sig-storage
-	// TODO: document the feature (when to use this feature for a test)
+	// Volume snapshot tests. Tests with this feature require a cluster
+	// with volume snapshot support, i.e. with the external snapshot-controller
+	// deployed and the VolumeSnapshot CRDs installed.
 	VolumeSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
 
 	// Owner: sig-storage

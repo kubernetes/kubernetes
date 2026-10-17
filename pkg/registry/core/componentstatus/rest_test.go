@@ -46,6 +46,10 @@ func (f *fakeHttpProber) Probe(*http.Request, time.Duration) (probe.Result, stri
 	return f.result, f.body, f.err
 }
 
+func (f *fakeHttpProber) ProbeH2C(*http.Request, time.Duration) (probe.Result, string, error) {
+	return f.result, f.body, f.err
+}
+
 type testResponse struct {
 	result probe.Result
 	data   string

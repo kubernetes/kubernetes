@@ -11,7 +11,6 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
-	"reflect"
 	"slices"
 	"sort"
 	"strconv"
@@ -299,15 +298,10 @@ func (x byCommentPos) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 func (x byCommentPos) Less(i, j int) bool { return x[i].Pos() < x[j].Pos() }
 
 // updateBasicLitPos updates lit.Pos,
-// ensuring that lit.End (if set) is displaced by the same amount.
+// ensuring that lit.End is displaced by the same amount.
 // (See https://go.dev/issue/76395.)
 func updateBasicLitPos(lit *ast.BasicLit, pos token.Pos) {
 	len := lit.End() - lit.Pos()
 	lit.ValuePos = pos
-	// TODO(adonovan): after go1.26, simplify to:
-	//   lit.ValueEnd = pos + len
-	v := reflect.ValueOf(lit).Elem().FieldByName("ValueEnd")
-	if v.IsValid() && v.Int() != 0 {
-		v.SetInt(int64(pos + len))
-	}
+	lit.ValueEnd = pos + len
 }

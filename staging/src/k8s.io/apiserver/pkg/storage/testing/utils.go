@@ -81,8 +81,8 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+func computePodKey(obj v1.Object) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
 // testPropagateStore helps propagates store with objects, automates key generation, and returns
@@ -153,9 +153,17 @@ func testCheckEventType(t *testing.T, w watch.Interface, expectEventType watch.E
 	}
 }
 
-func testCheckResult(t *testing.T, w watch.Interface, expectEvent watch.Event) {
+func testCheckResult(t *testing.T, w watch.Interface, expectEvent *watch.Event) {
+	if expectEvent == nil {
+		select {
+		case res := <-w.ResultChan():
+			t.Errorf("Unexpected: %#v event received, expected no events", res)
+		case <-time.After(100 * time.Millisecond):
+			return
+		}
+	}
 	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
-		expectNoDiff(t, "incorrect event", expectEvent, actualEvent)
+		expectNoDiff(t, "incorrect event", *expectEvent, actualEvent)
 	})
 }
 
@@ -165,6 +173,9 @@ func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent
 		obj := res.Object
 		if co, ok := obj.(runtime.CacheableObject); ok {
 			res.Object = co.GetObject()
+		}
+		if withRecordTime, ok := res.Object.(storage.WatchEventWithRecordTime); ok {
+			res.Object = withRecordTime.Unwrap()
 		}
 		check(res)
 	case <-time.After(wait.ForeverTestTimeout):
@@ -180,6 +191,9 @@ func testCheckResultWithIgnoreFunc(t *testing.T, w watch.Interface, expectedEven
 			obj := event.Object
 			if co, ok := obj.(runtime.CacheableObject); ok {
 				event.Object = co.GetObject()
+			}
+			if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
+				event.Object = withRecordTime.Unwrap()
 			}
 			if ignore != nil && ignore(event) {
 				continue
@@ -222,7 +236,7 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 
 func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
 	for _, expectedEvent := range expectedEvents {
-		testCheckResult(t, w, expectedEvent)
+		testCheckResult(t, w, &expectedEvent)
 	}
 }
 

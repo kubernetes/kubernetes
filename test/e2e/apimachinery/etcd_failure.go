@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
+var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), framework.WithProvider("gce", "aws"), func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -46,9 +46,8 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		// This test requires:
 		// - SSH
 		// - master access
-		// ... so the provider check should be identical to the intersection of
+		// ... so the provider check above should be identical to the intersection of
 		// providers that provide those capabilities.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		err := e2erc.RunRC(ctx, testutils.RCConfig{
@@ -65,8 +64,18 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		etcdFailTest(
 			ctx,
 			f,
-			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
-			"sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP",
+			`if command -v nft >/dev/null 2>&1; then
+				sudo nft add table inet e2e_failure
+				sudo nft add chain inet e2e_failure input '{ type filter hook input priority 0; }'
+				sudo nft add rule inet e2e_failure input tcp dport 2379 drop
+			else
+				sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP
+			fi`,
+			`if command -v nft >/dev/null 2>&1; then
+				sudo nft delete table inet e2e_failure
+			else
+				sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP
+			fi`,
 		)
 	})
 
@@ -74,7 +83,7 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		etcdFailTest(
 			ctx,
 			f,
-			"pgrep etcd | grep -v etcd-manager | xargs -I {} sudo kill -9 {}",
+			"sudo pkill -9 -x etcd",
 			"echo 'do nothing. monit should restart etcd.'",
 		)
 	})

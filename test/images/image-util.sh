@@ -26,6 +26,13 @@ source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 declare -a DEFAULT_IMAGE_PLATFORMS=("linux/amd64" "linux/arm64" "linux/ppc64le" "linux/s390x")
 
+# defaults for invoking a single image's Makefile directly
+: "${GOLANG_VERSION:=$(<"${KUBE_ROOT}/.go-version")}"
+: "${GOLANG_IMAGE:=golang:latest}"
+
+# GOTOOLCHAIN, not GOLANG_IMAGE, selects the go version we build with
+GOTOOLCHAIN="go${GOLANG_VERSION}"
+
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
 GIT_COMMIT_ID=$(git log -1 --format=%h || echo "${GIT_COMMIT_ID}")
@@ -145,11 +152,28 @@ build() {
       base_image=$(sed -n 's/^ARG BASEIMAGE=//p' "${dockerfile_name}")
     fi
 
-    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
-        --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" --build-arg GOLANG_VERSION="${GOLANG_VERSION}" \
-        -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" \
-        --label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
-        --label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}" .
+    local -a build_args=(--progress=plain --no-cache --pull)
+    if [[ "${output_type}" == "registry" ]]; then
+      # Keep per-platform tags as image manifests for the docker manifest create step.
+      build_args+=(--provenance=false)
+    fi
+    build_args+=(
+      --output=type="${output_type}"
+      --platform "${os_name}/${arch}"
+      --build-arg BASEIMAGE="${base_image}"
+      --build-arg REGISTRY="${REGISTRY}"
+      --build-arg OS_VERSION="${os_version}"
+      --build-arg GOLANG_VERSION="${GOLANG_VERSION}"
+      --build-arg GOLANG_IMAGE="${GOLANG_IMAGE}"
+      --build-arg GOTOOLCHAIN="${GOTOOLCHAIN}"
+      -t "${REGISTRY}/${image}:${TAG}-${suffix}"
+      -f "${dockerfile_name}"
+      --label "image_version=${TAG}"
+      --label "commit_id=${GIT_COMMIT_ID}"
+      --label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}"
+    )
+
+    docker buildx build "${build_args[@]}" .
     popd
   done
 }
@@ -213,10 +237,11 @@ bin() {
   for SRC in "$@";
   do
   docker run --rm -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
-        golang:"${GOLANG_VERSION}" \
+        -e GOTOOLCHAIN="${GOTOOLCHAIN}" \
+        "${GOLANG_IMAGE}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 GOOS=${OS} GOARCH=${ARCH} go build -buildvcs=false -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 

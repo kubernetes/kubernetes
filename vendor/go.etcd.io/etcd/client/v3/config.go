@@ -33,7 +33,14 @@ type Config struct {
 	// 0 disables auto-sync. By default auto-sync is disabled.
 	AutoSyncInterval time.Duration `json:"auto-sync-interval"`
 
-	// DialTimeout is the timeout for failing to establish a connection.
+	// DialTimeout is the timeout used for certain operations, such as fetching
+	// an authentication token and checking the cluster version (when
+	// RejectOldCluster is true). It is also used to derive the initial
+	// keep-alive timeout for lease keep-alives (DialTimeout + 1s).
+	// It is NOT used to bound the gRPC connection establishment itself,
+	// because client creation is non-blocking since
+	// https://github.com/etcd-io/etcd/pull/21832.
+	// A value of 0 means no timeout is applied to those operations.
 	DialTimeout time.Duration `json:"dial-timeout"`
 
 	// DialKeepAliveTime is the time after which client pings the server to see if
@@ -74,7 +81,7 @@ type Config struct {
 
 	// DialOptions is a list of dial options for the grpc client (e.g., for interceptors).
 	// Note that grpc.NewClient ignores options that are specific to grpc.Dial such as
-	// "grpc.WithBlock()". Use DialTimeout to bound client initialization time.
+	// "grpc.WithBlock()".
 	DialOptions []grpc.DialOption
 
 	// Context is the default client context; it can be used to cancel grpc dial out and

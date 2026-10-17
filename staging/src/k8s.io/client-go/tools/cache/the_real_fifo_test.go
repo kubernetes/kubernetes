@@ -575,6 +575,29 @@ func TestRealFIFO_Resync(t *testing.T) {
 	}
 }
 
+func TestRealFIFO_ResyncPropagatesQueueError(t *testing.T) {
+	sentinel := errors.New("computing key failed")
+	f := NewRealFIFO(
+		func(obj interface{}) (string, error) {
+			if fifoObj, ok := obj.(testFifoObject); ok && fifoObj.name == "broken" {
+				return "", sentinel
+			}
+			return testFifoObjectKeyFunc(obj)
+		},
+		literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("broken", 5)}
+		}),
+		nil,
+	)
+	err := f.Resync()
+	if err == nil {
+		t.Fatal("expected Resync to return an error when the object cannot be queued")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("expected the underlying queueing error to be wrapped, got: %v", err)
+	}
+}
+
 func TestRealFIFO_DeleteExistingNonPropagated(t *testing.T) {
 	f := NewRealFIFO(
 		testFifoObjectKeyFunc,

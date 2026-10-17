@@ -81,31 +81,20 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(logger klog.Logger, 
 }
 
 // computeFinalCpuSet determines the final set of CPUs to use based on the CPU and memory managers
-// and is extracted so that it can be tested
+// and is extracted so that it can be tested.
+//
+// When the CPU Manager has allocated CPUs, those CPUs are always used as-is. The CPU Manager's
+// allocation is authoritative — it already considered topology hints from the Topology Manager
+// and picked exact CPUs. Expanding with NUMA CPUs (the former "Case 3" union) would cause a
+// bookkeeping/enforcement mismatch (reconcileState overwrites any expansion) and could break CPU
+// isolation guarantees by including CPUs exclusively allocated to other containers.
+//
+// When only the Memory Manager is active, NUMA node CPUs are used to provide memory locality
+// through CPU affinity, since Windows has no direct NUMA memory pinning mechanism.
 func computeFinalCpuSet(allocatedCPUs cpuset.CPUSet, allNumaNodeCPUs []winstats.GroupAffinity) sets.Set[int] {
-	if !allocatedCPUs.IsEmpty() && len(allNumaNodeCPUs) > 0 {
-		// Both CPU and memory managers are enabled
-
-		numaNodeAffinityCPUSet := computeCPUSet(allNumaNodeCPUs)
-		cpuManagerAffinityCPUSet := sets.New[int](allocatedCPUs.List()...)
-
-		// Determine which set of CPUs to use using the following logic outlined in the KEP:
-		// Case 1: CPU manager selects more CPUs than those available in the NUMA nodes selected by the memory manager
-		// Case 2: CPU manager selects fewer CPUs, and they all fall within the CPUs available in the NUMA nodes selected by the memory manager
-		// Case 3: CPU manager selects fewer CPUs, but some are outside of the CPUs available in the NUMA nodes selected by the memory manager
-
-		if cpuManagerAffinityCPUSet.Len() > numaNodeAffinityCPUSet.Len() {
-			// Case 1, use CPU manager selected CPUs
-			return cpuManagerAffinityCPUSet
-		} else if numaNodeAffinityCPUSet.IsSuperset(cpuManagerAffinityCPUSet) {
-			// case 2, use CPU manager selected CPUstry
-			return cpuManagerAffinityCPUSet
-		} else {
-			// Case 3, merge CPU manager and memory manager selected CPUs
-			return cpuManagerAffinityCPUSet.Union(numaNodeAffinityCPUSet)
-		}
-	} else if !allocatedCPUs.IsEmpty() {
-		// Only CPU manager is enabled, use CPU manager selected CPUs
+	if !allocatedCPUs.IsEmpty() {
+		// CPU Manager has allocated CPUs — use them directly.
+		// This covers all cases: CPU manager only, or both managers active.
 		return sets.New[int](allocatedCPUs.List()...)
 	} else if len(allNumaNodeCPUs) > 0 {
 		// Only memory manager is enabled, use CPUs associated with selected NUMA nodes

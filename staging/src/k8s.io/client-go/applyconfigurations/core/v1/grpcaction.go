@@ -18,18 +18,27 @@ limitations under the License.
 
 package v1
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 // GRPCActionApplyConfiguration represents a declarative configuration of the GRPCAction type for use
 // with apply.
 //
 // GRPCAction specifies an action involving a GRPC service.
 type GRPCActionApplyConfiguration struct {
-	// Port number of the gRPC service. Number must be in the range 1 to 65535.
+	// port is the number of the gRPC service. Number must be in the range 1 to 65535.
 	Port *int32 `json:"port,omitempty"`
-	// Service is the name of the service to place in the gRPC HealthCheckRequest
+	// service is the name of the service to place in the gRPC HealthCheckRequest
 	// (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
 	//
 	// If this is not specified, the default behavior is defined by gRPC.
 	Service *string `json:"service,omitempty"`
+	// mode specifies the connection mode for the gRPC health probe.
+	// Set to "TLS" to use TLS without certificate verification.
+	// Set to "Plaintext" to use a plaintext (insecure) connection explicitly.
+	// If not specified, the probe uses a plaintext (insecure) connection.
+	Mode *corev1.GRPCProbeMode `json:"mode,omitempty"`
 }
 
 // GRPCActionApplyConfiguration constructs a declarative configuration of the GRPCAction type for use with
@@ -51,5 +60,13 @@ func (b *GRPCActionApplyConfiguration) WithPort(value int32) *GRPCActionApplyCon
 // If called multiple times, the Service field is set to the value of the last call.
 func (b *GRPCActionApplyConfiguration) WithService(value string) *GRPCActionApplyConfiguration {
 	b.Service = &value
+	return b
+}
+
+// WithMode sets the Mode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mode field is set to the value of the last call.
+func (b *GRPCActionApplyConfiguration) WithMode(value corev1.GRPCProbeMode) *GRPCActionApplyConfiguration {
+	b.Mode = &value
 	return b
 }

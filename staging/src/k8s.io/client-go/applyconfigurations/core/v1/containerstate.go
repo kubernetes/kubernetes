@@ -25,11 +25,11 @@ package v1
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerStateApplyConfiguration struct {
-	// Details about a waiting container
+	// waiting is details about a waiting container
 	Waiting *ContainerStateWaitingApplyConfiguration `json:"waiting,omitempty"`
-	// Details about a running container
+	// running is details about a running container
 	Running *ContainerStateRunningApplyConfiguration `json:"running,omitempty"`
-	// Details about a terminated container
+	// terminated is details about a terminated container
 	Terminated *ContainerStateTerminatedApplyConfiguration `json:"terminated,omitempty"`
 }
 

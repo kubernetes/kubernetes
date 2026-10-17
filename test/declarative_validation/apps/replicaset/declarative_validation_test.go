@@ -27,19 +27,37 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/replicaset"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func mkReplicaSet(tolerations ...api.Toleration) *apps.ReplicaSet {
-	return &apps.ReplicaSet{
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.ReplicaSet) {
+	return func(rs *apps.ReplicaSet) {
+		pod := &api.Pod{
+			Spec: rs.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		rs.Spec.Template.Spec = pod.Spec
+	}
+}
+
+func mkReplicaSet(tweaks ...func(*apps.ReplicaSet)) *apps.ReplicaSet {
+	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "abc"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"name": "abc"}},
-				Spec:       podtest.MakePodSpec(podtest.SetTolerations(tolerations...)),
+				Spec:       podtest.MakePodSpec(),
 			},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(rs)
+	}
+	return rs
 }
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -56,23 +74,63 @@ func TestDeclarativeValidate(t *testing.T) {
 				input: mkReplicaSet(),
 			},
 			"valid toleration key": {
-				input: mkReplicaSet(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}),
+				input: mkReplicaSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}))),
 			},
 			"valid toleration key without prefix": {
-				input: mkReplicaSet(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}),
+				input: mkReplicaSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}))),
 			},
 			"invalid toleration key format": {
-				input: mkReplicaSet(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}),
+				input: mkReplicaSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkReplicaSet(func(rs *apps.ReplicaSet) {
+					deadline := int64(0)
+					rs.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicaSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkReplicaSet(func(rs *apps.ReplicaSet) {
+					deadline := int64(2147483648)
+					rs.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicaSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 				},
 			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs,
-					apitesting.WithSkipGroupVersions("extensions/v1beta1"))
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
+		meta.RunObjectMetaTestCases(t, ctx, mkReplicaSet(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+		)
+		poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), mkReplicaSet(), func(baseObj *apps.ReplicaSet, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Spec.Template.Spec.EvictionResponders = responders
+			baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: apiVersion,
+			Name:       "abc",
+			Verb:       "update",
+		})
+		meta.RunObjectMetaUpdateTestCases(t, ctx, mkReplicaSet(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+		)
 	}
 }

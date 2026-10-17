@@ -84,6 +84,7 @@ func TestGenerateName(t *testing.T) {
 		"apiservices.v1.apiregistration.k8s.io",
 		"clustertrustbundles.v1alpha1.certificates.k8s.io",
 		"clustertrustbundles.v1beta1.certificates.k8s.io",
+		"clustertrustbundles.v1.certificates.k8s.io",
 		"customresourcedefinitions.v1.apiextensions.k8s.io",
 		"ipaddresses.v1.networking.k8s.io",
 		"storageversions.v1alpha1.internal.apiserver.k8s.io",
@@ -147,7 +148,6 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		"persistentvolumeclaims.v1",
 		"persistentvolumes.v1",
 		"podcertificaterequests.v1alpha1.certificates.k8s.io",
-		"podgroups.v1alpha3.scheduling.k8s.io",
 		"pods.v1",
 		"podtemplates.v1",
 		"priorityclasses.v1.scheduling.k8s.io",
@@ -175,7 +175,6 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		"validatingadmissionpolicies.v1beta1.admissionregistration.k8s.io",
 		"validatingadmissionpolicybindings.v1beta1.admissionregistration.k8s.io",
 		"volumeattributesclasses.v1.storage.k8s.io",
-		"workloads.v1alpha3.scheduling.k8s.io",
 	)
 	TestAllDefinitions(t, "unconditional-update", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {

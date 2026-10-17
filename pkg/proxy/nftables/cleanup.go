@@ -27,23 +27,27 @@ import (
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers(ctx context.Context) bool {
-	logger := klog.FromContext(ctx)
-	var encounteredError bool
-
+func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
 		nft, err := knftables.New(family, kubeProxyTable)
 		if err != nil {
 			continue
 		}
-		tx := nft.NewTransaction()
-		tx.Delete(&knftables.Table{})
-		err = nft.Run(ctx, tx)
-		if err != nil && !knftables.IsNotFound(err) {
-			logger.Error(err, "Error cleaning up nftables rules")
-			encounteredError = true
-		}
+		encounteredError = cleanupLeftoversForFamily(ctx, nft) || encounteredError
+	}
+	return
+}
+
+func cleanupLeftoversForFamily(ctx context.Context, nft knftables.Interface) (encounteredError bool) {
+	logger := klog.FromContext(ctx)
+
+	tx := nft.NewTransaction()
+	tx.Delete(&knftables.Table{})
+	err := nft.Run(ctx, tx)
+	if err != nil && !knftables.IsNotFound(err) {
+		logger.Error(err, "Error cleaning up nftables rules")
+		return true
 	}
 
-	return encounteredError
+	return false
 }

@@ -191,6 +191,8 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt For
 		if err != nil {
 			return 0, 0, DecimalExponent, false
 		}
+		// Stored objects keep the spelling they were given, so narrowing
+		// rather than rejecting is what keeps them decodable.
 		return 10, int32(parsed), DecimalExponent, true
 	}
 

@@ -17,146 +17,102 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
+	"slices"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
+	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
+
+	apiservervalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationinternalv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
-// ValidateSubjectAccessReviewSpec validates a SubjectAccessReviewSpec and returns an
-// ErrorList with any errors.
-func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
-	}
-	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceAttributes"), spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
-	}
-	if len(spec.User) == 0 && len(spec.Groups) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), spec.User, `at least one of user or group must be specified`))
-	}
-	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
-
-	return allErrs
+var omittedV1beta1SARPaths = []string{
+	"spec.authorizationOptions",
+	"status.conditionalDecision",
 }
 
-// ValidateSelfSubjectAccessReviewSpec validates a SelfSubjectAccessReviewSpec and returns an
-// ErrorList with any errors.
-func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
+func OmittedFieldPaths() map[schema.GroupVersionKind][]string {
+	return map[schema.GroupVersionKind][]string{
+		authorizationv1beta1.SchemeGroupVersion.WithKind("SubjectAccessReview"):      slices.Clone(omittedV1beta1SARPaths),
+		authorizationv1beta1.SchemeGroupVersion.WithKind("SelfSubjectAccessReview"):  slices.Clone(omittedV1beta1SARPaths),
+		authorizationv1beta1.SchemeGroupVersion.WithKind("LocalSubjectAccessReview"): slices.Clone(omittedV1beta1SARPaths),
 	}
-	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceAttributes"), spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
-	}
-	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
-
-	return allErrs
 }
 
-// ValidateSubjectAccessReview validates a SubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
+// ValidateSubjectAccessReviewCreate is the single composition of handwritten and declarative
+// SubjectAccessReview validation.
+func ValidateSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.SubjectAccessReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	versionedSAR := &authorizationv1.SubjectAccessReview{}
+
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_SubjectAccessReview_To_v1_SubjectAccessReview(sar, versionedSAR, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal SubjectAccessReview to v1: %w", err))}
 	}
-	return allErrs
+
+	errs := apiservervalidation.ValidateSubjectAccessReview(versionedSAR)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
-// ValidateSelfSubjectAccessReview validates a SelfSubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateSelfSubjectAccessReview(sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
+// ValidateSelfSubjectAccessReviewCreate is the single composition of handwritten and declarative
+// SelfSubjectAccessReview validation.
+func ValidateSelfSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	versionedSAR := &authorizationv1.SelfSubjectAccessReview{}
+
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_SelfSubjectAccessReview_To_v1_SelfSubjectAccessReview(sar, versionedSAR, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal SelfSubjectAccessReview to v1: %w", err))}
 	}
-	return allErrs
+
+	errs := apiservervalidation.ValidateSelfSubjectAccessReview(versionedSAR)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
-// ValidateLocalSubjectAccessReview validates a LocalSubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
+// ValidateLocalSubjectAccessReviewCreate is the single composition of handwritten and declarative
+// LocalSubjectAccessReview validation.
+func ValidateLocalSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	versionedSAR := &authorizationv1.LocalSubjectAccessReview{}
 
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.Namespace = ""
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty except for namespace`))
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(sar, versionedSAR, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal LocalSubjectAccessReview to v1: %w", err))}
 	}
 
-	if sar.Spec.ResourceAttributes != nil && sar.Spec.ResourceAttributes.Namespace != sar.Namespace {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.resourceAttributes.namespace"), sar.Spec.ResourceAttributes.Namespace, `must match metadata.namespace`))
-	}
-	if sar.Spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.nonResourceAttributes"), sar.Spec.NonResourceAttributes, `disallowed on this kind of request`))
-	}
-
-	return allErrs
+	errs := apiservervalidation.ValidateLocalSubjectAccessReview(versionedSAR)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
-func validateResourceAttributes(resourceAttributes *authorizationapi.ResourceAttributes, fldPath *field.Path) field.ErrorList {
-	if resourceAttributes == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	allErrs = append(allErrs, validateFieldSelectorAttributes(resourceAttributes.FieldSelector, fldPath.Child("fieldSelector"))...)
-	allErrs = append(allErrs, validateLabelSelectorAttributes(resourceAttributes.LabelSelector, fldPath.Child("labelSelector"))...)
-
-	return allErrs
-}
-
-func validateFieldSelectorAttributes(selector *authorizationapi.FieldSelectorAttributes, fldPath *field.Path) field.ErrorList {
-	if selector == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
-	}
-	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
+// ValidateAuthorizationConditionsReviewCreate is the single composition of handwritten and declarative
+// AuthorizationConditionsReview validation.
+func ValidateAuthorizationConditionsReviewCreate(ctx context.Context, scheme *runtime.Scheme, acr *authorizationapi.AuthorizationConditionsReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	versionedACR := &authorizationv1alpha1.AuthorizationConditionsReview{}
+	if err := scheme.Convert(acr, versionedACR, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal AuthorizationConditionsReview to v1alpha1: %w", err))}
 	}
 
-	// AllowUnknownOperatorInRequirement enables *SubjectAccessReview requests from newer skewed clients which understand operators kube-apiserver does not know about to be authorized.
-	validationOptions := metav1validation.FieldSelectorValidationOptions{AllowUnknownOperatorInRequirement: true}
-	for i, requirement := range selector.Requirements {
-		allErrs = append(allErrs, metav1validation.ValidateFieldSelectorRequirement(requirement, validationOptions, fldPath.Child("requirements").Index(i))...)
-	}
-
-	return allErrs
-}
-
-func validateLabelSelectorAttributes(selector *authorizationapi.LabelSelectorAttributes, fldPath *field.Path) field.ErrorList {
-	if selector == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
-	}
-	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
-	}
-
-	// AllowUnknownOperatorInRequirement enables *SubjectAccessReview requests from newer skewed clients which understand operators kube-apiserver does not know about to be authorized.
-	validationOptions := metav1validation.LabelSelectorValidationOptions{AllowUnknownOperatorInRequirement: true}
-	for i, requirement := range selector.Requirements {
-		allErrs = append(allErrs, metav1validation.ValidateLabelSelectorRequirement(requirement, validationOptions, fldPath.Child("requirements").Index(i))...)
-	}
-
-	return allErrs
+	errs := apiservervalidation.ValidateAuthorizationConditionsReview(versionedACR)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, acr, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }

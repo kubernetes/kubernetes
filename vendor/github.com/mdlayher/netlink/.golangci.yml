@@ -1,0 +1,21 @@
+version: "2"
+linters:
+  enable:
+    # - errorlint
+    - misspell
+    - modernize
+    - revive
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        path: _test.go
+formatters:
+  exclusions:
+    generated: lax

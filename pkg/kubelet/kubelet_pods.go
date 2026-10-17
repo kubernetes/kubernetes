@@ -27,7 +27,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -39,6 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -124,19 +124,31 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 	return uint32(num1), uint32(num2), nil
 }
 
+// defaultKubeletMappings returns the range of IDs to use for user namespaces when there is no
+// specific configuration for the kubelet user. It is the entire ID range except the IDs below
+// idsPerPod and the last idsPerPod IDs.
+func defaultKubeletMappings(idsPerPod uint32) (uint32, uint32) {
+	firstID := idsPerPod
+	// The last idsPerPod IDs are left unmapped since the kernel considers user
+	// 2^32-1 an invalid user (see man 7 user_namespaces)
+	//
+	// We cast firstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	length := uint32((1 << 32) - uint64(firstID) - uint64(idsPerPod))
+	return firstID, length
+}
+
 // getKubeletMappings returns the range of IDs that can be used to configure user namespaces.
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below idsPerPod.
+// The default mapping includes the entire IDs range except IDs below idsPerPod and the
+// last idsPerPod IDs (since the last user in the range is invalid from the kernel's POV).
 func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	defaultFirstID := idsPerPod
-	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
-	// fires the overflow detection (go is not smart enough to realize that if we subtract a
-	// non-negative number, it fits in 32 bits).
-	// Then we cast it back to 32 bits, as this what the function returns.
-	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
+	defaultFirstID, defaultLen := defaultKubeletMappings(idsPerPod)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
@@ -148,21 +160,20 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	// So we check for the kubelet user first, if it exist and getsubids is present, we expect
 	// to get _some_ configuration. If the user exist and getsubids doesn't give us any
 	// configuration, then we consider the remote down and fail to start the kubelet.
-	_, err := user.Lookup(kubeletUser)
+	found, err := getentUserExists(kubeletUser)
 	if err != nil {
-		var unknownUserErr user.UnknownUserError
-		if goerrors.As(err, &unknownUserErr) {
-			// if the user is not found, we assume that the user is not configured
-			logger.V(5).Info("user namespaces: user not found, using default mappings", "user", kubeletUser)
-			return defaultFirstID, defaultLen, nil
-		}
 		return 0, 0, err
+	}
+	if !found {
+		// if the user is not found, we assume that the user is not configured
+		logger.V(5).Info("user namespaces: user not found, using default mappings", "user", kubeletUser)
+		return defaultFirstID, defaultLen, nil
 	}
 
 	execName := "getsubids"
 	cmd, err := exec.LookPath(execName)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if goerrors.Is(err, exec.ErrNotFound) {
 			logger.V(2).Info("user namespaces: executable not found, using default mappings", "executable", execName, "err", err)
 			return defaultFirstID, defaultLen, nil
 		}
@@ -181,6 +192,24 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	}
 	logger.V(5).Info("user namespaces: user found, using mappings from getsubids", "user", kubeletUser)
 	return parseGetSubIdsOutput(string(outUids))
+}
+
+// getentUserExists checks name via getent(1), so it sees NSS accounts (sssd,
+// LDAP, FreeIPA) that a static (CGO_ENABLED=0) os/user would miss.
+func getentUserExists(name string) (bool, error) {
+	getent, err := exec.LookPath("getent")
+	if err != nil {
+		return false, nil // no getent: same as "not configured"
+	}
+	err = exec.Command(getent, "passwd", name).Run()
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	if goerrors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
+		return false, nil // getent(1): 2 = key not found
+	}
+	return false, fmt.Errorf("looking up user %q via getent: %w", name, err)
 }
 
 // Get a list of pods that have data directories.
@@ -425,6 +454,7 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			RecursiveReadOnly: rro,
 			SELinuxRelabel:    relabelVolume,
 			Propagation:       propagation,
+			BindMountOptions:  mount.BindMountOptions,
 		})
 	}
 	if mountEtcHostsFile {
@@ -595,7 +625,7 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
+	if pod.Spec.HostnameOverride != nil {
 		hostname := *pod.Spec.HostnameOverride
 		if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS subdomain: %s", hostname, strings.Join(msgs, ";"))
@@ -636,6 +666,11 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	pcm := kl.containerManager.NewPodContainerManager()
 	_, cgroupParent := pcm.GetPodContainerName(pod)
 	return cgroupParent
+}
+
+// ResizeEphemeralVolume directly triggers a resize of the specified volume.
+func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *apiresource.Quantity) error {
+	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName, newSize)
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -938,7 +973,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				}
 				// TODO: validate no NUL bytes
 				runtimeVal = string(runtimeValBytes)
-			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
+			case envVar.ValueFrom.FileKeyRef != nil:
 				f := envVar.ValueFrom.FileKeyRef
 				key := f.Key
 				volume := f.VolumeName
@@ -960,14 +995,20 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, err
 				}
 
-				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				var found bool
+				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
 				if err != nil {
+					// A missing file is equivalent to a missing key: the env var is
+					// simply not published when the reference is optional.
+					if optional && goerrors.Is(err, os.ErrNotExist) {
+						continue
+					}
 					logger.Error(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
 				}
 
 				// If the key was not found, and it's not optional, return an error
-				if runtimeVal == "" {
+				if !found {
 					if optional {
 						// If the key doesn't exist, and it's optional, skip this environment variable
 						continue
@@ -1082,10 +1123,11 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
-// secrets.
-func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Secret {
+// secrets. The names of secrets that cannot be found are returned so we can
+// emit an event later if the image pull fails too.
+func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) ([]v1.Secret, []string) {
 	pullSecrets := []v1.Secret{}
-	failedPullSecrets := []string{}
+	missingPullSecretNames := []string{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		if len(secretRef.Name) == 0 {
@@ -1095,19 +1137,15 @@ func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Se
 		}
 		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
-			logger.Info("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KObj(secret), "err", err)
-			failedPullSecrets = append(failedPullSecrets, secretRef.Name)
+			logger.Info("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KRef(pod.Namespace, secretRef.Name), "err", err)
+			missingPullSecretNames = append(missingPullSecretNames, secretRef.Name)
 			continue
 		}
 
 		pullSecrets = append(pullSecrets, *secret)
 	}
 
-	if len(failedPullSecrets) > 0 {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(failedPullSecrets, ", "))
-	}
-
-	return pullSecrets
+	return pullSecrets, missingPullSecretNames
 }
 
 // PodCouldHaveRunningContainers returns true if the pod with the given UID could still have running
@@ -1122,10 +1160,8 @@ func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	// status manager and its tests.
 	// TODO: extend PodDeletionSafetyProvider interface and implement it
 	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
-			return true
-		}
+	if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
+		return true
 	}
 	return false
 }
@@ -1229,7 +1265,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	)
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
-		cgroupPods, err = pcm.GetAllPodsFromCgroups()
+		cgroupPods, err = pcm.GetAllPodsFromCgroups(logger)
 		if err != nil {
 			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
 		}
@@ -1651,16 +1687,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 		return err
 	}
 
-	// Since v1.32, stdout may be nil if the stream is not requested.
-	if stdout != nil {
-		// Do a zero-byte write to stdout before handing off to the container runtime.
-		// This ensures at least one Write call is made to the writer when copying starts,
-		// even if we then block waiting for log output from the container.
-		if _, err := stdout.Write([]byte{}); err != nil {
-			return err
-		}
-	}
-
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 
@@ -1893,7 +1919,7 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 	// If pod is terminal, clear the resize status.
 	if podIsTerminal {
 		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
-		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID)
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
 	}
 
@@ -1966,7 +1992,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
-		kl.containerManager.UpdateAllocatedResourcesStatus(pod, s)
+		kl.containerManager.UpdateAllocatedResourcesStatus(logger, pod, s)
 	}
 
 	// preserve all conditions not owned by the kubelet
@@ -2172,7 +2198,8 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
 	}
@@ -2186,7 +2213,8 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 		allocatedResources = &v1.ResourceRequirements{}
 	}
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
@@ -2244,11 +2272,25 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	if cpuRequest != nil {
-		// If both the allocated & actual resources are at
-		// or below MinShares, preserve the allocated value in the API to avoid
-		// confusion and simplify comparisons.
+		// If both the allocated and actual values are at or below MinShares,
+		// preserve the allocated value in the API to avoid confusion and simplify
+		// comparisons at the cgroup minimum floor.
 		if cpuRequest.MilliValue() > cm.MinShares || resources.Requests.Cpu().MilliValue() > cm.MinShares {
-			resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
+			allocatedMilliCPU := resources.Requests.Cpu().MilliValue()
+			allocatedShares := cm.MilliCPUToShares(allocatedMilliCPU)
+			// On cgroup v2, cpu.weight has coarse granularity and converting
+			// shares -> weight -> shares can be lossy. If the cgroup readback
+			// matches the round-tripped allocated shares, preserve the allocated
+			// milliCPU in the API. Otherwise treat it as a real change and use
+			// the actuated value.
+			if cpuConfig != nil && cpuConfig.CPUShares != nil &&
+				cm.CPUSharesEqualAfterV2RoundTrip(allocatedShares, *cpuConfig.CPUShares) {
+				logger.V(4).Info("Preserving allocated CPU request due to cgroup v2 round-trip",
+					"allocated", allocatedMilliCPU, "actuated", cpuRequest.MilliValue(),
+					"allocatedShares", allocatedShares, "readbackShares", *cpuConfig.CPUShares)
+			} else {
+				resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
+			}
 		}
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
@@ -2256,17 +2298,14 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 
 	if _, found := resources.Requests[v1.ResourceMemory]; !found {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
 		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
 			resources.Requests[v1.ResourceMemory] = val
 		}
 	}
-
-	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
-	// the code needs to persist that value if it is non-nil.
-	preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests)
 
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
@@ -2448,25 +2487,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		// For non-running containers this will be the reported values.
 		// For non-resizable resources, these values will also be used.
 		resources := allocatedContainer.Resources.DeepCopy()
-		if resources.Limits != nil {
-			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
-				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
-				// allocated value in the API to avoid confusion and simplify comparisons.
-				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
-					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
-					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
-				}
-			} else {
-				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
-			}
-			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
-				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
-			} else {
-				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
-			}
-		}
 		if resources.Requests != nil {
-			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
+			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil && !cStatus.Resources.CPURequest.IsZero() {
 				// If both the allocated & actual resources are at or below MinShares, preserve the
 				// allocated value in the API to avoid confusion and simplify comparisons.
 				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
@@ -2480,6 +2502,29 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Requests[v1.ResourceMemory] = cStatus.Resources.MemoryRequest.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Requests, resources.Requests)
+			}
+		}
+		if resources.Limits != nil {
+			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil && !cStatus.Resources.CPULimit.IsZero() {
+				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
+				// allocated value in the API to avoid confusion and simplify comparisons.
+				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
+					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
+					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+				}
+			} else {
+				// CPU quota is disabled for containers with exclusive CPUs.
+				// Default the CPU limit to match the request, as it must for exclusive CPU allocation.
+				if kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
+					resources.Limits[v1.ResourceCPU] = resources.Requests[v1.ResourceCPU].DeepCopy()
+				} else {
+					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				}
+			}
+			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
+				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
+			} else {
+				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
 			}
 		}
 
@@ -2675,7 +2720,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			if cStatus.State == kubecontainer.ContainerStateRunning {
 				if oldStatus, ok := oldStatuses[status.Name]; ok && oldStatus.Started != nil {
-					status.Started = oldStatus.Started
+					// A kubelet restart loses in-memory probe results, so preserve Started
+					// for the same container. A replacement must pass its own startup probe.
+					// See https://github.com/kubernetes/kubernetes/issues/141155
+					if oldStatus.ContainerID == status.ContainerID {
+						status.Started = oldStatus.Started
+					}
 				}
 			}
 		}
@@ -2683,7 +2733,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
 			if allocatedContainer != nil {
+				// status.Resources reflects cgroup-actuated resources. If the container is running,
+				// it is populated from CRI status.
 				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+				// status.AllocatedResources represents the desired cgroup resource state for resize,
+				// and is strictly based on the uninflated standard cgroup resources requested in the spec.
+				// DRA based allocations are not included in AllocatedResources at the container level.
+				// This is because the claims can be shared across containers in the pod and can be
+				// shared unevenly (enforced by the DRA driver).
 				status.AllocatedResources = allocatedContainer.Resources.Requests
 			}
 		}
@@ -2956,4 +3013,31 @@ func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO bool) (bool, 
 	default:
 		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
+}
+
+func recordPodLevelResourcesAdmission(pod *v1.Pod) {
+	hasResources := func(containers []v1.Container) bool {
+		for _, c := range containers {
+			if len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	hasPodLevel := resourcehelper.IsPodLevelResourcesSet(pod)
+	hasContainerLevel := hasResources(pod.Spec.Containers) || hasResources(pod.Spec.InitContainers)
+
+	var configMode string
+	switch {
+	case hasPodLevel && hasContainerLevel:
+		configMode = "pod_and_container_level"
+	case hasPodLevel:
+		configMode = "pod_level"
+	case hasContainerLevel:
+		configMode = "container_level"
+	}
+
+	qosLabel := strings.ToLower(string(v1qos.GetPodQOS(pod)))
+	metrics.PodLevelResourcesAdmissionTotal.WithLabelValues(configMode, qosLabel).Inc()
 }

@@ -99,6 +99,11 @@ type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	ParamInformer informers.GenericInformer
 	ParamScope    meta.RESTScope
 
+	// DynamicClient is used for direct API calls to handle cache misses
+	DynamicClient dynamic.Interface
+	// RESTMapper is used to resolve GVK to GVR for direct API calls
+	RESTMapper meta.RESTMapper
+
 	Evaluator          E
 	ConfigurationError error
 }
@@ -352,6 +357,8 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			Evaluator:          s.compilePolicyLocked(policySpec),
 			ParamInformer:      paramInformer,
 			ParamScope:         paramScope,
+			DynamicClient:      s.dynamicClient,
+			RESTMapper:         s.restMapper,
 			ConfigurationError: configurationError,
 		})
 

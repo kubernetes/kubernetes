@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // Package subfield contains test types for testing subfield field validation tags.
@@ -33,19 +33,41 @@ type Struct struct {
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.StructField 2"
 	// +k8s:subfield(sliceField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.SliceField"
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.MapField"
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.PtrField"
 	StructField OtherStruct `json:"structField"`
 
+	// +k8s:optional
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.StructField 1"
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.StructField 2"
 	// +k8s:subfield(sliceField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.SliceField"
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.MapField"
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.PtrField"
 	StructPtrField *OtherStruct `json:"structPtrField"`
+
+	// Traversal does not assert that an intermediate field is set, so a chain
+	// which needs one declares it. The other fields here leave the same hop
+	// unmarked, so a nil hop is silently tolerated.
+	// +k8s:subfield(ptrField)=+k8s:required
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.RequiredHopField.PtrField"
+	RequiredHopField OtherStruct `json:"requiredHopField"`
+
+	// A subfield validation is the parent's own, so a short-circuit in the
+	// subfield type's own validations does not suppress it.
+	// +k8s:subfield(stringField)=+k8s:validateFalse="Struct.ValidatedChildField.StringField"
+	ValidatedChildField ValidatedStruct `json:"validatedChildField"`
+}
+
+// ValidatedStruct, unlike the other child types here, has validations of its own.
+type ValidatedStruct struct {
+	// +k8s:required
+	StringField string `json:"stringField"`
 }
 
 type OtherStruct struct {
 	StructField SmallStruct            `json:"structField"`
 	SliceField  []SmallStruct          `json:"sliceField"`
 	MapField    map[string]SmallStruct `json:"mapField"`
+	PtrField    *SmallStruct           `json:"ptrField"`
 }
 
 type SmallStruct struct {

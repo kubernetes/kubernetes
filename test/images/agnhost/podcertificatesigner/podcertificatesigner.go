@@ -43,10 +43,12 @@ var CmdPodCertificateSigner = &cobra.Command{
 
 var kubeconfigPath string
 var signerName string
+var clusterDNSDomain string
 
 func init() {
 	CmdPodCertificateSigner.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to kubeconfig file to use for connection.  If omitted, in-cluster config will be used.")
 	CmdPodCertificateSigner.Flags().StringVar(&signerName, "signer-name", "", "The signer name to sign certificates for")
+	CmdPodCertificateSigner.Flags().StringVar(&clusterDNSDomain, "cluster-dns-domain", "", "The cluster DNS domain to sign certificates for")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -71,7 +73,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("while generating CA hierarchy: %w", err)
 	}
 
-	c := hermeticpodcertificatesigner.New(clock.RealClock{}, signerName, caKeys, caCerts, kc)
+	c := hermeticpodcertificatesigner.New(clock.RealClock{}, signerName, clusterDNSDomain, caKeys, caCerts, kc)
 	go c.Run(ctx)
 
 	// Wait for a shutdown signal.

@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -86,7 +85,7 @@ func Validate_Item(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -121,19 +120,19 @@ func Validate_ItemList(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_Item); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_Item); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -223,12 +222,12 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceStringField[*]")
 				}); len(e) != 0 {
@@ -250,12 +249,12 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceTypeField[*]")
 				}); len(e) != 0 {
@@ -277,12 +276,12 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceComparableField[*]")
 				}); len(e) != 0 {
@@ -304,19 +303,19 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceNonComparableField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NonComparableStruct); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NonComparableStruct); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -335,19 +334,19 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceComparableField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -366,23 +365,23 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceNonComparableField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonComparableStruct); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonComparableStruct); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -401,21 +400,21 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key }, validate.DirectEqual,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *ComparableStructWithKey, b *ComparableStructWithKey) bool { return a.Key == b.Key }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStructWithKey) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceComparableField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *ComparableStructWithKey, b *ComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -434,26 +433,26 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *NonComparableStructWithKey, b *NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStructWithKey) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceNonComparableField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *NonComparableStructWithKey, b *NonComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_NonComparableStructWithKey); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *NonComparableStructWithKey, b *NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_NonComparableStructWithKey); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -472,13 +471,13 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *PtrKeyStruct, b *PtrKeyStruct) bool {
 					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
 				}, validate.SemanticDeepEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyStruct) field.ErrorList {
@@ -487,15 +486,15 @@ func Validate_StructSlice(
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *PtrKeyStruct, b *PtrKeyStruct) bool {
 					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *PtrKeyStruct, b *PtrKeyStruct) bool {
 					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
 				}, validate.SemanticDeepEqual, Validate_PtrKeyStruct); len(e) != 0 {
 				errs = append(errs, e...)
@@ -516,13 +515,13 @@ func Validate_StructSlice(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *MixedKeyStruct, b *MixedKeyStruct) bool {
 					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
 				}, validate.SemanticDeepEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedKeyStruct) field.ErrorList {
@@ -531,15 +530,15 @@ func Validate_StructSlice(
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MixedKeyStruct, b *MixedKeyStruct) bool {
 					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *MixedKeyStruct, b *MixedKeyStruct) bool {
 					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
 				}, validate.SemanticDeepEqual, Validate_MixedKeyStruct); len(e) != 0 {
 				errs = append(errs, e...)

@@ -19,7 +19,6 @@ package csimock
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -68,7 +67,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
@@ -106,7 +105,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
@@ -152,7 +151,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
@@ -192,7 +191,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
@@ -221,7 +220,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
@@ -254,7 +253,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
@@ -293,7 +292,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
@@ -326,7 +325,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
@@ -385,7 +384,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
@@ -440,7 +439,7 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
 
 			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, f.Timeouts.PVDelete)
 			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
 
 			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))

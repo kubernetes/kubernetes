@@ -34,10 +34,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 

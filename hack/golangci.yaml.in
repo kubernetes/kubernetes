@@ -59,6 +59,12 @@ linters:
           - gocritic
         text: "ifElseChain: rewrite if-else to switch statement"
 
+      # The CRD "deprecated" field documents itself; gocritic reads "deprecated in..." as a malformed notice.
+      - linters:
+          - gocritic
+        text: "deprecatedComment:"
+        source: "// deprecated indicates this version of the custom resource API is deprecated"
+
       # Only packages listed here opt into the strict "exported symbols must be documented".
       #
       # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
@@ -67,17 +73,6 @@ linters:
           - staticcheck
         text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
         path-except: cmd/kubeadm
-
-      # The unused linter that comes from staticcheck currently does not handle types which implement
-      # a generic interface. The linter incorrectly reports the implementations of unexported
-      # interface methods as unused. See https://github.com/dominikh/go-tools/issues/1294.
-      # Rather than exporting the interface methods, which makes the error go away but changes the
-      # semantics of the code, we ignore this error for affected files.
-      # This can be removed when the staticcheck implementation of this rule is fixed, which may
-      # depend on https://github.com/golang/go/issues/63982.
-      - linters:
-          - unused
-        path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
 
       # SSA Extract calls are allowed in tests.
       - linters:
@@ -90,6 +85,19 @@ linters:
           - forbidigo
         text: should not use Add, use AddVersioned instead
         path: _test.go$
+
+      # Tests can and have to use testing.T.
+      #
+      # Test helper packages like ktesting are also exempt:
+      # this is rather broad because there are several normal
+      # packages which implement tests via t.Run. We need to
+      # be careful here to not exclude the top-level test directory
+      # because test helper code should not depend on testing.T
+      # unnecessarily (limits usability).
+      - linters:
+          - forbidigo
+        text: should not depend on the testing package
+        path: /([^/]*testing|[^/]*test|test[^/]*)/|test/declarative_validation/|_test.go$
 
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
@@ -128,6 +136,13 @@ linters:
       - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
         linters:
           - gocritic
+
+      - linters:
+          - govet
+        # This could be fixed automatically via `go fix`, but isn't worth a tree-wide PR.
+        # The check remains enabled for other future inline opportunities where that decision
+        # might turn out differently.
+        text: "Call of \\(resource.Quantity\\).DeepCopy should be inlined"
 
       # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
 
@@ -186,22 +201,23 @@ linters:
   settings: # please keep this alphabetized
     custom:
       logcheck:
-        # Installed there by hack/verify-golangci-lint.sh.
-        path: _output/local/bin/logcheck.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: structured logging checker
         original-url: k8s.io/logtools/logcheck
         settings:
           config: |
             {{include "hack/logcheck.conf" | indent 12 | trim}}
       sorted:
-        # Installed there by hack/verify-golangci-lint.sh.
-        path: _output/local/bin/sorted.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: check if feature gates are sorted
         original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
         settings:
           {{include "hack/tools/golangci-lint/sorted/config.yaml" | indent 10 | trim}}
       kubeapilinter:
-        path: _output/local/bin/kube-api-linter.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
         original-url: sigs.k8s.io/kube-api-linter
         settings:
@@ -214,18 +230,30 @@ linters:
           deny:
             - pkg: "k8s.io/utils/pointer"
               desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
-        go-cmp:
+        test-only-dependencies:
           files:
+            # Apply deny list to all files except for _test.go files.
             - $all
             - "!$test"
+            # Some normal packages are meant to be used only in tests and thus
+            # are also exempt.
             - "!**/test/**"
-            - "!**/testing/**"
-            - "!**/apitesting/**"
+            - "!**/*testing/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
             - pkg: "html/template"
               desc: "template is allowed only in test files as it disables dead code elimination"
+            - pkg: "k8s.io/ktesting"
+              desc: "ktesting is allowed only in test files"
+            - pkg: "k8s.io/client-go/ktesting"
+              desc: "ktesting is allowed only in test files"
+            # Normal packages exempted above also must not be used in production code.
+            # depguard wants a prefix here, so we would need to list packages explicitly
+            # instead of using wildcards as above.
+            #
+            # This only covers one level of indirection, though.
+            # A better solution might be transitive deny (https://github.com/OpenPeeDeeP/depguard/issues/68).
     forbidigo:
       analyze-types: true
       forbid:
@@ -248,6 +276,11 @@ linters:
           pkg: ^github\.com/onsi/ginkgo/v2$
           msg: usage is restricted to code under control of SIG Testing
           # Exceptions are listed above under rules.
+        - pattern: \.(T|TB)$
+          pkg: ^testing$
+          msg: Production code should not depend on the testing package. Helper packages should be more flexible and support other implementations like ktesting.TContext. Replace with a locally-defined interface or some pre-defined one like test/utils.TB or ktesting.TB. Choose based on the context and which dependencies are acceptable.
+          # Exceptions are listed above under rules.
+          # testing.B is not checked because there are some (rare) valid usages and it's less common anyway, so we don't need to enforce anything.
       {{- if .Hints}}
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
@@ -266,7 +299,6 @@ linters:
         - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
         - captLocal
         - commentFormatting
-        - deprecatedComment
         - elseif
         # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
         - exitAfterDefer
@@ -285,6 +317,16 @@ linters:
       # Analyzers which are kept enabled are not
       # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
       # for the full list.
+      #
+      # We don't pro-actively modernize existing code, so checks need to be disabled
+      # for the base config unless we happen to pass the check already.
+      # For new language features (identified with e.g. "go 1.27" for a feature added in 1.27)
+      # we hold back enabling as hint to reduce the risk that usage of the feature makes
+      # backporting harder. Waiting until all supported releases support the feature is safe,
+      # but it's also okay to go faster because backports to very old releases become less
+      # likely over time and some features might be worth a hint sooner - use common sense.
+      #
+      # Please keep sorted alphabetically.
       disable:
         # Replace interface{} with any.
         #
@@ -294,12 +336,17 @@ linters:
         # and it's just syntactic sugar.
         - any
         {{- if .Base }}
-        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
-        #
-        # A useful hint for new code, but
-        # should only be updated in old code
-        # where it really matters.
-        - fmtappendf
+        # go 1.19: can simplify atomic int assignment/access
+        - atomictypes
+        {{- end }}
+        # go 1.27: can declare embedded fields inline
+        # TODO Kubernetes 1.39: limit to base config
+        - embedlit
+        {{- if .Base }}
+        # go 1.26: can simplify with errors.AsType
+        - errorsastype
+        {{- end }}
+        {{- if .Base }}
         # Replace explicit loops over maps with calls to maps package.
         #
         # Completely disabled because the benefit
@@ -309,12 +356,22 @@ linters:
         #
         # A useful hint for new code.
         - minmax
-        # simplify code by using go1.26's new(expr)
-        # should only be updated in old code where it really matters.
+        # go 1.26: can simplify with new(expr)
         - newexpr
-        # use iterators instead of Len/At-style APIs
-        # should only be updated in old code where it really matters.
+        # Replace 3-clause for loops with for-range over integers.
+        #
+        # A useful hint for new code (makes it shorter).
+        - rangeint
+        # go 1.26: can use iterators instead of Len/At-style APIs
         - stditerators
+        # go 1.25: can simplify with reflect.TypeAssert
+        - reflecttypeassert
+        # Replace reflect.TypeOf(x) with TypeFor[T]().
+        #
+        # A useful hint for new code, it could be more efficient.
+        - reflecttypefor
+        # go 1.23: can simplify with slices.Backward
+        - slicesbackward
         {{- end }}
         # Suggest replacing omitempty with omitzero for struct fields.
         #
@@ -322,14 +379,6 @@ linters:
         # with encoding of API structs.
         - omitzero
         {{- if .Base }}
-        # Replace 3-clause for loops with for-range over integers.
-        #
-        # A useful hint for new code (makes it shorter).
-        - rangeint
-        # Replace reflect.TypeOf(x) with TypeFor[T]().
-        #
-        # A useful hint for new code, it could be more efficient.
-        - reflecttypefor
         # Replace loops with slices.Contains or slices.ContainsFunc.
         #
         # A useful hint because it can make code more obvious
@@ -357,19 +406,17 @@ linters:
         # Replace context.WithCancel with t.Context in tests.
         #
         # Disabled because in Kubernetes,
-        # test/utils/ktesting handles
+        # k8s.io/ktesting handles
         # context cancellation and also
         # addresses other pain points.
         - testingcontext
+        {{- if .Base }}
         # Replace wg.Add(1)/go/wg.Done() with wg.Go.
         #
         # A useful hint leading to shorter code.
         # Makes wait.Group obsolete.
-        {{- if .Hints }}
-        # Please enable when all supported Kubernetes versions
-        # are on GoLang 1.25+
+        - waitgroupgo
         {{- end }}
-        - waitgroup
 
     revive:
       # Only these rules are enabled.

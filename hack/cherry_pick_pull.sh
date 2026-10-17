@@ -29,7 +29,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 declare -r REPO_ROOT
 cd "${REPO_ROOT}"
 
-STARTINGBRANCH=$(git symbolic-ref --short HEAD)
+STARTINGBRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse HEAD)
 declare -r STARTINGBRANCH
 declare -r REBASEMAGIC="${REPO_ROOT}/.git/rebase-apply"
 DRY_RUN=${DRY_RUN:-""}

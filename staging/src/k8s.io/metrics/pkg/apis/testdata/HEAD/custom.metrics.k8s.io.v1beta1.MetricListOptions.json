@@ -1,0 +1,6 @@
+{
+  "kind": "MetricListOptions",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "labelSelector": "labelSelectorValue",
+  "metricLabelSelector": "metricLabelSelectorValue"
+}

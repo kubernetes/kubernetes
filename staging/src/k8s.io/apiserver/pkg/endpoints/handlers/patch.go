@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -130,7 +131,17 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		admit = admission.WithAudit(admit)
 
-		audit.LogRequestPatch(req.Context(), patchBytes)
+		// Decode and convert the patch payload to JSON for storage into audit.
+		// the decision to reject the request for failure to decode before we record the request for audit.
+		//
+		// This guarantees that the audit event contains valid JSON, or the request is rejected.
+		patchForAudit, err := validateAndTranscodePatch(patchBytes, patchType)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
+		audit.LogRequestPatch(req.Context(), patchForAudit)
 		span.AddEvent("Recorded the audit event")
 
 		var baseContentType string
@@ -416,7 +427,7 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, strict
 		return patchedJS, strictErrors, nil
 	case types.MergePatchType:
 		if p.validationDirective == metav1.FieldValidationStrict || p.validationDirective == metav1.FieldValidationWarn {
-			v := map[string]interface{}{}
+			v := map[string]any{}
 			var err error
 			strictErrors, err = kjson.UnmarshalStrict(p.patchBytes, &v)
 			if err != nil {
@@ -493,8 +504,8 @@ type applyPatcher struct {
 	fieldManager        *managedfields.FieldManager
 	userAgent           string
 	validationDirective string
-	unmarshalFn         func(data []byte, v interface{}) error
-	unmarshalStrictFn   func(data []byte, v interface{}) error
+	unmarshalFn         func(data []byte, v any) error
+	unmarshalStrictFn   func(data []byte, v any) error
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context, obj runtime.Object) (runtime.Object, error) {
@@ -506,9 +517,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 		panic("FieldManager must be installed to run apply")
 	}
 
-	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	patchObj := &unstructured.Unstructured{Object: map[string]any{}}
 	if err := p.unmarshalFn(p.patch, &patchObj.Object); err != nil {
-		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
+		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
 	}
 
 	obj, err := p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
@@ -519,9 +530,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 	// TODO: spawn something to track deciding whether a fieldValidation=Strict
 	// fatal error should return before an error from the apply operation
 	if p.validationDirective == metav1.FieldValidationStrict || p.validationDirective == metav1.FieldValidationWarn {
-		if err := p.unmarshalStrictFn(p.patch, &map[string]interface{}{}); err != nil {
+		if err := p.unmarshalStrictFn(p.patch, &map[string]any{}); err != nil {
 			if p.validationDirective == metav1.FieldValidationStrict {
-				return nil, errors.NewBadRequest(fmt.Sprintf("error strict decoding YAML: %v", err))
+				return nil, errors.NewBadRequest(fmt.Sprintf("error strict decoding patch: %v", err))
 			}
 			addStrictDecodingWarnings(requestContext, []error{err})
 		}
@@ -832,4 +843,30 @@ func patchToCreateOptions(po *metav1.PatchOptions) *metav1.CreateOptions {
 	}
 	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
 	return co
+}
+
+func validateAndTranscodePatch(patchBytes []byte, patchType types.PatchType) ([]byte, error) {
+	switch patchType {
+	case types.ApplyCBORPatchType:
+		var obj any
+		if err := cbor.Unmarshal(patchBytes, &obj); err != nil {
+			return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
+		}
+		jsonBytes, err := json.Marshal(obj)
+		if err != nil {
+			return nil, errors.NewBadRequest(fmt.Sprintf("error encoding patch: %v", err))
+		}
+		return jsonBytes, nil
+	case types.ApplyYAMLPatchType:
+		jsonBytes, err := yaml.ToJSON(patchBytes)
+		if err != nil {
+			return nil, errors.NewBadRequest(fmt.Sprintf("error encoding patch: %v", err))
+		}
+		return jsonBytes, nil
+	default:
+		if !json.Valid(patchBytes) {
+			return nil, errors.NewBadRequest("invalid JSON patch")
+		}
+		return patchBytes, nil
+	}
 }

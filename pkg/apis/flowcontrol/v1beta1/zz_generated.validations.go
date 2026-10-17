@@ -26,10 +26,11 @@ import (
 	fmt "fmt"
 
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -39,6 +40,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type FlowSchema
+	scheme.AddValidationFunc(
+		(*flowcontrolv1beta1.FlowSchema)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_FlowSchema(
+					ctx, op, nil, /* fldPath */
+					obj.(*flowcontrolv1beta1.FlowSchema),
+					safe.Cast[*flowcontrolv1beta1.FlowSchema](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type PriorityLevelConfiguration
 	scheme.AddValidationFunc(
 		(*flowcontrolv1beta1.PriorityLevelConfiguration)(nil),
@@ -57,6 +73,41 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_FlowSchema validates an instance of FlowSchema according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchema(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta1.FlowSchema) (errs field.ErrorList) {
+
+	// field flowcontrolv1beta1.FlowSchema.TypeMeta has no validation
+
+	{ // field flowcontrolv1beta1.FlowSchema.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta1.FlowSchema) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field flowcontrolv1beta1.FlowSchema.Spec has no validation
+	// field flowcontrolv1beta1.FlowSchema.Status has no validation
+	return errs
+}
+
 // Validate_LimitResponse validates an instance of LimitResponse according
 // to declarative validation rules in the API schema.
 func Validate_LimitResponse(
@@ -67,10 +118,10 @@ func Validate_LimitResponse(
 		func(obj *flowcontrolv1beta1.LimitResponse) *flowcontrolv1beta1.QueuingConfiguration {
 			return obj.Queuing
 		},
-		func(obj *flowcontrolv1beta1.LimitResponse) flowcontrolv1beta1.LimitResponseType { return obj.Type }, validate.DirectEqualPtr,
+		func(obj *flowcontrolv1beta1.LimitResponse) flowcontrolv1beta1.LimitResponseType { return obj.Type }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.QueuingConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta1.QueuingConfiguration, flowcontrolv1beta1.LimitResponseType]{
@@ -80,7 +131,7 @@ func Validate_LimitResponse(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.QueuingConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						errs = append(errs, e...)
 						earlyReturn = true
 					}
@@ -107,7 +158,7 @@ func Validate_LimitResponse(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -136,7 +187,7 @@ func Validate_LimitResponse(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -169,7 +220,7 @@ func Validate_LimitedPriorityLevelConfiguration(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -196,7 +247,28 @@ func Validate_PriorityLevelConfiguration(
 	obj, oldObj *flowcontrolv1beta1.PriorityLevelConfiguration) (errs field.ErrorList) {
 
 	// field flowcontrolv1beta1.PriorityLevelConfiguration.TypeMeta has no validation
-	// field flowcontrolv1beta1.PriorityLevelConfiguration.ObjectMeta has no validation
+
+	{ // field flowcontrolv1beta1.PriorityLevelConfiguration.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta1.PriorityLevelConfiguration) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field flowcontrolv1beta1.PriorityLevelConfiguration.Spec
 		fn := func(
@@ -205,7 +277,7 @@ func Validate_PriorityLevelConfiguration(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -239,7 +311,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		}, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.ExemptPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta1.ExemptPriorityLevelConfiguration, flowcontrolv1beta1.PriorityLevelEnablement]{
@@ -249,7 +321,7 @@ func Validate_PriorityLevelConfigurationSpec(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.ExemptPriorityLevelConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						earlyReturn = true
 					}
 					if earlyReturn {
@@ -270,7 +342,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		}, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.LimitedPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta1.LimitedPriorityLevelConfiguration, flowcontrolv1beta1.PriorityLevelEnablement]{
@@ -280,7 +352,7 @@ func Validate_PriorityLevelConfigurationSpec(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.LimitedPriorityLevelConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						errs = append(errs, e...)
 						earlyReturn = true
 					}
@@ -307,7 +379,7 @@ func Validate_PriorityLevelConfigurationSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -330,13 +402,13 @@ func Validate_PriorityLevelConfigurationSpec(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -360,13 +432,13 @@ func Validate_PriorityLevelConfigurationSpec(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

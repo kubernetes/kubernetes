@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // Package policyconfig defines the configuration for the validating and mutating admission policy plugins.
-package policyconfig // import "k8s.io/apiserver/pkg/admission/plugin/policy/config/apis/policyconfig"
+package policyconfig

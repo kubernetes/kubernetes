@@ -3,12 +3,6 @@
     "": [
       "type Struct"
     ],
-    "UnvalidatedListField[0]": [
-      "type OtherStruct"
-    ],
-    "UnvalidatedListField[1]": [
-      "type OtherStruct"
-    ],
     "listField": [
       "field Struct.ListField"
     ],
@@ -19,6 +13,28 @@
     "listField[1]": [
       "field Struct.ListField[*]",
       "type OtherStruct"
+    ],
+    "listPtrField": [
+      "field Struct.ListPtrField"
+    ],
+    "listPtrField[0]": [
+      "field Struct.ListPtrField[*]",
+      "type OtherStruct"
+    ],
+    "listPtrField[1]": [
+      "field Struct.ListPtrField[*]",
+      "type OtherStruct"
+    ],
+    "listPtrTypedefField": [
+      "field Struct.ListPtrTypedefField"
+    ],
+    "listPtrTypedefField[0]": [
+      "field Struct.ListPtrTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "listPtrTypedefField[1]": [
+      "field Struct.ListPtrTypedefField[*]",
+      "type OtherTypedefStruct"
     ],
     "listTypedefField": [
       "field Struct.ListTypedefField"

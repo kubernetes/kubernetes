@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // ProcNetstat models the content of /proc/<pid>/net/netstat.
@@ -146,6 +146,20 @@ type TcpExt struct { // nolint:revive
 	TCPMTUPFail               *float64
 	TCPMTUPSuccess            *float64
 	TCPWqueueTooBig           *float64
+
+	// Legacy TcpExt counters dropped from recent kernels' TcpExt table;
+	// modeled so consumers retain metric parity with older kernels that
+	// still print them in /proc/net/netstat.
+	TCPLoss                   *float64
+	PAWSPassive               *float64
+	TCPForwardRetrans         *float64
+	TCPSchedulerFailed        *float64
+	TCPPrequeued              *float64
+	TCPDirectCopyFromBacklog  *float64
+	TCPDirectCopyFromPrequeue *float64
+	TCPPrequeueDropped        *float64
+	TCPFACKReorder            *float64
+	TCPHPHitsToUser           *float64
 }
 
 type IpExt struct { // nolint:revive
@@ -171,7 +185,7 @@ type IpExt struct { // nolint:revive
 
 func (p Proc) Netstat() (ProcNetstat, error) {
 	filename := p.path("net/netstat")
-	data, err := util.ReadFileNoStat(filename)
+	data, err := parsers.ReadFileNoStat(filename)
 	if err != nil {
 		return ProcNetstat{PID: p.PID}, err
 	}
@@ -396,6 +410,26 @@ func parseProcNetstat(r io.Reader, fileName string) (ProcNetstat, error) {
 					procNetstat.TCPMTUPSuccess = &value
 				case "TCPWqueueTooBig":
 					procNetstat.TCPWqueueTooBig = &value
+				case "TCPLoss":
+					procNetstat.TCPLoss = &value
+				case "PAWSPassive":
+					procNetstat.PAWSPassive = &value
+				case "TCPForwardRetrans":
+					procNetstat.TCPForwardRetrans = &value
+				case "TCPSchedulerFailed":
+					procNetstat.TCPSchedulerFailed = &value
+				case "TCPPrequeued":
+					procNetstat.TCPPrequeued = &value
+				case "TCPDirectCopyFromBacklog":
+					procNetstat.TCPDirectCopyFromBacklog = &value
+				case "TCPDirectCopyFromPrequeue":
+					procNetstat.TCPDirectCopyFromPrequeue = &value
+				case "TCPPrequeueDropped":
+					procNetstat.TCPPrequeueDropped = &value
+				case "TCPFACKReorder":
+					procNetstat.TCPFACKReorder = &value
+				case "TCPHPHitsToUser":
+					procNetstat.TCPHPHitsToUser = &value
 				}
 			case "IpExt":
 				switch key {

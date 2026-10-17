@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/nodemanager"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
@@ -70,7 +71,7 @@ type ProxyHealthServer struct {
 	httpFactory httpServerFactory
 	clock       clock.Clock
 
-	nodeManager nodeManager
+	nodeManager nodemanager.NodeManager
 
 	addr          string
 	healthTimeout time.Duration
@@ -80,17 +81,12 @@ type ProxyHealthServer struct {
 	oldestPendingQueuedMap map[v1.IPFamily]time.Time
 }
 
-// interface to break an import chain between pkg/proxy and pkg/proxy/healthcheck
-type nodeManager interface {
-	Node() *v1.Node
-}
-
 // NewProxyHealthServer returns a proxy health http server.
-func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
+func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager nodemanager.NodeManager) *ProxyHealthServer {
 	return newProxyHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, nodeManager)
 }
 
-func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
+func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager nodemanager.NodeManager) *ProxyHealthServer {
 	return &ProxyHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,

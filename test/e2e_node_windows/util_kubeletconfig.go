@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node_windows/kubeletconfig"
 )
 
 // getCurrentKubeletConfig returns the current KubeletConfiguration.

@@ -224,28 +224,6 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (ss *SampleStream) UnmarshalJSON(b []byte) error {
-	v := struct {
-		Metric     Metric                `json:"metric"`
-		Values     []SamplePair          `json:"values"`
-		Histograms []SampleHistogramPair `json:"histograms"`
-	}{
-		Metric:     ss.Metric,
-		Values:     ss.Values,
-		Histograms: ss.Histograms,
-	}
-
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-
-	ss.Metric = v.Metric
-	ss.Values = v.Values
-	ss.Histograms = v.Histograms
-
-	return nil
-}
-
 // Scalar is a scalar value evaluated at the set timestamp.
 type Scalar struct {
 	Value     SampleValue `json:"value"`
@@ -259,13 +237,13 @@ func (s Scalar) String() string {
 // MarshalJSON implements json.Marshaler.
 func (s Scalar) MarshalJSON() ([]byte, error) {
 	v := strconv.FormatFloat(float64(s.Value), 'f', -1, 64)
-	return json.Marshal([...]interface{}{s.Timestamp, v})
+	return json.Marshal([...]any{s.Timestamp, v})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (s *Scalar) UnmarshalJSON(b []byte) error {
 	var f string
-	v := [...]interface{}{&s.Timestamp, &f}
+	v := [...]any{&s.Timestamp, &f}
 
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
@@ -291,12 +269,12 @@ func (s *String) String() string {
 
 // MarshalJSON implements json.Marshaler.
 func (s String) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]interface{}{s.Timestamp, s.Value})
+	return json.Marshal([]any{s.Timestamp, s.Value})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (s *String) UnmarshalJSON(b []byte) error {
-	v := [...]interface{}{&s.Timestamp, &s.Value}
+	v := [...]any{&s.Timestamp, &s.Value}
 	return json.Unmarshal(b, &v)
 }
 

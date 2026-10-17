@@ -33,6 +33,7 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  defaultPartitionTypeAttribute: defaultPartitionTypeAttributeValue
   driver: driverValue
   limit: 3
   poolName: poolNameValue
@@ -51,8 +52,21 @@ status:
     driver: driverValue
     generation: 9
     nodeName: nodeNameValue
+    partitionSummary:
+    - allocatable: 3
+      attribute: attributeValue
+      total: 2
+      type: typeValue
     poolName: poolNameValue
     resourceSliceCount: 8
+    shareableSummary:
+      capacity:
+      - available: "0"
+        consumed: "0"
+        name: nameValue
+        total: "0"
+      fullyAvailableDevices: 1
+      partiallyAvailableDevices: 2
     totalDevices: 4
     unavailableDevices: 7
     validationError: validationErrorValue

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -288,6 +289,7 @@ func (o objectTrackerReact) Patch(action PatchActionImpl) (runtime.Object, error
 type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
+	logger  klog.Logger
 	lock    sync.RWMutex
 	objects map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject
 	// The value type of watchers is a map of which the key is either a namespace or
@@ -335,10 +337,19 @@ var _ ObjectTracker = &tracker{}
 
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
+//
+// Contextual logging: NewObjectTrackerWithLogger should be used instead of NewObjectTracker in code which supports contextual logging.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+	return NewObjectTrackerWithLogger(klog.Background(), scheme, decoder)
+}
+
+// NewObjectTrackerWithLogger is like NewObjectTracker, but supports passing
+// a logger for contextual logging instead of falling back to klog.Background.
+func NewObjectTrackerWithLogger(logger klog.Logger, scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
 		scheme:           scheme,
 		decoder:          decoder,
+		logger:           logger,
 		objects:          make(map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject),
 		watchers:         make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 		resourceVersions: make(map[schema.GroupVersionResource]int64),
@@ -430,7 +441,7 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	fakewatcher := watch.NewRaceFreeFake()
+	fakewatcher := watch.NewRaceFreeFakeWithLogger(t.logger)
 
 	if _, exists := t.watchers[gvr]; !exists {
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
@@ -745,9 +756,17 @@ var _ ObjectTracker = &managedFieldObjectTracker{}
 
 // NewFieldManagedObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects and managed fields for the fake clientset. Mostly useful for unit tests.
+//
+//logcheck:context // NewFieldManagedObjectTrackerWithLogger should be used instead of NewFieldManagedObjectTracker in code which supports contextual logging.
 func NewFieldManagedObjectTracker(scheme *runtime.Scheme, decoder runtime.Decoder, typeConverter managedfields.TypeConverter) ObjectTracker {
+	return NewFieldManagedObjectTrackerWithLogger(klog.Background(), scheme, decoder, typeConverter)
+}
+
+// NewFieldManagedObjectTrackerWithLogger is like NewFieldManagedObjectTracker, but supports passing
+// a logger for contextual logging instead of falling back to klog.Background.
+func NewFieldManagedObjectTrackerWithLogger(logger klog.Logger, scheme *runtime.Scheme, decoder runtime.Decoder, typeConverter managedfields.TypeConverter) ObjectTracker {
 	return &managedFieldObjectTracker{
-		ObjectTracker:   NewObjectTracker(scheme, decoder),
+		ObjectTracker:   NewObjectTrackerWithLogger(logger, scheme, decoder),
 		scheme:          scheme,
 		objectConverter: scheme,
 		mapper: func() meta.RESTMapper {

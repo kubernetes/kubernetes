@@ -31,8 +31,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
@@ -54,6 +55,7 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
+	"k8s.io/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -64,7 +66,6 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -160,7 +161,7 @@ func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 	return lcm.allocatableReservation
 }
 
-func (lcm *localCM) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (lcm *localCM) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	if !localStorageCapacityIsolation {
 		delete(lcm.capacity, v1.ResourceEphemeralStorage)
 	}
@@ -298,6 +299,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
 						KubeProxyVersion:        "",
+						RunningInUserNamespace:  kubelet.runningInUserNS(),
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -478,6 +480,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -684,6 +687,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -918,6 +922,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -3199,7 +3204,10 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+			if !tc.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -3230,4 +3238,72 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 			assert.Equal(t, tc.expectedFeatures, updatedNode.Status.DeclaredFeatures)
 		})
 	}
+}
+
+func TestNodeRefWithUID(t *testing.T) {
+	const nodeUID = "66cedd99-0823-46bf-a36d-5db3fa6f28cd"
+
+	newKubelet := func(t *testing.T) *Kubelet {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		t.Cleanup(testKubelet.Cleanup)
+		kubelet := testKubelet.kubelet
+		// Mirror the static, UID-less reference built in NewMainKubelet.
+		kubelet.nodeRef = &v1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Node",
+			Name:       string(kubelet.nodeName),
+		}
+		return kubelet
+	}
+
+	t.Run("fills the UID from the node cache when nodeRef has none", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Equal(t, nodeUID, string(ref.UID), "expected the node UID to be populated")
+		// The shared reference must remain untouched (no in-place mutation/data race).
+		assert.Empty(t, string(kubelet.nodeRef.UID), "shared nodeRef must not be mutated")
+	})
+
+	t.Run("falls back to the name-only reference when the node is not cached", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		kubelet.nodeLister = testNodeLister{}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Empty(t, string(ref.UID), "UID should stay empty when the node is unavailable")
+		assert.Equal(t, testKubeletHostname, ref.Name)
+		assert.Equal(t, "Node", ref.Kind)
+	})
+
+	t.Run("does not override an already populated UID", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		kubelet.nodeRef.UID = "preset-uid"
+		// A different UID in the cache must be ignored when one is already set.
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Equal(t, "preset-uid", string(ref.UID))
+	})
+
+	t.Run("caches the resolved reference and does not refresh", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		first := kubelet.nodeRefWithUID()
+		require.Equal(t, nodeUID, string(first.UID))
+
+		// Simulate the node being recreated with a new UID. Because the resolved
+		// reference is cached once, later calls keep returning the original pointer
+		// and UID rather than re-reading the lister.
+		recreated := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: "new-uid"}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{recreated}}
+
+		second := kubelet.nodeRefWithUID()
+		assert.Same(t, first, second, "expected the cached reference to be reused")
+		assert.Equal(t, nodeUID, string(second.UID))
+	})
 }

@@ -428,6 +428,11 @@ func (r *YAMLReader) Read() ([]byte, error) {
 			}
 		}
 		if err == io.EOF { //nolint:errorlint
+			// Like io.Reader, r.reader may return the final line together with
+			// io.EOF; a bare "\n" is only the terminator it appends at EOF.
+			if len(line) > 0 && !bytes.Equal(line, []byte("\n")) {
+				buffer.Write(line)
+			}
 			if buffer.Len() != 0 {
 				// If we're at EOF, we have a final, non-terminated line. Return it.
 				return buffer.Bytes(), nil

@@ -29,10 +29,10 @@ import (
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
 type DaemonSetUpdateStrategyApplyConfiguration struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// type is the type of daemon set update. Can be "RollingUpdate" or "OnDelete".
 	// Default is OnDelete.
 	Type *extensionsv1beta1.DaemonSetUpdateStrategyType `json:"type,omitempty"`
-	// Rolling update config params. Present only if type = "RollingUpdate".
+	// rollingUpdate is the rolling update config params. Present only if type = "RollingUpdate".
 	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as Deployment `strategy.rollingUpdate`.

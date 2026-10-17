@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -88,7 +87,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -96,7 +95,7 @@ func Validate_Struct(
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField[*]")
 				}); len(e) != 0 {
@@ -118,7 +117,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -126,14 +125,14 @@ func Validate_Struct(
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListTypedefField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListTypedefField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StringType); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StringType); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -146,5 +145,87 @@ func Validate_Struct(
 	}
 
 	// field Struct.UnvalidatedListField has no validation
+
+	{ // field Struct.ListPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrSliceNoNils[string](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachPtrSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*string {
+				return oldObj.ListPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("listPtrField"), obj.ListPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.ListPtrTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*StringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrSliceNoNils[StringType](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachPtrSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachPtrSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StringType); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*StringType {
+				return oldObj.ListPtrTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("listPtrTypedefField"), obj.ListPtrTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	// field Struct.UnvalidatedListPtrField has no validation
 	return errs
 }

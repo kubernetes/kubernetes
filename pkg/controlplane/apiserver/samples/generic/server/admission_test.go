@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/plugin/pkg/admission/job"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
@@ -50,7 +49,6 @@ var intentionallyOffPlugins = sets.New[string](
 	podsecurity.PluginName,                  // PodSecurity
 	podtopologylabels.PluginName,            // PodTopologyLabels
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatures
-	job.PluginName,                          // JobValidation
 	podresize.PluginName,                    // PodResize
 )
 

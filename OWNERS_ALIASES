@@ -173,6 +173,7 @@ aliases:
     - Huang-Wei
     - kerthcet
     - macsko
+    - mm4tt
     - sanposhiho
   # emeritus:
   # - alculquicondor
@@ -183,16 +184,19 @@ aliases:
   # - wojtek-t
   sig-scheduling:
     - ania-borowiec
+    - Argh4k
     - AxeZhan
+    - brejman
     - damemi
     - denkensk
     - dom4ha
+    - kerthcet
     - macsko
     - mm4tt
+    - pacoxu
     - sanposhiho
     - tosi3k
     - utam0k
-    - kerthcet
   # emeritus:
   # - adtac
   # - liu-cong
@@ -286,6 +290,7 @@ aliases:
     - natasha41575
     - ndixita
     - harche
+    - pravk03
   sig-network-approvers:
     - aojea
     - bowei
@@ -341,7 +346,6 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
-    - rexagod
     - richabanker
     - pohly
   # sig-instrumentation-emeritus
@@ -349,6 +353,7 @@ aliases:
   # - DirectXMan12
   # - ehashman
   # - logicalhan
+  # - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
@@ -359,7 +364,6 @@ aliases:
     - pohly
     - mengjiao-liu
     - nmn3m
-    - rexagod
     - richabanker
   api-approvers:
     - deads2k
@@ -367,11 +371,13 @@ aliases:
     - smarterclayton
     - thockin
     - liggitt
+    - jpbetz
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
     - deads2k
     - liggitt
     - smarterclayton
+    - jpbetz
   sig-apps-api-approvers:
     - deads2k
     - liggitt
@@ -387,6 +393,11 @@ aliases:
   sig-cloud-provider-api-approvers:
     - liggitt
     - thockin
+  sig-cloud-provider-leads:
+    - bridgetkromhout
+    - cheftako
+    - elmiko
+    - joelspeed
   sig-cluster-lifecycle-api-approvers:
     - deads2k
     - liggitt
@@ -395,7 +406,6 @@ aliases:
     - fabriziopandini
     - justinsb
     - neolit123
-    - vincepri
   sig-network-api-approvers:
     - smarterclayton
     - thockin
@@ -437,6 +447,7 @@ aliases:
     - saad-ali
     - luxas
     - janetkuo
+    - jpbetz
     - justinsb
     - pwittrock
     - tallclair
@@ -584,7 +595,6 @@ aliases:
     - msau42 # Storage
     - omerap12 # Autoscaling
     - pohly # Instrumentation
-    - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
     - sanposhiho # Scheduling
@@ -599,8 +609,10 @@ aliases:
     - wojtek-t # Scalability
   # feature-approvers-emeritus:
   # - logicalhan # Instrumentation
+  # - rexagod # Instrumentation
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
+    - BenTheElder
     - smarterclayton
     - johnbelamaric
     - dims

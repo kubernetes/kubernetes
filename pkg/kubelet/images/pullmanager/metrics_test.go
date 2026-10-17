@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestFSPullRecordsMetrics(t *testing.T) {

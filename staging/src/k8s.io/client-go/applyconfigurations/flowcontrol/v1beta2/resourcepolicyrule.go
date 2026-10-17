@@ -31,27 +31,27 @@ package v1beta2
 // true or (d2) the request specifies a namespace and least one member
 // of namespaces matches the request's namespace.
 type ResourcePolicyRuleApplyConfiguration struct {
-	// `verbs` is a list of matching verbs and may not be empty.
+	// verbs is a list of matching verbs and may not be empty.
 	// "*" matches all verbs and, if present, must be the only entry.
 	// Required.
 	Verbs []string `json:"verbs,omitempty"`
-	// `apiGroups` is a list of matching API groups and may not be empty.
+	// apiGroups is a list of matching API groups and may not be empty.
 	// "*" matches all API groups and, if present, must be the only entry.
 	// Required.
 	APIGroups []string `json:"apiGroups,omitempty"`
-	// `resources` is a list of matching resources (i.e., lowercase
+	// resources is a list of matching resources (i.e., lowercase
 	// and plural) with, if desired, subresource.  For example, [
 	// "services", "nodes/status" ].  This list may not be empty.
 	// "*" matches all resources and, if present, must be the only entry.
 	// Required.
 	Resources []string `json:"resources,omitempty"`
-	// `clusterScope` indicates whether to match requests that do not
+	// clusterScope indicates whether to match requests that do not
 	// specify a namespace (which happens either because the resource
 	// is not namespaced or the request targets all namespaces).
 	// If this field is omitted or false then the `namespaces` field
 	// must contain a non-empty list.
 	ClusterScope *bool `json:"clusterScope,omitempty"`
-	// `namespaces` is a list of target namespaces that restricts
+	// namespaces is a list of target namespaces that restricts
 	// matches.  A request that specifies a target namespace matches
 	// only if either (a) this list contains that target namespace or
 	// (b) this list contains "*".  Note that "*" matches any

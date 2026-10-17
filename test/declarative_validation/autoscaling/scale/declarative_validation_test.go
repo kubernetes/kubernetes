@@ -48,7 +48,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			old:    mkScale(),
 			update: mkScale(setReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 	}
@@ -61,7 +61,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				t.Run(k, func(t *testing.T) {
 					tc.old.ResourceVersion = "1"
 					tc.update.ResourceVersion = "1"
-					apitesting.VerifyUpdateValidationEquivalenceFunc(t, ctx, &tc.update, &tc.old, validateScale, tc.expectedErrs, apitesting.WithSubResources("scale"), apitesting.WithSkipGroupVersions("extensions/v1beta1"))
+					apitesting.VerifyUpdateValidationEquivalenceFunc(t, ctx, &tc.update, &tc.old, validateScale, tc.expectedErrs, apitesting.WithSubResources("scale"))
 				})
 			}
 		})

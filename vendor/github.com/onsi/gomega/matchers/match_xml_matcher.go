@@ -83,9 +83,9 @@ func parseXmlContent(content string) (*xmlNode, error) {
 
 		switch tok := tok.(type) {
 		case xml.StartElement:
-			attrs := attributesSlice(tok.Attr)
+			attrs := withNormalizedNamespaceDeclarations(tok.Attr)
 			sort.Sort(attrs)
-			allNodes = append(allNodes, &xmlNode{XMLName: tok.Name, XMLAttr: tok.Attr})
+			allNodes = append(allNodes, &xmlNode{XMLName: tok.Name, XMLAttr: attrs})
 		case xml.EndElement:
 			if len(allNodes) > 1 {
 				allNodes[lastNodeIndex-1].Nodes = append(allNodes[lastNodeIndex-1].Nodes, lastNode)
@@ -107,6 +107,22 @@ func parseXmlContent(content string) (*xmlNode, error) {
 	trimParentNodesContentSpaces(firstNode)
 
 	return firstNode, nil
+}
+
+// withNormalizedNamespaceDeclarations replaces the name of each xmlns="..." and
+// xmlns:prefix="..." attribute with the same placeholder name, so that only the
+// namespace URIs declared on the element are compared, not the prefixes bound
+// to them.  The decoder has already resolved element and attribute names to
+// namespace URIs, so the prefixes play no other part in the comparison.
+func withNormalizedNamespaceDeclarations(attrs []xml.Attr) attributesSlice {
+	normalized := make(attributesSlice, len(attrs))
+	for i, attr := range attrs {
+		if attr.Name.Space == "xmlns" || (attr.Name.Space == "" && attr.Name.Local == "xmlns") {
+			attr.Name = xml.Name{Space: "xmlns"}
+		}
+		normalized[i] = attr
+	}
+	return normalized
 }
 
 func newXmlDecoder(reader io.Reader) *xml.Decoder {

@@ -18,19 +18,21 @@ package csimock
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/codes"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -46,55 +48,68 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 	m := newMockDriverSetup(f)
 
 	f.Context("CSI Mock Node Volume Health", f.WithSlow(), func() {
+		// NodeGetVolumeHealth is probed by the volumehealth manager independently of
+		// NodeGetVolumeStats, so call order is not guaranteed.
 		trackedCalls := []string{
 			"NodeGetVolumeStats",
+			"NodeGetVolumeHealth",
 		}
 		tests := []struct {
-			name                        string
-			expectedCalls               []csiCall
-			nodeVolumeConditionRequired bool
-			nodeAbnormalVolumeCondition bool
+			name                     string
+			expectedCalls            []csiCall
+			forbiddenCalls           []string
+			nodeVolumeHealthRequired bool
+			nodeAbnormalVolumeHealth bool
 		}{
 			{
-				name: "return normal volume stats",
+				name: "return normal volume health",
 				expectedCalls: []csiCall{
 					{
 						expectedMethod: "NodeGetVolumeStats",
 						expectedError:  codes.OK,
 					},
+					{
+						expectedMethod: "NodeGetVolumeHealth",
+						expectedError:  codes.OK,
+					},
 				},
-				nodeVolumeConditionRequired: true,
-				nodeAbnormalVolumeCondition: false,
+				nodeVolumeHealthRequired: true,
+				nodeAbnormalVolumeHealth: false,
 			},
 			{
-				name: "return normal volume stats without volume condition",
+				name: "return normal volume stats without volume health",
 				expectedCalls: []csiCall{
 					{
 						expectedMethod: "NodeGetVolumeStats",
 						expectedError:  codes.OK,
 					},
 				},
-				nodeVolumeConditionRequired: false,
-				nodeAbnormalVolumeCondition: false,
+				forbiddenCalls:           []string{"NodeGetVolumeHealth"},
+				nodeVolumeHealthRequired: false,
+				nodeAbnormalVolumeHealth: false,
 			},
 			{
-				name: "return normal volume stats with abnormal volume condition",
+				name: "return abnormal volume health",
 				expectedCalls: []csiCall{
 					{
 						expectedMethod: "NodeGetVolumeStats",
 						expectedError:  codes.OK,
 					},
+					{
+						expectedMethod: "NodeGetVolumeHealth",
+						expectedError:  codes.OK,
+					},
 				},
-				nodeVolumeConditionRequired: true,
-				nodeAbnormalVolumeCondition: true,
+				nodeVolumeHealthRequired: true,
+				nodeAbnormalVolumeHealth: true,
 			},
 		}
 		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				m.init(ctx, testParameters{
 					registerDriver:            true,
-					enableNodeVolumeCondition: test.nodeVolumeConditionRequired,
-					hooks:                     createGetVolumeStatsHook(test.nodeAbnormalVolumeCondition),
+					enableNodeVolumeCondition: test.nodeVolumeHealthRequired,
+					hooks:                     createVolumeHealthHook(test.nodeAbnormalVolumeHealth),
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 				_, claim, pod := m.createPod(ctx, pvcReference)
@@ -110,88 +125,194 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				framework.ExpectNoError(err, "wait for running pod")
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(c context.Context) (done bool, err error) {
-					var index int
-					_, index, err = compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
-					if err != nil {
-						return true, err
-					}
-					if index == 0 {
-						// No CSI call received yet
-						return false, nil
-					}
-					if len(test.expectedCalls) == index {
-						// all calls received
-						return true, nil
-					}
-					return false, nil
+					return expectedCSICallsSeen(ctx, trackedCalls, test.expectedCalls, test.forbiddenCalls, m.driver.GetCalls)
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
 				// the mocked csidriver register doesn't regist itself to normal csidriver.
-				if test.nodeVolumeConditionRequired {
+				if test.nodeVolumeHealthRequired {
 					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "get running pod")
-					grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
-					framework.ExpectNoError(err, "creating the metrics grabber")
-					waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
-						framework.Logf("Grabbing Kubelet metrics")
-						// Grab kubelet metrics from the node the pod was scheduled on
-						var err error
-						kubeMetrics, err := grabber.GrabFromKubelet(ctx, pod.Spec.NodeName)
+
+					waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+						updated, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 						if err != nil {
-							framework.Logf("Error fetching kubelet metrics err: %v", err)
 							return false, err
 						}
-						if !findVolumeConditionMetrics(f.Namespace.Name, claim.Name, kubeMetrics, test.nodeAbnormalVolumeCondition) {
-							return false, nil
-						}
-						return true, nil
+						return podVolumeHealthMatches(updated, test.nodeAbnormalVolumeHealth), nil
 					})
-					framework.ExpectNoError(waitErr, "call metrics should not have any error")
+					framework.ExpectNoError(waitErr, "pod.status.volumeHealth should reflect NodeGetVolumeHealth")
 				}
 			})
 		}
 
 	})
+
+	f.Context("CSI Mock Node Storage Health", f.WithSlow(), func() {
+		ginkgo.It("should mark CSINode unhealthy and then healthy", func(ctx context.Context) {
+			var unhealthy atomic.Bool
+			unhealthy.Store(true)
+			m.init(ctx, testParameters{
+				registerDriver:          true,
+				enableNodeStorageHealth: true,
+				hooks:                   createStorageHealthHook(&unhealthy),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			nodeName := m.config.ClientNodeSelection.Name
+			driverName := m.config.GetUniqueDriverName()
+
+			ginkgo.By("Waiting for CSINode to report the storage backend as unreachable")
+			err := wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+				csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return csiNodeStorageHealthMatches(csiNode, driverName, true), nil
+			})
+			framework.ExpectNoError(err, "CSINode should report the driver's storage backend as unreachable")
+
+			ginkgo.By("Making the storage backend healthy")
+			unhealthy.Store(false)
+
+			ginkgo.By("Waiting for CSINode to clear the storage health condition")
+			err = wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+				csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return csiNodeStorageHealthMatches(csiNode, driverName, false), nil
+			})
+			framework.ExpectNoError(err, "CSINode should clear the driver's storage health condition")
+		})
+	})
 })
 
-func findVolumeConditionMetrics(pvcNamespace, pvcName string, kubeMetrics e2emetrics.KubeletMetrics, nodeAbnormalVolumeCondition bool) bool {
+// expectedCSICallsSeen reports whether every expected CSI method has been observed
+// (order-independent) and that no forbidden methods appear. Health and stats are
+// probed on independent kubelet paths, so ordered matching is not reliable.
+func expectedCSICallsSeen(
+	ctx context.Context,
+	trackedCalls []string,
+	expectedCalls []csiCall,
+	forbiddenCalls []string,
+	getCalls func(ctx context.Context) ([]drivers.MockCSICall, error),
+) (bool, error) {
+	allCalls, err := getCalls(ctx)
+	if err != nil {
+		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
+		return false, nil
+	}
 
-	found := false
-	framework.Logf("Looking for sample tagged with namespace `%s`, PVC `%s`", pvcNamespace, pvcName)
-	for key, value := range kubeMetrics {
-		for _, sample := range value {
-			framework.Logf("Found sample %++v with key: %s", sample, key)
-			samplePVC, ok := sample.Metric["persistentvolumeclaim"]
-			if !ok {
-				break
-			}
-			sampleNS, ok := sample.Metric["namespace"]
-			if !ok {
-				break
-			}
-
-			if string(samplePVC) == pvcName && string(sampleNS) == pvcNamespace && strings.Contains(key, kubeletmetrics.VolumeStatsHealthStatusAbnormalKey) {
-				if (nodeAbnormalVolumeCondition && sample.Value.String() == "1") || (!nodeAbnormalVolumeCondition && sample.Value.String() == "0") {
-					found = true
-					break
-				}
+	tracked := sets.NewString(trackedCalls...)
+	forbidden := sets.NewString(forbiddenCalls...)
+	seenOK := sets.NewString()
+	for _, c := range allCalls {
+		if !tracked.Has(c.Method) {
+			continue
+		}
+		if forbidden.Has(c.Method) {
+			return true, fmt.Errorf("unexpected CSI call %s (%d)", c.Method, c.FullError.Code)
+		}
+		for _, expected := range expectedCalls {
+			if c.Method == expected.expectedMethod && c.FullError.Code == expected.expectedError {
+				seenOK.Insert(expected.expectedMethod)
 			}
 		}
 	}
-	return found
+	for _, expected := range expectedCalls {
+		if !seenOK.Has(expected.expectedMethod) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
-func createGetVolumeStatsHook(abnormalVolumeCondition bool) *drivers.Hooks {
-	return &drivers.Hooks{
-		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
-			if req, ok := request.(*csipbv1.NodeGetVolumeStatsRequest); ok {
-				if abnormalVolumeCondition {
-					req.VolumePath = "/tmp/csi/health/abnormal"
-				}
-			}
-			return nil, nil
-		},
+func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
+	var entry *v1.PodVolumeHealth
+	for i := range pod.Status.VolumeHealth {
+		vh := &pod.Status.VolumeHealth[i]
+		if vh.Name != "" {
+			entry = vh
+			break
+		}
+	}
+	if !abnormal {
+		// Healthy: either no VolumeHealth entry, or an entry with empty conditions.
+		return entry == nil || len(entry.HealthConditions) == 0
+	}
+	if entry == nil || len(entry.HealthConditions) == 0 {
+		return false
 	}
 
+	for _, c := range entry.HealthConditions {
+		if c.Status == v1.VolumeHealthInaccessible && c.Reason == "AbnormalVolumeHealth" {
+			return true
+		}
+	}
+	return false
+}
+
+func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, unhealthy bool) bool {
+	for _, health := range csiNode.Status.StorageHealth {
+		if health.Name != driverName {
+			continue
+		}
+		if !unhealthy {
+			return len(health.HealthConditions) == 0
+		}
+		for _, condition := range health.HealthConditions {
+			if condition.Status == storagev1.StorageUnreachable && condition.Reason == "BackendUnavailable" {
+				return true
+			}
+		}
+		return false
+	}
+	return !unhealthy
+}
+
+func createVolumeHealthHook(abnormalVolumeHealth bool) *drivers.Hooks {
+	return &drivers.Hooks{
+		Post: func(ctx context.Context, fullMethod string, request, reply interface{}, err error) (interface{}, error) {
+			if !strings.Contains(fullMethod, "NodeGetVolumeHealth") {
+				return reply, err
+			}
+			if resp, ok := reply.(*csipbv1.NodeGetVolumeHealthResponse); ok && abnormalVolumeHealth {
+				if resp.VolumeHealth == nil {
+					resp.VolumeHealth = &csipbv1.VolumeHealth{}
+				}
+				resp.VolumeHealth.HealthStatuses = []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{
+						Status:  csipbv1.VolumeHealthErrorType_INACCESSIBLE,
+						Reason:  "AbnormalVolumeHealth",
+						Message: "The target path of the volume doesn't exist",
+					},
+				}
+				return resp, nil
+			}
+			return reply, err
+		},
+	}
+}
+
+func createStorageHealthHook(unhealthy *atomic.Bool) *drivers.Hooks {
+	return &drivers.Hooks{
+		Post: func(ctx context.Context, fullMethod string, request, reply interface{}, err error) (interface{}, error) {
+			if !strings.Contains(fullMethod, "NodeGetStorageHealth") || !unhealthy.Load() {
+				return reply, err
+			}
+			resp, ok := reply.(*csipbv1.NodeGetStorageHealthResponse)
+			if !ok {
+				return reply, err
+			}
+			resp.BackendHealth = []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+				{
+					Status:  csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE,
+					Reason:  "BackendUnavailable",
+					Message: "The storage backend is unreachable",
+				},
+			}
+			return resp, err
+		},
+	}
 }

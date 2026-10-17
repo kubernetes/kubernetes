@@ -64,7 +64,7 @@ func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op 
 }
 
 // Validate validates an object using the registered validation function.
-func (s *Scheme) Validate(ctx context.Context, options []string, object any, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, options map[string]bool, object any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
@@ -75,7 +75,7 @@ func (s *Scheme) Validate(ctx context.Context, options []string, object any, sub
 }
 
 // ValidateUpdate validates an update to an object using the registered validation function.
-func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject any, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, options map[string]bool, object, oldObject any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
@@ -131,12 +131,12 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	for t := range s.s.validationFuncs {
 		var v any
 		// TODO: this should handle maps and slices
-		if t.Kind() == reflect.Ptr {
+		if t.Kind() == reflect.Pointer {
 			v = reflect.New(t.Elem()).Interface()
 		} else {
 			v = reflect.Indirect(reflect.New(t)).Interface()
 		}
-		if reflect.TypeOf(v).Kind() != reflect.Ptr {
+		if reflect.TypeOf(v).Kind() != reflect.Pointer {
 			v = &v
 		}
 		s.ValueFuzzed(v)
@@ -248,7 +248,7 @@ type ValidationTester struct {
 	value        any
 	oldValue     any
 	isUpdate     bool
-	options      []string
+	options      map[string]bool
 	subresources []string
 }
 
@@ -272,7 +272,7 @@ func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 }
 
 // Opts sets the ValidationOpts to use.
-func (v *ValidationTester) Opts(options []string) *ValidationTester {
+func (v *ValidationTester) Opts(options map[string]bool) *ValidationTester {
 	v.options = options
 	return v
 }
@@ -383,7 +383,7 @@ func (v *ValidationTester) validate() field.ErrorList {
 	}
 
 	rt := reflect.TypeOf(v.value)
-	for rt.Kind() == reflect.Ptr {
+	for rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
 	}
 	pkgName := strings.Split(rt.String(), ".")[0]

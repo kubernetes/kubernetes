@@ -27,20 +27,38 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/daemonset"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func mkDaemonSet(tolerations ...api.Toleration) *apps.DaemonSet {
-	return &apps.DaemonSet{
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.DaemonSet) {
+	return func(ds *apps.DaemonSet) {
+		pod := &api.Pod{
+			Spec: ds.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		ds.Spec.Template.Spec = pod.Spec
+	}
+}
+
+func mkDaemonSet(tweaks ...func(*apps.DaemonSet)) *apps.DaemonSet {
+	ds := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.DaemonSetSpec{
 			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"name": "abc"}},
 			UpdateStrategy: apps.DaemonSetUpdateStrategy{Type: apps.OnDeleteDaemonSetStrategyType},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"name": "abc"}},
-				Spec:       podtest.MakePodSpec(podtest.SetTolerations(tolerations...)),
+				Spec:       podtest.MakePodSpec(),
 			},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(ds)
+	}
+	return ds
 }
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -57,23 +75,63 @@ func TestDeclarativeValidate(t *testing.T) {
 				input: mkDaemonSet(),
 			},
 			"valid toleration key": {
-				input: mkDaemonSet(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}),
+				input: mkDaemonSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}))),
 			},
 			"valid toleration key without prefix": {
-				input: mkDaemonSet(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}),
+				input: mkDaemonSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}))),
 			},
 			"invalid toleration key format": {
-				input: mkDaemonSet(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}),
+				input: mkDaemonSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(0)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(2147483648)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 				},
 			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs,
-					apitesting.WithSkipGroupVersions("extensions/v1beta1"))
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
+		meta.RunObjectMetaTestCases(t, ctx, mkDaemonSet(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+		)
+		poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), mkDaemonSet(), func(baseObj *apps.DaemonSet, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Spec.Template.Spec.EvictionResponders = responders
+			baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: apiVersion,
+			Name:       "abc",
+			Verb:       "update",
+		})
+		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDaemonSet(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+		)
 	}
 }

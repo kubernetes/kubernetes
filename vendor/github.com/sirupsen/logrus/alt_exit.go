@@ -57,7 +57,7 @@ func Exit(code int) {
 //
 // This method is useful when a caller wishes to use logrus to log a fatal
 // message but also needs to gracefully shutdown. An example usecase could be
-// closing database connections, or sending a alert that the application is
+// closing database connections, or sending an alert that the application is
 // closing.
 func RegisterExitHandler(handler func()) {
 	handlers = append(handlers, handler)
@@ -69,7 +69,7 @@ func RegisterExitHandler(handler func()) {
 //
 // This method is useful when a caller wishes to use logrus to log a fatal
 // message but also needs to gracefully shutdown. An example usecase could be
-// closing database connections, or sending a alert that the application is
+// closing database connections, or sending an alert that the application is
 // closing.
 func DeferExitHandler(handler func()) {
 	handlers = append([]func(){handler}, handlers...)

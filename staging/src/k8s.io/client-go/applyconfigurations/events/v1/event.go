@@ -39,7 +39,7 @@ import (
 // treated as informative, best-effort, supplemental data.
 type EventApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// eventTime is the time when this Event was first observed. It is required.

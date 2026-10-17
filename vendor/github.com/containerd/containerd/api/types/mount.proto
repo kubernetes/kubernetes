@@ -63,3 +63,27 @@ message ActivationInfo {
 
   map<string, string> labels = 4;
 }
+
+// MountCapabilities describes mount handling that a component performs itself,
+// so that the mount manager does not perform it on the component's behalf.
+//
+// A shim advertises this as an extension of its BootstrapResult. A runtime
+// may be able to handle a mount more efficiently than the host can; a VM
+// based runtime, for example, may pass a disk image directly to the guest
+// instead of having a loop device set up for it on the host.
+//
+// Mount types and transforms are named with open ended strings, so
+// supporting a new one of either is not a change to this protocol.
+message MountCapabilities {
+  // Types are the mount types the sender performs itself, such as "erofs" or
+  // "loop". These are base mount types, with any transform prefixes removed.
+  repeated string types = 1;
+
+  // Transforms are the mount transforms the sender applies itself, such as
+  // "format", "mkfs" or "mkdir".
+  //
+  // A transform is named on its own, without the "/<mount-type>" suffix that
+  // appears in a mount type, so "format" covers the mount types "format/bind"
+  // and "format/mkdir/overlay" alike.
+  repeated string transforms = 2;
+}

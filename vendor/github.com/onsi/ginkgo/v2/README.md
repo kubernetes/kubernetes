@@ -1,6 +1,9 @@
-![Ginkgo](https://onsi.github.io/ginkgo/images/ginkgo.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ginkgo-dark.png">
+  <img alt="Ginkgo" src="docs/images/ginkgo.png">
+</picture>
 
-[![test](https://github.com/onsi/ginkgo/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/onsi/ginkgo/actions?query=workflow%3Atest+branch%3Amaster) | [Ginkgo Docs](https://onsi.github.io/ginkgo/)
+[![test](https://github.com/onsi/ginkgo/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/onsi/ginkgo/actions/workflows/test.yml?query=branch%3Amaster) [![Ginkgo Docs](docs/images/docs-badge.svg)](https://onsi.github.io/ginkgo/) [![Sponsor onsi](docs/images/sponsor-badge.svg)](https://github.com/sponsors/onsi)
 
 ---
 
@@ -105,6 +108,19 @@ Ginkgo ships with `ginkgo`, a [command line tool](https://onsi.github.io/ginkgo/
 And that's just Ginkgo!  [Gomega](https://onsi.github.io/gomega/) brings a rich, mature, family of [assertions and matchers](https://onsi.github.io/gomega/#provided-matchers) to your suites.  With Gomega you can easily mix [synchronous and asynchronous assertions](https://onsi.github.io/ginkgo/#patterns-for-asynchronous-testing) in your specs.  You can even build your own set of expressive domain-specific matchers quickly and easily by composing Gomega's [existing building blocks](https://onsi.github.io/ginkgo/#building-custom-matchers).
 
 Happy Testing!
+
+## Using Ginkgo with Claude Code
+
+Ginkgo ships a set of [Claude Code](https://claude.com/claude-code) skills as a plugin, with this repo doubling as the marketplace, so an agent writing specs in *your* project has Ginkgo's idioms, decorators, and gotchas on hand. From inside Claude Code:
+
+```
+/plugin marketplace add onsi/ginkgo
+/plugin install ginkgo@ginkgo
+```
+
+(or non-interactively: `claude plugin marketplace add onsi/ginkgo` then `claude plugin install ginkgo@ginkgo`)
+
+This installs a family of `ginkgo:*` skills that activate automatically while you write and run specs. Start with `ginkgo:overview`; see the [plugin README](plugins/ginkgo/README.md) for the full list.
 
 ## License
 

@@ -109,6 +109,7 @@ func TestValidateClaim(t *testing.T) {
 		claim                         *resource.ResourceClaim
 		wantFailures                  field.ErrorList
 		consumableCapacityFeatureGate bool
+		listTypeAttributesFeatureGate bool
 	}{
 		"good-claim": {
 			claim: testClaim(goodName, goodNS, validClaimSpec),
@@ -354,10 +355,10 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"invalid-distinct-constraint": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "a fully qualified name must be a domain and a name separated by a slash"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.FullyQualifiedName(""), "a fully qualified name must be a domain and a name separated by a slash"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.FullyQualifiedName(""), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`)},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -378,6 +379,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 			consumableCapacityFeatureGate: true,
 		},
+
 		"valid-request": {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -633,6 +635,405 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"derived-attributes-valid": {
+			claim: &resource.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      goodName,
+					Namespace: goodNS,
+				},
+				Spec: resource.ResourceClaimSpec{
+					Devices: resource.DeviceClaim{
+						Requests: []resource.DeviceRequest{
+							{
+								Name: goodName,
+								Exactly: &resource.ExactDeviceRequest{
+									DeviceClassName: goodName,
+									AllocationMode:  resource.DeviceAllocationModeExactCount,
+									Count:           1,
+									DerivedAttributes: []resource.DeviceDerivedAttribute{
+										{
+											Name:       "derived/sharedNumaNode",
+											Expression: `device.attributes["dra.example.com"]["numa"]`,
+										},
+									},
+								},
+							},
+						},
+						Constraints: []resource.DeviceConstraint{
+							{
+								Requests:       []string{goodName},
+								MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+							},
+						},
+					},
+				},
+			},
+		},
+		"derived-attributes-valid-dotted-domain": {
+			claim: &resource.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      goodName,
+					Namespace: goodNS,
+				},
+				Spec: resource.ResourceClaimSpec{
+					Devices: resource.DeviceClaim{
+						Requests: []resource.DeviceRequest{
+							{
+								Name: goodName,
+								Exactly: &resource.ExactDeviceRequest{
+									DeviceClassName: goodName,
+									AllocationMode:  resource.DeviceAllocationModeExactCount,
+									Count:           1,
+									DerivedAttributes: []resource.DeviceDerivedAttribute{
+										{
+											Name:       "dra.example.com/sharedNumaNode",
+											Expression: `device.attributes["dra.example.com"]["numa"]`,
+										},
+									},
+								},
+							},
+						},
+						Constraints: []resource.DeviceConstraint{
+							{
+								Requests:       []string{goodName},
+								MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/sharedNumaNode")),
+							},
+						},
+					},
+				},
+			},
+		},
+		"derived-attributes-valid-global-constraint": {
+			claim: &resource.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      goodName,
+					Namespace: goodNS,
+				},
+				Spec: resource.ResourceClaimSpec{
+					Devices: resource.DeviceClaim{
+						Requests: []resource.DeviceRequest{
+							{
+								Name: goodName,
+								Exactly: &resource.ExactDeviceRequest{
+									DeviceClassName: goodName,
+									AllocationMode:  resource.DeviceAllocationModeExactCount,
+									Count:           1,
+									DerivedAttributes: []resource.DeviceDerivedAttribute{
+										{
+											Name:       "derived/sharedNumaNode",
+											Expression: `device.attributes["dra.example.com"]["numa"]`,
+										},
+									},
+								},
+							},
+						},
+						Constraints: []resource.DeviceConstraint{
+							{
+								// Empty requests means globally applied constraint
+								MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+							},
+						},
+					},
+				},
+			},
+		},
+		"derived-attributes-valid-parent-constraint": {
+			claim: &resource.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      goodName,
+					Namespace: goodNS,
+				},
+				Spec: resource.ResourceClaimSpec{
+					Devices: resource.DeviceClaim{
+						Requests: []resource.DeviceRequest{
+							{
+								Name: goodName,
+								FirstAvailable: []resource.DeviceSubRequest{
+									{
+										Name:            "subreq",
+										DeviceClassName: goodName,
+										AllocationMode:  resource.DeviceAllocationModeExactCount,
+										Count:           1,
+										DerivedAttributes: []resource.DeviceDerivedAttribute{
+											{
+												Name:       "derived/sharedNumaNode",
+												Expression: `device.attributes["dra.example.com"]["numa"]`,
+											},
+										},
+									},
+								},
+							},
+						},
+						Constraints: []resource.DeviceConstraint{
+							{
+								Requests:       []string{goodName}, // Parent constraint applies to all subrequests
+								MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+							},
+						},
+					},
+				},
+			},
+		},
+		"derived-attributes-unreferenced": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), resource.FullyQualifiedName("derived/sharedNumaNode"), "must be referenced by at least one matchAttribute or distinctAttribute constraint targeting this request"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       resource.FullyQualifiedName("derived/sharedNumaNode"), // Unreferenced attribute
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-unreferenced-wrong-request-constraint": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), resource.FullyQualifiedName("derived/sharedNumaNode"), "must be referenced by at least one matchAttribute or distinctAttribute constraint targeting this request"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, resource.DeviceRequest{
+					Name: goodName2,
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: goodName,
+						AllocationMode:  resource.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				})
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       resource.FullyQualifiedName("derived/sharedNumaNode"),
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName2}, // Targets goodName2, NOT goodName
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-duplicate-name": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(1), "derived/sharedNumaNode"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "derived/sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+					{
+						Name:       "derived/sharedNumaNode", // Duplicate name
+						Expression: `device.attributes["dra.example.com"]["socket"]`,
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-CEL-compile-errors": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "derived/sharedNumaNode",
+						Expression: `device.attributes[true].someBoolean`, // Invalid map lookup key type (boolean instead of string)
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-CEL-invalid-type": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes`, "must evaluate to a primitive scalar (string, integer, boolean, semver), not map(string, map(string, google.protobuf.Any))"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "derived/sharedNumaNode",
+						Expression: `device.attributes`, // Invalid return type (map instead of primitive scalar or list)
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-CEL-length": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				expression := `device.driver == ""`
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "derived/sharedNumaNode",
+						// Expression length exceeds maximum allowed characters (1023)
+						Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resource.CELSelectorExpressionMaxLength-len(expression)+1)+`"`),
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+		},
+
+		// derived-attributes-CEL-cost-under-limit verifies that an expression
+		// with a cost of ~500k-600k is valid because it falls under the 1,000,000 budget limit.
+		"derived-attributes-CEL-cost-under-limit": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "derived/sharedNumaNode1",
+						// This expression uses 5 levels of nested .all() loops over arrays of 10 elements.
+						// Each nesting level multiplies the cost estimate by 10, resulting in a single expression
+						// complexity of ~500k-600k. This is well within the 1,000,000 budget limit.
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, int('1'.find('[0-9]*')) < 100)))))`,
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode1")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-CEL-cost-per-expression-exceeds-limit": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "too complex, exceeds cost limit"),
+				field.Forbidden(field.NewPath("spec", "devices"), "too complex, total cost of derived attribute CEL expressions in the claim exceeds cost limit"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "derived/sharedNumaNode1",
+						// This expression uses 7 levels of nested .all() loops, making it exceed the 1,000,000 per-expression budget limit.
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))`,
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode1")),
+					},
+				}
+				return claim
+			}(),
+		},
+		// derived-attributes-CEL-cost-exceeds-limit verifies that the cost limit for derived
+		// attribute CEL expressions is a shared budget across the entire DeviceClaim.
+		// Two derived attributes are defined, each with an expression whose individual
+		// cost is below the limit, but their combined cost exceeds it.
+		"derived-attributes-CEL-cost-exceeds-limit": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices"), "too complex, total cost of derived attribute CEL expressions in the claim exceeds cost limit"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "derived/sharedNumaNode1",
+						// This expression uses 5 levels of nested .all() loops over arrays of 10 elements.
+						// Each nesting level multiplies the cost estimate by 10, resulting in a single expression
+						// complexity of ~500k-600k. This is well within the 1,000,000 budget limit.
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, int('1'.find('[0-9]*')) < 100)))))`,
+					},
+					{
+						Name: "derived/sharedNumaNode2",
+						// The exact same expression as above. By itself, it is valid, but combined with the previous
+						// expression, the total sum of derived attribute costs across the claim exceeds the 1,000,000 limit.
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, int('1'.find('[0-9]*')) < 100)))))`,
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode1")),
+					},
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode2")),
+					},
+				}
+				return claim
+			}(),
+		},
+		"derived-attributes-list-type-disabled": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `[1, 2, 3]`, "must evaluate to a primitive scalar (string, integer, boolean, semver), not list(int)"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "derived/sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (rejected if DRAListTypeAttributes feature gate is disabled)
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+			listTypeAttributesFeatureGate: false,
+		},
+		"derived-attributes-list-type-enabled": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "derived/sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (allowed if DRAListTypeAttributes feature gate is enabled)
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{goodName},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				}
+				return claim
+			}(),
+			listTypeAttributesFeatureGate: true,
+		},
 		"prioritized-list-valid": {
 			wantFailures: nil,
 			claim: func() *resource.ResourceClaim {
@@ -878,7 +1279,10 @@ func TestValidateClaim(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: scenario.consumableCapacityFeatureGate,
+				features.DRAListTypeAttributes: scenario.listTypeAttributesFeatureGate,
+			})
 			errs := ValidateResourceClaim(scenario.claim)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

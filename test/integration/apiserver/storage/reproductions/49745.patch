@@ -1,0 +1,20 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+index d2f388d1fb4..9c1a8be41a2 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+@@ -502,12 +502,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
+ 	const initProcessThreshold = 500 * time.Millisecond
+ 	startTime := time.Now()
+ 
+-	// cacheInterval may be created from a version being more fresh than requested
+-	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
+-	// with lower resourceVersion from being delivered to ensure watch contract.
+-	if cacheInterval.resourceVersion > resourceVersion {
+-		resourceVersion = cacheInterval.resourceVersion
+-	}
++	// BUG REVERT (#49745 class): pre-fix the watch RV floor was not raised to the
++	// snapshot RV, so a cacheInterval built from a fresher version could deliver
++	// events below the requested resourceVersion.
+ 
+ 	initEventCount, err := c.streamInterval(cacheInterval, &resourceVersion)
+ 	if err != nil {

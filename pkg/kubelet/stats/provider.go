@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	cadvisormemory "github.com/google/cadvisor/cache/memory"
+	cadvisormemory "github.com/google/cadvisor/lib/cache/memory"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,10 +54,11 @@ func NewCRIStatsProvider(
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
+	podSandboxStatsUnimplemented bool,
 	fallbackStatsProvider containerStatsProvider,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, fallbackStatsProvider))
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, podSandboxStatsUnimplemented, fallbackStatsProvider))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both

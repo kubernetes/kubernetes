@@ -34,13 +34,11 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -396,17 +394,11 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 
-		// If ratcheting is enabled, allow rule with oldSelf to evaluate
-		// when `optionalOldSelf` is set to true
+		// Rules with oldSelf are allowed to evaluate when `optionalOldSelf` is set to true
 		optionalOldSelfRule := ptr.Deref(rule.OptionalOldSelf, false)
 		if compiled.UsesOldSelf && oldObj == nil {
-			// transition rules are evaluated only if there is a comparable existing value
-			// But if the rule uses optional oldSelf and gate is enabled we allow
-			// the rule to be evaluated
-			if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
-				continue
-			}
-
+			// transition rules are evaluated only if there is a comparable existing
+			// value, unless the rule uses optional oldSelf
 			if !optionalOldSelfRule {
 				continue
 			}

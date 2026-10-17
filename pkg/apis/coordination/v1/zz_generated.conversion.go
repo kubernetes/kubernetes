@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	coordination "k8s.io/kubernetes/pkg/apis/coordination"
@@ -120,13 +119,7 @@ func Convert_coordination_LeaseList_To_v1_LeaseList(in *coordination.LeaseList, 
 }
 
 func autoConvert_v1_LeaseSpec_To_coordination_LeaseSpec(in *coordinationv1.LeaseSpec, out *coordination.LeaseSpec, s conversion.Scope) error {
-	out.HolderIdentity = (*string)(unsafe.Pointer(in.HolderIdentity))
-	out.LeaseDurationSeconds = (*int32)(unsafe.Pointer(in.LeaseDurationSeconds))
-	out.AcquireTime = (*metav1.MicroTime)(unsafe.Pointer(in.AcquireTime))
-	out.RenewTime = (*metav1.MicroTime)(unsafe.Pointer(in.RenewTime))
-	out.LeaseTransitions = (*int32)(unsafe.Pointer(in.LeaseTransitions))
-	out.Strategy = (*coordination.CoordinatedLeaseStrategy)(unsafe.Pointer(in.Strategy))
-	out.PreferredHolder = (*string)(unsafe.Pointer(in.PreferredHolder))
+	*out = *(*coordination.LeaseSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -136,13 +129,7 @@ func Convert_v1_LeaseSpec_To_coordination_LeaseSpec(in *coordinationv1.LeaseSpec
 }
 
 func autoConvert_coordination_LeaseSpec_To_v1_LeaseSpec(in *coordination.LeaseSpec, out *coordinationv1.LeaseSpec, s conversion.Scope) error {
-	out.HolderIdentity = (*string)(unsafe.Pointer(in.HolderIdentity))
-	out.LeaseDurationSeconds = (*int32)(unsafe.Pointer(in.LeaseDurationSeconds))
-	out.AcquireTime = (*metav1.MicroTime)(unsafe.Pointer(in.AcquireTime))
-	out.RenewTime = (*metav1.MicroTime)(unsafe.Pointer(in.RenewTime))
-	out.LeaseTransitions = (*int32)(unsafe.Pointer(in.LeaseTransitions))
-	out.Strategy = (*coordinationv1.CoordinatedLeaseStrategy)(unsafe.Pointer(in.Strategy))
-	out.PreferredHolder = (*string)(unsafe.Pointer(in.PreferredHolder))
+	*out = *(*coordinationv1.LeaseSpec)(unsafe.Pointer(in))
 	return nil
 }
 

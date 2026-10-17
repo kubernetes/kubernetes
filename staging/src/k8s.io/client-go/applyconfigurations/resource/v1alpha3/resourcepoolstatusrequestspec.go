@@ -23,16 +23,16 @@ package v1alpha3
 //
 // ResourcePoolStatusRequestSpec defines the filters for the pool status request.
 type ResourcePoolStatusRequestSpecApplyConfiguration struct {
-	// Driver specifies the DRA driver name to filter pools.
+	// driver specifies the DRA driver name to filter pools.
 	// Only pools from ResourceSlices with this driver will be included.
 	// Must be a DNS subdomain (e.g., "gpu.example.com").
 	Driver *string `json:"driver,omitempty"`
-	// PoolName optionally filters to a specific pool name.
+	// poolName optionally filters to a specific pool name.
 	// If not specified, all pools from the specified driver are included.
 	// When specified, must be a non-empty valid resource pool name
 	// (DNS subdomains separated by "/").
 	PoolName *string `json:"poolName,omitempty"`
-	// Limit optionally specifies the maximum number of pools to return in the status.
+	// limit optionally specifies the maximum number of pools to return in the status.
 	// If more pools match the filter criteria, the response will be truncated
 	// (i.e., len(status.pools) < status.poolCount).
 	//
@@ -40,6 +40,19 @@ type ResourcePoolStatusRequestSpecApplyConfiguration struct {
 	// Minimum: 1
 	// Maximum: 1000
 	Limit *int32 `json:"limit,omitempty"`
+	// defaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for partitionable devices whose slice has not declared
+	// one themselves.
+	//
+	// A slice's own PartitionTypeAttribute always takes precedence. This default
+	// applies only to devices whose slice does not declare one, so that a request
+	// can still get an accurate partitionSummary from a driver that has not
+	// been updated to declare it. When neither the slice nor this default names
+	// an attribute, a partitionable pool reports no partitionSummary.
+	//
+	// Must include the domain qualifier.
+	DefaultPartitionTypeAttribute *string `json:"defaultPartitionTypeAttribute,omitempty"`
 }
 
 // ResourcePoolStatusRequestSpecApplyConfiguration constructs a declarative configuration of the ResourcePoolStatusRequestSpec type for use with
@@ -69,5 +82,13 @@ func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithPoolName(value str
 // If called multiple times, the Limit field is set to the value of the last call.
 func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithLimit(value int32) *ResourcePoolStatusRequestSpecApplyConfiguration {
 	b.Limit = &value
+	return b
+}
+
+// WithDefaultPartitionTypeAttribute sets the DefaultPartitionTypeAttribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultPartitionTypeAttribute field is set to the value of the last call.
+func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithDefaultPartitionTypeAttribute(value string) *ResourcePoolStatusRequestSpecApplyConfiguration {
+	b.DefaultPartitionTypeAttribute = &value
 	return b
 }

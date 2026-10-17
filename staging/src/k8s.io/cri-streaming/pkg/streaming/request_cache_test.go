@@ -21,16 +21,15 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestInsert(t *testing.T) {
-	c, _ := newTestCache()
+	c := newRequestCache()
 
 	// Insert normal
 	oldestTok, err := c.Insert(nextRequest())
@@ -80,131 +79,128 @@ func TestInsert(t *testing.T) {
 }
 
 func TestConsume(t *testing.T) {
-	c, clock := newTestCache()
+	synctest.Test(t, func(t *testing.T) {
+		c := newRequestCache()
 
-	{ // Insert & consume.
-		req := nextRequest()
-		tok, err := c.Insert(req)
-		require.NoError(t, err)
-		assertCacheSize(t, c, 1)
+		{ // Insert & consume.
+			req := nextRequest()
+			tok, err := c.Insert(req)
+			require.NoError(t, err)
+			assertCacheSize(t, c, 1)
 
-		cachedReq, ok := c.Consume(tok)
-		assert.True(t, ok)
-		assert.Equal(t, req, cachedReq)
-		assertCacheSize(t, c, 0)
-	}
+			cachedReq, ok := c.Consume(tok)
+			assert.True(t, ok)
+			assert.Equal(t, req, cachedReq)
+			assertCacheSize(t, c, 0)
+		}
 
-	{ // Insert & consume out of order
-		req1 := nextRequest()
-		tok1, err := c.Insert(req1)
-		require.NoError(t, err)
-		assertCacheSize(t, c, 1)
+		{ // Insert & consume out of order
+			req1 := nextRequest()
+			tok1, err := c.Insert(req1)
+			require.NoError(t, err)
+			assertCacheSize(t, c, 1)
 
-		req2 := nextRequest()
-		tok2, err := c.Insert(req2)
-		require.NoError(t, err)
-		assertCacheSize(t, c, 2)
+			req2 := nextRequest()
+			tok2, err := c.Insert(req2)
+			require.NoError(t, err)
+			assertCacheSize(t, c, 2)
 
-		cachedReq2, ok := c.Consume(tok2)
-		assert.True(t, ok)
-		assert.Equal(t, req2, cachedReq2)
-		assertCacheSize(t, c, 1)
+			cachedReq2, ok := c.Consume(tok2)
+			assert.True(t, ok)
+			assert.Equal(t, req2, cachedReq2)
+			assertCacheSize(t, c, 1)
 
-		cachedReq1, ok := c.Consume(tok1)
-		assert.True(t, ok)
-		assert.Equal(t, req1, cachedReq1)
-		assertCacheSize(t, c, 0)
-	}
+			cachedReq1, ok := c.Consume(tok1)
+			assert.True(t, ok)
+			assert.Equal(t, req1, cachedReq1)
+			assertCacheSize(t, c, 0)
+		}
 
-	{ // Consume a second time
-		req := nextRequest()
-		tok, err := c.Insert(req)
-		require.NoError(t, err)
-		assertCacheSize(t, c, 1)
+		{ // Consume a second time
+			req := nextRequest()
+			tok, err := c.Insert(req)
+			require.NoError(t, err)
+			assertCacheSize(t, c, 1)
 
-		cachedReq, ok := c.Consume(tok)
-		assert.True(t, ok)
-		assert.Equal(t, req, cachedReq)
-		assertCacheSize(t, c, 0)
+			cachedReq, ok := c.Consume(tok)
+			assert.True(t, ok)
+			assert.Equal(t, req, cachedReq)
+			assertCacheSize(t, c, 0)
 
-		_, ok = c.Consume(tok)
-		assert.False(t, ok)
-		assertCacheSize(t, c, 0)
-	}
+			_, ok = c.Consume(tok)
+			assert.False(t, ok)
+			assertCacheSize(t, c, 0)
+		}
 
-	{ // Consume without insert
-		_, ok := c.Consume("fooBAR")
-		assert.False(t, ok)
-		assertCacheSize(t, c, 0)
-	}
+		{ // Consume without insert
+			_, ok := c.Consume("fooBAR")
+			assert.False(t, ok)
+			assertCacheSize(t, c, 0)
+		}
 
-	{ // Consume expired
-		tok, err := c.Insert(nextRequest())
-		require.NoError(t, err)
-		assertCacheSize(t, c, 1)
+		{ // Consume expired
+			tok, err := c.Insert(nextRequest())
+			require.NoError(t, err)
+			assertCacheSize(t, c, 1)
 
-		clock.Step(2 * cacheTTL)
+			time.Sleep(2 * cacheTTL)
 
-		_, ok := c.Consume(tok)
-		assert.False(t, ok)
-		assertCacheSize(t, c, 0)
-	}
+			_, ok := c.Consume(tok)
+			assert.False(t, ok)
+			assertCacheSize(t, c, 0)
+		}
+	})
 }
 
 func TestGC(t *testing.T) {
-	c, clock := newTestCache()
+	synctest.Test(t, func(t *testing.T) {
+		c := newRequestCache()
 
-	// When empty
-	c.gc()
-	assertCacheSize(t, c, 0)
+		// When empty
+		c.gc()
+		assertCacheSize(t, c, 0)
 
-	tok1, err := c.Insert(nextRequest())
-	require.NoError(t, err)
-	assertCacheSize(t, c, 1)
-	clock.Step(10 * time.Second)
-	tok2, err := c.Insert(nextRequest())
-	require.NoError(t, err)
-	assertCacheSize(t, c, 2)
-
-	// expired: tok1, tok2
-	// non-expired: tok3, tok4
-	clock.Step(2 * cacheTTL)
-	tok3, err := c.Insert(nextRequest())
-	require.NoError(t, err)
-	assertCacheSize(t, c, 1)
-	clock.Step(10 * time.Second)
-	tok4, err := c.Insert(nextRequest())
-	require.NoError(t, err)
-	assertCacheSize(t, c, 2)
-
-	_, ok := c.Consume(tok1)
-	assert.False(t, ok)
-	_, ok = c.Consume(tok2)
-	assert.False(t, ok)
-	_, ok = c.Consume(tok3)
-	assert.True(t, ok)
-	_, ok = c.Consume(tok4)
-	assert.True(t, ok)
-
-	// When full, nothing is expired.
-	for i := 0; i < maxInFlight; i++ {
-		_, err := c.Insert(nextRequest())
+		tok1, err := c.Insert(nextRequest())
 		require.NoError(t, err)
-	}
-	assertCacheSize(t, c, maxInFlight)
+		assertCacheSize(t, c, 1)
+		time.Sleep(10 * time.Second)
+		tok2, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+		assertCacheSize(t, c, 2)
 
-	// When everything is expired
-	clock.Step(2 * cacheTTL)
-	_, err = c.Insert(nextRequest())
-	require.NoError(t, err)
-	assertCacheSize(t, c, 1)
-}
+		// expired: tok1, tok2
+		// non-expired: tok3, tok4
+		time.Sleep(2 * cacheTTL)
+		tok3, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+		time.Sleep(10 * time.Second)
+		tok4, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+		assertCacheSize(t, c, 2)
 
-func newTestCache() (*requestCache, *testingclock.FakeClock) {
-	c := newRequestCache()
-	fakeClock := testingclock.NewFakeClock(time.Now())
-	c.clock = fakeClock
-	return c, fakeClock
+		_, ok := c.Consume(tok1)
+		assert.False(t, ok)
+		_, ok = c.Consume(tok2)
+		assert.False(t, ok)
+		_, ok = c.Consume(tok3)
+		assert.True(t, ok)
+		_, ok = c.Consume(tok4)
+		assert.True(t, ok)
+
+		// When full, nothing is expired.
+		for range maxInFlight {
+			_, err := c.Insert(nextRequest())
+			require.NoError(t, err)
+		}
+		assertCacheSize(t, c, maxInFlight)
+
+		// When everything is expired
+		time.Sleep(2 * cacheTTL)
+		_, err = c.Insert(nextRequest())
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+	})
 }
 
 func assertCacheSize(t *testing.T, cache *requestCache, expectedSize int) {

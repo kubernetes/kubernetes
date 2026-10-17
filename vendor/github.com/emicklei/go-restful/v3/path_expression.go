@@ -9,7 +9,13 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 )
+
+// regexpCache caches compiled *regexp.Regexp instances keyed by regular expression string.
+// WebService and Route path templates are registered at startup; callers must not mutate
+// the shared *regexp.Regexp (for example, by calling Matcher.Longest()).
+var regexpCache sync.Map
 
 // PathExpression holds a compiled path expression (RegExp) needed to match against
 // Http request paths and to extract path parameter values.
@@ -26,9 +32,16 @@ type pathExpression struct {
 // Returns an error if the path is invalid.
 func newPathExpression(path string) (*pathExpression, error) {
 	expression, literalCount, varNames, varCount, tokens := templateToRegularExpression(path)
-	compiled, err := regexp.Compile(expression)
-	if err != nil {
-		return nil, err
+	var compiled *regexp.Regexp
+	if cached, ok := regexpCache.Load(expression); ok {
+		compiled = cached.(*regexp.Regexp)
+	} else {
+		var err error
+		compiled, err = regexp.Compile(expression)
+		if err != nil {
+			return nil, err
+		}
+		regexpCache.Store(expression, compiled)
 	}
 	return &pathExpression{literalCount, varNames, varCount, compiled, expression, tokens}, nil
 }

@@ -1,0 +1,16 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..3092a117bc4 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -755,6 +755,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
+ 	if err != nil {
+ 		return err
+ 	}
++	// BUG REVERT (#125584): strip trailing slash on recursive list prefix so a list
++	// on "/pods/ns" also returns sibling prefixes such as "/pods/ns-other/...".
++	if opts.Recursive && len(preparedKey) > len(c.resourcePrefix)+1 {
++		preparedKey = strings.TrimSuffix(preparedKey, "/")
++	}
+ 	_, err = c.versioner.ParseResourceVersion(opts.ResourceVersion)
+ 	if err != nil {
+ 		return err

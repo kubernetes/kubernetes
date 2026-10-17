@@ -46,7 +46,8 @@
   "spec": {
     "driver": "driverValue",
     "poolName": "poolNameValue",
-    "limit": 3
+    "limit": 3,
+    "defaultPartitionTypeAttribute": "defaultPartitionTypeAttributeValue"
   },
   "status": {
     "poolCount": 6,
@@ -61,7 +62,27 @@
         "availableDevices": 6,
         "unavailableDevices": 7,
         "nodeName": "nodeNameValue",
-        "validationError": "validationErrorValue"
+        "validationError": "validationErrorValue",
+        "partitionSummary": [
+          {
+            "attribute": "attributeValue",
+            "type": "typeValue",
+            "total": 2,
+            "allocatable": 3
+          }
+        ],
+        "shareableSummary": {
+          "fullyAvailableDevices": 1,
+          "partiallyAvailableDevices": 2,
+          "capacity": [
+            {
+              "name": "nameValue",
+              "total": "0",
+              "consumed": "0",
+              "available": "0"
+            }
+          ]
+        }
       }
     ],
     "conditions": [

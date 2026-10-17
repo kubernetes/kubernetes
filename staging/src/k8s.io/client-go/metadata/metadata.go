@@ -159,6 +159,32 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	return result.Error()
 }
 
+// DeleteWithResult removes the provided resource from the server.
+func (c *client) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) (metav1.APIResult, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	// if DeleteOptions are delivered to Negotiator for serialization,
+	// HTTP-Request header will bring "Content-Type: application/vnd.kubernetes.protobuf"
+	// apiextensions-apiserver uses unstructuredNegotiatedSerializer to decode the input,
+	// server-side will reply with 406 errors.
+	// The special treatment here is to be compatible with CRD Handler
+	// see: https://github.com/kubernetes/kubernetes/blob/1a845ccd076bbf1b03420fe694c85a5cd3bd6bed/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/customresource_handler.go#L843
+	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
+	if err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.
+		Delete().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
+		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
+		Body(deleteOptionsByte).
+		Do(ctx)
+	return metadataResult{rest.APIResultAdapter{Result: result}}, result.Error()
+}
+
 // DeleteCollection triggers deletion of all resources in the specified scope (namespace or cluster).
 func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	// See comment on Delete
@@ -328,4 +354,28 @@ func (c *client) makeURLSegments(name string) []string {
 
 func isLikelyObjectMetadata(meta *metav1.PartialObjectMetadata) bool {
 	return len(meta.UID) > 0 || !meta.CreationTimestamp.IsZero() || len(meta.Name) > 0 || len(meta.GenerateName) > 0
+}
+
+type metadataResult struct {
+	rest.APIResultAdapter
+}
+
+func (r metadataResult) Get() (runtime.Object, error) {
+	obj, err := r.Result.Get()
+	if runtime.IsNotRegisteredError(err) {
+		rawBytes, err := r.Result.Raw()
+		if err != nil {
+			return nil, err
+		}
+		var partial metav1.PartialObjectMetadata
+		if err := json.Unmarshal(rawBytes, &partial); err != nil {
+			return nil, fmt.Errorf("unable to decode returned object as PartialObjectMetadata: %w", err)
+		}
+		if !isLikelyObjectMetadata(&partial) {
+			return nil, fmt.Errorf("object does not appear to match the ObjectMeta schema: %#v", partial)
+		}
+		partial.TypeMeta = metav1.TypeMeta{}
+		return &partial, nil
+	}
+	return obj, err
 }

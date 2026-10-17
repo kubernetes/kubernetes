@@ -48,7 +48,9 @@ type activeQueuer interface {
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// Note: it does not signal the pop() method to wake up,
 	// so the caller is responsible for calling broadcast() after executing this method.
-	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string)
+	// 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
+	// queue or newly added to correctly maintain incoming entities metrics.
+	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy)
 	// get returns the entity matching entity inside the activeQ.
 	get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool)
 
@@ -266,18 +268,17 @@ func (aq *activeQueue) delete(entityLookup framework.QueuedEntityInfo) framework
 func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity framework.QueuedEntityInfo) error {
 	entity.IncAttempts()
 	var podsToDiscard []*framework.QueuedPodInfo
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
 		// https://github.com/kubernetes/kubernetes/pull/127016
 		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
 			podsToDiscard = append(podsToDiscard, pInfo)
-			return true
+			continue
 		}
 
 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
-		return true
-	})
+	}
 	if len(podsToDiscard) > 0 {
 		switch specificEntity := entity.(type) {
 		case *framework.QueuedPodInfo:
@@ -288,7 +289,7 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 				_ = specificEntity.RemovePod(pInfo.Pod)
 				logger.Error(nil, "Discarding the popped pod group member. It's tracked in multiple places in the scheduler", "pod", klog.KObj(pInfo), "podGroup", klog.KObj(specificEntity))
 			}
-			if len(specificEntity.QueuedPodInfos) == 0 {
+			if !specificEntity.HasQueuedPodInfos() {
 				return fmt.Errorf("all pods from the pod group are tracked in multiple places in the scheduler: %s", klog.KObj(specificEntity))
 			}
 		default:
@@ -298,12 +299,11 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 	aq.schedCycle++
 
 	// Update metrics for unschedulable plugins.
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
-		return true
-	})
+	}
 	return nil
 }
 
@@ -344,7 +344,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (framework.QueuedEntityIn
 		if err != nil {
 			return nil, err
 		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Add(float64(entity.Size()))
+		recordIncomingEntitiesMetrics("active", entity, framework.PopFromBackoffQ, nil)
 	}
 	err = aq.unlockedMoveEntityToInFlight(logger, entity)
 	if err != nil {
@@ -379,16 +379,17 @@ func (aq *activeQueue) list() []*v1.Pod {
 	defer aq.lock.RUnlock()
 	var result []*v1.Pod
 	for _, entity := range aq.queue.List() {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
-			return true
-		})
+		}
 	}
 	return result
 }
 
 // len returns length of the queue.
 func (aq *activeQueue) len() int {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
 	return aq.queue.Len()
 }
 
@@ -403,12 +404,12 @@ func (aq *activeQueue) has(entityLookup framework.QueuedEntityInfo) bool {
 // The event should show which event triggered this addition and is used for the metric recording.
 // Note: it does not signal the pop() method to wake up,
 // so the caller is responsible for calling broadcast() after executing this method.
-func (aq *activeQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string) {
+func (aq *activeQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
 	aq.queue.AddOrUpdate(entity)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Add(float64(entity.Size()))
+	recordIncomingEntitiesMetrics("active", entity, event, strategy)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", activeQ)
 }
 

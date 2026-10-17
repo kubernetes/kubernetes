@@ -24,8 +24,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
@@ -62,7 +65,11 @@ type peerAggregatedDiscoveryHandler struct {
 func NewPeerAggregatedDiscoveryHandler(serverID string, localDiscoveryProvider ResourceManager, peerDiscoveryProvider PeerDiscoveryProvider, path string) PeerAggregatedResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	codecs := serializer.NewCodecFactory(scheme)
+	var opts []serializer.CodecFactoryOptionsMutator
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+	codecs := serializer.NewCodecFactory(scheme, opts...)
 
 	registerPeerMetrics()
 

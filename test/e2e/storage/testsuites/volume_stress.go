@@ -20,6 +20,7 @@ package testsuites
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/onsi/ginkgo/v2"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -80,10 +80,10 @@ func (t *volumeStressTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return t.tsInfo
 }
 
-func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	dInfo := driver.GetDriverInfo()
 	if dInfo.StressTestOptions == nil {
-		e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %s doesn't specify stress test options", dInfo.Name)
 	}
 	if dInfo.StressTestOptions.NumPods <= 0 {
 		framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
@@ -93,11 +93,12 @@ func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 	}
 
 	if _, ok := driver.(storageframework.DynamicPVTestDriver); !ok {
-		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %s doesn't implement DynamicPVTestDriver", dInfo.Name)
 	}
 	if !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support block volume mode", dInfo.Name)
 	}
+	return ""
 }
 
 func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

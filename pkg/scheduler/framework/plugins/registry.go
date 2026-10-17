@@ -20,6 +20,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/deferredpodscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
@@ -58,6 +59,7 @@ func NewInTreeRegistry() runtime.Registry {
 		nodeaffinity.Name:                    runtime.FactoryAdapter(fts, nodeaffinity.New),
 		nodedeclaredfeatures.Name:            runtime.FactoryAdapter(fts, nodedeclaredfeatures.New),
 		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
+		deferredpodscheduling.Name:           runtime.FactoryAdapter(fts, deferredpodscheduling.New),
 		nodeunschedulable.Name:               runtime.FactoryAdapter(fts, nodeunschedulable.New),
 		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
 		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),

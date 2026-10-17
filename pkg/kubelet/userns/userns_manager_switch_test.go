@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMakeUserNsManagerSwitch(t *testing.T) {

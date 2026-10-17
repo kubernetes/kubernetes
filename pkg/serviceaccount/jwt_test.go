@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	admissionregistrationv1listers "k8s.io/client-go/listers/admissionregistration/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
@@ -380,6 +381,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			v1listers.NewNodeLister(newIndexer(func(_, name string) (interface{}, error) {
 				return tc.Client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			})),
+			admissionregistrationv1listers.NewValidatingWebhookConfigurationLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), name, metav1.GetOptions{})
+			})),
+			admissionregistrationv1listers.NewMutatingWebhookConfigurationLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), name, metav1.GetOptions{})
+			})),
 		)
 		var secretsWriter typedv1core.SecretsGetter
 		if tc.Client != nil {
@@ -465,7 +472,7 @@ func (k *keyIDPrefixer) GetPublicKeys(ctx context.Context, keyIDHint string) []s
 }
 
 func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
-	jws, err := jose.ParseSigned(jwsString)
+	jws, err := jose.ParseSigned(jwsString, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		t.Fatalf("Error checking for key ID: couldn't parse token: %v", err)
 	}
@@ -524,7 +531,7 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 
 	ecdsaToken := generateECDSAToken(t, "panda", serviceAccount, ecdsaSecret)
 
-	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken)
+	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		t.Fatal(err)
 	}

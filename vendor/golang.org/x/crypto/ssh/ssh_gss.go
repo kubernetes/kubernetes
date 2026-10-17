@@ -118,24 +118,28 @@ func parseGSSAPIPayload(payload []byte) (*userAuthRequestGSSAPI, error) {
 		OIDS: make([]asn1.ObjectIdentifier, n),
 	}
 	for i := 0; i < int(n); i++ {
-		var (
-			desiredMech []byte
-			err         error
-		)
+		var desiredMech []byte
 		desiredMech, rest, ok = parseString(rest)
 		if !ok {
 			return nil, errors.New("parse string failed")
 		}
-		if rest, err = asn1.Unmarshal(desiredMech, &s.OIDS[i]); err != nil {
+		trailing, err := asn1.Unmarshal(desiredMech, &s.OIDS[i])
+		if err != nil {
 			return nil, err
 		}
+		if len(trailing) != 0 {
+			return nil, errors.New("trailing bytes after OID")
+		}
+	}
+	if len(rest) != 0 {
+		return nil, errors.New("trailing bytes after mechanisms")
 	}
 	return s, nil
 }
 
 // See RFC 4462 section 3.6.
 func buildMIC(sessionID string, username string, service string, authMethod string) []byte {
-	out := make([]byte, 0, 0)
+	out := make([]byte, 0)
 	out = appendString(out, sessionID)
 	out = append(out, msgUserAuthRequest)
 	out = appendString(out, username)

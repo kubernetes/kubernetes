@@ -149,11 +149,13 @@ func (b *BackendQuota) Cost(v any) int {
 func costPut(r *pb.PutRequest) int { return kvOverhead + len(r.Key) + len(r.Value) }
 
 func costTxnReq(u *pb.RequestOp) int {
-	r := u.GetRequestPut()
-	if r == nil {
-		return 0
+	if r := u.GetRequestPut(); r != nil {
+		return costPut(r)
 	}
-	return costPut(r)
+	if t := u.GetRequestTxn(); t != nil {
+		return costTxn(t)
+	}
+	return 0
 }
 
 func costTxn(r *pb.TxnRequest) int {

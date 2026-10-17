@@ -183,14 +183,16 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 						t.Fatalf("Delete failed: %v", err)
 					}
 				}
+				var expectEvent *watch.Event
 				if watchTest.expectEvent {
 					expectObj := out
 					if watchTest.watchType == watch.Deleted {
 						expectObj = prevObj
 						expectObj.ResourceVersion = out.ResourceVersion
 					}
-					testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
+					expectEvent = &watch.Event{Type: watchTest.watchType, Object: expectObj}
 				}
+				testCheckResult(t, w, expectEvent)
 				prevObj = out
 			}
 			w.Stop()
@@ -211,7 +213,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, w, watch.Event{Type: watch.Added, Object: storedObj})
+	testCheckResult(t, w, &watch.Event{Type: watch.Added, Object: storedObj})
 
 	// Update
 	out := &example.Pod{}
@@ -228,7 +230,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 	// when testing with the Cacher since we may have to allow for slow
 	// processing by allowing updates to propagate to the watch cache.
 	// This allows for that.
-	testCheckResult(t, w, watch.Event{Type: watch.Modified, Object: out})
+	testCheckResult(t, w, &watch.Event{Type: watch.Modified, Object: out})
 	w.Stop()
 
 	// Make sure when we watch from 0 we receive an ADDED event
@@ -237,7 +239,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 		t.Fatalf("Watch failed: %v", err)
 	}
 
-	testCheckResult(t, w, watch.Event{Type: watch.Added, Object: out})
+	testCheckResult(t, w, &watch.Event{Type: watch.Added, Object: out})
 	w.Stop()
 
 	// Compact previous versions
@@ -264,7 +266,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, w, watch.Event{Type: watch.Added, Object: newOut})
+	testCheckResult(t, w, &watch.Event{Type: watch.Added, Object: newOut})
 
 	// Make sure we can't watch from older resource versions anymoer and get a "Gone" error.
 	tooOldWatcher, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: storage.Everything})
@@ -315,7 +317,7 @@ func RunTestWatchFromNonZero(ctx context.Context, t *testing.T, store storage.In
 			newObj.Annotations = map[string]string{"version": "2"}
 			return newObj, nil
 		}), nil)
-	testCheckResult(t, w, watch.Event{Type: watch.Modified, Object: out})
+	testCheckResult(t, w, &watch.Event{Type: watch.Modified, Object: out})
 }
 
 func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -413,8 +415,13 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 	testCheckEventType(t, w, watch.Error)
 }
 
-func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "test-ns",
+		},
+	}
 	key := computePodKey(obj)
 
 	out := &example.Pod{}
@@ -433,8 +440,10 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Now trigger watch error by injecting failing transformer.
-	revertTransformer := store.CorruptTransformer()
+	// Now trigger watch error by making the object fail to transform.
+	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(func(string) error {
+		return corruptErr
+	}))
 	defer revertTransformer()
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
@@ -541,7 +550,7 @@ func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Inte
 		if err := store.Create(ctx, computePodKey(pod), pod, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
-		testCheckResult(t, readingWatcher, watch.Event{Type: watch.Added, Object: out})
+		testCheckResult(t, readingWatcher, &watch.Event{Type: watch.Added, Object: out})
 	}
 	if time.Since(startTime) > time.Duration(250*nonReadingWatchers)*time.Millisecond {
 		t.Errorf("waiting for events took too long: %v", time.Since(startTime))
@@ -568,7 +577,7 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 		t.Fatalf("ResourceVersion didn't changed on deletion: %s", deletedObj.ResourceVersion)
 	}
 
-	testCheckResult(t, w, watch.Event{Type: watch.Deleted, Object: deletedObj})
+	testCheckResult(t, w, &watch.Event{Type: watch.Deleted, Object: deletedObj})
 }
 
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -785,9 +794,11 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				} else {
 					currentObjs[watchTest.obj.Name] = out
 				}
+				var expectEvent *watch.Event
 				if watchTest.expectEvent {
-					testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
+					expectEvent = &watch.Event{Type: watchTest.watchType, Object: expectObj}
 				}
+				testCheckResult(t, w, expectEvent)
 			}
 			w.Stop()
 			testCheckStop(t, w)
@@ -1100,9 +1111,11 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				} else {
 					currentObjs[podIdentifier] = out
 				}
+				var expectEvent *watch.Event
 				if watchTest.expectEvent {
-					testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
+					expectEvent = &watch.Event{Type: watchTest.watchType, Object: expectObj}
 				}
+				testCheckResult(t, w, expectEvent)
 			}
 			w.Stop()
 			testCheckStop(t, w)

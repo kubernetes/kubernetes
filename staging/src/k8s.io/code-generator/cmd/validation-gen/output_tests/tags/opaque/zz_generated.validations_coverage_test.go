@@ -32,6 +32,39 @@ import (
 
 func init() {
 	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "BaseStruct"},
+		coverage.FieldRules{
+			"field": {
+				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
+			},
+		},
+	)
+}
+
+func init() {
+	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OpaqueAliasWithValidation"},
+		coverage.FieldRules{
+			"": {
+				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
+			},
+		},
+	)
+}
+
+func init() {
+	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OpaqueStructWithValidation"},
+		coverage.FieldRules{
+			"": {
+				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
+			},
+		},
+	)
+}
+
+func init() {
+	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OtherString"},
 		coverage.FieldRules{
 			"": {
@@ -49,6 +82,17 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
 			},
 			"stringField": {
+				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
+			},
+		},
+	)
+}
+
+func init() {
+	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "ParentWithOpaqueAliasWithValidation"},
+		coverage.FieldRules{
+			"field": {
 				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
 			},
 		},

@@ -17,7 +17,6 @@ limitations under the License.
 package state
 
 import (
-	"maps"
 	"sync"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -98,9 +97,7 @@ func (s *stateMemory) GetPodMemoryAssignments() PodMemoryAssignments {
 	s.RLock()
 	defer s.RUnlock()
 
-	clone := make(PodMemoryAssignments)
-	maps.Copy(clone, s.podAssignments)
-	return clone
+	return s.podAssignments.Clone()
 }
 
 // SetMachineState stores NUMANodeMap in State
@@ -139,8 +136,7 @@ func (s *stateMemory) SetPodMemoryAssignments(assignments PodMemoryAssignments) 
 	s.Lock()
 	defer s.Unlock()
 
-	s.podAssignments = make(PodMemoryAssignments)
-	maps.Copy(s.podAssignments, assignments)
+	s.podAssignments = assignments.Clone()
 	s.logger.V(5).Info("Updated Pod Memory assignments", "assignments", assignments)
 }
 

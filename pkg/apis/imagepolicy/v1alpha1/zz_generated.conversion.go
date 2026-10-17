@@ -113,7 +113,7 @@ func Convert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(in *imagepolicy.Ima
 }
 
 func autoConvert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec(in *imagepolicyv1alpha1.ImageReviewContainerSpec, out *imagepolicy.ImageReviewContainerSpec, s conversion.Scope) error {
-	out.Image = in.Image
+	*out = *(*imagepolicy.ImageReviewContainerSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -123,7 +123,7 @@ func Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContain
 }
 
 func autoConvert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec(in *imagepolicy.ImageReviewContainerSpec, out *imagepolicyv1alpha1.ImageReviewContainerSpec, s conversion.Scope) error {
-	out.Image = in.Image
+	*out = *(*imagepolicyv1alpha1.ImageReviewContainerSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -133,9 +133,7 @@ func Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContain
 }
 
 func autoConvert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *imagepolicyv1alpha1.ImageReviewSpec, out *imagepolicy.ImageReviewSpec, s conversion.Scope) error {
-	out.Containers = *(*[]imagepolicy.ImageReviewContainerSpec)(unsafe.Pointer(&in.Containers))
-	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
-	out.Namespace = in.Namespace
+	*out = *(*imagepolicy.ImageReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -145,9 +143,7 @@ func Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *imagepo
 }
 
 func autoConvert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepolicy.ImageReviewSpec, out *imagepolicyv1alpha1.ImageReviewSpec, s conversion.Scope) error {
-	out.Containers = *(*[]imagepolicyv1alpha1.ImageReviewContainerSpec)(unsafe.Pointer(&in.Containers))
-	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
-	out.Namespace = in.Namespace
+	*out = *(*imagepolicyv1alpha1.ImageReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -157,9 +153,7 @@ func Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepo
 }
 
 func autoConvert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *imagepolicyv1alpha1.ImageReviewStatus, out *imagepolicy.ImageReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
-	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
+	*out = *(*imagepolicy.ImageReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -169,9 +163,7 @@ func Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *ima
 }
 
 func autoConvert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(in *imagepolicy.ImageReviewStatus, out *imagepolicyv1alpha1.ImageReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
-	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
+	*out = *(*imagepolicyv1alpha1.ImageReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 

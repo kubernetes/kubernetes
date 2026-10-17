@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha3
 
+// CompositePodGroupListerExpansion allows custom methods to be added to
+// CompositePodGroupLister.
+type CompositePodGroupListerExpansion interface{}
+
+// CompositePodGroupNamespaceListerExpansion allows custom methods to be added to
+// CompositePodGroupNamespaceLister.
+type CompositePodGroupNamespaceListerExpansion interface{}
+
 // PodGroupListerExpansion allows custom methods to be added to
 // PodGroupLister.
 type PodGroupListerExpansion interface{}

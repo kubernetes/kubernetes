@@ -29,33 +29,31 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	g "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/dynamic-resource-allocation/internal/workqueue"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
-
-func init() {
-	klog.InitFlags(nil)
-}
 
 // TestControllerSyncPool verifies that syncPool produces the right ResourceSlices.
 // Update vs. Create API calls are checked by bumping the ResourceVersion in
 // updates.
-func TestControllerSyncPool(t *testing.T) {
-
+func TestControllerSyncPool(t *testing.T) { testControllerSyncPool(ktesting.Init(t)) }
+func testControllerSyncPool(tCtx ktesting.TContext) {
 	var (
 		ownerName      = "owner"
 		nodeUID        = types.UID("node-uid")
@@ -137,6 +135,42 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"invalid-other-pool-blocks-create-slice": {
+			nodeUID:        nodeUID,
+			initialObjects: []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{newDevice(deviceName), newDevice(deviceName)}}}},
+				},
+			},
+			expectedErrors: []string{`pool validation failed: found duplicate device "device" in pool "other-pool"`},
+		},
+		"create-slice-with-skip-node-operations": {
+			nodeUID:        nodeUID,
+			initialObjects: []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							Devices:            []resourceapi.Device{},
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					SkipNodeOperations(resourceapi.SkipNodeOperationAll).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
 		"keep-slice-unchanged": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
@@ -203,6 +237,81 @@ func TestControllerSyncPool(t *testing.T) {
 							resourceapi.DeviceTaint{
 								Effect:    resourceapi.DeviceTaintEffectNoExecute,
 								TimeAdded: &timeAdded,
+							},
+						)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
+		// Two taints whose TimeAdded has to survive an update triggered by
+		// something else. With one taint the previous case passes either way.
+		"keep-time-added-of-every-taint": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							resourceapi.DeviceTaint{
+								Key:       "taint-a",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							resourceapi.DeviceTaint{
+								Key:       "taint-b",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAddedLater,
+							},
+						)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{
+							newDevice(
+								deviceName,
+								// The attribute is what makes the controller update the
+								// slice. A change in TimeAdded alone would not.
+								attrs,
+								resourceapi.DeviceTaint{
+									Key:    "taint-a",
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+								},
+								resourceapi.DeviceTaint{
+									Key:    "taint-b",
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+								},
+							),
+						}}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							attrs,
+							resourceapi.DeviceTaint{
+								Key:       "taint-a",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							resourceapi.DeviceTaint{
+								Key:       "taint-b",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAddedLater,
 							},
 						)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
@@ -363,6 +472,123 @@ func TestControllerSyncPool(t *testing.T) {
 					Obj(),
 			},
 			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAConsumableCapacity`},
+		},
+		"drop-optional-node-operations-field": {
+			features: features{disableOptionalNodeOperations: true},
+			nodeUID:  nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices:            []resourceapi.Device{newDevice(deviceName)},
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAOptionalNodeOperations`},
+		},
+		"drop-compatibility-groups-field": {
+			features: features{disableCompatibilityGroups: true},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								PerDeviceNodeSelection: new(true),
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.Counter{
+										"mem": {Value: resource.MustParse("1")},
+									},
+								}},
+							},
+							{
+								PerDeviceNodeSelection: new(true),
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										nodeNameField(ownerName),
+										[]resourceapi.DeviceCounterConsumption{{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.Counter{
+												"mem": {Value: resource.MustParse("1")},
+											},
+											CompatibilityGroups: []string{"group1", "group2"},
+										}},
+									),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 2,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(true).
+					SharedCounters([]resourceapi.CounterSet{{
+						Name: "gpu-0",
+						Counters: map[string]resourceapi.Counter{
+							"mem": {Value: resource.MustParse("1")},
+						},
+					}}).
+					Driver(driverName).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(true).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							nodeNameField(ownerName),
+							resourceapi.DeviceCounterConsumption{
+								CounterSet: "gpu-0",
+								Counters: map[string]resourceapi.Counter{
+									"mem": {Value: resource.MustParse("1")},
+								},
+							},
+						),
+					}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+			},
+			expectedErrors: []string{`create ResourceSlice: pool "pool", slice #1: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceCompatibilityGroups`},
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
@@ -917,6 +1143,78 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"reconcile-with-pool-name-other-pools": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			initialObjects:        []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices:   []Slice{{Devices: []resourceapi.Device{}}},
+						AllNodes: true,
+					},
+					"other-pool-1": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+					"other-pool-2": {Slices: []Slice{{Devices: []resourceapi.Device{newDevice(deviceName), newDevice(deviceName)}}}},
+				},
+			},
+			expectedStats: Stats{NumCreates: 1},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					AllNodes(true).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(false).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			expectedErrors: []string{
+				`pool validation failed: found pool "other-pool-1", but ReconcilePoolWithName only allows pool "pool"`,
+				`pool validation failed: found pool "other-pool-2", but ReconcilePoolWithName only allows pool "pool"`,
+			},
+		},
+		"reconcile-with-pool-name-wrong-pool": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			syncDelay:             new(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedStats:  Stats{NumDeletes: 1},
+			expectedErrors: []string{`pool validation failed: found pool "other-pool", but ReconcilePoolWithName only allows pool "pool"`},
+		},
+		"reconcile-with-pool-name-invalid-pool": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {Slices: []Slice{{Devices: []resourceapi.Device{newDevice(deviceName), newDevice(deviceName)}}}},
+				},
+			},
+			expectedErrors: []string{`pool validation failed: found duplicate device "device" in pool "pool"`},
+		},
+		"reconcile-with-pool-name-no-pools": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			syncDelay:             new(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{}},
+			expectedStats:        Stats{NumDeletes: 1},
+		},
 		"update-node-selector": {
 			initialObjects: []runtime.Object{
 				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
@@ -1289,6 +1587,32 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedErrors: []string{`pool validation failed: counter "cpu" referenced by device "device" not found in counter set "counterset"`},
 		},
+		"detect-device-attribute-qualified-with-driver-name": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+										Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+											resourceapi.QualifiedName(driverName + "/foo"): {StringValue: new("bar")},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: pool "pool": device "device": attribute "driver/foo": use unqualified "foo", the driver name is added implicitly`},
+		},
 		"migration-from-random-naming-to-index-based-naming": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
@@ -1387,17 +1711,57 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
 			},
 		},
+		"drop-node-allocatable-resources-field": {
+			features: features{disableNodeAllocatableResources: true},
+			nodeUID:  nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: []resourceapi.Device{{
+								Name: deviceName,
+								NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+									v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(resource.MustParse("1"))}},
+								},
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRANodeAllocatableResources`},
+		},
 	}
 	for name, test := range testCases {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			inputObjects := make([]runtime.Object, 0, len(test.initialObjects)+len(test.initialOtherObjects))
 			for _, initialOtherObject := range test.initialOtherObjects {
 				inputObjects = append(inputObjects, initialOtherObject.DeepCopyObject())
 			}
 			for _, initialObject := range test.initialObjects {
-				if _, ok := initialObject.(*resourceapi.ResourceSlice); !ok {
-					t.Fatalf("test.initialObjects have to be of type *resourceapi.ResourceSlice")
+				_, ok := initialObject.(*resourceapi.ResourceSlice)
+				if !ok {
+					tCtx.Fatalf("test.initialObjects have to be of type *resourceapi.ResourceSlice")
 				}
 				inputObjects = append(inputObjects, initialObject.DeepCopyObject())
 			}
@@ -1420,7 +1784,7 @@ func TestControllerSyncPool(t *testing.T) {
 				owner = nil
 			}
 			var controllerErrors []error
-			ctrl, err := newController(ctx, Options{
+			ctrl, err := newController(tCtx, Options{
 				DriverName: driverName,
 				KubeClient: kubeClient,
 				Owner:      owner,
@@ -1433,22 +1797,22 @@ func TestControllerSyncPool(t *testing.T) {
 				ReconcilePoolWithName: test.reconcilePoolWithName,
 			})
 			defer ctrl.Stop()
-			require.NoError(t, err, "unexpected controller creation error")
+			tCtx.ExpectNoError(err, "unexpected controller creation error")
 
 			// Process work items in the queue until the queue is empty.
 			// Processing races with informers adding new work items,
 			// but the desired state should already be reached in the
 			// first iteration, so all following iterations should be nops.
-			ctrl.run(ctx)
+			ctrl.run(tCtx)
 
 			// Check ResourceSlices
-			resourceSlices, err := kubeClient.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
-			require.NoError(t, err, "list resource slices")
+			resourceSlices, err := kubeClient.ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
+			tCtx.ExpectNoError(err, "list resource slices")
 
 			sortResourceSlices(test.expectedResourceSlices)
 			sortResourceSlices(resourceSlices.Items)
-			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items)
-			assert.Equal(t, test.expectedStats, ctrl.GetStats())
+			tCtx.Assert(resourceSlices.Items).To(g.HaveExactElements(test.expectedResourceSlices))
+			tCtx.Assert(ctrl.GetStats()).To(g.Equal(test.expectedStats))
 
 			// The informer might have added a work item before or after ctrl.run returned,
 			// therefore we cannot compare the `Later` field. It's either defaultMutationCacheTTL
@@ -1462,15 +1826,15 @@ func TestControllerSyncPool(t *testing.T) {
 				actualState.Ready = nil
 			}
 			var expectState workqueue.MockState[string]
-			assert.Equal(t, expectState, actualState)
+			tCtx.Assert(actualState).To(g.Equal(expectState))
 
 			// Sync all pools again. Nothing changed, so the statistics should remain the same.
 			if test.inputDriverResources != nil {
 				for poolName := range test.inputDriverResources.Pools {
 					queue.Add(poolName)
 				}
-				ctrl.run(ctx)
-				assert.Equal(t, test.expectedStats, ctrl.GetStats(), "statistics after re-sync")
+				ctrl.run(tCtx)
+				tCtx.Assert(ctrl.GetStats()).To(g.Equal(test.expectedStats), "statistics after re-sync")
 			}
 
 			// Dedup the list of errors since we synced the pool twice.
@@ -1488,83 +1852,300 @@ func TestControllerSyncPool(t *testing.T) {
 			ctrl.Stop()
 			switch {
 			case len(test.expectedErrors) != 0 && len(dedupedControllerErrors) == 0:
-				t.Errorf("expected errors, got none: %s", joinErrors(test.expectedErrors))
+				tCtx.Errorf("expected errors, got none: %s", joinErrors(test.expectedErrors))
 			case len(test.expectedErrors) == 0 && len(dedupedControllerErrors) > 0:
-				t.Errorf("expected no error, got:\n  %s", joinErrors(formatErrors(controllerErrors)))
+				tCtx.Errorf("expected no error, got:\n  %s", joinErrors(formatErrors(controllerErrors)))
 			case len(test.expectedErrors) != len(dedupedControllerErrors):
-				t.Errorf("expected %d errors, got %d:\n  %s", len(test.expectedErrors), len(dedupedControllerErrors), joinErrors(formatErrors(dedupedControllerErrors)))
+				tCtx.Errorf("expected %d errors, got %d:\n  %s", len(test.expectedErrors), len(dedupedControllerErrors), joinErrors(formatErrors(dedupedControllerErrors)))
 			default:
 				expectedErrorsSet := sets.New(test.expectedErrors...)
 				actualErrorsSet := sets.New(errsToStrings(dedupedControllerErrors)...)
 				if !expectedErrorsSet.Equal(actualErrorsSet) {
-					t.Errorf("expected errors:\n  %s\ngot:\n  %s", joinErrors(test.expectedErrors), joinErrors(formatErrors(dedupedControllerErrors)))
+					tCtx.Errorf("expected errors:\n  %s\ngot:\n  %s", joinErrors(test.expectedErrors), joinErrors(formatErrors(dedupedControllerErrors)))
 				}
 			}
 		})
 	}
 }
 
-// TestControllerUpdateReconcilePoolWithNameValidation verifies that Update rejects
-// invalid pool sets when ReconcilePoolWithName is set
-func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {
+// TestControllerUpdateDeleteRecreate reproduces the bug where a ResourceSlice
+// that was updated by the controller (leaving a mutation in the MutationCache)
+// and then deleted on the apiserver was not being recreated.
+//
+// The root cause was that the MutationCache kept the stale updated object, so
+// the controller believed the slice still existed and skipped the create.
+// The fix calls OnDelete in the informer's delete event handler, which clears
+// the mutation before the work queue item is processed.
+func TestControllerUpdateDeleteRecreate(t *testing.T) {
+	testControllerUpdateDeleteRecreate(ktesting.Init(t))
+}
+func testControllerUpdateDeleteRecreate(tCtx ktesting.TContext) {
+	const (
+		driverName = "driver"
+		poolName   = "pool"
+	)
+	generateName := encodeIndex(0, resourceSliceIndexMinLength) + "-" + driverName + "-"
+	sliceName := generateName + "0"
+
+	initialSlice := MakeResourceSlice().
+		Name(sliceName).
+		UID("original-uid").
+		GenerateName(generateName).
+		ResourceVersion("1").
+		Driver(driverName).
+		AllNodes(true).
+		Devices([]resourceapi.Device{newDevice("old-device")}).
+		Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+		Obj()
+
+	kubeClient := createTestClient(features{}, metav1.Time{}, initialSlice)
+	syncDelay := time.Duration(0)
+
+	ctrl, err := StartController(tCtx, Options{
+		DriverName: driverName,
+		KubeClient: kubeClient,
+		Resources: &DriverResources{
+			Pools: map[string]Pool{
+				poolName: {
+					AllNodes:   true,
+					Generation: 1,
+					Slices:     []Slice{{Devices: []resourceapi.Device{newDevice("new-device")}}},
+				},
+			},
+		},
+		SyncDelay: &syncDelay,
+	})
+	tCtx.ExpectNoError(err)
+	defer ctrl.Stop()
+
+	// Wait for the controller to update the initial slice to reflect the
+	// desired "new-device" state.
+	tCtx.Eventually(ctrl.GetStats).WithTimeout(5*time.Second).WithPolling(10*time.Millisecond).Should(g.HaveField("NumUpdates", g.BeNumerically(">=", 1)), "controller should update the initial slice")
+
+	// Simulate what happens when the DRA driver restarts and kubelet deletes
+	// the slice before the driver can reclaim it.  The informer's delete
+	// handler calls OnDelete, which clears the stale mutation from the cache
+	// before the work-queue item is processed.  Without that call the
+	// MutationCache would serve the stale updated copy and syncPool would
+	// skip the necessary create.
+	tCtx.ExpectNoError(kubeClient.ResourceV1().ResourceSlices().Delete(tCtx, sliceName, metav1.DeleteOptions{}))
+
+	tCtx.Eventually(func() bool {
+		return ctrl.GetStats().NumCreates >= 1
+	}).WithTimeout(5 * time.Second).WithPolling(10 * time.Millisecond).Should(g.BeTrueBecause("controller should recreate the deleted slice"))
+}
+
+// TestControllerUpdateErrorHandlerCanReplaceResources verifies that an error
+// handler can replace invalid resources by calling Update.
+func TestControllerUpdateErrorHandlerCanReplaceResources(t *testing.T) {
+	testControllerUpdateErrorHandlerCanReplaceResources(ktesting.Init(t))
+}
+func testControllerUpdateErrorHandlerCanReplaceResources(tCtx ktesting.TContext) {
+	type ctxKey struct{}
+	tCtx = tCtx.WithValue(ctxKey{}, "controller")
 	const poolName = "pool"
-
-	testcases := map[string]struct {
-		resources      *DriverResources
-		expectedErrors []string
-	}{
-		"multiple pools returns error": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
-			expectedErrors: []string{"found 2 pools; expected exactly one pool with this name"},
+	valid := &DriverResources{
+		Pools: map[string]Pool{
+			poolName: {AllNodes: true, Slices: []Slice{{Devices: []resourceapi.Device{}}}},
 		},
-
-		"wrong pool only returns error": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
-			expectedErrors: []string{"found 1 pools; expected exactly one pool with this name"},
+	}
+	invalid := &DriverResources{
+		Pools: map[string]Pool{
+			"other-pool": {AllNodes: true, Slices: []Slice{{Devices: []resourceapi.Device{}}}},
 		},
-
-		"empty pools succeeds": {
-			resources: &DriverResources{Pools: map[string]Pool{}},
-		},
-
-		"single matching pool succeeds": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
+	}
+	mixed := &DriverResources{
+		Pools: map[string]Pool{
+			poolName:     valid.Pools[poolName],
+			"other-pool": invalid.Pools["other-pool"],
 		},
 	}
 
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			ctrl := &Controller{
-				reconcilePoolWithName: poolName,
-				queue:                 ptr.To(workqueue.Mock[string]{}),
-				errorHandler: func(_ context.Context, err error, _ string) {
-					if len(tc.expectedErrors) > 0 {
-						require.Error(t, err)
-						for _, expectedError := range tc.expectedErrors {
-							assert.Contains(t, err.Error(), expectedError)
-						}
-						return
-					}
-
-					require.NoError(t, err)
-				},
+	var ctrl *Controller
+	var queue workqueue.Mock[string]
+	var controllerErrors []error
+	// No data race: ctrl.run calls the handler on this goroutine.
+	calling := true
+	ctrl, err := newController(tCtx, Options{
+		DriverName:            "driver",
+		KubeClient:            createTestClient(features{}, metav1.Time{}),
+		Resources:             invalid,
+		Queue:                 &queue,
+		ReconcilePoolWithName: poolName,
+		ErrorHandler: func(ctx context.Context, err error, _ string) {
+			controllerErrors = append(controllerErrors, err)
+			// kubeletplugin.Helper holds its mutex while it creates or updates
+			// the controller, so republishing from HandleError would deadlock.
+			if calling {
+				tCtx.Error("error handler called synchronously")
+				return
 			}
-			ctrl.Update(tc.resources)
+			// Fail instead of deadlocking if the lock is held.
+			if !ctrl.mutex.TryLock() {
+				tCtx.Error("error handler called while holding the lock")
+				return
+			}
+			ctrl.mutex.Unlock()
+			// Contextual logging needs the controller's context.
+			tCtx.Assert(ctx.Value(ctxKey{})).To(g.Equal("controller"))
+			// Replace only once, so that a regression fails below instead of looping.
+			if len(controllerErrors) == 1 {
+				ctrl.Update(valid)
+			}
+		},
+	})
+	calling = false
+	tCtx.ExpectNoError(err)
+	defer ctrl.Stop()
+
+	ctrl.run(tCtx)
+	tCtx.Require(controllerErrors).To(g.HaveLen(1))
+	tCtx.Require(controllerErrors[0]).To(g.MatchError(g.ContainSubstring(`found pool "other-pool"`)))
+	tCtx.Require(ctrl.GetStats()).To(g.Equal(Stats{NumCreates: 1}))
+
+	calling = true
+	ctrl.Update(mixed)
+	calling = false
+	ctrl.run(tCtx)
+	tCtx.Require(controllerErrors).To(g.HaveLen(2))
+	tCtx.Require(controllerErrors[1]).To(g.MatchError(g.ContainSubstring(`found pool "other-pool"`)))
+	tCtx.Assert(ctrl.GetStats()).To(g.Equal(Stats{NumCreates: 1}))
+}
+
+func TestControllerPoolNameFieldSelector(t *testing.T) {
+	testControllerPoolNameFieldSelector(ktesting.Init(t))
+}
+func testControllerPoolNameFieldSelector(tCtx ktesting.TContext) {
+	const (
+		driverName = "test-driver"
+		poolName   = "pool-a"
+	)
+
+	testCases := map[string]struct {
+		rejectList                  bool
+		rejectWatch                 bool
+		initialObjects              []runtime.Object
+		expectedListSelectors       []bool
+		expectedWatchSelectors      []bool
+		checkListFallbackFiltering  bool
+		checkWatchFallbackFiltering bool
+	}{
+		"field-selector-supported": {
+			expectedListSelectors:  []bool{true},
+			expectedWatchSelectors: []bool{true},
+		},
+		"field-selector-unsupported-for-list": {
+			rejectList: true,
+			initialObjects: []runtime.Object{
+				resourceSliceForPool(poolName, "matching"),
+				resourceSliceForPool("other-pool", "other"),
+			},
+			expectedListSelectors:      []bool{true, false},
+			expectedWatchSelectors:     []bool{false},
+			checkListFallbackFiltering: true,
+		},
+		"field-selector-unsupported-for-watch": {
+			rejectWatch:                 true,
+			expectedListSelectors:       []bool{true},
+			expectedWatchSelectors:      []bool{true, false},
+			checkWatchFallbackFiltering: true,
+		},
+	}
+
+	badRequestError := apierrors.NewBadRequest(fmt.Sprintf("field label not supported for %s: %s", resourceapi.SchemeGroupVersion.WithKind("ResourceSlice"), resourceapi.ResourceSliceSelectorPoolName))
+
+	for name, testCase := range testCases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			kubeClient := fake.NewSimpleClientset(testCase.initialObjects...)
+			kubeClient.PrependReactor("list", "resourceslices", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				if testCase.rejectList && hasPoolNameFieldSelector(action, poolName) {
+					return true, nil, badRequestError
+				}
+				return false, nil, nil
+			})
+			kubeClient.PrependWatchReactor("resourceslices", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				if testCase.rejectWatch && hasPoolNameFieldSelector(action, poolName) {
+					return true, nil, badRequestError
+				}
+				return false, nil, nil
+			})
+
+			ctrl, err := newController(tCtx, Options{
+				DriverName:            driverName,
+				KubeClient:            kubeClient,
+				ReconcilePoolWithName: poolName,
+				SyncDelay:             new(time.Hour),
+			})
+			tCtx.ExpectNoError(err)
+			tCtx.Cleanup(ctrl.Stop)
+
+			tCtx.Eventually(func() bool {
+				return len(resourceSliceSelectorRequests(kubeClient.Actions(), "watch", poolName)) == len(testCase.expectedWatchSelectors)
+			}).WithTimeout(5 * time.Second).WithPolling(10 * time.Millisecond).Should(g.BeTrueBecause("wait for ResourceSlice watch requests"))
+			tCtx.Assert(resourceSliceSelectorRequests(kubeClient.Actions(), "list", poolName)).To(g.Equal(testCase.expectedListSelectors))
+			tCtx.Assert(resourceSliceSelectorRequests(kubeClient.Actions(), "watch", poolName)).To(g.Equal(testCase.expectedWatchSelectors))
+			tCtx.Assert(ctrl.usePoolNameFieldSelector.Load()).To(g.Equal(!testCase.rejectList && !testCase.rejectWatch))
+
+			if testCase.checkListFallbackFiltering {
+				matching, err := ctrl.sliceStore.ByIndex(poolNameIndex, poolName)
+				tCtx.ExpectNoError(err)
+				tCtx.Assert(matching).To(g.HaveLen(1))
+				other, err := ctrl.sliceStore.ByIndex(poolNameIndex, "other-pool")
+				tCtx.ExpectNoError(err)
+				tCtx.Assert(other).To(g.BeEmpty())
+			}
+
+			if testCase.checkWatchFallbackFiltering {
+				_, err := kubeClient.ResourceV1().ResourceSlices().Create(tCtx, resourceSliceForPool(poolName, "matching"), metav1.CreateOptions{})
+				tCtx.ExpectNoError(err)
+				_, err = kubeClient.ResourceV1().ResourceSlices().Create(tCtx, resourceSliceForPool("other-pool", "other"), metav1.CreateOptions{})
+				tCtx.ExpectNoError(err)
+				type indexed struct {
+					Matching []interface{}
+					Other    []interface{}
+				}
+				tCtx.Eventually(func() (indexed, error) {
+					matching, err := ctrl.sliceStore.ByIndex(poolNameIndex, poolName)
+					if err != nil {
+						return indexed{}, err
+					}
+					other, err := ctrl.sliceStore.ByIndex(poolNameIndex, "other-pool")
+					if err != nil {
+						return indexed{}, err
+					}
+					return indexed{Matching: matching, Other: other}, nil
+				}).WithTimeout(5*time.Second).WithPolling(10*time.Millisecond).Should(gstruct.MatchAllFields(gstruct.Fields{
+					"Matching": g.HaveLen(1),
+					"Other":    g.BeEmpty(),
+				}), "wait for the fallback watcher to filter ResourceSlices")
+			}
 		})
 	}
+}
+
+func hasPoolNameFieldSelector(action k8stesting.Action, poolName string) bool {
+	var fieldSelector fields.Selector
+	switch action := action.(type) {
+	case k8stesting.ListAction:
+		fieldSelector = action.GetListRestrictions().Fields
+	case k8stesting.WatchAction:
+		fieldSelector = action.GetWatchRestrictions().Fields
+	default:
+		return false
+	}
+
+	value, found := fieldSelector.RequiresExactMatch(resourceapi.ResourceSliceSelectorPoolName)
+	return found && value == poolName
+}
+
+func resourceSliceSelectorRequests(actions []k8stesting.Action, verb, poolName string) []bool {
+	var requests []bool
+	for _, action := range actions {
+		if action.Matches(verb, "resourceslices") {
+			requests = append(requests, hasPoolNameFieldSelector(action, poolName))
+		}
+	}
+	return requests
 }
 
 func joinErrors(errors []string) string {
@@ -1606,10 +2187,13 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
-	disableBindingConditions    bool
-	disableDeviceTaints         bool
-	disablePartitionableDevices bool
-	disableConsumableCapacity   bool
+	disableBindingConditions        bool
+	disableDeviceTaints             bool
+	disablePartitionableDevices     bool
+	disableConsumableCapacity       bool
+	disableOptionalNodeOperations   bool
+	disableCompatibilityGroups      bool
+	disableNodeAllocatableResources bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -1689,6 +2273,21 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 	if features.disableConsumableCapacity {
 		for i := range resourceslice.Spec.Devices {
 			resourceslice.Spec.Devices[i].AllowMultipleAllocations = nil
+		}
+	}
+	if features.disableOptionalNodeOperations {
+		resourceslice.Spec.SkipNodeOperations = nil
+	}
+	if features.disableCompatibilityGroups {
+		for i := range resourceslice.Spec.Devices {
+			for j := range resourceslice.Spec.Devices[i].ConsumesCounters {
+				resourceslice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = nil
+			}
+		}
+	}
+	if features.disableNodeAllocatableResources {
+		for i := range resourceslice.Spec.Devices {
+			resourceslice.Spec.Devices[i].NodeAllocatableResources = nil
 		}
 	}
 }
@@ -1831,6 +2430,12 @@ func (r *ResourceSliceWrapper) SharedCounters(counters []resourceapi.CounterSet)
 	return r
 }
 
+// SkipNodeOperations sets ResourceSlice.Spec.SkipNodeOperations.
+func (r *ResourceSliceWrapper) SkipNodeOperations(skip ...resourceapi.SkipNodeOperation) *ResourceSliceWrapper {
+	r.Spec.SkipNodeOperations = skip
+	return r
+}
+
 type nodeNameField string
 type allowMultipleAllocationsField bool
 
@@ -1863,7 +2468,8 @@ func newDevice(name string, fields ...any) resourceapi.Device {
 	return device
 }
 
-func TestGetIndexLength(t *testing.T) {
+func TestGetIndexLength(t *testing.T) { testGetIndexLength(ktesting.Init(t)) }
+func testGetIndexLength(tCtx ktesting.TContext) {
 	testCases := []struct {
 		numSlices int
 		expected  int
@@ -1879,13 +2485,14 @@ func TestGetIndexLength(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%d", tc.numSlices), func(t *testing.T) {
-			assert.Equal(t, tc.expected, getIndexLength(tc.numSlices))
+		tCtx.Run(fmt.Sprintf("%d", tc.numSlices), func(tCtx ktesting.TContext) {
+			tCtx.Assert(getIndexLength(tc.numSlices)).To(g.Equal(tc.expected))
 		})
 	}
 }
 
-func TestEncodeIndex(t *testing.T) {
+func TestEncodeIndex(t *testing.T) { testEncodeIndex(ktesting.Init(t)) }
+func testEncodeIndex(tCtx ktesting.TContext) {
 	testCases := []struct {
 		index          int
 		expectedLength int
@@ -1905,13 +2512,14 @@ func TestEncodeIndex(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%d", tc.index), func(t *testing.T) {
-			assert.Equal(t, tc.expected, encodeIndex(tc.index, tc.expectedLength))
+		tCtx.Run(fmt.Sprintf("%d", tc.index), func(tCtx ktesting.TContext) {
+			tCtx.Assert(encodeIndex(tc.index, tc.expectedLength)).To(g.Equal(tc.expected))
 		})
 	}
 }
 
-func TestDecodeIndex(t *testing.T) {
+func TestDecodeIndex(t *testing.T) { testDecodeIndex(ktesting.Init(t)) }
+func testDecodeIndex(tCtx ktesting.TContext) {
 	testCases := []struct {
 		name           string
 		expectedLength int
@@ -1952,16 +2560,17 @@ func TestDecodeIndex(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
 			actual, err := decodeIndex(tc.name, tc.expectedLength)
 			if tc.expectError {
-				require.Error(t, err)
 				if tc.expectedError != "" {
-					assert.Contains(t, err.Error(), tc.expectedError)
+					tCtx.Require(err).To(g.MatchError(g.ContainSubstring(tc.expectedError)))
+				} else {
+					tCtx.Require(err).To(g.HaveOccurred())
 				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expected, actual)
+				tCtx.ExpectNoError(err)
+				tCtx.Assert(actual).To(g.Equal(tc.expected))
 			}
 		})
 	}
@@ -1973,4 +2582,92 @@ func getExpectedForLargeInt(val int64) int {
 		return -1
 	}
 	return int(val)
+}
+
+func deepCopyDevices(devices []resourceapi.Device) []resourceapi.Device {
+	out := make([]resourceapi.Device, len(devices))
+	for i := range devices {
+		out[i] = *devices[i].DeepCopy()
+	}
+	return out
+}
+
+func TestCopyTaintTimeAdded(t *testing.T) { testCopyTaintTimeAdded(ktesting.Init(t)) }
+func testCopyTaintTimeAdded(tCtx ktesting.TContext) {
+	t1 := metav1.Time{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	t2 := metav1.Time{Time: time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)}
+	t3 := metav1.Time{Time: time.Date(2026, 3, 3, 0, 0, 0, 0, time.UTC)}
+	taint := func(key, value string, timeAdded *metav1.Time) resourceapi.DeviceTaint {
+		return resourceapi.DeviceTaint{
+			Key:       key,
+			Value:     value,
+			Effect:    resourceapi.DeviceTaintEffectNoExecute,
+			TimeAdded: timeAdded,
+		}
+	}
+	device := func(taints ...resourceapi.DeviceTaint) []resourceapi.Device {
+		return []resourceapi.Device{newDevice("device-0", taints)}
+	}
+
+	for name, tc := range map[string]struct {
+		from, to, want []resourceapi.Device
+	}{
+		"every-matching-taint": {
+			from: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+			to:   device(taint("a", "value-a", nil), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+		},
+		"matched-by-content-not-position": {
+			from: device(taint("b", "value-b", &t2), taint("a", "value-a", &t1)),
+			to:   device(taint("a", "value-a", nil), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+		},
+		"explicit-time-wins": {
+			from: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+			to:   device(taint("a", "value-a", &t3), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t3), taint("b", "value-b", &t2)),
+		},
+		"no-matching-device": {
+			from: []resourceapi.Device{newDevice("other", taint("a", "value-a", &t1))},
+			to:   device(taint("a", "value-a", nil)),
+			want: device(taint("a", "value-a", nil)),
+		},
+		// A taint is the whole of key, value and effect, so an edit to any of
+		// them is a different taint and starts its own clock.
+		"changed-taint-does-not-inherit-the-old-time": {
+			from: device(taint("a", "value-a", &t1), taint("b", "old", &t2)),
+			to:   device(taint("a", "value-a", nil), taint("b", "new", nil), taint("c", "value-c", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "new", nil), taint("c", "value-c", nil)),
+		},
+		// from is in the other order, so a device read by position rather than
+		// by name would take the wrong one's times.
+		"devices-are-matched-by-name": {
+			from: []resourceapi.Device{
+				newDevice("device-1", taint("b", "value-b", &t2)),
+				newDevice("device-0", taint("a", "value-a", &t1)),
+			},
+			to: []resourceapi.Device{
+				newDevice("device-0", taint("a", "value-a", nil)),
+				newDevice("device-1", taint("b", "value-b", nil)),
+			},
+			want: []resourceapi.Device{
+				newDevice("device-0", taint("a", "value-a", &t1)),
+				newDevice("device-1", taint("b", "value-b", &t2)),
+			},
+		},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			// Deep copies: a shallow one keeps pointing at the same taints,
+			// so a write into them would show up in the baseline as well.
+			fromBefore := deepCopyDevices(tc.from)
+			toBefore := deepCopyDevices(tc.to)
+
+			got := copyTaintTimeAdded(tc.from, tc.to)
+
+			tCtx.Assert(got).To(g.Equal(tc.want))
+			// Both inputs are documented as read-only.
+			tCtx.Assert(tc.from).To(g.Equal(fromBefore), "from was modified")
+			tCtx.Assert(tc.to).To(g.Equal(toBefore), "to was modified")
+		})
+	}
 }

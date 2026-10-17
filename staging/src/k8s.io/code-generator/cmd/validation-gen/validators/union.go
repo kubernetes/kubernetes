@@ -78,8 +78,8 @@ func getUnionValidations(shared map[string]unions, context Context) (Validations
 }
 
 const (
-	unionDiscriminatorTagName = "k8s:unionDiscriminator"
-	unionMemberTagName        = "k8s:unionMember"
+	unionDiscriminatorTagName = "unionDiscriminator"
+	unionMemberTagName        = "unionMember"
 )
 
 type unionDiscriminatorTagValidator struct {
@@ -300,8 +300,14 @@ func processUnionValidations(structPath *field.Path, parentType *types.Type, uni
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
+				// DiscriminatedUnion reports at the mismatched member's path,
+				// not at the struct's.
+				var memberEmits []Emission
+				for _, m := range u.members {
+					memberEmits = append(memberEmits, Emission{emits.Type, emits.Origin, "." + m.fieldName})
+				}
 				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).
-					WithEmits(emits)
+					WithEmits(memberEmits...)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, parentType, false)...))

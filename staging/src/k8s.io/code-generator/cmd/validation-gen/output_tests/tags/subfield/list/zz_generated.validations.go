@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -72,7 +71,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -93,19 +92,19 @@ func Validate_Struct(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
-						return validate.Unique(ctx, op, fldPath, obj, oldObj,
-							func(a v1.OwnerReference, b v1.OwnerReference) bool { return a.UID == b.UID })
+						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID })
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
-						return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-							func(a v1.OwnerReference, b v1.OwnerReference) bool { return a.UID == b.UID }, validate.SemanticDeepEqual,
+						return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID }, validate.SemanticDeepEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *v1.OwnerReference) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-									func(o *v1.OwnerReference) *string { return &o.Name }, validate.DirectEqualPtr,
+									func(o *v1.OwnerReference) *string { return &o.Name }, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "ownerReference name error")
 									})
@@ -118,7 +117,7 @@ func Validate_Struct(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "finalizers",
 					func(o *v1.ObjectMeta) []string { return o.Finalizers }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
-						return validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
+						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}

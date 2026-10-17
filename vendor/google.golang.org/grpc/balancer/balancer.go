@@ -60,7 +60,7 @@ func Register(b Builder) {
 	if !envconfig.CaseSensitiveBalancerRegistries {
 		name = strings.ToLower(name)
 		if name != b.Name() {
-			logger.Warningf("Balancer registered with name %q. grpc-go will be switching to case sensitive balancer registries soon. After 2 releases, we will enable the env var by default.", b.Name())
+			logger.Warningf("Balancer registered with name %q. grpc-go has switched to case sensitive balancer registries. GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES env variable will be removed in release v1.82.0", b.Name())
 		}
 	}
 	m[name] = b
@@ -85,7 +85,7 @@ func Get(name string) Builder {
 	if !envconfig.CaseSensitiveBalancerRegistries {
 		lowerName := strings.ToLower(name)
 		if lowerName != name {
-			logger.Warningf("Balancer retrieved for name %q. grpc-go will be switching to case sensitive balancer registries soon. After 2 releases, we will enable the env var by default.", name)
+			logger.Warningf("Balancer retrieved for name %q. grpc-go has switched to case sensitive balancer registries. GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES env variable will be removed in release v1.82.0", name)
 		}
 		name = lowerName
 	}

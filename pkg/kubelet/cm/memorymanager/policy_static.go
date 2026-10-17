@@ -17,12 +17,12 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,6 +38,7 @@ import (
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -59,12 +60,21 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	// skipExtend, when true, disables extending the Topology Manager hint to
+	// additional NUMA nodes even when the hint does not, by itself, satisfy the
+	// container's memory request. The Linux static policy always leaves it false.
+	// It is set per container by the Windows BestEffort policy (see
+	// policy_best_effort.go) when the container follows the CPU manager's NUMA
+	// decision: Windows has no cpuset.mems, so memory placement follows CPU
+	// affinity and the hint must not be widened beyond the CPU manager's
+	// exclusive-CPU nodes.
+	skipExtend bool
 }
 
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(_ klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -104,7 +114,7 @@ func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
 // shared pool. Such a configuration is invalid because it would lead to
 // containers in the shared pool having no memory allocated, causing them to
 // fail.
-func (p *staticPolicy) validatePodScopeResources(logger logr.Logger, pod *v1.Pod) error {
+func (p *staticPolicy) validatePodScopeResources(logger klog.Logger, pod *v1.Pod) error {
 	podTotalMemory, err := getPodRequestedResources(logger, pod)
 	if err != nil {
 		return err
@@ -180,13 +190,20 @@ func (p *staticPolicy) validatePodScopeResources(logger logr.Logger, pod *v1.Pod
 // It's called once per pod by the Topology Manager's pod-scope admit handler.
 // The logic here allocates a single NUMA-aligned "bubble" of memory for the
 // entire pod. All containers within the pod will share this NUMA binding.
-func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) (rerr error) {
-	podUID := string(pod.UID)
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) (rerr error) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "operation", operation)
 	logger.V(4).Info("AllocatePod called for pod-level managed pod")
-
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("Pod-level memory allocation skipped, memory manager with static policy supports only add operation")
+		return nil
+	}
+	podUID := string(pod.UID)
 	qos := v1qos.GetPodQOS(pod)
 	if qos != v1.PodQOSGuaranteed {
+		return nil
+	}
+	if blocks := s.GetPodMemoryBlocks(podUID); blocks != nil {
+		logger.V(4).Info("Pod already present in state, skipping")
 		return nil
 	}
 
@@ -218,7 +235,7 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 
 	// 3. Handle hints and NUMA alignment.
 	machineState := s.GetMachineState()
-	bestHint := p.affinity.GetAffinity(podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	bestHint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
 	if bestHint.NUMANodeAffinity == nil {
 		defaultHint, err := p.getDefaultHint(machineState, pod, podTotalMemory)
 		if err != nil {
@@ -421,9 +438,14 @@ func memoryBlocksToString(blocks []state.Block) string {
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	// allocate the memory only for guaranteed pods
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
+
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("Container-level memory allocation skipped, Memory manager with static policy supports only add operation")
+		return nil
+	}
 
 	podUID := string(pod.UID)
 	// Allocate the memory only for guaranteed pods
@@ -435,6 +457,15 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
+		return nil
+	}
+
+	requestedResources, err := getContainerRequestedResources(logger, pod, container)
+	if err != nil {
+		return err
+	}
+	if len(requestedResources) == 0 {
+		logger.V(5).Info("Exclusive memory allocation skipped, container requests no memory resources", "podUID", podUID, "containerName", container.Name)
 		return nil
 	}
 
@@ -455,13 +486,8 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
-	hint := p.affinity.GetAffinity(podUID, container.Name)
+	hint := p.affinity.GetAffinity(logger, podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
-
-	requestedResources, err := getContainerRequestedResources(logger, pod, container)
-	if err != nil {
-		return err
-	}
 
 	machineState := s.GetMachineState()
 	bestHint := &hint
@@ -480,8 +506,11 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	}
 
 	// topology manager returns the hint that does not satisfy completely the container request
-	// we should extend this hint to the one who will satisfy the request and include the current hint
-	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) {
+	// we should extend this hint to the one who will satisfy the request and include the current hint,
+	// unless skipExtend is set. skipExtend is set per container by the Windows BestEffort policy when
+	// the container follows the CPU manager's NUMA decision (see policy_best_effort.go); the Linux
+	// static policy never sets it, so the hint is extended as usual.
+	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) && !p.skipExtend {
 		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
 		if err != nil {
 			return err
@@ -660,44 +689,65 @@ func (p *staticPolicy) releaseMemory(s state.State, blocks []state.Block) {
 	s.SetMachineState(machineState)
 }
 
-func regenerateHints(logger klog.Logger, pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+// regenerateHints rebuilds the hints for a container that already holds an
+// allocation, which happens after a kubelet restart. The affinity comes from the
+// stored blocks, but the Score describes the node and so is read off the machine
+// state exactly as calculateHints does.
+func regenerateHints(logger klog.Logger, machineState state.NUMANodeMap, pod *v1.Pod, blocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
 	hints := map[string][]topologymanager.TopologyHint{}
 	for resourceName := range reqRsrc {
 		hints[string(resourceName)] = []topologymanager.TopologyHint{}
 	}
 
-	if len(ctnBlocks) != len(reqRsrc) {
-		logger.Info("The number of requested resources by the container differs from the number of memory blocks", "containerName", ctn.Name)
+	if len(blocks) != len(reqRsrc) {
+		logger.Info("The number of requested resources differs from the number of memory blocks")
 		return nil
 	}
 
-	for _, b := range ctnBlocks {
+	// Validate every block before building any hint. One bad block discards the
+	// whole result, so scoring an earlier block first would be wasted work, and
+	// it would log a regenerated hint for an allocation we go on to reject.
+	numaAffinities := make([]bitmask.BitMask, len(blocks))
+	for i, b := range blocks {
 		if _, ok := reqRsrc[b.Type]; !ok {
-			logger.Info("Container requested resources but none available of this type", "containerName", ctn.Name, "type", b.Type)
+			logger.Info("Requested resources do not include the allocated memory block type", "type", b.Type)
 			return nil
 		}
 
 		if b.Size != reqRsrc[b.Type] {
-			logger.Info("Memory already allocated with different numbers than requested", "containerName", ctn.Name, "type", b.Type, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
+			logger.Info("Memory already allocated with a different size than requested", "type", b.Type, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
 			return nil
 		}
 
-		containerNUMAAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
+		numaAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
 		if err != nil {
-			logger.Error(err, "Failed to generate NUMA bitmask", "containerName", ctn.Name, "type", b.Type)
+			logger.Error(err, "Failed to generate NUMA bitmask", "type", b.Type)
 			return nil
 		}
+		numaAffinities[i] = numaAffinity
+	}
 
-		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID, "containerName", ctn.Name)
+	for i, b := range blocks {
+		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID)
+		// The container's own blocks are reserved in the machine state already,
+		// so they count as assigned here. A hint spanning several NUMA nodes
+		// scores the span as a whole.
+		var allocatable, free int64
+		for _, nodeID := range b.NUMAAffinity {
+			allocatable += int64(machineState[nodeID].MemoryMap[b.Type].Allocatable)
+			free += int64(machineState[nodeID].MemoryMap[b.Type].Free)
+		}
+		assigned := allocatable - free
 		hints[string(b.Type)] = append(hints[string(b.Type)], topologymanager.TopologyHint{
-			NUMANodeAffinity: containerNUMAAffinity,
+			NUMANodeAffinity: numaAffinities[i],
 			Preferred:        true,
+			Score:            topologymanager.UtilizationScore(allocatable, assigned),
 		})
 	}
 	return hints
 }
 
-func getPodRequestedResources(logger logr.Logger, pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
+func getPodRequestedResources(logger klog.Logger, pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	// If pod-level resources are set, use them directly.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		requestedResources := make(map[v1.ResourceName]uint64)
@@ -771,8 +821,12 @@ func getPodRequestedResources(logger logr.Logger, pod *v1.Pod) (map[v1.ResourceN
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "operation", operation)
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("GetPodTopologyHints skipped, memory manager with static policy supports only add operation")
+		return nil
+	}
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -812,13 +866,25 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		return nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		podBlocks := s.GetPodMemoryBlocks(string(pod.UID))
+		if podBlocks != nil {
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "pod"), s.GetMachineState(), pod, podBlocks, reqRsrcs)
+		}
+	}
+
 	for _, ctn := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		containerBlocks := s.GetMemoryBlocks(string(pod.UID), ctn.Name)
 		// Short circuit to regenerate the same hints if there are already
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(logger, pod, &ctn, containerBlocks, reqRsrcs)
+			containerRequestedResources, err := getContainerRequestedResources(logger, pod, &ctn)
+			if err != nil {
+				logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", ctn.Name)
+				return nil
+			}
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), s.GetMachineState(), pod, containerBlocks, containerRequestedResources)
 		}
 	}
 
@@ -829,8 +895,12 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "operation", operation)
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("GetTopologyHints skipped, memory manager with static policy supports only add operation")
+		return nil
+	}
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -839,6 +909,9 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	requestedResources, err := getContainerRequestedResources(logger, pod, container)
 	if err != nil {
 		logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", container.Name)
+		return nil
+	}
+	if len(requestedResources) == 0 {
 		return nil
 	}
 
@@ -854,13 +927,13 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	// memory allocated for the container. This might happen after a
 	// kubelet restart, for example.
 	if containerBlocks != nil {
-		return regenerateHints(logger, pod, container, containerBlocks, requestedResources)
+		return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", container.Name), s.GetMachineState(), pod, containerBlocks, requestedResources)
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
 }
 
-func getContainerRequestedResources(logger logr.Logger, pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
+func getContainerRequestedResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
 	requestedResources := map[v1.ResourceName]uint64{}
 	// For pod-level resource management, a container is only considered for exclusive
 	// memory if its request equals its limit for both the CPU and Memory. This
@@ -961,9 +1034,22 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 			if _, ok := hints[string(resourceName)]; !ok {
 				hints[string(resourceName)] = []topologymanager.TopologyHint{}
 			}
+			// Score is a snapshot of node state, so memory this pod's init
+			// containers still hold counts as assigned even though the app
+			// containers will reuse it: it is Reserved, not Free. The
+			// getPodReusableMemory() call above decides whether the request
+			// fits on this mask; it does not change how full the mask is.
+			//
+			// Convert before subtracting: a free total larger than the
+			// allocatable one means the accounting is already wrong, and in
+			// uint64 that underflows into a plausible looking score.
+			allocatable := int64(totalAllocatableSize[resourceName])
+			free := int64(totalFreeSize[resourceName])
+			assigned := allocatable - free
 			hints[string(resourceName)] = append(hints[string(resourceName)], topologymanager.TopologyHint{
 				NUMANodeAffinity: mask,
 				Preferred:        false,
+				Score:            topologymanager.UtilizationScore(allocatable, assigned),
 			})
 		}
 	})

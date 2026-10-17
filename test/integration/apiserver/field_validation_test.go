@@ -1368,7 +1368,7 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "paused" already set in map
   line 27: key "imagePullPolicy" already set in map`,
 		},
@@ -1448,7 +1448,7 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "paused" already set in map
   line 27: key "imagePullPolicy" already set in map`,
 		},
@@ -2573,7 +2573,7 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "knownField1" already set in map
   line 16: key "hostPort" already set in map`,
 		},
@@ -2659,7 +2659,7 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "knownField1" already set in map
   line 16: key "hostPort" already set in map`,
 		},
@@ -2744,7 +2744,7 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "knownField1" already set in map
   line 16: key "hostPort" already set in map`,
 		},
@@ -2839,7 +2839,7 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+			strictDecodingError: `error strict decoding patch: error converting YAML to JSON: yaml: unmarshal errors:
   line 10: key "knownField1" already set in map
   line 16: key "hostPort" already set in map`,
 		},

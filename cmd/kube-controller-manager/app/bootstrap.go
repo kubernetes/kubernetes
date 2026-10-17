@@ -40,6 +40,7 @@ func newBootstrapSignerController(ctx context.Context, controllerContext Control
 	}
 
 	bsc, err := bootstrap.NewSigner(
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
@@ -68,6 +69,7 @@ func newTokenCleanerController(ctx context.Context, controllerContext Controller
 	}
 
 	tcc, err := bootstrap.NewTokenCleaner(
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),

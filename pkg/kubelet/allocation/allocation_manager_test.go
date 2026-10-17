@@ -18,7 +18,9 @@ package allocation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -38,8 +40,12 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
@@ -54,7 +60,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -166,121 +171,102 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
 	}
 
+	withPassthroughChanges := func(p *v1.Pod) *v1.Pod {
+		p = p.DeepCopy()
+		p.Spec.ActiveDeadlineSeconds = ptr.To[int64](60)
+		p.Spec.Tolerations = []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}}
+		p.Spec.TerminationGracePeriodSeconds = ptr.To[int64](10)
+		p.Spec.EphemeralContainers = []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}}}
+		// Every container, since copying the image of the first one only would go unnoticed otherwise.
+		for i := range p.Spec.Containers {
+			p.Spec.Containers[i].Image = "new"
+		}
+		for i := range p.Spec.InitContainers {
+			p.Spec.InitContainers[i].Image = "new"
+		}
+		return p
+	}
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 
 	tests := []struct {
 		name                         string
 		pod                          *v1.Pod
-		allocated                    state.PodResourceInfo
+		allocated                    *v1.Pod
 		expectPod                    *v1.Pod
 		expectUpdate                 bool
 		inPlacePodLevelResizeEnabled bool
 	}{{
-		name: "steady state",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-		},
+		name:         "steady state",
+		pod:          pod,
+		allocated:    pod,
 		expectUpdate: false,
 	}, {
 		name:         "no allocations",
 		pod:          pod,
-		allocated:    state.PodResourceInfo{},
 		expectUpdate: false,
 	}, {
+		// A pod migrated from a V1 checkpoint has no name, and only the containers that were checkpointed.
 		name: "missing container allocation",
 		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+		allocated: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: pod.UID},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{pod.Spec.Containers[1]},
 			},
 		},
 		expectUpdate: false,
 	}, {
-		name: "resized container",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-		},
+		name:         "resized container",
+		pod:          pod,
+		allocated:    resizedPod,
 		expectUpdate: true,
 		expectPod:    resizedPod,
 	}, {
-		name: "resized pod-level allocation",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:         "changed passthrough fields",
+		pod:          withPassthroughChanges(pod),
+		allocated:    pod,
+		expectUpdate: false,
+		expectPod:    withPassthroughChanges(pod),
+	}, {
+		name:         "changed passthrough fields and resized container",
+		pod:          withPassthroughChanges(pod),
+		allocated:    resizedPod,
+		expectUpdate: true,
+		expectPod:    withPassthroughChanges(resizedPod),
+	}, {
+		name:                         "resized pod-level allocation",
+		pod:                          pod,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources and allocation",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:                         "resized pod-level resources and allocation",
+		pod:                          podWithPodLevelResources,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources and no container resources",
-		pod:  podWithoutContainerResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:                         "resized pod-level resources and no container resources",
+		pod:                          podWithoutContainerResources,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "pod-level resources with overhead, checkpoint matches spec (no overhead stored)",
-		pod:  podWithPodLevelResourcesAndOverhead,
-		allocated: state.PodResourceInfo{
-			PodLevelResources: podWithPodLevelResourcesAndOverhead.Spec.Resources.DeepCopy(),
-		},
+		name:                         "pod-level resources with overhead, allocation matches spec",
+		pod:                          podWithPodLevelResourcesAndOverhead,
+		allocated:                    podWithPodLevelResourcesAndOverhead,
 		expectUpdate:                 false,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources with feature gate disabled",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPod.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 false,
-		expectPod:                    podWithPodLevelResources,
+		name:                         "resized pod-level resources with feature gate disabled",
+		pod:                          podWithPodLevelResources,
+		allocated:                    pod,
+		expectUpdate:                 true,
+		expectPod:                    pod,
 		inPlacePodLevelResizeEnabled: false,
 	}}
 
@@ -290,7 +276,9 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
-			allocationManager.(*manager).allocated.SetPodResourceInfo(logger, pod.UID, test.allocated)
+			if test.allocated != nil {
+				require.NoError(t, allocationManager.(*manager).allocated.SetPod(logger, test.allocated))
+			}
 			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(pod)
 
 			if test.expectUpdate {
@@ -299,9 +287,407 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 				assert.NotEqual(t, pod, allocatedPod)
 			} else {
 				assert.False(t, updated, "updated")
-				assert.Same(t, pod, allocatedPod)
+				expectPod := test.expectPod
+				if expectPod == nil {
+					expectPod = pod
+				}
+				assert.Equal(t, expectPod, allocatedPod)
 			}
 		})
+	}
+}
+
+// TestUpdatePodFromAllocationFieldClassification makes it explicit how each field of a pod spec and
+// of a container is allocated. A field that is added to the API fails it until it is classified
+// here and, if it is passthrough, copied in copyPassthroughFields.
+func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	type category string
+	const (
+		// A passthrough field takes effect as soon as it changes in the pod.
+		passthrough category = "passthrough"
+		// A gated field has its allocated value, so that a change only takes effect once it is
+		// allocated as a whole. A field that cannot change is gated too, since its allocated value
+		// is the one it has in the pod anyway.
+		gated category = "gated"
+	)
+
+	// Of the gated fields, only the resources of the pod and of its containers can change, and the
+	// size limit of a memory-backed emptyDir volume.
+	podSpecFields := map[category][]string{
+		passthrough: {"ActiveDeadlineSeconds", "EphemeralContainers", "TerminationGracePeriodSeconds", "Tolerations"},
+		gated: {
+			"Volumes", "InitContainers", "Containers", "RestartPolicy", "DNSPolicy", "NodeSelector",
+			"ServiceAccountName", "DeprecatedServiceAccount", "AutomountServiceAccountToken", "NodeName",
+			"HostNetwork", "HostPID", "HostIPC", "ShareProcessNamespace", "SecurityContext",
+			"ImagePullSecrets", "Hostname", "Subdomain", "Affinity", "SchedulerName", "HostAliases",
+			"PriorityClassName", "Priority", "DNSConfig", "ReadinessGates", "RuntimeClassName",
+			"EnableServiceLinks", "PreemptionPolicy", "Overhead", "TopologySpreadConstraints",
+			"SetHostnameAsFQDN", "OS", "HostUsers", "SchedulingGates", "ResourceClaims", "Resources",
+			"HostnameOverride", "SchedulingGroup", "EvictionResponders",
+		},
+	}
+	containerFields := map[category][]string{
+		passthrough: {"Image"},
+		gated: {
+			"Name", "Command", "Args", "WorkingDir", "Ports", "EnvFrom", "Env", "Resources",
+			"ResizePolicy", "RestartPolicy", "RestartPolicyRules", "VolumeMounts", "VolumeDevices",
+			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
+			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
+		},
+	}
+
+	// classify returns the category of each field of typ, and fails if a field has no category or
+	// more than one, or if a category names a field that does not exist.
+	classify := func(t *testing.T, typ reflect.Type, fields map[category][]string) map[string]category {
+		t.Helper()
+		categories := map[string]category{}
+		for cat, names := range fields {
+			for _, name := range names {
+				if previous, found := categories[name]; found {
+					t.Errorf("%s.%s is both %s and %s", typ.Name(), name, previous, cat)
+				}
+				categories[name] = cat
+			}
+		}
+		for field := range typ.Fields() {
+			if name := field.Name; categories[name] == "" {
+				t.Errorf("%s.%s has no category: it is passthrough, and has to be copied in copyPassthroughFields, if a change to it has to take effect before it is allocated, and gated otherwise", typ.Name(), name)
+			}
+		}
+		for name := range categories {
+			if _, found := typ.FieldByName(name); !found {
+				t.Errorf("%s.%s does not exist anymore", typ.Name(), name)
+			}
+		}
+		return categories
+	}
+
+	// setNonZero sets v, and everything in it that it can, to a value that is not the zero value.
+	var setNonZero func(v reflect.Value)
+	setNonZero = func(v reflect.Value) {
+		if !v.CanSet() {
+			return
+		}
+		switch v.Kind() {
+		case reflect.Pointer:
+			v.Set(reflect.New(v.Type().Elem()))
+			setNonZero(v.Elem())
+		case reflect.Slice:
+			v.Set(reflect.MakeSlice(v.Type(), 1, 1))
+			setNonZero(v.Index(0))
+		case reflect.Map:
+			v.Set(reflect.MakeMap(v.Type()))
+			key, value := reflect.New(v.Type().Key()).Elem(), reflect.New(v.Type().Elem()).Elem()
+			setNonZero(key)
+			setNonZero(value)
+			v.SetMapIndex(key, value)
+		case reflect.Struct:
+			if v.Type() == reflect.TypeFor[resource.Quantity]() {
+				v.Set(reflect.ValueOf(resource.MustParse("1")))
+				return
+			}
+			for _, field := range v.Fields() {
+				setNonZero(field)
+			}
+		case reflect.String:
+			v.SetString("x")
+		case reflect.Bool:
+			v.SetBool(true)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v.SetInt(1)
+		}
+	}
+
+	// allocate returns the pod as it is allocated when stored is its allocated pod, and whether a
+	// change to a gated field is pending.
+	allocate := func(t *testing.T, stored, pod *v1.Pod) (*v1.Pod, bool) {
+		t.Helper()
+		logger, _ := ktesting.NewTestContext(t)
+		m := &manager{allocated: state.NewStateMemory(logger, nil, nil)}
+		require.NoError(t, m.allocated.SetPod(logger, stored))
+
+		before := pod.DeepCopy()
+		allocated, updated := m.UpdatePodFromAllocation(pod)
+		assert.Equal(t, before, pod, "the pod must not be modified")
+		return allocated, updated
+	}
+
+	// assertTaken checks that a field of the allocated pod has the value that its category says.
+	assertTaken := func(t *testing.T, cat category, allocated, stored, pod reflect.Value) {
+		t.Helper()
+		want, from := stored, "allocated pod"
+		if cat == passthrough {
+			want, from = pod, "pod"
+		}
+		assert.Equal(t, want.Interface(), allocated.Interface(), "a %s field has its value in the %s", cat, from)
+	}
+
+	// For each field, the pod has a value that its allocated pod does not.
+	newStoredPod := func() *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "uid", Name: "test", Namespace: "default"}}
+	}
+
+	podSpecCategories := classify(t, reflect.TypeFor[v1.PodSpec](), podSpecFields)
+	for _, name := range sets.List(sets.KeySet(podSpecCategories)) {
+		t.Run("PodSpec."+name, func(t *testing.T) {
+			field := func(p *v1.Pod) reflect.Value { return reflect.ValueOf(&p.Spec).Elem().FieldByName(name) }
+			stored := newStoredPod()
+			pod := stored.DeepCopy()
+			setNonZero(field(pod))
+			require.False(t, field(pod).IsZero(), "setNonZero has to be extended to set a %s", field(pod).Type())
+
+			allocated, updated := allocate(t, stored, pod)
+			assertTaken(t, podSpecCategories[name], field(allocated), field(stored), field(pod))
+			// A change to a gated field is pending, since it only takes effect once it is allocated.
+			// One to a passthrough field is not, since it takes effect right away.
+			assert.Equal(t, podSpecCategories[name] == gated, updated, "updated")
+		})
+	}
+
+	containerCategories := classify(t, reflect.TypeFor[v1.Container](), containerFields)
+	for _, name := range sets.List(sets.KeySet(containerCategories)) {
+		for _, list := range []string{"Containers", "InitContainers"} {
+			t.Run(list+"."+name, func(t *testing.T) {
+				containers := func(p *v1.Pod) *[]v1.Container {
+					if list == "InitContainers" {
+						return &p.Spec.InitContainers
+					}
+					return &p.Spec.Containers
+				}
+				field := func(p *v1.Pod) reflect.Value {
+					return reflect.ValueOf(&(*containers(p))[0]).Elem().FieldByName(name)
+				}
+				stored := newStoredPod()
+				*containers(stored) = []v1.Container{{Name: "c"}}
+				pod := stored.DeepCopy()
+				setNonZero(field(pod))
+				require.False(t, field(pod).IsZero(), "setNonZero has to be extended to set a %s", field(pod).Type())
+
+				allocated, updated := allocate(t, stored, pod)
+				assertTaken(t, containerCategories[name], field(allocated), field(stored), field(pod))
+				assert.Equal(t, containerCategories[name] == gated, updated, "updated")
+			})
+		}
+	}
+}
+
+// TestUpdatePodFromAllocationMigratedFromV1 follows a pod that is only known from a V1 checkpoint,
+// which only has resources, until it is added again and stored as a whole.
+//
+// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
+func TestUpdatePodFromAllocationMigratedFromV1(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	cpu := func(quantity string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}
+	}
+
+	// A V1 checkpoint has no entry for the init container, since V1 skipped containers that cannot be resized.
+	v1Data, err := json.Marshal(state.PodResourceCheckpointInfo{Entries: state.PodResourceInfoMap{
+		"uid1": {
+			ContainerResources:   map[string]v1.ResourceRequirements{"c1": {Requests: cpu("1")}},
+			PodLevelResources:    &v1.ResourceRequirements{Requests: cpu("3")},
+			EmptyDirVolumeLimits: map[string]*resource.Quantity{"mem-vol": new(resource.MustParse("64Mi"))},
+		},
+	}})
+	require.NoError(t, err)
+	v1Checkpoint := &state.Checkpoint{Data: string(v1Data)}
+	v1Checkpoint.Checksum = checksum.New(v1Checkpoint.Data)
+
+	stateDir := t.TempDir()
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
+	require.NoError(t, err)
+	require.NoError(t, checkpointManager.CreateCheckpoint(allocatedPodsStateFile, v1Checkpoint))
+	allocated, err := state.NewStateCheckpoint(logger, stateDir, allocatedPodsStateFile, nil)
+	require.NoError(t, err)
+	m := &manager{allocated: allocated}
+
+	// All of its resources have been resized since they were allocated.
+	desired := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "uid1", Name: "pod1", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			NodeName:    "node1",
+			Tolerations: []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}},
+			InitContainers: []v1.Container{{
+				Name:      "init",
+				Image:     "i0",
+				Resources: v1.ResourceRequirements{Requests: cpu("100m")},
+			}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Image:     "i1",
+				Resources: v1.ResourceRequirements{Requests: cpu("2")},
+			}},
+			Resources: &v1.ResourceRequirements{Requests: cpu("4")},
+			Volumes: []v1.Volume{{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: new(resource.MustParse("128Mi")),
+				}},
+			}},
+		},
+	}
+	assertAllocatedResources := func(t *testing.T, pod *v1.Pod) {
+		t.Helper()
+		assert.Equal(t, "1", pod.Spec.Containers[0].Resources.Requests.Cpu().String(), "container")
+		assert.Equal(t, "3", pod.Spec.Resources.Requests.Cpu().String(), "pod")
+		assert.Equal(t, "64Mi", pod.Spec.Volumes[0].EmptyDir.SizeLimit.String(), "emptyDir")
+	}
+
+	migrated, found := m.allocated.GetPod("uid1")
+	require.True(t, found)
+	assert.True(t, state.IsMigratedFromV1(migrated))
+
+	// The resources are overlaid onto the pod, which has everything else, including the resources
+	// that the checkpoint does not have.
+	allocatedPod, updated := m.UpdatePodFromAllocation(desired)
+	assert.True(t, updated, "updated")
+	assertAllocatedResources(t, allocatedPod)
+	assert.Equal(t, "100m", allocatedPod.Spec.InitContainers[0].Resources.Requests.Cpu().String(), "init container")
+	assert.Equal(t, desired.Spec.NodeName, allocatedPod.Spec.NodeName)
+	assert.Equal(t, "i1", allocatedPod.Spec.Containers[0].Image)
+	assert.Equal(t, "2", desired.Spec.Containers[0].Resources.Requests.Cpu().String(), "the pod must not be modified")
+
+	// Adding the pod stores it as a whole, with the resources it had been allocated.
+	admitted, reason, message := m.AddPod(ctx, nil, desired)
+	require.True(t, admitted, "%s: %s", reason, message)
+	stored, found := m.allocated.GetPod("uid1")
+	require.True(t, found)
+	assert.False(t, state.IsMigratedFromV1(stored))
+	assertAllocatedResources(t, stored)
+	assert.Equal(t, "i1", stored.Spec.Containers[0].Image)
+
+	// From then on the allocated pod is built from the stored pod. A gated field can only be told
+	// apart from a passthrough one by changing the former, which does not happen to a real pod.
+	changed := desired.DeepCopy()
+	changed.Spec.NodeName = "node2"
+	changed.Spec.Tolerations = nil
+	allocatedPod, updated = m.UpdatePodFromAllocation(changed)
+	assert.True(t, updated, "updated")
+	assertAllocatedResources(t, allocatedPod)
+	assert.Equal(t, "node1", allocatedPod.Spec.NodeName, "gated")
+	assert.Empty(t, allocatedPod.Spec.Tolerations, "passthrough")
+}
+
+// TestUpdatePodFromAllocationPending checks which changes to a pod are pending: the ones to a gated
+// field. For a pod that is stored as a whole, that is any of them, whichever the feature gates. A pod
+// migrated from a V1 checkpoint goes through the overlay instead, which only compares the resources
+// that the feature gates enable.
+//
+// It also checks which of the pending changes are resizes, since only those get the resize events and
+// conditions. That does not depend on the feature gates either: the admit handlers reject a resize
+// that is not allowed.
+//
+// TODO: Remove the checks of the overlay in v1.39 when the V1 checkpoint format is no longer supported.
+func TestUpdatePodFromAllocationPending(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	emptyDir := func(name string, medium v1.StorageMedium, limit string) v1.Volume {
+		source := &v1.EmptyDirVolumeSource{Medium: medium}
+		if limit != "" {
+			source.SizeLimit = new(resource.MustParse(limit))
+		}
+		return v1.Volume{Name: name, VolumeSource: v1.VolumeSource{EmptyDir: source}}
+	}
+	restartAlways := v1.ContainerRestartPolicyAlways
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "uid", Name: "test", Namespace: "default"},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "init", Resources: cpu("100m")},
+					{Name: "sidecar", RestartPolicy: &restartAlways, Resources: cpu("200m")},
+				},
+				Containers: []v1.Container{{Name: "c", Resources: cpu("300m")}},
+				Resources:  new(cpu("1")),
+				Volumes: []v1.Volume{
+					emptyDir("memory", v1.StorageMediumMemory, "64Mi"),
+					emptyDir("disk", v1.StorageMediumDefault, "64Mi"),
+					emptyDir("unlimited", v1.StorageMediumMemory, ""),
+				},
+			},
+		}
+	}
+
+	always := func(podLevelGate, memoryBackedGate bool) bool { return true }
+	never := func(podLevelGate, memoryBackedGate bool) bool { return false }
+	withPodLevelGate := func(podLevelGate, memoryBackedGate bool) bool { return podLevelGate }
+	withMemoryBackedGate := func(podLevelGate, memoryBackedGate bool) bool { return memoryBackedGate }
+
+	tests := []struct {
+		name string
+		// change makes the pod differ from its allocated pod.
+		change func(pod, allocated *v1.Pod)
+		// overlayPending returns whether the overlay finds the change pending, given the state of the
+		// feature gates.
+		overlayPending func(podLevelGate, memoryBackedGate bool) bool
+		// pending is whether the change is pending for a pod that is stored as a whole, whichever the
+		// feature gates.
+		pending bool
+		// resize is whether the change is a resize of a container, of the pod or of a memory-backed
+		// volume, whichever the feature gates.
+		resize bool
+	}{
+		{"no change", func(pod, allocated *v1.Pod) {}, never, false, false},
+		{"container resources", func(pod, allocated *v1.Pod) { pod.Spec.Containers[0].Resources = cpu("400m") }, always, true, true},
+		{"init container resources", func(pod, allocated *v1.Pod) { pod.Spec.InitContainers[0].Resources = cpu("400m") }, always, true, true},
+		{"sidecar resources", func(pod, allocated *v1.Pod) { pod.Spec.InitContainers[1].Resources = cpu("400m") }, always, true, true},
+		{"container missing from the allocated pod", func(pod, allocated *v1.Pod) { allocated.Spec.Containers = nil }, never, true, false},
+		{"pod-level resources", func(pod, allocated *v1.Pod) { pod.Spec.Resources = new(cpu("2")) }, withPodLevelGate, true, true},
+		{"pod-level resources removed", func(pod, allocated *v1.Pod) { pod.Spec.Resources = nil }, withPodLevelGate, true, true},
+		{"memory-backed emptyDir limit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[0].EmptyDir.SizeLimit = new(resource.MustParse("128Mi"))
+		}, withMemoryBackedGate, true, true},
+		{"memory-backed emptyDir limit in another unit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[0].EmptyDir.SizeLimit = new(resource.MustParse("65536Ki"))
+		}, never, false, false},
+		{"disk-backed emptyDir limit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[1].EmptyDir.SizeLimit = new(resource.MustParse("128Mi"))
+		}, never, true, false},
+		{"emptyDir limit removed", func(pod, allocated *v1.Pod) { pod.Spec.Volumes[0].EmptyDir.SizeLimit = nil }, never, true, true},
+		{"emptyDir limit added", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[2].EmptyDir.SizeLimit = new(resource.MustParse("64Mi"))
+		}, never, true, true},
+		{"pod field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.HostUsers = new(false) }, never, true, false},
+		{"container field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.Containers[0].Command = []string{"new"} }, never, true, false},
+		{"passthrough fields", func(pod, allocated *v1.Pod) {
+			pod.Spec.Tolerations = []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}}
+			pod.Spec.Containers[0].Image = "new"
+		}, never, false, false},
+	}
+
+	for _, test := range tests {
+		for _, podLevelGate := range []bool{false, true} {
+			for _, memoryBackedGate := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/podLevelGate=%t/memoryBackedGate=%t", test.name, podLevelGate, memoryBackedGate), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, podLevelGate)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, memoryBackedGate)
+					pod, allocated := newPod(), newPod()
+					test.change(pod, allocated)
+
+					_, overlayPending := state.UpdatePodFromV1(pod, allocated)
+					assert.Equal(t, test.overlayPending(podLevelGate, memoryBackedGate), overlayPending, "overlay")
+
+					logger, _ := ktesting.NewTestContext(t)
+					m := &manager{allocated: state.NewStateMemory(logger, nil, nil)}
+					require.NoError(t, m.allocated.SetPod(logger, allocated))
+					allocatedPod, pending := m.UpdatePodFromAllocation(pod)
+					assert.Equal(t, test.pending, pending, "pending")
+					assert.Equal(t, test.resize, isResizeRequested(pod, allocatedPod), "resize")
+				})
+			}
+		}
 	}
 }
 
@@ -310,7 +696,8 @@ func TestRetryPendingResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	cpu2m := resource.MustParse("2m")
@@ -782,12 +1169,19 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod1, testPod2, testPod3}, nil)
 
-				if !tt.newResourcesAllocated {
-					require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-				} else {
-					require.NoError(t, allocationManager.SetAllocatedResources(newPod))
+				for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, p))
 				}
-				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+				if !tt.newResourcesAllocated {
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+				} else {
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, newPod))
+				}
+				t.Cleanup(func() {
+					for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
+						allocationManager.RemovePod(logger, p.UID)
+					}
+				})
 
 				if tt.originalInProgress {
 					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
@@ -799,7 +1193,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(originalPod.UID)
+				allocationManager.PushPendingResize(logger, originalPod.UID)
 				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
@@ -826,14 +1220,13 @@ func TestRetryPendingResizes(t *testing.T) {
 						assert.Empty(t, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests should be empty")
 					}
 
-					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
+					alloc, found := allocationManager.(*manager).allocated.GetPodLevelResources(newPod.UID)
 					if tt.expectedAllocatedPodReqs != nil {
 						require.True(t, found, "pod allocation")
-						if alloc.PodLevelResources == nil {
-							assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
-						}
+						require.NotNil(t, alloc)
+						assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.Requests, "stored pod request allocation")
 					} else {
-						require.False(t, found, "pod allocation should not be found")
+						require.Nil(t, alloc, "pod allocation should not be found")
 					}
 				}
 
@@ -843,22 +1236,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
 
 				resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
-				if assert.Len(t, resizeStatus, len(tt.expectedResize), "different number of resize conditions") {
-					for i := range resizeStatus {
-						// Ignore probe time and last transition time during comparison.
-						resizeStatus[i].LastProbeTime = metav1.Time{}
-						resizeStatus[i].LastTransitionTime = metav1.Time{}
-
-						// Message is a substring assertion, since it can change slightly.
-						if tt.expectedResize[i].Message != "" {
-							assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
-						} else {
-							assert.Empty(t, resizeStatus[i].Message)
-						}
-						resizeStatus[i].Message = tt.expectedResize[i].Message
-					}
-					assert.Equal(t, tt.expectedResize, resizeStatus)
-				}
+				verifyResizeConditions(t, tt.expectedResize, resizeStatus)
 				assert.Equal(t, tt.expectPodSyncTriggered, newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 			})
 		}
@@ -870,7 +1248,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	nodeConfig := cm.NodeConfig{}
 	nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -1068,13 +1446,13 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{guaranteedQOSPod, guaranteedQOSPodWithSidecar, bestEffortPod}, &nodeConfig)
 
-				require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+				require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+				t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(originalPod.UID)
+				allocationManager.PushPendingResize(logger, originalPod.UID)
 				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
@@ -1099,18 +1477,211 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
 
 				resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
-				for i := range resizeStatus {
-					// Ignore probe time and last transition time during comparison.
-					resizeStatus[i].LastProbeTime = metav1.Time{}
-					resizeStatus[i].LastTransitionTime = metav1.Time{}
-
-					// Message is a substring assertion, since it can change slightly.
-					assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
-					resizeStatus[i].Message = tt.expectedResize[i].Message
-				}
-				assert.Equal(t, tt.expectedResize, resizeStatus)
+				verifyResizeConditions(t, tt.expectedResize, resizeStatus)
 			})
 		}
+	}
+}
+
+func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	logger := klog.FromContext(tCtx)
+
+	quantity100Mi := resource.MustParse("100Mi")
+	quantity200Mi := resource.MustParse("200Mi")
+	cpu1000m := resource.MustParse("1")
+	cpu2000m := resource.MustParse("2")
+	defaultCPU := v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}
+
+	createTestPod := func(uid types.UID, name string, req, lim v1.ResourceList, limit *resource.Quantity) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: uid, Name: name, Namespace: "default"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:      "c1",
+						Image:     "test-image",
+						Resources: v1.ResourceRequirements{Requests: req, Limits: lim},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: limit,
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:               "c1",
+						AllocatedResources: req,
+					},
+				},
+			},
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name                string
+		originalCPURequests v1.ResourceList
+		newCPURequests      v1.ResourceList
+		originalCPULimits   v1.ResourceList
+		newCPULimits        v1.ResourceList
+		originalLimit       *resource.Quantity
+		newLimit            *resource.Quantity
+		cgroupVersion       int
+		expectedResize      []*v1.PodCondition
+		expectSuccess       bool
+	}{
+		{
+			name:          "Resize succeeds on cgroups v2",
+			originalLimit: &quantity100Mi,
+			newLimit:      &quantity200Mi,
+			cgroupVersion: 2,
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+			expectSuccess: true,
+		},
+		{
+			name:          "Resize fails on cgroups v1",
+			originalLimit: &quantity100Mi,
+			newLimit:      &quantity200Mi,
+			cgroupVersion: 1,
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Memory-backed emptyDir volume resize is not supported on cgroups v1",
+				},
+			},
+			expectSuccess: false,
+		},
+		{
+			name:                "Resize fails on cgroups v1 when accompanied by CPU resize (atomic failure)",
+			originalCPURequests: v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			newCPURequests:      v1.ResourceList{v1.ResourceCPU: cpu2000m},
+			originalCPULimits:   v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			newCPULimits:        v1.ResourceList{v1.ResourceCPU: cpu2000m},
+			originalLimit:       &quantity100Mi,
+			newLimit:            &quantity200Mi,
+			cgroupVersion:       1,
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Memory-backed emptyDir volume resize is not supported on cgroups v1",
+				},
+			},
+			expectSuccess: false,
+		},
+		{
+			name:                "Resize succeeds on cgroups v2 when accompanied by CPU resize",
+			originalCPURequests: v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			newCPURequests:      v1.ResourceList{v1.ResourceCPU: cpu2000m},
+			originalCPULimits:   v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			newCPULimits:        v1.ResourceList{v1.ResourceCPU: cpu2000m},
+			originalLimit:       &quantity100Mi,
+			newLimit:            &quantity200Mi,
+			cgroupVersion:       2,
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+			expectSuccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+			origReq := tt.originalCPURequests
+			if origReq == nil {
+				origReq = defaultCPU
+			}
+			origLim := tt.originalCPULimits
+			if origLim == nil {
+				origLim = defaultCPU
+			}
+			newReq := tt.newCPURequests
+			if newReq == nil {
+				newReq = defaultCPU
+			}
+			newLim := tt.newCPULimits
+			if newLim == nil {
+				newLim = defaultCPU
+			}
+
+			originalPod := createTestPod("1111", "pod1", origReq, origLim, tt.originalLimit)
+			newPod := createTestPod("1111", "pod1", newReq, newLim, tt.newLimit)
+
+			nodeConfig := cm.NodeConfig{}
+			nodeConfig.CgroupVersion = tt.cgroupVersion
+
+			podStatus := &kubecontainer.PodStatus{
+				ID:        originalPod.UID,
+				Name:      originalPod.Name,
+				Namespace: originalPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:  "c1",
+						State: kubecontainer.ContainerStateRunning,
+						Resources: &kubecontainer.ContainerResources{
+							CPURequest: origReq.Cpu(),
+							CPULimit:   origLim.Cpu(),
+						},
+					},
+				},
+			}
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{originalPod}, &nodeConfig)
+
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
+
+			allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+				return newPod, true
+			}
+			allocationManager.PushPendingResize(logger, originalPod.UID)
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
+			verifyResizeConditions(t, tt.expectedResize, resizeStatus)
+
+			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod.DeepCopy())
+			if tt.expectSuccess {
+				assert.Equal(t, tt.newLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), "limit should be updated to new value")
+				newCPU := newReq[v1.ResourceCPU]
+				allocatedCPU := allocatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+				assert.Equal(t, newCPU.MilliValue(), allocatedCPU.MilliValue(), "CPU request should be updated")
+			} else {
+				assert.Equal(t, tt.originalLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), "limit should remain at original value")
+				origCPU := origReq[v1.ResourceCPU]
+				allocatedCPU := allocatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+				assert.Equal(t, origCPU.MilliValue(), allocatedCPU.MilliValue(), "CPU request should remain at original value")
+			}
+		})
 	}
 }
 
@@ -1125,7 +1696,7 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 		features.InPlacePodVerticalScaling: true,
 		features.NodeSwap:                  true,
 	})
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
 
 	cpu500m := resource.MustParse("500m")
@@ -1248,13 +1819,13 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 			}
 			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{testPod}, nil)
 
-			require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-			t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 			allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return newPod, true
 			}
-			allocationManager.PushPendingResize(testPod.UID)
+			allocationManager.PushPendingResize(logger, testPod.UID)
 			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 			var updatedPod *v1.Pod
@@ -1272,14 +1843,7 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 			assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
 
 			resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
-			for i := range resizeStatus {
-				// Ignore probe time and last transition time during comparison.
-				resizeStatus[i].LastProbeTime = metav1.Time{}
-				resizeStatus[i].LastTransitionTime = metav1.Time{}
-				assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
-				resizeStatus[i].Message = tt.expectedResize[i].Message
-			}
-			assert.Equal(t, tt.expectedResize, resizeStatus)
+			verifyResizeConditions(t, tt.expectedResize, resizeStatus)
 			assert.Equal(t, "true", newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 
 			assert.NoError(t, testutil.GatherAndCompare(
@@ -1294,7 +1858,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -1348,7 +1912,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	}
 
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod}, nil)
-	require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		return testPod, true
 	}
@@ -1464,16 +2028,11 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				},
 			}
 
-			allocationManager.PushPendingResize(testPod.UID)
+			allocationManager.PushPendingResize(logger, testPod.UID)
 			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(testPod.UID)
-			require.Len(t, conditions, len(tc.expectedConditions))
-			for _, c := range conditions {
-				c.LastProbeTime = metav1.Time{}
-				c.LastTransitionTime = metav1.Time{}
-			}
-			require.Equal(t, tc.expectedConditions, conditions)
+			verifyResizeConditions(t, tc.expectedConditions, conditions)
 
 			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
 			if tc.expectedEvent != "" {
@@ -1483,6 +2042,133 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 			} else {
 				require.Empty(t, fakeRecorder.Events)
 			}
+		})
+	}
+}
+
+// TestRetryPendingResizesNonResourceChange checks that a pending change that is not a resize goes
+// through the admit handlers like any other, but that the resize events and conditions are only
+// emitted for a change to resources.
+func TestRetryPendingResizesNonResourceChange(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	// A field that is gated on allocation and is not a resource, like one that the pod has but that an
+	// older version did not checkpoint.
+	changeOtherField := func(pod *v1.Pod) { pod.Spec.HostUsers = new(false) }
+
+	tests := []struct {
+		name string
+		// deferred is whether the pod has a deferred resize before the retry.
+		deferred bool
+		// change makes the pod differ from its allocated pod.
+		change func(pod *v1.Pod)
+		// reject makes an admit handler reject the pod.
+		reject             bool
+		expectedConditions []*v1.PodCondition
+		expectedEvent      string
+		// expectAllocated is whether the change is allocated after the retry.
+		expectAllocated bool
+	}{
+		{
+			name:            "other field",
+			change:          changeOtherField,
+			expectAllocated: true,
+		},
+		{
+			name:            "other field, while a deferred resize is reverted",
+			deferred:        true,
+			change:          changeOtherField,
+			expectAllocated: true,
+		},
+		{
+			name:   "other field, rejected by an admit handler",
+			change: changeOtherField,
+			reject: true,
+		},
+		{
+			name:     "other field, rejected by an admit handler, while a deferred resize is reverted",
+			deferred: true,
+			change:   changeOtherField,
+			reject:   true,
+		},
+		{
+			name: "other field and resources",
+			change: func(pod *v1.Pod) {
+				changeOtherField(pod)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			},
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+			expectedEvent:   `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1}`,
+			expectAllocated: true,
+		},
+		{
+			name: "other field and resources, rejected by an admit handler",
+			change: func(pod *v1.Pod) {
+				changeOtherField(pod)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			},
+			reject: true,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizePending,
+				Status:             "True",
+				Reason:             v1.PodReasonDeferred,
+				Message:            "rejected by the test",
+				ObservedGeneration: 1,
+			}},
+			expectedEvent: `Warning ResizeDeferred Pod resize Rejected: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1,"error":"rejected by the test"}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("500m")}},
+				},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			if tc.reject {
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
+					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+						return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test"}
+					},
+				}})
+			}
+			statusManager := allocationManager.(*manager).statusManager
+			if tc.deferred {
+				statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "deferred by the test", pod.Generation)
+			}
+
+			allocationManager.PushPendingResize(logger, pod.UID)
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			verifyResizeConditions(t, tc.expectedConditions, statusManager.GetPodResizeConditions(pod.UID))
+			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			if tc.expectedEvent != "" {
+				require.Len(t, fakeRecorder.Events, 1)
+				require.Equal(t, tc.expectedEvent, <-fakeRecorder.Events)
+			} else {
+				require.Empty(t, fakeRecorder.Events)
+			}
+
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, !tc.expectAllocated, pending, "pending")
 		})
 	}
 }
@@ -1505,6 +2191,8 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -1725,6 +2413,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.ipprPLRFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
@@ -1746,7 +2435,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -1755,7 +2444,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -1807,6 +2496,8 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -1986,6 +2677,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	for _, tc := range testCases {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.ipprFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
@@ -2002,7 +2694,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -2011,7 +2703,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -2038,6 +2730,8 @@ func TestAllocationManagerAddPod(t *testing.T) {
 }
 
 func TestIsResizeIncreasingRequests(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
@@ -2216,7 +2910,7 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 			}
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{testPod}, nil)
-			require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 
 			if tc.newPodRequests != nil {
 				testPod.Spec.Resources.Requests = tc.newPodRequests
@@ -2230,6 +2924,8 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 }
 
 func TestSortPendingResizes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
@@ -2259,7 +2955,7 @@ func TestSortPendingResizes(t *testing.T) {
 	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6)}
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
 	for _, testPod := range testPods {
-		require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+		require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 	}
 
 	// testPods[0] has the highest priority, as it doesn't increase resource requests (pod-level).
@@ -2296,14 +2992,14 @@ func TestSortPendingResizes(t *testing.T) {
 
 	// Push all the pods to the queue.
 	for i := range testPods {
-		allocationManager.PushPendingResize(testPods[i].UID)
+		allocationManager.PushPendingResize(logger, testPods[i].UID)
 	}
 	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
 
 	// Clear the queue and push the pods in reverse order to spice things up.
 	allocationManager.(*manager).podsWithPendingResizes = nil
 	for i := len(testPods) - 1; i >= 0; i-- {
-		allocationManager.PushPendingResize(testPods[i].UID)
+		allocationManager.PushPendingResize(logger, testPods[i].UID)
 	}
 	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
 }
@@ -2313,9 +3009,10 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	metrics.Register()
 	metrics.PodDeferredAcceptedResizes.Reset()
-	tCtx := ktesting.Init(t)
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2392,7 +3089,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
 
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
-			require.NoError(t, am.SetAllocatedResources(original))
+			require.NoError(t, am.SetAllocatedResources(logger, original))
 			if tc.hasPendingCondition {
 				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
 			}
@@ -2400,7 +3097,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			am.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return resizedPod, true
 			}
-			am.PushPendingResize(original.UID)
+			am.PushPendingResize(logger, original.UID)
 			resizedPods := am.(*manager).retryPendingResizes(tCtx, tc.trigger)
 
 			require.Len(t, resizedPods, 1)
@@ -2418,17 +3115,861 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 	}
 }
 
+func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	tests := []struct {
+		name               string
+		featureGateEnabled bool
+		pod                *v1.Pod
+		expectedAllocated  bool
+		expectedLimit      *resource.Quantity
+	}{
+		{
+			name:               "admit memory-backed volume with size limit when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-1",
+					Name:      "test-pod-1",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "admit memory-backed volume with size limit when gate is disabled",
+			featureGateEnabled: false,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-2",
+					Name:      "test-pod-2",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol-2",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			// The whole spec is stored. The gate only controls whether the limit is applied.
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "admit volume with medium Default (not Memory) when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-3",
+					Name:      "test-pod-3",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "default-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumDefault,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "admit memory-backed volume with nil size limit when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-4",
+					Name:      "test-pod-4",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol-nil-limit",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedAllocated: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.featureGateEnabled)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
+
+			// Admit the Pod
+			ok, reason, message := allocationManager.AddPod(tCtx, []*v1.Pod{test.pod}, test.pod)
+			require.True(t, ok, "admit should succeed: reason=%s, msg=%s", reason, message)
+
+			// Verify state memory has the correct emptyDir allocation
+			memoryStore := allocationManager.(*manager).allocated
+
+			var volName string
+			if len(test.pod.Spec.Volumes) > 0 {
+				volName = test.pod.Spec.Volumes[0].Name
+			}
+			limit, exists := memoryStore.GetEmptyDirVolumeLimit(test.pod.UID, volName)
+
+			if test.expectedAllocated {
+				require.True(t, exists, "emptyDir limit allocation should exist")
+				require.NotNil(t, limit)
+				assert.True(t, test.expectedLimit.Equal(*limit))
+			} else {
+				assert.False(t, exists, "emptyDir limit allocation should not exist")
+				assert.Nil(t, limit)
+			}
+		})
+	}
+}
+
+func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	tests := []struct {
+		name               string
+		featureGateEnabled bool
+		pod                *v1.Pod
+		checkpointLimit    *resource.Quantity
+		expectedUpdated    bool
+		expectedLimit      *resource.Quantity
+	}{
+		{
+			name:               "apply checkpoint limit to spec mismatch when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-1",
+					Name:      "mismatch-pod-1",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI), // 64Mi in spec
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi
+			expectedUpdated: true,
+			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "spec mismatch with checkpoint limit is pending when gate is disabled",
+			featureGateEnabled: false,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-2",
+					Name:      "mismatch-pod-2",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI), // 64Mi in spec
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+			expectedUpdated: true,
+			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "spec already matches checkpoint limits when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-3",
+					Name:      "mismatch-pod-3",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+			expectedUpdated: false,
+			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
+		},
+		{
+			name:               "non-memory volume type mismatch when gate is enabled",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-4",
+					Name:      "mismatch-pod-4",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "default-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumDefault,
+									SizeLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI), // 64Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+			expectedUpdated: false,
+			expectedLimit:   resource.NewQuantity(1024*1024*64, resource.BinarySI),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.featureGateEnabled)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
+
+			// Pre-populate the local cache with the pod as it was allocated, with the checkpoint limit
+			stored := test.pod.DeepCopy()
+			for i := range stored.Spec.Volumes {
+				if vol := &stored.Spec.Volumes[i]; vol.Name == "mem-vol" {
+					vol.EmptyDir.SizeLimit = test.checkpointLimit
+				}
+			}
+			require.NoError(t, allocationManager.(*manager).allocated.SetPod(logger, stored))
+
+			// Actuate UpdatePodFromAllocation and check outcomes
+			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(test.pod)
+			require.Equal(t, test.expectedUpdated, updated)
+			if test.expectedUpdated {
+				assert.NotSame(t, test.pod, allocatedPod, "when an update is pending, the result is a copy")
+			} else {
+				assert.Same(t, test.pod, allocatedPod, "when no update is pending, the pod is returned as-is")
+			}
+
+			if len(allocatedPod.Spec.Volumes) > 0 {
+				vol := allocatedPod.Spec.Volumes[0]
+				if vol.EmptyDir.SizeLimit != nil {
+					assert.True(t, test.expectedLimit.Equal(*vol.EmptyDir.SizeLimit))
+				} else {
+					assert.Nil(t, test.expectedLimit)
+				}
+			}
+		})
+	}
+}
+
+func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	logger := klog.FromContext(tCtx)
+
+	tests := []struct {
+		name                     string
+		isGateEnabled            bool
+		pod                      *v1.Pod
+		targetPod                *v1.Pod
+		expectResizeAllocated    bool
+		expectedAllocatedLimit   *resource.Quantity
+		expectedResizeConditions []*v1.PodCondition
+	}{
+		{
+			name:          "successfully scale up emptyDir limit when gate is enabled",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-1",
+					Name:       "resize-pod-1",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-1",
+					Name:       "resize-pod-1",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI), // Scaled to 256Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  true,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI),
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 2,
+				},
+			},
+		},
+		{
+			name:          "successfully scale down emptyDir limit when gate is enabled",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-2",
+					Name:       "resize-pod-2",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-2",
+					Name:       "resize-pod-2",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI), // Scaled down to 64Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  true,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI),
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 2,
+				},
+			},
+		},
+		{
+			name:          "resize request is infeasible when gate is disabled",
+			isGateEnabled: false,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-3",
+					Name:       "resize-pod-3",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-3",
+					Name:       "resize-pod-3",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  false,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // Stays at 128Mi
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             "Infeasible",
+					Message:            "Memory-backed emptyDir volume resize is disabled",
+					ObservedGeneration: 2,
+				},
+			},
+		},
+		{
+			name:          "no-op resize request (target limit same as current allocation)",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-4",
+					Name:       "resize-pod-4",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-4",
+					Name:       "resize-pod-4",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:    false,
+			expectedAllocatedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
+			expectedResizeConditions: nil,
+		},
+		{
+			name:          "scale up emptyDir limit combined with out-of-resources CPU resize (expect Deferred)",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-5",
+					Name:       "resize-pod-5",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"), // 1 CPU
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-5",
+					Name:       "resize-pod-5",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("5"), // 5 CPU: exceeds Node Allocatable CPU 4!
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI), // 256Mi target
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  false,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // Stays at 128Mi
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             "Deferred",
+					Message:            "cpu",
+					ObservedGeneration: 2,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.isGateEnabled)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
+
+			// Set the initial checkpoints
+			err := allocationManager.SetAllocatedResources(logger, test.pod)
+			require.NoError(t, err)
+
+			// Setup getPodByUID mock to return targetPod
+			allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+				if uid == test.pod.UID {
+					return test.targetPod, true
+				}
+				return nil, false
+			}
+
+			// Actuate
+			resizeAllocated, err := allocationManager.(*manager).handlePodResourcesResize(context.Background(), test.targetPod)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResizeAllocated, resizeAllocated)
+
+			// Verify the final checkpoint allocation
+			limit, exists := allocationManager.(*manager).allocated.GetEmptyDirVolumeLimit(test.pod.UID, "mem-vol")
+
+			if test.expectedAllocatedLimit != nil {
+				require.True(t, exists)
+				assert.True(t, test.expectedAllocatedLimit.Equal(*limit))
+			} else {
+				assert.False(t, exists)
+			}
+
+			// Verify status manager conditions
+			actualConditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(test.pod.UID)
+			verifyResizeConditions(t, test.expectedResizeConditions, actualConditions)
+		})
+	}
+}
+
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod, nodeConfig *cm.NodeConfig) Manager {
 	t.Helper()
 	logger, _ := ktesting.NewTestContext(t)
 	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	var containerManager *cm.FakeContainerManager
 	if nodeConfig == nil {
-		containerManager = cm.NewFakeContainerManager()
+		containerManager = cm.NewFakeContainerManager(logger)
 	} else {
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
 	allocationManager := NewInMemoryManager(
+		logger,
 		statusManager,
 		func(_ context.Context, pod *v1.Pod) {
 			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
@@ -2467,7 +4008,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	}
 
 	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager, logger)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
@@ -2482,4 +4023,199 @@ func setContainerStatus(podStatus *kubecontainer.PodStatus, c *v1.Container, idx
 			MemoryLimit: c.Resources.Limits.Memory(),
 		},
 	}
+}
+
+func verifyResizeConditions(t *testing.T, expected, actual []*v1.PodCondition) {
+	t.Helper()
+	if !assert.Len(t, actual, len(expected), "different number of resize conditions") {
+		return
+	}
+	for i := range actual {
+		// Ignore probe time and last transition time during comparison.
+		actual[i].LastProbeTime = metav1.Time{}
+		actual[i].LastTransitionTime = metav1.Time{}
+
+		// Message is a substring assertion, since it can change slightly.
+		if expected[i].Message != "" {
+			assert.Contains(t, actual[i].Message, expected[i].Message)
+		} else {
+			assert.Empty(t, actual[i].Message)
+		}
+		actual[i].Message = expected[i].Message
+	}
+	assert.Equal(t, expected, actual)
+}
+
+// TestNonAllocatedPodsExcludedFromCapacity_Resize verifies that a pending pod
+// without an allocation does not block resize of an already-running pod.
+func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
+	allocationManager, runningPod, pendingPod, logger := setupNonAllocatedCapacityTest(t)
+
+	cpu1500m := resource.MustParse("1500m")
+	mem1000M := resource.MustParse("1Gi")
+
+	resizedPod := runningPod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}
+
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		if uid == runningPod.UID {
+			return resizedPod, true
+		}
+		if uid == pendingPod.UID {
+			return pendingPod, true
+		}
+		return nil, false
+	}
+
+	allocationManager.PushPendingResize(logger, runningPod.UID)
+	allocationManager.RetryPendingResizes(context.TODO(), TriggerReasonPodUpdated)
+
+	// If pendingPod was incorrectly included in capacity calculations, this
+	// resize would be deferred (1500m + 10000m > 4000m allocatable).
+	resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(runningPod.UID)
+	require.Len(t, resizeStatus, 1)
+	assert.Equal(t, v1.PodResizeInProgress, resizeStatus[0].Type)
+	assert.Equal(t, v1.ConditionTrue, resizeStatus[0].Status)
+
+	alloc, found := allocationManager.GetContainerResourceAllocation(runningPod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, cpu1500m, *alloc.Requests.Cpu())
+
+	_, foundPending := allocationManager.GetContainerResourceAllocation(pendingPod.UID, "c1")
+	assert.False(t, foundPending)
+}
+
+// TestNonAllocatedPodsExcludedFromCapacity_AddPod verifies that a pending pod
+// without an allocation does not block admission of a new pod.
+func TestNonAllocatedPodsExcludedFromCapacity_AddPod(t *testing.T) {
+	allocationManager, runningPod, pendingPod, _ := setupNonAllocatedCapacityTest(t)
+
+	cpu500m := resource.MustParse("500m")
+	mem1000M := resource.MustParse("1Gi")
+
+	newPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "new-pod",
+			Name:      "new-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	// If pendingPod was incorrectly included in capacity calculations,
+	// AddPod would fail (500m + 1000m + 10000m > 4000m allocatable).
+	ok, reason, message := allocationManager.AddPod(context.TODO(), []*v1.Pod{runningPod, pendingPod}, newPod)
+	assert.True(t, ok, "AddPod should succeed: reason=%s message=%s", reason, message)
+
+	newAlloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, cpu500m, *newAlloc.Requests.Cpu())
+
+	_, foundPending := allocationManager.GetContainerResourceAllocation(pendingPod.UID, "c1")
+	assert.False(t, foundPending)
+}
+
+// setupNonAllocatedCapacityTest creates a common test environment with:
+//   - A running pod allocated 1000m CPU and 1Gi memory
+//   - A pending pod requesting resources way beyond node capacity (not allocated)
+//   - An allocation manager with 4 CPU and 4Gi memory allocatable
+//
+// This setup is used to verify that the non-allocated pending pod is excluded
+// from capacity calculations and doesn't block legitimate operations.
+func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klog.Logger) {
+	t.Helper()
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	cpu10000m := resource.MustParse("10")
+	mem1000M := resource.MustParse("1Gi")
+	mem10000M := resource.MustParse("10Gi")
+
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "running-pod",
+			Name:      "running-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	pendingPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pending-pod",
+			Name:      "pending-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu10000m, v1.ResourceMemory: mem10000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID:        runningPod.UID,
+		Name:      runningPod.Name,
+		Namespace: runningPod.Namespace,
+	}
+	podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(runningPod.Spec.Containers))
+	for i, c := range runningPod.Spec.Containers {
+		setContainerStatus(podStatus, &c, i)
+	}
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{runningPod, pendingPod}, nil)
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, runningPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(logger, runningPod.UID)
+		allocationManager.RemovePod(logger, pendingPod.UID)
+	})
+
+	return allocationManager, runningPod, pendingPod, logger
 }

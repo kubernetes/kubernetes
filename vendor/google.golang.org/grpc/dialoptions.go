@@ -173,10 +173,8 @@ func newJoinDialOption(opts ...DialOption) DialOption {
 // If this option is set to true every connection will release the buffer after
 // flushing the data on the wire.
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// Deprecated: shared write buffer is enabled by default. WithSharedWriteBuffer
+// will be removed in a future release.
 func WithSharedWriteBuffer(val bool) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.SharedWriteBuffer = val
@@ -229,6 +227,14 @@ func WithInitialConnWindowSize(s int32) DialOption {
 
 // WithStaticStreamWindowSize returns a DialOption which sets the initial
 // stream window size to the value provided and disables dynamic flow control.
+//
+// Note that this also disables dynamic flow control for the connection,
+// falling back to a default static connection-level window of 64KB. To
+// use a larger connection-level window, you must also use the
+// [WithStaticConnWindowSize] DialOption.
+//
+// Most users should not configure static flow control windows unless
+// operating in a memory-constrained environment.
 func WithStaticStreamWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialWindowSize = s
@@ -239,6 +245,14 @@ func WithStaticStreamWindowSize(s int32) DialOption {
 // WithStaticConnWindowSize returns a DialOption which sets the initial
 // connection window size to the value provided and disables dynamic flow
 // control.
+//
+// Note that this also disables dynamic flow control for individual streams,
+// falling back to a default static connection-level window of 64KB. To
+// explicitly configure the stream-level window size, you must also use the
+// [WithStaticStreamWindowSize] DialOption.
+//
+// Most users should not configure static flow control windows unless
+// operating in a memory-constrained environment.
 func WithStaticConnWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialConnWindowSize = s

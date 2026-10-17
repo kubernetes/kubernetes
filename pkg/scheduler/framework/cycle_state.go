@@ -109,15 +109,22 @@ func (c *CycleState) IsPodGroupSchedulingCycle() bool {
 	return c.podGroupCycleState != nil
 }
 
-func (c *CycleState) SetPodGroupSchedulingCycle(podGroupCycleState fwk.PodGroupCycleState) {
+func (c *CycleState) SetPodGroupCycleState(podGroupCycleState fwk.PodGroupCycleState) {
 	c.podGroupCycleState = podGroupCycleState
 }
 
-func (c *CycleState) GetPodGroupSchedulingCycle() fwk.PodGroupCycleState {
+func (c *CycleState) GetPodGroupCycleState() fwk.PodGroupCycleState {
 	return c.podGroupCycleState
 }
 
 func (c *CycleState) GetPlacementCycleState() fwk.PlacementCycleState {
+	return c.placementCycleState
+}
+
+// GetParentPlacementCycleState implements [fwk.PodGroupCycleState.GetParentPlacementCycleState].
+// We can reuse the same placementCycleState field as GetPlacementCycleState, as it implements a different interface
+// and the two are mutually exclusive.
+func (c *CycleState) GetParentPlacementCycleState() fwk.PlacementCycleState {
 	return c.placementCycleState
 }
 

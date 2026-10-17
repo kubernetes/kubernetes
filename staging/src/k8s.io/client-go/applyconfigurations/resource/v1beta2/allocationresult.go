@@ -28,12 +28,12 @@ import (
 //
 // AllocationResult contains attributes of an allocated resource.
 type AllocationResultApplyConfiguration struct {
-	// Devices is the result of allocating devices.
+	// devices is the result of allocating devices.
 	Devices *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
-	// NodeSelector defines where the allocated resources are available. If
+	// nodeSelector defines where the allocated resources are available. If
 	// unset, they are available everywhere.
 	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	// AllocationTimestamp stores the time when the resources were allocated.
+	// allocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
 	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus

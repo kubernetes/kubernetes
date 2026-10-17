@@ -29,6 +29,9 @@ func decodePoString(text string) string {
 				break
 			}
 			switch line[i+1] {
+			case 'r': // \\r -> \r
+				data = append(data, '\r')
+				i++
 			case 'n': // \\n -> \n
 				data = append(data, '\n')
 				i++
@@ -62,6 +65,8 @@ func encodePoString(text string) string {
 				buf.WriteString(`\\`)
 			case '"':
 				buf.WriteString(`\"`)
+			case '\r':
+				buf.WriteString(`\r`)
 			case '\n':
 				buf.WriteString(`\n`)
 			case '\t':
@@ -96,6 +101,8 @@ func encodeCommentPoString(text string) string {
 				buf.WriteString(`\\`)
 			case '"':
 				buf.WriteString(`\"`)
+			case '\r':
+				buf.WriteString(`\r`)
 			case '\n':
 				buf.WriteString(`\n`)
 			case '\t':

@@ -37,13 +37,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/ktesting"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 )
 
@@ -221,7 +221,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": localUpClusterRuntimeConfig,
-			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
+			"FEATURE_GATES":  "DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, fmt.Sprintf("0-initial-%d.%d", major, previousMinor), binDir, localUpClusterEnv, "")
@@ -267,6 +267,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	var subTests = map[string]struct {
 		test            initialTestFunc
 		driverResources map[string]resourceslice.DriverResources
+		configureDriver func(*drautils.Driver)
 	}{
 		"core-dra": {
 			test:            coreDRA,
@@ -290,6 +291,14 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 			test:            extendedResourceUpgradeDowngrade(resourceTypeImplicit),
 			driverResources: extendedResourcesDriverResources(nodes),
 		},
+		"pool-name-field-selector-fallback": {
+			test:            poolNameFieldSelectorFallback,
+			driverResources: poolNameFieldSelectorFallbackResources(nodes),
+			configureDriver: func(d *drautils.Driver) {
+				d.ReconcilePoolWithName = poolNameFieldSelectorFallbackPool
+				d.UsePrivilegedClient = true
+			},
+		},
 	}
 
 	// Create a driver and builder for each sub-test. Opening sockets locally
@@ -302,6 +311,9 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		d := drautils.NewDriverInstance(tCtx)
 		d.SetNameSuffix(tCtx, name)
 		d.IsLocal = true
+		if def.configureDriver != nil {
+			def.configureDriver(d)
+		}
 		d.Run(tCtx, "/var/lib/kubelet", nodes, def.driverResources)
 		b := drautils.NewBuilderNow(tCtx, d)
 		b.SkipCleanup = true

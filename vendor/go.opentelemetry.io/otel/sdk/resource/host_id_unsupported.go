@@ -3,7 +3,7 @@
 
 //go:build !darwin && !dragonfly && !freebsd && !linux && !netbsd && !openbsd && !solaris && !windows
 
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource
 
 // hostIDReaderUnsupported is a placeholder implementation for operating systems
 // for which this project currently doesn't support host.id

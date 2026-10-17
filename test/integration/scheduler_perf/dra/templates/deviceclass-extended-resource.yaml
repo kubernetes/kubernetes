@@ -1,4 +1,4 @@
-apiVersion: resource.k8s.io/v1beta2
+apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
   name: test-class-{{.Index}}
@@ -6,4 +6,4 @@ spec:
   selectors:
   - cel:
       expression: device.driver == "test-driver.cdi.k8s.io"
-  extendedResourceName: example.com/gpu-{{.Index}}
+  {{if eq .class "example.com/gpu"}}extendedResourceName: example.com/gpu-{{.Index}}{{end}}

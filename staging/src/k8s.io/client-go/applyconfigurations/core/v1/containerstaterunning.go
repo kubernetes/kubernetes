@@ -27,7 +27,7 @@ import (
 //
 // ContainerStateRunning is a running state of a container.
 type ContainerStateRunningApplyConfiguration struct {
-	// Time at which the container was last (re-)started
+	// startedAt is the time at which the container was last (re-)started
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
 }
 

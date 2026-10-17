@@ -37,6 +37,7 @@ import (
 type RuntimeClass struct {
 	metav1.TypeMeta `json:""`
 
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -52,9 +53,9 @@ type RuntimeClass struct {
 	// The handler must be lowercase, conform to the DNS Label (RFC 1123) requirements,
 	// and is immutable.
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:format="k8s-short-name"
-	// +k8s:alpha(since: "1.36")=+k8s:immutable
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:format="k8s-short-name"
+	// +k8s:immutable
+	// +k8s:required
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
 
 	// overhead represents the resource overhead associated with running a pod for a

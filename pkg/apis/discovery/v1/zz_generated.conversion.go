@@ -24,11 +24,9 @@ package v1
 import (
 	unsafe "unsafe"
 
-	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	discovery "k8s.io/kubernetes/pkg/apis/discovery"
 )
 
@@ -123,16 +121,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1_Endpoint_To_discovery_Endpoint(in *discoveryv1.Endpoint, out *discovery.Endpoint, s conversion.Scope) error {
-	out.Addresses = *(*[]string)(unsafe.Pointer(&in.Addresses))
-	if err := Convert_v1_EndpointConditions_To_discovery_EndpointConditions(&in.Conditions, &out.Conditions, s); err != nil {
-		return err
-	}
-	out.Hostname = (*string)(unsafe.Pointer(in.Hostname))
-	out.TargetRef = (*core.ObjectReference)(unsafe.Pointer(in.TargetRef))
-	out.DeprecatedTopology = *(*map[string]string)(unsafe.Pointer(&in.DeprecatedTopology))
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.Zone = (*string)(unsafe.Pointer(in.Zone))
-	out.Hints = (*discovery.EndpointHints)(unsafe.Pointer(in.Hints))
+	*out = *(*discovery.Endpoint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -142,16 +131,7 @@ func Convert_v1_Endpoint_To_discovery_Endpoint(in *discoveryv1.Endpoint, out *di
 }
 
 func autoConvert_discovery_Endpoint_To_v1_Endpoint(in *discovery.Endpoint, out *discoveryv1.Endpoint, s conversion.Scope) error {
-	out.Addresses = *(*[]string)(unsafe.Pointer(&in.Addresses))
-	if err := Convert_discovery_EndpointConditions_To_v1_EndpointConditions(&in.Conditions, &out.Conditions, s); err != nil {
-		return err
-	}
-	out.Hostname = (*string)(unsafe.Pointer(in.Hostname))
-	out.TargetRef = (*corev1.ObjectReference)(unsafe.Pointer(in.TargetRef))
-	out.DeprecatedTopology = *(*map[string]string)(unsafe.Pointer(&in.DeprecatedTopology))
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.Zone = (*string)(unsafe.Pointer(in.Zone))
-	out.Hints = (*discoveryv1.EndpointHints)(unsafe.Pointer(in.Hints))
+	*out = *(*discoveryv1.Endpoint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -161,9 +141,7 @@ func Convert_discovery_Endpoint_To_v1_Endpoint(in *discovery.Endpoint, out *disc
 }
 
 func autoConvert_v1_EndpointConditions_To_discovery_EndpointConditions(in *discoveryv1.EndpointConditions, out *discovery.EndpointConditions, s conversion.Scope) error {
-	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
-	out.Serving = (*bool)(unsafe.Pointer(in.Serving))
-	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
+	*out = *(*discovery.EndpointConditions)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -173,9 +151,7 @@ func Convert_v1_EndpointConditions_To_discovery_EndpointConditions(in *discovery
 }
 
 func autoConvert_discovery_EndpointConditions_To_v1_EndpointConditions(in *discovery.EndpointConditions, out *discoveryv1.EndpointConditions, s conversion.Scope) error {
-	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
-	out.Serving = (*bool)(unsafe.Pointer(in.Serving))
-	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
+	*out = *(*discoveryv1.EndpointConditions)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -185,8 +161,7 @@ func Convert_discovery_EndpointConditions_To_v1_EndpointConditions(in *discovery
 }
 
 func autoConvert_v1_EndpointHints_To_discovery_EndpointHints(in *discoveryv1.EndpointHints, out *discovery.EndpointHints, s conversion.Scope) error {
-	out.ForZones = *(*[]discovery.ForZone)(unsafe.Pointer(&in.ForZones))
-	out.ForNodes = *(*[]discovery.ForNode)(unsafe.Pointer(&in.ForNodes))
+	*out = *(*discovery.EndpointHints)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -196,8 +171,7 @@ func Convert_v1_EndpointHints_To_discovery_EndpointHints(in *discoveryv1.Endpoin
 }
 
 func autoConvert_discovery_EndpointHints_To_v1_EndpointHints(in *discovery.EndpointHints, out *discoveryv1.EndpointHints, s conversion.Scope) error {
-	out.ForZones = *(*[]discoveryv1.ForZone)(unsafe.Pointer(&in.ForZones))
-	out.ForNodes = *(*[]discoveryv1.ForNode)(unsafe.Pointer(&in.ForNodes))
+	*out = *(*discoveryv1.EndpointHints)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -207,10 +181,7 @@ func Convert_discovery_EndpointHints_To_v1_EndpointHints(in *discovery.EndpointH
 }
 
 func autoConvert_v1_EndpointPort_To_discovery_EndpointPort(in *discoveryv1.EndpointPort, out *discovery.EndpointPort, s conversion.Scope) error {
-	out.Name = (*string)(unsafe.Pointer(in.Name))
-	out.Protocol = (*core.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*int32)(unsafe.Pointer(in.Port))
-	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
+	*out = *(*discovery.EndpointPort)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -220,10 +191,7 @@ func Convert_v1_EndpointPort_To_discovery_EndpointPort(in *discoveryv1.EndpointP
 }
 
 func autoConvert_discovery_EndpointPort_To_v1_EndpointPort(in *discovery.EndpointPort, out *discoveryv1.EndpointPort, s conversion.Scope) error {
-	out.Name = (*string)(unsafe.Pointer(in.Name))
-	out.Protocol = (*corev1.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*int32)(unsafe.Pointer(in.Port))
-	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
+	*out = *(*discoveryv1.EndpointPort)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -281,7 +249,7 @@ func Convert_discovery_EndpointSliceList_To_v1_EndpointSliceList(in *discovery.E
 }
 
 func autoConvert_v1_ForNode_To_discovery_ForNode(in *discoveryv1.ForNode, out *discovery.ForNode, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*discovery.ForNode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -291,7 +259,7 @@ func Convert_v1_ForNode_To_discovery_ForNode(in *discoveryv1.ForNode, out *disco
 }
 
 func autoConvert_discovery_ForNode_To_v1_ForNode(in *discovery.ForNode, out *discoveryv1.ForNode, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*discoveryv1.ForNode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -301,7 +269,7 @@ func Convert_discovery_ForNode_To_v1_ForNode(in *discovery.ForNode, out *discove
 }
 
 func autoConvert_v1_ForZone_To_discovery_ForZone(in *discoveryv1.ForZone, out *discovery.ForZone, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*discovery.ForZone)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -311,7 +279,7 @@ func Convert_v1_ForZone_To_discovery_ForZone(in *discoveryv1.ForZone, out *disco
 }
 
 func autoConvert_discovery_ForZone_To_v1_ForZone(in *discovery.ForZone, out *discoveryv1.ForZone, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*discoveryv1.ForZone)(unsafe.Pointer(in))
 	return nil
 }
 

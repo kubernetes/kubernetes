@@ -44,11 +44,10 @@
     ]
   },
   "spec": {
-    "podGroupTemplateRef": {
-      "workload": {
-        "workloadName": "workloadNameValue",
-        "podGroupTemplateName": "podGroupTemplateNameValue"
-      }
+    "parentCompositePodGroupName": "parentCompositePodGroupNameValue",
+    "workloadRef": {
+      "workloadName": "workloadNameValue",
+      "templateName": "templateNameValue"
     },
     "schedulingPolicy": {
       "basic": {},
@@ -75,7 +74,8 @@
       "all": {}
     },
     "priorityClassName": "priorityClassNameValue",
-    "priority": 7
+    "priority": 8,
+    "preemptionPolicy": "preemptionPolicyValue"
   },
   "status": {
     "conditions": [

@@ -23,8 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	cadvisorv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
@@ -449,23 +448,23 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID ty
 }
 
 // GetRequestedContainersInfo returns container info.
-func (kl *Kubelet) GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapiv1.ContainerInfo, error) {
+func (kl *Kubelet) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return kl.cadvisor.GetRequestedContainersInfo(containerName, options)
 }
 
 // GetVersionInfo returns information about the version of cAdvisor in use.
-func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
+func (kl *Kubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return kl.cadvisor.VersionInfo()
 }
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
-func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
+func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	kl.machineInfoLock.RLock()
 	defer kl.machineInfoLock.RUnlock()
 	return kl.machineInfo, nil
 }
 
-func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
+func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapi.MachineInfo) {
 	kl.machineInfoLock.Lock()
 	defer kl.machineInfoLock.Unlock()
 	kl.machineInfo = info
@@ -480,4 +479,24 @@ func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAd
 		return nil
 	}
 	return node.Status.Addresses
+}
+
+// GetAllocatedPods returns all active pods with their allocated resources.
+func (kl *Kubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	return kl.allocationManager.GetAllocatedPods(), nil
+}
+
+// GetAllocatedPodByName returns the allocated pod with the given namespace and name.
+// It returns (nil, nil) if the pod is not found or is inactive.
+func (kl *Kubelet) GetAllocatedPodByName(namespace, name string) (*v1.Pod, error) {
+	pod, found := kl.GetPodByName(namespace, name)
+	if !found {
+		return nil, nil
+	}
+	activePods := kl.filterOutInactivePods([]*v1.Pod{pod})
+	if len(activePods) == 0 {
+		return nil, nil
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	return allocatedPod, nil
 }

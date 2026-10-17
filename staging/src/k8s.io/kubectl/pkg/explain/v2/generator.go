@@ -39,6 +39,8 @@ type Generator interface {
 		fieldSelector []string,
 		// Boolean indicating whether the fields should be rendered recursively/deeply
 		recursive bool,
+		// Maximum recursion depth when recursive is true. 0 means no limit.
+		maxDepth int,
 		// Output writer
 		writer io.Writer,
 	) error
@@ -48,6 +50,7 @@ type TemplateContext struct {
 	GVR       schema.GroupVersionResource
 	Document  map[string]interface{}
 	Recursive bool
+	MaxDepth  int
 	FieldPath []string
 }
 
@@ -84,6 +87,8 @@ func (g *generator) Render(
 	fieldSelector []string,
 	// Boolean indicating whether the fields should be rendered recursively/deeply
 	recursive bool,
+	// Maximum recursion depth when recursive is true. 0 means no limit.
+	maxDepth int,
 	// Output writer
 	writer io.Writer,
 ) error {
@@ -95,6 +100,7 @@ func (g *generator) Render(
 	err := compiledTemplate.Execute(writer, TemplateContext{
 		Document:  document,
 		Recursive: recursive,
+		MaxDepth:  maxDepth,
 		FieldPath: fieldSelector,
 		GVR:       gvr,
 	})

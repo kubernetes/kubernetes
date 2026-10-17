@@ -30,17 +30,12 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 	runAsUser := int64(1)
 	runAsGroup := int64(1)
 	runAsNonRoot := true
-	hostUsers := false
 	onRootMismatchPolicy := api.FSGroupChangeOnRootMismatch
 
 	testcases := []*api.PodSecurityContext{
 		nil,
 		{},
 		{FSGroup: &fsGroup},
-		{HostIPC: true},
-		{HostNetwork: true},
-		{HostPID: true},
-		{HostUsers: &hostUsers},
 		{RunAsNonRoot: &runAsNonRoot},
 		{RunAsUser: &runAsUser},
 		{RunAsGroup: &runAsGroup},
@@ -59,18 +54,6 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 
 		if v := a.FSGroup(); !reflect.DeepEqual(expected.FSGroup, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.FSGroup, v)
-		}
-		if v := a.HostIPC(); !reflect.DeepEqual(expected.HostIPC, v) {
-			t.Errorf("%d: expected %#v, got %#v", i, expected.HostIPC, v)
-		}
-		if v := a.HostNetwork(); !reflect.DeepEqual(expected.HostNetwork, v) {
-			t.Errorf("%d: expected %#v, got %#v", i, expected.HostNetwork, v)
-		}
-		if v := a.HostPID(); !reflect.DeepEqual(expected.HostPID, v) {
-			t.Errorf("%d: expected %#v, got %#v", i, expected.HostPID, v)
-		}
-		if v := a.HostUsers(); !reflect.DeepEqual(expected.HostUsers, v) {
-			t.Errorf("%d: expected %#v, got %#v", i, expected.HostUsers, v)
 		}
 		if v := a.RunAsNonRoot(); !reflect.DeepEqual(expected.RunAsNonRoot, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsNonRoot, v)
@@ -109,10 +92,6 @@ func TestPodSecurityContextMutator(t *testing.T) {
 		"populated": {
 			newSC: func() *api.PodSecurityContext {
 				return &api.PodSecurityContext{
-					HostNetwork:         true,
-					HostIPC:             true,
-					HostPID:             true,
-					HostUsers:           nil,
 					SELinuxOptions:      &api.SELinuxOptions{},
 					RunAsUser:           nil,
 					RunAsGroup:          nil,
@@ -141,10 +120,6 @@ func TestPodSecurityContextMutator(t *testing.T) {
 
 			// no-op sets should not modify the object
 			m.SetFSGroup(m.FSGroup())
-			m.SetHostNetwork(m.HostNetwork())
-			m.SetHostIPC(m.HostIPC())
-			m.SetHostPID(m.HostPID())
-			m.SetHostUsers(m.HostUsers())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
 			m.SetRunAsGroup(m.RunAsGroup())
@@ -167,55 +142,6 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			i := int64(1123)
 			modifiedSC.FSGroup = &i
 			m.SetFSGroup(&i)
-			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
-				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
-				continue
-			}
-		}
-
-		// HostNetwork
-		{
-			modifiedSC := nonNilSC(tc.newSC())
-			m := NewPodSecurityContextMutator(tc.newSC())
-			modifiedSC.HostNetwork = !modifiedSC.HostNetwork
-			m.SetHostNetwork(!m.HostNetwork())
-			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
-				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
-				continue
-			}
-		}
-
-		// HostIPC
-		{
-			modifiedSC := nonNilSC(tc.newSC())
-			m := NewPodSecurityContextMutator(tc.newSC())
-			modifiedSC.HostIPC = !modifiedSC.HostIPC
-			m.SetHostIPC(!m.HostIPC())
-			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
-				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
-				continue
-			}
-		}
-
-		// HostPID
-		{
-			modifiedSC := nonNilSC(tc.newSC())
-			m := NewPodSecurityContextMutator(tc.newSC())
-			modifiedSC.HostPID = !modifiedSC.HostPID
-			m.SetHostPID(!m.HostPID())
-			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
-				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
-				continue
-			}
-		}
-
-		// HostUsers
-		{
-			modifiedSC := nonNilSC(tc.newSC())
-			m := NewPodSecurityContextMutator(tc.newSC())
-			b := false
-			modifiedSC.HostUsers = &b
-			m.SetHostUsers(&b)
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue

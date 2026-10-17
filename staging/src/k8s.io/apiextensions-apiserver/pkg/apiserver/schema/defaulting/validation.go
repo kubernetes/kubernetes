@@ -26,12 +26,10 @@ import (
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
@@ -87,7 +85,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			// check ObjectMeta/TypeMeta and everything else
 			if err := schemaobjectmeta.Coerce(nil, obj, rootSchema, true, false); err != nil {
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", err)))
-			} else if errs := schemaobjectmeta.Validate(nil, obj, rootSchema, true); len(errs) > 0 {
+			} else if errs := schemaobjectmeta.Validate(ctx, nil, obj, rootSchema, true); len(errs) > 0 {
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
@@ -95,11 +93,10 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-					// If ratcheting is enabled some CEL rules may use optionalOldSelf
-					// For such rules the above validation is not sufficient for
-					// determining if the default value is a valid value to introduce
-					// via create or uncorrelated update.
+				if len(celErrs) == 0 {
+					// Some CEL rules may use optionalOldSelf. For such rules the above
+					// validation is not sufficient for determining if the default value
+					// is a valid value to introduce via create or uncorrelated update.
 					//
 					// Validate an update from nil to the default value to ensure
 					// that the default value pass
@@ -131,7 +128,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			// check ObjectMeta/TypeMeta and everything else
 			if err := schemaobjectmeta.Coerce(pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource, false); err != nil {
 				allErrs = append(allErrs, err)
-			} else if errs := schemaobjectmeta.Validate(pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource); len(errs) > 0 {
+			} else if errs := schemaobjectmeta.Validate(ctx, pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
@@ -139,11 +136,10 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-					// If ratcheting is enabled some CEL rules may use optionalOldSelf
-					// For such rules the above validation is not sufficient for
-					// determining if the default value is a valid value to introduce
-					// via create or uncorrelated update.
+				if len(celErrs) == 0 {
+					// Some CEL rules may use optionalOldSelf. For such rules the above
+					// validation is not sufficient for determining if the default value
+					// is a valid value to introduce via create or uncorrelated update.
 					//
 					// Validate an update from nil to the default value to ensure
 					// that the default value pass

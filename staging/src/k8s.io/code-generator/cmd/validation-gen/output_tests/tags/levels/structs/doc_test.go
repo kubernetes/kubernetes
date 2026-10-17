@@ -76,14 +76,14 @@ func TestConditionalStruct(t *testing.T) {
 		ConditionalFieldBeta: 15,
 		RecursiveAlpha:       25,
 		RecursiveBeta:        25,
-	}).Opts([]string{"MyFeature"}).ExpectValid()
+	}).Opts(map[string]bool{"MyFeature": true}).ExpectValid()
 
 	st.Value(&ConditionalStruct{
 		ConditionalField:     5,
 		ConditionalFieldBeta: 5,
 		RecursiveAlpha:       10,
 		RecursiveBeta:        10,
-	}).Opts([]string{"MyFeature"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
+	}).Opts(map[string]bool{"MyFeature": true}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
 		field.Invalid(field.NewPath("conditionalField"), 5, "").WithOrigin("minimum").MarkAlpha(),
 		field.Invalid(field.NewPath("conditionalFieldBeta"), 5, "").WithOrigin("minimum").MarkBeta(),
 		field.Invalid(field.NewPath("recursiveAlpha"), 10, "").WithOrigin("minimum").MarkAlpha(),

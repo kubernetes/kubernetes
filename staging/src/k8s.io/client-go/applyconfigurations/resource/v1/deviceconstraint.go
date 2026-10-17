@@ -27,7 +27,7 @@ import (
 //
 // DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraintApplyConfiguration struct {
-	// Requests is a list of the one or more requests in this claim which
+	// requests is a list of the one or more requests in this claim which
 	// must co-satisfy this constraint. If a request is fulfilled by
 	// multiple devices, then all of the devices must satisfy the
 	// constraint. If this is not specified, this constraint applies to all
@@ -37,7 +37,7 @@ type DeviceConstraintApplyConfiguration struct {
 	// and may include the subrequest using the format <main request>[/<subrequest>]. If just
 	// the main request is given, the constraint applies to all subrequests.
 	Requests []string `json:"requests,omitempty"`
-	// MatchAttribute requires that all devices in question have this
+	// matchAttribute requires that all devices in question have this
 	// attribute and that its type and value are the same across those
 	// devices.
 	//
@@ -55,7 +55,7 @@ type DeviceConstraintApplyConfiguration struct {
 	//
 	// Must include the domain qualifier.
 	MatchAttribute *resourcev1.FullyQualifiedName `json:"matchAttribute,omitempty"`
-	// DistinctAttribute requires that all devices in question have this
+	// distinctAttribute requires that all devices in question have this
 	// attribute and that its type and value are unique across those devices.
 	//
 	// When the DRAListTypeAttributes feature gate is enabled, comparison uses

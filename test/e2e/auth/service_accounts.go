@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -449,6 +450,118 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			if tc.fsGroup {
 				pod.Spec.SecurityContext.FSGroup = &tc.wantGID
+			}
+
+			output := []string{
+				fmt.Sprintf("perms of file \"%v\": %s", tokenVolumePath, tc.wantPerm),
+				fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, `[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*`),
+				fmt.Sprintf("owner UID of \"%v\": %d", tokenVolumePath, tc.wantUID),
+				fmt.Sprintf("owner GID of \"%v\": %d", tokenVolumePath, tc.wantGID),
+			}
+			e2eoutput.TestContainerOutputRegexp(ctx, f, "service account token: ", pod, 0, output)
+		}
+	})
+
+	f.It("should set ownership when DefaultUser or User is present [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
+		var (
+			podName         = "test-pod-" + string(uuid.NewUUID())
+			volumeName      = "test-volume"
+			volumeMountPath = "/test-volume"
+			tokenVolumePath = "/test-volume/..data/token"
+		)
+
+		volumes := []v1.Volume{
+			{
+				Name: volumeName,
+				VolumeSource: v1.VolumeSource{
+					Projected: &v1.ProjectedVolumeSource{
+						Sources: []v1.VolumeProjection{
+							{
+								ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+									Path:              "token",
+									ExpirationSeconds: ptr.To[int64](60 * 60),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		volumeMounts := []v1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: volumeMountPath,
+				ReadOnly:  true,
+			},
+		}
+		mounttestArgs := []string{
+			"mounttest",
+			fmt.Sprintf("--file_perm=%v", tokenVolumePath),
+			fmt.Sprintf("--file_owner=%v", tokenVolumePath),
+			fmt.Sprintf("--file_content=%v", tokenVolumePath),
+		}
+
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, volumes, volumeMounts, nil, mounttestArgs...)
+		pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+		testcases := []struct {
+			runAsUser   *int64
+			runAsGroup  *int64
+			fsGroup     *int64
+			defaultUser *int64
+			itemUser    *int64
+			wantPerm    string
+			wantUID     int64
+			wantGID     int64
+		}{
+			{
+				defaultUser: ptr.To[int64](1001),
+				wantPerm:    "-rw-------",
+				wantUID:     1001,
+				wantGID:     0,
+			},
+			{
+				itemUser: ptr.To[int64](1001),
+				wantPerm: "-rw-------",
+				wantUID:  1001,
+				wantGID:  0,
+			},
+			{
+				defaultUser: ptr.To[int64](1000),
+				itemUser:    ptr.To[int64](1001),
+				wantPerm:    "-rw-------",
+				wantUID:     1001,
+				wantGID:     0,
+			},
+			{
+				runAsUser:  ptr.To[int64](1000),
+				runAsGroup: ptr.To[int64](1000),
+				fsGroup:    ptr.To[int64](1000),
+				itemUser:   ptr.To[int64](1001),
+				wantPerm:   "-rw-r-----",
+				wantUID:    1001,
+				wantGID:    1000,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			if tc.runAsUser != nil {
+				pod.Spec.SecurityContext.RunAsUser = tc.runAsUser
+			}
+			if tc.runAsGroup != nil {
+				pod.Spec.SecurityContext.RunAsGroup = tc.runAsGroup
+			}
+			if tc.fsGroup != nil {
+				pod.Spec.SecurityContext.FSGroup = tc.fsGroup
+			}
+			if tc.defaultUser != nil {
+				pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = tc.defaultUser
+			}
+			if tc.itemUser != nil {
+				pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ServiceAccountToken.User = tc.itemUser
 			}
 
 			output := []string{

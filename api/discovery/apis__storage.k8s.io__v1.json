@@ -38,6 +38,17 @@
       ]
     },
     {
+      "kind": "CSINode",
+      "name": "csinodes/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "kind": "CSIStorageCapacity",
       "name": "csistoragecapacities",
       "namespaced": true,

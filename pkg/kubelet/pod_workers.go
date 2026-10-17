@@ -336,6 +336,16 @@ const (
 // podSyncStatus tracks per-pod transitions through the three phases of pod
 // worker sync (setup, terminating, terminated).
 type podSyncStatus struct {
+	// ctx is reused across normal pod syncs.
+	// A new ctx is created on the next startPodSync after explicit cancellation.
+	//
+	// TODO: remove this from the struct by having the context initialized
+	// in startPodSync, the cancelFn used by UpdatePod, and cancellation of
+	// a parent context for tearing down workers (if needed) on shutdown.
+	// Be careful not to leak contexts (see #139823).
+	// Be careful that long-lived goroutines (such as prober workers) outlive
+	// the lifetime of a single startPodSync cancellation context.
+	ctx context.Context
 	// cancelFn if set is expected to cancel the current podSyncer operation.
 	cancelFn context.CancelFunc
 
@@ -794,7 +804,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 			// Check to see if the pod is not running and the pod is terminal; if this succeeds then record in the podWorker that it is terminated.
 			// This is needed because after a kubelet restart, we need to ensure terminal pods will NOT be considered active in Pod Admission. See http://issues.k8s.io/105523
 			// However, `filterOutInactivePods`, considers pods that are actively terminating as active. As a result, `IsPodKnownTerminated()` needs to return true and thus `terminatedAt` needs to be set.
-			if statusCache, err := p.podCache.Get(uid); err == nil {
+			if statusCache, err := p.podCache.Get(ctx, uid); err == nil {
 				if isPodStatusCacheTerminal(statusCache) {
 					// At this point we know:
 					// (1) The pod is terminal based on the config source.
@@ -1152,7 +1162,11 @@ func (p *podWorkers) startPodSync(parentCtx context.Context, podUID types.UID) (
 	default:
 	}
 
-	ctx, status.cancelFn = context.WithCancel(parentCtx)
+	if status.ctx == nil || status.ctx.Err() != nil {
+		// create a context with parentCtx's values, and reuse it until it is canceled
+		status.ctx, status.cancelFn = context.WithCancel(context.WithoutCancel(parentCtx))
+	}
+	ctx = status.ctx
 
 	// if we are already started, make our state visible to downstream components
 	if status.IsStarted() {
@@ -1271,7 +1285,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				//  Improving this latency also reduces the possibility that a terminated
 				//  container's status is garbage collected before we have a chance to update the
 				//  API server (thus losing the exit code).
-				status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
+				status, err = p.podCache.GetNewerThan(ctx, update.Options.Pod.UID, lastSyncTime)
 
 				if err != nil {
 					// This is the legacy event thrown by manage pod loop all other events are now dispatched

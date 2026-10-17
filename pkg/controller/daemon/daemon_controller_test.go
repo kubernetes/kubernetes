@@ -552,8 +552,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(ctx.Done())
-	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
+	f.StartWithContext(ctx)
+	for ty, ok := range f.WaitForCacheSyncWithContext(ctx).Synced {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}

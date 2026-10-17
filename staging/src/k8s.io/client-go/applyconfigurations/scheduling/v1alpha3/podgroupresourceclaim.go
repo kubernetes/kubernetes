@@ -30,17 +30,17 @@ package v1alpha3
 // own Spec.ResourceClaims. The Pod's claim must match all fields of the
 // PodGroup's claim exactly.
 type PodGroupResourceClaimApplyConfiguration struct {
-	// Name uniquely identifies this resource claim inside the PodGroup.
+	// name uniquely identifies this resource claim inside the PodGroup.
 	// This must be a DNS_LABEL.
 	Name *string `json:"name,omitempty"`
-	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// resourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this PodGroup. The ResourceClaim will be reserved for the
 	// PodGroup instead of its individual pods.
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
-	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// resourceClaimTemplateName is the name of a ResourceClaimTemplate
 	// object in the same namespace as this PodGroup.
 	//
 	// The template will be used to create a new ResourceClaim, which will

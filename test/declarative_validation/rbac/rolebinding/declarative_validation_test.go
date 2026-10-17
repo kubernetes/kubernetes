@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	registry "k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -91,14 +92,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				Kind:     "ClusterRole",
 			})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkAlpha(),
+				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkBeta(),
 			},
 		},
 
 		"missing subject.name": {
 			input: mkValidRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -109,6 +110,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidRoleBinding()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -159,20 +163,22 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		// TODO: Add more test cases
 	}
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "rbac.authorization.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "rolebindings",
+		Name:              "test-binding",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "rbac.authorization.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "rolebindings",
-				Name:              "test-binding",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidRoleBinding()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }

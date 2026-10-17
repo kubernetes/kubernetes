@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestGetBootTime(t *testing.T) {

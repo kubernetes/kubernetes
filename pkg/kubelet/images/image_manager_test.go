@@ -39,6 +39,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -46,7 +47,6 @@ import (
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -821,7 +821,7 @@ func (m *mockDockerKeyringWithTrackedCreds) Lookup(image string) ([]credentialpr
 }
 
 func pullerTestEnv(
-	t *testing.T,
+	t ktesting.TB,
 	c pullerTestCase,
 	serialized bool,
 	maxParallelImagePulls *int32,
@@ -1125,7 +1125,13 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 }
 
 func TestMaxParallelImagePullsLimit(t *testing.T) {
-	ctx := ktesting.Init(t)
+	ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+		testMaxParallelImagePullsLimit(tCtx)
+	})
+}
+
+func testMaxParallelImagePullsLimit(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
@@ -1165,7 +1171,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1177,7 +1183,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1198,7 +1204,13 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 }
 
 func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+		testParallelPodPullingTimeRecorderWithErr(tCtx)
+	})
+}
+
+func testParallelPodPullingTimeRecorderWithErr(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod1",

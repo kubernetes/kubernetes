@@ -27,7 +27,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).ExpectValid()
+	}).Opts(map[string]bool{"FeatureZ": false}).ExpectValid()
 
 	st.Value(&Struct{
 		DiscriminatorField: Discriminator{
@@ -38,7 +38,7 @@ func Test(t *testing.T) {
 			Discriminator: "A",
 			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
 		},
-	}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureZ": false}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{field.Forbidden(field.NewPath("discriminatorFieldDisabled", "fieldB"), "").WithOrigin("")},
 	)
@@ -52,7 +52,7 @@ func Test(t *testing.T) {
 			Discriminator: "A",
 			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
 		},
-	}).Opts([]string{"FeatureZ"}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureZ": true}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{field.Forbidden(field.NewPath("discriminatorField", "fieldB"), "").WithOrigin("")},
 	)

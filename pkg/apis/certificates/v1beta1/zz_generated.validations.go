@@ -26,13 +26,13 @@ import (
 	fmt "fmt"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -96,8 +96,60 @@ func Validate_CertificateSigningRequest(
 	obj, oldObj *certificatesv1beta1.CertificateSigningRequest) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.CertificateSigningRequest.TypeMeta has no validation
-	// field certificatesv1beta1.CertificateSigningRequest.ObjectMeta has no validation
-	// field certificatesv1beta1.CertificateSigningRequest.Spec has no validation
+
+	{ // field certificatesv1beta1.CertificateSigningRequest.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.CertificateSigningRequest) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	{ // field certificatesv1beta1.CertificateSigningRequest.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *certificatesv1beta1.CertificateSigningRequestSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// +k8s:required on non-pointer struct fields is purely documentation
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CertificateSigningRequestSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.CertificateSigningRequest) *certificatesv1beta1.CertificateSigningRequestSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	{ // field certificatesv1beta1.CertificateSigningRequest.Status
 		fn := func(
@@ -106,7 +158,7 @@ func Validate_CertificateSigningRequest(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -121,6 +173,56 @@ func Validate_CertificateSigningRequest(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_CertificateSigningRequestSpec validates an instance of CertificateSigningRequestSpec according
+// to declarative validation rules in the API schema.
+func Validate_CertificateSigningRequestSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1beta1.CertificateSigningRequestSpec) (errs field.ErrorList) {
+
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Request has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.SignerName has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.ExpirationSeconds has no validation
+
+	{ // field certificatesv1beta1.CertificateSigningRequestSpec.Usages
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []certificatesv1beta1.KeyUsage,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_KeyUsage); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.CertificateSigningRequestSpec) []certificatesv1beta1.KeyUsage {
+				return oldObj.Usages
+			})
+		errs = append(errs, fn(fldPath.Child("usages"), obj.Usages, oldVal, oldObj != nil)...)
+	}
+
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Username has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.UID has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Groups has no validation
+	// field certificatesv1beta1.CertificateSigningRequestSpec.Extra has no validation
 	return errs
 }
 
@@ -140,13 +242,13 @@ func Validate_CertificateSigningRequestStatus(
 			// Uniqueness validation is implemented via custom, handwritten validation
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -168,7 +270,7 @@ func Validate_CertificateSigningRequestStatus(
 						}
 					}
 					return false
-				}).MarkAlpha(); len(e) != 0 {
+				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -191,7 +293,28 @@ func Validate_ClusterTrustBundle(
 	obj, oldObj *certificatesv1beta1.ClusterTrustBundle) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.ClusterTrustBundle.TypeMeta has no validation
-	// field certificatesv1beta1.ClusterTrustBundle.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.ClusterTrustBundle.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.ClusterTrustBundle) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field certificatesv1beta1.ClusterTrustBundle.Spec
 		fn := func(
@@ -260,6 +383,21 @@ func Validate_ClusterTrustBundleSpec(
 	return errs
 }
 
+var symbolsForKeyUsage = sets.New(certificatesv1beta1.UsageAny, certificatesv1beta1.UsageCRLSign, certificatesv1beta1.UsageCertSign, certificatesv1beta1.UsageClientAuth, certificatesv1beta1.UsageCodeSigning, certificatesv1beta1.UsageContentCommitment, certificatesv1beta1.UsageDataEncipherment, certificatesv1beta1.UsageDecipherOnly, certificatesv1beta1.UsageDigitalSignature, certificatesv1beta1.UsageEmailProtection, certificatesv1beta1.UsageEncipherOnly, certificatesv1beta1.UsageIPsecEndSystem, certificatesv1beta1.UsageIPsecTunnel, certificatesv1beta1.UsageIPsecUser, certificatesv1beta1.UsageKeyAgreement, certificatesv1beta1.UsageKeyEncipherment, certificatesv1beta1.UsageMicrosoftSGC, certificatesv1beta1.UsageNetscapeSGC, certificatesv1beta1.UsageOCSPSigning, certificatesv1beta1.UsageSMIME, certificatesv1beta1.UsageServerAuth, certificatesv1beta1.UsageSigning, certificatesv1beta1.UsageTimestamping)
+
+// Validate_KeyUsage validates an instance of KeyUsage according
+// to declarative validation rules in the API schema.
+func Validate_KeyUsage(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1beta1.KeyUsage) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForKeyUsage, nil).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_PodCertificateRequest validates an instance of PodCertificateRequest according
 // to declarative validation rules in the API schema.
 func Validate_PodCertificateRequest(
@@ -267,7 +405,29 @@ func Validate_PodCertificateRequest(
 	obj, oldObj *certificatesv1beta1.PodCertificateRequest) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.PodCertificateRequest.TypeMeta has no validation
-	// field certificatesv1beta1.PodCertificateRequest.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.PodCertificateRequest.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.PodCertificateRequest) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
 	// field certificatesv1beta1.PodCertificateRequest.Spec has no validation
 
 	{ // field certificatesv1beta1.PodCertificateRequest.Status
@@ -277,7 +437,7 @@ func Validate_PodCertificateRequest(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -308,7 +468,7 @@ func Validate_PodCertificateRequestStatus(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -321,13 +481,13 @@ func Validate_PodCertificateRequestStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

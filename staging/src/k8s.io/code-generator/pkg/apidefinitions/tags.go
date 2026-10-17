@@ -95,3 +95,17 @@ func GroupNameForPackage(comments []string) (group string, ok bool, err error) {
 	}
 	return values[0], true, nil
 }
+
+// OpenAPIModelPackageForPackage returns the value of the
+// +k8s:openapi-model-package= tag from comments. ok is false when the tag is
+// absent.
+func OpenAPIModelPackageForPackage(comments []string) (modelPackage string, ok bool, err error) {
+	values, err := tagValues(comments, OpenAPI.InputTag)
+	if err != nil {
+		return "", false, err
+	}
+	if len(values) == 0 {
+		return "", false, nil
+	}
+	return values[0], true, nil
+}

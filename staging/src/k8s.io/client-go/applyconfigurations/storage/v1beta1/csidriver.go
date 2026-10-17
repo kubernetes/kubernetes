@@ -40,7 +40,7 @@ import (
 // CSIDriver objects are non-namespaced.
 type CSIDriverApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// metadata.Name indicates the name of the CSI driver that this object
 	// refers to; it MUST be the same name returned by the CSI GetPluginName()
 	// call for that driver.

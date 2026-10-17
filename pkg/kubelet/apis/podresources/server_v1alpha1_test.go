@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/ktesting"
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListPodResourcesV1alpha1(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -129,7 +129,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 
 			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
 			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:    mockPodsProvider,

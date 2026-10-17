@@ -30,8 +30,44 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1beta1", Kind: "DeviceClass"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"metadata.name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.config": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},

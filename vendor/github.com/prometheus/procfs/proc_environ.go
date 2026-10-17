@@ -16,14 +16,14 @@ package procfs
 import (
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Environ reads process environments from `/proc/<pid>/environ`.
 func (p Proc) Environ() ([]string, error) {
 	environments := make([]string, 0)
 
-	data, err := util.ReadFileNoStat(p.path("environ"))
+	data, err := parsers.ReadFileNoStat(p.path("environ"))
 	if err != nil {
 		return environments, err
 	}

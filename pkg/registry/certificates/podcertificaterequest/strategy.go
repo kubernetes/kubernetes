@@ -16,11 +16,13 @@ limitations under the License.
 
 // Package podcertificaterequest provides Registry interface and its RESTStorage
 // implementation for storing PodCertificateRequest objects.
-package podcertificaterequest // import "k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest"
+package podcertificaterequest
 
 import (
 	"context"
 	"fmt"
+
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,6 @@ import (
 	certvalidation "k8s.io/kubernetes/pkg/apis/certificates/validation"
 	"k8s.io/kubernetes/pkg/certauthorization"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // strategy implements behavior for PodCertificateRequests.
@@ -100,6 +101,20 @@ func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (s *Strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"certificates.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+	return fields
+}
+
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
@@ -120,6 +135,10 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAu
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"certificates.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

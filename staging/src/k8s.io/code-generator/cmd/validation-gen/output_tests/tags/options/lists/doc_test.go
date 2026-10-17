@@ -33,7 +33,7 @@ func Test(t *testing.T) {
 			{Name: "b", Value: "1"},
 			{Name: "b", Value: "2"},
 		},
-	}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{field.Duplicate(field.NewPath("listMapDisabled").Index(1), ListItem{Name: "b", Value: "2"}).WithOrigin("")},
 	)
@@ -47,7 +47,7 @@ func Test(t *testing.T) {
 			{Name: "b", Value: "1"},
 			{Name: "b", Value: "2"},
 		},
-	}).Opts([]string{"FeatureX"}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{field.Duplicate(field.NewPath("listMap").Index(1), ListItem{Name: "a", Value: "2"}).WithOrigin("")},
 	)
@@ -59,7 +59,7 @@ func Test(t *testing.T) {
 		ListEachValDisabled: []ListItem{
 			{Name: "d", Value: "4"},
 		},
-	}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectValidateFalseByPath(map[string][]string{
 		"listEachValDisabled[0]": {"field Struct.ListEachValDisabled/val"},
 	})
 
@@ -70,7 +70,7 @@ func Test(t *testing.T) {
 		ListEachValDisabled: []ListItem{
 			{Name: "d", Value: "4"},
 		},
-	}).Opts([]string{"FeatureX"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectValidateFalseByPath(map[string][]string{
 		"listEachVal[0]": {"field Struct.ListEachVal/val"},
 	})
 }

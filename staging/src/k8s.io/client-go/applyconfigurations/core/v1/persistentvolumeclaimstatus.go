@@ -98,6 +98,9 @@ type PersistentVolumeClaimStatusApplyConfiguration struct {
 	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
 	// When this is unset, there is no ModifyVolume operation being attempted.
 	ModifyVolumeStatus *ModifyVolumeStatusApplyConfiguration `json:"modifyVolumeStatus,omitempty"`
+	// healthStatus contains the latest controller-reported health information
+	// for the volume bound to this claim.
+	HealthStatus *VolumeHealthStatusApplyConfiguration `json:"healthStatus,omitempty"`
 }
 
 // PersistentVolumeClaimStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimStatus type for use with
@@ -180,5 +183,13 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithCurrentVolumeAttribu
 // If called multiple times, the ModifyVolumeStatus field is set to the value of the last call.
 func (b *PersistentVolumeClaimStatusApplyConfiguration) WithModifyVolumeStatus(value *ModifyVolumeStatusApplyConfiguration) *PersistentVolumeClaimStatusApplyConfiguration {
 	b.ModifyVolumeStatus = value
+	return b
+}
+
+// WithHealthStatus sets the HealthStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HealthStatus field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithHealthStatus(value *VolumeHealthStatusApplyConfiguration) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.HealthStatus = value
 	return b
 }

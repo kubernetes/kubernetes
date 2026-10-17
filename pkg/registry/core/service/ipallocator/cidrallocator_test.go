@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,20 +30,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	networkingv1fake "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	netutils "k8s.io/utils/net"
 )
 
 func newTestMetaAllocator() (*MetaAllocator, error) {
+	return newTestMetaAllocatorWithFamily(false)
+}
+
+func newTestMetaAllocatorWithFamily(isIPv6 bool) (*MetaAllocator, error) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
@@ -92,7 +95,7 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 		return false, ip, err
 	}))
 
-	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, false, nil)
+	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, isIPv6)
 
 	c.serviceCIDRSynced = func() bool { return true }
 	c.ipAddressSynced = func() bool { return true }
@@ -101,7 +104,6 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 }
 
 func TestCIDRAllocateMultiple(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +136,7 @@ func TestCIDRAllocateMultiple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -199,7 +201,6 @@ func TestCIDRAllocateMultiple(t *testing.T) {
 }
 
 func TestCIDRAllocateShadow(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -272,7 +273,6 @@ func TestCIDRAllocateShadow(t *testing.T) {
 }
 
 func TestCIDRAllocateGrow(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -304,7 +304,7 @@ func TestCIDRAllocateGrow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -364,7 +364,6 @@ func TestCIDRAllocateGrow(t *testing.T) {
 }
 
 func TestCIDRAllocateShrink(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -396,7 +395,7 @@ func TestCIDRAllocateShrink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -415,7 +414,7 @@ func TestCIDRAllocateShrink(t *testing.T) {
 	if _, err := r.AllocateNext(); err == nil {
 		t.Fatal(err)
 	}
-	for _, ip := range found.List() {
+	for _, ip := range sets.List(found) {
 		err = r.Release(netutils.ParseIPSloppy(ip))
 		if err != nil {
 			t.Fatalf("unexpected error releasing ip %s", err)
@@ -477,10 +476,8 @@ func TestCIDRAllocateShrink(t *testing.T) {
 
 }
 
-func TestCIDRAllocateDualWrite(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
-	r, err := newTestMetaAllocator()
+func TestCIDRAllocateIPv6(t *testing.T) {
+	r, err := newTestMetaAllocatorWithFamily(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,8 +486,13 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 	if f := r.Free(); f != 0 {
 		t.Errorf("free: %d", f)
 	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Error(err)
+	}
 
-	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	// An IPv6 /120 network has 2^8 - 1 = 255 allocatable addresses: the network
+	// address is reserved and, unlike IPv4, IPv6 has no broadcast address.
+	cidr := newServiceCIDR("test", "fd00:1:2:3::/120")
 	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -498,7 +500,7 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 	r.enqueueServiceCIDR(cidr)
 	// wait for the cidr to be processed and set the informer synced
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("fd00:1:2:3::1"), true)
 		if err != nil {
 			t.Logf("unexpected error %v", err)
 			return false, nil
@@ -510,26 +512,15 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a bitmap allocator that will mirror the ip allocator
-	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
-	if err != nil {
-		t.Fatalf("unexpected failure: %v", err)
-	}
-	bitmapAllocator, err := NewInMemory(ipnet)
-	if err != nil {
-		t.Fatalf("unexpected failure: %v", err)
-	}
-	r.bitmapAllocator = bitmapAllocator
-
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
 		if err != nil {
 			t.Fatalf("error @ free: %d count: %d: %v", r.Free(), count, err)
 		}
-		if r.Free() != bitmapAllocator.Free() {
-			t.Fatalf("ip and bitmap allocator out of sync: %d %d", r.Free(), bitmapAllocator.Free())
+		if !netutils.IsIPv6(ip) {
+			t.Fatalf("expected an IPv6 address, got %s", ip.String())
 		}
 		count++
 		if found.Has(ip.String()) {
@@ -537,38 +528,44 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 		}
 		found.Insert(ip.String())
 	}
-	if count != 14 {
-		t.Fatalf("expected 14 IPs got %d", count)
+	if count != 255 {
+		t.Fatalf("expected 255 IPs got %d", count)
 	}
 	if _, err := r.AllocateNext(); err == nil {
 		t.Fatal(err)
 	}
+
+	// releasing every address must make the whole range available again
+	for _, ip := range sets.List(found) {
+		if err := r.Release(netutils.ParseIPSloppy(ip)); err != nil {
+			t.Fatalf("unexpected error releasing ip %s: %v", ip, err)
+		}
+	}
+	if r.Used() > 0 {
+		t.Fatalf("expected allocator to be empty, got %d used", r.Used())
+	}
 }
 
-func TestCIDRAllocateDualWriteCollision(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
-	r, err := newTestMetaAllocator()
+func TestCIDRAllocateDualStack(t *testing.T) {
+	// A dual-stack ServiceCIDR carries both an IPv4 and an IPv6 range. A
+	// family-specific MetaAllocator must only consume the range that matches its
+	// own family and ignore the other one.
+	r, err := newTestMetaAllocatorWithFamily(true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Destroy()
 
-	if f := r.Free(); f != 0 {
-		t.Errorf("free: %d", f)
-	}
-
-	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	cidr := newServiceCIDR("test", "192.168.0.0/24", "fd00:1:2:3::/120")
 	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.enqueueServiceCIDR(cidr)
-	// wait for the cidr to be processed and set the informer synced
+	// wait for the IPv6 range of the dual-stack ServiceCIDR to be processed
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("fd00:1:2:3::1"), true)
 		if err != nil {
-			t.Logf("unexpected error %v", err)
 			return false, nil
 		}
 		allocator.ipAddressSynced = func() bool { return true }
@@ -578,37 +575,33 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a bitmap allocator that will mirror the ip allocator
-	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
-	if err != nil {
-		t.Fatalf("unexpected failure: %v", err)
+	// the IPv4 range of the dual-stack ServiceCIDR must be ignored by an IPv6
+	// allocator, so no allocator should exist for it
+	if _, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), false); !errors.Is(err, ErrMismatchedNetwork) {
+		t.Fatalf("expected ErrMismatchedNetwork for the IPv4 range, got %v", err)
 	}
-	bitmapAllocator, err := NewInMemory(ipnet)
-	if err != nil {
-		t.Fatalf("unexpected failure: %v", err)
-	}
-	r.bitmapAllocator = bitmapAllocator
 
-	// preallocate one IP in the bitmap allocator
-	err = bitmapAllocator.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
+	// allocations must come from the IPv6 range only
+	_, ipv6Net, err := netutils.ParseCIDRSloppy("fd00:1:2:3::/120")
 	if err != nil {
-		t.Fatalf("unexpected error allocating an IP on the bitmap allocator: %v", err)
+		t.Fatal(err)
 	}
-	// the ipallocator must not be able to allocate
-	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
-	if err == nil {
-		t.Fatalf("unexpected allocation: %v", err)
+	ip, err := r.AllocateNext()
+	if err != nil {
+		t.Fatalf("unexpected error allocating an IPv6 address: %v", err)
+	}
+	if !ipv6Net.Contains(ip) {
+		t.Fatalf("expected IP %s to be in %s", ip.String(), ipv6Net.String())
 	}
 }
 
-// TODO: add IPv6 and dual stack test cases
-func newServiceCIDR(name, cidr string) *networkingv1.ServiceCIDR {
+func newServiceCIDR(name string, cidrs ...string) *networkingv1.ServiceCIDR {
 	return &networkingv1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: networkingv1.ServiceCIDRSpec{
-			CIDRs: []string{cidr},
+			CIDRs: cidrs,
 		},
 		Status: networkingv1.ServiceCIDRStatus{
 			Conditions: []metav1.Condition{
@@ -663,7 +656,6 @@ func Test_isNotContained(t *testing.T) {
 }
 
 func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	clearMetrics()
 
 	r, err := newTestMetaAllocator()
@@ -707,7 +699,7 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	expectMetrics(t, "192.168.1.0/30", em1)
 
 	// Allocate all IPs from first CIDR (should be 2 usable IPs: .1 and .2)
-	found := sets.NewString()
+	found := sets.New[string]()
 	allocatedFromCIDR1 := 0
 	for r.Free() > 0 && allocatedFromCIDR1 < 2 {
 		ip, err := r.AllocateNext()
@@ -984,5 +976,203 @@ func TestCIDRAllocateNextDontStopOnNot(t *testing.T) {
 		if !secondSubnet.Contains(ip) {
 			t.Fatalf("expected IP %s to be in %s", ip.String(), secondSubnet.String())
 		}
+	}
+}
+
+// newLaggingMetaAllocator builds a MetaAllocator backed by started informers,
+// so the lister only observes an IPAddress after the fake watch delivers it.
+// That reproduces the TOCTOU window between lister.Get and Create that exists
+// against a real apiserver, which the reactor-based test harness hides.
+func newLaggingMetaAllocator(t *testing.T) (*MetaAllocator, *fake.Clientset) {
+	t.Helper()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	serviceCIDRInformer := informerFactory.Networking().V1().ServiceCIDRs()
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+
+	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, false)
+
+	stopCh := make(chan struct{})
+	t.Cleanup(func() { close(stopCh) })
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+	go c.run()
+	t.Cleanup(c.Destroy)
+	return c, client
+}
+
+func waitForReadyAllocator(t *testing.T, c *MetaAllocator, ip string) {
+	t.Helper()
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := c.getAllocator(netutils.ParseIPSloppy(ip), true)
+		if err != nil {
+			return false, nil
+		}
+		return allocator.ready.Load() && allocator.ipAddressSynced(), nil
+	})
+	if err != nil {
+		t.Fatalf("allocator for %s never became ready: %v", ip, err)
+	}
+}
+
+func TestCIDRAllocateNextConcurrent(t *testing.T) {
+	clearMetrics()
+	c, client := newLaggingMetaAllocator(t)
+	c.EnableMetrics()
+
+	// /26 -> 62 usable addresses, rangeOffset 16, so both the upper and
+	// lower subranges are exercised and the range gets exhausted.
+	const usable = 62
+	const workers = 100
+	cidr := newServiceCIDR("test", "192.168.0.0/26")
+	if _, err := client.NetworkingV1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForReadyAllocator(t, c, "192.168.0.1")
+
+	type result struct {
+		ip  net.IP
+		err error
+	}
+	results := make(chan result, workers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Go(func() {
+			<-start
+			svc := &api.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "svc"}}
+			ip, err := c.AllocateNextService(svc)
+			results <- result{ip, err}
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	allocated := sets.New[string]()
+	full := 0
+	for r := range results {
+		switch {
+		case r.err == nil:
+			if allocated.Has(r.ip.String()) {
+				t.Fatalf("IP %s allocated twice", r.ip)
+			}
+			allocated.Insert(r.ip.String())
+		case errors.Is(r.err, ErrFull):
+			full++
+		default:
+			t.Fatalf("unexpected error: %v", r.err)
+		}
+	}
+	if allocated.Len() != usable {
+		t.Errorf("expected %d allocations, got %d", usable, allocated.Len())
+	}
+	if full != workers-usable {
+		t.Errorf("expected %d ErrFull, got %d", workers-usable, full)
+	}
+
+	// No leak and no duplicate: the stored IPAddress objects must be exactly
+	// the set returned to callers.
+	ips, err := client.NetworkingV1().IPAddresses().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := sets.New[string]()
+	for _, ip := range ips.Items {
+		stored.Insert(ip.Name)
+	}
+	if !stored.Equal(allocated) {
+		t.Errorf("stored IPAddresses differ from allocated: only stored %v, only allocated %v",
+			sets.List(stored.Difference(allocated)), sets.List(allocated.Difference(stored)))
+	}
+
+	// Every create beyond the successful ones is a mid-air collision that
+	// was retried transparently.
+	creates := 0
+	for _, action := range client.Actions() {
+		if action.Matches("create", "ipaddresses") {
+			creates++
+		}
+	}
+	collisions := creates - allocated.Len()
+	t.Logf("workers=%d allocated=%d full=%d creates=%d collisions=%d", workers, allocated.Len(), full, creates, collisions)
+
+	// Callers never see a collision, but each one is a wasted write to the
+	// storage, so they must remain traceable through the error metric.
+	dynamicErrors, err := testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues("192.168.0.0/26", "dynamic"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(dynamicErrors) != full+collisions {
+		t.Errorf("expected %d dynamic allocation errors (%d ErrFull + %d collisions), got %d", full+collisions, full, collisions, int(dynamicErrors))
+	}
+	dynamicAllocations, err := testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues("192.168.0.0/26", "dynamic"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(dynamicAllocations) != usable {
+		t.Errorf("expected %d dynamic allocations, got %d", usable, int(dynamicAllocations))
+	}
+}
+
+// TestCIDRAllocateNextConcurrentWithRelease mixes dynamic allocations with
+// releases to check that concurrent callers of the allocators map do not
+// deadlock or corrupt state.
+func TestCIDRAllocateNextConcurrentWithRelease(t *testing.T) {
+	c, client := newLaggingMetaAllocator(t)
+
+	// /26 -> 62 usable, peak live set is workers*(rounds/2+1)=40.
+	cidr := newServiceCIDR("test", "10.0.0.0/26")
+	if _, err := client.NetworkingV1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForReadyAllocator(t, c, "10.0.0.1")
+
+	const workers = 10
+	const rounds = 6
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	live := sets.New[string]()
+	for range workers {
+		wg.Go(func() {
+			svc := &api.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "svc"}}
+			for j := range rounds {
+				ip, err := c.AllocateNextService(svc)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				mu.Lock()
+				if live.Has(ip.String()) {
+					t.Errorf("IP %s allocated twice while live", ip)
+				}
+				live.Insert(ip.String())
+				mu.Unlock()
+				if j%2 == 0 {
+					// Drop from live before the delete reaches the tracker, otherwise
+					// another worker can legitimately re-allocate it in between.
+					mu.Lock()
+					live.Delete(ip.String())
+					mu.Unlock()
+					if err := c.Release(ip); err != nil {
+						t.Errorf("unexpected error releasing %s: %v", ip, err)
+					}
+				}
+			}
+		})
+	}
+	wg.Wait()
+
+	ips, err := client.NetworkingV1().IPAddresses().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := sets.New[string]()
+	for _, ip := range ips.Items {
+		stored.Insert(ip.Name)
+	}
+	if !stored.Equal(live) {
+		t.Errorf("stored IPAddresses differ from live allocations: only stored %v, only live %v",
+			sets.List(stored.Difference(live)), sets.List(live.Difference(stored)))
 	}
 }

@@ -35,11 +35,15 @@ import (
 //   - Blank lines (including those with only whitespace) are ignored when not within quotes
 //   - Lines starting with '#' are treated as comments and ignored
 //   - Whitespace before '=' is invalid (e.g., VAR = 'value' is rejected)
-//   - Whitespace after '=' but before the quote results in empty assignment (e.g., VAR= 'value' assigns empty string)
-func ParseEnv(envFilePath, key string) (string, error) {
+//   - Whitespace after '=' followed by nothing or a comment assigns an empty string (e.g., VAR= # comment)
+//   - Any other content after that whitespace is invalid (e.g., VAR= 'value' is rejected)
+//
+// The returned bool reports whether the key was present, which distinguishes a
+// key with an empty value from a key that is absent.
+func ParseEnv(envFilePath, key string) (string, bool, error) {
 	file, err := os.Open(envFilePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open environment variable file %q: %w", envFilePath, err)
+		return "", false, fmt.Errorf("failed to open environment variable file %q: %w", envFilePath, err)
 	}
 	defer func() { _ = file.Close() }()
 
@@ -63,41 +67,43 @@ func ParseEnv(envFilePath, key string) (string, error) {
 
 		eqIdx := strings.Index(line, "=")
 		if eqIdx == -1 {
-			return "", fmt.Errorf("invalid environment variable format at line %d: missing '='", lineNum)
+			return "", false, fmt.Errorf("invalid environment variable format at line %d: missing '='", lineNum)
 		}
 
 		// Variable name must not contain whitespace or trailing whitespace before '='
 		varNamePart := line[:eqIdx]
 		varName := strings.TrimRight(varNamePart, " \t")
 		if varName == "" {
-			return "", fmt.Errorf("invalid environment variable format at line %d: empty variable name", lineNum)
+			return "", false, fmt.Errorf("invalid environment variable format at line %d: empty variable name", lineNum)
 		}
 
 		// If trimming removed whitespace, it means there was whitespace before '='
 		if varNamePart != varName {
-			return "", fmt.Errorf("invalid environment variable format at line %d: whitespace before '=' is not allowed", lineNum)
+			return "", false, fmt.Errorf("invalid environment variable format at line %d: whitespace before '=' is not allowed", lineNum)
 		}
 		valuePart := line[eqIdx+1:]
 
-		// Check if there's whitespace before any non-whitespace character
-		trimmedValue := strings.TrimLeft(valuePart, " \t")
-		if valuePart != trimmedValue {
-			// There is whitespace between '=' and the value
-			// This matches bash behavior: KEY= 'val1' results in KEY being empty
+		// In POSIX shell, whitespace after '=' ends the assignment with an empty value.
+		// A comment may follow, but anything else is a separate word: bash runs
+		// KEY= 'val' as the command val, so that form is a syntax error here.
+		if trimmedValue := strings.TrimLeft(valuePart, " \t"); trimmedValue != valuePart {
+			if trimmedValue != "" && !strings.HasPrefix(trimmedValue, "#") {
+				return "", false, fmt.Errorf("invalid environment variable format at line %d: unexpected content after whitespace following '='", lineNum)
+			}
 			if varName == key {
-				return "", nil
+				return "", true, nil
 			}
 			continue
 		}
 
 		// Value must start with single quote
-		if !strings.HasPrefix(trimmedValue, "'") {
-			return "", fmt.Errorf("invalid environment variable format at line %d: value must be enclosed in single quotes", lineNum)
+		if !strings.HasPrefix(valuePart, "'") {
+			return "", false, fmt.Errorf("invalid environment variable format at line %d: value must be enclosed in single quotes", lineNum)
 		}
 
 		// Find the closing single quote (may span multiple lines)
 		var valueBuilder strings.Builder
-		rest := trimmedValue[1:]
+		rest := valuePart[1:]
 		startLineNum := lineNum
 
 		for {
@@ -106,11 +112,11 @@ func ParseEnv(envFilePath, key string) (string, error) {
 				valueBuilder.WriteString(rest[:closingIdx])
 				afterQuote := strings.TrimLeft(rest[closingIdx+1:], " \t")
 				if afterQuote != "" && !strings.HasPrefix(afterQuote, "#") {
-					return "", fmt.Errorf("invalid environment variable format at line %d: unexpected content after closing quote", lineNum)
+					return "", false, fmt.Errorf("invalid environment variable format at line %d: unexpected content after closing quote", lineNum)
 				}
 
 				if varName == key {
-					return valueBuilder.String(), nil
+					return valueBuilder.String(), true, nil
 				}
 				break
 			}
@@ -118,7 +124,7 @@ func ParseEnv(envFilePath, key string) (string, error) {
 			valueBuilder.WriteString(rest)
 			valueBuilder.WriteString("\n")
 			if !scanner.Scan() {
-				return "", fmt.Errorf("invalid environment variable format starting at line %d: unclosed single quote", startLineNum)
+				return "", false, fmt.Errorf("invalid environment variable format starting at line %d: unclosed single quote", startLineNum)
 			}
 			lineNum++
 			rest = scanner.Text()
@@ -126,8 +132,8 @@ func ParseEnv(envFilePath, key string) (string, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading environment variable file %q: %w", envFilePath, err)
+		return "", false, fmt.Errorf("error reading environment variable file %q: %w", envFilePath, err)
 	}
 
-	return "", nil
+	return "", false, nil
 }

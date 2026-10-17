@@ -50,7 +50,6 @@ func TestEnforceRequirements(t *testing.T) {
 	tcases := []struct {
 		name               string
 		newK8sVersion      string
-		dryRun             bool
 		flags              applyPlanFlags
 		expectedErr        string
 		expectedErrNonRoot string
@@ -81,7 +80,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, &output.TextPrinter{})
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
 			}

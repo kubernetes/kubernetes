@@ -19,6 +19,8 @@ package daemonset
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.

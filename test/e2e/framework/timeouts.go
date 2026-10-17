@@ -40,6 +40,7 @@ var defaultTimeouts = TimeoutContext{
 	NodeSchedulable:           30 * time.Minute,
 	SystemDaemonsetStartup:    5 * time.Minute,
 	NodeNotReady:              3 * time.Minute,
+	ClaimUnusedCondition:      3 * time.Minute,
 }
 
 // TimeoutContext contains timeout settings for several actions.
@@ -110,6 +111,9 @@ type TimeoutContext struct {
 
 	// NodeNotReady is how long to wait for a node to be not ready.
 	NodeNotReady time.Duration
+
+	// ClaimUnusedCondition is how long to wait for the Unused condition to appear or change on a PVC.
+	ClaimUnusedCondition time.Duration
 }
 
 // NewTimeoutContext returns a TimeoutContext with all values set either to

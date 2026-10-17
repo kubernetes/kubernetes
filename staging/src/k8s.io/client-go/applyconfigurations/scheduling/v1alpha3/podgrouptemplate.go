@@ -18,50 +18,53 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+)
+
 // PodGroupTemplateApplyConfiguration represents a declarative configuration of the PodGroupTemplate type for use
 // with apply.
 //
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
 type PodGroupTemplateApplyConfiguration struct {
-	// Name is a unique identifier for the PodGroupTemplate within the Workload.
+	// name is a unique identifier for the PodGroupTemplate within the Workload.
 	// It must be a DNS label. This field is immutable.
 	Name *string `json:"name,omitempty"`
-	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
+	// schedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
 	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	// This field is immutable.
 	SchedulingConstraints *PodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
-	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the group. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
 	// PodGroup's claim exactly. The claim must have the same name and refer to
 	// the same ResourceClaim or ResourceClaimTemplate.
 	//
-	// This is an alpha-level field and requires that the
+	// This is a beta-level field and requires that the
 	// DRAWorkloadResourceClaims feature gate is enabled.
 	//
 	// This field is immutable.
 	ResourceClaims []PodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
-	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// disruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// This field is immutable.
 	DisruptionMode *DisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
-	// PriorityClassName indicates the priority that should be considered when scheduling
-	// a pod group created from this template. If no priority class is specified, admission
-	// control can set this to the global default priority class if it exists. Otherwise,
-	// pod groups created from this template will have the priority set to zero.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// priorityClassName indicates the priority that should be considered when scheduling
+	// a pod group created from this template.
+	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
-	// Priority is the value of priority of pod groups created from this template. Various
-	// system components use this field to find the priority of the pod group. When
-	// Priority Admission Controller is enabled, it prevents users from setting this field.
-	// The admission controller populates this field from PriorityClassName.
+	// priority is the value of priority of pod groups created from this template. Various
+	// system components use this field to find the priority of the pod group.
 	// The higher the value, the higher the priority.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	PreemptionPolicy *schedulingv1alpha3.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // PodGroupTemplateApplyConfiguration constructs a declarative configuration of the PodGroupTemplate type for use with
@@ -128,5 +131,13 @@ func (b *PodGroupTemplateApplyConfiguration) WithPriorityClassName(value string)
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *PodGroupTemplateApplyConfiguration) WithPriority(value int32) *PodGroupTemplateApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreemptionPolicy field is set to the value of the last call.
+func (b *PodGroupTemplateApplyConfiguration) WithPreemptionPolicy(value schedulingv1alpha3.PreemptionPolicy) *PodGroupTemplateApplyConfiguration {
+	b.PreemptionPolicy = &value
 	return b
 }

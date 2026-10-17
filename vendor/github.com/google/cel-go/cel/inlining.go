@@ -178,7 +178,36 @@ func (opt *inliningOptimizer) rewritePresenceExpr(ctx *OptimizerContext, prev, i
 			))
 		return
 	}
+	if zeroValExpr, ok := zeroValueExpr(ctx, inlinedType); ok {
+		ctx.UpdateExpr(prev,
+			ctx.NewCall(operators.NotEquals,
+				inlined, zeroValExpr))
+		return
+	}
 	ctx.ReportErrorAtID(prev.ID(), "unable to inline expression type %v into presence test", inlinedType)
+}
+
+// zeroValueExpr creates an expression representing the empty or zero value for the given type
+// Note: bytes, lists, maps, and strings are supported via the `SizerType` trait.
+func zeroValueExpr(ctx *OptimizerContext, t *Type) (ast.Expr, bool) {
+	// Note: bytes, strings, lists, and maps are covered by the "sizer-type" check
+	switch t.Kind() {
+	case types.BoolKind:
+		return ctx.NewLiteral(types.False), true
+	case types.DoubleKind:
+		return ctx.NewLiteral(types.Double(0)), true
+	case types.DurationKind:
+		return ctx.NewCall(overloads.TypeConvertDuration, ctx.NewLiteral(types.String("0s"))), true
+	case types.IntKind:
+		return ctx.NewLiteral(types.IntZero), true
+	case types.TimestampKind:
+		return ctx.NewCall(overloads.TypeConvertTimestamp, ctx.NewLiteral(types.Int(0))), true
+	case types.StructKind:
+		return ctx.NewStruct(t.TypeName(), []ast.EntryExpr{}), true
+	case types.UintKind:
+		return ctx.NewLiteral(types.Uint(0)), true
+	}
+	return nil, false
 }
 
 // isBindable indicates whether the inlined type can be used within a cel.bind() if the expression
@@ -212,17 +241,43 @@ func isBindable(matches []ast.NavigableExpr, inlined ast.Expr, inlinedType *Type
 // field selection. This may be a future refinement.
 func (opt *inliningOptimizer) matchVariable(varName string) ast.ExprMatcher {
 	return func(e ast.NavigableExpr) bool {
-		if e.Kind() == ast.IdentKind && e.AsIdent() == varName {
-			return true
+		name, found := maybeAsVariableName(e)
+		if !found || name != varName {
+			return false
 		}
-		if e.Kind() == ast.SelectKind {
-			sel := e.AsSelect()
-			// While the `ToQualifiedName` call could take the select directly, this
-			// would skip presence tests from possible matches, which we would like
-			// to include.
-			qualName, found := containers.ToQualifiedName(sel.Operand())
-			return found && qualName+"."+sel.FieldName() == varName
+
+		// Determine whether the variable being referenced has been shadowed by a comprehension
+		p, hasParent := e.Parent()
+		for hasParent {
+			if p.Kind() != ast.ComprehensionKind {
+				p, hasParent = p.Parent()
+				continue
+			}
+			// If the inline variable name matches any of the comprehension variables at any scope,
+			// return false as the variable has been shadowed.
+			compre := p.AsComprehension()
+			if varName == compre.AccuVar() || varName == compre.IterVar() || varName == compre.IterVar2() {
+				return false
+			}
+			p, hasParent = p.Parent()
 		}
-		return false
+
+		return true
 	}
+}
+
+func maybeAsVariableName(e ast.NavigableExpr) (string, bool) {
+	if e.Kind() == ast.IdentKind {
+		return e.AsIdent(), true
+	}
+	if e.Kind() == ast.SelectKind {
+		sel := e.AsSelect()
+		// While the `ToQualifiedName` call could take the select directly, this
+		// would skip presence tests from possible matches, which we would like
+		// to include.
+		if qualName, found := containers.ToQualifiedName(sel.Operand()); found {
+			return qualName + "." + sel.FieldName(), true
+		}
+	}
+	return "", false
 }

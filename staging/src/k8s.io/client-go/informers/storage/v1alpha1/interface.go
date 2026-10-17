@@ -24,12 +24,12 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CSIStorageCapacities returns a CSIStorageCapacityInformer.
-	CSIStorageCapacities() CSIStorageCapacityInformer
-	// VolumeAttachments returns a VolumeAttachmentInformer.
-	VolumeAttachments() VolumeAttachmentInformer
-	// VolumeAttributesClasses returns a VolumeAttributesClassInformer.
-	VolumeAttributesClasses() VolumeAttributesClassInformer
+	// CSIStorageCapacities returns a TypedCSIStorageCapacityInformer.
+	CSIStorageCapacities() TypedCSIStorageCapacityInformer
+	// VolumeAttachments returns a TypedVolumeAttachmentInformer.
+	VolumeAttachments() TypedVolumeAttachmentInformer
+	// VolumeAttributesClasses returns a TypedVolumeAttributesClassInformer.
+	VolumeAttributesClasses() TypedVolumeAttributesClassInformer
 }
 
 type version struct {
@@ -43,17 +43,17 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// CSIStorageCapacities returns a CSIStorageCapacityInformer.
-func (v *version) CSIStorageCapacities() CSIStorageCapacityInformer {
+// CSIStorageCapacities returns a TypedCSIStorageCapacityInformer.
+func (v *version) CSIStorageCapacities() TypedCSIStorageCapacityInformer {
 	return &cSIStorageCapacityInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// VolumeAttachments returns a VolumeAttachmentInformer.
-func (v *version) VolumeAttachments() VolumeAttachmentInformer {
+// VolumeAttachments returns a TypedVolumeAttachmentInformer.
+func (v *version) VolumeAttachments() TypedVolumeAttachmentInformer {
 	return &volumeAttachmentInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// VolumeAttributesClasses returns a VolumeAttributesClassInformer.
-func (v *version) VolumeAttributesClasses() VolumeAttributesClassInformer {
+// VolumeAttributesClasses returns a TypedVolumeAttributesClassInformer.
+func (v *version) VolumeAttributesClasses() TypedVolumeAttributesClassInformer {
 	return &volumeAttributesClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

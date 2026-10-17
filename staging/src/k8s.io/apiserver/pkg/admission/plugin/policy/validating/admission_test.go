@@ -1172,11 +1172,21 @@ func TestAuditValidationAction(t *testing.T) {
 	}
 	testContext := setupFakeTest(t, compiler, matcher)
 
-	// Push some fake
-	noParamSourcePolicy := *denyPolicy
-	noParamSourcePolicy.Spec.ParamKind = nil
+	policy1 := *denyPolicy
+	policy1.Name = "denypolicy1.example.com"
+	policy1.Spec.ParamKind = nil
+	binding1 := *denyBindingWithAudit
+	binding1.Name = "denybinding1.example.com"
+	binding1.Spec.PolicyName = policy1.Name
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
+	policy2 := *denyPolicy
+	policy2.Name = "denypolicy2.example.com"
+	policy2.Spec.ParamKind = nil
+	binding2 := *denyBindingWithAudit
+	binding2.Name = "denybinding2.example.com"
+	binding2.Spec.PolicyName = policy2.Name
+
+	compiler.RegisterDefinition(&policy1, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
 				{
@@ -1186,8 +1196,18 @@ func TestAuditValidationAction(t *testing.T) {
 			},
 		}
 	})
+	compiler.RegisterDefinition(&policy2, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
+		return validating.ValidateResult{
+			Decisions: []validating.PolicyDecision{
+				{
+					Action:  validating.ActionDeny,
+					Message: "I can't do that",
+				},
+			},
+		}
+	})
 
-	require.NoError(t, testContext.UpdateAndWait(&noParamSourcePolicy, denyBindingWithAudit))
+	require.NoError(t, testContext.UpdateAndWait(&policy1, &policy2, &binding1, &binding2))
 
 	attr := attributeRecord(nil, fakeParams, admission.Create)
 	warningRecorder := newWarningRecorder()
@@ -1207,14 +1227,23 @@ func TestAuditValidationAction(t *testing.T) {
 	var value []validating.ValidationFailureValue
 	jsonErr := utiljson.Unmarshal([]byte(valueJson), &value)
 	require.NoError(t, jsonErr)
-	expected := []validating.ValidationFailureValue{{
-		ExpressionIndex:   0,
-		Message:           "I'm sorry Dave",
-		ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Audit},
-		Binding:           "denybinding.example.com",
-		Policy:            noParamSourcePolicy.Name,
-	}}
-	require.Equal(t, expected, value)
+	expected := []validating.ValidationFailureValue{
+		{
+			ExpressionIndex:   0,
+			Message:           "I'm sorry Dave",
+			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Audit},
+			Binding:           "denybinding1.example.com",
+			Policy:            policy1.Name,
+		},
+		{
+			ExpressionIndex:   0,
+			Message:           "I can't do that",
+			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Audit},
+			Binding:           "denybinding2.example.com",
+			Policy:            policy2.Name,
+		},
+	}
+	require.ElementsMatch(t, expected, value)
 
 	require.NoError(t, err)
 }
@@ -1986,7 +2015,6 @@ func (r *warningRecorder) AddWarning(_, text string) {
 	r.Lock()
 	defer r.Unlock()
 	r.warnings.Insert(text)
-	return
 }
 
 func (r *warningRecorder) hasWarning(text string) bool {

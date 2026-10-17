@@ -844,6 +844,135 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdateDeletedServices(t *testing.T) {
+	udpSvc := makeTestService("ns1", "udp-svc", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
+	})
+	tcpSvc := makeTestService("ns1", "tcp-svc", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.5"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "TCP", 1235, 5321, 0)
+	})
+
+	udpPortName := makeServicePortName("ns1", "udp-svc", "p1", v1.ProtocolUDP)
+	tcpPortName := makeServicePortName("ns1", "tcp-svc", "p1", v1.ProtocolTCP)
+
+	t.Run("initial add has no deleted services", func(t *testing.T) {
+		fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+		fp.addService(udpSvc)
+		fp.addService(tcpSvc)
+
+		result := fp.svcPortMap.Update(fp.serviceChanges)
+		if len(result.DeletedServices) != 0 {
+			t.Errorf("expected 0 deleted services, got %d", len(result.DeletedServices))
+		}
+		if result.ConntrackCleanupRequired {
+			t.Errorf("expected no conntrack cleanup required")
+		}
+		for _, svc := range []*v1.Service{udpSvc, tcpSvc} {
+			name := makeNSN(svc.Namespace, svc.Name)
+			if !result.UpdatedServices.Has(name) {
+				t.Errorf("expected updated service for %q", name)
+			}
+		}
+		if len(result.UpdatedServices) != 2 {
+			t.Errorf("expected 2 updated services, got %d", len(result.UpdatedServices))
+		}
+	})
+
+	t.Run("single udp deletion", func(t *testing.T) {
+		fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+		fp.addService(udpSvc)
+		fp.addService(tcpSvc)
+		fp.svcPortMap.Update(fp.serviceChanges)
+
+		fp.deleteService(udpSvc)
+		result := fp.svcPortMap.Update(fp.serviceChanges)
+
+		if len(result.DeletedServices) != 1 {
+			t.Errorf("expected 1 deleted service, got %d", len(result.DeletedServices))
+		}
+		if !result.ConntrackCleanupRequired {
+			t.Errorf("expected conntrack cleanup required")
+		}
+		if deletedSvc, ok := result.DeletedServices[udpPortName]; !ok {
+			t.Errorf("expected deleted service for %q", udpPortName)
+		} else {
+			if deletedSvc.ClusterIP().String() != "172.16.55.4" {
+				t.Errorf("expected deleted UDP service ClusterIP 172.16.55.4, got %s", deletedSvc.ClusterIP().String())
+			}
+			if deletedSvc.Port() != 1234 {
+				t.Errorf("expected deleted UDP service port 1234, got %d", deletedSvc.Port())
+			}
+			if deletedSvc.Protocol() != v1.ProtocolUDP {
+				t.Errorf("expected deleted UDP service protocol UDP, got %s", deletedSvc.Protocol())
+			}
+		}
+		if _, ok := result.DeletedServices[tcpPortName]; ok {
+			t.Errorf("did not expect deleted service for %q", tcpPortName)
+		}
+	})
+
+	t.Run("single tcp deletion", func(t *testing.T) {
+		fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+		fp.addService(udpSvc)
+		fp.addService(tcpSvc)
+		fp.svcPortMap.Update(fp.serviceChanges)
+
+		fp.deleteService(tcpSvc)
+		result := fp.svcPortMap.Update(fp.serviceChanges)
+
+		if len(result.DeletedServices) != 1 {
+			t.Errorf("expected 1 deleted service, got %d", len(result.DeletedServices))
+		}
+		if result.ConntrackCleanupRequired {
+			t.Errorf("expected no conntrack cleanup required")
+		}
+		if deletedSvc, ok := result.DeletedServices[tcpPortName]; !ok {
+			t.Errorf("expected deleted service for %q", tcpPortName)
+		} else {
+			if deletedSvc.ClusterIP().String() != "172.16.55.5" {
+				t.Errorf("expected deleted TCP service ClusterIP 172.16.55.5, got %s", deletedSvc.ClusterIP().String())
+			}
+			if deletedSvc.Port() != 1235 {
+				t.Errorf("expected deleted TCP service port 1235, got %d", deletedSvc.Port())
+			}
+			if deletedSvc.Protocol() != v1.ProtocolTCP {
+				t.Errorf("expected deleted TCP service protocol TCP, got %s", deletedSvc.Protocol())
+			}
+		}
+		if _, ok := result.DeletedServices[udpPortName]; ok {
+			t.Errorf("did not expect deleted service for %q", udpPortName)
+		}
+	})
+
+	t.Run("all deleted service ports are surfaced", func(t *testing.T) {
+		fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+		fp.addService(udpSvc)
+		fp.addService(tcpSvc)
+		fp.svcPortMap.Update(fp.serviceChanges)
+
+		fp.deleteService(udpSvc)
+		fp.deleteService(tcpSvc)
+		result := fp.svcPortMap.Update(fp.serviceChanges)
+
+		if len(result.DeletedServices) != 2 {
+			t.Errorf("expected 2 deleted services, got %d", len(result.DeletedServices))
+		}
+		if !result.ConntrackCleanupRequired {
+			t.Errorf("expected conntrack cleanup required")
+		}
+		if _, ok := result.DeletedServices[udpPortName]; !ok {
+			t.Errorf("expected deleted service for %q", udpPortName)
+		}
+		if _, ok := result.DeletedServices[tcpPortName]; !ok {
+			t.Errorf("expected deleted service for %q", tcpPortName)
+		}
+	})
+}
+
 func TestServiceCacheLeaks(t *testing.T) {
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 

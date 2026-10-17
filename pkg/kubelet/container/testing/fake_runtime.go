@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -315,7 +316,7 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
-func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
+func (f *FakeRuntime) GeneratePodStatus(_ context.Context, event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	f.Lock()
 	defer f.Unlock()
 
@@ -595,6 +596,9 @@ func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kub
 	return f.PodResizeInProgress
 }
 
-func (f *FakeRuntime) UpdateActuatedPodLevelResources(allocatedPod *v1.Pod) error {
+func (f *FakeRuntime) UpdateActuatedPodLevelResources(logger klog.Logger, allocatedPod *v1.Pod) error {
 	return nil
+}
+
+func (f *FakeRuntime) InitializeActuatedPod(_ klog.Logger, _ *v1.Pod) {
 }

@@ -36,15 +36,15 @@ type Handshaker interface {
 	// While we currently only have implementations on the server-side, this
 	// interface should be sufficient to implement similar handshakes on the
 	// client-side.
-	Handshake(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error)
+	Handshake(ctx context.Context, conn net.Conn) (net.Conn, any, error)
 }
 
-type handshakerFunc func(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error)
+type handshakerFunc func(ctx context.Context, conn net.Conn) (net.Conn, any, error)
 
-func (fn handshakerFunc) Handshake(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error) {
+func (fn handshakerFunc) Handshake(ctx context.Context, conn net.Conn) (net.Conn, any, error) {
 	return fn(ctx, conn)
 }
 
-func noopHandshake(_ context.Context, conn net.Conn) (net.Conn, interface{}, error) {
+func noopHandshake(_ context.Context, conn net.Conn) (net.Conn, any, error) {
 	return conn, nil, nil
 }

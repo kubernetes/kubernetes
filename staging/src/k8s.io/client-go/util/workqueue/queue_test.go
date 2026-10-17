@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -452,13 +454,12 @@ func mustGarbageCollect(t *testing.T, i interface{}) {
 		atomic.StoreInt32(&collected, 1)
 	})
 	t.Cleanup(func() {
-		if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
+		// The test context is canceled before cleanup callbacks run.
+		gomega.NewWithT(t).Eventually(func() int32 {
 			// Trigger GC explicitly, otherwise we may need to wait a long time for it to run
 			runtime.GC()
-			return atomic.LoadInt32(&collected) == 1, nil
-		}); err != nil {
-			t.Errorf("object was not garbage collected")
-		}
+			return atomic.LoadInt32(&collected)
+		}).WithTimeout(wait.ForeverTestTimeout).WithPolling(100*time.Millisecond).Should(gomega.Equal(int32(1)), "object was not garbage collected")
 	})
 }
 

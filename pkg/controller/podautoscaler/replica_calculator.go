@@ -115,7 +115,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		}
 
 		// if we don't have any unready or missing pods, we can calculate the new replica count now
-		return int32(math.Ceil(usageRatio * float64(readyPodCount))), utilization, rawUtilization, timestamp, nil
+		return ceilToInt32(usageRatio * float64(readyPodCount)), utilization, rawUtilization, timestamp, nil
 	}
 
 	if len(missingPods) > 0 {
@@ -153,7 +153,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
 	}
 
-	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	newReplicas := ceilToInt32(newUsageRatio * float64(len(metrics)))
 	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
 		// return the current replicas if the change of metrics length would cause a change in scale direction
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
@@ -220,7 +220,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		}
 
 		// if we don't have any unready or missing pods, we can calculate the new replica count now
-		return int32(math.Ceil(usageRatio * float64(readyPodCount))), usage, nil
+		return ceilToInt32(usageRatio * float64(readyPodCount)), usage, nil
 	}
 
 	if len(missingPods) > 0 {
@@ -253,7 +253,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return currentReplicas, usage, nil
 	}
 
-	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	newReplicas := ceilToInt32(newUsageRatio * float64(len(metrics)))
 	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
 		// return the current replicas if the change of metrics length would cause a change in scale direction
 		return currentReplicas, usage, nil
@@ -290,17 +290,10 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 		if err != nil {
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
-		// Calculate replicaCount as float64 first
-		replicaCountFloat := usageRatio * float64(readyPodCount)
-		// Check if replicaCount exceeds max int32
-		if replicaCountFloat > math.MaxInt32 {
-			replicaCount = math.MaxInt32
-		} else {
-			replicaCount = int32(math.Ceil(replicaCountFloat))
-		}
+		replicaCount = ceilToInt32(usageRatio * float64(readyPodCount))
 	} else {
 		// Scale to zero or n pods depending on usageRatio
-		replicaCount = int32(math.Ceil(usageRatio))
+		replicaCount = ceilToInt32(usageRatio)
 	}
 
 	return replicaCount, timestamp, err
@@ -318,9 +311,9 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
 	if !tolerances.isWithin(usageRatio) {
 		// update number of replicas if change is large enough
-		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
+		replicaCount = ceilToInt32(float64(usage) / float64(targetAverageUsage))
 	}
-	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
+	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
 
@@ -402,21 +395,22 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
 	if !tolerances.isWithin(usageRatio) {
 		// update number of replicas if the change is large enough
-		replicaCountResult := math.Ceil(float64(usage) / float64(targetUsagePerPod))
-		// Ensure that the result exceeds the bounds of an int32
-		if replicaCountResult > float64(math.MaxInt32) {
-			replicaCount = math.MaxInt32
-		} else {
-			replicaCount = int32(replicaCountResult)
-		}
+		replicaCount = ceilToInt32(float64(usage) / float64(targetUsagePerPod))
 	}
-	// Handle usage overflow cases
-	if float64(usage) >= float64(math.MaxInt64) {
-		usage = math.MaxInt64
-	} else {
-		usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
-	}
+	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
+}
+
+// getPerPodUsage calculates the per-pod usage based on total usage and replica count,
+// returning MaxInt64 on overflow to prevent wrapping and 0 when replicas is 0 to avoid division by zero.
+func getPerPodUsage(usage int64, statusReplicas int32) int64 {
+	if float64(usage) >= float64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	if statusReplicas == 0 {
+		return 0
+	}
+	return int64(math.Ceil(float64(usage) / float64(statusReplicas)))
 }
 
 func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.Set[string]) {
@@ -424,7 +418,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 	unreadyPods = sets.New[string]()
 	ignoredPods = sets.New[string]()
 	for _, pod := range pods {
-		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
+		if pod.DeletionTimestamp != nil || podutil.IsPodTerminal(pod) {
 			ignoredPods.Insert(pod.Name)
 			continue
 		}
@@ -502,7 +496,9 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
+	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
+		ExcludeOverhead: true,
+	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
@@ -547,5 +543,17 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
 	for _, pod := range pods.UnsortedList() {
 		delete(metrics, pod)
+	}
+}
+
+func ceilToInt32(f float64) int32 {
+	c := math.Ceil(f)
+	switch {
+	case c > math.MaxInt32:
+		return math.MaxInt32
+	case c < math.MinInt32:
+		return math.MinInt32
+	default:
+		return int32(c)
 	}
 }

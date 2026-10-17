@@ -65,7 +65,7 @@ var _ rangeallocation.RangeRegistry = &Etcd{}
 func NewEtcd(alloc allocator.Snapshottable, baseKey string, config *storagebackend.ConfigForResource) (*Etcd, error) {
 	// note that newFunc, newListFunc
 	// can be left blank unless the storage.Watch method is used
-	storage, d, err := generic.NewRawStorage(config, nil, nil, baseKey)
+	storage, d, err := generic.NewRawStorage(config, nil, nil, nil, baseKey)
 	if err != nil {
 		return nil, err
 	}

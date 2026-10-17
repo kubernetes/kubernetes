@@ -643,6 +643,7 @@ type FakePodControl struct {
 	DeletePodName   []string
 	Patches         [][]byte
 	Err             error
+	DeleteErr       error
 	CreateLimit     int
 	CreateCallCount int
 }
@@ -670,6 +671,9 @@ func (f *FakePodControl) CreatePodsWithGenerateName(ctx context.Context, namespa
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
 		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
+	// spec usually points into an informer-cached object; copy before writing
+	// so the fake doesn't mutate the cache (RealPodControl copies too).
+	spec = spec.DeepCopy()
 	spec.GenerateName = generateNamePrefix
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
@@ -683,6 +687,9 @@ func (f *FakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 	f.Lock()
 	defer f.Unlock()
 	f.DeletePodName = append(f.DeletePodName, podID)
+	if f.DeleteErr != nil {
+		return f.DeleteErr
+	}
 	if f.Err != nil {
 		return f.Err
 	}

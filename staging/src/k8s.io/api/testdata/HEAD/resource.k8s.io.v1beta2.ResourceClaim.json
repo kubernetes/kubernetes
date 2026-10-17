@@ -73,7 +73,13 @@
               "requests": {
                 "requestsKey": "0"
               }
-            }
+            },
+            "derivedAttributes": [
+              {
+                "name": "nameValue",
+                "expression": "expressionValue"
+              }
+            ]
           },
           "firstAvailable": [
             {
@@ -101,7 +107,13 @@
                 "requests": {
                   "requestsKey": "0"
                 }
-              }
+              },
+              "derivedAttributes": [
+                {
+                  "name": "nameValue",
+                  "expression": "expressionValue"
+                }
+              ]
             }
           ]
         }
@@ -165,7 +177,10 @@
             "shareID": "shareIDValue",
             "consumedCapacity": {
               "consumedCapacityKey": "0"
-            }
+            },
+            "skipNodeOperations": [
+              "skipNodeOperationsValue"
+            ]
           }
         ],
         "config": [

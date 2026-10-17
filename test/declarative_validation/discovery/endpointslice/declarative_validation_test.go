@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
 		APIGroup:          "discovery.k8s.io",
 		APIVersion:        apiVersion,
 		Resource:          "endpointslices",
@@ -60,25 +62,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Endpoints[0].Addresses = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkAlpha(),
+				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), ""),
 			},
 		},
 		"invalid too many endpoint addresses": {
 			input: mkValidEndpointSlice(tweakAddresses(101)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
 			},
 		},
 		"invalid missing addressType": {
 			input: mkValidEndpointSlice(tweakAddressType("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("addressType"), "").MarkAlpha(),
+				field.Required(field.NewPath("addressType"), ""),
 			},
 		},
 		"invalid addressType not supported": {
 			input: mkValidEndpointSlice(tweakAddressType("invalid")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("addressType"), discovery.AddressType("invalid"), []string{string(discovery.AddressTypeIPv4), string(discovery.AddressTypeIPv6), string(discovery.AddressTypeFQDN)}).MarkAlpha(),
+				field.NotSupported(field.NewPath("addressType"), discovery.AddressType("invalid"), []string{string(discovery.AddressTypeIPv4), string(discovery.AddressTypeIPv6), string(discovery.AddressTypeFQDN)}),
 			},
 		},
 	}
@@ -87,6 +89,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidEndpointSlice()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -98,6 +102,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "discovery.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "endpointslices",
+		Name:              "valid-endpointslice",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj       discovery.EndpointSlice
 		updateObj    discovery.EndpointSlice
@@ -117,40 +130,33 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				obj.Endpoints[0].Addresses = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkAlpha(),
+				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), ""),
 			},
 		},
 		"invalid update too many addresses": {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(tweakAddresses(101)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems"),
 			},
 		},
 		"invalid update addressType immutable": {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(tweakAddressType(discovery.AddressTypeIPv6)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "discovery.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "endpointslices",
-				Name:              "valid-endpointslice",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidEndpointSlice()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidEndpointSlice(tweaks ...func(obj *discovery.EndpointSlice)) discovery.EndpointSlice {

@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // For the proc file format details,
@@ -57,7 +57,7 @@ var softNetProcFile = "net/softnet_stat"
 
 // NetSoftnetStat reads data from /proc/net/softnet_stat.
 func (fs FS) NetSoftnetStat() ([]SoftnetStat, error) {
-	b, err := util.ReadFileNoStat(fs.proc.Path(softNetProcFile))
+	b, err := parsers.ReadFileNoStat(fs.proc.Path(softNetProcFile))
 	if err != nil {
 		return nil, err
 	}

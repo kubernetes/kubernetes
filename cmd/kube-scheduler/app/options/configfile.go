@@ -18,6 +18,7 @@ package options
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 )
+
+// redactedBytes serializes to the literal string "REDACTED" when encoded as
+// base64 in YAML or JSON output.
+var redactedBytes, _ = base64.StdEncoding.DecodeString("REDACTED")
 
 // LoadConfigFromFile loads scheduler config from the specified file path
 func LoadConfigFromFile(logger klog.Logger, file string) (*config.KubeSchedulerConfiguration, error) {
@@ -85,16 +90,19 @@ func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSched
 	}
 	cfg.Profiles = completedProfiles
 
-	buf, err := encodeConfig(cfg)
-	if err != nil {
-		return err
-	}
-
 	if loggerV.Enabled() {
+		buf, err := encodeConfig(redactSecrets(cfg))
+		if err != nil {
+			return err
+		}
 		loggerV.Info("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
+		buf, err := encodeConfig(cfg)
+		if err != nil {
+			return err
+		}
 		configFile, err := os.Create(fileName)
 		if err != nil {
 			return err
@@ -107,4 +115,19 @@ func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSched
 		os.Exit(0)
 	}
 	return nil
+}
+
+// redactSecrets returns a copy of cfg with inline extender TLS key material
+// replaced by a placeholder, so that the config can be logged without
+// disclosing secrets. The datapolicy tag on KeyData cannot take effect here
+// because the whole config is flattened into a single string before it
+// reaches the logger.
+func redactSecrets(cfg *config.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {
+	redacted := cfg.DeepCopy()
+	for i := range redacted.Extenders {
+		if tlsConfig := redacted.Extenders[i].TLSConfig; tlsConfig != nil && len(tlsConfig.KeyData) > 0 {
+			tlsConfig.KeyData = redactedBytes
+		}
+	}
+	return redacted
 }

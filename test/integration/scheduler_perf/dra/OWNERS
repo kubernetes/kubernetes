@@ -3,6 +3,7 @@
 reviewers:
   - bart0sh
   - klueska
+  - nojnhuh
   - pohly
 labels:
   - wg/device-management

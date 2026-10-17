@@ -68,7 +68,7 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 		return nil, err
 	}
 
-	informer := controllerContext.InformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+	informer := controllerContext.InformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
 	crdClientset, err := apiextensionsclientset.NewForConfig(config)
 	if err != nil {

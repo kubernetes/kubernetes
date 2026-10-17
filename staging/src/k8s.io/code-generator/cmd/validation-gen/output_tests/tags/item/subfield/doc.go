@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -30,7 +30,9 @@ type Struct struct {
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=key
+	// These two subfields short-circuit independently of each other.
 	// +k8s:item(key: "target")=+k8s:subfield(stringField)=+k8s:validateFalse="item Items[key=target].stringField"
+	// +k8s:item(key: "target")=+k8s:subfield(otherField)=+k8s:required
 	Items []Item `json:"items"`
 
 	// +k8s:listType=map
@@ -42,6 +44,7 @@ type Struct struct {
 type Item struct {
 	Key         string `json:"key"`
 	StringField string `json:"stringField"`
+	OtherField  string `json:"otherField"`
 }
 
 type RatchetItem struct {

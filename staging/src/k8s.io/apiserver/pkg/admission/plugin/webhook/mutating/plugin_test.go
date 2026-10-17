@@ -84,13 +84,13 @@ func BenchmarkAdmit(b *testing.B) {
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)
 
-			informer.Start(stopCh)
-			informer.WaitForCacheSync(stopCh)
-
 			if err = wh.ValidateInitialization(); err != nil {
 				b.Errorf("failed to validate initialization: %v", err)
 				return
 			}
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
 
 			var attr admission.Attributes
 			if tt.IsCRD {
@@ -143,13 +143,13 @@ func TestAdmit(t *testing.T) {
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)
 
-			informer.Start(stopCh)
-			informer.WaitForCacheSync(stopCh)
-
 			if err = wh.ValidateInitialization(); err != nil {
 				t.Errorf("failed to validate initialization: %v", err)
 				return
 			}
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
 
 			var attr admission.Attributes
 			if tt.IsCRD {
@@ -245,13 +245,13 @@ func TestAdmitCachedClient(t *testing.T) {
 		wh.SetExternalKubeClientSet(client)
 		wh.SetExternalKubeInformerFactory(informer)
 
-		informer.Start(stopCh)
-		informer.WaitForCacheSync(stopCh)
-
 		if err = wh.ValidateInitialization(); err != nil {
 			t.Errorf("%s: failed to validate initialization: %v", tt.Name, err)
 			continue
 		}
+
+		informer.Start(stopCh)
+		informer.WaitForCacheSync(stopCh)
 
 		err = wh.Admit(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
@@ -304,13 +304,13 @@ func TestWebhookDuration(ts *testing.T) {
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)
 
-			informer.Start(stopCh)
-			informer.WaitForCacheSync(stopCh)
-
 			if err = wh.ValidateInitialization(); err != nil {
 				t.Errorf("failed to validate initialization: %v", err)
 				return
 			}
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
 
 			_ = wh.Admit(ctx, webhooktesting.NewAttribute(ns, nil, test.IsDryRun), objectInterfaces)
 			wd, ok := request.LatencyTrackersFrom(ctx)

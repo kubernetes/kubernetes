@@ -27,9 +27,9 @@ import (
 //
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategyApplyConfiguration struct {
-	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// type is the type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	Type *extensionsv1beta1.DeploymentStrategyType `json:"type,omitempty"`
-	// Rolling update config params. Present only if DeploymentStrategyType =
+	// rollingUpdate is the rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
 	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it

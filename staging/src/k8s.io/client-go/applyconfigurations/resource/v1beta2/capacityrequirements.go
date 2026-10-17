@@ -28,13 +28,24 @@ import (
 //
 // CapacityRequirements defines the capacity requirements for a specific device request.
 type CapacityRequirementsApplyConfiguration struct {
-	// Requests represent individual device resource requests for distinct resources,
+	// requests represent individual device resource requests for distinct resources,
 	// all of which must be provided by the device.
 	//
 	// This value is used as an additional filtering condition against the available capacity on the device.
 	// This is semantically equivalent to a CEL selector with
 	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
 	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
+	//
+	// The domain prefix can be omitted, in which case it defaults to the driver of the
+	// device under evaluation. For example, "bandwidth: 1Gi" is equivalent to
+	// "<driver>/bandwidth: 1Gi" for a device published by driver "<driver>", regardless of
+	// which other, differently-domained "bandwidth" capacities that device might also have.
+	// To request one of those, the domain must be given explicitly, for example
+	// "example.com/bandwidth". Requesting the same driver capacity with and without
+	// the driver name as domain, for example "bandwidth: 1Gi" and "<driver>/bandwidth: 2Gi", is
+	// ambiguous and causes scheduling to fail with an error. For the sake of consistency
+	// there's no exception for such a conflict where the value is the same - that is still
+	// an error.
 	//
 	// When a requestPolicy is defined, the requested amount is adjusted upward
 	// to the nearest valid value based on the policy.

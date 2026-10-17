@@ -26,7 +26,7 @@ package v1beta2
 // - How are requests for this priority level limited?
 // - What should be done with requests that exceed the limit?
 type LimitedPriorityLevelConfigurationApplyConfiguration struct {
-	// `assuredConcurrencyShares` (ACS) configures the execution
+	// assuredConcurrencyShares (ACS) configures the execution
 	// limit, which is a limit on the number of requests of this
 	// priority level that may be executing at a given time.  ACS must
 	// be a positive number. The server's concurrency limit (SCL) is
@@ -42,9 +42,9 @@ type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	// expense of every other PL).
 	// This field has a default value of 30.
 	AssuredConcurrencyShares *int32 `json:"assuredConcurrencyShares,omitempty"`
-	// `limitResponse` indicates what to do with requests that can not be executed right now
+	// limitResponse indicates what to do with requests that can not be executed right now
 	LimitResponse *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
-	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// lendablePercent prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels. The value of this
 	// field must be between 0 and 100, inclusive, and it defaults to 0.
 	// The number of seats that other levels can borrow from this level, known
@@ -52,8 +52,8 @@ type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	//
 	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
 	LendablePercent *int32 `json:"lendablePercent,omitempty"`
-	// `borrowingLimitPercent`, if present, configures a limit on how many
-	// seats this priority level can borrow from other priority levels.
+	// borrowingLimitPercent configures a limit on how many
+	// seats this priority level can borrow from other priority levels, if present.
 	// The limit is known as this level's BorrowingConcurrencyLimit
 	// (BorrowingCL) and is a limit on the total number of seats that this
 	// level may borrow at any one time.

@@ -17,6 +17,7 @@ limitations under the License.
 package jws
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,4 +67,56 @@ func TestDetachedTokenIsValid(t *testing.T) {
 	sig2 := sig + "foo"
 	assert.False(t, DetachedTokenIsValid(sig2, content, id, secret),
 		"Content %q and token \"%s:%s\" should not equal signature: %q", content, id, secret, sig)
+}
+
+func TestSignatureCompatibility(t *testing.T) {
+	testcases := []struct {
+		name     string
+		secret   string
+		expected string
+	}{
+		{
+			name:     "empty secret",
+			secret:   "",
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..GBG9nJpyHc7Tk_iryUsRXOvX6U-19DDCA2AmlC326DU",
+		},
+		{
+			name:     "1 byte secret",
+			secret:   "x",
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..x-LVIHM7D6uo6buZFEW2ldnwJL2Ddduh2ZhxFN33v5w",
+		},
+		{
+			name:     "8 byte secret",
+			secret:   strings.Repeat("x", 8),
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..pCqXr-QOqtnLik5dOn0DZu842z-u_rchSqd6B-MoOFQ",
+		},
+		{
+			name:     "31 byte secret",
+			secret:   strings.Repeat("x", 31),
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..Wy4AKm0ArcyixzYnGnwAjWR7POeVBKBwnkLZw8GUkG8",
+		},
+		{
+			name:     "32 byte secret",
+			secret:   strings.Repeat("x", 32),
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..1z14ArXPw5a3L8hIAZmzMWdDXXsxED78LO7wn3m4a0k",
+		},
+		{
+			name:     "33 byte secret",
+			secret:   strings.Repeat("x", 33),
+			expected: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImlkIn0..exPZdsbPApmX14UF7bf2KoBdZwrkzSotja4egZ60UXs",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			sig, err := ComputeDetachedSignature("content", "id", tc.secret)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if sig != tc.expected {
+				t.Fatalf("wanted signature %q but got %q", tc.expected, sig)
+			}
+		})
+	}
 }

@@ -28,14 +28,68 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "storagemigration.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "storageversionmigrations",
+				IsResourceRequest: true,
+				Verb:              "create",
+			})
+
+			meta.RunObjectMetaTestCases(t, ctx, &storagemigration.StorageVersionMigration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-svm",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: metav1.GroupResource{
+						Group:    "group",
+						Resource: "resources",
+					},
+				},
+			}, registry.Strategy, meta.WithStringentFinalizerValidation())
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "storagemigration.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "storageversionmigrations",
+				IsResourceRequest: true,
+				Verb:              "update",
+			})
+
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &storagemigration.StorageVersionMigration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-svm",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: metav1.GroupResource{
+						Group:    "group",
+						Resource: "resources",
+					},
+				},
+			}, registry.Strategy, meta.WithStringentFinalizerValidation())
+		})
+	}
+}
+
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:    "storagemigration.k8s.io",
-				APIVersion:  apiVersion,
-				Resource:    "storageversionmigrations",
-				Subresource: "status",
+				APIGroup:          "storagemigration.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "storageversionmigrations",
+				Subresource:       "status",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
 
 			meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &storagemigration.StorageVersionMigration{}, registry.StatusStrategy, func(obj *storagemigration.StorageVersionMigration, c []metav1.Condition) {

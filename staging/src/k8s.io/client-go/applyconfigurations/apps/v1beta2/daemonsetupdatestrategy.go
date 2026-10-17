@@ -27,9 +27,9 @@ import (
 //
 // DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
 type DaemonSetUpdateStrategyApplyConfiguration struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
+	// type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
 	Type *appsv1beta2.DaemonSetUpdateStrategyType `json:"type,omitempty"`
-	// Rolling update config params. Present only if type = "RollingUpdate".
+	// rollingUpdate config params. Present only if type = "RollingUpdate".
 	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as Deployment `strategy.rollingUpdate`.

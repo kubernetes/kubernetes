@@ -359,6 +359,9 @@ func ValidateEncryptionAlgorithm(algo kubeadm.EncryptionAlgorithmType, fldPath *
 		kubeadm.EncryptionAlgorithmRSA2048,
 		kubeadm.EncryptionAlgorithmRSA3072,
 		kubeadm.EncryptionAlgorithmRSA4096,
+		kubeadm.EncryptionAlgorithmMLDSA44,
+		kubeadm.EncryptionAlgorithmMLDSA65,
+		kubeadm.EncryptionAlgorithmMLDSA87,
 	)
 	if !knownAlgorithms.Has(algo) {
 		msg := fmt.Sprintf("Invalid encryption algorithm %q. Must be one of %v", algo, sets.List(knownAlgorithms))
@@ -738,6 +741,11 @@ func ValidateExtraArgs(args []kubeadm.Arg, fldPath *field.Path) field.ErrorList 
 	for idx, arg := range args {
 		if len(arg.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has no name"))
+		}
+		if arg.MergeMethod != "" {
+			if arg.MergeMethod != kubeadm.ArgMergeMethodAppend && arg.MergeMethod != kubeadm.ArgMergeMethodPrepend {
+				allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has an invalid merge method"))
+			}
 		}
 	}
 

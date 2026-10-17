@@ -35,6 +35,7 @@ type Interface interface {
 // Update is not supported by the server, but Patch can be used for the actions Update would handle.
 type ResourceInterface interface {
 	Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error
+	DeleteWithResult(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error
 	Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error)

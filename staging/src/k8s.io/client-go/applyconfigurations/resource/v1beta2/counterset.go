@@ -30,10 +30,10 @@ package v1beta2
 // the portion of counters it uses will no longer be available for use
 // by other devices.
 type CounterSetApplyConfiguration struct {
-	// Name defines the name of the counter set.
+	// name defines the name of the counter set.
 	// It must be a DNS label.
 	Name *string `json:"name,omitempty"`
-	// Counters defines the set of counters for this CounterSet
+	// counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
 	// The maximum number of counters is 32.

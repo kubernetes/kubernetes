@@ -69,7 +69,7 @@ type MockCgroupNotifier_Start_Call struct {
 // Start is a helper method to define mock.On call
 //   - ctx context.Context
 //   - eventCh chan<- struct{}
-func (_e *MockCgroupNotifier_Expecter) Start(ctx interface{}, eventCh interface{}) *MockCgroupNotifier_Start_Call {
+func (_e *MockCgroupNotifier_Expecter) Start(ctx any, eventCh any) *MockCgroupNotifier_Start_Call {
 	return &MockCgroupNotifier_Start_Call{Call: _e.mock.On("Start", ctx, eventCh)}
 }
 
@@ -199,7 +199,7 @@ type MockNotifierFactory_NewCgroupNotifier_Call struct {
 //   - path string
 //   - attribute string
 //   - threshold int64
-func (_e *MockNotifierFactory_Expecter) NewCgroupNotifier(logger interface{}, path interface{}, attribute interface{}, threshold interface{}) *MockNotifierFactory_NewCgroupNotifier_Call {
+func (_e *MockNotifierFactory_Expecter) NewCgroupNotifier(logger any, path any, attribute any, threshold any) *MockNotifierFactory_NewCgroupNotifier_Call {
 	return &MockNotifierFactory_NewCgroupNotifier_Call{Call: _e.mock.On("NewCgroupNotifier", logger, path, attribute, threshold)}
 }
 
@@ -325,7 +325,7 @@ type MockThresholdNotifier_Start_Call struct {
 
 // Start is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockThresholdNotifier_Expecter) Start(ctx interface{}) *MockThresholdNotifier_Start_Call {
+func (_e *MockThresholdNotifier_Expecter) Start(ctx any) *MockThresholdNotifier_Start_Call {
 	return &MockThresholdNotifier_Start_Call{Call: _e.mock.On("Start", ctx)}
 }
 
@@ -377,7 +377,7 @@ type MockThresholdNotifier_UpdateThreshold_Call struct {
 // UpdateThreshold is a helper method to define mock.On call
 //   - ctx context.Context
 //   - summary *v1alpha1.Summary
-func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(ctx interface{}, summary interface{}) *MockThresholdNotifier_UpdateThreshold_Call {
+func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(ctx any, summary any) *MockThresholdNotifier_UpdateThreshold_Call {
 	return &MockThresholdNotifier_UpdateThreshold_Call{Call: _e.mock.On("UpdateThreshold", ctx, summary)}
 }
 

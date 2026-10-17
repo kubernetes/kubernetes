@@ -19,6 +19,7 @@ package singlekey
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -164,4 +165,33 @@ func Test(t *testing.T) {
 			{Key: nil, Data: "d3"},
 		},
 	}).ExpectValid()
+
+	// Test pointer items (PtrSliceItem)
+	st.Value(&Struct{
+		PointerItems: []*Item{
+			{Key: "a", Data: "d1"},
+			{Key: "target", Data: "d2"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`pointerItems[1]`: {
+			"item PointerItems[key=target]",
+		},
+	})
+
+	st.Value(&Struct{
+		PointerItems: []*Item{
+			{Key: "a", Data: "d1"},
+			{Key: "b", Data: "d2"},
+		},
+	}).ExpectValid()
+
+	// Nil element in list should trigger Required error
+	st.Value(&Struct{
+		PointerItems: []*Item{
+			{Key: "a", Data: "d1"},
+			nil,
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("pointerItems").Index(1), ""),
+	})
 }

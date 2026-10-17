@@ -183,7 +183,7 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		// node lifecycle controller uses existing cluster role from node-controller
 		client,
-		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
@@ -204,9 +204,6 @@ func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.TaintEvictionController,
 		constructor: newTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.SeparateTaintEvictionController,
-		},
 	}
 }
 
@@ -246,6 +243,11 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		return nil, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %w", err)
 	}
 
+	metricsPlugins, err := ProbePersistentVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe metrics volume plugins when starting persistentvolume controller: %w", err)
+	}
+
 	client, err := controllerContext.NewClient("persistent-volume-binder")
 	if err != nil {
 		return nil, err
@@ -255,6 +257,7 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		KubeClient:                client,
 		SyncPeriod:                controllerContext.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
 		VolumePlugins:             plugins,
+		MetricsVolumePlugins:      metricsPlugins,
 		VolumeInformer:            controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             controllerContext.InformerFactory.Storage().V1().StorageClasses(),
@@ -579,10 +582,9 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, err
 	}
-	logger := klog.FromContext(ctx)
 
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
-		logger,
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,
@@ -721,7 +723,7 @@ func newPersistentVolumeClaimProtectionController(ctx context.Context, controlle
 	}
 
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
@@ -749,11 +751,14 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 		return nil, err
 	}
 
-	pvpc := pvprotection.NewPVProtectionController(
-		klog.FromContext(ctx),
+	pvpc, err := pvprotection.NewPVProtectionController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		client,
 	)
+	if err != nil {
+		return nil, err
+	}
 	return newControllerLoop(func(ctx context.Context) {
 		pvpc.Run(ctx, 1)
 	}, controllerName), nil
@@ -776,7 +781,7 @@ func newVolumeAttributesClassProtectionController(ctx context.Context, controlle
 	}
 
 	vacProtectionController, err := vacprotection.NewVACProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),

@@ -32,6 +32,8 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -89,6 +91,7 @@ type watcher struct {
 	client                   *clientv3.Client
 	codec                    runtime.Codec
 	newFunc                  func() runtime.Object
+	reverseKeyFunc           storageKeyReverseFunc
 	objectType               string
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
@@ -97,13 +100,24 @@ type watcher struct {
 	getResourceSizeEstimator func() *resourceSizeEstimator
 }
 
+// storageKey keeps backend-prefixed keys distinct from the resource-relative
+// keys accepted by storage.ReverseKeyFunc.
+type storageKey string
+
+// storageKeyReverseFunc recovers object identity from an etcd key that still
+// contains the backend-specific prefix.
+type storageKeyReverseFunc func(key storageKey) (name string, namespace string, err error)
+
 // watchChan implements watch.Interface.
 type watchChan struct {
-	watcher                  *watcher
-	key                      string
-	initialRev               int64
-	recursive                bool
-	progressNotify           bool
+	watcher        *watcher
+	key            string
+	initialRev     int64
+	recursive      bool
+	progressNotify bool
+	// recordTimestamps enables wrapping watch events with decode timestamps and
+	// etcd client-side watch response buffer logging.
+	recordTimestamps         bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -133,7 +147,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -146,13 +160,14 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
 		initialRev:               rev,
 		recursive:                recursive,
 		progressNotify:           progressNotify,
+		recordTimestamps:         recordTimestamps,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
@@ -301,6 +316,7 @@ func (wc *watchChan) sync() error {
 		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			return err
 		}
+		etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
 		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
 	}
 	return wc.syncPaginated()
@@ -374,12 +390,13 @@ func (wc *watchChan) syncStreamRecursive() error {
 	startTime := time.Now()
 	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
 	if err != nil {
-		if grpcstatus.Code(err) == grpccodes.Unimplemented {
-			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
-		}
 		return err
 	}
 	defer func() {
+		// Only record the listStream metric if streaming was actually exercised.
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			return
+		}
 		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
 	}()
 
@@ -468,6 +485,11 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	if wc.progressNotify {
 		opts = append(opts, clientv3.WithProgressNotify())
 	}
+
+	if wc.recordTimestamps && klog.V(3).Enabled() {
+		opts = append(opts, clientv3.WithWatchBufLog())
+	}
+
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	estimator := wc.getResourceSizeEstimator()
 	for wres := range wch {
@@ -697,7 +719,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 				Type:   watch.Modified,
 				Object: curObj,
 			}
-			return res, nil
+			break
 		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
@@ -719,7 +741,39 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 			}
 		}
 	}
+	if res != nil && wc.recordTimestamps && !e.isInitialEvent {
+		res.Object = &timedWatchEvent{Object: res.Object, recordTime: e.recordTime}
+	}
 	return res, nil
+}
+
+// timedWatchEvent wraps a decoded watch object with the timestamp at which the
+// storage layer decoded it, so the watch cache can measure end-to-end dispatch
+// latency. It exists only on the watch cache's ingest path (opened with
+// ListOptions.RecordTimestamps) and MUST be unwrapped by the watch cache before
+// the object is stored or serialized.
+type timedWatchEvent struct {
+	runtime.Object
+	recordTime time.Time
+}
+
+var _ storage.WatchEventWithRecordTime = &timedWatchEvent{}
+
+func (t *timedWatchEvent) GetObjectMeta() metav1.Object {
+	m, _ := meta.Accessor(t.Object)
+	return m
+}
+
+func (t *timedWatchEvent) DeepCopyObject() runtime.Object {
+	return &timedWatchEvent{Object: t.Object.DeepCopyObject(), recordTime: t.recordTime}
+}
+
+func (t *timedWatchEvent) RecordTime() time.Time {
+	return t.recordTime
+}
+
+func (t *timedWatchEvent) Unwrap() runtime.Object {
+	return t.Object
 }
 
 func transformErrorToEvent(err error) *watch.Event {

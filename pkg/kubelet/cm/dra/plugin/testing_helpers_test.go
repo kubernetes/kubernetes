@@ -19,7 +19,7 @@ package plugin
 import (
 	"context"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 )
 
 // mockStreamHandler is a mock implementation of the StreamHandler interface,
@@ -28,7 +28,7 @@ type mockStreamHandler struct{}
 
 var _ StreamHandler = &mockStreamHandler{}
 
-func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error {
+func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error {
 	<-ctx.Done()
 	return nil
 }

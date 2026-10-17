@@ -1,3 +1,7 @@
+{{$numRequests := (or .numRequests 1) | Int}}
+{{$selectors := (or .selectors nil) | JSON}}
+{{$constraints := (or .constraints nil) | JSON}}
+
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
@@ -5,7 +9,9 @@ metadata:
 spec:
   spec:
     devices:
-      requests:
-      - name: req-0
+      constraints: {{$constraints}}
+      requests:{{range $numRequests}}
+      - name: req-{{.}}
         exactly:
           deviceClassName: test-class
+          selectors: {{$selectors}}{{end}}

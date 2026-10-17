@@ -30,20 +30,20 @@ import (
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type DeviceApplyConfiguration struct {
-	// Name is unique identifier among all devices managed by
+	// name is unique identifier among all devices managed by
 	// the driver in the pool. It must be a DNS label.
 	Name *string `json:"name,omitempty"`
-	// Attributes defines the set of attributes for this device.
+	// attributes defines the set of attributes for this device.
 	// The name of each attribute must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	Attributes map[resourcev1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	// Capacity defines the set of capacities for this device.
+	// capacity defines the set of capacities for this device.
 	// The name of each capacity must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	Capacity map[resourcev1.QualifiedName]DeviceCapacityApplyConfiguration `json:"capacity,omitempty"`
-	// ConsumesCounters defines a list of references to sharedCounters
+	// consumesCounters defines a list of references to sharedCounters
 	// and the set of counters that the device will
 	// consume from those counter sets.
 	//
@@ -52,24 +52,24 @@ type DeviceApplyConfiguration struct {
 	// The maximum number of device counter consumptions per
 	// device is 2.
 	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration `json:"consumesCounters,omitempty"`
-	// NodeName identifies the node where the device is available.
+	// nodeName identifies the node where the device is available.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	NodeName *string `json:"nodeName,omitempty"`
-	// NodeSelector defines the nodes where the device is available.
+	// nodeSelector defines the nodes where the device is available.
 	//
 	// Must use exactly one term.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	NodeSelector *corev1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	// AllNodes indicates that all nodes have access to the device.
+	// allNodes indicates that all nodes have access to the device.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	AllNodes *bool `json:"allNodes,omitempty"`
-	// If specified, these are the driver-defined taints.
+	// taints if specified, these are the driver-defined taints.
 	//
 	// The maximum number of taints is 16. If taints are set for
 	// any device in a ResourceSlice, then the maximum number of
@@ -78,7 +78,7 @@ type DeviceApplyConfiguration struct {
 	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Taints []DeviceTaintApplyConfiguration `json:"taints,omitempty"`
-	// BindsToNode indicates if the usage of an allocation involving this device
+	// bindsToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
@@ -86,7 +86,7 @@ type DeviceApplyConfiguration struct {
 	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindsToNode *bool `json:"bindsToNode,omitempty"`
-	// BindingConditions defines the conditions for proceeding with binding.
+	// bindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
 	// conditions with a value of True to proceed with binding the pod to the node
 	// while scheduling the pod.
@@ -98,7 +98,7 @@ type DeviceApplyConfiguration struct {
 	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
-	// BindingFailureConditions defines the conditions for binding failure.
+	// bindingFailureConditions defines the conditions for binding failure.
 	// They may be set in the per-device status conditions.
 	// If any is set to "True", a binding failure occurred.
 	//
@@ -109,12 +109,12 @@ type DeviceApplyConfiguration struct {
 	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
-	// AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
+	// allowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
 	//
 	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
 	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty"`
-	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// nodeAllocatableResources defines the mapping of node resources
 	// that are managed by the DRA driver exposing this device. This includes resources currently
 	// reported in v1.Node `status.allocatable` that are not extended resources
 	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
@@ -125,7 +125,7 @@ type DeviceApplyConfiguration struct {
 	// dependencies of an accelerator device.
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
-	NodeAllocatableResourceMappings map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration `json:"nodeAllocatableResourceMappings,omitempty"`
+	NodeAllocatableResources map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration `json:"nodeAllocatableResources,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -256,16 +256,16 @@ func (b *DeviceApplyConfiguration) WithAllowMultipleAllocations(value bool) *Dev
 	return b
 }
 
-// WithNodeAllocatableResourceMappings puts the entries into the NodeAllocatableResourceMappings field in the declarative configuration
+// WithNodeAllocatableResources puts the entries into the NodeAllocatableResources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the NodeAllocatableResourceMappings field,
-// overwriting an existing map entries in NodeAllocatableResourceMappings field with the same key.
-func (b *DeviceApplyConfiguration) WithNodeAllocatableResourceMappings(entries map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration) *DeviceApplyConfiguration {
-	if b.NodeAllocatableResourceMappings == nil && len(entries) > 0 {
-		b.NodeAllocatableResourceMappings = make(map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration, len(entries))
+// If called multiple times, the entries provided by each call will be put on the NodeAllocatableResources field,
+// overwriting an existing map entries in NodeAllocatableResources field with the same key.
+func (b *DeviceApplyConfiguration) WithNodeAllocatableResources(entries map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration) *DeviceApplyConfiguration {
+	if b.NodeAllocatableResources == nil && len(entries) > 0 {
+		b.NodeAllocatableResources = make(map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
-		b.NodeAllocatableResourceMappings[k] = v
+		b.NodeAllocatableResources[k] = v
 	}
 	return b
 }

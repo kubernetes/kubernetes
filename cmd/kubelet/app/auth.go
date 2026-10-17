@@ -21,15 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -92,7 +93,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 		if client == nil {
 			return nil, nil, nil, errors.New("no client provided, cannot use webhook authentication")
 		}
-		authenticatorConfig.WebhookRetryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
+		authenticatorConfig.WebhookRetryBackoff = authWebhookRetryBackoff()
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
@@ -132,7 +133,7 @@ func BuildAuthz(client authorizationclient.AuthorizationV1Interface, authz kubel
 			SubjectAccessReviewClient: client,
 			AllowCacheTTL:             authz.Webhook.CacheAuthorizedTTL.Duration,
 			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,
-			WebhookRetryBackoff:       genericoptions.DefaultAuthWebhookRetryBackoff(),
+			WebhookRetryBackoff:       authWebhookRetryBackoff(),
 		}
 		return authorizerConfig.New()
 
@@ -142,5 +143,17 @@ func BuildAuthz(client authorizationclient.AuthorizationV1Interface, authz kubel
 	default:
 		return nil, fmt.Errorf("unknown authorization mode %s", authz.Mode)
 
+	}
+}
+
+// authWebhookRetryBackoff has the same values as the generic API server default
+// (k8s.io/apiserver/pkg/server/options.DefaultAuthWebhookRetryBackoff), inlined
+// so the kubelet does not import the generic server options.
+func authWebhookRetryBackoff() *wait.Backoff {
+	return &wait.Backoff{
+		Duration: 500 * time.Millisecond,
+		Factor:   1.5,
+		Jitter:   0.2,
+		Steps:    5,
 	}
 }

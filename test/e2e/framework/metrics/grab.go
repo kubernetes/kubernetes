@@ -31,7 +31,7 @@ func GrabBeforeEach(ctx context.Context, f *framework.Framework) (result *Collec
 	}
 
 	ginkgo.By("Gathering metrics before test", func() {
-		grabber, err := NewMetricsGrabber(ctx, f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), !framework.ProviderIs("kubemark"), false, false, false, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+		grabber, err := NewMetricsGrabber(ctx, f.ClientSet, f.ClientConfig(), true, false, false, false, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
 			framework.Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
 			return
@@ -55,8 +55,8 @@ func GrabAfterEach(ctx context.Context, f *framework.Framework, before *Collecti
 
 	ginkgo.By("Gathering metrics after test", func() {
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
-		grabMetricsFromKubelets := framework.TestContext.GatherMetricsAfterTest != "master" && !framework.ProviderIs("kubemark")
-		grabber, err := NewMetricsGrabber(ctx, f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+		grabMetricsFromKubelets := framework.TestContext.GatherMetricsAfterTest != "master"
+		grabber, err := NewMetricsGrabber(ctx, f.ClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
 			framework.Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 			return

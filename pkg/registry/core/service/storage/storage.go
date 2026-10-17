@@ -23,6 +23,8 @@ import (
 	"net/url"
 	"strconv"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutil "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 type PodStorage interface {

@@ -123,22 +123,11 @@ kube::util::ensure-temp-dir
 
 # Install golangci-lint.
 #
-# hack/tools/golangci-lint uses the "tool" directive in a stand-alone
-# go.mod.
-#
-# Installing from source (https://golangci-lint.run/welcome/install/#install-from-sources)
+# Building from source (https://golangci-lint.run/welcome/install/#install-from-sources)
 # is not recommended, but for Kubernetes we prefer it because it avoids the need for
-# pre-built binaries for different platforms and gives more insights on dependencies.
+# pre-built binaries for different platforms, gives more insights on dependencies, and allows custom plugins.
 echo "installing golangci-lint, logcheck kube-api-linter and sorted plugins from hack/tools/golangci-lint into ${GOBIN}"
-GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-if [ "${golangci_config}" ]; then
-  # Plugins cannot be used without a config.
-  # This uses `go build` because `go install -buildmode=plugin` doesn't work
-  # (on purpose: https://github.com/golang/go/issues/64964).
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/kube-api-linter.so" -buildmode=plugin sigs.k8s.io/kube-api-linter/pkg/plugin
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/sorted.so" -buildmode=plugin k8s.io/kubernetes/hack/tools/golangci-lint/sorted/plugin
-fi
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/golangci-lint" .
 
 # Verify that the given config is valid (if one is provided). "golangci-lint run" does not
 # do that, which makes it easy to miss mistakes while editing the configuration.
@@ -159,17 +148,6 @@ EOF
 fi
 
 if [ "${golangci_config}" ]; then
-  # The relative path to _output/local/bin only works if that actually is the
-  # GOBIN. If not, then we have to make a temporary copy of the config and
-  # replace the path with an absolute one. This could be done also
-  # unconditionally, but the invocation that is printed below is nicer if we
-  # don't to do it when not required.
-  if grep -q 'path: _output/local/bin/' "${golangci_config}" &&
-     [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
-    patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
-    sed -e "s;path: _output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
-    golangci_config="${patched_golangci_config}"
-  fi
   golangci+=(--config="${golangci_config}")
 fi
 

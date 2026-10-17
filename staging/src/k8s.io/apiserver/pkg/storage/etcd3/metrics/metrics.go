@@ -18,9 +18,14 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
+
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -30,7 +35,11 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
+
+// ErrTransactionConflict indicates that an optimistic transaction failed due to a conflict.
+var ErrTransactionConflict = errors.New("transaction conflict")
 
 /*
  * By default, all the following metrics are defined as falling under
@@ -66,10 +75,10 @@ var (
 	etcdRequestErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "etcd_request_errors_total",
-			Help:           "Etcd failed request counts for each operation and object type.",
+			Help:           "Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"operation", "group", "resource"},
+		[]string{"operation", "group", "resource", "reason"},
 	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -80,32 +89,24 @@ var (
 		},
 		[]string{"resource"},
 	)
-	resourceSizeEstimate = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_resource_size_estimate_bytes",
-			Help:           "Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
+	resourceSizeEstimateDesc = compbasemetrics.NewDesc(
+		"apiserver_resource_size_estimate_bytes",
+		"Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.",
 		[]string{"group", "resource"},
+		nil,
+		compbasemetrics.BETA,
+		"",
 	)
-	newObjectCounts = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_resource_objects",
-			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
+	resourceSizeEstimate = newTimestampedResourceGaugeCollector(resourceSizeEstimateDesc, clock.RealClock{})
+	resourceObjectsDesc  = compbasemetrics.NewDesc(
+		"apiserver_resource_objects",
+		"Number of stored objects at the time of last check split by kind.",
 		[]string{"group", "resource"},
+		nil,
+		compbasemetrics.ALPHA,
+		"",
 	)
-	dbTotalSize = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Subsystem:         "apiserver",
-			Name:              "storage_db_total_size_in_bytes",
-			Help:              "Total size of the storage database file physically allocated in bytes.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.28.0",
-		},
-		[]string{"endpoint"},
-	)
+	newObjectCounts          = newTimestampedResourceGaugeCollector(resourceObjectsDesc, clock.RealClock{})
 	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
 	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
@@ -152,6 +153,17 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	listLatency = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: "apiserver",
+			Name:      "storage_list_duration_seconds",
+			Help:      "Latency of the storage layer GetList call in seconds, including object decode, split by whether etcd RangeStream was used.",
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"streamed", "group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -164,15 +176,15 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
-		legacyregistry.MustRegister(resourceSizeEstimate)
-		legacyregistry.MustRegister(newObjectCounts)
-		legacyregistry.MustRegister(dbTotalSize)
+		legacyregistry.CustomMustRegister(resourceSizeEstimate)
+		legacyregistry.CustomMustRegister(newObjectCounts)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(listLatency)
 	})
 }
 
@@ -180,19 +192,13 @@ func Register() {
 func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, err error) {
 	if err != nil {
 		objectCounts.WithLabelValues(groupResource.String()).Set(-1)
-		newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		}
 		return
 	}
 	objectCounts.WithLabelValues(groupResource.String()).Set(float64(stats.ObjectCount))
-	newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.ObjectCount))
+	newObjectCounts.set(groupResource, stats.ObjectCount)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		if stats.ObjectCount > 0 && stats.EstimatedAverageObjectSizeBytes == 0 {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		} else {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.EstimatedAverageObjectSizeBytes * stats.ObjectCount))
+		if stats.ObjectCount == 0 || stats.EstimatedAverageObjectSizeBytes > 0 {
+			resourceSizeEstimate.set(groupResource, stats.EstimatedAverageObjectSizeBytes*stats.ObjectCount)
 		}
 	}
 }
@@ -200,9 +206,9 @@ func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, e
 // DeleteStoreStats delete the stats metrics.
 func DeleteStoreStats(groupResource schema.GroupResource) {
 	objectCounts.Delete(map[string]string{"resource": groupResource.String()})
-	newObjectCounts.Delete(map[string]string{"group": groupResource.Group, "resource": groupResource.Resource})
+	newObjectCounts.delete(groupResource)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		resourceSizeEstimate.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+		resourceSizeEstimate.delete(groupResource)
 	}
 }
 
@@ -212,8 +218,37 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 	etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 	etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
 	if err != nil {
-		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
+		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource, errorReason(err)).Inc()
 	}
+}
+
+func errorReason(err error) string {
+	if errors.Is(err, ErrTransactionConflict) {
+		return "Conflict"
+	}
+	var etcdErr etcdrpc.EtcdError
+	if errors.As(err, &etcdErr) {
+		return etcdErr.Code().String()
+	}
+	if s, ok := grpcstatus.FromError(err); ok {
+		return s.Code().String()
+	}
+	if errors.Is(err, context.Canceled) {
+		return grpccodes.Canceled.String()
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return grpccodes.DeadlineExceeded.String()
+	}
+	return grpccodes.Unknown.String()
+}
+
+// RecordListLatency sets the storage_list_duration_seconds metric.
+func RecordListLatency(groupResource schema.GroupResource, streamed bool, startTime time.Time) {
+	streamedLabel := "false"
+	if streamed {
+		streamedLabel = "true"
+	}
+	listLatency.WithLabelValues(streamedLabel, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 // RecordEtcdEvent updated the etcd_events_received_total metric.
@@ -235,6 +270,8 @@ func RecordDecodeError(groupResource schema.GroupResource) {
 // Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
+	newObjectCounts.Reset()
+	resourceSizeEstimate.Reset()
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
@@ -242,12 +279,6 @@ func Reset() {
 // This is a variable to facilitate testing.
 var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-// UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
-// Deprecated: Metric etcd_db_total_size_in_bytes will be replaced with apiserver_storage_size_bytes
-func UpdateEtcdDbSize(ep string, size int64) {
-	dbTotalSize.WithLabelValues(ep).Set(float64(size))
 }
 
 // SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
@@ -324,5 +355,44 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 			klog.ErrorS(err, "Failed to create metric", "storage_cluster_id", storageClusterID)
 		}
 		ch <- metric
+	}
+}
+
+// OperationLatencyTracker is a pre-materialized tracker for etcd request latency and request/error counters.
+type OperationLatencyTracker struct {
+	verb          string
+	groupResource schema.GroupResource
+	latency       compbasemetrics.ObserverMetric
+	requests      compbasemetrics.CounterMetric
+}
+
+// NewOperationLatencyTracker pre-materializes etcd request metrics for a specific verb and groupResource.
+func NewOperationLatencyTracker(verb string, groupResource schema.GroupResource) *OperationLatencyTracker {
+	return &OperationLatencyTracker{
+		verb:          verb,
+		groupResource: groupResource,
+		latency:       etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		requests:      etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record records latency, request count, and error count if applicable.
+func (t *OperationLatencyTracker) Record(err error, startTime time.Time) {
+	t.latency.Observe(sinceInSeconds(startTime))
+	t.requests.Inc()
+	if err != nil {
+		etcdRequestErrorCounts.WithLabelValues(t.verb, t.groupResource.Group, t.groupResource.Resource, errorReason(err)).Inc()
+	}
+}
+
+// EtcdMetricsTracker holds pre-materialized metric trackers for etcd3 storage operations.
+type EtcdMetricsTracker struct {
+	Get *OperationLatencyTracker
+}
+
+// NewEtcdMetricsTracker initializes pre-materialized metric trackers for a given GroupResource.
+func NewEtcdMetricsTracker(groupResource schema.GroupResource) *EtcdMetricsTracker {
+	return &EtcdMetricsTracker{
+		Get: NewOperationLatencyTracker("get", groupResource),
 	}
 }

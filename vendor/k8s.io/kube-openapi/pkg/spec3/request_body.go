@@ -17,12 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -37,29 +35,14 @@ type RequestBody struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (r *RequestBody) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshalingV3 {
-		return internal.DeterministicMarshal(r)
-	}
-	b1, err := json.Marshal(r.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(r.RequestBodyProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	return internal.DeterministicMarshal(r)
 }
 
 func (r *RequestBody) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		Ref              string                   `json:"$ref,omitempty"`
-		RequestBodyProps requestBodyPropsOmitZero `json:",inline"`
-		Extensions       spec.Extensions          `json:",inline"`
+		RequestBodyProps requestBodyPropsOmitZero `json:",embed"`
+		Extensions       spec.Extensions          `json:",embed"`
 	}
 	x.Ref = r.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(r.Extensions)
@@ -68,19 +51,7 @@ func (r *RequestBody) MarshalJSONTo(enc *jsontext.Encoder) error {
 }
 
 func (r *RequestBody) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
-	if err := json.Unmarshal(data, &r.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.RequestBodyProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return jsonv2.Unmarshal(data, r)
 }
 
 // RequestBodyProps describes a single request body, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#requestBodyObject
@@ -101,7 +72,7 @@ type requestBodyPropsOmitZero struct {
 
 func (r *RequestBody) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions spec.Extensions `json:",inline"`
+		Extensions spec.Extensions `json:",embed"`
 		RequestBodyProps
 	}
 	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {

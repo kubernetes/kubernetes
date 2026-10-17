@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -107,6 +107,22 @@ type UpdateListStruct struct {
 	// +k8s:listMapKey=name
 	// +k8s:eachVal=+k8s:update=NoModify
 	EachValNoModifyList []UpdateItem `json:"eachValNoModifyList"`
+
+	// Pointer Slice NoSet
+	// +k8s:listType=atomic
+	// +k8s:update=NoSet
+	PointerSliceNoSet []*string `json:"pointerSliceNoSet"`
+
+	// Pointer listType=set + NoAddItem
+	// +k8s:listType=set
+	// +k8s:update=NoAddItem
+	PointerSetNoAdd []*string `json:"pointerSetNoAdd"`
+
+	// Pointer listType=map + NoRemoveItem
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:update=NoRemoveItem
+	PointerMapListNoRemove []*UpdateItem `json:"pointerMapListNoRemove"`
 }
 
 type UpdateItem struct {

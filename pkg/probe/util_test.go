@@ -19,6 +19,7 @@ package probe
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -34,6 +35,7 @@ func TestFindPortByName(t *testing.T) {
 		args    args
 		want    int
 		wantErr bool
+		errMsg  string
 	}{
 		{
 			name: "get port from exist port name",
@@ -74,6 +76,7 @@ func TestFindPortByName(t *testing.T) {
 			},
 			want:    0,
 			wantErr: true,
+			errMsg:  `port "http" not found`,
 		},
 	}
 
@@ -84,6 +87,9 @@ func TestFindPortByName(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("findPortByName() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.errMsg != "" {
+				require.EqualError(t, err, tt.errMsg)
 			}
 			if got != tt.want {
 				t.Errorf("findPortByName() = %v, want %v", got, tt.want)
@@ -103,6 +109,7 @@ func TestResolveContainerPort(t *testing.T) {
 		args    args
 		want    int
 		wantErr bool
+		errMsg  string
 	}{
 		{
 			name: "get port by int type",
@@ -157,6 +164,7 @@ func TestResolveContainerPort(t *testing.T) {
 			},
 			want:    0,
 			wantErr: true,
+			errMsg:  `port "foo" not found`,
 		},
 		{
 			name: "invalid param type",
@@ -186,6 +194,9 @@ func TestResolveContainerPort(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveContainerPort() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.errMsg != "" {
+				require.EqualError(t, err, tt.errMsg)
 			}
 			if got != tt.want {
 				t.Errorf("ResolveContainerPort() = %v, want %v", got, tt.want)

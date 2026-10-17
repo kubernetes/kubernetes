@@ -49,11 +49,14 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 		return errors.New("no kubelet component config found")
 	}
 
-	if err := kubeletCfg.Mutate(); err != nil {
+	// Node-specific mutations must not leak into the cluster-wide configuration
+	// that may be uploaded after this file is written.
+	localKubeletCfg := kubeletCfg.DeepCopy()
+	if err := localKubeletCfg.Mutate(); err != nil {
 		return err
 	}
 
-	kubeletBytes, err := kubeletCfg.Marshal()
+	kubeletBytes, err := localKubeletCfg.Marshal()
 	if err != nil {
 		return err
 	}

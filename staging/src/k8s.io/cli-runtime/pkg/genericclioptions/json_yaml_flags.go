@@ -17,7 +17,6 @@ limitations under the License.
 package genericclioptions
 
 import (
-	"os"
 	"slices"
 	"strings"
 
@@ -31,12 +30,7 @@ func (f *JSONYamlPrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}
 	}
-	formats := []string{"json", "yaml"}
-	// We can't use the cmdutil pkg directly because of import cycle.
-	if strings.ToLower(os.Getenv("KUBECTL_KYAML")) != "false" {
-		formats = append(formats, "kyaml")
-	}
-	return formats
+	return []string{"json", "yaml", "kyaml"}
 }
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.

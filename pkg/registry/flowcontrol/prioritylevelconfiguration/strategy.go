@@ -19,6 +19,8 @@ package prioritylevelconfiguration
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // priorityLevelConfigurationStrategy implements verification logic for priority level configurations.

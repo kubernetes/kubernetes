@@ -25,11 +25,11 @@ package v1alpha3
 // PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
 // generated name for the corresponding ResourceClaim.
 type PodGroupResourceClaimStatusApplyConfiguration struct {
-	// Name uniquely identifies this resource claim inside the PodGroup. This
+	// name uniquely identifies this resource claim inside the PodGroup. This
 	// must match the name of an entry in podgroup.spec.resourceClaims, which
 	// implies that the string must be a DNS_LABEL.
 	Name *string `json:"name,omitempty"`
-	// ResourceClaimName is the name of the ResourceClaim that was generated for
+	// resourceClaimName is the name of the ResourceClaim that was generated for
 	// the PodGroup in the namespace of the PodGroup. If this is unset, then
 	// generating a ResourceClaim was not necessary. The
 	// podgroup.spec.resourceClaims entry can be ignored in this case.

@@ -34,7 +34,7 @@ import (
 // This range is used to allocate ClusterIPs to Service objects.
 type ServiceCIDRApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec is the desired state of the ServiceCIDR.

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
 
@@ -39,6 +39,16 @@ type Struct struct {
 	ListTypedefField []StringType `json:"listTypedefField"`
 
 	UnvalidatedListField []string `json:"UnvalidatedListField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
+	ListPtrField []*string `json:"listPtrField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrTypedefField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrTypedefField[*]"
+	ListPtrTypedefField []*StringType `json:"listPtrTypedefField"`
+
+	UnvalidatedListPtrField []*string `json:"UnvalidatedListPtrField"`
 }
 
 // +k8s:validateFalse="type StringType"

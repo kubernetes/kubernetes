@@ -72,9 +72,7 @@ type ExternalJWTSignerClient interface {
 	Sign(ctx context.Context, in *SignJWTRequest, opts ...grpc.CallOption) (*SignJWTResponse, error)
 	// FetchKeys returns the set of public keys that are trusted to sign
 	// Kubernetes service account tokens. Kube-apiserver will call this RPC:
-	//
-	// * Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
-	//
+	//   - Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
 	//   - Periodically, so it can serve reasonably-up-to-date keys from the OIDC
 	//     JWKs endpoint.
 	FetchKeys(ctx context.Context, in *FetchKeysRequest, opts ...grpc.CallOption) (*FetchKeysResponse, error)
@@ -136,9 +134,7 @@ type ExternalJWTSignerServer interface {
 	Sign(context.Context, *SignJWTRequest) (*SignJWTResponse, error)
 	// FetchKeys returns the set of public keys that are trusted to sign
 	// Kubernetes service account tokens. Kube-apiserver will call this RPC:
-	//
-	// * Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
-	//
+	//   - Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
 	//   - Periodically, so it can serve reasonably-up-to-date keys from the OIDC
 	//     JWKs endpoint.
 	FetchKeys(context.Context, *FetchKeysRequest) (*FetchKeysResponse, error)

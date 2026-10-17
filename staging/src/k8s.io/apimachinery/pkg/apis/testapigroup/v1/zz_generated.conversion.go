@@ -24,7 +24,6 @@ package v1
 import (
 	unsafe "unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testapigroup "k8s.io/apimachinery/pkg/apis/testapigroup"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -133,12 +132,7 @@ func Convert_testapigroup_Carp_To_v1_Carp(in *testapigroup.Carp, out *Carp, s co
 }
 
 func autoConvert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, out *testapigroup.CarpCondition, s conversion.Scope) error {
-	out.Type = testapigroup.CarpConditionType(in.Type)
-	out.Status = testapigroup.ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*testapigroup.CarpCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -148,12 +142,7 @@ func Convert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, o
 }
 
 func autoConvert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup.CarpCondition, out *CarpCondition, s conversion.Scope) error {
-	out.Type = CarpConditionType(in.Type)
-	out.Status = ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*CarpCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -163,10 +152,7 @@ func Convert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup.Car
 }
 
 func autoConvert_v1_CarpInfo_To_testapigroup_CarpInfo(in *CarpInfo, out *testapigroup.CarpInfo, s conversion.Scope) error {
-	out.A = in.A
-	out.B = in.B
-	out.C = (*string)(unsafe.Pointer(in.C))
-	out.Data = in.Data
+	*out = *(*testapigroup.CarpInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -176,10 +162,7 @@ func Convert_v1_CarpInfo_To_testapigroup_CarpInfo(in *CarpInfo, out *testapigrou
 }
 
 func autoConvert_testapigroup_CarpInfo_To_v1_CarpInfo(in *testapigroup.CarpInfo, out *CarpInfo, s conversion.Scope) error {
-	out.A = in.A
-	out.B = in.B
-	out.C = (*string)(unsafe.Pointer(in.C))
-	out.Data = in.Data
+	*out = *(*CarpInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -271,14 +254,7 @@ func Convert_testapigroup_CarpSpec_To_v1_CarpSpec(in *testapigroup.CarpSpec, out
 }
 
 func autoConvert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *testapigroup.CarpStatus, s conversion.Scope) error {
-	out.Phase = testapigroup.CarpPhase(in.Phase)
-	out.Conditions = *(*[]testapigroup.CarpCondition)(unsafe.Pointer(&in.Conditions))
-	out.Message = in.Message
-	out.Reason = in.Reason
-	out.HostIP = in.HostIP
-	out.CarpIP = in.CarpIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.Infos = *(*[]testapigroup.CarpInfo)(unsafe.Pointer(&in.Infos))
+	*out = *(*testapigroup.CarpStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -288,14 +264,7 @@ func Convert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *testa
 }
 
 func autoConvert_testapigroup_CarpStatus_To_v1_CarpStatus(in *testapigroup.CarpStatus, out *CarpStatus, s conversion.Scope) error {
-	out.Phase = CarpPhase(in.Phase)
-	out.Conditions = *(*[]CarpCondition)(unsafe.Pointer(&in.Conditions))
-	out.Message = in.Message
-	out.Reason = in.Reason
-	out.HostIP = in.HostIP
-	out.CarpIP = in.CarpIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.Infos = *(*[]CarpInfo)(unsafe.Pointer(&in.Infos))
+	*out = *(*CarpStatus)(unsafe.Pointer(in))
 	return nil
 }
 

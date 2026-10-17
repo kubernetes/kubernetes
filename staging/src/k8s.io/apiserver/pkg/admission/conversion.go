@@ -59,6 +59,14 @@ func (v *VersionedAttributes) GetObject() runtime.Object {
 	return v.Attributes.GetObject()
 }
 
+// GetOldObject overrides the Attributes.GetOldObject()
+func (v *VersionedAttributes) GetOldObject() runtime.Object {
+	if v.VersionedOldObject.object != nil {
+		return v.VersionedOldObject.object
+	}
+	return v.Attributes.GetOldObject()
+}
+
 // ConvertToGVK converts object to the desired gvk.
 func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o ObjectInterfaces) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
@@ -107,7 +115,12 @@ func NewVersionedAttributes(attr Attributes, gvk schema.GroupVersionKind, o Obje
 // LazyObject encapsulates a versioned runtime.Object and its lazily-evaluated Common Expression Language (CEL) representation.
 type LazyObject struct {
 	object runtime.Object
-	celVal ref.Val
+	// UseSchemalessTypeRef indicates whether to use SchemalessTypedToVal (reflection-based lazy ref.Val)
+	// instead of converting to an unstructured representation with DefaultTypeAdapter.
+	//
+	// Deprecated: This field is temporary and will be removed when schemaless becomes the default.
+	UseSchemalessTypeRef bool
+	celVal               ref.Val
 }
 
 // NewLazyObject returns a new LazyObject wrapping the provided runtime.Object.
@@ -136,8 +149,17 @@ func (l *LazyObject) CELValue() (ref.Val, error) {
 		l.celVal = types.DefaultTypeAdapter.NativeToValue(u.Object)
 		return l.celVal, nil
 	}
+	// TODO: use SchemalessTypeRef always.
+	if l.UseSchemalessTypeRef {
+		l.celVal = common.SchemalessTypedToVal(l.object)
+		return l.celVal, nil
+	}
 
-	l.celVal = common.SchemalessTypedToVal(l.object)
+	u, err := ConvertObjectToUnstructured(l.object)
+	if err != nil {
+		return nil, err
+	}
+	l.celVal = types.DefaultTypeAdapter.NativeToValue(u.Object)
 	return l.celVal, nil
 }
 

@@ -30,16 +30,19 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
-const testingCheckpoint = "cpumanager_checkpoint_test"
+const (
+	testingCheckpoint = "cpumanager_checkpoint_test"
+	stateDir          = "cpumanager_state_test"
+)
 
 type FeatureGateCombination map[featuregate.Feature]bool
 
@@ -166,8 +169,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below test case V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore valid checkpoint",
-			nil,
+			"Restore valid checkpoint with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: false},
 			`{
 				"policyName": "other",
 				"defaultCPUSet": "1-9",
@@ -186,6 +189,40 @@ func TestCheckpointStateRestore(t *testing.T) {
 					},
 				},
 				defaultCPUSet: cpuset.New(7, 8, 9),
+			},
+		},
+		// In below test case V2 part of checkpoint is intentionally corrupted to verify that it is not used.
+		{
+			"Restore valid checkpoint with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: true},
+			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
+				"dataChecksum": 1420829534
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(7, 8, 9),
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(4, 5, 6),
+						},
+						"container2": {
+							Baseline: cpuset.New(1, 2, 3),
+						},
+					},
+				},
 			},
 		},
 		{
@@ -327,8 +364,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 			nil,
 		},
 		{
-			"Restore checkpoint from v2 (migration)",
-			nil,
+			"Restore checkpoint from v2 (migration) with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: false},
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "7-9",
@@ -354,8 +391,48 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: false},
+			"Restore checkpoint from v2 (migration) with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: true},
+			`{
+				"policyName": "static",
+				"defaultCPUSet": "7-9",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 1942532442
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(7, 8, 9),
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(4, 5, 6),
+						},
+						"container2": {
+							Baseline: cpuset.New(1, 2, 3),
+						},
+					},
+				},
+			},
+		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled and InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               false,
+				features.InPlacePodVerticalScalingExclusiveCPUs: false,
+			},
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "1-2",
@@ -386,8 +463,56 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled and InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               false,
+				features.InPlacePodVerticalScalingExclusiveCPUs: true,
+			},
+			`{
+				"policyName": "static",
+				"defaultCPUSet": "1-2",
+				"entries": {
+					"pod1": {
+						"container1": "5-6",
+						"container2": "3-4"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 766259872
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(5, 6),
+						"container2": cpuset.New(3, 4),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2),
+				baselines: ContainerCPUBaselines{
+					"pod1": {
+						"container1": {
+							Baseline: cpuset.New(5, 6),
+						},
+						"container2": {
+							Baseline: cpuset.New(3, 4),
+						},
+					},
+				},
+			},
+		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled and InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               true,
+				features.InPlacePodVerticalScalingExclusiveCPUs: false,
+			},
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "1-2",
@@ -422,16 +547,69 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 			},
 		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled and InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               true,
+				features.InPlacePodVerticalScalingExclusiveCPUs: true,
+			},
+			`{
+				"policyName": "static",
+				"defaultCPUSet": "1-2",
+				"entries": {
+					"pod1": {
+						"container1": "5-6",
+						"container2": "3-4"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 766259872
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(5, 6),
+						"container2": cpuset.New(3, 4),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2),
+				podAssignments: PodCPUAssignments{
+					"pod2": PodEntry{
+						CPUSet: cpuset.New(7, 8, 9),
+					},
+				},
+				baselines: ContainerCPUBaselines{
+					"pod1": {
+						"container1": {
+							Baseline: cpuset.New(5, 6),
+						},
+						"container2": {
+							Baseline: cpuset.New(3, 4),
+						},
+					},
+				},
+			},
+		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: false},
+			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled and InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               false,
+				features.InPlacePodVerticalScalingExclusiveCPUs: false,
+			},
 			`{
 				"policyName": "other",
 				"defaultCPUSet": "1-9",
 				"checksum": 1234,
-				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
-				"dataChecksum": 2328898362
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}}}",
+				"dataChecksum": 1032795074
 			}`,
 			"static",
 			containermap.ContainerMap{},
@@ -448,14 +626,54 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled and InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               false,
+				features.InPlacePodVerticalScalingExclusiveCPUs: true,
+			},
 			`{
 				"policyName": "other",
 				"defaultCPUSet": "1-9",
 				"checksum": 1234,
-				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
-				"dataChecksum": 2328898362
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}}}",
+				"dataChecksum": 1032795074
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(4, 5),
+						},
+						"container2": {
+							Baseline: cpuset.New(7, 8),
+						},
+					},
+				},
+			},
+		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
+		{
+			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled and InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               true,
+				features.InPlacePodVerticalScalingExclusiveCPUs: false,
+			},
+			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}}}",
+				"dataChecksum": 1032795074
 			}`,
 			"static",
 			containermap.ContainerMap{},
@@ -475,6 +693,48 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 			},
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
+		{
+			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled and InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{
+				features.PodLevelResourceManagers:               true,
+				features.InPlacePodVerticalScalingExclusiveCPUs: true,
+			},
+			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}}}",
+				"dataChecksum": 1032795074
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+				podAssignments: PodCPUAssignments{
+					"pod": PodEntry{
+						CPUSet: cpuset.New(4, 5, 6, 7, 8, 9, 10),
+					},
+				},
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(4, 5),
+						},
+						"container2": {
+							Baseline: cpuset.New(7, 8),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// create temp dir
@@ -488,6 +748,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 	// list of all features verified in this test
 	featureGateList := []featuregate.Feature{
 		features.PodLevelResourceManagers,
+		features.InPlacePodVerticalScalingExclusiveCPUs,
 	}
 	// iterate over all possible enabled/disabled feature combinations
 	for _, fgComb := range allFeatureGateCombinations(featureGateList) {
@@ -542,19 +803,40 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 func TestCheckpointStateStore(t *testing.T) {
 	testCases := []struct {
-		description   string
-		expectedState *stateMemory
+		description    string
+		fgRequirements FeatureGateCombination
+		expectedState  *stateMemory
 	}{
 		{
-			"Store default cpu set",
-			&stateMemory{defaultCPUSet: cpuset.New(1, 2, 3)},
+			description:    "Store default cpu set",
+			fgRequirements: nil,
+			expectedState:  &stateMemory{defaultCPUSet: cpuset.New(1, 2, 3)},
 		},
 		{
-			"Store assignments",
-			&stateMemory{
+			description:    "Store assignments",
+			fgRequirements: FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: false},
+			expectedState: &stateMemory{
 				assignments: map[string]map[string]cpuset.CPUSet{
 					"pod": {
 						"container1": cpuset.New(1, 5, 8),
+					},
+				},
+			},
+		},
+		{
+			description:    "Store baselines",
+			fgRequirements: FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: true},
+			expectedState: &stateMemory{
+				assignments: map[string]map[string]cpuset.CPUSet{
+					"pod": {
+						"container1": cpuset.New(1, 5, 8),
+					},
+				},
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(1, 5),
+						},
 					},
 				},
 			},
@@ -573,28 +855,57 @@ func TestCheckpointStateStore(t *testing.T) {
 		t.Fatalf("could not create testing checkpoint manager: %v", err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(testingCheckpoint)
-
-			logger, _ := ktesting.NewTestContext(t)
-			cs1, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
-			if err != nil {
-				t.Fatalf("could not create testing checkpointState instance: %v", err)
+	// list of all features verified in this test
+	featureGateList := []featuregate.Feature{
+		features.PodLevelResourceManagers,
+		features.InPlacePodVerticalScalingExclusiveCPUs,
+	}
+	// iterate over all possible enabled/disabled feature combinations
+	for _, fgComb := range allFeatureGateCombinations(featureGateList) {
+		// run all testcases for current feature combination
+		t.Run(describe(fgComb), func(t *testing.T) {
+			for _, key := range slices.Sorted(maps.Keys(fgComb)) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, key, fgComb[key])
 			}
 
-			// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
-			cs1.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
-			cs1.SetCPUAssignments(tc.expectedState.assignments)
+			for _, tc := range testCases {
+				// verify feature gate requirements for testcase
+				skip := false
+				for fg, requiredState := range tc.fgRequirements {
+					state, exist := fgComb[fg]
+					if !exist || requiredState != state {
+						skip = true
+					}
+				}
+				if skip {
+					continue
+				}
 
-			// restore checkpoint with previously stored values
-			cs2, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
-			if err != nil {
-				t.Fatalf("could not create testing checkpointState instance: %v", err)
+				t.Run(tc.description, func(t *testing.T) {
+					// ensure there is no previous checkpoint
+					err = cpm.RemoveCheckpoint(testingCheckpoint)
+					require.NoErrorf(t, err, "could not remove previous checkpoint: %v", err)
+
+					logger, _ := ktesting.NewTestContext(t)
+					cs1, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+					if err != nil {
+						t.Fatalf("could not create testing checkpointState instance: %v", err)
+					}
+
+					// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
+					cs1.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
+					cs1.SetCPUAssignments(tc.expectedState.assignments)
+					cs1.SetCPUBaselines(tc.expectedState.baselines)
+
+					// restore checkpoint with previously stored values
+					cs2, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+					if err != nil {
+						t.Fatalf("could not create testing checkpointState instance: %v", err)
+					}
+
+					AssertStateEqual(t, cs2, tc.expectedState)
+				})
 			}
-
-			AssertStateEqual(t, cs2, tc.expectedState)
 		})
 	}
 }
@@ -650,7 +961,8 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(testingCheckpoint)
+			err = cpm.RemoveCheckpoint(testingCheckpoint)
+			require.NoErrorf(t, err, "could not remove previous checkpoint: %v", err)
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
@@ -744,6 +1056,13 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
+
+	cpubaselinesSf := sf.GetCPUBaselines()
+	cpubaselinesSm := sm.GetCPUBaselines()
+	if !reflect.DeepEqual(cpubaselinesSf, cpubaselinesSm) {
+		t.Errorf("State CPU baseline entries mismatch. Have %s, want %s", cpubaselinesSf, cpubaselinesSm)
+	}
+
 }
 
 func TestCPUManagerCheckpoint_MarshalCheckpoint_HashCompatibility(t *testing.T) {
@@ -934,5 +1253,271 @@ func removeAll(dir string, t *testing.T) {
 	t.Helper()
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatalf("unable to remove dir %s: %v", dir, err)
+	}
+}
+
+func TestSetPodCPUSet(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		cpuSet             []int
+		expected           string
+	}{
+		{
+			description:        "Assign CPUSet to given pod with PodLevelResourceManagers feature gate enabled",
+			featureGateEnabled: true,
+			cpuSet:             []int{1, 2, 3, 4, 8},
+			expected:           "1-4,8",
+		},
+		{
+			description:        "Assign CPUSet to given pod with PodLevelResourceManagers feature gate disabled",
+			featureGateEnabled: false,
+			cpuSet:             []int{1, 2, 3, 4, 8},
+			expected:           "",
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.featureGateEnabled)
+
+			tmpDir, err := os.MkdirTemp("", stateDir)
+			require.NoError(t, err)
+
+			// Remove previous checkpoint's dir during subtest cleanup
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+			})
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			state1.SetPodCPUSet("pod1", cpuset.New(testCase.cpuSet...))
+
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			actual, _ := state2.GetPodCPUSet("pod1")
+			require.Equal(t, testCase.expected, actual.String())
+		})
+	}
+}
+
+func TestSetPodCPUAssignments(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		podEntries         PodCPUAssignments
+		expected           map[string]string
+	}{
+		{
+			description:        "Assign CPUSet to pods with PodLevelResourceManagers feature gate enabled",
+			featureGateEnabled: true,
+			podEntries: PodCPUAssignments{
+				"pod1": {CPUSet: cpuset.New(4, 7)},
+				"pod2": {CPUSet: cpuset.New(1, 2, 3)},
+			},
+			expected: map[string]string{
+				"pod1": "4,7",
+				"pod2": "1-3",
+			},
+		},
+		{
+			description:        "Assign CPUSet to pods with PodLevelResourceManagers feature gate disabled",
+			featureGateEnabled: false,
+			podEntries: PodCPUAssignments{
+				"pod1": {CPUSet: cpuset.New(3, 5)},
+			},
+			expected: map[string]string{},
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.featureGateEnabled)
+
+			tmpDir, err := os.MkdirTemp("", stateDir)
+			require.NoError(t, err)
+
+			// Remove previous checkpoint's dir during subtest cleanup
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+			})
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			state1.SetPodCPUAssignments(testCase.podEntries)
+
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			actual := state2.GetPodCPUAssignments()
+			require.Len(t, actual, len(testCase.expected))
+
+			for pod, entry := range actual {
+				require.Equal(t, testCase.expected[pod], entry.CPUSet.String())
+			}
+		})
+	}
+}
+
+func TestGetBaselineCPUSet(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		content            string
+		expected           ContainerCPUBaselines
+	}{
+		{
+			description:        "Get baseline CPUSet with InPlacePodVerticalScalingExclusiveCPUs feature gate enabled when baselines field included",
+			featureGateEnabled: true,
+			content: `{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container\":\"4-5\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}},\"baselines\":{\"pod\":{\"container\":{\"baseline\":\"5\"}}}}",
+				"dataChecksum": 4038000775
+			}`,
+			expected: ContainerCPUBaselines{
+				"pod": {
+					"container": {
+						Baseline: cpuset.New(5),
+					},
+				},
+			},
+		},
+		{
+			description:        "Get baseline CPUSet with InPlacePodVerticalScalingExclusiveCPUs feature gate enabled when baselines field excluded",
+			featureGateEnabled: true,
+			content: `{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container\":\"4-5\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"dataChecksum": 234652157
+			}`,
+			expected: ContainerCPUBaselines{
+				"pod": {
+					"container": {
+						Baseline: cpuset.New(4, 5), // Must be equal to value from entries
+					},
+				},
+			},
+		},
+		{
+			description:        "Get baseline CPUSet with InPlacePodVerticalScalingExclusiveCPUs feature gate disabled",
+			featureGateEnabled: false,
+			content: `{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container\":\"4-5\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"dataChecksum": 234652157
+			}`,
+			expected: ContainerCPUBaselines{
+				"pod": {
+					"container": {
+						Baseline: cpuset.New(),
+					},
+				},
+			},
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, err := os.MkdirTemp("", stateDir)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+
+	cpm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, testCase.featureGateEnabled)
+
+			err = cpm.RemoveCheckpoint(testingCheckpoint)
+			require.NoErrorf(t, err, "could not remove previous checkpoint: %v", err)
+
+			checkpoint := &testutil.MockCheckpoint{Content: testCase.content}
+			err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
+			require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
+
+			state, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			originals, _ := state.GetBaselineCPUSet("pod", "container")
+			require.Equal(t, testCase.expected["pod"]["container"].Baseline, originals)
+		})
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		content            string
+		podUIDs            []string // Pods to delete
+		expected           map[string]string
+	}{
+		{
+			description:        "Delete existing pod(s) CPUSet with PodLevelResourceManagers feature gate enabled",
+			featureGateEnabled: true,
+			content: `{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod1\":{\"container\":\"4-5\"},\"pod2\":{\"container\":\"7-8\"}},\"podEntries\":{\"pod1\":{\"cpuSet\":\"4-6\"},\"pod2\":{\"cpuSet\":\"7-9\"}}}",
+				"dataChecksum": 2086345991
+			}`,
+			podUIDs: []string{"pod1"},
+			expected: map[string]string{
+				"pod2": "7-9",
+			},
+		},
+		{
+			description:        "Delete nonexisting pod(s) CPUSet with PodLevelResourceManagers feature gate enabled",
+			featureGateEnabled: true,
+			content: `{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod1\":{\"container\":\"4-5\"},\"pod2\":{\"container\":\"7-8\"}},\"podEntries\":{\"pod1\":{\"cpuSet\":\"4-6\"},\"pod2\":{\"cpuSet\":\"7-9\"}}}",
+				"dataChecksum": 2086345991
+			}`,
+			podUIDs: []string{"pod3", "pod4"},
+			expected: map[string]string{
+				"pod1": "4-6",
+				"pod2": "7-9",
+			},
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, err := os.MkdirTemp("", stateDir)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+
+	cpm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.featureGateEnabled)
+
+			err = cpm.RemoveCheckpoint(testingCheckpoint)
+			require.NoErrorf(t, err, "could not remove previous checkpoint: %v", err)
+
+			checkpoint := &testutil.MockCheckpoint{Content: testCase.content}
+			err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
+			require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
+
+			state, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			for _, uid := range testCase.podUIDs {
+				state.DeletePod(uid)
+			}
+			actual := state.GetPodCPUAssignments()
+
+			require.Len(t, actual, len(testCase.expected))
+			for pod, entry := range actual {
+				require.Equal(t, testCase.expected[pod], entry.CPUSet.String())
+			}
+		})
 	}
 }

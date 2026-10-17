@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.0.22
+
+- Add `UseNetlink` option to `knftables.New()` to make it use netlink
+  for `List*` methods. This is much more efficient than using `nft
+  list`, but is currently considered experimental. (`@aojea`)
+
 ## v0.0.21
 
 - Updated previous `List()` fix to pass the `--terse` flag to `nft

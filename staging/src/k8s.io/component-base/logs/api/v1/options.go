@@ -405,11 +405,8 @@ func setRecommendedOutputRouting(o *OutputRoutingOptions) {
 		o.InfoBufferSize = resource.QuantityValue{
 			// This is similar, but not quite the same as a default
 			// constructed instance.
-			Quantity: *resource.NewQuantity(0, resource.DecimalSI),
+			Quantity: resource.MustParse("0"),
 		}
-		// This sets the unexported Quantity.s which will be compared
-		// by reflect.DeepEqual in some tests.
-		_ = o.InfoBufferSize.String()
 	}
 }
 

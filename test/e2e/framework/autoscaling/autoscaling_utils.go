@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -638,28 +639,27 @@ func (rc *ResourceConsumer) makeConsumeCPUPerPodRequests(ctx context.Context) {
 // sendConsumeCPUPerPodRequest distributes CPU load evenly across all running
 // pods by sending requests directly via the Kubernetes pod proxy API. This
 // bypasses kube-proxy load balancing, guaranteeing each pod receives exactly
-// its share. Falls back to sendConsumeCPURequest if pod listing fails.
+// its share.
 func (rc *ResourceConsumer) sendConsumeCPUPerPodRequest(ctx context.Context, millicoresTotal int) {
-	pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("name=%s", rc.name),
-	})
-	if err != nil {
-		framework.Logf("ConsumeCPUPerPod: failed to list pods: %v, falling back to service proxy", err)
-		rc.sendConsumeCPURequest(ctx, millicoresTotal)
-		return
-	}
-
 	var readyPods []string
-	for i := range pods.Items {
-		if pods.Items[i].Status.Phase == v1.PodRunning {
-			readyPods = append(readyPods, pods.Items[i].Name)
+	err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+		pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("name=%s", rc.name),
+		})
+		if err != nil {
+			return err
 		}
-	}
-	if len(readyPods) == 0 {
-		framework.Logf("ConsumeCPUPerPod: no running pods, falling back to service proxy")
-		rc.sendConsumeCPURequest(ctx, millicoresTotal)
-		return
-	}
+		for i := range pods.Items {
+			if pods.Items[i].Status.Phase == v1.PodRunning {
+				readyPods = append(readyPods, pods.Items[i].Name)
+			}
+		}
+		if len(readyPods) == 0 {
+			return fmt.Errorf("ConsumeCPUPerPod: no running pods labeled name=%s", rc.name)
+		}
+		return nil
+	}).WithTimeout(serviceInitializationTimeout).WithPolling(serviceInitializationInterval).Should(gomega.Succeed())
+	framework.ExpectNoError(err)
 
 	perPodMillicores := millicoresTotal / len(readyPods)
 	if perPodMillicores == 0 {
@@ -725,22 +725,17 @@ func (rc *ResourceConsumer) GetReplicas(ctx context.Context) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		deploymentReplicas := int64(deployment.Status.ReadyReplicas)
-
 		scale, err := rc.scaleClient.Scales(rc.nsName).Get(ctx, schema.GroupResource{Group: crdGroup, Resource: crdNamePlural}, rc.name, metav1.GetOptions{})
 		if err != nil {
 			return 0, err
 		}
-		crdInstance, err := rc.resourceClient.Get(ctx, rc.name, metav1.GetOptions{})
-		if err != nil {
-			return 0, err
-		}
-		// Update custom resource's status.replicas with child Deployment's current number of ready replicas.
-		err = unstructured.SetNestedField(crdInstance.Object, deploymentReplicas, "status", "replicas")
-		if err != nil {
-			return 0, err
-		}
-		_, err = rc.resourceClient.Update(ctx, crdInstance, metav1.UpdateOptions{})
+		// Stand in for the controller a real CRD would have by mirroring the child
+		// Deployment's ready replicas into status.replicas. A merge patch carries no
+		// resourceVersion, so it can't collide with the HPA writing spec.replicas
+		// through the scale subresource at the same moment; a read-modify-write
+		// Update did, and HandleRetry treats the resulting 409 as fatal.
+		patch := fmt.Sprintf(`{"status":{"replicas":%d}}`, deployment.Status.ReadyReplicas)
+		_, err = rc.resourceClient.Patch(ctx, rc.name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			return 0, err
 		}

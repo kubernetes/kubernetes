@@ -27,6 +27,7 @@ import (
 	"time"
 
 	authv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,8 +52,10 @@ import (
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
-// FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+// FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster.
+// If shortConfigMapGet is true, a short retry is used when fetching the kubeadm-config ConfigMap,
+// which is suitable for callers like "kubeadm reset" that don't need a long retry.
+func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
@@ -61,7 +64,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
-	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, constants.KubeletRunDirectory, client, getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, constants.KubeletRunDirectory, client, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +81,31 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
-func getInitConfigurationFromCluster(kubeconfigDir string, kubeletRunDir string, client clientset.Interface, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(kubeconfigDir string, kubeletRunDir string, client clientset.Interface, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	var configMap *v1.ConfigMap
+	var err error
+	if shortConfigMapGet {
+		configMap, err = apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	} else {
+		var lastErr error
+		err = wait.PollUntilContextTimeout(context.Background(),
+			constants.KubernetesAPICallRetryInterval,
+			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+			true, func(_ context.Context) (bool, error) {
+				var err error
+				configMap, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
+					context.Background(), constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				if err == nil {
+					return true, nil
+				}
+				lastErr = err
+				return false, nil
+			})
+		if err != nil {
+			err = lastErr
+		}
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}

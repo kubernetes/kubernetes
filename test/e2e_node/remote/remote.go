@@ -31,7 +31,14 @@ import (
 )
 
 var testTimeout = CommandLine.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
-var resultsDir = CommandLine.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var resultsDir = CommandLine.String("results-dir", defaultResultsDir(), "Directory to scp test results to.")
+
+func defaultResultsDir() string {
+	if artifacts, ok := os.LookupEnv("ARTIFACTS"); ok {
+		return artifacts
+	}
+	return "/tmp"
+}
 
 const archiveName = "e2e_node_test.tar.gz"
 

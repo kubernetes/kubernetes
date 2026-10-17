@@ -187,6 +187,18 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	defer m.workerLock.Unlock()
 
 	logger := klog.FromContext(ctx)
+	// Detach the workers' context from the caller's: the pod worker cancels the
+	// sync context when the pod begins terminating, but probe workers must keep
+	// probing until the container stops so a failing readiness probe can mark
+	// the pod NotReady during graceful termination. Workers are stopped
+	// explicitly via their stop channel (RemovePod/CleanupPods).
+	//
+	// TODO(#140977): This also means nothing cancels an in-flight probe. worker.stop()
+	// only signals stopCh, which is checked between probes, so an exec probe that is
+	// already running keeps executing in a container that is being killed until its
+	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
+	// cancelled by stop(), not the pod sync context, which cancels too early.
+	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
@@ -234,7 +246,7 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	defer m.workerLock.RUnlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{liveness, startup} {
 			key.probeType = probeType
@@ -298,7 +310,16 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 // setReadyStateOnKubeletRestart sets the ready state of a container to false if it was started
 // before kubelet restarted and has a readiness probe, but the pod is not ready yet.
 // This is to avoid flapping ready status of containers that were ready before kubelet restarted.
-func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, pod *v1.Pod, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
+func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, pod *v1.Pod, apiContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
+	if !canInheritProbeState(apiContainerStatuses, containerStatus.Name, containerStatus.ContainerID) {
+		// The caller defaults to ready while no readiness worker is registered, which is
+		// the case on the first sync after a kubelet restart, so clear it explicitly.
+		if containerSpec.ReadinessProbe != nil {
+			*ready = false
+		}
+		return
+	}
+
 	var containerStartTime time.Time
 	if containerStatus.State.Running != nil {
 		containerStartTime = containerStatus.State.Running.StartedAt.Time
@@ -367,7 +388,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 					}
 				}
 				if containerSpec != nil {
-					m.setReadyStateOnKubeletRestart(logger, &ready, pod, &podStatus.ContainerStatuses[i], containerSpec)
+					m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.ContainerStatuses, &podStatus.ContainerStatuses[i], containerSpec)
 				}
 			}
 		}
@@ -412,7 +433,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				}
 			}
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
-				m.setReadyStateOnKubeletRestart(logger, &ready, pod, &podStatus.InitContainerStatuses[i], &initContainer)
+				m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.InitContainerStatuses, &podStatus.InitContainerStatuses[i], &initContainer)
 			}
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready
@@ -447,4 +468,15 @@ func (m *manager) workerCount() int {
 // status changes for containers that were previously ready.
 func kubeletRestartGracePeriod(start time.Time) time.Time {
 	return start.Add(-time.Second * 10)
+}
+
+// canInheritProbeState checks whether the container the API server last knew about with the given
+// container name is the same container the kubelet is currently probing.
+// A replacement container must not inherit the previous container's probe state after kubelet restarts.
+func canInheritProbeState(apiContainerStatuses []v1.ContainerStatus, name, runtimeID string) bool {
+	apiContainerStatus, ok := podutil.GetContainerStatus(apiContainerStatuses, name)
+	if !ok || apiContainerStatus.ContainerID == "" || runtimeID == "" {
+		return true
+	}
+	return apiContainerStatus.ContainerID == runtimeID
 }

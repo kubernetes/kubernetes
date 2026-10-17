@@ -66,10 +66,10 @@ func (p *singleNumaNodePolicy) Merge(logger klog.Logger, providersHints []map[st
 	singleNumaHints := filterSingleNumaHints(filteredHints)
 
 	merger := NewHintMerger(p.numaInfo, singleNumaHints, p.Name(), p.opts)
-	bestHint := merger.Merge()
+	bestHint := merger.Merge(logger)
 
 	if bestHint.NUMANodeAffinity.IsEqual(p.numaInfo.DefaultAffinityMask()) {
-		bestHint = TopologyHint{nil, bestHint.Preferred}
+		bestHint = TopologyHint{NUMANodeAffinity: nil, Preferred: bestHint.Preferred}
 	}
 
 	admit := p.canAdmitPodResult(&bestHint)

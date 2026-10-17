@@ -41,6 +41,7 @@ type PriorityClassInterface interface {
 	Create(ctx context.Context, priorityClass *schedulingv1beta1.PriorityClass, opts v1.CreateOptions) (*schedulingv1beta1.PriorityClass, error)
 	Update(ctx context.Context, priorityClass *schedulingv1beta1.PriorityClass, opts v1.UpdateOptions) (*schedulingv1beta1.PriorityClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*schedulingv1beta1.PriorityClass, error)
 	List(ctx context.Context, opts v1.ListOptions) (*schedulingv1beta1.PriorityClassList, error)

@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/ktesting/format"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
 	"k8s.io/utils/ptr"
 )
 
@@ -104,6 +104,7 @@ type testParameters struct {
 	enableSnapshot               bool
 	enableVolumeMountGroup       bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
 	enableNodeVolumeCondition    bool
+	enableNodeStorageHealth      bool
 	hooks                        *drivers.Hooks
 	tokenRequests                []storagev1.TokenRequest
 	serviceAccountTokenInSecrets *bool // if true, the service account token should be passed only via secrets
@@ -178,6 +179,7 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 		EnableResizing:               tp.enableResizing,
 		EnableNodeExpansion:          tp.enableNodeExpansion,
 		EnableNodeVolumeCondition:    tp.enableNodeVolumeCondition,
+		EnableNodeStorageHealth:      tp.enableNodeStorageHealth,
 		DisableControllerExpansion:   tp.disableControllerExpansion,
 		EnableSnapshot:               tp.enableSnapshot,
 		EnableVolumeMountGroup:       tp.enableVolumeMountGroup,
@@ -245,7 +247,7 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 				errs = append(errs, err)
 			}
 			if claim.Spec.VolumeName != "" {
-				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(ctx, cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(ctx, cs, claim.Spec.VolumeName, framework.Poll, m.f.Timeouts.PVDelete))
 			}
 		}
 	}

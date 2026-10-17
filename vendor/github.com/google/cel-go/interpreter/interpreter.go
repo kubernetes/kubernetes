@@ -29,11 +29,11 @@ import (
 // PlannerOption configures the program plan options during interpretable setup.
 type PlannerOption func(*planner) (*planner, error)
 
-// Interpreter generates a new Interpretable from a checked or unchecked expression.
+// Interpreter generates a new InterpretableV2 from a checked or unchecked expression.
 type Interpreter interface {
-	// NewInterpretable creates an Interpretable from a checked expression and an
+	// NewInterpretable creates an InterpretableV2 from a checked expression and an
 	// optional list of PlannerOption values.
-	NewInterpretable(exprAST *ast.AST, opts ...PlannerOption) (Interpretable, error)
+	NewInterpretable(exprAST *ast.AST, opts ...PlannerOption) (InterpretableV2, error)
 }
 
 // EvalObserver is a functional interface that accepts an expression id and an observed value.
@@ -43,16 +43,16 @@ type EvalObserver func(vars Activation, id int64, programStep any, value ref.Val
 
 // StatefulObserver observes evaluation while tracking or utilizing stateful behavior.
 type StatefulObserver interface {
-	// InitState configures stateful metadata on the activation.
-	InitState(Activation) (Activation, error)
+	// InitState configures stateful metadata on the execution frame.
+	InitState(*ExecutionFrame) (any, error)
 
-	// GetState retrieves the stateful metadata from the activation.
-	GetState(Activation) any
+	// GetState retrieves the stateful metadata from the execution frame.
+	GetState(*ExecutionFrame) any
 
 	// Observe passes the activation and relevant evaluation metadata to the observer.
-	// The observe method is expected to do the equivalent of GetState(vars) in order
+	// The observe method is expected to do the equivalent of GetState(AsFrame(activation))
 	// to find the metadata that needs to be updated upon invocation.
-	Observe(vars Activation, id int64, programStep any, value ref.Val)
+	Observe(Activation, int64, any, ref.Val)
 }
 
 // EvalCancelledError represents a cancelled program evaluation operation.
@@ -106,37 +106,6 @@ func EvalStateObserver(opts ...evalStateOption) PlannerOption {
 	}
 }
 
-// evalStateConverter identifies an object which is convertible to an EvalState instance.
-type evalStateConverter interface {
-	asEvalState() EvalState
-}
-
-// evalStateActivation hides state in the Activation in a manner not accessible to expressions.
-type evalStateActivation struct {
-	vars  Activation
-	state EvalState
-}
-
-// ResolveName proxies variable lookups to the backing activation.
-func (esa evalStateActivation) ResolveName(name string) (any, bool) {
-	return esa.vars.ResolveName(name)
-}
-
-// Parent proxies parent lookups to the backing activation.
-func (esa evalStateActivation) Parent() Activation {
-	return esa.vars
-}
-
-// AsPartialActivation supports conversion to a partial activation in order to detect unknown attributes.
-func (esa evalStateActivation) AsPartialActivation() (PartialActivation, bool) {
-	return AsPartialActivation(esa.vars)
-}
-
-// asEvalState implements the evalStateConverter method.
-func (esa evalStateActivation) asEvalState() EvalState {
-	return esa.state
-}
-
 // activationWrapper identifies an object carrying local variables which should not be exposed to the user
 // Activations used for such purposes can be unwrapped to return the activation which omits local state.
 type activationWrapper interface {
@@ -144,57 +113,56 @@ type activationWrapper interface {
 	Unwrap() Activation
 }
 
-// asEvalState walks the Activation hierarchy and returns the first EvalState found, if present.
-func asEvalState(vars Activation) (EvalState, bool) {
-	if conv, ok := vars.(evalStateConverter); ok {
-		return conv.asEvalState(), true
-	}
-	// Check if the current activation wraps another activation. This is used to support
-	// wrappers such as the @block() activation which may be composed of a dynamicSlotActivation or a
-	// constantSlotActivation. In this case, the underlying activation is the portion which interacts
-	// with the EvalState.
-	if wrapper, ok := vars.(activationWrapper); ok {
-		unwrapped := wrapper.Unwrap()
-		// Recursively call asEvalState on the unwrapped activation. This will check the unwrapped value and its parents.
-		return asEvalState(unwrapped)
-	}
-	if vars.Parent() != nil {
-		return asEvalState(vars.Parent())
-	}
-	return nil, false
-}
-
 // evalStateFactory holds a reference to a factory function that produces an EvalState instance.
 type evalStateFactory struct {
 	factory func() EvalState
 }
 
-// InitState produces an EvalState instance and bundles it into the Activation in a way which is
+// InitState produces an EvalState instance and bundles it into the ExecutionFrame in a way which is
 // not visible to expression evaluation.
-func (et *evalStateFactory) InitState(vars Activation) (Activation, error) {
+func (et *evalStateFactory) InitState(frame *ExecutionFrame) (any, error) {
 	state := et.factory()
-	return evalStateActivation{vars: vars, state: state}, nil
+	if frame.ctx == nil {
+		frame.ctx = evalContextPool.Get().(*evalContext)
+	}
+	frame.ctx.state = state
+	return state, nil
 }
 
 // GetState extracts the EvalState from the Activation.
-func (et *evalStateFactory) GetState(vars Activation) any {
-	if state, found := asEvalState(vars); found {
-		return state
+func (et *evalStateFactory) GetState(frame *ExecutionFrame) any {
+	if frame.ctx == nil {
+		return nil
 	}
-	return nil
+	return frame.ctx.state
 }
 
 // Observe records the evaluation state for a given expression node and program step.
 func (et *evalStateFactory) Observe(vars Activation, id int64, programStep any, val ref.Val) {
-	state, found := asEvalState(vars)
-	if !found {
+	frame := AsFrame(vars)
+	if frame.ctx == nil || frame.ctx.state == nil {
 		return
 	}
-	state.SetValue(id, val)
+	frame.ctx.state.SetValue(id, val)
 }
 
 // CustomDecorator configures a custom interpretable decorator for the program.
 func CustomDecorator(dec InterpretableDecorator) PlannerOption {
+	return func(p *planner) (*planner, error) {
+		dec2 := func(i InterpretableV2) (InterpretableV2, error) {
+			legacy, err := dec(i)
+			if err != nil {
+				return nil, err
+			}
+			return adaptToV2(legacy), nil
+		}
+		p.decorators = append(p.decorators, dec2)
+		return p, nil
+	}
+}
+
+// CustomDecoratorV2 configures a custom V2 interpretable decorator for the program.
+func CustomDecoratorV2(dec InterpretableDecoratorV2) PlannerOption {
 	return func(p *planner) (*planner, error) {
 		p.decorators = append(p.decorators, dec)
 		return p, nil
@@ -207,7 +175,7 @@ func CustomDecorator(dec InterpretableDecorator) PlannerOption {
 // provided to the decorator. This decorator is not thread-safe, and the EvalState
 // must be reset between Eval() calls.
 func ExhaustiveEval() PlannerOption {
-	return CustomDecorator(decDisableShortcircuits())
+	return CustomDecoratorV2(decDisableShortcircuits())
 }
 
 // InterruptableEval annotates comprehension loops with information that indicates they
@@ -216,13 +184,13 @@ func ExhaustiveEval() PlannerOption {
 // The custom activation is currently managed higher up in the stack within the 'cel' package
 // and should not require any custom support on behalf of callers.
 func InterruptableEval() PlannerOption {
-	return CustomDecorator(decInterruptFolds())
+	return CustomDecoratorV2(decInterruptFolds())
 }
 
 // Optimize will pre-compute operations such as list and map construction and optimize
 // call arguments to set membership tests. The set of optimizations will increase over time.
 func Optimize() PlannerOption {
-	return CustomDecorator(decOptimize())
+	return CustomDecoratorV2(decOptimize())
 }
 
 // RegexOptimization provides a way to replace an InterpretableCall for a regex function when the
@@ -247,7 +215,7 @@ type RegexOptimization struct {
 // CompileRegexConstants compiles regex pattern string constants at program creation time and reports any regex pattern
 // compile errors.
 func CompileRegexConstants(regexOptimizations ...*RegexOptimization) PlannerOption {
-	return CustomDecorator(decRegexOptimizer(regexOptimizations...))
+	return CustomDecoratorV2(decRegexOptimizer(regexOptimizations...))
 }
 
 type exprInterpreter struct {
@@ -273,10 +241,10 @@ func NewInterpreter(dispatcher Dispatcher,
 		attrFactory: attrFactory}
 }
 
-// NewIntepretable implements the Interpreter interface method.
+// NewInterpretable implements the Interpreter interface method.
 func (i *exprInterpreter) NewInterpretable(
 	checked *ast.AST,
-	opts ...PlannerOption) (Interpretable, error) {
+	opts ...PlannerOption) (InterpretableV2, error) {
 	p := newPlanner(i.dispatcher, i.provider, i.adapter, i.attrFactory, i.container, checked)
 	var err error
 	for _, o := range opts {

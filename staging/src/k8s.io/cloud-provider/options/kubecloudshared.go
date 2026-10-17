@@ -17,12 +17,9 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 
 	cpconfig "k8s.io/cloud-provider/config"
-	"k8s.io/cloud-provider/names"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
@@ -58,8 +55,6 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
-	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
-		fmt.Sprintf("The period for syncing NodeStatus in %s.", names.CloudNodeLifecycleController))
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&o.ClusterCIDR, "cluster-cidr", o.ClusterCIDR, "CIDR Range for Pods in cluster. Only used when --allocate-node-cidrs=true; if false, this option will be ignored.")
 	fs.BoolVar(&o.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider. Requires --cluster-cidr.")
@@ -86,7 +81,6 @@ func (o *KubeCloudSharedOptions) ApplyTo(cfg *cpconfig.KubeCloudSharedConfigurat
 	cfg.UseServiceAccountCredentials = o.UseServiceAccountCredentials
 	cfg.AllowUntaggedCloud = o.AllowUntaggedCloud
 	cfg.RouteReconciliationPeriod = o.RouteReconciliationPeriod
-	cfg.NodeMonitorPeriod = o.NodeMonitorPeriod
 	cfg.ClusterName = o.ClusterName
 	cfg.ClusterCIDR = o.ClusterCIDR
 	cfg.AllocateNodeCIDRs = o.AllocateNodeCIDRs

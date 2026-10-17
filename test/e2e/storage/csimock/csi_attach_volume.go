@@ -132,6 +132,14 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			ginkgo.By("Checking if VolumeAttachment was created for the pod")
 			err = e2evolume.WaitForVolumeAttachmentCreated(ctx, attachmentName, m.cs, interval, csiVolumeAttachmentTimeout)
 			framework.ExpectNoError(err, "Failed to wait for VolumeAttachment %s to be created: %v", attachmentName, err)
+			ginkgo.By("Wait for VolumeAttachment to become attached")
+			err = e2evolume.WaitForVolumeAttached(ctx, attachmentName, m.cs, csiVolumeAttachmentTimeout)
+			framework.ExpectNoError(err, "VolumeAttachment %q did not become attached: %v", attachmentName, err)
+
+			ginkgo.By("Wait for pod volume mount to complete")
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err, "Pod did not start with AttachRequired=true: %v", err)
+
 			ginkgo.By("Delete CSIDriver object")
 			err = m.cs.StorageV1().CSIDrivers().Delete(ctx, driverName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Failed to delete CSIDriver: %v", err)

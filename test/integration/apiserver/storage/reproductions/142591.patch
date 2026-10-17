@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..bc7d15abc48 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -277,7 +277,9 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
+ 		if opts.IgnoreNotFound {
+ 			return runtime.SetZeroValue(out)
+ 		}
+-		return storage.NewKeyNotFoundError(preparedKey, getResp.Revision)
++		// BUG REVERT (#142591): return ResourceVersion=0 on KeyNotFoundError in
++		// etcd3.Get instead of getResp.Revision.
++		return storage.NewKeyNotFoundError(preparedKey, 0)
+ 	}
+ 
+ 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))

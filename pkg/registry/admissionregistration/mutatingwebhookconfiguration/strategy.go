@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 )
 
 // mutatingWebhookConfigurationStrategy implements verification logic for mutatingWebhookConfiguration.
@@ -54,10 +55,14 @@ func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (mutatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	ic := obj.(*admissionregistration.MutatingWebhookConfiguration)
+	var warnings []string
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
-		return validation.WarningsForStaticSuffix(ic.Name)
+		warnings = append(warnings, validation.WarningsForStaticSuffix(ic.Name)...)
 	}
-	return nil
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExcludeAdmissionWebhookVirtualResources) {
+		warnings = append(warnings, validation.WarningsForMutatingWebhookRules(ic.Webhooks, exclusion.Excluded())...)
+	}
+	return warnings
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -103,7 +108,12 @@ func (mutatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, 
 // WarningsOnUpdate returns warnings for the given update.
 func (mutatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	newIC := obj.(*admissionregistration.MutatingWebhookConfiguration)
-	return validation.WarningsForStaticSuffix(newIC.Name)
+	var warnings []string
+	warnings = append(warnings, validation.WarningsForStaticSuffix(newIC.Name)...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExcludeAdmissionWebhookVirtualResources) {
+		warnings = append(warnings, validation.WarningsForMutatingWebhookRules(newIC.Webhooks, exclusion.Excluded())...)
+	}
+	return warnings
 }
 
 // AllowUnconditionalUpdate is the default update policy for mutatingWebhookConfiguration objects. Status update should

@@ -36,22 +36,28 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
-// config, with the specified protocols.
-func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
+// config, with the specified protocols. The URL is not modified, so callers may
+// reuse it for further connections.
+func OpenWebSocketForURL(u *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tls config: %w", err)
 	}
-	if url.Scheme == "https" {
-		url.Scheme = "wss"
-	} else {
-		url.Scheme = "ws"
+	// Work on a copy: rewriting the caller's URL in place turned "https" into
+	// "wss" on the first call and then "wss" into "ws" on the next, so a retry
+	// with the same URL spoke plaintext to a TLS server.
+	wsURL := *u
+	switch wsURL.Scheme {
+	case "https", "wss":
+		wsURL.Scheme = "wss"
+	default:
+		wsURL.Scheme = "ws"
 	}
-	headers, err := headersForConfig(config, url)
+	headers, err := headersForConfig(config, &wsURL)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load http headers: %w", err)
 	}
-	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
+	cfg, err := websocket.NewConfig(wsURL.String(), "http://localhost")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create websocket config: %w", err)
 	}

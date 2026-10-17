@@ -44,37 +44,37 @@ func newUnschedulableEntities(unschedulableRecorder, gatedRecorder metrics.Metri
 
 // updateMetricsOnStateChange handles the metric accounting when an entity changes
 // between Gated and Unschedulable states.
-func (u *unschedulableEntities) updateMetricsOnStateChange(gatedBefore, isGated bool, size int) {
+func (u *unschedulableEntities) updateMetricsOnStateChange(gatedBefore, isGated bool, entity framework.QueuedEntityInfo) {
 	if gatedBefore == isGated {
 		return
 	}
 
 	if gatedBefore {
 		// Transition: Gated -> Ungated
-		u.gatedRecorder.Add(-size)
-		u.unschedulableRecorder.Add(size)
+		u.gatedRecorder.Remove(entity)
+		u.unschedulableRecorder.Add(entity)
 	} else {
 		// Transition: Ungated -> Gated
-		u.gatedRecorder.Add(size)
-		u.unschedulableRecorder.Add(-size)
+		u.gatedRecorder.Add(entity)
+		u.unschedulableRecorder.Remove(entity)
 	}
 }
 
 // addOrUpdate adds an entity to the unschedulable entityInfoMap.
 // The event should show which event triggered the addition and is used for the metric recording.
-func (u *unschedulableEntities) addOrUpdate(entity framework.QueuedEntityInfo, gatedBefore bool, event string) {
+// 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
+// queue or newly added to correctly maintain incoming entities metrics.
+func (u *unschedulableEntities) addOrUpdate(entity framework.QueuedEntityInfo, gatedBefore bool, event string, strategy *queueingStrategy) {
 	entityKey := u.keyFunc(entity)
 	if _, exists := u.entityInfoMap[entityKey]; exists {
-		u.updateMetricsOnStateChange(gatedBefore, entity.Gated(), entity.Size())
+		u.updateMetricsOnStateChange(gatedBefore, entity.Gated(), entity)
 	} else {
 		if entity.Gated() {
-			u.gatedRecorder.Add(entity.Size())
+			u.gatedRecorder.Add(entity)
 		} else {
-			u.unschedulableRecorder.Add(entity.Size())
+			u.unschedulableRecorder.Add(entity)
 		}
-		if metrics.SchedulerQueueIncomingPods != nil {
-			metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Add(float64(entity.Size()))
-		}
+		recordIncomingEntitiesMetrics("unschedulable", entity, event, strategy)
 	}
 	u.entityInfoMap[entityKey] = entity
 }
@@ -85,9 +85,9 @@ func (u *unschedulableEntities) delete(entity framework.QueuedEntityInfo, gated 
 	entityKey := u.keyFunc(entity)
 	if _, exists := u.entityInfoMap[entityKey]; exists {
 		if gated {
-			u.gatedRecorder.Add(-entity.Size())
+			u.gatedRecorder.Remove(entity)
 		} else {
-			u.unschedulableRecorder.Add(-entity.Size())
+			u.unschedulableRecorder.Remove(entity)
 		}
 	}
 	delete(u.entityInfoMap, entityKey)

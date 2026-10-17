@@ -30,11 +30,131 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.jobTemplate.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.backoffLimit": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.jobTemplate.spec.completions": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.maxFailedIndexes": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.parallelism": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.scheduling": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.jobTemplate.spec.scheduling.disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimTemplateName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingPolicy": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingPolicy.gang.minCount": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.template.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.template.spec.schedulingGroup": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
 			"spec.jobTemplate.spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"spec.jobTemplate.spec.ttlSecondsAfterFinished": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.schedule": {
 				{ErrorType: "FieldValueRequired"},

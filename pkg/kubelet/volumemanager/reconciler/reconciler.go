@@ -23,11 +23,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (rc *reconciler) Run(ctx context.Context, stopCh <-chan struct{}) {
+func (rc *reconciler) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	rc.reconstructVolumes(logger)
 	logger.Info("Reconciler: start to sync state")
-	wait.Until(func() { rc.reconcile(ctx) }, rc.loopSleepDuration, stopCh)
+	wait.Until(func() { rc.reconcile(ctx) }, rc.loopSleepDuration, ctx.Done())
 }
 
 func (rc *reconciler) reconcile(ctx context.Context) {

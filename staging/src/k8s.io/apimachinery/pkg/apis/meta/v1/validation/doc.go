@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-input=k8s.io/apimachinery/pkg/apis/meta/v1
 
 // Package validation holds generated validations for meta/v1 types.

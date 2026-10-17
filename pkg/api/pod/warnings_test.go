@@ -151,6 +151,10 @@ func TestWarnings(t *testing.T) {
 		api.ResourceMemory:           resource.MustParse("4m"),
 		api.ResourceEphemeralStorage: resource.MustParse("4m"),
 	}
+	largeIntegerByteResources := api.ResourceList{
+		api.ResourceMemory:           resource.MustParse("9223372036854775808"),
+		api.ResourceEphemeralStorage: resource.MustParse("9223372036854775808"),
+	}
 	testName := "Test"
 	testcases := []struct {
 		name                  string
@@ -843,6 +847,62 @@ func TestWarnings(t *testing.T) {
 				`spec.containers[0].resources.limits[memory]: fractional byte value "4m" is invalid, must be an integer`,
 				`spec.overhead[ephemeral-storage]: fractional byte value "4m" is invalid, must be an integer`,
 				`spec.overhead[memory]: fractional byte value "4m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "large integer byte resources",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: largeIntegerByteResources,
+						Limits:   largeIntegerByteResources,
+					},
+				}},
+				Overhead: largeIntegerByteResources,
+			}},
+			expected: nil,
+		},
+		{
+			name: "large fractional byte resources",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("9223372036854775808.001"),
+						},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].resources.requests[memory]: fractional byte value "9223372036854775808001m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "whole byte value whose milli projection overflows int64",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("9223372036854776"),
+						},
+					},
+				}},
+			}},
+			expected: nil,
+		},
+		{
+			name: "fractional byte value within a milli of the next whole byte",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("1.9999"),
+						},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].resources.requests[memory]: fractional byte value "1999900u" is invalid, must be an integer`,
 			},
 		},
 		{

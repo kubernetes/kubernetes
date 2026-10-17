@@ -18,6 +18,12 @@ func (s *FreezerGroup) Name() string {
 	return "freezer"
 }
 
+// ID returns the controller ID for freezer subsystem.
+// Returns 0 as freezer is not a cgroups.Controller.
+func (s *FreezerGroup) ID() cgroups.Controller {
+	return 0
+}
+
 func (s *FreezerGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

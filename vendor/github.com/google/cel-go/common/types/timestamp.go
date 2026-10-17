@@ -302,6 +302,9 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		if err != nil {
 			return WrapErr(err)
 		}
+		if min < 0 || min > 59 {
+			return WrapErr(fmt.Errorf("timezone offset minutes out of range [0, 59]: %s", val))
+		}
 		var offset int
 		if string(val[0]) == "-" {
 			offset = hr*60 - min

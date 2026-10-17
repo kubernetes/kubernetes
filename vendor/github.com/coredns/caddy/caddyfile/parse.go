@@ -51,11 +51,21 @@ func allTokens(input io.Reader) ([]Token, error) {
 
 type parser struct {
 	Dispenser
-	block           ServerBlock // current server block being parsed
-	validDirectives []string    // a directive must be valid or it's an error
-	eof             bool        // if we encounter a valid EOF in a hard place
-	definedSnippets map[string][]Token
+	block             ServerBlock // current server block being parsed
+	validDirectives   []string    // a directive must be valid or it's an error
+	eof               bool        // if we encounter a valid EOF in a hard place
+	definedSnippets   map[string][]Token
+	snippetExpansions int // counts snippet imports expanded during this parse
+	fileExpansions    int // counts file/glob imports expanded during this parse
 }
+
+// maxSnippetExpansions is a hard cap to prevent excessively deep or cyclic snippet imports.
+// set as a variable to allow modifications for testing
+var maxSnippetExpansions = 10000
+
+// maxFileExpansions is a hard cap to prevent excessively deep or cyclic file imports.
+// set as a variable to allow modifications for testing
+var maxFileExpansions = 100000
 
 func (p *parser) parseAll() ([]ServerBlock, error) {
 	var blocks []ServerBlock
@@ -107,6 +117,16 @@ func (p *parser) begin() error {
 		tokens, err := p.snippetTokens()
 		if err != nil {
 			return err
+		}
+		// minimal guard: detect trivial self-import in snippet body
+		for i := 0; i+1 < len(tokens); i++ {
+			if tokens[i].Text == "import" {
+				// Only consider it an import directive if at start of a line
+				atLineStart := i == 0 || tokens[i-1].File != tokens[i].File || tokens[i-1].Line != tokens[i].Line
+				if atLineStart && replaceEnvVars(tokens[i+1].Text) == name {
+					return p.Errf("maximum snippet import depth (%d) exceeded", maxSnippetExpansions)
+				}
+			}
 		}
 		p.definedSnippets[name] = tokens
 		// empty block keys so we don't save this block as a real server.
@@ -245,10 +265,18 @@ func (p *parser) doImport() error {
 	tokensAfter := p.tokens[p.cursor+1:]
 	var importedTokens []Token
 
-	// first check snippets. That is a simple, non-recursive replacement
+	// first check snippets. Count expansion and enforce cap.
 	if p.definedSnippets != nil && p.definedSnippets[importPattern] != nil {
+		if p.snippetExpansions >= maxSnippetExpansions {
+			return p.Errf("maximum snippet import depth (%d) exceeded", maxSnippetExpansions)
+		}
+		p.snippetExpansions++
 		importedTokens = p.definedSnippets[importPattern]
 	} else {
+		if p.fileExpansions >= maxFileExpansions {
+			return p.Errf("maximum file import depth (%d) exceeded", maxSnippetExpansions)
+		}
+		p.fileExpansions++
 		// make path relative to the file of the _token_ being processed rather
 		// than current working directory (issue #867) and then use glob to get
 		// list of matching filenames

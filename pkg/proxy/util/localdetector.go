@@ -17,6 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"context"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/nodemanager"
+
 	netutils "k8s.io/utils/net"
 )
 
@@ -40,6 +47,51 @@ type LocalTrafficDetector interface {
 	// IfNotLocalNFT returns nftables arguments that will match traffic that is not
 	// from a local pod.
 	IfNotLocalNFT() []string
+}
+
+func GetLocalTrafficDetectors(ctx context.Context, config *kubeproxyconfig.KubeProxyConfiguration, nodeManager nodemanager.NodeManager) map[v1.IPFamily]LocalTrafficDetector {
+	logger := klog.FromContext(ctx)
+
+	primaryIPFamily := nodeManager.PrimaryIPFamily()
+	nodePodCIDRs := nodeManager.PodCIDRs()
+
+	localDetectors := map[v1.IPFamily]LocalTrafficDetector{
+		v1.IPv4Protocol: NewNoOpLocalDetector(),
+		v1.IPv6Protocol: NewNoOpLocalDetector(),
+	}
+
+	switch config.DetectLocalMode {
+	case kubeproxyconfig.LocalModeClusterCIDR:
+		for family, cidrs := range MapCIDRsByIPFamily(config.DetectLocal.ClusterCIDRs) {
+			localDetectors[family] = NewDetectLocalByCIDR(cidrs[0].String())
+		}
+		if !localDetectors[primaryIPFamily].IsImplemented() {
+			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDRs", config.DetectLocal.ClusterCIDRs)
+		}
+
+	case kubeproxyconfig.LocalModeNodeCIDR:
+		for family, cidrs := range MapCIDRsByIPFamily(nodePodCIDRs) {
+			localDetectors[family] = NewDetectLocalByCIDR(cidrs[0].String())
+		}
+		if !localDetectors[primaryIPFamily].IsImplemented() {
+			logger.Info("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for primary IP family", "ipFamily", primaryIPFamily, "podCIDRs", nodePodCIDRs)
+		}
+
+	case kubeproxyconfig.LocalModeBridgeInterface:
+		localDetector := NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
+		localDetectors[v1.IPv4Protocol] = localDetector
+		localDetectors[v1.IPv6Protocol] = localDetector
+
+	case kubeproxyconfig.LocalModeInterfaceNamePrefix:
+		localDetector := NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
+		localDetectors[v1.IPv4Protocol] = localDetector
+		localDetectors[v1.IPv6Protocol] = localDetector
+
+	default:
+		logger.Info("Defaulting to no-op detect-local")
+	}
+
+	return localDetectors
 }
 
 type detectLocal struct {

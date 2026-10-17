@@ -73,6 +73,7 @@ type KubeControllerManagerOptions struct {
 	CSRSigningController                      *CSRSigningControllerOptions
 	DaemonSetController                       *DaemonSetControllerOptions
 	DeploymentController                      *DeploymentControllerOptions
+	DisruptionController                      *DisruptionControllerOptions
 	DeviceTaintEvictionController             *DeviceTaintEvictionControllerOptions
 	ResourceClaimController                   *ResourceClaimControllerOptions
 	StatefulSetController                     *StatefulSetControllerOptions
@@ -145,6 +146,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeploymentController: &DeploymentControllerOptions{
 			&componentConfig.DeploymentController,
+		},
+		DisruptionController: &DisruptionControllerOptions{
+			&componentConfig.DisruptionController,
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
 			&componentConfig.DeviceTaintEvictionController,
@@ -271,6 +275,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.AttachDetachController.AddFlags(fss.FlagSet(names.PersistentVolumeAttachDetachController))
 	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
 	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
+	s.DisruptionController.AddFlags(fss.FlagSet(names.DisruptionController))
 	s.DeviceTaintEvictionController.AddFlags(fss.FlagSet(names.DeviceTaintEvictionController))
 	s.ResourceClaimController.AddFlags(fss.FlagSet(names.ResourceClaimController))
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
@@ -333,6 +338,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeploymentController.ApplyTo(&c.ComponentConfig.DeploymentController); err != nil {
+		return err
+	}
+	if err := s.DisruptionController.ApplyTo(&c.ComponentConfig.DisruptionController); err != nil {
 		return err
 	}
 	if err := s.DeviceTaintEvictionController.ApplyTo(&c.ComponentConfig.DeviceTaintEvictionController); err != nil {
@@ -437,6 +445,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.CSRSigningController.Validate()...)
 	errs = append(errs, s.DaemonSetController.Validate()...)
 	errs = append(errs, s.DeploymentController.Validate()...)
+	errs = append(errs, s.DisruptionController.Validate()...)
 	errs = append(errs, s.DeviceTaintEvictionController.Validate()...)
 	errs = append(errs, s.ResourceClaimController.Validate()...)
 	errs = append(errs, s.StatefulSetController.Validate()...)

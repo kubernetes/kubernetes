@@ -75,19 +75,15 @@ components and endpoints is stored in [endpoint-mappings.yaml](endpoint-mappings
 
 Metrics are discovered through static analysis of the codebase. As each metric
 is found, a match to its source file path is attempted based on the lists found
-under `coreComponents` and `standaloneComponents` within the YAML file.
+under `coreComponents` within the YAML file.
 
 All "core" components are assumed to inherit common metrics, such as
 `kubernetes_healthcheck`, this includes components such as `kube-apiserver` and
 `kubelet`. The directories defined as containing the common metrics are listed
 under `sharedPaths`.
 
-A "standalone" component only exports the metrics it defines, this includes
-components such as `etcd-version-monitor`. Common metrics will not be associated
-with standalone components.
-
-Both types of component can have multiple paths, and it is assumed that each
-component will be defined only once.
+Components can have multiple paths, and it is assumed that each component will
+be defined only once.
 
 #### Endpoints
 
@@ -103,8 +99,8 @@ When generating documentation, you may see a warning if metrics were detected in
 unmapped directories:
 
 ```shell
-WARNING: found 1 metric(s) in "cluster/images/etcd-version-monitor/etcd-version-monitor.go" but could not infer component endpoints. Consider updating endpoint-mappings.yaml.
+WARNING: found 1 metric(s) in "pkg/mycomponent/metrics/metrics.go" but could not infer component endpoints. Consider updating endpoint-mappings.yaml.
 ```
 
-In this example, the directory `cluster/images/etcd-version-monitor/` should be
+In this example, the directory `pkg/mycomponent/metrics/` should be
 added under the relevant component, as explained above under Schema > Components.

@@ -989,6 +989,56 @@ func TestCreateOrReplaceLoadbalancer_FileAlreadyExistsNoMatchingLB(t *testing.T)
 	assert.Nil(t, lb)
 }
 
+func TestGetAllLoadBalancers_SkipsLoadBalancersWithoutPortMappings(t *testing.T) {
+	testCases := []struct {
+		name         string
+		portMappings []hcn.LoadBalancerPortMapping
+	}{
+		{
+			name:         "nil port mappings",
+			portMappings: nil,
+		},
+		{
+			name:         "empty port mappings",
+			portMappings: []hcn.LoadBalancerPortMapping{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hcnMock := getHcnMock("L2Bridge")
+			hns := hns{hcn: hcnMock}
+
+			hcnMock.PopulateRawQueriedLoadbalancer(&hcn.HostComputeLoadBalancer{
+				Id:           "LBID-malformed",
+				FrontendVIPs: []string{serviceVip},
+				PortMappings: tc.portMappings,
+			})
+			hcnMock.PopulateQueriedLoadbalancers("LBID-valid", serviceVip, protocol, internalPort, externalPort, false, "EPID-1")
+
+			loadBalancers, err := hns.getAllLoadBalancers()
+			assert.NoError(t, err)
+
+			hnsIDs := make([]string, 0, len(loadBalancers))
+			for _, lb := range loadBalancers {
+				hnsIDs = append(hnsIDs, lb.hnsID)
+			}
+			assert.ElementsMatch(t, []string{"LBID-valid"}, hnsIDs)
+		})
+	}
+}
+
+func TestGetAllLoadBalancers_AllLoadBalancersWithoutPortMappings(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	hcnMock.PopulateRawQueriedLoadbalancer(&hcn.HostComputeLoadBalancer{Id: "LBID-malformed"})
+
+	loadBalancers, err := hns.getAllLoadBalancers()
+	assert.NoError(t, err)
+	assert.Empty(t, loadBalancers)
+}
+
 func TestDeleteLoadBalancer_NotFound(t *testing.T) {
 	hcnMock := getHcnMock("L2Bridge")
 	hns := hns{hcn: hcnMock}

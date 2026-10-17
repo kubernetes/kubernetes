@@ -17,6 +17,7 @@ limitations under the License.
 package sharding
 
 import (
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,5 +138,130 @@ func TestSelectorString(t *testing.T) {
 	expected := "shardRange(object.metadata.uid, '0x00', '0x80')"
 	if sel.String() != expected {
 		t.Errorf("String() = %q, want %q", sel.String(), expected)
+	}
+}
+
+func TestNewShardRangeSelector(t *testing.T) {
+	if _, err := NewShardRangeSelector("", 0, 2); err == nil {
+		t.Fatal("expected error for empty key")
+	}
+	if _, err := NewShardRangeSelector("metadata.uid", 0, 2); err == nil {
+		t.Fatal("expected error for unsupported key without object. prefix")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", 0, 0); err == nil {
+		t.Fatal("expected error for non-positive totalShards")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", -1, 2); err == nil {
+		t.Fatal("expected error for negative shardIndex")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", 2, 2); err == nil {
+		t.Fatal("expected error for out-of-range shardIndex")
+	}
+
+	single, err := NewShardRangeSelector("object.metadata.namespace", 0, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := single.String(), "shardRange(object.metadata.namespace, '0x0000000000000000', '0x10000000000000000')"; got != want {
+		t.Errorf("single.String() = %q, want %q", got, want)
+	}
+
+	s0, err := NewShardRangeSelector("object.metadata.uid", 0, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s1, err := NewShardRangeSelector("object.metadata.uid", 1, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := s0.String(), "shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')"; got != want {
+		t.Errorf("s0.String() = %q, want %q", got, want)
+	}
+	if got, want := s1.String(), "shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')"; got != want {
+		t.Errorf("s1.String() = %q, want %q", got, want)
+	}
+
+	// Both power-of-two and non-power-of-two shard counts must form a contiguous,
+	// disjoint partition covering [0, 2^64) where every object matches exactly one shard.
+	objects := make([]*testObject, 64)
+	for i := range objects {
+		objects[i] = &testObject{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(fmt.Sprintf("uid-%04d", i)),
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: fmt.Sprintf("ns-%d", i%11),
+			},
+		}
+	}
+
+	for _, totalShards := range []int{1, 2, 3, 4, 5, 7, 8, 10, 16} {
+		for _, key := range []string{"object.metadata.uid", "object.metadata.namespace"} {
+			selectors := make([]Selector, totalShards)
+			var prevEnd string
+			for i := range totalShards {
+				sel, err := NewShardRangeSelector(key, i, totalShards)
+				if err != nil {
+					t.Fatalf("NewShardRangeSelector(%q, %d, %d): %v", key, i, totalShards, err)
+				}
+				selectors[i] = sel
+				reqs := sel.Requirements()
+				if len(reqs) != 1 {
+					t.Fatalf("expected 1 requirement, got %d", len(reqs))
+				}
+				if i == 0 && reqs[0].Start != "0x0000000000000000" {
+					t.Errorf("totalShards=%d shard 0 Start = %q, want 0x0000000000000000", totalShards, reqs[0].Start)
+				}
+				if i > 0 && reqs[0].Start != prevEnd {
+					t.Errorf("totalShards=%d shard %d Start %q != shard %d End %q", totalShards, i, reqs[0].Start, i-1, prevEnd)
+				}
+				if !HexLess(reqs[0].Start, reqs[0].End) {
+					t.Errorf("totalShards=%d shard %d Start %q not less than End %q", totalShards, i, reqs[0].Start, reqs[0].End)
+				}
+				prevEnd = reqs[0].End
+			}
+			if prevEnd != "0x10000000000000000" {
+				t.Errorf("totalShards=%d final shard End = %q, want 0x10000000000000000", totalShards, prevEnd)
+			}
+
+			for _, obj := range objects {
+				matchedShard := -1
+				for shard, sel := range selectors {
+					ok, err := sel.Matches(obj)
+					if err != nil {
+						t.Fatalf("Matches: %v", err)
+					}
+					if ok {
+						if matchedShard != -1 {
+							t.Errorf("totalShards=%d key=%s object %s matched both shard %d and %d", totalShards, key, obj.Name, matchedShard, shard)
+						}
+						matchedShard = shard
+					}
+				}
+				if matchedShard == -1 {
+					t.Errorf("totalShards=%d key=%s object %s did not match any shard", totalShards, key, obj.Name)
+				}
+			}
+		}
+	}
+}
+
+func BenchmarkSelectorMatches(b *testing.B) {
+	obj := &testObject{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID("2a9c1b7e-0042-4f3a-9c1d-000000000042"),
+			Name:      "pod-42",
+			Namespace: "default",
+		},
+	}
+	sel, err := NewShardRangeSelector("object.metadata.uid", 0, 4)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := sel.Matches(obj); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

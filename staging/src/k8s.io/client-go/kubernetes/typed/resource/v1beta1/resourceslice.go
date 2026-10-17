@@ -41,6 +41,7 @@ type ResourceSliceInterface interface {
 	Create(ctx context.Context, resourceSlice *resourcev1beta1.ResourceSlice, opts v1.CreateOptions) (*resourcev1beta1.ResourceSlice, error)
 	Update(ctx context.Context, resourceSlice *resourcev1beta1.ResourceSlice, opts v1.UpdateOptions) (*resourcev1beta1.ResourceSlice, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1beta1.ResourceSlice, error)
 	List(ctx context.Context, opts v1.ListOptions) (*resourcev1beta1.ResourceSliceList, error)

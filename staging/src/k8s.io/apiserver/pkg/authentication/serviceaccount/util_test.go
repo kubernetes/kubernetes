@@ -69,6 +69,42 @@ func TestUserInfo(t *testing.T) {
 				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
 			},
 		},
+		"extracts validating webhook configuration name/uid and attestations": {
+			info: ServiceAccountInfo{
+				Name:                                "name",
+				Namespace:                           "ns",
+				ValidatingWebhookConfigurationName:  "my-vwc",
+				ValidatingWebhookConfigurationUID:   "vwc-uid",
+				AttestationAdmissionReviewAPIGroups: []string{"apps"},
+			},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/validatingwebhookconfiguration-name":  {"my-vwc"},
+					"authentication.kubernetes.io/validatingwebhookconfiguration-uid":   {"vwc-uid"},
+					"attestation.authentication.kubernetes.io/admissionReviewAPIGroups": {"apps"},
+				},
+			},
+		},
+		"extracts mutating webhook configuration name/uid and attestations": {
+			info: ServiceAccountInfo{
+				Name:                                "name",
+				Namespace:                           "ns",
+				MutatingWebhookConfigurationName:    "my-mwc",
+				MutatingWebhookConfigurationUID:     "mwc-uid",
+				AttestationAdmissionReviewAPIGroups: []string{"apps"},
+			},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/mutatingwebhookconfiguration-name":    {"my-mwc"},
+					"authentication.kubernetes.io/mutatingwebhookconfiguration-uid":     {"mwc-uid"},
+					"attestation.authentication.kubernetes.io/admissionReviewAPIGroups": {"apps"},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {

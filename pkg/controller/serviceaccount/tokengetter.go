@@ -19,29 +19,33 @@ package serviceaccount
 import (
 	"context"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionregistrationv1listers "k8s.io/client-go/listers/admissionregistration/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
 type clientGetter struct {
-	client               clientset.Interface
-	secretLister         v1listers.SecretLister
-	serviceAccountLister v1listers.ServiceAccountLister
-	podLister            v1listers.PodLister
-	nodeLister           v1listers.NodeLister
+	client                               clientset.Interface
+	secretLister                         v1listers.SecretLister
+	serviceAccountLister                 v1listers.ServiceAccountLister
+	podLister                            v1listers.PodLister
+	nodeLister                           v1listers.NodeLister
+	validatingWebhookConfigurationLister admissionregistrationv1listers.ValidatingWebhookConfigurationLister
+	mutatingWebhookConfigurationLister   admissionregistrationv1listers.MutatingWebhookConfigurationLister
 }
 
 // NewGetterFromClient returns a ServiceAccountTokenGetter that
 // uses the specified client to retrieve service accounts, pods, secrets and nodes.
 // The client should NOT authenticate using a service account token
 // the returned getter will be used to retrieve, or recursion will result.
-func NewGetterFromClient(c clientset.Interface, secretLister v1listers.SecretLister, serviceAccountLister v1listers.ServiceAccountLister, podLister v1listers.PodLister, nodeLister v1listers.NodeLister) serviceaccount.ServiceAccountTokenGetter {
-	return clientGetter{c, secretLister, serviceAccountLister, podLister, nodeLister}
+func NewGetterFromClient(c clientset.Interface, secretLister v1listers.SecretLister, serviceAccountLister v1listers.ServiceAccountLister, podLister v1listers.PodLister, nodeLister v1listers.NodeLister, validatingWebhookConfigurationLister admissionregistrationv1listers.ValidatingWebhookConfigurationLister, mutatingWebhookConfigurationLister admissionregistrationv1listers.MutatingWebhookConfigurationLister) serviceaccount.ServiceAccountTokenGetter {
+	return clientGetter{c, secretLister, serviceAccountLister, podLister, nodeLister, validatingWebhookConfigurationLister, mutatingWebhookConfigurationLister}
 }
 
 func (c clientGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
@@ -74,4 +78,18 @@ func (c clientGetter) GetNode(ctx context.Context, name string) (*v1.Node, error
 		return node, nil
 	}
 	return c.client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+}
+
+func (c clientGetter) GetValidatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	if validatingWebhookCfg, err := c.validatingWebhookConfigurationLister.Get(name); err == nil {
+		return validatingWebhookCfg, nil
+	}
+	return c.client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, name, metav1.GetOptions{})
+}
+
+func (c clientGetter) GetMutatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	if mutatingWebhookCfg, err := c.mutatingWebhookConfigurationLister.Get(name); err == nil {
+		return mutatingWebhookCfg, nil
+	}
+	return c.client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, name, metav1.GetOptions{})
 }

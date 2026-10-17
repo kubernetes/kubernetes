@@ -193,9 +193,11 @@ func (m *MetricVec) CurryWith(labels Labels) (*MetricVec, error) {
 //
 // Keeping the Metric for later use is possible (and should be considered if
 // performance is critical), but keep in mind that Reset, DeleteLabelValues and
-// Delete can be used to delete the Metric from the MetricVec. In that case, the
-// Metric will still exist, but it will not be exported anymore, even if a
-// Metric with the same label values is created later.
+// Delete can be used to delete the Metric from the MetricVec. In that case, if
+// you have previously kept a reference to that Metric, the Metric object still
+// exists and can be used, but it will not be exported anymore. If a Metric with
+// the same label values is created later, updates to the old Metric reference
+// will not be exported.
 //
 // An error is returned if the number of label values is not the same as the
 // number of variable labels in Desc (minus any curried labels).
@@ -657,7 +659,7 @@ func inlineLabelValues(lvs []string, curry []curriedLabelValue) []string {
 }
 
 var labelsPool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return make(Labels)
 	},
 }

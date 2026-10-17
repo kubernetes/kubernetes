@@ -26,7 +26,6 @@ import (
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -341,9 +340,7 @@ func Convert_autoscaling_ContainerResourceMetricStatus_To_v2_ContainerResourceMe
 }
 
 func autoConvert_v2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *autoscalingv2.CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	*out = *(*autoscaling.CrossVersionObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -353,9 +350,7 @@ func Convert_v2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectRef
 }
 
 func autoConvert_autoscaling_CrossVersionObjectReference_To_v2_CrossVersionObjectReference(in *autoscaling.CrossVersionObjectReference, out *autoscalingv2.CrossVersionObjectReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	*out = *(*autoscalingv2.CrossVersionObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -365,12 +360,7 @@ func Convert_autoscaling_CrossVersionObjectReference_To_v2_CrossVersionObjectRef
 }
 
 func autoConvert_v2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *autoscalingv2.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ExternalMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -380,12 +370,7 @@ func Convert_v2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *aut
 }
 
 func autoConvert_autoscaling_ExternalMetricSource_To_v2_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *autoscalingv2.ExternalMetricSource, s conversion.Scope) error {
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricTarget_To_v2_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ExternalMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -395,12 +380,7 @@ func Convert_autoscaling_ExternalMetricSource_To_v2_ExternalMetricSource(in *aut
 }
 
 func autoConvert_v2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *autoscalingv2.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ExternalMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -410,12 +390,7 @@ func Convert_v2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *aut
 }
 
 func autoConvert_autoscaling_ExternalMetricStatus_To_v2_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *autoscalingv2.ExternalMetricStatus, s conversion.Scope) error {
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ExternalMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -425,9 +400,7 @@ func Convert_autoscaling_ExternalMetricStatus_To_v2_ExternalMetricStatus(in *aut
 }
 
 func autoConvert_v2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *autoscalingv2.HPAScalingPolicy, out *autoscaling.HPAScalingPolicy, s conversion.Scope) error {
-	out.Type = autoscaling.HPAScalingPolicyType(in.Type)
-	out.Value = in.Value
-	out.PeriodSeconds = in.PeriodSeconds
+	*out = *(*autoscaling.HPAScalingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -437,9 +410,7 @@ func Convert_v2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *autoscaling
 }
 
 func autoConvert_autoscaling_HPAScalingPolicy_To_v2_HPAScalingPolicy(in *autoscaling.HPAScalingPolicy, out *autoscalingv2.HPAScalingPolicy, s conversion.Scope) error {
-	out.Type = autoscalingv2.HPAScalingPolicyType(in.Type)
-	out.Value = in.Value
-	out.PeriodSeconds = in.PeriodSeconds
+	*out = *(*autoscalingv2.HPAScalingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -449,10 +420,7 @@ func Convert_autoscaling_HPAScalingPolicy_To_v2_HPAScalingPolicy(in *autoscaling
 }
 
 func autoConvert_v2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *autoscalingv2.HPAScalingRules, out *autoscaling.HPAScalingRules, s conversion.Scope) error {
-	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
-	out.SelectPolicy = (*autoscaling.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
-	out.Policies = *(*[]autoscaling.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
-	out.Tolerance = (*resource.Quantity)(unsafe.Pointer(in.Tolerance))
+	*out = *(*autoscaling.HPAScalingRules)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -462,10 +430,7 @@ func Convert_v2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *autoscalingv2
 }
 
 func autoConvert_autoscaling_HPAScalingRules_To_v2_HPAScalingRules(in *autoscaling.HPAScalingRules, out *autoscalingv2.HPAScalingRules, s conversion.Scope) error {
-	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
-	out.SelectPolicy = (*autoscalingv2.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
-	out.Policies = *(*[]autoscalingv2.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
-	out.Tolerance = (*resource.Quantity)(unsafe.Pointer(in.Tolerance))
+	*out = *(*autoscalingv2.HPAScalingRules)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -497,8 +462,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2_HorizontalPodAutoscal
 }
 
 func autoConvert_v2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in *autoscalingv2.HorizontalPodAutoscalerBehavior, out *autoscaling.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
-	out.ScaleUp = (*autoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
-	out.ScaleDown = (*autoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
+	*out = *(*autoscaling.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -508,8 +472,7 @@ func Convert_v2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAuto
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2_HorizontalPodAutoscalerBehavior(in *autoscaling.HorizontalPodAutoscalerBehavior, out *autoscalingv2.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
-	out.ScaleUp = (*autoscalingv2.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
-	out.ScaleDown = (*autoscalingv2.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
+	*out = *(*autoscalingv2.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -519,12 +482,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2_HorizontalPodAuto
 }
 
 func autoConvert_v2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *autoscalingv2.HorizontalPodAutoscalerCondition, out *autoscaling.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = autoscaling.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = autoscaling.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	*out = *(*autoscaling.HorizontalPodAutoscalerCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -534,12 +492,7 @@ func Convert_v2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAut
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v2_HorizontalPodAutoscalerCondition(in *autoscaling.HorizontalPodAutoscalerCondition, out *autoscalingv2.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = autoscalingv2.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	*out = *(*autoscalingv2.HorizontalPodAutoscalerCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -693,8 +646,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2_HorizontalPodAutosc
 }
 
 func autoConvert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *autoscalingv2.MetricIdentifier, out *autoscaling.MetricIdentifier, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	*out = *(*autoscaling.MetricIdentifier)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -704,8 +656,7 @@ func Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *autoscaling
 }
 
 func autoConvert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(in *autoscaling.MetricIdentifier, out *autoscalingv2.MetricIdentifier, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	*out = *(*autoscalingv2.MetricIdentifier)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -807,10 +758,7 @@ func Convert_autoscaling_MetricStatus_To_v2_MetricStatus(in *autoscaling.MetricS
 }
 
 func autoConvert_v2_MetricTarget_To_autoscaling_MetricTarget(in *autoscalingv2.MetricTarget, out *autoscaling.MetricTarget, s conversion.Scope) error {
-	out.Type = autoscaling.MetricTargetType(in.Type)
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
-	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
+	*out = *(*autoscaling.MetricTarget)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -820,10 +768,7 @@ func Convert_v2_MetricTarget_To_autoscaling_MetricTarget(in *autoscalingv2.Metri
 }
 
 func autoConvert_autoscaling_MetricTarget_To_v2_MetricTarget(in *autoscaling.MetricTarget, out *autoscalingv2.MetricTarget, s conversion.Scope) error {
-	out.Type = autoscalingv2.MetricTargetType(in.Type)
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
-	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
+	*out = *(*autoscalingv2.MetricTarget)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -833,9 +778,7 @@ func Convert_autoscaling_MetricTarget_To_v2_MetricTarget(in *autoscaling.MetricT
 }
 
 func autoConvert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *autoscalingv2.MetricValueStatus, out *autoscaling.MetricValueStatus, s conversion.Scope) error {
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
-	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
+	*out = *(*autoscaling.MetricValueStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -845,9 +788,7 @@ func Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *autoscali
 }
 
 func autoConvert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(in *autoscaling.MetricValueStatus, out *autoscalingv2.MetricValueStatus, s conversion.Scope) error {
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
-	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
+	*out = *(*autoscalingv2.MetricValueStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -857,15 +798,7 @@ func Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(in *autoscali
 }
 
 func autoConvert_v2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *autoscalingv2.ObjectMetricSource, out *autoscaling.ObjectMetricSource, s conversion.Scope) error {
-	if err := Convert_v2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ObjectMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -875,15 +808,7 @@ func Convert_v2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *autosca
 }
 
 func autoConvert_autoscaling_ObjectMetricSource_To_v2_ObjectMetricSource(in *autoscaling.ObjectMetricSource, out *autoscalingv2.ObjectMetricSource, s conversion.Scope) error {
-	if err := Convert_autoscaling_CrossVersionObjectReference_To_v2_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricTarget_To_v2_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ObjectMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -893,15 +818,7 @@ func Convert_autoscaling_ObjectMetricSource_To_v2_ObjectMetricSource(in *autosca
 }
 
 func autoConvert_v2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *autoscalingv2.ObjectMetricStatus, out *autoscaling.ObjectMetricStatus, s conversion.Scope) error {
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ObjectMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -911,15 +828,7 @@ func Convert_v2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *autosca
 }
 
 func autoConvert_autoscaling_ObjectMetricStatus_To_v2_ObjectMetricStatus(in *autoscaling.ObjectMetricStatus, out *autoscalingv2.ObjectMetricStatus, s conversion.Scope) error {
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_CrossVersionObjectReference_To_v2_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ObjectMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -929,12 +838,7 @@ func Convert_autoscaling_ObjectMetricStatus_To_v2_ObjectMetricStatus(in *autosca
 }
 
 func autoConvert_v2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscalingv2.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.PodsMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -944,12 +848,7 @@ func Convert_v2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscaling
 }
 
 func autoConvert_autoscaling_PodsMetricSource_To_v2_PodsMetricSource(in *autoscaling.PodsMetricSource, out *autoscalingv2.PodsMetricSource, s conversion.Scope) error {
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricTarget_To_v2_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.PodsMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -959,12 +858,7 @@ func Convert_autoscaling_PodsMetricSource_To_v2_PodsMetricSource(in *autoscaling
 }
 
 func autoConvert_v2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *autoscalingv2.PodsMetricStatus, out *autoscaling.PodsMetricStatus, s conversion.Scope) error {
-	if err := Convert_v2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.PodsMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -974,12 +868,7 @@ func Convert_v2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *autoscaling
 }
 
 func autoConvert_autoscaling_PodsMetricStatus_To_v2_PodsMetricStatus(in *autoscaling.PodsMetricStatus, out *autoscalingv2.PodsMetricStatus, s conversion.Scope) error {
-	if err := Convert_autoscaling_MetricIdentifier_To_v2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
-		return err
-	}
-	if err := Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.PodsMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -989,10 +878,7 @@ func Convert_autoscaling_PodsMetricStatus_To_v2_PodsMetricStatus(in *autoscaling
 }
 
 func autoConvert_v2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *autoscalingv2.ResourceMetricSource, out *autoscaling.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
-	if err := Convert_v2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ResourceMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1002,10 +888,7 @@ func Convert_v2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *aut
 }
 
 func autoConvert_autoscaling_ResourceMetricSource_To_v2_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *autoscalingv2.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
-	if err := Convert_autoscaling_MetricTarget_To_v2_MetricTarget(&in.Target, &out.Target, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ResourceMetricSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1015,10 +898,7 @@ func Convert_autoscaling_ResourceMetricSource_To_v2_ResourceMetricSource(in *aut
 }
 
 func autoConvert_v2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *autoscalingv2.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
-	if err := Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscaling.ResourceMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1028,10 +908,7 @@ func Convert_v2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *aut
 }
 
 func autoConvert_autoscaling_ResourceMetricStatus_To_v2_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *autoscalingv2.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
-	if err := Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
-		return err
-	}
+	*out = *(*autoscalingv2.ResourceMetricStatus)(unsafe.Pointer(in))
 	return nil
 }
 

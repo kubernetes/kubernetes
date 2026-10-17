@@ -53,9 +53,9 @@ import (
 // the driver may use a node selector to specify where the devices are available.
 type ResourceSliceApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Contains the information published by the driver.
+	// spec contains the information published by the driver.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec *ResourceSliceSpecApplyConfiguration `json:"spec,omitempty"`

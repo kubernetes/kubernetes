@@ -467,7 +467,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			framework.Failf("Failed to convert response object to Deployment")
 		}
 		if *deployment.Spec.Replicas != 3 {
-			framework.Failf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
+			framework.Failf("Expected deployment.spec.replicas to be 3, but got %d", *deployment.Spec.Replicas)
 		}
 		if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
 			framework.Failf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
@@ -1064,7 +1064,7 @@ spec:
 			framework.Failf("Failed to convert response object to Deployment")
 		}
 		if *deployment.Spec.Replicas != 4 {
-			framework.Failf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
+			framework.Failf("Expected deployment.spec.replicas to be 4, but got %d", *deployment.Spec.Replicas)
 		}
 	})
 })

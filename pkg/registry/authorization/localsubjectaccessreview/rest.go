@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
@@ -33,10 +35,11 @@ import (
 
 type REST struct {
 	authorizer authorizer.UnconditionalAuthorizer
+	scheme     *runtime.Scheme
 }
 
-func NewREST(authorizer authorizer.UnconditionalAuthorizer) *REST {
-	return &REST{authorizer}
+func NewREST(authorizer authorizer.UnconditionalAuthorizer, scheme *runtime.Scheme) *REST {
+	return &REST{authorizer, scheme}
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -65,7 +68,18 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
 	}
 
-	if errs := authorizationvalidation.ValidateLocalSubjectAccessReview(localSubjectAccessReview); len(errs) > 0 {
+	// Clear status so it's not taken into account during input validation.
+	// This is important, as we cannot make validation stricter; in k8s 1.37 and before, the client was able to pass a bogus status without a validation error.
+	localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{}
+
+	// Clear the options for opting into conditions-awareness when the feature gate is off.
+	// This means that we fallback to the conditions-unaware Authorize when the feature gate is
+	// off, even though both the client and authorizer might have supported conditions.
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		localSubjectAccessReview.Spec.AuthorizationOptions = nil
+	}
+
+	if errs := authorizationvalidation.ValidateLocalSubjectAccessReviewCreate(ctx, r.scheme, localSubjectAccessReview); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(localSubjectAccessReview.Kind), "", errs)
 	}
 	namespace := genericapirequest.NamespaceValue(ctx)

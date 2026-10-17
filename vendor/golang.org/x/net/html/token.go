@@ -1300,9 +1300,22 @@ func NewTokenizerFragment(r io.Reader, contextTag string) *Tokenizer {
 		attrNames: make(map[string]bool),
 	}
 	if contextTag != "" {
+		// Per the "Parsing HTML Fragments" portion of the spec:
+		//    For performance reasons, an implementation that does not report errors
+		//    and that uses the actual state machine described in this specification
+		//    directly could use the PLAINTEXT state instead of the RAWTEXT and script
+		//    data states where those are mentioned in the list above. Except for
+		//    rules regarding parse errors, they are equivalent, since there is no
+		//    appropriate end tag token in the fragment case, yet they involve far
+		//    fewer state transitions.
+		//
+		// As such we just set everything to plaintext, which makes some complex parsing
+		// cases somewhat simpler.
 		switch s := strings.ToLower(contextTag); s {
-		case "iframe", "noembed", "noframes", "noscript", "plaintext", "script", "style", "title", "textarea", "xmp":
+		case "title", "textarea":
 			z.rawTag = s
+		case "style", "xmp", "iframe", "noembed", "noframes", "script", "noscript", "plaintext":
+			z.rawTag = "plaintext"
 		}
 	}
 	return z

@@ -41,6 +41,7 @@ type MutatingAdmissionPolicyBindingInterface interface {
 	Create(ctx context.Context, mutatingAdmissionPolicyBinding *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, opts v1.CreateOptions) (*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, error)
 	Update(ctx context.Context, mutatingAdmissionPolicyBinding *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, opts v1.UpdateOptions) (*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, error)
 	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, error)

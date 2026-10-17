@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package propagation // import "go.opentelemetry.io/otel/propagation"
+package propagation
 
 import (
 	"context"

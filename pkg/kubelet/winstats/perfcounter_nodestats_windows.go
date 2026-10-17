@@ -30,7 +30,7 @@ import (
 	"time"
 	"unsafe"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 

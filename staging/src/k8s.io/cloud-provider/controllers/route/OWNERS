@@ -1,13 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+  - sig-cloud-provider-leads
   - wojtek-t
   - bowei
-  - andrewsykim
-  - cheftako
 reviewers:
   - wojtek-t
-  - andrewsykim
-  - cheftako
 emeritus_approvers:
   - gmarek
+  - andrewsykim

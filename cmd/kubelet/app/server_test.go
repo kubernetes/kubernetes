@@ -17,6 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/mldsa"
+	"crypto/rsa"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -27,7 +33,9 @@ import (
 
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -103,6 +111,28 @@ func TestParseResourceList(t *testing.T) {
 		q := rl[v1.ResourceCPU]
 		require.Equal(t, test.expected, q.String(), test.name)
 	}
+}
+
+func TestParseResourceListCPUOverflowsMicro(t *testing.T) {
+	// The old rounding read the quantity through a wrapping micro projection, so
+	// a reservation past that range was stored as a negative number of cores.
+	for _, v := range []string{"1e30", "10000000000000", "9223372036854775808u"} {
+		rl, err := parseResourceList(map[string]string{"cpu": v})
+		require.NoError(t, err, v)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, 1, q.Sign(), v)
+		require.Zero(t, q.Cmp(resource.MustParse(v)), "%s: kept unrounded, got %s", v, q.String())
+	}
+
+	// The largest micro value that fits, where adding 500 before dividing does not.
+	rl, err := parseResourceList(map[string]string{"cpu": "9223372036854775807u"})
+	require.NoError(t, err)
+	q := rl[v1.ResourceCPU]
+	require.Equal(t, int64(9223372036854776), q.MilliValue())
+
+	// Rounding stops at the cutoff rather than continuing past it, so the largest
+	// rounded value sits above the smallest kept one.
+	require.Equal(t, 1, q.Cmp(resource.MustParse("9223372036854775808u")))
 }
 
 func TestMergeKubeletConfigurations(t *testing.T) {
@@ -550,6 +580,120 @@ readOnlyPort: 9999
 				field := value.FieldByName(fieldName)
 				require.Equal(t, expectedValue, field.Interface(), "Field mismatch: "+fieldName)
 			}
+		})
+	}
+}
+
+func TestMarshalKubeletConfigForLog(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		// Non-default values that must round-trip into the marshaled output.
+		FailSwapOn:   false,
+		EvictionHard: map[string]string{"memory.available": "200Mi"},
+		// Sensitive field that must be masked.
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	out, err := marshalKubeletConfigForLog(kc)
+	require.NoError(t, err)
+
+	// (2) The output carries the external GroupVersionKind, mirroring /configz.
+	require.Contains(t, out, "apiVersion: kubelet.config.k8s.io/v1beta1")
+	require.Contains(t, out, "kind: KubeletConfiguration")
+
+	// (1) Non-default effective values are present.
+	require.Contains(t, out, "failSwapOn: false")
+	require.Contains(t, out, "memory.available: 200Mi")
+
+	// (3) Sensitive StaticPodURLHeader values are masked, never leaked.
+	require.Contains(t, out, "<masked>")
+	require.NotContains(t, out, "super-secret-token")
+
+	// The helper must not mutate the caller's config when masking.
+	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+// describePublicKey names the exact key a certificate carries, so that P-256
+// and P-384 (both x509.ECDSA) and the three ML-DSA variants stay distinct.
+func describePublicKey(t *testing.T, pub crypto.PublicKey) string {
+	t.Helper()
+	switch k := pub.(type) {
+	case *ecdsa.PublicKey:
+		return "ECDSA " + k.Curve.Params().Name
+	case *rsa.PublicKey:
+		return fmt.Sprintf("RSA %d", k.N.BitLen())
+	case *mldsa.PublicKey:
+		switch k.Parameters() {
+		case mldsa.MLDSA44():
+			return "ML-DSA-44"
+		case mldsa.MLDSA65():
+			return "ML-DSA-65"
+		case mldsa.MLDSA87():
+			return "ML-DSA-87"
+		default:
+			t.Fatalf("certificate carries an ML-DSA key with unrecognized parameters")
+		}
+	default:
+		t.Fatalf("certificate carries an unrecognized key type %T", pub)
+	}
+	return ""
+}
+
+// verifySelfSignedKey runs InitializeTLS against an empty cert directory and
+// names the key of the certificate it generates.
+func verifySelfSignedKey(t *testing.T, algorithm *kubeletconfiginternal.CertificateKeyAlgorithmType, wantKey string) {
+	t.Helper()
+	kf := &options.KubeletFlags{
+		CertDirectory:    t.TempDir(),
+		HostnameOverride: "test-node",
+	}
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TLSMinVersion:                 "VersionTLS13",
+		ServerCertificateKeyAlgorithm: algorithm,
+	}
+
+	if _, err := InitializeTLS(context.Background(), kf, kc); err != nil {
+		t.Fatalf("InitializeTLS() failed: %v", err)
+	}
+
+	certs, err := certutil.CertsFromFile(kc.TLSCertFile)
+	if err != nil {
+		t.Fatalf("reading the generated cert: %v", err)
+	}
+	if got := describePublicKey(t, certs[0].PublicKey); got != wantKey {
+		t.Errorf("generated cert key = %s, want %s", got, wantKey)
+	}
+}
+
+func TestInitializeTLSSelfSignedKeyAlgorithm(t *testing.T) {
+	wantKeys := map[kubeletconfiginternal.CertificateKeyAlgorithmType]string{
+		kubeletconfiginternal.CertificateKeyAlgorithmECDSAP256: "ECDSA P-256",
+		kubeletconfiginternal.CertificateKeyAlgorithmECDSAP384: "ECDSA P-384",
+		kubeletconfiginternal.CertificateKeyAlgorithmRSA2048:   "RSA 2048",
+		kubeletconfiginternal.CertificateKeyAlgorithmRSA3072:   "RSA 3072",
+		kubeletconfiginternal.CertificateKeyAlgorithmRSA4096:   "RSA 4096",
+		kubeletconfiginternal.CertificateKeyAlgorithmMLDSA44:   "ML-DSA-44",
+		kubeletconfiginternal.CertificateKeyAlgorithmMLDSA65:   "ML-DSA-65",
+		kubeletconfiginternal.CertificateKeyAlgorithmMLDSA87:   "ML-DSA-87",
+	}
+
+	t.Run("unset uses the documented ECDSA-P256 default", func(t *testing.T) {
+		verifySelfSignedKey(t, nil, "ECDSA P-256")
+	})
+
+	for _, algorithm := range kubeletconfiginternal.ValidCertificateKeyAlgorithms {
+		wantKey, ok := wantKeys[algorithm]
+		if !ok {
+			t.Errorf("no expected key recorded for supported algorithm %q", algorithm)
+			continue
+		}
+		t.Run(string(algorithm), func(t *testing.T) {
+			verifySelfSignedKey(t, &algorithm, wantKey)
 		})
 	}
 }

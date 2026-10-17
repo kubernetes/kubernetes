@@ -32,7 +32,7 @@ Packet flow through netfilter looks something like:
 where the `[*]` represents a routing decision, and all of the boxes except in the top row
 represent netfilter hooks. More detailed versions of this diagram can be seen at
 https://en.wikipedia.org/wiki/Netfilter#/media/File:Netfilter-packet-flow.svg and
-https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks but note that in the the
+https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks but note that in the
 standard version of this diagram, the top two boxes are squished together into "local
 process" which (a) fails to make a few important distinctions, and (b) makes it look like
 a single packet can go `input` -> "local process" -> `output`, which it cannot. Note also
@@ -105,12 +105,11 @@ This is implemented as follows:
   - We install a `reject` rule for ClusterIPs matching `@cluster-ips` set and a `drop`
     rule for ClusterIPs belonging to any of the ServiceCIDRs in `forward` and `output` hook, with a 
     higher (i.e. less urgent) priority than the DNAT chains making sure all valid
-    traffic directed for ClusterIPs is already DNATed. Drop rule will only
-    be installed if `MultiCIDRServiceAllocator` feature is enabled.
+    traffic directed for ClusterIPs is already DNATed.
 
 ## Integrating with kube-proxy's nftables mode
 
-Implementations of pod networking, NetworkPolicy, service meshes, etc, may need to be
+Implementations of pod networking, NetworkPolicy, service meshes, etc., may need to be
 aware of some slightly lower-level details of kube-proxy's implementation.
 
 Components other than kube-proxy should *never* make any modifications to the
@@ -128,7 +127,7 @@ by setting appropriate `priority` values for your base chains. In particular:
   - Service traffic that needs to be masqueraded will be SNATted on a chain of `type
     nat`, `hook postrouting`, and `priority srcnat`. (So chains in other tables that run
     before this will always see the original client IP, while chains that run after this
-    will will see masqueraded source IPs for some traffic.)
+    will see masqueraded source IPs for some traffic.)
 
   - Traffic to services with no endpoints will be dropped or rejected from a chain with
     `type filter`, `priority filter`, and any of `hook input`, `hook output`, or `hook

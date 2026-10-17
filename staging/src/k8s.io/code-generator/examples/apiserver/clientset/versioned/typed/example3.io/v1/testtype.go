@@ -42,6 +42,7 @@ type TestTypeInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, testType *example3iov1.TestType, opts metav1.UpdateOptions) (*example3iov1.TestType, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*example3iov1.TestType, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*example3iov1.TestTypeList, error)

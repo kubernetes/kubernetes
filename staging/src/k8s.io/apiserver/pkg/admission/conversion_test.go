@@ -165,6 +165,39 @@ func TestRuntimeSchemeConvert(t *testing.T) {
 	}
 }
 
+func TestObjectAccessors(t *testing.T) {
+	scheme := initiateScheme(t)
+	attrs := func(obj, oldObj runtime.Object) Attributes {
+		return NewAttributesRecord(obj, oldObj, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
+	}
+	o := NewObjectInterfacesFromScheme(scheme)
+	origAttrs := attrs(
+		&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
+		&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
+	)
+	v1GVK := examplev1.SchemeGroupVersion.WithKind("Pod")
+	versionedAttrs, err := NewVersionedAttributes(origAttrs, v1GVK, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantObject := &examplev1.Pod{
+		TypeMeta:   metav1.TypeMeta{Kind: "Pod", APIVersion: "example.apiserver.k8s.io/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "newpod"},
+	}
+	wantOldObject := &examplev1.Pod{
+		TypeMeta:   metav1.TypeMeta{Kind: "Pod", APIVersion: "example.apiserver.k8s.io/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "oldpod"},
+	}
+
+	if diff := cmp.Diff(wantObject, versionedAttrs.GetObject()); diff != "" {
+		t.Errorf("Unexpected GetObject() diff (-want, +got): %s", diff)
+	}
+	if diff := cmp.Diff(wantOldObject, versionedAttrs.GetOldObject()); diff != "" {
+		t.Errorf("Unexpected GetOldObject() diff (-want, +got): %s", diff)
+	}
+}
+
 func TestConvertVersionedAttributes(t *testing.T) {
 	scheme := initiateScheme(t)
 	o := NewObjectInterfacesFromScheme(scheme)
@@ -417,6 +450,128 @@ func TestVersionedAttributesCELObjectsCaching(t *testing.T) {
 		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uObj))
 		require.Equal(t, "old-rs", getMetaName(uOldObj))
 		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uOldObj))
+	})
+}
+
+func TestLazyObjectCELValue(t *testing.T) {
+	tests := []struct {
+		name          string
+		object        runtime.Object
+		useSchemaless bool
+		expectNil     bool
+		expectedName  string
+		expectedType  string
+	}{
+		{
+			name:      "nil object",
+			object:    nil,
+			expectNil: true,
+		},
+		{
+			name: "unstructured object",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.apiserver.k8s.io/v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name": "unstructured-pod",
+					},
+				},
+			},
+			expectedName: "unstructured-pod",
+			expectedType: "map[string]interface {}",
+		},
+		{
+			name: "typed object with UseSchemalessTypeRef",
+			object: &examplev1.Pod{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "schemaless-pod"},
+			},
+			useSchemaless: true,
+			expectedName:  "schemaless-pod",
+			expectedType:  "v1.Pod",
+		},
+		{
+			name: "typed object without UseSchemalessTypeRef (default unstructured conversion)",
+			object: &examplev1.Pod{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "default-pod"},
+			},
+			expectedName: "default-pod",
+			expectedType: "map[string]interface {}",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			l := NewLazyObject(tc.object)
+			l.UseSchemalessTypeRef = tc.useSchemaless
+			val, err := l.CELValue()
+			require.NoError(t, err)
+			if tc.expectNil {
+				require.Nil(t, val)
+				return
+			}
+			require.NotNil(t, val)
+			require.Equal(t, tc.expectedName, getMetaName(val))
+			require.Equal(t, tc.expectedType, reflect.TypeOf(val.Value()).String())
+
+			// verify caching
+			valCached, err := l.CELValue()
+			require.NoError(t, err)
+			require.Equal(t, val, valCached)
+		})
+	}
+
+	t.Run("cache invalidation when Set is called", func(t *testing.T) {
+		typedObj1 := &examplev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+		}
+		l := NewLazyObject(typedObj1)
+		val, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-1", getMetaName(val))
+		require.NotNil(t, l.celVal)
+
+		typedObj2 := &examplev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+		}
+		l.Set(typedObj2)
+		require.Nil(t, l.celVal)
+
+		val2, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-2", getMetaName(val2))
+	})
+
+	t.Run("schemaless conversion with UseSchemalessTypeRef", func(t *testing.T) {
+		typedObj := &examplev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-schemaless-test"},
+		}
+		l := NewLazyObject(typedObj)
+		l.UseSchemalessTypeRef = true
+
+		val1, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-schemaless-test", getMetaName(val1))
+		require.Equal(t, "v1.Pod", reflect.TypeOf(val1.Value()).String())
+
+		// Verify Set clears cached value and preserves UseSchemalessTypeRef
+		typedObj2 := &examplev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-2-schemaless"},
+		}
+		l.Set(typedObj2)
+		require.Nil(t, l.celVal)
+		require.True(t, l.UseSchemalessTypeRef)
+
+		val2, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-2-schemaless", getMetaName(val2))
+		require.Equal(t, "v1.Pod", reflect.TypeOf(val2.Value()).String())
 	})
 }
 

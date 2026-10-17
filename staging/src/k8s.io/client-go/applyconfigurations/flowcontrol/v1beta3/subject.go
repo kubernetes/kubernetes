@@ -28,14 +28,14 @@ import (
 // Subject matches the originator of a request, as identified by the request authentication system. There are three
 // ways of matching an originator; by user, group, or service account.
 type SubjectApplyConfiguration struct {
-	// `kind` indicates which one of the other fields is non-empty.
+	// kind indicates which one of the other fields is non-empty.
 	// Required
 	Kind *flowcontrolv1beta3.SubjectKind `json:"kind,omitempty"`
-	// `user` matches based on username.
+	// user matches based on username.
 	User *UserSubjectApplyConfiguration `json:"user,omitempty"`
-	// `group` matches based on user group name.
+	// group matches based on user group name.
 	Group *GroupSubjectApplyConfiguration `json:"group,omitempty"`
-	// `serviceAccount` matches ServiceAccounts.
+	// serviceAccount matches ServiceAccounts.
 	ServiceAccount *ServiceAccountSubjectApplyConfiguration `json:"serviceAccount,omitempty"`
 }
 

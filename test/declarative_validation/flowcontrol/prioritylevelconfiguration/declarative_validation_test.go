@@ -23,8 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
 	registry "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -64,7 +65,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.type: Limited with limited=nil": {
 			input: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: Exempt with limited set": {
@@ -77,19 +78,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				// Mandatory object check: spec of 'exempt' differs from bootstrap (HW-only)
 				field.Invalid(specPath, nil, "").MarkFromImperative(),
-				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: Limited with exempt set": {
 			input: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: Queue with queuing=nil": {
 			input: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: Reject with queuing set": {
@@ -99,19 +100,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				QueueLengthLimit: 50,
 			})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: empty": {
 			input: mkPLC(tweakSpecType(""), tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: empty": {
 			input: mkPLC(tweakLimitResponseType("")),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 	}
@@ -121,6 +122,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkPLC()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -151,21 +154,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkPLC(),
 			update: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: add exempt field to Limited PLC": {
 			old:    mkPLC(),
 			update: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: Queue with queuing set to nil": {
 			old:    mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
 			update: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: Reject with queuing added": {
@@ -176,7 +179,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				QueueLengthLimit: 50,
 			})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 	}
@@ -197,6 +200,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "flowcontrol.apiserver.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "prioritylevelconfigurations",
+		Name:              "test-limited",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	updateObj := mkPLC()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 // mkPLC creates a valid Limited PriorityLevelConfiguration with Reject limit response.

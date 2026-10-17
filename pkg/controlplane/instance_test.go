@@ -31,7 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -78,6 +78,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -541,7 +542,7 @@ func TestGenericStorageProviders(t *testing.T) {
 		}
 
 		// special case: we identify full core and generic core
-		if kt.Kind() == reflect.Ptr && kt.Elem().PkgPath() == reflect.TypeOf(corerest.Config{}).PkgPath() {
+		if kt.Kind() == reflect.Pointer && kt.Elem().PkgPath() == reflect.TypeOf(corerest.Config{}).PkgPath() {
 			kt = reflect.TypeOf(&corerest.GenericConfig{})
 		}
 
@@ -560,7 +561,8 @@ func TestGenericStorageProviders(t *testing.T) {
 			schedulingrest.RESTStorageProvider,
 			storagerest.RESTStorageProvider,
 			appsrest.StorageProvider,
-			resourcerest.RESTStorageProvider:
+			resourcerest.RESTStorageProvider,
+			lifecyclerest.RESTStorageProvider:
 			// all these are non-generic, but kube specific
 			continue
 		default:
@@ -751,6 +753,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"batch/v1/jobs":     "mudhfqk/qZY=",
 	"batch/v1/cronjobs": "sd5LIXh4Fjs=",
 	"certificates.k8s.io/v1/certificatesigningrequests":                 "95fRKMXA+00=",
+	"certificates.k8s.io/v1/clustertrustbundles":                        "v5yhuVertL4=",
+	"certificates.k8s.io/v1/podcertificaterequests":                     "wYA9yXQH8fg=",
 	"coordination.k8s.io/v1/leases":                                     "gqkMMb/YqFM=",
 	"discovery.k8s.io/v1/endpointslices":                                "qgS0xkrxYAI=",
 	"networking.k8s.io/v1/networkpolicies":                              "YpfwF18m1G8=",
@@ -765,6 +769,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"rbac.authorization.k8s.io/v1/rolebindings":                         "eGsCzGH6b1g=",
 	"rbac.authorization.k8s.io/v1/roles":                                "7FuwZcIIItM=",
 	"resource.k8s.io/v1/deviceclasses":                                  "Yk2PTc1Ybxk=",
+	"resource.k8s.io/v1/devicetaintrules":                               "i+85+TcIKpA=",
 	"resource.k8s.io/v1/resourceclaims":                                 "wgAZaHcZxUg=",
 	"resource.k8s.io/v1/resourceclaimtemplates":                         "TuzjC49aUfM=",
 	"resource.k8s.io/v1/resourceslices":                                 "KsC072WgaEY=",
@@ -775,6 +780,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"storage.k8s.io/v1/csistoragecapacities":                            "xeVl+2Ly1kE=",
 	"storage.k8s.io/v1/volumeattachments":                               "tJx/ezt6UDU=",
 	"storage.k8s.io/v1/volumeattributesclasses":                         "tIjydgKBC5w=",
+	"storagemigration.k8s.io/v1/storageversionmigrations":               "pCjmmKOkLy4=",
 	"apps/v1/controllerrevisions":                                       "85nkx63pcBU=",
 	"apps/v1/daemonsets":                                                "dd7pWHUlMKQ=",
 	"apps/v1/deployments":                                               "8aSe+NMegvE=",
@@ -782,8 +788,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"apps/v1/statefulsets":                                              "H+vl74LkKdo=",
 	"admissionregistration.k8s.io/v1/mutatingwebhookconfigurations":     "Sqi0GUgDaX0=",
 	"admissionregistration.k8s.io/v1/validatingwebhookconfigurations":   "B0wHjQmsGNk=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "LYmCf+UMVdg=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "90V5FRZZ3Zg=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "mHCkTKpUTrE=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "ZKgZT1uTmZ0=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicies":       "6OxvlMmQ6is=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicybindings": "v9715VZqakg=",
 	"events.k8s.io/v1/events":                                           "r2yiGXH7wu8=",

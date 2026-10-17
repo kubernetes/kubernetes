@@ -4,20 +4,18 @@
 package openapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 
-	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	"google.golang.org/protobuf/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/kustomize/kyaml/errors"
-	"sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi"
-	"sigs.k8s.io/kustomize/kyaml/openapi/kustomizationapi"
+	"sigs.k8s.io/kustomize/kyaml/openapi/internal/builtinopenapi"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	k8syaml "sigs.k8s.io/yaml"
 )
@@ -80,11 +78,23 @@ type openapiData struct {
 	defaultBuiltInSchemaParseStatus schemaParseStatus
 }
 
+// format is retained for compatibility with the exported JsonOrYaml and Proto
+// constants. Built-in schemas are now loaded from compiled bundles instead of
+// selecting a parser with this type.
 type format string
 
 const (
+	// JsonOrYaml identifies the legacy JSON-or-YAML OpenAPI input format.
+	//
+	// Deprecated: Use AddSchema to load a custom JSON or YAML schema. Built-in
+	// schemas are loaded from compiled bundles.
 	JsonOrYaml format = "jsonOrYaml"
-	Proto      format = "proto"
+	// Proto identifies the legacy protobuf OpenAPI input format.
+	//
+	// Deprecated: Built-in schemas are loaded from compiled bundles and no
+	// longer select a protobuf parser. Use AddSchema with JSON or YAML for a
+	// custom schema.
+	Proto format = "proto"
 )
 
 // precomputedIsNamespaceScoped precomputes IsNamespaceScoped for known types. This avoids Schema creation,
@@ -96,6 +106,8 @@ var precomputedIsNamespaceScoped = map[yaml.TypeMeta]bool{
 	{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingWebhookConfiguration"}:      false,
 	{APIVersion: "admissionregistration.k8s.io/v1beta1", Kind: "MutatingWebhookConfiguration"}:   false,
 	{APIVersion: "admissionregistration.k8s.io/v1beta1", Kind: "ValidatingWebhookConfiguration"}: false,
+	{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingAdmissionPolicy"}:           false,
+	{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingAdmissionPolicyBinding"}:    false,
 	{APIVersion: "apiextensions.k8s.io/v1", Kind: "CustomResourceDefinition"}:                    false,
 	{APIVersion: "apiextensions.k8s.io/v1beta1", Kind: "CustomResourceDefinition"}:               false,
 	{APIVersion: "apiregistration.k8s.io/v1", Kind: "APIService"}:                                false,
@@ -301,7 +313,7 @@ func schemaUsingField(object *yaml.RNode, field string) (*spec.Schema, error) {
 
 // AddSchema parses s, and adds definitions from s to the global schema.
 func AddSchema(s []byte) error {
-	return parse(s, JsonOrYaml)
+	return parse(s)
 }
 
 // ResetOpenAPI resets the openapi data to empty
@@ -577,11 +589,7 @@ func (rs *ResourceSchema) PatchStrategyAndKey() (string, string) {
 const (
 	// kubernetesOpenAPIDefaultVersion is the latest version number of the statically compiled in
 	// OpenAPI schema for kubernetes built-in types
-	kubernetesOpenAPIDefaultVersion = kubernetesapi.DefaultOpenAPI
-
-	// kustomizationAPIAssetName is the name of the asset containing the statically compiled in
-	// OpenAPI definitions for Kustomization built-in types
-	kustomizationAPIAssetName = "kustomizationapi/swagger.json"
+	kubernetesOpenAPIDefaultVersion = DefaultOpenAPI
 
 	// kubernetesGVKExtensionKey is the key to lookup the kubernetes group version kind extension
 	// -- the extension is an array of objects containing a gvk
@@ -637,7 +645,7 @@ func SetSchema(openAPIField map[string]string, schema []byte, reset bool) error 
 	if kubernetesOpenAPIVersion == "" {
 		return nil
 	}
-	if _, ok := kubernetesapi.OpenAPIMustAsset[kubernetesOpenAPIVersion]; !ok {
+	if !hasBuiltinOpenAPIVersion(kubernetesOpenAPIVersion) {
 		return fmt.Errorf("the specified OpenAPI version is not built in")
 	}
 
@@ -674,7 +682,7 @@ func initSchema() {
 
 	// TODO(natasha41575): Accept proto-formatted schema files
 	if customSchema != nil {
-		err := parse(customSchema, JsonOrYaml)
+		err := parse(customSchema)
 		if err != nil {
 			panic(fmt.Errorf("invalid schema file: %w", err))
 		}
@@ -692,57 +700,82 @@ func initSchema() {
 		globalSchema.defaultBuiltInSchemaParseStatus = schemaParsed
 	}
 
-	if err := parse(kustomizationapi.MustAsset(kustomizationAPIAssetName), JsonOrYaml); err != nil {
+	if err := parse(builtinKustomizationOpenAPI); err != nil {
 		// this should never happen
 		panic(err)
 	}
 }
 
-// parseBuiltinSchema calls parse to parse the json or proto schemas
+// parseBuiltinSchema decodes and indexes the compiled built-in schema bundle.
 func parseBuiltinSchema(version string) {
 	if globalSchema.noUseBuiltInSchema {
 		// don't parse the built in schema
 		return
 	}
-	// parse the swagger, this should never fail
-	assetName := filepath.Join(
-		"kubernetesapi",
-		strings.ReplaceAll(version, ".", "_"),
-		"swagger.pb")
-
-	if err := parse(kubernetesapi.OpenAPIMustAsset[version](assetName), Proto); err != nil {
+	if !hasBuiltinOpenAPIVersion(version) {
+		panic(fmt.Errorf("the specified OpenAPI version is not built in"))
+	}
+	if err := parseBuiltinBundle(builtinKubernetesOpenAPIBundle); err != nil {
 		// this should never happen
 		panic(err)
 	}
 }
 
-// parse parses and indexes a single json or proto schema
-func parse(b []byte, format format) error {
-	var swagger spec.Swagger
-	switch {
-	case format == Proto:
-		doc := &openapi_v2.Document{}
-		// We parse protobuf and get an openapi_v2.Document here.
-		if err := proto.Unmarshal(b, doc); err != nil {
-			return fmt.Errorf("openapi proto unmarshalling failed: %w", err)
+// parseBuiltinBundle parses and indexes the compiled built-in schema bundle.
+func parseBuiltinBundle(data []byte) error {
+	bundle, err := decodeBuiltinBundle(data)
+	if err != nil {
+		return err
+	}
+
+	AddDefinitions(bundle.Definitions)
+	if globalSchema.namespaceabilityByResourceType == nil {
+		globalSchema.namespaceabilityByResourceType = make(map[yaml.TypeMeta]bool)
+	}
+	for _, resource := range bundle.Resources {
+		typeMeta := yaml.TypeMeta{APIVersion: resource.APIVersion, Kind: resource.Kind}
+		switch resource.Scope {
+		case builtinopenapi.ScopeUnknown:
+		case builtinopenapi.ScopeNamespaced:
+			globalSchema.namespaceabilityByResourceType[typeMeta] = true
+		case builtinopenapi.ScopeCluster:
+			globalSchema.namespaceabilityByResourceType[typeMeta] = false
 		}
-		// convert the openapi_v2.Document back to Swagger
-		_, err := swagger.FromGnostic(doc)
+	}
+	return nil
+}
+
+func decodeBuiltinBundle(data []byte) (*builtinopenapi.Bundle, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	var bundle builtinopenapi.Bundle
+	if err := decoder.Decode(&bundle); err != nil {
+		return nil, errors.Wrap(err)
+	}
+	// Reject a second JSON value or invalid trailing data in the artifact.
+	var trailing interface{}
+	if err := decoder.Decode(&trailing); err == nil {
+		return nil, fmt.Errorf("built-in OpenAPI bundle contains multiple JSON values")
+	} else if err != io.EOF {
+		return nil, errors.Wrap(err)
+	}
+	if err := bundle.Validate(); err != nil {
+		return nil, fmt.Errorf("validate built-in OpenAPI bundle: %w", err)
+	}
+	return &bundle, nil
+}
+
+// parse parses and indexes a single JSON or YAML OpenAPI schema.
+func parse(b []byte) error {
+	var swagger spec.Swagger
+	if len(b) > 0 && b[0] != byte('{') {
+		var err error
+		b, err = k8syaml.YAMLToJSON(b)
 		if err != nil {
 			return errors.Wrap(err)
 		}
-
-	case format == JsonOrYaml:
-		if len(b) > 0 && b[0] != byte('{') {
-			var err error
-			b, err = k8syaml.YAMLToJSON(b)
-			if err != nil {
-				return errors.Wrap(err)
-			}
-		}
-		if err := swagger.UnmarshalJSON(b); err != nil {
-			return errors.Wrap(err)
-		}
+	}
+	if err := swagger.UnmarshalJSON(b); err != nil {
+		return errors.Wrap(err)
 	}
 
 	AddDefinitions(swagger.Definitions)

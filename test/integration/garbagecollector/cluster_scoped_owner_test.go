@@ -67,7 +67,6 @@ func TestClusterScopedOwners(t *testing.T) {
 		})
 	}
 	ctx := setupWithServer(t, server, 5)
-	defer ctx.tearDown()
 
 	_, clientSet := ctx.gc, ctx.clientSet
 

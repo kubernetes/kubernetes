@@ -28,11 +28,11 @@ import (
 //
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackendApplyConfiguration struct {
-	// Specifies the name of the referenced service.
+	// serviceName specifies the name of the referenced service.
 	ServiceName *string `json:"serviceName,omitempty"`
-	// Specifies the port of the referenced service.
+	// servicePort specifies the port of the referenced service.
 	ServicePort *intstr.IntOrString `json:"servicePort,omitempty"`
-	// Resource is an ObjectRef to another Kubernetes resource in the namespace
+	// resource is an ObjectRef to another Kubernetes resource in the namespace
 	// of the Ingress object. If resource is specified, serviceName and servicePort
 	// must not be specified.
 	Resource *v1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`

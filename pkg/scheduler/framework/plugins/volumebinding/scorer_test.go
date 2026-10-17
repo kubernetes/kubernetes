@@ -57,7 +57,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					0,
+					100,
 				},
 				{
 					classResourceMap{
@@ -66,7 +66,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					30,
+					70,
 				},
 				{
 					classResourceMap{
@@ -84,7 +84,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					100,
+					0,
 				},
 			},
 		},
@@ -103,7 +103,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					0,
+					100,
 				},
 				{
 					classResourceMap{
@@ -116,7 +116,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					15,
+					85,
 				},
 				{
 					classResourceMap{
@@ -129,7 +129,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					30,
+					70,
 				},
 				{
 					classResourceMap{
@@ -142,7 +142,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					45,
+					55,
 				},
 				{
 					classResourceMap{
@@ -168,7 +168,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					75,
+					25,
 				},
 				{
 					classResourceMap{
@@ -181,7 +181,7 @@ func TestScore(t *testing.T) {
 							Capacity:  100,
 						},
 					},
-					100,
+					0,
 				},
 			},
 		},

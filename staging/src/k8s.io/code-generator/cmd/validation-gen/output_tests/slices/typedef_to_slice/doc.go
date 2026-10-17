@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
 
@@ -29,19 +29,27 @@ var localSchemeBuilder = testscheme.New()
 // Note: no validation here
 type UnvalidatedType []string
 
+// Note: no validation here
+type UnvalidatedPtrType []*string
+
 // +k8s:validateFalse="type ListType"
 // +k8s:eachVal=+k8s:validateFalse="type ListType[*]"
 type ListType []string
 
-// Note: no validation here
-type UnvalidatedPtrType []*string
-
-// +k8s:validateFalse="type StringType"
-type StringType string
+// +k8s:validateFalse="type ListPtrType"
+// +k8s:eachVal=+k8s:validateFalse="type ListPtrType[*]"
+type ListPtrType []*string
 
 // +k8s:validateFalse="type ListTypedefType"
 // +k8s:eachVal=+k8s:validateFalse="type ListTypedefType[*]"
 type ListTypedefType []StringType
+
+// +k8s:validateFalse="type ListPtrTypedefType"
+// +k8s:eachVal=+k8s:validateFalse="type ListPtrTypedefType[*]"
+type ListPtrTypedefType []*StringType
+
+// +k8s:validateFalse="type StringType"
+type StringType string
 
 // +k8s:validateFalse="type Struct"
 type Struct struct {
@@ -54,4 +62,16 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.ListTypedefField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
 	ListTypedefField ListTypedefType `json:"listTypedefField"`
+
+	UnvalidatedListField UnvalidatedType `json:"UnvalidatedListField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
+	ListPtrField ListPtrType `json:"listPtrField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrTypedefField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrTypedefField[*]"
+	ListPtrTypedefField ListPtrTypedefType `json:"listPtrTypedefField"`
+
+	UnvalidatedListPtrField UnvalidatedPtrType `json:"UnvalidatedListPtrField"`
 }

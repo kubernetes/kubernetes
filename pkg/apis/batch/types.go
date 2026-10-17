@@ -17,6 +17,7 @@ limitations under the License.
 package batch
 
 import (
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -320,6 +321,14 @@ type JobSpec struct {
 	// +optional
 	Completions *int32
 
+	// Specifies the duration in seconds relative to the startTime that the job
+	// may be continuously active before the system tries to terminate it; value
+	// must be positive integer. If a Job is suspended (at creation or through an
+	// update), this timer will effectively be stopped and reset when the Job is
+	// resumed again.
+	// +optional
+	ActiveDeadlineSeconds *int64
+
 	// Specifies the policy of handling failed pods. In particular, it allows to
 	// specify the set of actions and conditions which need to be
 	// satisfied to take the associated action.
@@ -339,14 +348,6 @@ type JobSpec struct {
 	//
 	// +optional
 	SuccessPolicy *SuccessPolicy
-
-	// Specifies the duration in seconds relative to the startTime that the job
-	// may be continuously active before the system tries to terminate it; value
-	// must be positive integer. If a Job is suspended (at creation or through an
-	// update), this timer will effectively be stopped and reset when the Job is
-	// resumed again.
-	// +optional
-	ActiveDeadlineSeconds *int64
 
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified.
@@ -469,6 +470,54 @@ type JobSpec struct {
 	// This field is immutable.
 	// +optional
 	ManagedBy *string
+
+	// scheduling defines the Workload-aware Scheduling configuration for this Job.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When omitted, the Job defaults to the basic scheduling policy, which behaves
+	// as standard pod-by-pod scheduling.
+	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// Once set, this field is immutable except for the policy.gang.minCount.
+	//
+	// +featureGate=WorkloadWithJob
+	// +optional
+	Scheduling *JobSchedulingConfiguration
+}
+
+// JobSchedulingConfiguration composes the reusable scheduling building blocks
+// from scheduling.k8s.io for use on a Job.
+type JobSchedulingConfiguration struct {
+	// SchedulingPolicy defines the scheduling policy for this Job.
+	// Exactly one of Basic or Gang must be set.
+	//
+	// +optional
+	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology)
+	// for the Job's pods.
+	//
+	// +optional
+	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+	// One of Single, All.
+	//
+	// +optional
+	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Job. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
 }
 
 // JobStatus represents the current state of a Job.
@@ -515,16 +564,6 @@ type JobStatus struct {
 	// +optional
 	Active int32
 
-	// The number of pods which are terminating (in phase Pending or Running
-	// and have a deletionTimestamp).
-	// +optional
-	Terminating *int32
-
-	// The number of active pods which have a Ready condition and are not
-	// terminating (without a deletionTimestamp).
-	// +optional
-	Ready *int32
-
 	// The number of pods which reached phase Succeeded.
 	// The value increases monotonically for a given spec. However, it may
 	// decrease in reaction to scale down of elastic indexed jobs.
@@ -535,6 +574,11 @@ type JobStatus struct {
 	// The value increases monotonically.
 	// +optional
 	Failed int32
+
+	// The number of pods which are terminating (in phase Pending or Running
+	// and have a deletionTimestamp).
+	// +optional
+	Terminating *int32
 
 	// completedIndexes holds the completed indexes when .spec.completionMode =
 	// "Indexed" in a text format. The indexes are represented as decimal integers
@@ -576,6 +620,11 @@ type JobStatus struct {
 	// The structure is empty for finished jobs.
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods
+
+	// The number of active pods which have a Ready condition and are not
+	// terminating (without a deletionTimestamp).
+	// +optional
+	Ready *int32
 }
 
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't

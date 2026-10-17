@@ -67,15 +67,16 @@ func (p *capacityTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *capacityTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (p *capacityTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	// Check preconditions.
 	if pattern.VolType != storageframework.DynamicPV {
-		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[storageframework.CapCapacity] {
-		e2eskipper.Skipf("Driver %s doesn't publish storage capacity -- skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %s doesn't publish storage capacity", dInfo.Name)
 	}
+	return ""
 }
 
 func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

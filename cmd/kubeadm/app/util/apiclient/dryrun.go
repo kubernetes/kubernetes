@@ -18,10 +18,12 @@ limitations under the License.
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/lithammer/dedent"
@@ -29,14 +31,22 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	fakerest "k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -57,9 +67,13 @@ import (
 //   - If the above fails try to GET or LIST the object from the fake client store, unless
 //     a user reactor was added with PrependReactor() or AppendReactor().
 type DryRun struct {
-	fakeClient    *fake.Clientset
-	client        clientset.Interface
-	dynamicClient dynamic.Interface
+	fake               *testing.Fake
+	fakeClient         clientset.Interface
+	client             clientset.Interface
+	dynamicClient      dynamic.Interface
+	serverVersion      *version.Info
+	listKinds          map[schema.GroupVersionResource]schema.GroupVersionKind
+	requestInfoFactory *request.RequestInfoFactory
 
 	writer      io.Writer
 	marshalFunc func(runtime.Object, schema.GroupVersion) ([]byte, error)
@@ -67,9 +81,25 @@ type DryRun struct {
 
 // NewDryRun creates a new DryRun object that only has a fake client.
 func NewDryRun() *DryRun {
-	d := &DryRun{}
-	d.fakeClient = fake.NewSimpleClientset()
+	d := &DryRun{
+		fake:          &testing.Fake{},
+		serverVersion: constants.CurrentKubernetesVersion.Info(),
+		listKinds:     map[schema.GroupVersionResource]schema.GroupVersionKind{},
+		requestInfoFactory: &request.RequestInfoFactory{
+			APIPrefixes:          sets.NewString("api", "apis"),
+			GrouplessAPIPrefixes: sets.NewString("api"),
+		},
+	}
+	d.addListKinds()
+	tracker := testing.NewObjectTracker(clientsetscheme.Scheme, clientsetscheme.Codecs.UniversalDecoder())
+	d.fake.AddReactor("*", "*", testing.ObjectReaction(tracker))
 	d.addReactors()
+	d.fakeClient = clientset.NewForConfigOrDie(&rest.Config{
+		Transport:          fakerest.CreateHTTPClient(d.roundTrip).Transport,
+		ContentType:        runtime.ContentTypeJSON,
+		AcceptContentTypes: runtime.ContentTypeJSON,
+		QPS:                -1,
+	})
 	return d
 }
 
@@ -126,16 +156,22 @@ func (d *DryRun) WithDefaultMarshalFunction() *DryRun {
 	return d
 }
 
+// WithServerVersion sets the version that the fake client serves at /version.
+func (d *DryRun) WithServerVersion(v *version.Info) *DryRun {
+	d.serverVersion = v
+	return d
+}
+
 // PrependReactor prepends a new reactor in the fake client ReactorChain at position 1.
 // Keeps position 0 for the log reactor:
 // [ log, r, ... rest of the chain, default fake client reactor ]
 func (d *DryRun) PrependReactor(r *testing.SimpleReactor) *DryRun {
-	log := d.fakeClient.Fake.ReactionChain[0]
-	chain := make([]testing.Reactor, len(d.fakeClient.Fake.ReactionChain)+1)
+	log := d.fake.ReactionChain[0]
+	chain := make([]testing.Reactor, len(d.fake.ReactionChain)+1)
 	chain[0] = log
 	chain[1] = r
-	copy(chain[2:], d.fakeClient.Fake.ReactionChain[1:])
-	d.fakeClient.Fake.ReactionChain = chain
+	copy(chain[2:], d.fake.ReactionChain[1:])
+	d.fake.ReactionChain = chain
 	return d
 }
 
@@ -143,10 +179,10 @@ func (d *DryRun) PrependReactor(r *testing.SimpleReactor) *DryRun {
 // Keeps position len-1 for the default fake client reactor.
 // [ log, rest of the chain... , r, default fake client reactor ]
 func (d *DryRun) AppendReactor(r *testing.SimpleReactor) *DryRun {
-	sz := len(d.fakeClient.Fake.ReactionChain)
-	def := d.fakeClient.Fake.ReactionChain[sz-1]
-	d.fakeClient.Fake.ReactionChain[sz-1] = r
-	d.fakeClient.Fake.ReactionChain = append(d.fakeClient.Fake.ReactionChain, def)
+	sz := len(d.fake.ReactionChain)
+	def := d.fake.ReactionChain[sz-1]
+	d.fake.ReactionChain[sz-1] = r
+	d.fake.ReactionChain = append(d.fake.ReactionChain, def)
 	return d
 }
 
@@ -163,6 +199,19 @@ func (d *DryRun) DynamicClient() dynamic.Interface {
 // FakeClient returns the fake client for this DryRun.
 func (d *DryRun) FakeClient() clientset.Interface {
 	return d.fakeClient
+}
+
+// addListKinds maps each resource to the kind the object tracker needs to build LIST results.
+func (d *DryRun) addListKinds() {
+	for gvk := range clientsetscheme.Scheme.AllKnownTypes() {
+		kind, ok := strings.CutSuffix(gvk.Kind, "List")
+		if !ok || kind == "" {
+			continue
+		}
+		gvk.Kind = kind
+		plural, _ := meta.UnsafeGuessKindToResource(gvk)
+		d.listKinds[plural] = gvk
+	}
 }
 
 // addRectors is by default called by NewDryRun after creating the fake client.
@@ -225,7 +274,7 @@ func (d *DryRun) addReactors() {
 			},
 		},
 	}
-	d.fakeClient.Fake.ReactionChain = append(reactors, d.fakeClient.Fake.ReactionChain...)
+	d.fake.ReactionChain = append(reactors, d.fake.ReactionChain...)
 }
 
 // handleGetAction tries to handle all GET actions with the dynamic client.
@@ -288,6 +337,39 @@ func (d *DryRun) decodeUnstructuredIntoAPIObject(action testing.Action, obj runt
 		return nil, err
 	}
 	return newObj, nil
+}
+
+// roundTrip answers clientset requests in-process by turning each one into the
+// client-go testing Action the typed fake clients produce and running the reactor chain.
+func (d *DryRun) roundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Path == "/version" {
+		data, err := json.Marshal(d.serverVersion)
+		if err != nil {
+			return errorResponse(req, err), nil
+		}
+		return jsonResponse(req, http.StatusOK, data), nil
+	}
+	action, err := actionFor(req, d.requestInfoFactory, d.listKinds)
+	if err != nil {
+		return errorResponse(req, err), nil
+	}
+	obj, err := d.fake.Invokes(action, nil)
+	if err != nil {
+		return errorResponse(req, err), nil
+	}
+	if list, ok := action.(testing.ListAction); ok && obj != nil {
+		if err := filterByLabels(obj, list.GetListRestrictions().Labels); err != nil {
+			return errorResponse(req, err), nil
+		}
+	}
+	if obj == nil {
+		obj = &metav1.Status{Status: metav1.StatusSuccess, Code: http.StatusOK}
+	}
+	data, err := runtime.Encode(clientsetscheme.Codecs.LegacyCodec(action.GetResource().GroupVersion()), obj)
+	if err != nil {
+		return errorResponse(req, err), nil
+	}
+	return jsonResponse(req, http.StatusOK, data), nil
 }
 
 // LogAction logs details about an action, such as name, object and resource.
@@ -804,5 +886,102 @@ func getDeploymentList() *appsv1.DeploymentList {
 				},
 			},
 		},
+	}
+}
+
+// actionFor maps a request to the testing Action the typed fake clients would have produced.
+func actionFor(req *http.Request, infoFactory *request.RequestInfoFactory, listKinds map[schema.GroupVersionResource]schema.GroupVersionKind) (testing.Action, error) {
+	info, err := infoFactory.NewRequestInfo(req)
+	if err != nil {
+		return nil, apierrors.NewBadRequest(err.Error())
+	}
+	if !info.IsResourceRequest {
+		return nil, apierrors.NewNotFound(schema.GroupResource{}, req.URL.Path)
+	}
+	gvr := schema.GroupVersionResource{Group: info.APIGroup, Version: info.APIVersion, Resource: info.Resource}
+
+	switch info.Verb {
+	case "get":
+		return testing.NewGetSubresourceAction(gvr, info.Namespace, info.Subresource, info.Name), nil
+	case "list":
+		// NewListActionWithOptions panics on malformed selectors; parse them first.
+		query := req.URL.Query()
+		opts := metav1.ListOptions{
+			LabelSelector: query.Get("labelSelector"),
+			FieldSelector: query.Get("fieldSelector"),
+		}
+		if _, err := labels.Parse(opts.LabelSelector); err != nil {
+			return nil, apierrors.NewBadRequest(err.Error())
+		}
+		if _, err := fields.ParseSelector(opts.FieldSelector); err != nil {
+			return nil, apierrors.NewBadRequest(err.Error())
+		}
+		return testing.NewListActionWithOptions(gvr, listKinds[gvr], info.Namespace, opts), nil
+	case "create", "update", "patch":
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(err.Error())
+		}
+		if info.Verb == "patch" {
+			patchType := types.PatchType(req.Header.Get("Content-Type"))
+			return testing.NewPatchSubresourceAction(gvr, info.Namespace, info.Name, patchType, body, info.Subresource), nil
+		}
+		obj, _, err := clientsetscheme.Codecs.UniversalDeserializer().Decode(body, nil, nil)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(err.Error())
+		}
+		if info.Verb == "create" {
+			return testing.NewCreateSubresourceAction(gvr, info.Name, info.Subresource, info.Namespace, obj), nil
+		}
+		return testing.NewUpdateSubresourceAction(gvr, info.Subresource, info.Namespace, obj), nil
+	case "delete":
+		return testing.NewDeleteSubresourceAction(gvr, info.Subresource, info.Namespace, info.Name), nil
+	}
+	// kubeadm never watches or deletes collections.
+	return nil, apierrors.NewMethodNotSupported(gvr.GroupResource(), info.Verb)
+}
+
+// filterByLabels drops the list items sel does not match, as the typed fake clients did.
+func filterByLabels(obj runtime.Object, sel labels.Selector) error {
+	if sel == nil || sel.Empty() {
+		return nil
+	}
+	items, err := meta.ExtractList(obj)
+	if err != nil {
+		return err
+	}
+	kept := items[:0]
+	for _, item := range items {
+		if m, err := meta.Accessor(item); err == nil && sel.Matches(labels.Set(m.GetLabels())) {
+			kept = append(kept, item)
+		}
+	}
+	return meta.SetList(obj, kept)
+}
+
+// errorResponse encodes err as a metav1.Status like the API server does, so that helpers
+// such as apierrors.IsNotFound keep working for callers of the dry-run client.
+func errorResponse(req *http.Request, err error) *http.Response {
+	var apiStatus apierrors.APIStatus
+	if !errors.As(err, &apiStatus) {
+		apiStatus = apierrors.NewInternalError(err)
+	}
+	status := apiStatus.Status()
+	if status.Code == 0 {
+		status.Code = http.StatusInternalServerError
+	}
+	data, err := runtime.Encode(clientsetscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), &status)
+	if err != nil {
+		return jsonResponse(req, http.StatusInternalServerError, []byte(err.Error()))
+	}
+	return jsonResponse(req, int(status.Code), data)
+}
+
+func jsonResponse(req *http.Request, code int, data []byte) *http.Response {
+	return &http.Response{
+		StatusCode: code,
+		Header:     http.Header{"Content-Type": []string{runtime.ContentTypeJSON}},
+		Body:       io.NopCloser(bytes.NewReader(data)),
+		Request:    req,
 	}
 }

@@ -78,7 +78,7 @@ type OpCode struct {
 // notion, pairing up elements that appear uniquely in each sequence.
 // That, and the method here, appear to yield more intuitive difference
 // reports than does diff.  This method appears to be the least vulnerable
-// to synching up on blocks of "junk lines", though (like blank lines in
+// to syncing up on blocks of "junk lines", though (like blank lines in
 // ordinary text files, or maybe "<P>" lines in HTML files).  That may be
 // because this is the only method of the 3 that has a *concept* of
 // "junk" <wink>.
@@ -567,7 +567,7 @@ type UnifiedDiff struct {
 func WriteUnifiedDiff(writer io.Writer, diff UnifiedDiff) error {
 	buf := bufio.NewWriter(writer)
 	defer buf.Flush()
-	wf := func(format string, args ...interface{}) error {
+	wf := func(format string, args ...any) error {
 		_, err := fmt.Fprintf(buf, format, args...)
 		return err
 	}

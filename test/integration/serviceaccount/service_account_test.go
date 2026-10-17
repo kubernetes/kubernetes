@@ -38,7 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -377,7 +376,14 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 
 				return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
 			})
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, authorizer)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+				unionauthz.NamedAuthorizer{AuthorizerName: "service-account-test", Authorizer: authorizer},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 
@@ -394,7 +400,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
-		klog.FromContext(ctx),
+		ctx,
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,
@@ -406,9 +412,8 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	go tokenController.Run(ctx, 1)
-	logger := klog.FromContext(ctx)
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
-		logger,
+		ctx,
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
 		rootClientset,

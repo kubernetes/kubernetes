@@ -31,6 +31,7 @@ type DefaultReporter struct {
 	specDenoter  string
 	retryDenoter string
 	formatter    formatter.Formatter
+	fdHierarchy  []string
 
 	runningInParallel bool
 	lock              *sync.Mutex
@@ -82,6 +83,8 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 		if report.SuiteConfig.ParallelTotal > 1 {
 			r.emit(r.f("- %d procs ", report.SuiteConfig.ParallelTotal))
 		}
+	} else if r.conf.FdOutput {
+		return
 	} else {
 		banner := r.f("Running Suite: %s - %s", report.SuiteDescription, report.SuitePath)
 		r.emitBlock(banner)
@@ -124,7 +127,7 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 
 func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	failures := report.SpecReports.WithState(types.SpecStateFailureStates)
-	if len(failures) > 0 {
+	if !r.conf.FdOutput && len(failures) > 0 {
 		r.emitBlock("\n")
 		if len(failures) > 1 {
 			r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
@@ -227,6 +230,10 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 		return
 	}
 
+	if r.conf.FdOutput {
+		r.didRunFd(report)
+		return
+	}
 	header := r.specDenoter
 	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
 		header = fmt.Sprintf("[%s]", report.LeafNodeType)
@@ -358,6 +365,51 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 	r.emitDelimiter(0)
 }
 
+func (r *DefaultReporter) didRunFd(report types.SpecReport) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if !report.LeafNodeType.Is(types.NodeTypeIt) {
+		return
+	}
+
+	hierarchy := report.ContainerHierarchyTexts
+
+	// blank line when top-level container changes
+	if len(r.fdHierarchy) > 0 &&
+		(len(hierarchy) == 0 || hierarchy[0] != r.fdHierarchy[0]) {
+		fmt.Fprintln(r.writer)
+	}
+
+	// emit newly-diverged container lines
+	divergeAt := 0
+	for divergeAt < len(r.fdHierarchy) && divergeAt < len(hierarchy) &&
+		r.fdHierarchy[divergeAt] == hierarchy[divergeAt] {
+		divergeAt++
+	}
+	for i := divergeAt; i < len(hierarchy); i++ {
+		fmt.Fprintf(r.writer, "%s%s\n", strings.Repeat("  ", i), hierarchy[i])
+	}
+
+	// leaf label
+	depth := len(hierarchy)
+	indent := strings.Repeat("  ", depth)
+	label := report.LeafNodeText
+
+	switch report.State {
+	case types.SpecStateFailed, types.SpecStatePanicked:
+		label = fmt.Sprintf("%s (FAILED)", label)
+	case types.SpecStatePending:
+		label = fmt.Sprintf("%s (PENDING)", label)
+	case types.SpecStateSkipped:
+		label = fmt.Sprintf("%s (SKIPPED)", label)
+	}
+
+	color := r.highlightColorForState(report.State)
+	fmt.Fprintf(r.writer, "%s%s\n", indent, r.f(color+"%s{{/}}", label))
+	r.fdHierarchy = hierarchy
+}
+
 func (r *DefaultReporter) highlightColorForState(state types.SpecState) string {
 	switch state {
 	case types.SpecStatePassed:
@@ -423,7 +475,7 @@ func (r *DefaultReporter) emitTimeline(indent uint, report types.SpecReport, tim
 		case types.ReportEntry:
 			r.emitReportEntry(indent, x)
 		case types.ProgressReport:
-			r.emitProgressReport(indent, false, isVeryVerbose, x)
+			r.emitProgressReport(indent, isVeryVerbose, false, x)
 		case types.SpecEvent:
 			if isVeryVerbose || !x.IsOnlyVisibleAtVeryVerbose() || r.conf.ShowNodeEvents {
 				r.emitSpecEvent(indent, x, isVeryVerbose)
@@ -533,6 +585,7 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 		indent -= 1
 	}
 
+	// Emit only top-level groups because github logging cannot handle nested groups correctly.
 	if r.conf.GithubOutput && emitGroup {
 		r.emitBlock(r.fi(indent, "::group::Progress Report"))
 	}

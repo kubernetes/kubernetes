@@ -37,7 +37,7 @@ func testGetMutatingWebhookConfig(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	manager := NewMutatingWebhookConfigurationManager(informerFactory).(*mutatingWebhookConfigurationManager)
+	manager := NewMutatingWebhookConfigurationManager(informerFactory, nil).(*mutatingWebhookConfigurationManager)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 
@@ -212,7 +212,7 @@ func TestGetMutatingWebhookConfigSmartReload(t *testing.T) {
 				informerFactory := informers.NewSharedInformerFactory(client, 0)
 				stop := make(chan struct{})
 				defer close(stop)
-				manager := NewMutatingWebhookConfigurationManager(informerFactory)
+				manager := NewMutatingWebhookConfigurationManager(informerFactory, nil)
 				managerStructPtr := manager.(*mutatingWebhookConfigurationManager)
 				fakeWebhookAccessorCreator := &mockCreateMutatingWebhookAccessor{}
 				managerStructPtr.createMutatingWebhookAccessor = fakeWebhookAccessorCreator.fn

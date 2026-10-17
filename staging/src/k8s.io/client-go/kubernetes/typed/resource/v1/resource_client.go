@@ -29,6 +29,7 @@ import (
 type ResourceV1Interface interface {
 	RESTClient() rest.Interface
 	DeviceClassesGetter
+	DeviceTaintRulesGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
@@ -41,6 +42,10 @@ type ResourceV1Client struct {
 
 func (c *ResourceV1Client) DeviceClasses() DeviceClassInterface {
 	return newDeviceClasses(c)
+}
+
+func (c *ResourceV1Client) DeviceTaintRules() DeviceTaintRuleInterface {
+	return newDeviceTaintRules(c)
 }
 
 func (c *ResourceV1Client) ResourceClaims(namespace string) ResourceClaimInterface {
@@ -99,7 +104,9 @@ func setConfigDefaults(config *rest.Config) {
 	gv := resourcev1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
+	}
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

@@ -35,11 +35,14 @@ import (
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/filesystem"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -103,13 +106,16 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 	}
 
 	var (
-		authorizers   []authorizer.Authorizer
+		authorizers   []union.NamedAuthorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
 
 	// Add SystemPrivilegedGroup as an authorizing group
 	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-	authorizers = append(authorizers, superuserAuthorizer)
+	authorizers = append(authorizers, union.NamedAuthorizer{
+		AuthorizerName: "system-privileged-group.authorizer.kubernetes.io",
+		Authorizer:     superuserAuthorizer,
+	})
 
 	for _, configuredAuthorizer := range authzConfig.Authorizers {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
@@ -118,32 +124,44 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if r.nodeAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type Node is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.nodeAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.nodeAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, r.nodeAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysAllowAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysAllowAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, alwaysAllowAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeAlwaysDeny):
 			alwaysDenyAuthorizer := authorizerfactory.NewAlwaysDenyAuthorizer()
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysDenyAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysDenyAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeABAC):
 			if r.abacAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type ABAC is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.abacAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.abacAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, r.abacAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeWebhook):
 			if r.initialConfig.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, r.initialConfig.CustomDial)
+			sarClientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, r.initialConfig.CustomDial)
 			if err != nil {
 				return nil, nil, err
 			}
 			if configuredAuthorizer.Webhook.Timeout.Duration != 0 {
-				clientConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
+				sarClientConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
 			}
 			var decisionOnError authorizer.Decision
 			switch configuredAuthorizer.Webhook.FailurePolicy {
@@ -162,7 +180,26 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if !configuredAuthorizer.Webhook.CacheUnauthorizedRequests {
 				unauthorizedTTL = 0
 			}
-			webhookAuthorizer, err := webhook.New(clientConfig,
+			var conditionsReviewConfig *rest.Config
+			var conditionsReviewVersion string
+			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+				if cr := configuredAuthorizer.Webhook.ConditionsReview; cr != nil {
+					conditionsReviewConfig, err = webhookutil.LoadKubeconfigWithContext(
+						*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile,
+						cr.KubeConfigContextName,
+						r.initialConfig.CustomDial,
+					)
+					if err != nil {
+						return nil, nil, fmt.Errorf("failed to load conditions review kubeconfig context %q: %w", cr.KubeConfigContextName, err)
+					}
+					conditionsReviewVersion = cr.Version
+					if configuredAuthorizer.Webhook.Timeout.Duration != 0 {
+						conditionsReviewConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
+					}
+				}
+			}
+
+			webhookAuthorizer, err := webhook.New(sarClientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				authorizedTTL,
 				unauthorizedTTL,
@@ -172,24 +209,36 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				configuredAuthorizer.Name,
 				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
 				r.compiler,
+				conditionsReviewConfig,
+				conditionsReviewVersion,
 			)
 			if err != nil {
 				return nil, nil, err
 			}
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, webhookAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, webhookAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeRBAC):
 			if r.rbacAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type RBAC is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.rbacAuthorizer))
+			authorizers = append(authorizers, union.NamedAuthorizer{
+				AuthorizerName: configuredAuthorizer.Name,
+				Authorizer:     authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.rbacAuthorizer),
+			})
 			ruleResolvers = append(ruleResolvers, r.rbacAuthorizer)
 		default:
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", configuredAuthorizer.Type)
 		}
 	}
 
-	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+	unioned, err := union.New(authorizers...)
+	if err != nil {
+		return nil, nil, err
+	}
+	return unioned, union.NewRuleResolvers(ruleResolvers...), nil
 }
 
 type kubeapiserverWebhookMetrics struct {

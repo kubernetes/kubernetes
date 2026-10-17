@@ -27,9 +27,9 @@ import (
 //
 // NodeAddress contains information for the node's address.
 type NodeAddressApplyConfiguration struct {
-	// Node address type, one of Hostname, ExternalIP or InternalIP.
+	// type is the node address type, one of Hostname, ExternalIP or InternalIP.
 	Type *corev1.NodeAddressType `json:"type,omitempty"`
-	// The node address.
+	// address is the node address.
 	Address *string `json:"address,omitempty"`
 }
 

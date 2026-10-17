@@ -216,23 +216,37 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+	// Keep the outcome of the last probe around: on timeout it is the only
+	// clue about what the server was still waiting for, and /healthz names
+	// the checks that did not pass in its body.
+	var lastStatus int
+	var lastBody []byte
+	var lastErr error
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+		res := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx)
 		status := 0
-		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
+		res.StatusCode(&status)
+		body, rerr := res.Raw()
+		// The probe that runs into the poll deadline is aborted mid-flight and
+		// carries no useful outcome; keep the last one that actually completed.
+		if ctx.Err() == nil {
+			lastStatus, lastBody, lastErr = status, body, rerr
 		}
-		return false, nil
+		return status == 200, nil
 	})
 	if err != nil {
-		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
+		// A probe that got a response leaves lastErr nil, which is the common
+		// case here, so only mention the error when there is one to report.
+		if lastErr != nil {
+			return result, fmt.Errorf("failed to wait for /healthz to return ok: %w (last status %d, last body %.512q, last error %w)", err, lastStatus, lastBody, lastErr)
+		}
+		return result, fmt.Errorf("failed to wait for /healthz to return ok: %w (last status %d, last body %.512q)", err, lastStatus, lastBody)
 	}
 
 	// from here the caller must call tearDown

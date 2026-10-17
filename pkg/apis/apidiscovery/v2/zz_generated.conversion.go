@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apidiscovery "k8s.io/kubernetes/pkg/apis/apidiscovery"
@@ -136,14 +135,7 @@ func Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in *
 }
 
 func autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *apidiscoveryv2.APIResourceDiscovery, out *apidiscovery.APIResourceDiscovery, s conversion.Scope) error {
-	out.Resource = in.Resource
-	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
-	out.Scope = apidiscovery.ResourceScope(in.Scope)
-	out.SingularResource = in.SingularResource
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
-	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
-	out.Subresources = *(*[]apidiscovery.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
+	*out = *(*apidiscovery.APIResourceDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -153,14 +145,7 @@ func Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *ap
 }
 
 func autoConvert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *apidiscovery.APIResourceDiscovery, out *apidiscoveryv2.APIResourceDiscovery, s conversion.Scope) error {
-	out.Resource = in.Resource
-	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
-	out.Scope = apidiscoveryv2.ResourceScope(in.Scope)
-	out.SingularResource = in.SingularResource
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
-	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
-	out.Subresources = *(*[]apidiscoveryv2.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
+	*out = *(*apidiscoveryv2.APIResourceDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -170,10 +155,7 @@ func Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *ap
 }
 
 func autoConvert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in *apidiscoveryv2.APISubresourceDiscovery, out *apidiscovery.APISubresourceDiscovery, s conversion.Scope) error {
-	out.Subresource = in.Subresource
-	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
-	out.AcceptedTypes = *(*[]v1.GroupVersionKind)(unsafe.Pointer(&in.AcceptedTypes))
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
+	*out = *(*apidiscovery.APISubresourceDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -183,10 +165,7 @@ func Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(
 }
 
 func autoConvert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in *apidiscovery.APISubresourceDiscovery, out *apidiscoveryv2.APISubresourceDiscovery, s conversion.Scope) error {
-	out.Subresource = in.Subresource
-	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
-	out.AcceptedTypes = *(*[]v1.GroupVersionKind)(unsafe.Pointer(&in.AcceptedTypes))
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
+	*out = *(*apidiscoveryv2.APISubresourceDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -196,9 +175,7 @@ func Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(
 }
 
 func autoConvert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *apidiscoveryv2.APIVersionDiscovery, out *apidiscovery.APIVersionDiscovery, s conversion.Scope) error {
-	out.Version = in.Version
-	out.Resources = *(*[]apidiscovery.APIResourceDiscovery)(unsafe.Pointer(&in.Resources))
-	out.Freshness = apidiscovery.DiscoveryFreshness(in.Freshness)
+	*out = *(*apidiscovery.APIVersionDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -208,9 +185,7 @@ func Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *apid
 }
 
 func autoConvert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in *apidiscovery.APIVersionDiscovery, out *apidiscoveryv2.APIVersionDiscovery, s conversion.Scope) error {
-	out.Version = in.Version
-	out.Resources = *(*[]apidiscoveryv2.APIResourceDiscovery)(unsafe.Pointer(&in.Resources))
-	out.Freshness = apidiscoveryv2.DiscoveryFreshness(in.Freshness)
+	*out = *(*apidiscoveryv2.APIVersionDiscovery)(unsafe.Pointer(in))
 	return nil
 }
 

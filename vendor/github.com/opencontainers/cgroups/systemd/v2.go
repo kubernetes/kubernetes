@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	cpuIdleSupportedVersion = 252
+	cpuIdleSupportedVersion   = 252
+	oomPolicySupportedVersion = 253
 )
 
 type UnifiedManager struct {
@@ -183,13 +184,8 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 				newProp("TasksMax", num))
 
 		case "memory.oom.group":
-			// Setting this to 1 is roughly equivalent to OOMPolicy=kill
-			// (as per systemd.service(5) and
-			// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html),
-			// but it's not clear what to do if it is unset or set
-			// to 0 in runc update, as there are two other possible
-			// values for OOMPolicy (continue/stop).
-			fallthrough
+			// This was set before the unit started, so no need to
+			// warn about it here.
 
 		default:
 			// Ignore the unknown resource here -- will still be
@@ -337,6 +333,29 @@ func (m *UnifiedManager) Apply(pid int) error {
 		newProp("DefaultDependencies", false))
 
 	properties = append(properties, c.SystemdProps...)
+
+	// OOMPolicy must be set at unit creation time, systemd does not allow
+	// changing it on a running scope for some reason despite the kernel allowing so
+	// so we do this here in Apply() instead of Set()
+	if c.Resources != nil {
+		if v, ok := c.Resources.Unified["memory.oom.group"]; ok {
+			if systemdVersion(m.dbus) >= oomPolicySupportedVersion {
+				value, err := strconv.ParseUint(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("unified resource %q value conversion error: %w", "memory.oom.group", err)
+				}
+
+				switch value {
+				case 0:
+					properties = append(properties, newProp("OOMPolicy", "continue"))
+				case 1:
+					properties = append(properties, newProp("OOMPolicy", "kill"))
+				default:
+					logrus.Debugf("don't know how to convert memory.oom.group=%d; skipping (will still be applied to cgroupfs)", value)
+				}
+			}
+		}
+	}
 
 	if err := startUnit(m.dbus, unitName, properties, pid == -1); err != nil {
 		return fmt.Errorf("unable to start unit %q (properties %+v): %w", unitName, properties, err)
@@ -495,6 +514,11 @@ func (m *UnifiedManager) GetAllPids() ([]int, error) {
 
 func (m *UnifiedManager) GetStats() (*cgroups.Stats, error) {
 	return m.fsMgr.GetStats()
+}
+
+// Stats returns cgroup statistics for the specified controllers.
+func (m *UnifiedManager) Stats(opts *cgroups.StatsOptions) (*cgroups.Stats, error) {
+	return m.fsMgr.Stats(opts)
 }
 
 func (m *UnifiedManager) Set(r *cgroups.Resources) error {

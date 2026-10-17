@@ -7,10 +7,16 @@ import (
 type NameGroup struct {
 	GroupName string
 	Join      bool
+	GroupID   cgroups.Controller
 }
 
 func (s *NameGroup) Name() string {
 	return s.GroupName
+}
+
+// ID returns the controller ID for named subsystem.
+func (s *NameGroup) ID() cgroups.Controller {
+	return s.GroupID
 }
 
 func (s *NameGroup) Apply(path string, _ *cgroups.Resources, pid int) error {

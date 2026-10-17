@@ -56,6 +56,7 @@ func TestBuildGenericConfig(t *testing.T) {
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
 		nil,
 		generatedopenapi.GetOpenAPIDefinitions,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Failed to build generic config: %v", err)

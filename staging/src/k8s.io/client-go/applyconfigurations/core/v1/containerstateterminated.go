@@ -27,19 +27,19 @@ import (
 //
 // ContainerStateTerminated is a terminated state of a container.
 type ContainerStateTerminatedApplyConfiguration struct {
-	// Exit status from the last termination of the container
+	// exitCode is the exit status from the last termination of the container
 	ExitCode *int32 `json:"exitCode,omitempty"`
-	// Signal from the last termination of the container
+	// signal from the last termination of the container
 	Signal *int32 `json:"signal,omitempty"`
-	// (brief) reason from the last termination of the container
+	// reason from the last termination of the container
 	Reason *string `json:"reason,omitempty"`
-	// Message regarding the last termination of the container
+	// message regarding the last termination of the container
 	Message *string `json:"message,omitempty"`
-	// Time at which previous execution of the container started
+	// startedAt is the time at which previous execution of the container started
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
-	// Time at which the container last terminated
+	// finishedAt is the time at which the container last terminated
 	FinishedAt *metav1.Time `json:"finishedAt,omitempty"`
-	// Container's ID in the format '<type>://<container_id>'
+	// containerID is the container's ID in the format '<type>://<container_id>'
 	ContainerID *string `json:"containerID,omitempty"`
 }
 

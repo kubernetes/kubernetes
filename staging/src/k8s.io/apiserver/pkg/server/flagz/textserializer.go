@@ -33,6 +33,7 @@ var (
 const headerFmt = `
 %s flagz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
+Note: This shows command-line flag values (or defaults if unset), not the effective runtime configuration. Values set via configuration files are not reflected here; where available, /configz reports the resolved configuration.
 `
 
 // flagzTextSerializer implements runtime.Serializer for text/plain output.

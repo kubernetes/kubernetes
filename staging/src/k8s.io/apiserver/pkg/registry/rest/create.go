@@ -127,18 +127,8 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 
 	strategy.PrepareForCreate(ctx, obj)
 
-	errs := strategy.Validate(ctx, obj)
-	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
-		errs = dv.ValidateDeclaratively(ctx, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(ctx, obj, nil))
-	}
-	if len(errs) > 0 {
-		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
-	}
-
-	// Custom validation (including name validation) passed
-	// Now run common validation on object meta
-	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata")); len(errs) > 0 {
+	errs := ValidateCreate(ctx, obj, strategy)
+	if len(errs) != 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 
@@ -149,6 +139,31 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	strategy.Canonicalize(obj)
 
 	return nil
+}
+
+// ValidateCreate performs common and strategy-specific validation for a create operation.
+func ValidateCreate(ctx context.Context, obj runtime.Object, strategy RESTCreateStrategy) field.ErrorList {
+	errs := strategy.Validate(ctx, obj)
+
+	if len(errs) == 0 {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %w", err)))
+		}
+
+		// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
+
+		// Custom validation (including name validation) passed
+		// Now run common validation on object meta
+		// Do this *after* custom validation so that specific error messages are shown whenever possible
+		errs = append(errs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata"))...)
+	}
+
+	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
+		errs = dv.ValidateDeclaratively(ctx, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(ctx, obj, nil))
+	}
+
+	return errs
 }
 
 // CheckGeneratedNameError checks whether an error that occurred creating a resource is due

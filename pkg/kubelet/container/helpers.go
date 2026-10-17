@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -79,6 +80,9 @@ type RuntimeHelper interface {
 	// OnPodSandboxReady callback is invoked after pod sandbox, networking, volume are ready.
 	// This is used to update the PodReadyToStartContainers condition.
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
+
+	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -482,6 +486,7 @@ func MakePortMappings(logger klog.Logger, container *v1.Container) (ports []Port
 
 // HasAnyRegularContainerStarted returns true if any regular container has
 // started, which indicates all init containers have been initialized.
+//
 // Deprecated: This function is not accurate when its pod sandbox is recreated.
 // Use HasAnyActiveRegularContainerStarted instead.
 func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {

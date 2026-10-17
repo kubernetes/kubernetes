@@ -617,6 +617,108 @@ var (
 		},
 	}
 	/*
+		Topology type 2 from dual xeon gold 6230; lscpu excerpt
+		Topology from https://www-lb.open-mpi.org/projects/hwloc/lstopo/images/2XeonSPv2+2kmem.v2.1.png.
+		CPU(s):              80
+		On-line CPU(s) list: 0-79
+		Thread(s) per core:  2
+		Core(s) per socket:  20
+		Socket(s):           2
+		NUMA node(s):        4
+		NUMA node0 CPU(s):   0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76
+		NUMA node1 CPU(s):   1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77
+		NUMA node2 CPU(s):   2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78
+		NUMA node3 CPU(s):   3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79
+	*/
+	topoDualSocketMultiNumaPerSocketHTType2 = &topology.CPUTopology{
+		NumCPUs:      80,
+		NumSockets:   2,
+		NumCores:     40,
+		NumNUMANodes: 4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+			7:  {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			9:  {CoreID: 9, SocketID: 1, NUMANodeID: 1},
+			10: {CoreID: 10, SocketID: 0, NUMANodeID: 2},
+			11: {CoreID: 11, SocketID: 1, NUMANodeID: 3},
+			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			13: {CoreID: 13, SocketID: 1, NUMANodeID: 1},
+			14: {CoreID: 14, SocketID: 0, NUMANodeID: 2},
+			15: {CoreID: 15, SocketID: 1, NUMANodeID: 3},
+			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			17: {CoreID: 17, SocketID: 1, NUMANodeID: 1},
+			18: {CoreID: 18, SocketID: 0, NUMANodeID: 2},
+			19: {CoreID: 19, SocketID: 1, NUMANodeID: 3},
+			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			21: {CoreID: 21, SocketID: 1, NUMANodeID: 1},
+			22: {CoreID: 22, SocketID: 0, NUMANodeID: 2},
+			23: {CoreID: 23, SocketID: 1, NUMANodeID: 3},
+			24: {CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			25: {CoreID: 25, SocketID: 1, NUMANodeID: 1},
+			26: {CoreID: 26, SocketID: 0, NUMANodeID: 2},
+			27: {CoreID: 27, SocketID: 1, NUMANodeID: 3},
+			28: {CoreID: 28, SocketID: 0, NUMANodeID: 0},
+			29: {CoreID: 29, SocketID: 1, NUMANodeID: 1},
+			30: {CoreID: 30, SocketID: 0, NUMANodeID: 2},
+			31: {CoreID: 31, SocketID: 1, NUMANodeID: 3},
+			32: {CoreID: 32, SocketID: 0, NUMANodeID: 0},
+			33: {CoreID: 33, SocketID: 1, NUMANodeID: 1},
+			34: {CoreID: 34, SocketID: 0, NUMANodeID: 2},
+			35: {CoreID: 35, SocketID: 1, NUMANodeID: 3},
+			36: {CoreID: 36, SocketID: 0, NUMANodeID: 0},
+			37: {CoreID: 37, SocketID: 1, NUMANodeID: 1},
+			38: {CoreID: 38, SocketID: 0, NUMANodeID: 2},
+			39: {CoreID: 39, SocketID: 1, NUMANodeID: 3},
+			40: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			41: {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			42: {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+			43: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+			44: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			45: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			46: {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+			47: {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+			48: {CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			49: {CoreID: 9, SocketID: 1, NUMANodeID: 1},
+			50: {CoreID: 10, SocketID: 0, NUMANodeID: 2},
+			51: {CoreID: 11, SocketID: 1, NUMANodeID: 3},
+			52: {CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			53: {CoreID: 13, SocketID: 1, NUMANodeID: 1},
+			54: {CoreID: 14, SocketID: 0, NUMANodeID: 2},
+			55: {CoreID: 15, SocketID: 1, NUMANodeID: 3},
+			56: {CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			57: {CoreID: 17, SocketID: 1, NUMANodeID: 1},
+			58: {CoreID: 18, SocketID: 0, NUMANodeID: 2},
+			59: {CoreID: 19, SocketID: 1, NUMANodeID: 3},
+			60: {CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			61: {CoreID: 21, SocketID: 1, NUMANodeID: 1},
+			62: {CoreID: 22, SocketID: 0, NUMANodeID: 2},
+			63: {CoreID: 23, SocketID: 1, NUMANodeID: 3},
+			64: {CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			65: {CoreID: 25, SocketID: 1, NUMANodeID: 1},
+			66: {CoreID: 26, SocketID: 0, NUMANodeID: 2},
+			67: {CoreID: 27, SocketID: 1, NUMANodeID: 3},
+			68: {CoreID: 28, SocketID: 0, NUMANodeID: 0},
+			69: {CoreID: 29, SocketID: 1, NUMANodeID: 1},
+			70: {CoreID: 30, SocketID: 0, NUMANodeID: 2},
+			71: {CoreID: 31, SocketID: 1, NUMANodeID: 3},
+			72: {CoreID: 32, SocketID: 0, NUMANodeID: 0},
+			73: {CoreID: 33, SocketID: 1, NUMANodeID: 1},
+			74: {CoreID: 34, SocketID: 0, NUMANodeID: 2},
+			75: {CoreID: 35, SocketID: 1, NUMANodeID: 3},
+			76: {CoreID: 36, SocketID: 0, NUMANodeID: 0},
+			77: {CoreID: 37, SocketID: 1, NUMANodeID: 1},
+			78: {CoreID: 38, SocketID: 0, NUMANodeID: 2},
+			79: {CoreID: 39, SocketID: 1, NUMANodeID: 3},
+		},
+	}
+	/*
 		FAKE Topology from dual xeon gold 6230
 		(see: topoDualSocketMultiNumaPerSocketHT).
 		We flip NUMA cells and Sockets to exercise the code.
@@ -2555,6 +2657,177 @@ var (
 			23: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 15, UncoreCacheID: 0},
 		},
 	}
+
+	/*
+		Topology from Intel Core i7-14700
+		CPU(s):                28
+		On-line CPU(s) list:   0-27
+		Thread(s) per core:    2/1
+		Core(s) per socket:    20
+		Socket(s):             1
+		NUMA node(s):          1
+	*/
+	topoSingleSocketSingleNumaPerSocketPCoreHTECoreST = &topology.CPUTopology{
+		NumCPUs:      28,
+		NumCores:     20,
+		NumNUMANodes: 1,
+		NumSockets:   1,
+		CPUDetails: topology.CPUDetails{
+			// P-Cores (HT)
+			0:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 0},
+			1:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 0},
+			2:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 4},
+			3:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 4},
+			4:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 8},
+			5:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 8},
+			6:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 12},
+			7:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 12},
+			8:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 16},
+			9:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 16},
+			10: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 20},
+			11: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 20},
+			12: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 24},
+			13: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 24},
+			14: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 28},
+			15: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 28},
+			// E-Cores (ST)
+			16: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 32},
+			17: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 33},
+			18: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 34},
+			19: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 35},
+			20: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 36},
+			21: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 37},
+			22: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 38},
+			23: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 39},
+			24: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 40},
+			25: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 41},
+			26: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 42},
+			27: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 43},
+		},
+	}
+
+	/*
+		Topology from AMD EPYC 9005
+		CPU(s):                96
+		On-line CPU(s) list:   0-95
+		Thread(s) per core:    2
+		Socket(s):             2
+		Core(s) per socket:    16/32
+		NUMA node(s):          4
+		NUMA node0 CPU(s):     0-7,48-55
+		NUMA node1 CPU(s):     8-15,56-63
+		NUMA node2 CPU(s):     16-31,64-79
+		NUMA node3 CPU(s):     32-47,80-95
+	*/
+	topoDualSocketMultiNumaPerSocketMixedChips = &topology.CPUTopology{
+		NumCPUs:      96,
+		NumCores:     48,
+		NumSockets:   2,
+		NumNUMANodes: 4,
+		CPUDetails: topology.CPUDetails{
+			// Socket0, NUMA node0: 8-Core Zen5 chip, 16 CPUs (SMT)
+			0:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 0},
+			1:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 1},
+			2:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 2},
+			3:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 3},
+			4:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 4},
+			5:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 5},
+			6:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 6},
+			7:  topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 7},
+			48: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 0},
+			49: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 1},
+			50: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 2},
+			51: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 3},
+			52: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 4},
+			53: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 5},
+			54: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 6},
+			55: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 7},
+			// Socket0, NUMA node1: 8-Core Zen5 chip, 16 CPUs (SMT)
+			8:  topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 8},
+			9:  topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 9},
+			10: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 10},
+			11: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 11},
+			12: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 12},
+			13: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 13},
+			14: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 14},
+			15: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 15},
+			56: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 8},
+			57: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 9},
+			58: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 10},
+			59: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 11},
+			60: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 12},
+			61: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 13},
+			62: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 14},
+			63: topology.CPUInfo{NUMANodeID: 1, SocketID: 0, CoreID: 15},
+			// Socket1, NUMA node2: 16-Core Zen5c chip, 32 CPUs (SMT)
+			16: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 16},
+			17: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 17},
+			18: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 18},
+			19: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 19},
+			20: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 20},
+			21: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 21},
+			22: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 22},
+			23: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 23},
+			24: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 24},
+			25: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 25},
+			26: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 26},
+			27: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 27},
+			28: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 28},
+			29: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 29},
+			30: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 30},
+			31: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 31},
+			64: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 16},
+			65: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 17},
+			66: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 18},
+			67: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 19},
+			68: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 20},
+			69: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 21},
+			70: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 22},
+			71: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 23},
+			72: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 24},
+			73: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 25},
+			74: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 26},
+			75: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 27},
+			76: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 28},
+			77: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 29},
+			78: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 30},
+			79: topology.CPUInfo{NUMANodeID: 2, SocketID: 1, CoreID: 31},
+			// Socket1, NUMA node3: 16-Core Zen5c chip, 32 CPUs (SMT)
+			32: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 32},
+			33: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 33},
+			34: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 34},
+			35: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 35},
+			36: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 36},
+			37: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 37},
+			38: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 38},
+			39: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 39},
+			40: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 40},
+			41: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 41},
+			42: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 42},
+			43: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 43},
+			44: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 44},
+			45: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 45},
+			46: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 46},
+			47: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 47},
+			80: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 32},
+			81: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 33},
+			82: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 34},
+			83: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 35},
+			84: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 36},
+			85: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 37},
+			86: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 38},
+			87: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 39},
+			88: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 40},
+			89: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 41},
+			90: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 42},
+			91: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 43},
+			92: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 44},
+			93: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 45},
+			94: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 46},
+			95: topology.CPUInfo{NUMANodeID: 3, SocketID: 1, CoreID: 47},
+		},
+	}
+
 	/*
 		Topology from 1P ARM Ampere Altra 128C; lscpu excerpt
 		CPU(s):                128

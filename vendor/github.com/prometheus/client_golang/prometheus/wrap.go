@@ -20,7 +20,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
-	"google.golang.org/protobuf/proto"
 )
 
 // WrapRegistererWith returns a Registerer wrapping the provided
@@ -212,8 +211,8 @@ func (m *wrappingMetric) Write(out *dto.Metric) error {
 	}
 	for ln, lv := range m.labels {
 		out.Label = append(out.Label, &dto.LabelPair{
-			Name:  proto.String(ln),
-			Value: proto.String(lv),
+			Name:  new(ln),
+			Value: new(lv),
 		})
 	}
 	sort.Sort(internal.LabelPairSorter(out.Label))
@@ -230,6 +229,7 @@ func wrapDesc(desc *Desc, prefix string, labels Labels) *Desc {
 			return &Desc{
 				fqName:          desc.fqName,
 				help:            desc.help,
+				unit:            desc.unit,
 				variableLabels:  desc.variableLabels,
 				constLabelPairs: desc.constLabelPairs,
 				err:             fmt.Errorf("attempted wrapping with already existing label name %q", ln),
@@ -238,8 +238,8 @@ func wrapDesc(desc *Desc, prefix string, labels Labels) *Desc {
 		constLabels[ln] = lv
 	}
 	// NewDesc will do remaining validations.
-	newDesc := V2.NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels)
-	// Propagate errors if there was any. This will override any errer
+	newDesc := V2.NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels, WithUnit(desc.unit))
+	// Propagate errors if there was any. This will override any error
 	// created by NewDesc above, i.e. earlier errors get precedence.
 	if desc.err != nil {
 		newDesc.err = desc.err

@@ -19,6 +19,7 @@ package json
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"slices"
 	"testing"
 
@@ -810,7 +811,7 @@ func BenchmarkStreamEncodeCollections(b *testing.B) {
 		kvs[c.String(0)] = c.Uint64()
 		kvs[c.String(0)] = c.String(0)
 	}
-	f := randfill.New().Funcs(disableFuzzFieldsV1, fuzzMap)
+	f := randfill.New().RandSource(rand.NewSource(12345)).Funcs(disableFuzzFieldsV1, fuzzMap)
 	carpList := &testapigroupv1.CarpList{}
 	carpList.Items = make([]testapigroupv1.Carp, 1000)
 	for i := range 1000 {

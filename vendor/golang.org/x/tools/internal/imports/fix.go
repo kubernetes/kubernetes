@@ -32,6 +32,7 @@ import (
 	"golang.org/x/tools/internal/event"
 	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/gopathwalk"
+	"golang.org/x/tools/internal/modindex"
 	"golang.org/x/tools/internal/stdlib"
 )
 
@@ -273,7 +274,6 @@ func (p *pass) loadPackageNames(ctx context.Context, imports []*ImportInfo) erro
 		}
 		unknown = append(unknown, imp.ImportPath)
 	}
-
 	names, err := p.source.LoadPackageNames(ctx, p.srcDir, unknown)
 	if err != nil {
 		return err
@@ -321,6 +321,7 @@ func (p *pass) importIdentifier(imp *ImportInfo) string {
 // load reads in everything necessary to run a pass, and reports whether the
 // file already has all the imports it needs. It fills in p.missingRefs with the
 // file's missing symbols, if any, or removes unused imports if not.
+// This is called 3(!) times: self, otherFiles, loadRealPackageNames
 func (p *pass) load(ctx context.Context) ([]*ImportFix, bool) {
 	p.knownPackages = map[string]*PackageInfo{}
 	p.missingRefs = References{}
@@ -460,6 +461,15 @@ func sortFixes(fixes []*ImportFix) {
 		}
 		return fi.FixType < fj.FixType
 	})
+}
+
+func hasDeleteFix(fixes []*ImportFix) bool {
+	for _, fix := range fixes {
+		if fix.FixType == DeleteImport {
+			return true
+		}
+	}
+	return false
 }
 
 // importSpecName gets the import name of imp in the import spec.
@@ -620,7 +630,7 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	// Now we can try adding imports from the stdlib.
 	p.assumeSiblingImportsValid()
 	addStdlibCandidates(p, p.missingRefs)
-	if fixes, done := p.fix(); done {
+	if fixes, done := p.fix(); done && !hasDeleteFix(fixes) {
 		return fixes, nil
 	}
 
@@ -636,6 +646,31 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	}
 	p.loadRealPackageNames = true
 	p.otherFiles = otherFiles
+
+	// If there is an Index for the GOMODCACHE, remember that, and later make it so that the
+	// directory walk doesn't go into the module cache, since we already have all the information.
+	var ix *modindex.Index
+	if src, ok := source.(*ProcessEnvSource); ok {
+		var err error
+		if ix, err = modindex.Read(src.env.Env["GOMODCACHE"]); err != nil {
+			ix = nil // don't use it if there was an error
+		}
+	}
+
+	if ix != nil {
+		src, ok := p.source.(*ProcessEnvSource)
+		if ok {
+			// For safety, clone the env so that we don't modify the caller's env.
+			env := *src.env
+			env.Env = maps.Clone(src.env.Env)
+			src.env = &env
+			// avoid looking in the module cache, as we have the index instead:
+			// This makes a later call to newModuleresolver (from
+			// LoadPackageNames) produce a resolver that will not look
+			// in the module cache
+			src.env.Env["GOMODCACHE"] = ""
+		}
+	}
 	if fixes, done := p.load(ctx); done {
 		return fixes, nil
 	}
@@ -650,7 +685,7 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 
 	// Go look for candidates in $GOPATH, etc. We don't necessarily load
 	// the real exports of sibling imports, so keep assuming their contents.
-	if err := addExternalCandidates(ctx, p, p.missingRefs, filename); err != nil {
+	if err := addExternalCandidates(ctx, p, p.missingRefs, filename, ix); err != nil {
 		return nil, err
 	}
 
@@ -1185,13 +1220,31 @@ type scanCallback struct {
 	exportsLoaded func(pkg *pkg, exports []stdlib.Symbol)
 }
 
-func addExternalCandidates(ctx context.Context, pass *pass, refs References, filename string) error {
+func addExternalCandidates(ctx context.Context, pass *pass, refs References, filename string, ix *modindex.Index) error {
 	ctx, done := event.Start(ctx, "imports.addExternalCandidates")
 	defer done()
 
 	results, err := pass.source.ResolveReferences(ctx, filename, refs)
 	if err != nil {
 		return err
+	}
+
+	// Add candidates from the module cache.
+	if ix != nil {
+		for k, v := range refs {
+			for n := range v {
+				cands := ix.Lookup(k, n, false)
+				for _, cand := range cands {
+					x := &Result{
+						&ImportInfo{ImportPath: cand.ImportPath},
+						&PackageInfo{Name: cand.PkgName,
+							Exports: map[string]bool{cand.Name: true},
+						},
+					}
+					results = append(results, x)
+				}
+			}
+		}
 	}
 
 	for _, result := range results {
@@ -1650,9 +1703,7 @@ func (s *symbolSearcher) search(ctx context.Context, candidates []pkgDistance, p
 	}()
 
 	// Start the search.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i, c := range candidates {
 			select {
 			case loadExportsSem <- struct{}{}:
@@ -1681,7 +1732,7 @@ func (s *symbolSearcher) search(ctx context.Context, candidates []pkgDistance, p
 				rescv[i] <- pkg // may be nil
 			}()
 		}
-	}()
+	})
 
 	// Await the first (best) result.
 	for _, resc := range rescv {

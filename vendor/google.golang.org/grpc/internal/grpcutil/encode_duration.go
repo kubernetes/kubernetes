@@ -39,7 +39,6 @@ func div(d, r time.Duration) int64 {
 //
 // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
 func EncodeDuration(t time.Duration) string {
-	// TODO: This is simplistic and not bandwidth efficient. Improve it.
 	if t <= 0 {
 		return "0n"
 	}

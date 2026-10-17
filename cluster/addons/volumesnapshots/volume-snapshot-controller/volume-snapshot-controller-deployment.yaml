@@ -27,3 +27,4 @@ spec:
             - "--v=5"
             - "--metrics-path=/metrics"
             - "--http-endpoint=:9102"
+            - "--feature-gates=CSIVolumeGroupSnapshot=true"

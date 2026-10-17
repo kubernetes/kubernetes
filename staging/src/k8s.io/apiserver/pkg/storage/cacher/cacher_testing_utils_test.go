@@ -23,11 +23,10 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/server/v3/embed"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -92,6 +91,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		codec,
 		newPod,
 		newPodList,
+		nil,
 		prefix,
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},
@@ -106,50 +106,36 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 	return server, storage
 }
 
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+func computePodKey(obj metav1.Object) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
-func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	cfg := testserver.NewTestConfig(t)
-	cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
-	server := &etcd3testing.EtcdTestServer{V3Client: testserver.RunEtcd(t, cfg)}
-	versioner := storage.APIObjectVersioner{}
+func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
+	config := storagetesting.StoreConfigForBenchmarks()
+	server := &etcd3testing.EtcdTestServer{V3Client: testserver.RunEtcd(t, func(cfg *embed.Config) {
+		cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
+	})}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
 	t.Cleanup(compactor.Stop)
 	s, err := etcd3.New(
 		server.V3Client,
 		compactor,
-		corev1ProtoCodec,
-		func() runtime.Object { return &corev1.Pod{} },
-		func() runtime.Object { return &corev1.PodList{} },
+		config.Codec,
+		config.NewFunc,
+		config.NewListFunc,
+		nil,
 		etcd3testing.PathPrefix(),
-		"/pods/",
-		schema.GroupResource{Resource: "pods"},
+		config.ResourcePrefix,
+		config.GroupResource,
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
-		etcd3.NewDefaultDecoder(corev1ProtoCodec, versioner),
-		versioner)
+		etcd3.NewDefaultDecoder(config.Codec, config.Versioner),
+		config.Versioner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
 	return server, s
-}
-
-func getCorev1PodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
-	}
-	fs := fields.Set{
-		"metadata.name":      pod.Name,
-		"metadata.namespace": pod.Namespace,
-		"spec.nodeName":      pod.Spec.NodeName,
-		"spec.restartPolicy": string(pod.Spec.RestartPolicy),
-		"status.phase":       string(pod.Status.Phase),
-	}
-	return labels.Set(pod.Labels), fs, nil
 }
 
 func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
@@ -161,7 +147,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		}
 
 		c.cacher.watchCache.RLock()
-		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), false, rv)
+		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), rv)
 		c.cacher.watchCache.RUnlock()
 		if err != nil {
 			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
@@ -175,7 +161,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
 		}
 
-		if len(c.cacher.watchers.allWatchers) > 0 || len(c.cacher.watchers.valueWatchers) > 0 {
+		if len(c.cacher.watchers.scopeWatchers) > 0 || len(c.cacher.watchers.indexWatchers) > 0 {
 			// We could consider terminating those watchers, but given
 			// watchcache doesn't really support compaction and we don't
 			// exercise it in tests, we just throw an error here.
@@ -190,7 +176,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 
 			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.storage.listResourceVersion = rv
+		c.cacher.watchCache.history.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}

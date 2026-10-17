@@ -21,9 +21,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -32,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
+
+var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
 func TestStatefulSetStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
@@ -349,6 +353,28 @@ func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	}
 }
 
+func makeValidStatefulSetWithUpdateStrategy(strategyType apps.StatefulSetUpdateStrategyType) *apps.StatefulSet {
+	validSelector := map[string]string{"a": "b"}
+	return &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: apps.StatefulSetSpec{
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: strategyType},
+			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: validSelector},
+				Spec: api.PodSpec{
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					TerminationGracePeriodSeconds: ptr.To[int64](30),
+				},
+			},
+		},
+		Status: apps.StatefulSetStatus{Replicas: 3},
+	}
+}
+
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
@@ -410,4 +436,155 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStatefulSetStrategy_RecreateStrategy_Validate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	cases := map[string]struct {
+		enableRecreateStrategyFG bool
+		set                      *apps.StatefulSet
+		wantErrs                 field.ErrorList
+	}{
+		"Validate create with Recreate strategy when feature gate is enabled": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+		},
+		"Validate create with Recreate strategy when feature gate is disabled": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, tc.enableRecreateStrategyFG)
+
+			Strategy.PrepareForCreate(ctx, tc.set)
+			if tc.set.Status.Replicas != 0 {
+				t.Error("StatefulSet should not allow setting status.replicas on create")
+			}
+			errs := Strategy.Validate(ctx, tc.set)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+
+}
+
+func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	cases := map[string]struct {
+		enableRecreateStrategyFG bool
+		set                      *apps.StatefulSet
+		update                   func(*apps.StatefulSet)
+		wantErrs                 field.ErrorList
+	}{
+		"Rolling to Recreate, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Rolling to Recreate, RecreateFG off - forbidden": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
+			},
+		},
+		"OnDelete to Recreate, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.OnDeleteStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"OnDelete to Recreate, RecreateFG off - forbidden": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.OnDeleteStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
+			},
+		},
+		"Recreate to Recreate, RecreateFG off - allowed": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Recreate to Recreate, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Recreate to RollingUpdate, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			},
+		},
+		"Recreate to RollingUpdate, RecreateFG off - allowed": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			},
+		},
+		"Recreate to OnDelete, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
+			},
+		},
+		"Recreate to OnDelete, RecreateFG off - allowed": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, tc.enableRecreateStrategyFG)
+
+			newSet := tc.set.DeepCopy()
+			tc.update(newSet)
+			Strategy.PrepareForUpdate(ctx, newSet, tc.set)
+			errs := Strategy.ValidateUpdate(ctx, newSet, tc.set)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+
 }

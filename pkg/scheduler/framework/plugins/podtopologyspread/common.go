@@ -143,7 +143,7 @@ func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels
 }
 
 func countPodsMatchSelector(podInfos []fwk.PodInfo, selector labels.Selector, ns string) int {
-	if selector.Empty() {
+	if labels.MatchesNothing(selector) {
 		return 0
 	}
 	count := 0

@@ -401,7 +401,7 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 	memberMatcher := regexp.MustCompile(EntryMemberPattern)
 	list := memberMatcher.ReplaceAllString(string(out[:]), "")
 	strs := strings.Split(list, "\n")
-	results := make([]string, 0)
+	results := make([]string, 0, len(strs))
 	for i := range strs {
 		if len(strs[i]) > 0 {
 			results = append(results, strs[i])

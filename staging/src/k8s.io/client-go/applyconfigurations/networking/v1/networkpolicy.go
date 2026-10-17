@@ -33,7 +33,7 @@ import (
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicyApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec represents the specification of the desired behavior for this NetworkPolicy.

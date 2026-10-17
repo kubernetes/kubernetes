@@ -59,15 +59,19 @@ func WithCorruptObjErrorHandlingTransformer(transformer value.Transformer) value
 	return &corruptObjErrorInterpretingTransformer{Transformer: transformer}
 }
 
+// maxCorruptObjErrsToAggregate caps the number of corrupt object errors
+// aggregated during a LIST operation.
+const maxCorruptObjErrsToAggregate = 100
+
 // corruptObjErrAggregatorFactory returns an error aggregator that aggregates
 // corrupt object error(s) that the list operation encounters while
 // retrieving objects from the storage.
 // maxCount: it is the maximum number of error that will be aggregated
-func corruptObjErrAggregatorFactory(maxCount int) func() ListErrorAggregator {
+func corruptObjErrAggregatorFactory(maxCount int) func() listItemErrors {
 	if maxCount <= 0 {
 		return defaultListErrorAggregatorFactory
 	}
-	return func() ListErrorAggregator {
+	return func() listItemErrors {
 		return &corruptObjErrAggregator{maxCount: maxCount}
 	}
 }
@@ -81,15 +85,19 @@ type corruptObjErrAggregator struct {
 	maxCount int
 }
 
-func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
-	if len(a.errs) >= a.maxCount {
-		// add a sentinel error to indicate there are more
-		a.errs = append(a.errs, errTooMany)
+func (a *corruptObjErrAggregator) Append(key string, err error) bool {
+	if a.abortErr != nil {
 		return true
 	}
+
 	var corruptObjErr *corruptObjectError
 	if errors.As(err, &corruptObjErr) {
 		a.errs = append(a.errs, storage.NewCorruptObjError(key, corruptObjErr))
+		if len(a.errs) >= a.maxCount {
+			// treat exceeding the limit as an abort condition
+			a.abortErr = errTooMany
+			return true
+		}
 		return false
 	}
 
@@ -98,13 +106,13 @@ func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
 	return true
 }
 
-func (a *corruptObjErrAggregator) Err() error {
+func (a *corruptObjErrAggregator) Aggregate() error {
 	switch {
 	case len(a.errs) == 0 && a.abortErr != nil:
 		return a.abortErr
 	case len(a.errs) > 0:
 		err := utilerrors.NewAggregate(a.errs)
-		return &aggregatedStorageError{errs: err, resourcePrefix: "list"}
+		return &aggregatedStorageError{errs: err, abortErr: a.abortErr, resourcePrefix: "list"}
 	default:
 		return nil
 	}
@@ -217,6 +225,9 @@ func (e *corruptObjectError) Error() string {
 type aggregatedStorageError struct {
 	resourcePrefix string
 	errs           utilerrors.Aggregate
+	// abortErr is the reason the aggregation stopped, if any.
+	// It is nil when all items were processed without hitting a limit or unexpected error.
+	abortErr error
 }
 
 func (e *aggregatedStorageError) Error() string {
@@ -227,14 +238,18 @@ func (e *aggregatedStorageError) Error() string {
 		fmt.Fprintf(&b, "\t%s\n", err.Error())
 	}
 	b.WriteString("}")
+	if e.abortErr != nil {
+		fmt.Fprintf(&b, ", aborted: %v", e.abortErr)
+	}
 	return b.String()
 }
 
 // NewAPIStatusError creates a new APIStatus object from the
 // aggregated list of StorageError
 func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.GroupResource) *apierrors.StatusError {
+	errs := e.errs.Errors()
 	var causes []metav1.StatusCause
-	for _, err := range e.errs.Errors() {
+	for _, err := range errs {
 		var storageErr *storage.StorageError
 		if errors.As(err, &storageErr) {
 			causes = append(causes, metav1.StatusCause{
@@ -243,14 +258,27 @@ func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.Grou
 				// TODO: do we need to expose the internal error message here?
 				Message: err.Error(),
 			})
-			continue
 		}
-		if errors.Is(err, errTooMany) {
-			causes = append(causes, metav1.StatusCause{
-				Type:    metav1.CauseTypeTooMany,
-				Message: errTooMany.Error(),
-			})
-		}
+	}
+	switch {
+	case errors.Is(e.abortErr, errTooMany):
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeTooMany,
+			Message: errTooMany.Error(),
+		})
+	case e.abortErr != nil:
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeUnexpectedServerResponse,
+			Message: e.abortErr.Error(),
+		})
+	}
+
+	// the top-level message carries the first underlying error so it survives
+	// layers that flatten the error to text and drop the causes, for example
+	// the watch cache wrapping the reflector list error.
+	message := fmt.Sprintf("failed to read one or more %s from the storage: %v", qualifiedResource.String(), errs[0])
+	if len(errs) > 1 {
+		message = fmt.Sprintf("%s (and %d more)", message, len(errs)-1)
 	}
 
 	return &apierrors.StatusError{
@@ -264,7 +292,7 @@ func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.Grou
 				Name:   e.resourcePrefix,
 				Causes: causes,
 			},
-			Message: fmt.Sprintf("failed to read one or more %s from the storage", qualifiedResource.String()),
+			Message: message,
 		},
 	}
 }

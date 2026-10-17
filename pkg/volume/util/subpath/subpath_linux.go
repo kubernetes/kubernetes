@@ -20,7 +20,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -117,9 +116,10 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 			return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
 		}
 		if !samePath {
-			// It's already mounted but not what we want, unmount it
-			if err = mounter.Unmount(bindPathTarget); err != nil {
-				return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
+			// Use lazy unmount so a hung FUSE/GlusterFS flush cannot block pod recovery.
+			klog.V(4).Infof("Subpath bind mount at %s points to a different inode/device than source, will lazy-unmount and recreate", bindPathTarget)
+			if err = lazyUnmountFn(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error lazy-unmounting stale subpath mount %s: %w", bindPathTarget, err)
 			}
 		} else {
 			// It's already mounted
@@ -150,11 +150,17 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		// A file is enough for all possible targets (symlink, device, pipe,
 		// socket, ...), bind-mounting them into a file correctly changes type
 		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+		if err = os.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
 			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
 		}
 	}
 	return false, bindPathTarget, nil
+}
+
+// lazyUnmountFn is a package-level variable so tests can replace it without
+// forking the binary.
+var lazyUnmountFn = func(path string) error {
+	return syscall.Unmount(path, syscall.MNT_DETACH)
 }
 
 func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error) {
@@ -245,7 +251,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
 	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
 
-	containerDirs, err := ioutil.ReadDir(subPathDir)
+	containerDirs, err := os.ReadDir(subPathDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

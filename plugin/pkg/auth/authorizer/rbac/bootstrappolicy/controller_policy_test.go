@@ -39,6 +39,13 @@ var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"horizontal-pod-autoscaler",
 	saRolePrefix+"clusterrole-aggregation-controller",
 	saRolePrefix+"disruption-controller",
+	saRolePrefix+"storage-version-migrator-controller",
+)
+
+// rolesWithAllowListWithoutWatch are the controller roles which are allowed to contain a
+// List verb without a Watch verb. If you're adding to this list tag sig-auth
+var rolesWithAllowListWithoutWatch = sets.NewString(
+	saRolePrefix + "storage-version-migrator-controller",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
@@ -101,25 +108,47 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 	roleName := saRolePrefix + "podgroup-protection-controller"
 
 	tests := []struct {
-		name              string
-		enableFeatureGate bool
-		expectRole        bool
+		name                    string
+		enableGenericWorkload   bool
+		enableCompositePodGroup bool
+		expectRole              bool
+		wantRules               []rbacv1.PolicyRule
 	}{
 		{
-			name:              "role and binding absent when GenericWorkload is disabled",
-			enableFeatureGate: false,
-			expectRole:        false,
+			name:                  "role and binding absent when GenericWorkload is disabled",
+			enableGenericWorkload: false,
+			expectRole:            false,
 		},
 		{
-			name:              "role and binding present when GenericWorkload is enabled",
-			enableFeatureGate: true,
-			expectRole:        true,
+			name:                    "role and binding present when GenericWorkload is enabled and CompositePodGroup is disabled",
+			enableGenericWorkload:   true,
+			enableCompositePodGroup: false,
+			expectRole:              true,
+			wantRules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
+				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+			},
+		},
+		{
+			name:                    "role and binding present with compositepodgroups when GenericWorkload and CompositePodGroup are enabled",
+			enableGenericWorkload:   true,
+			enableCompositePodGroup: true,
+			expectRole:              true,
+			wantRules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
+				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"compositepodgroups"}},
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enableFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 test.enableGenericWorkload,
+				features.TopologyAwareWorkloadScheduling: test.enableCompositePodGroup,
+				features.CompositePodGroup:               test.enableCompositePodGroup,
+			})
 
 			var foundRole *rbacv1.ClusterRole
 			for i, role := range ControllerRoles() {
@@ -140,12 +169,8 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 				t.Fatalf("role %q not found when GenericWorkload is enabled", roleName)
 			}
 
-			wantRules := []rbacv1.PolicyRule{
-				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
-				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
-			}
-			if !reflect.DeepEqual(foundRole.Rules, wantRules) {
-				t.Errorf("unexpected rules:\ngot:  %+v\nwant: %+v", foundRole.Rules, wantRules)
+			if !reflect.DeepEqual(foundRole.Rules, test.wantRules) {
+				t.Errorf("unexpected rules:\ngot:  %+v\nwant: %+v", foundRole.Rules, test.wantRules)
 			}
 
 			var foundBinding *rbacv1.ClusterRoleBinding
@@ -176,7 +201,7 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 	for _, role := range roles {
 		for _, rule := range role.Rules {
 			verbs := rule.Verbs
-			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") && !rolesWithAllowListWithoutWatch.Has(role.Name) {
 				t.Errorf("The ClusterRole %s has Verb `List` but does not have Verb `Watch`.", role.Name)
 			}
 		}

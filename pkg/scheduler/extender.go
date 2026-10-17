@@ -134,6 +134,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 }
 
 // ProcessPreemption returns filtered candidate nodes and victims after running preemption logic in extender.
+// nodeNameToVictims may contain placeholder nodes with an empty victim list; see Extender.ProcessPreemption.
 func (h *HTTPExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,

@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package observ // import "go.opentelemetry.io/otel/sdk/trace/internal/observ"
+package observ
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk"
 	"go.opentelemetry.io/otel/sdk/internal/x"
-	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
-	"go.opentelemetry.io/otel/semconv/v1.41.0/otelconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"go.opentelemetry.io/otel/semconv/v1.43.0/otelconv"
 )
 
 const (
@@ -47,6 +47,8 @@ type BSP struct {
 	processedQueueFullOpts []metric.AddOption
 }
 
+// NewBSP creates new instrumentation for a BatchSpanProcessor.
+// It returns nil if observability is not enabled.
 func NewBSP(id int64, qLen func() int64, qMax int64) (*BSP, error) {
 	if !x.Observability.Enabled() {
 		return nil, nil
@@ -108,12 +110,16 @@ func NewBSP(id int64, qLen func() int64, qMax int64) (*BSP, error) {
 	}, err
 }
 
+// Shutdown unregisters the callbacks registered by NewBSP.
 func (b *BSP) Shutdown() error { return b.reg.Unregister() }
 
+// Processed records n spans as having finished processing successfully.
 func (b *BSP) Processed(ctx context.Context, n int64) {
 	b.processed.Add(ctx, n, b.processedOpts...)
 }
 
+// ProcessedQueueFull records n spans as having finished processing with a
+// queue-full error.
 func (b *BSP) ProcessedQueueFull(ctx context.Context, n int64) {
 	b.processed.Add(ctx, n, b.processedQueueFullOpts...)
 }

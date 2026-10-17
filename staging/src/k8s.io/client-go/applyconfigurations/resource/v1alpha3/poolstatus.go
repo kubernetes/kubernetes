@@ -23,46 +23,59 @@ package v1alpha3
 //
 // PoolStatus contains status information for a single resource pool.
 type PoolStatusApplyConfiguration struct {
-	// Driver is the DRA driver name for this pool.
+	// driver is the DRA driver name for this pool.
 	// Must be a DNS subdomain (e.g., "gpu.example.com").
 	Driver *string `json:"driver,omitempty"`
-	// PoolName is the name of the pool.
+	// poolName is the name of the pool.
 	// Must be a valid resource pool name (DNS subdomains separated by "/").
 	PoolName *string `json:"poolName,omitempty"`
-	// Generation is the pool generation observed across all ResourceSlices
+	// generation is the pool generation observed across all ResourceSlices
 	// in this pool. Only the latest generation is reported. During a generation
 	// rollout, if not all slices at the latest generation have been published,
 	// the pool is included with a validationError and device counts unset.
 	Generation *int64 `json:"generation,omitempty"`
-	// ResourceSliceCount is the number of ResourceSlices that make up this pool.
+	// resourceSliceCount is the number of ResourceSlices that make up this pool.
 	// May be unset when validationError is set.
 	ResourceSliceCount *int32 `json:"resourceSliceCount,omitempty"`
-	// TotalDevices is the total number of devices in the pool across all slices.
+	// totalDevices is the total number of devices in the pool across all slices.
 	// A value of 0 means the pool has no devices.
 	// May be unset when validationError is set.
 	TotalDevices *int32 `json:"totalDevices,omitempty"`
-	// AllocatedDevices is the number of devices currently allocated to claims.
+	// allocatedDevices is the number of devices currently allocated to claims.
 	// A value of 0 means no devices are allocated.
 	// May be unset when validationError is set.
 	AllocatedDevices *int32 `json:"allocatedDevices,omitempty"`
-	// AvailableDevices is the number of devices available for allocation.
+	// availableDevices is the number of devices available for allocation.
 	// This equals TotalDevices - AllocatedDevices - UnavailableDevices.
 	// A value of 0 means no devices are currently available.
 	// May be unset when validationError is set.
 	AvailableDevices *int32 `json:"availableDevices,omitempty"`
-	// UnavailableDevices is the number of devices that are not available
+	// unavailableDevices is the number of devices that are not available
 	// due to taints or other conditions, but are not allocated.
 	// A value of 0 means all unallocated devices are available.
 	// May be unset when validationError is set.
 	UnavailableDevices *int32 `json:"unavailableDevices,omitempty"`
-	// NodeName is the node this pool is associated with.
+	// nodeName is the node this pool is associated with.
 	// When omitted, the pool is not associated with a specific node.
 	// Must be a valid DNS subdomain name (RFC1123).
 	NodeName *string `json:"nodeName,omitempty"`
-	// ValidationError is set when the pool's data could not be fully
+	// validationError is set when the pool's data could not be fully
 	// validated (e.g., incomplete slice publication). When set, device
 	// count fields and ResourceSliceCount may be unset.
 	ValidationError *string `json:"validationError,omitempty"`
+	// partitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool that publishes SharedCounters. Each entry names
+	// the grouping attribute it was resolved from: the PartitionTypeAttribute
+	// declared by a device's own slice, or for devices whose slice declares
+	// none, the default named in the request. A pool that mixes partitions
+	// declared under different attributes reports each independently. When no
+	// slice declares an attribute and the request names no default, the pool
+	// reports no partition summary.
+	PartitionSummary []PartitionTypeStatusApplyConfiguration `json:"partitionSummary,omitempty"`
+	// shareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations. It is populated only when at
+	// least one device in the pool is shareable.
+	ShareableSummary *ShareableSummaryStatusApplyConfiguration `json:"shareableSummary,omitempty"`
 }
 
 // PoolStatusApplyConfiguration constructs a declarative configuration of the PoolStatus type for use with
@@ -148,5 +161,26 @@ func (b *PoolStatusApplyConfiguration) WithNodeName(value string) *PoolStatusApp
 // If called multiple times, the ValidationError field is set to the value of the last call.
 func (b *PoolStatusApplyConfiguration) WithValidationError(value string) *PoolStatusApplyConfiguration {
 	b.ValidationError = &value
+	return b
+}
+
+// WithPartitionSummary adds the given value to the PartitionSummary field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the PartitionSummary field.
+func (b *PoolStatusApplyConfiguration) WithPartitionSummary(values ...*PartitionTypeStatusApplyConfiguration) *PoolStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithPartitionSummary")
+		}
+		b.PartitionSummary = append(b.PartitionSummary, *values[i])
+	}
+	return b
+}
+
+// WithShareableSummary sets the ShareableSummary field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ShareableSummary field is set to the value of the last call.
+func (b *PoolStatusApplyConfiguration) WithShareableSummary(value *ShareableSummaryStatusApplyConfiguration) *PoolStatusApplyConfiguration {
+	b.ShareableSummary = value
 	return b
 }

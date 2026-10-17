@@ -85,7 +85,8 @@ func (t *volumeModeTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo 
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumeModeTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -297,8 +298,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
-	f.It("should fail to use a volume in a pod with mismatched mode", f.WithSlow(), func(ctx context.Context) {
-		skipTestIfBlockNotSupported(driver)
+	failMismatched := func(ctx context.Context) {
 		init(ctx)
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
@@ -350,12 +350,12 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
-	})
+	}
+	if reason := checkIfBlockNotSupported(driver); reason == "" {
+		f.It("should fail to use a volume in a pod with mismatched mode", f.WithSlow(), failMismatched)
+	}
 
-	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func(ctx context.Context) {
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			skipTestIfBlockNotSupported(driver)
-		}
+	notMapUnused := func(ctx context.Context) {
 		init(ctx)
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
@@ -414,7 +414,10 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		for _, path := range devicePaths {
 			gomega.Expect(path).NotTo(gomega.ContainSubstring(safeVolumePlugin), fmt.Sprintf("no %s volume should be symlinked into pod directory", volumePlugin))
 		}
-	})
+	}
+	if reason := checkIfBlockNotSupported(driver); pattern.VolMode != v1.PersistentVolumeBlock || reason == "" {
+		ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", notMapUnused)
+	}
 }
 
 func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1.VolumeBindingMode,

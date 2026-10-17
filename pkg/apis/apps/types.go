@@ -90,6 +90,15 @@ const (
 	// When a scale operation is performed with this strategy, new Pods will be
 	// created from the specification version indicated by the StatefulSet's updateRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
+	// RecreateStatefulSetStrategyType indicates that all existing pods will be
+	// deleted and fully terminated before any new-revision pods are created.
+	// This ensures that old and new revision Pods never run at the same time.
+	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// Switching to the Recreate strategy is allowed when the feature gate is enabled,
+	// and switching away from it to a different update strategy is also allowed.
+	//
+	// +featureGate=StatefulSetRecreateStrategy
+	RecreateStatefulSetStrategyType StatefulSetUpdateStrategyType = "Recreate"
 )
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
@@ -101,7 +110,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	Partition int32
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Absolute number is calculated from percentage by rounding down. This can not be 0.
 	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
 	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
 	// will be counted towards MaxUnavailable.
@@ -293,6 +302,12 @@ type StatefulSetStatus struct {
 
 // StatefulSetConditionType describes the condition types of StatefulSets.
 type StatefulSetConditionType string
+
+const (
+	// StatefulSetProgressing means the StatefulSet is progressing through an update.
+	// This condition is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	StatefulSetProgressing StatefulSetConditionType = "Progressing"
+)
 
 // TODO: Add valid condition types for Statefulsets.
 
@@ -803,7 +818,8 @@ const (
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
+	//
+	// Deprecated: DefaultDaemonSetUniqueLabelKey is used instead.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 )
 

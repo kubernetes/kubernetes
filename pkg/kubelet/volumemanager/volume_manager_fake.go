@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -129,4 +130,9 @@ func (f *FakeVolumeManager) GetVolumesReportedInUse() []v1.UniqueVolumeName {
 		inuse = append(inuse, reportedVolume)
 	}
 	return inuse
+}
+
+// ResizeEphemeralVolume is not implemented
+func (f *FakeVolumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return nil
 }

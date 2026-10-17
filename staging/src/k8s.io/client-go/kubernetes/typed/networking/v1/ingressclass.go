@@ -41,6 +41,7 @@ type IngressClassInterface interface {
 	Create(ctx context.Context, ingressClass *networkingv1.IngressClass, opts metav1.CreateOptions) (*networkingv1.IngressClass, error)
 	Update(ctx context.Context, ingressClass *networkingv1.IngressClass, opts metav1.UpdateOptions) (*networkingv1.IngressClass, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkingv1.IngressClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*networkingv1.IngressClassList, error)

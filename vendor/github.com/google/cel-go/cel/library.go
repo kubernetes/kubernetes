@@ -590,7 +590,7 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 // ProgramOptions implements the Library interface method.
 func (lib *optionalLib) ProgramOptions() []ProgramOption {
 	return []ProgramOption{
-		CustomDecorator(decorateOptionalOr),
+		CustomDecoratorV2(decorateOptionalOr),
 	}
 }
 
@@ -683,7 +683,7 @@ func EnableErrorOnBadPresenceTest(value bool) EnvOption {
 	return features(featureEnableErrorOnBadPresenceTest, value)
 }
 
-func decorateOptionalOr(i interpreter.Interpretable) (interpreter.Interpretable, error) {
+func decorateOptionalOr(i interpreter.InterpretableV2) (interpreter.InterpretableV2, error) {
 	call, ok := i.(interpreter.InterpretableCall)
 	if !ok {
 		return i, nil
@@ -720,8 +720,8 @@ func decorateOptionalOr(i interpreter.Interpretable) (interpreter.Interpretable,
 // the second optional expression is evaluated and returned.
 type evalOptionalOr struct {
 	id  int64
-	lhs interpreter.Interpretable
-	rhs interpreter.Interpretable
+	lhs interpreter.InterpretableV2
+	rhs interpreter.InterpretableV2
 }
 
 // ID implements the Interpretable interface method.
@@ -729,27 +729,34 @@ func (opt *evalOptionalOr) ID() int64 {
 	return opt.id
 }
 
+func (opt *evalOptionalOr) Exec(frame *interpreter.ExecutionFrame) ref.Val {
+	// short-circuit lhs.
+	optLHS := opt.lhs.Exec(frame)
+	switch val := optLHS.(type) {
+	case *types.Err, *types.Unknown:
+		return optLHS
+	case *types.Optional:
+		if val.HasValue() {
+			return optLHS
+		}
+		return opt.rhs.Exec(frame)
+	default:
+		return types.NoSuchOverloadErr()
+	}
+}
+
 // Eval evaluates the left-hand side optional to determine whether it contains a value, else
 // proceeds with the right-hand side evaluation.
 func (opt *evalOptionalOr) Eval(ctx interpreter.Activation) ref.Val {
-	// short-circuit lhs.
-	optLHS := opt.lhs.Eval(ctx)
-	optVal, ok := optLHS.(*types.Optional)
-	if !ok {
-		return optLHS
-	}
-	if optVal.HasValue() {
-		return optVal
-	}
-	return opt.rhs.Eval(ctx)
+	return opt.Exec(interpreter.AsFrame(ctx))
 }
 
 // evalOptionalOrValue selects between an optional or a concrete value. If the optional has a value,
 // its value is returned, otherwise the alternative value expression is evaluated and returned.
 type evalOptionalOrValue struct {
 	id  int64
-	lhs interpreter.Interpretable
-	rhs interpreter.Interpretable
+	lhs interpreter.InterpretableV2
+	rhs interpreter.InterpretableV2
 }
 
 // ID implements the Interpretable interface method.
@@ -757,19 +764,27 @@ func (opt *evalOptionalOrValue) ID() int64 {
 	return opt.id
 }
 
+func (opt *evalOptionalOrValue) Exec(frame *interpreter.ExecutionFrame) ref.Val {
+	// short-circuit lhs.
+	optLHS := opt.lhs.Exec(frame)
+
+	switch val := optLHS.(type) {
+	case *types.Err, *types.Unknown:
+		return optLHS
+	case *types.Optional:
+		if val.HasValue() {
+			return val.GetValue()
+		}
+		return opt.rhs.Exec(frame)
+	default:
+		return types.NoSuchOverloadErr()
+	}
+}
+
 // Eval evaluates the left-hand side optional to determine whether it contains a value, else
 // proceeds with the right-hand side evaluation.
 func (opt *evalOptionalOrValue) Eval(ctx interpreter.Activation) ref.Val {
-	// short-circuit lhs.
-	optLHS := opt.lhs.Eval(ctx)
-	optVal, ok := optLHS.(*types.Optional)
-	if !ok {
-		return optLHS
-	}
-	if optVal.HasValue() {
-		return optVal.GetValue()
-	}
-	return opt.rhs.Eval(ctx)
+	return opt.Exec(interpreter.AsFrame(ctx))
 }
 
 type timeLegacyLibrary struct{}

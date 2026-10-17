@@ -47,6 +47,8 @@ import (
 func TestListAndWatch(t *testing.T) { synctest.Test(t, testListAndWatch) }
 func testListAndWatch(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cm1",
@@ -54,8 +56,6 @@ func testListAndWatch(t *testing.T) {
 		},
 	}
 	client := fake.NewClientset(cm)
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	createDone := make(chan struct{})
 
 	f := informers.NewSharedInformerFactory(client, 0)
@@ -85,19 +85,19 @@ func testListAndWatch(t *testing.T) {
 	})
 
 	var adds, updates, deletes int
-	handle, err := configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	handle, err := configMapInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(_ any) { adds++ },
 		UpdateFunc: func(_, _ any) { updates++ },
 		DeleteFunc: func(_ any) { deletes++ },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		t.Fatalf("Unexpected error adding event handler: %v", err)
 	}
 	defer configMapInformer.RemoveEventHandler(handle)
 
 	configMapStore := configMapInformer.GetStore()
-	f.Start(stopCh)
-	f.WaitForCacheSync(stopCh)
+	f.StartWithContext(ctx)
+	f.WaitForCacheSyncWithContext(ctx)
 	logger.Info("Caches synced")
 
 	objs := configMapStore.List()

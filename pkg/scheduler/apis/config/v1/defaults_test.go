@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/featuregate"
@@ -122,6 +124,10 @@ var pluginConfigs = []configv1.PluginConfig{
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
 			BindTimeoutSeconds: ptr.To[int64](600),
+			Shape: []configv1.UtilizationShapePoint{
+				{Utilization: 0, Score: 10},
+				{Utilization: 100, Score: 0},
+			},
 		}},
 	},
 }
@@ -345,6 +351,10 @@ func TestSchedulerDefaults(t *testing.T) {
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
 									BindTimeoutSeconds: ptr.To[int64](600),
+									Shape: []configv1.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								}},
 							},
 						},
@@ -356,8 +366,8 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []configv1.Plugin{
 									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
-									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
+									{Name: names.NodeUnschedulable},
 									{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 									{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 									{Name: names.NodePorts},
@@ -666,8 +676,8 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
-			name:     "default DynamicResources",
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			name:     "default TopologyAwareWorkloadScheduling",
+			features: map[featuregate.Feature]bool{features.GenericWorkload: true, features.TopologyAwareWorkloadScheduling: true},
 			config:   &configv1.KubeSchedulerConfiguration{},
 			expected: &configv1.KubeSchedulerConfiguration{
 				Parallelism: ptr.To[int32](16),
@@ -676,7 +686,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       ptr.To(true),
+					LeaderElect:       new(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -689,14 +699,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: ptr.To[int64](1),
-				PodMaxBackoffSeconds:     ptr.To[int64](10),
+				PercentageOfNodesToScore:      ptr.To[int32](config.DefaultPercentageOfNodesToScore),
+				PercentageOfPlacementsToScore: ptr.To[int32](config.DefaultPercentageOfPlacementsToScore),
+				PodInitialBackoffSeconds:      ptr.To[int64](1),
+				PodMaxBackoffSeconds:          ptr.To[int64](10),
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
-						SchedulerName: ptr.To("default-scheduler"),
+						SchedulerName: new("default-scheduler"),
 					},
 				},
 			},
@@ -706,6 +716,10 @@ func TestSchedulerDefaults(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
+			if len(tc.features) > 0 && len(tc.expected.Profiles) > 0 {
+				// Recompute plugin defaults after enabling feature gates for this test.
+				tc.expected.Profiles[0].Plugins = getDefaultPlugins()
+			}
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
@@ -918,5 +932,24 @@ func TestPluginArgsDefaults(t *testing.T) {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPluginsNames(t *testing.T) {
+	plugins := &configv1.Plugins{}
+	val := reflect.ValueOf(plugins).Elem()
+
+	want := sets.New[string]()
+	for i := 0; i < val.NumField(); i++ {
+		name := val.Type().Field(i).Name
+		val.Field(i).Set(reflect.ValueOf(configv1.PluginSet{
+			Enabled: []configv1.Plugin{{Name: name}},
+		}))
+		want.Insert(name)
+	}
+
+	gotNames := pluginsNames(plugins)
+	if diff := cmp.Diff(sets.List(want), gotNames); diff != "" {
+		t.Errorf("pluginsNames() doesn't contain all extension points (-want,+got):\n%s", diff)
 	}
 }

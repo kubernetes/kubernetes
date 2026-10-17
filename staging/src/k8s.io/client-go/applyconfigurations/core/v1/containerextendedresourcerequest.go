@@ -24,11 +24,11 @@ package v1
 // ContainerExtendedResourceRequest has the mapping of container name,
 // extended resource name to the device request name.
 type ContainerExtendedResourceRequestApplyConfiguration struct {
-	// The name of the container requesting resources.
+	// containerName is the name of the container requesting resources.
 	ContainerName *string `json:"containerName,omitempty"`
-	// The name of the extended resource in that container which gets backed by DRA.
+	// resourceName is the name of the extended resource in that container which gets backed by DRA.
 	ResourceName *string `json:"resourceName,omitempty"`
-	// The name of the request in the special ResourceClaim which corresponds to the extended resource.
+	// requestName is the name of the request in the special ResourceClaim which corresponds to the extended resource.
 	RequestName *string `json:"requestName,omitempty"`
 }
 

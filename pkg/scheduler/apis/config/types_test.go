@@ -17,9 +17,11 @@ limitations under the License.
 package config
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestPluginsNames(t *testing.T) {
@@ -59,5 +61,24 @@ func TestPluginsNames(t *testing.T) {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
 			}
 		})
+	}
+}
+
+func TestPluginsNamesAllExtensionPoints(t *testing.T) {
+	plugins := &Plugins{}
+	val := reflect.ValueOf(plugins).Elem()
+
+	want := sets.New[string]()
+	for i := 0; i < val.NumField(); i++ {
+		name := val.Type().Field(i).Name
+		val.Field(i).Set(reflect.ValueOf(PluginSet{
+			Enabled: []Plugin{{Name: name}},
+		}))
+		want.Insert(name)
+	}
+
+	gotNames := plugins.Names()
+	if diff := cmp.Diff(sets.List(want), gotNames); diff != "" {
+		t.Errorf("plugins.Names() doesn't contain all extension points (-want,+got):\n%s", diff)
 	}
 }

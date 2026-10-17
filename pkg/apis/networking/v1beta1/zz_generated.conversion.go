@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -410,7 +409,7 @@ func Convert_networking_IPAddressList_To_v1beta1_IPAddressList(in *networking.IP
 }
 
 func autoConvert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(in *networkingv1beta1.IPAddressSpec, out *networking.IPAddressSpec, s conversion.Scope) error {
-	out.ParentRef = (*networking.ParentReference)(unsafe.Pointer(in.ParentRef))
+	*out = *(*networking.IPAddressSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -420,7 +419,7 @@ func Convert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(in *networkingv1b
 }
 
 func autoConvert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(in *networking.IPAddressSpec, out *networkingv1beta1.IPAddressSpec, s conversion.Scope) error {
-	out.ParentRef = (*networkingv1beta1.ParentReference)(unsafe.Pointer(in.ParentRef))
+	*out = *(*networkingv1beta1.IPAddressSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -523,11 +522,7 @@ func Convert_networking_IngressClassList_To_v1beta1_IngressClassList(in *network
 }
 
 func autoConvert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *networkingv1beta1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
-	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.Scope = (*string)(unsafe.Pointer(in.Scope))
-	out.Namespace = (*string)(unsafe.Pointer(in.Namespace))
+	*out = *(*networking.IngressClassParametersReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -537,11 +532,7 @@ func Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassP
 }
 
 func autoConvert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *networkingv1beta1.IngressClassParametersReference, s conversion.Scope) error {
-	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.Scope = (*string)(unsafe.Pointer(in.Scope))
-	out.Namespace = (*string)(unsafe.Pointer(in.Namespace))
+	*out = *(*networkingv1beta1.IngressClassParametersReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -551,8 +542,7 @@ func Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassP
 }
 
 func autoConvert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *networkingv1beta1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
-	out.Controller = in.Controller
-	out.Parameters = (*networking.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
+	*out = *(*networking.IngressClassSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -562,8 +552,7 @@ func Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *network
 }
 
 func autoConvert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in *networking.IngressClassSpec, out *networkingv1beta1.IngressClassSpec, s conversion.Scope) error {
-	out.Controller = in.Controller
-	out.Parameters = (*networkingv1beta1.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
+	*out = *(*networkingv1beta1.IngressClassSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -615,9 +604,7 @@ func Convert_networking_IngressList_To_v1beta1_IngressList(in *networking.Ingres
 }
 
 func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *networkingv1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
-	out.IP = in.IP
-	out.Hostname = in.Hostname
-	out.Ports = *(*[]networking.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	*out = *(*networking.IngressLoadBalancerIngress)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -627,9 +614,7 @@ func Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalance
 }
 
 func autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *networkingv1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
-	out.IP = in.IP
-	out.Hostname = in.Hostname
-	out.Ports = *(*[]networkingv1beta1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	*out = *(*networkingv1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -639,7 +624,7 @@ func Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalance
 }
 
 func autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *networkingv1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]networking.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+	*out = *(*networking.IngressLoadBalancerStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -649,7 +634,7 @@ func Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancer
 }
 
 func autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *networkingv1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]networkingv1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+	*out = *(*networkingv1beta1.IngressLoadBalancerStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -659,9 +644,7 @@ func Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancer
 }
 
 func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *networkingv1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
-	out.Port = in.Port
-	out.Protocol = core.Protocol(in.Protocol)
-	out.Error = (*string)(unsafe.Pointer(in.Error))
+	*out = *(*networking.IngressPortStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -671,9 +654,7 @@ func Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *netwo
 }
 
 func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *networkingv1beta1.IngressPortStatus, s conversion.Scope) error {
-	out.Port = in.Port
-	out.Protocol = v1.Protocol(in.Protocol)
-	out.Error = (*string)(unsafe.Pointer(in.Error))
+	*out = *(*networkingv1beta1.IngressPortStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -781,9 +762,7 @@ func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.In
 }
 
 func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *networkingv1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
-	if err := Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
-		return err
-	}
+	*out = *(*networking.IngressStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -793,9 +772,7 @@ func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *networkingv1b
 }
 
 func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *networkingv1beta1.IngressStatus, s conversion.Scope) error {
-	if err := Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
-		return err
-	}
+	*out = *(*networkingv1beta1.IngressStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -805,8 +782,7 @@ func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.In
 }
 
 func autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in *networkingv1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
-	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
-	out.SecretName = in.SecretName
+	*out = *(*networking.IngressTLS)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -816,8 +792,7 @@ func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *networkingv1beta1.I
 }
 
 func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *networkingv1beta1.IngressTLS, s conversion.Scope) error {
-	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
-	out.SecretName = in.SecretName
+	*out = *(*networkingv1beta1.IngressTLS)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -827,10 +802,7 @@ func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressT
 }
 
 func autoConvert_v1beta1_ParentReference_To_networking_ParentReference(in *networkingv1beta1.ParentReference, out *networking.ParentReference, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.Name = in.Name
+	*out = *(*networking.ParentReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -840,10 +812,7 @@ func Convert_v1beta1_ParentReference_To_networking_ParentReference(in *networkin
 }
 
 func autoConvert_networking_ParentReference_To_v1beta1_ParentReference(in *networking.ParentReference, out *networkingv1beta1.ParentReference, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.Name = in.Name
+	*out = *(*networkingv1beta1.ParentReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -907,7 +876,7 @@ func Convert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList(in *networkin
 }
 
 func autoConvert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *networkingv1beta1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
-	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	*out = *(*networking.ServiceCIDRSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -917,7 +886,7 @@ func Convert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *networkin
 }
 
 func autoConvert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *networkingv1beta1.ServiceCIDRSpec, s conversion.Scope) error {
-	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	*out = *(*networkingv1beta1.ServiceCIDRSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -927,7 +896,7 @@ func Convert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(in *networkin
 }
 
 func autoConvert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *networkingv1beta1.ServiceCIDRStatus, out *networking.ServiceCIDRStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*networking.ServiceCIDRStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -937,7 +906,7 @@ func Convert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *netwo
 }
 
 func autoConvert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(in *networking.ServiceCIDRStatus, out *networkingv1beta1.ServiceCIDRStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*networkingv1beta1.ServiceCIDRStatus)(unsafe.Pointer(in))
 	return nil
 }
 

@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -46,6 +48,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
 	metricsfeatures "k8s.io/component-base/metrics/features"
@@ -121,13 +124,18 @@ func BuildGenericConfig(
 	schemes []*runtime.Scheme,
 	resourceConfig *serverstorage.ResourceConfig,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
+	informerName *cache.InformerName,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
-	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	codecs := legacyscheme.Codecs
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		codecs = serializer.NewCodecFactory(legacyscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+	genericConfig = genericapiserver.NewConfig(codecs)
 	genericConfig.Flagz = s.Flagz
 	genericConfig.MergedResourceConfig = resourceConfig
 
@@ -160,7 +168,12 @@ func BuildGenericConfig(
 		}
 		return obj, nil
 	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
+	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
+		clientgoExternalClient,
+		10*time.Minute,
+		clientgoinformers.WithTransform(trim),
+		clientgoinformers.WithInformerName(informerName),
+	)
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return

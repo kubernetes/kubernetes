@@ -40,8 +40,11 @@ package log
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 
 	"github.com/sirupsen/logrus"
+	lslog "github.com/sirupsen/logrus/hooks/slog"
 )
 
 // G is a shorthand for [GetLogger].
@@ -108,10 +111,17 @@ const (
 	PanicLevel Level = logrus.PanicLevel
 )
 
-// SetLevel sets log level globally. It returns an error if the given
-// level is not supported.
+// levelValue is a log level accepted by [SetLevel].
+type levelValue interface {
+	string | Level | slog.Level | lslog.Level | lslog.SlogLevel
+}
+
+// SetLevel sets the global log level.
 //
-// level can be one of:
+// The level may be specified as a string, a [Level], a [slog.Level], an
+// [lslog.Level], or an [lslog.SlogLevel].
+//
+// String levels are parsed using [logrus.ParseLevel] and may be one of:
 //
 //   - "trace" ([TraceLevel])
 //   - "debug" ([DebugLevel])
@@ -120,10 +130,34 @@ const (
 //   - "error" ([ErrorLevel])
 //   - "fatal" ([FatalLevel])
 //   - "panic" ([PanicLevel])
-func SetLevel(level string) error {
-	lvl, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+//
+// slog levels are mapped to Logrus levels using the mapping defined by
+// [lslog.SlogLevel]. [lslog.Level] values are accepted directly as their
+// underlying Logrus level.
+//
+// SetLevel returns an error if a string level is not supported.
+func SetLevel[T levelValue](level T) error {
+	var lvl Level
+
+	switch l := any(level).(type) {
+	case string:
+		var err error
+		lvl, err = logrus.ParseLevel(l)
+		if err != nil {
+			return err
+		}
+
+	case Level:
+		lvl = l
+
+	case slog.Level:
+		lvl = lslog.SlogLevel(l).Level()
+
+	case lslog.Level:
+		lvl = Level(l)
+
+	case lslog.SlogLevel:
+		lvl = l.Level()
 	}
 
 	L.Logger.SetLevel(lvl)
@@ -149,21 +183,39 @@ const (
 
 // SetFormat sets the log output format ([TextFormat] or [JSONFormat]).
 func SetFormat(format OutputFormat) error {
+	if slogOut != nil {
+		var handler slog.Handler
+		switch format {
+		case TextFormat:
+			handler = slog.NewTextHandler(slogOut, &slog.HandlerOptions{Level: loggerLevel{}})
+		case JSONFormat:
+			handler = slog.NewJSONHandler(slogOut, &slog.HandlerOptions{Level: loggerLevel{}})
+		default:
+			return fmt.Errorf("unknown log format: %s", format)
+		}
+		slog.SetDefault(slog.New(handler))
+
+		// Keep logrus formatting and output disabled, as both are handled by slog.
+		L.Logger.SetFormatter(discardFormatter{})
+		L.Logger.SetOutput(io.Discard)
+		return nil
+	}
+
 	switch format {
 	case TextFormat:
 		L.Logger.SetFormatter(&logrus.TextFormatter{
 			TimestampFormat: RFC3339NanoFixed,
 			FullTimestamp:   true,
 		})
-		return nil
 	case JSONFormat:
 		L.Logger.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: RFC3339NanoFixed,
 		})
-		return nil
 	default:
 		return fmt.Errorf("unknown log format: %s", format)
 	}
+
+	return nil
 }
 
 // WithLogger returns a new context with the provided logger. Use in

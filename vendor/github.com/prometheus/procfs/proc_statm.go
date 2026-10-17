@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // - https://man7.org/linux/man-pages/man5/proc_pid_statm.5.html
@@ -45,6 +45,7 @@ type ProcStatm struct {
 }
 
 // NewStatm returns the current status information of the process.
+//
 // Deprecated: Use p.Statm() instead.
 func (p Proc) NewStatm() (ProcStatm, error) {
 	return p.Statm()
@@ -52,7 +53,7 @@ func (p Proc) NewStatm() (ProcStatm, error) {
 
 // Statm returns the current memory usage information of the process.
 func (p Proc) Statm() (ProcStatm, error) {
-	data, err := util.ReadFileNoStat(p.path("statm"))
+	data, err := parsers.ReadFileNoStat(p.path("statm"))
 	if err != nil {
 		return ProcStatm{}, err
 	}

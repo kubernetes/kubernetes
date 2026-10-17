@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"sync"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -30,11 +31,18 @@ const (
 
 type registerables []metrics.Registerable
 
-// init registers all metrics
-func init() {
-	for _, metric := range toRegister {
-		legacyregistry.MustRegister(metric)
-	}
+var registerMetricsOnce sync.Once
+
+// RegisterMetrics registers the cloud-provider webhook metrics with the legacy
+// registry. It is invoked from webhook server setup at runtime rather than from
+// an init() function, so that metric feature gates (e.g. NativeHistograms) have
+// already been parsed and applied by the time the histogram metrics are created.
+func RegisterMetrics() {
+	registerMetricsOnce.Do(func() {
+		for _, metric := range toRegister {
+			legacyregistry.MustRegister(metric)
+		}
+	})
 }
 
 var (

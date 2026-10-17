@@ -17,7 +17,10 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"testing"
+
+	inf "gopkg.in/inf.v0"
 )
 
 func TestInt64AmountAsInt64(t *testing.T) {
@@ -30,7 +33,8 @@ func TestInt64AmountAsInt64(t *testing.T) {
 		{100, 0, 100, true},
 		{100, 1, 1000, true},
 		{100, -5, 0, false},
-		{100, 100, 0, false},
+		// overflow saturates to the sign-correct rail; ok stays false.
+		{100, 100, mostPositive, false},
 	} {
 		r, ok := int64Amount{value: test.value, scale: test.scale}.AsInt64()
 		if r != test.result {
@@ -56,6 +60,10 @@ func TestInt64AmountAdd(t *testing.T) {
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 1, scale: -1}, int64Amount{value: 0, scale: -1}, false},
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 0, scale: -1}, int64Amount{value: mostPositive, scale: -1}, true},
 		{int64Amount{value: mostPositive / 10, scale: 1}, int64Amount{value: 10, scale: 0}, int64Amount{value: mostPositive, scale: -1}, false},
+
+		// Scale deltas exceeding math.MaxInt32 do not fit in Scale and must fail.
+		{int64Amount{value: 1, scale: math.MaxInt32}, int64Amount{value: 1, scale: -1}, int64Amount{}, false},
+		{int64Amount{value: 5, scale: math.MinInt32}, int64Amount{value: 1, scale: 0}, int64Amount{}, false},
 	} {
 		c := test.a
 		ok := c.Add(test.b)
@@ -85,6 +93,27 @@ func TestInt64AmountAdd(t *testing.T) {
 			if c != test.b {
 				t.Errorf("%v: overflow addition mutated source: %d", test, c)
 			}
+		}
+	}
+}
+
+func TestInt64AmountSubMostNegative(t *testing.T) {
+	// Sub can't form -mostNegative in an int64, so it declines the fast path and
+	// leaves the receiver untouched for Quantity.Sub to fall back from.
+	for _, test := range []struct {
+		name string
+		a    int64Amount
+		b    int64Amount
+	}{
+		{"unscaled", int64Amount{value: 1, scale: 0}, int64Amount{value: mostNegative, scale: 0}},
+		{"scaled", int64Amount{value: 1, scale: Milli}, int64Amount{value: mostNegative, scale: Milli}},
+	} {
+		got := test.a
+		if got.Sub(test.b) {
+			t.Errorf("%s: Sub(%v) = true, want false", test.name, test.b)
+		}
+		if got != test.a {
+			t.Errorf("%s: Sub(%v) mutated receiver to %v, want %v", test.name, test.b, got, test.a)
 		}
 	}
 }
@@ -142,6 +171,14 @@ func TestInt64AsCanonicalString(t *testing.T) {
 		{100, 1, "1", 3},
 		{100, -1, "10", 0},
 		{10800, -10, "1080", -9},
+		{10, math.MaxInt32, "100", math.MaxInt32 - 1},
+		{1000, math.MaxInt32, "10000", math.MaxInt32 - 1},
+		{math.MaxInt64, math.MaxInt32, "92233720368547758070", math.MaxInt32 - 1},
+		{1000, math.MinInt32, "10", math.MinInt32 + 2},
+		// No multiple of 3 fits at or below these exponents.
+		{1, math.MinInt32 + 1, "1", math.MinInt32 + 1},
+		{10, math.MinInt32, "1", math.MinInt32 + 1},
+		{1, math.MinInt32, "1", math.MinInt32},
 	} {
 		r, exp := int64Amount{value: test.value, scale: test.scale}.AsCanonicalBytes(nil)
 		if string(r) != test.result {
@@ -186,7 +223,7 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 		{"test when i.scale < scaled ", int64Amount{value: 100, scale: 0}, 5, 1, true},
 		{"test when i.scale = scaled", int64Amount{value: 100, scale: 1}, 1, 100, true},
 		{"test when i.scale > scaled and result doesn't overflow", int64Amount{value: 100, scale: 5}, 2, 100000, true},
-		{"test when i.scale > scaled and result overflows", int64Amount{value: 876, scale: 30}, 4, 0, false},
+		{"test when i.scale > scaled and result overflows (saturates to the sign-correct rail)", int64Amount{value: 876, scale: 30}, 4, mostPositive, false},
 		{"test when i.scale < 0 and fraction exists", int64Amount{value: 93, scale: -1}, 0, 10, true},
 		{"test when i.scale < 0 and fraction doesn't exist", int64Amount{value: 100, scale: -1}, 0, 10, true},
 		{"test when i.value < 0 and fraction exists", int64Amount{value: -1932, scale: 2}, 4, -20, true},
@@ -199,6 +236,74 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 			}
 			if ok != test.ok {
 				t.Errorf("%v: expected ok: %t, got ok: %t", test.name, test.ok, ok)
+			}
+		})
+	}
+}
+
+func TestScaleInfScale(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		scale    Scale
+		result   inf.Scale
+		resultOK bool
+	}{
+		{"positive scale flips sign", 3, -3, true},
+		{"negative scale flips sign", -3, 3, true},
+		{"zero", 0, 0, true},
+		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32, true},
+		// Scale is an int32 and infScale returns inf.Scale(-s). Negating
+		// math.MinInt32 does not fit in an int32, so the sign is not flipped
+		// and the value stays math.MinInt32 - the same int-negation edge as
+		// -mostNegative for int64. This asserts that behavior of infScale
+		// directly (it is exercised on the inf.Dec path, e.g. ScaledValue on
+		// a Dec-backed Quantity; the int64 backend does not call it).
+		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got, gotOK := test.scale.infScale(); got != test.result || gotOK != test.resultOK {
+				t.Errorf("%s: Scale(%d).infScale() = %d,%v, want %d,%v", test.name, test.scale, got, gotOK, test.result, test.resultOK)
+			}
+		})
+	}
+}
+
+func TestWidenInfScale(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   inf.Scale
+		want widenedScale
+	}{
+		{"positive flips sign", 3, -3},
+		{"negative flips sign", -3, 3},
+		{"zero", 0, 0},
+		{"MinInt32 flips sign", math.MinInt32, -math.MinInt32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := widenInfScale(tc.in); got != tc.want {
+				t.Errorf("widenInfScale(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNarrowScale(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		in       widenedScale
+		want     Scale
+		wantFits bool
+	}{
+		{"zero", 0, 0, true},
+		{"MaxInt32", math.MaxInt32, math.MaxInt32, true},
+		{"MinInt32", math.MinInt32, math.MinInt32, true},
+		{"MaxInt32+1 saturates", math.MaxInt32 + 1, math.MaxInt32, false},
+		{"MinInt32-1 saturates", math.MinInt32 - 1, math.MinInt32, false},
+		{"2^32 saturates", 1 << 32, math.MaxInt32, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, fits := narrowScale(tc.in); got != tc.want || fits != tc.wantFits {
+				t.Errorf("narrowScale(%d) = (%d, %t), want (%d, %t)", tc.in, got, fits, tc.want, tc.wantFits)
 			}
 		})
 	}

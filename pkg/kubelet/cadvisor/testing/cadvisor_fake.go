@@ -19,8 +19,7 @@ package testing
 import (
 	"context"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
@@ -49,12 +48,12 @@ func (c *Fake) Start() error {
 }
 
 // ContainerInfoV2 is a fake implementation of Interface.ContainerInfoV2.
-func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	return map[string]cadvisorapiv2.ContainerInfo{}, nil
+func (c *Fake) ContainerInfoV2(name string, options cadvisorapi.RequestOptions) (map[string]cadvisorapi.ContainerInfo, error) {
+	return map[string]cadvisorapi.ContainerInfo{}, nil
 }
 
 // GetRequestedContainersInfo is a fake implementation if Interface.GetRequestedContainersInfo
-func (c *Fake) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (c *Fake) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
@@ -79,21 +78,21 @@ func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 }
 
 // ImagesFsInfo is a fake implementation of Interface.ImagesFsInfo.
-func (c *Fake) ImagesFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (c *Fake) ImagesFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }
 
 // RootFsInfo is a fake implementation of Interface.RootFsInfo.
-func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (c *Fake) RootFsInfo() (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }
 
 // ContainerFsInfo is a fake implementation of Interface.ContainerFsInfo.
-func (c *Fake) ContainerFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (c *Fake) ContainerFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }
 
 // GetDirFsInfo is a fake implementation of Interface.GetDirFsInfo.
-func (c *Fake) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (c *Fake) GetDirFsInfo(path string) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }

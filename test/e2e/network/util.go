@@ -183,6 +183,36 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 
+// execNodenameTest executes curl to access "/envvar?var=NODE_NAME" endpoint on target address
+// from given Pod. Unlike execHostnameTest it does not strip FQDN suffixes because Kubernetes
+// node names are always short identifiers, not FQDNs.
+// xref: https://issues.k8s.io/121018
+func execNodenameTest(sourcePod v1.Pod, targetAddr, expectedNodeName string) {
+	var (
+		err     error
+		stdout  string
+		timeout = 2 * time.Minute
+	)
+
+	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --max-time 30 '%s/envvar?var=NODE_NAME'`, targetAddr)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
+		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		if err != nil {
+			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
+			continue
+		}
+		break
+	}
+
+	framework.ExpectNoError(err, "not able to connect to %s after %v", targetAddr, timeout)
+	gomega.Expect(strings.TrimSpace(stdout)).To(gomega.Equal(expectedNodeName))
+}
+
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
 func createSecondNodePortService(ctx context.Context, f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
 	svc := &v1.Service{

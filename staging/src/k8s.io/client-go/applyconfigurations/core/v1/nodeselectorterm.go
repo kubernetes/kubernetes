@@ -25,9 +25,9 @@ package v1
 // them are ANDed.
 // The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 type NodeSelectorTermApplyConfiguration struct {
-	// A list of node selector requirements by node's labels.
+	// matchExpressions is a list of node selector requirements by node's labels.
 	MatchExpressions []NodeSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
-	// A list of node selector requirements by node's fields.
+	// matchFields is a list of node selector requirements by node's fields.
 	MatchFields []NodeSelectorRequirementApplyConfiguration `json:"matchFields,omitempty"`
 }
 

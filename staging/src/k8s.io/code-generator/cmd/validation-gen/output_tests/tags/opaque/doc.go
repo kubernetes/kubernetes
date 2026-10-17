@@ -122,6 +122,7 @@ type OtherString string
 
 // +k8s:opaqueType
 type TypedefOpaqueStruct struct {
+	// +k8s:required
 	StringField string `json:"stringField"`
 }
 
@@ -163,4 +164,25 @@ type OpaqueNoValidationFieldsStruct struct {
 
 	// +k8s:opaqueType
 	IsolatedOpaqueStructField NoValidationStruct `json:"isolatedOpaqueStructField"`
+}
+
+// +k8s:opaqueType
+// +k8s:validateFalse="type OpaqueStructWithValidation"
+type OpaqueStructWithValidation struct {
+	// +k8s:validateFalse="field OpaqueStructWithValidation.StringField"
+	StringField string `json:"stringField"`
+}
+
+type BaseStruct struct {
+	// +k8s:validateFalse="field BaseStruct.Field"
+	Field string `json:"field"`
+}
+
+// +k8s:opaqueType
+// +k8s:validateFalse="type OpaqueAliasWithValidation"
+type OpaqueAliasWithValidation BaseStruct
+
+type ParentWithOpaqueAliasWithValidation struct {
+	TypeMeta int                       `json:"typeMeta"`
+	Field    OpaqueAliasWithValidation `json:"field"`
 }

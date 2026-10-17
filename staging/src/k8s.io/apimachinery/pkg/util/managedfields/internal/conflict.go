@@ -23,10 +23,11 @@ import (
 	"strings"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/merge"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v6/merge"
 )
 
 // NewConflictError returns an error including details on the requests apply conflicts

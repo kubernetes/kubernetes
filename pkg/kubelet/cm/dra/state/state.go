@@ -17,8 +17,10 @@ limitations under the License.
 package state
 
 import (
+	"slices"
 	"time"
 
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -48,6 +50,15 @@ type ClaimInfoState struct {
 // +k8s:deepcopy-gen=true
 type DriverState struct {
 	Devices []Device
+	// SkipNodeOperations allows kubelet to bypass node-local gRPC calls (NodePrepareResources
+	// and/or NodeUnprepareResources) when allocated devices do not require them.
+	SkipNodeOperations []resourceapi.SkipNodeOperation `json:"skipNodeOperations,omitempty"`
+}
+
+// Skips checks whether the given operation or wildcard '*' is present in SkipNodeOperations.
+func (s DriverState) Skips(op resourceapi.SkipNodeOperation) bool {
+	return slices.Contains(s.SkipNodeOperations, resourceapi.SkipNodeOperationAll) ||
+		slices.Contains(s.SkipNodeOperations, op)
 }
 
 // Device is how a DRA driver described an allocated device in a claim

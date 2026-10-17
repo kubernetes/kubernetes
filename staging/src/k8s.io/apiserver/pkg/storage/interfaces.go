@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -268,6 +269,7 @@ type Interface interface {
 	// https://github.com/kubernetes/kubernetes/blob/9325a57125e8502941d1b0c7379c4bb80a678d5c/vendor/go.etcd.io/etcd/client/v3/watch.go#L1037-L1042
 	//
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
+	//
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
 
@@ -336,6 +338,25 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// RecordTimestamps requests that the storage layer wrap each emitted watch
+	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
+	// latency telemetry. This is intended for internal clients only (the watch
+	// cache); external clients cannot set it. The watch cache strips the wrapper
+	// before storing or serializing the object, so it never reaches other watchers.
+	RecordTimestamps bool
+}
+
+// WatchEventWithRecordTime wraps a runtime.Object with the timestamp at which the
+// storage layer decoded the corresponding watch event. It is produced by the
+// storage layer only when ListOptions.RecordTimestamps is set, and is consumed
+// and stripped by the watch cache before the underlying object is stored or
+// serialized. It is never sent to watch clients.
+type WatchEventWithRecordTime interface {
+	runtime.Object
+	// RecordTime returns the decode timestamp of the wrapped event.
+	RecordTime() time.Time
+	// Unwrap returns the underlying object.
+	Unwrap() runtime.Object
 }
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
@@ -425,3 +446,16 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	}
 	return key, nil
 }
+
+// ReverseKeyFunc recovers object identity from a resource-relative key
+// produced by the corresponding registry KeyFunc. Backend-specific prefixes
+// are removed before the key is passed to this function.
+// The key identifies a single object, not a collection or root.
+// It starts with "/" and does not end with "/".
+//
+// For namespaced resources, namespace and name are both non-empty. For
+// cluster-scoped resources, namespace is empty and name is non-empty. An error
+// is returned if the key cannot be parsed into a valid object identity.
+// A nil ReverseKeyFunc indicates that identity cannot be derived from the
+// key and callers must fall back to decoding the stored object.
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)

@@ -21,4 +21,17 @@ limitations under the License.
 
 // +groupName=scheduling.k8s.io
 
+// +k8s:validation-gen=*
+// +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha3
+// +k8s:validation-gen-scheme-registry=nil
+
+// A non-registering copy of the declarative validation is generated in this
+// package so out-of-tree consumers can run the same validation the
+// kube-apiserver enforces without importing k8s.io/kubernetes/pkg or mutating
+// a shared scheme on import. The registered copy lives in
+// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3.
+// The `*` selector generates validators for all types, including the
+// WorkloadPodGroup* building blocks that are not reachable from a TypeMeta
+// root.
+
 package v1alpha3

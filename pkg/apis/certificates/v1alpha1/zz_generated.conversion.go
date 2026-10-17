@@ -119,8 +119,7 @@ func Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleL
 }
 
 func autoConvert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *certificatesv1alpha1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
-	out.SignerName = in.SignerName
-	out.TrustBundle = in.TrustBundle
+	*out = *(*certificates.ClusterTrustBundleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -130,8 +129,7 @@ func Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleS
 }
 
 func autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *certificatesv1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
-	out.SignerName = in.SignerName
-	out.TrustBundle = in.TrustBundle
+	*out = *(*certificatesv1alpha1.ClusterTrustBundleSpec)(unsafe.Pointer(in))
 	return nil
 }
 

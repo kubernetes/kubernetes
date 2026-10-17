@@ -48,6 +48,8 @@ import (
 	fakeauthenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1/fake"
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	fakeauthorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1/fake"
+	authorizationv1alpha1 "k8s.io/client-go/kubernetes/typed/authorization/v1alpha1"
+	fakeauthorizationv1alpha1 "k8s.io/client-go/kubernetes/typed/authorization/v1alpha1/fake"
 	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	fakeauthorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1/fake"
 	autoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
@@ -90,6 +92,8 @@ import (
 	fakeflowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2/fake"
 	flowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
 	fakeflowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3/fake"
+	lifecyclev1alpha1 "k8s.io/client-go/kubernetes/typed/lifecycle/v1alpha1"
+	fakelifecyclev1alpha1 "k8s.io/client-go/kubernetes/typed/lifecycle/v1alpha1/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
@@ -130,6 +134,8 @@ import (
 	fakestoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
+	storagemigrationv1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1"
+	fakestoragemigrationv1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1/fake"
 	storagemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 	fakestoragemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1/fake"
 	"k8s.io/client-go/testing"
@@ -176,7 +182,7 @@ type Clientset struct {
 	tracker   testing.ObjectTracker
 }
 
-func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterfaces {
 	return c.discovery
 }
 
@@ -300,6 +306,11 @@ func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1b
 	return &fakeauthorizationv1beta1.FakeAuthorizationV1beta1{Fake: &c.Fake}
 }
 
+// AuthorizationV1alpha1 retrieves the AuthorizationV1alpha1Client
+func (c *Clientset) AuthorizationV1alpha1() authorizationv1alpha1.AuthorizationV1alpha1Interface {
+	return &fakeauthorizationv1alpha1.FakeAuthorizationV1alpha1{Fake: &c.Fake}
+}
+
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
 	return &fakeautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
@@ -400,6 +411,11 @@ func (c *Clientset) FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3In
 	return &fakeflowcontrolv1beta3.FakeFlowcontrolV1beta3{Fake: &c.Fake}
 }
 
+// LifecycleV1alpha1 retrieves the LifecycleV1alpha1Client
+func (c *Clientset) LifecycleV1alpha1() lifecyclev1alpha1.LifecycleV1alpha1Interface {
+	return &fakelifecyclev1alpha1.FakeLifecycleV1alpha1{Fake: &c.Fake}
+}
+
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
@@ -498,6 +514,11 @@ func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
+}
+
+// StoragemigrationV1 retrieves the StoragemigrationV1Client
+func (c *Clientset) StoragemigrationV1() storagemigrationv1.StoragemigrationV1Interface {
+	return &fakestoragemigrationv1.FakeStoragemigrationV1{Fake: &c.Fake}
 }
 
 // StoragemigrationV1beta1 retrieves the StoragemigrationV1beta1Client

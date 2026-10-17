@@ -24,7 +24,6 @@ package v1
 import (
 	unsafe "unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication"
@@ -181,10 +180,7 @@ func Convert_clientauthentication_ExecCredentialSpec_To_v1_ExecCredentialSpec(in
 }
 
 func autoConvert_v1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *clientauthentication.ExecCredentialStatus, s conversion.Scope) error {
-	out.ExpirationTimestamp = (*metav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
-	out.Token = in.Token
-	out.ClientCertificateData = in.ClientCertificateData
-	out.ClientKeyData = in.ClientKeyData
+	*out = *(*clientauthentication.ExecCredentialStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -194,10 +190,7 @@ func Convert_v1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatu
 }
 
 func autoConvert_clientauthentication_ExecCredentialStatus_To_v1_ExecCredentialStatus(in *clientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s conversion.Scope) error {
-	out.ExpirationTimestamp = (*metav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
-	out.Token = in.Token
-	out.ClientCertificateData = in.ClientCertificateData
-	out.ClientKeyData = in.ClientKeyData
+	*out = *(*ExecCredentialStatus)(unsafe.Pointer(in))
 	return nil
 }
 

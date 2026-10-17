@@ -1,3 +1,55 @@
+## Unreleased
+
+### Features
+
+### Fixes
+
+### Maintenance
+
+## 1.44.0
+
+### Fixes
+- `BeNumerically` compares signed and unsigned integers by value: `-1` no longer equals `uint64(math.MaxUint64)` and `uint(5)` is now greater than `-3` (#925) [26e3c6b]
+- `BeNumerically("~")` no longer overflows when computing the distance between extreme integers (#928) [1955764]
+- `BeNumerically("==", x, threshold)` now honors the threshold for floats, as it already did for integers (#927) [10e2aca]
+- `HaveKeyWithValue` succeeds if any key accepted by the key matcher has a matching value, rather than depending on map iteration order (#929) [ffc577a]
+- `HaveKey` and `HaveKeyWithValue` treat key and value matcher errors like `ContainElement` does: a match wins, and an error is only reported when nothing matches (#926) [dc91598]
+- `MatchJSON` no longer treats numbers too large for a float64 as equal to one another (#930) [9d619a5]
+- `MatchJSON` compares integers beyond ±2^53 exactly, so neighboring large integers (e.g. IDs) no longer match; all other numbers are still compared as float64s (#931) [8ef1aa7, 630fe12]
+- `HaveExactElements` reports missing or extra elements that start at index 0, and reports the first extra element's index rather than the last (#934) [af1b777]
+- `MatchYAML` compares every document in a multi-document stream rather than only the first; empty documents (e.g. a leading or trailing `---`) are ignored (#933) [2773796]
+- `MatchXML` ignores namespace prefixes: elements and attributes are compared by namespace URI, and the URIs declared on each element must match whatever prefix they are bound to (#932) [c0dbd89, 2565350]
+
+## 1.43.1
+
+### Maintenance
+- Update go.yaml.in/yaml/v3 to v3.0.5 [d547015]
+- Releases are now cut by a GitHub Actions workflow (Actions -> Release -> Run workflow) rather than by hand, with changelog entries collected under `## Unreleased` as the work happens.  Releases still ship the stripped-down tree on `master-lite` - tests removed and Ginkgo dropped from `go.mod` - and the workflow now builds it and checks it on every push.  See RELEASING.md. [e9dc84d]
+
+## 1.43.0
+
+### Features
+
+Add gomock adaptor extension for using Gomega matchers with gomock
+
+## 1.42.1
+
+Bump Dependencies
+
+## 1.42.0
+
+Add a set of Claude skill as a marketplace plugin
+
+## 1.41.0
+
+### Features
+
+Add `BeASlice` and `BeAnArray` matchers
+
+### Fixes
+
+Object formatting now detects pointer cycles to avoid runaway formatting output.
+
 ## 1.40.0
 
 We're adopting a new release strategy to minimize dependency bloat in projects that consume Gomega.  It is a limitation of the go mod toolchain that _test_ subdependencies of your project's direct dependencies get pulled in as *indirect* dependencies.  In the case of Gomega, this ends up pulling in all of Ginkgo into your `go.mod` even if you are only using Gomega (Gomega uses Ginkgo for its own tests).

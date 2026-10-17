@@ -17,11 +17,15 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"time"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -38,8 +42,18 @@ type REST struct {
 	Token *TokenREST
 }
 
+type webhook interface {
+	*admissionregistrationv1.ValidatingWebhookConfiguration | *admissionregistrationv1.MutatingWebhookConfiguration
+	metav1.Object
+}
+
+type webhookGetter[T webhook] interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (T, error)
+}
+
 // NewREST returns a RESTStorage object that will work against service accounts.
-func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, auds authenticator.Audiences, max time.Duration, podStorage, secretStorage, nodeStorage rest.Getter, extendExpiration bool, maxExtendedExpiration time.Duration) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, auds authenticator.Audiences, authorizer authorizer.Authorizer, max time.Duration, podStorage, secretStorage, nodeStorage rest.Getter,
+	validatingWebhooks webhookGetter[*admissionregistrationv1.ValidatingWebhookConfiguration], mutatingWebhooks webhookGetter[*admissionregistrationv1.MutatingWebhookConfiguration], extendExpiration bool, maxExtendedExpiration time.Duration) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc:               func() runtime.Object { return &api.ServiceAccountList{} },
@@ -53,6 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
+
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
@@ -65,9 +80,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 			pods:                         podStorage,
 			secrets:                      secretStorage,
 			nodes:                        nodeStorage,
+			validatingWebhooks:           &vwhGetter{validatingWebhooks: validatingWebhooks},
+			mutatingWebhooks:             &mwhGetter{mutatingWebhooks: mutatingWebhooks},
 			issuer:                       issuer,
 			auds:                         auds,
-			audsSet:                      sets.NewString(auds...),
+			audsSet:                      sets.New[string](auds...),
+			authorizer:                   authorizer,
 			maxExpirationSeconds:         int64(max.Seconds()),
 			maxExtendedExpirationSeconds: int64(maxExtendedExpiration.Seconds()),
 			extendExpiration:             extendExpiration,

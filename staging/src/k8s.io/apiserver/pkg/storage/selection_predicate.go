@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/sharding"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -99,7 +98,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 			return matched, err
 		}
 	}
-	if s.Empty() {
+	if s.labelFieldEmpty() {
 		return true, nil
 	}
 	labels, fields, err := s.GetAttrs(obj)
@@ -153,7 +152,17 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
-	return s.Label.Empty() && s.Field.Empty()
+	// Check the selector before the feature gate: Empty is called per event on
+	// watch paths, and the nil check is free while the gate lookup is not.
+	if s.ShardSelector != nil && !s.ShardSelector.Empty() &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		return false
+	}
+	return s.labelFieldEmpty()
+}
+
+func (s *SelectionPredicate) labelFieldEmpty() bool {
+	return (s.Label == nil || s.Label.Empty()) && (s.Field == nil || s.Field.Empty())
 }
 
 // For any index defined by IndexFields, if a matcher can match only (a subset)
@@ -164,11 +173,6 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 	for _, field := range s.IndexFields {
 		if value, ok := s.Field.RequiresExactMatch(field); ok {
 			result = append(result, MatchValue{IndexName: FieldIndex(field), Value: value})
-		} else if field == "metadata.namespace" {
-			// list pods in the namespace. i.e. /api/v1/namespaces/default/pods
-			if namespace, isNamespaceScope := isNamespaceScopedRequest(ctx); isNamespaceScope {
-				result = append(result, MatchValue{IndexName: FieldIndex(field), Value: namespace})
-			}
 		}
 	}
 	for _, label := range s.IndexLabels {
@@ -201,14 +205,6 @@ func (s *SelectionPredicate) SetShardInfoOnList(listObj runtime.Object) {
 			setter.SetShardInfo(&metav1.ShardInfo{Selector: s.ShardSelector.String()})
 		}
 	}
-}
-
-func isNamespaceScopedRequest(ctx context.Context) (string, bool) {
-	re, _ := request.RequestInfoFrom(ctx)
-	if re == nil || len(re.Namespace) == 0 {
-		return "", false
-	}
-	return re.Namespace, true
 }
 
 // LabelIndex add prefix for label index.

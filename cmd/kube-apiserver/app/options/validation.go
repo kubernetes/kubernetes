@@ -23,20 +23,16 @@ import (
 	"strings"
 
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	netutils "k8s.io/utils/net"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
 // validateClusterIPFlags is expected to be called after Complete()
 func validateClusterIPFlags(options Extra) []error {
 	var errs []error
-	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
-	maxCIDRBits := 20
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {
@@ -46,15 +42,6 @@ func validateClusterIPFlags(options Extra) []error {
 	serviceClusterIPRangeList := strings.Split(options.ServiceClusterIPRanges, ",")
 	if len(serviceClusterIPRangeList) > 2 {
 		errs = append(errs, errors.New("--service-cluster-ip-range must not contain more than two entries"))
-	}
-
-	// Complete() expected to have set Primary* and Secondary
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-		// primary CIDR validation
-		if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
-			errs = append(errs, err)
-		}
 	}
 
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
@@ -72,27 +59,9 @@ func validateClusterIPFlags(options Extra) []error {
 		if !dualstack {
 			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) ||
-			!utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
-				errs = append(errs, err)
-			}
-		}
 	}
 
 	return errs
-}
-
-func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) error {
-	// Should be smallish sized cidr, this thing is kept in etcd
-	// bigger cidr (specially those offered by IPv6) will add no value
-	// significantly increase snapshotting time.
-	var ones, bits = cidr.Mask.Size()
-	if bits-ones > maxCIDRBits {
-		return fmt.Errorf("specified %s is too large; for %d-bit addresses, the mask must be >= %d", cidrFlag, bits, bits-maxCIDRBits)
-	}
-
-	return nil
 }
 
 func validateServiceNodePort(options Extra) []error {

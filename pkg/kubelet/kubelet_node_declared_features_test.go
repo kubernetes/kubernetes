@@ -31,8 +31,6 @@ import (
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
-
 	podLevelResourcesIPPRFeatureGate := features.InPlacePodLevelResourcesVerticalScaling
 	featureMaxVersion := version.MustParseSemantic("v1.36.0")
 	createMockFeature := func(t *testing.T, name string, cfg *ndf.NodeConfiguration) *ndftesting.MockFeature {
@@ -102,8 +100,6 @@ func TestDeclaredFeatureDiscovery(t *testing.T) {
 }
 
 func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
-
 	testcases := []struct {
 		name                          string
 		extendWebSocketsToKubeletGate bool

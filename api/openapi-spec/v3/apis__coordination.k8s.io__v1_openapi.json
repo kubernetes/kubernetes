@@ -19,7 +19,7 @@
               }
             ],
             "default": {},
-            "description": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -106,7 +106,7 @@
             "type": "integer"
           },
           "preferredHolder": {
-            "description": "PreferredHolder signals to a lease holder that the lease has a more optimal holder and should be given up. This field can only be set if Strategy is also set.",
+            "description": "preferredHolder signals to a lease holder that the lease has a more optimal holder and should be given up. This field can only be set if Strategy is also set.",
             "type": "string"
           },
           "renewTime": {
@@ -118,7 +118,7 @@
             "description": "renewTime is a time when the current holder of a lease has last updated the lease."
           },
           "strategy": {
-            "description": "Strategy indicates the strategy for picking the leader for coordinated leader election. If the field is not specified, there is no active coordination for this lease. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+            "description": "strategy indicates the strategy for picking the leader for coordinated leader election. If the field is not specified, there is no active coordination for this lease. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
             "type": "string"
           }
         },

@@ -33,11 +33,16 @@ import (
 // NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
 func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
-		"basic":                             newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
-		"with-taints-and-consumes-counters": newResourceSliceWithTaintsAndConsumesCounters(),
-		"with-shared-counters":              newSharedCountersResourceSlice(),
-		"with-list-values":                  newResourceSliceWithListValues(),
-		"with-taints-and-consumes-counters-and-list-values": newResourceSliceWithTaintsAndConsumesCountersAndListValues(),
+		"basic": newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
+		// advanced combines all device-level features (taints, consumes counters
+		// with compatibility groups, and list values) into the largest possible
+		// device-based slice.
+		// Compatibility groups grow this maximal slice by ~16,640 B (1,190,621 B -> ~1,207,261 B, +1.4%),
+		// which stays well within the object size limit.
+		"advanced": newAdvancedResourceSlice(),
+		// shared-counters is a distinct slice kind: SharedCounters and Devices are
+		// mutually exclusive per slice, so it cannot be merged into "advanced".
+		"shared-counters": newSharedCountersResourceSlice(),
 	}
 	return slices
 }
@@ -123,16 +128,27 @@ func newSharedCountersResourceSlice() *resourceapi.ResourceSlice {
 	return slice
 }
 
-func newResourceSliceWithListValues() *resourceapi.ResourceSlice {
-	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+// newAdvancedResourceSlice builds the maximal device-feature slice: taints,
+// consumes counters, compatibility groups, and list values combined.
+func newAdvancedResourceSlice() *resourceapi.ResourceSlice {
+	slice := newResourceSliceWithTaintsAndConsumesCounters()
 	addListValues(slice)
+	addCompatibilityGroups(slice)
 	return slice
 }
 
-func newResourceSliceWithTaintsAndConsumesCountersAndListValues() *resourceapi.ResourceSlice {
-	slice := newResourceSliceWithTaintsAndConsumesCounters()
-	addListValues(slice)
-	return slice
+// addCompatibilityGroups declares the maximum number of compatibility groups
+// on each device counter consumption.
+func addCompatibilityGroups(slice *resourceapi.ResourceSlice) {
+	for i := range slice.Spec.Devices {
+		for j := range slice.Spec.Devices[i].ConsumesCounters {
+			groups := make([]string, 0, resourceapi.DeviceCompatibilityGroupsMaxSize)
+			for k := range resourceapi.DeviceCompatibilityGroupsMaxSize {
+				groups = append(groups, maxDNSLabel(k))
+			}
+			slice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = groups
+		}
+	}
 }
 
 func addListValues(slice *resourceapi.ResourceSlice) {

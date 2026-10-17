@@ -58,6 +58,7 @@ func (c *Client) dialStreamLocal(socketPath string) (Channel, error) {
 		return nil, err
 	}
 	go DiscardRequests(in)
+	go io.Copy(io.Discard, ch.Stderr())
 	return ch, err
 }
 
@@ -79,6 +80,7 @@ func (l *unixListener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 	go DiscardRequests(incoming)
+	go io.Copy(io.Discard, ch.Stderr())
 
 	return &chanConn{
 		Channel: ch,

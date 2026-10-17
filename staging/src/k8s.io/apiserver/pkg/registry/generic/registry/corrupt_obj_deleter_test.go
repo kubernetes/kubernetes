@@ -33,10 +33,14 @@ import (
 )
 
 // fakeStorage is a test double for storage.Interface that intercepts Delete calls, records the
-// arguments, and returns a pre-configured error.
+// arguments, and returns a pre-configured error. By default it mimics the etcd3 store handling
+// a corrupt object: the deletion validator runs after the corruption check and before the
+// delete, a validator error aborts the delete. With bypassValidator set, it simulates a buggy
+// backend that deletes without consulting the deletion validator.
 type fakeStorage struct {
 	storage.Interface
-	deleteErr error
+	deleteErr       error
+	bypassValidator bool
 
 	deleteCalled            bool
 	key                     string
@@ -51,13 +55,21 @@ func (s *fakeStorage) Delete(ctx context.Context, key string, out runtime.Object
 	s.expectTransformOrDecode = opts.ExpectTransformOrDecodeError
 	s.preconditions = preconditions
 	s.cachedExistingObject = cachedExistingObject
-	return s.deleteErr
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	if s.bypassValidator {
+		return nil
+	}
+	// the object is nil for a corrupt object, it cannot be decoded
+	return deleteValidation(ctx, nil)
 }
 
 func TestCorruptObjectDeleterDelete(t *testing.T) {
 	for _, test := range []struct {
 		name               string
 		deleteErr          error
+		bypassValidator    bool
 		opts               *metav1.DeleteOptions
 		expectDeleteCalled bool
 		wantDeleted        bool
@@ -100,10 +112,38 @@ func TestCorruptObjectDeleterDelete(t *testing.T) {
 			expectDeleteCalled: true,
 			wantErr:            errors.IsNotFound,
 		},
+		{
+			name:               "option true, dry run, object not decodable, store honors the validator",
+			opts:               &metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true), DryRun: []string{"All"}},
+			expectDeleteCalled: true,
+			wantDeleted:        true,
+			wantErr:            func(err error) bool { return err == nil },
+		},
+		{
+			name:               "option true, dry run, object decodable, store returns InvalidObj",
+			opts:               &metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true), DryRun: []string{"All"}},
+			deleteErr:          storage.NewInvalidObjError("/pods/foo", "object is decodable"),
+			expectDeleteCalled: true,
+			wantErr:            errors.IsConflict,
+		},
+		{
+			name:               "option true, dry run, object not found, store returns NotFound",
+			opts:               &metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true), DryRun: []string{"All"}},
+			deleteErr:          storage.NewKeyNotFoundError("/pods/foo", 0),
+			expectDeleteCalled: true,
+			wantErr:            errors.IsNotFound,
+		},
+		{
+			name:               "option true, dry run, store deletes without invoking the validator",
+			opts:               &metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true), DryRun: []string{"All"}},
+			bypassValidator:    true,
+			expectDeleteCalled: true,
+			wantErr:            errors.IsInternalError,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-			fs := &fakeStorage{deleteErr: test.deleteErr}
+			fs := &fakeStorage{deleteErr: test.deleteErr, bypassValidator: test.bypassValidator}
 			const podPrefix = "/pods/"
 			store := &Store{
 				NewFunc:                   func() runtime.Object { return &example.Pod{} },
@@ -120,6 +160,10 @@ func TestCorruptObjectDeleterDelete(t *testing.T) {
 			}
 			deleter := NewCorruptObjectDeleter(store)
 
+			// the unsafe deleter must ignore the caller's admission validator, it
+			// passes its own validator to the storage instead: admit-everything for
+			// a regular delete, a hardcoded-fail sentinel for dry run. This func
+			// fails the test if the deleter ever wires admission back in.
 			obj, deleted, err := deleter.Delete(ctx, "foo", func(context.Context, runtime.Object) error {
 				t.Fatal("caller-provided admission was invoked")
 				return nil

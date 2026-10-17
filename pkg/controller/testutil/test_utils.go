@@ -203,6 +203,11 @@ func (m *FakeNodeHandler) Delete(_ context.Context, id string, opt metav1.Delete
 	return nil
 }
 
+// DeleteWithResult deletes the status of a Node from the fake store.
+func (m *FakeNodeHandler) DeleteWithResult(_ context.Context, name string, _ metav1.DeleteOptions) (metav1.APIResult, error) {
+	return nil, nil
+}
+
 // DeleteCollection deletes a collection of Nodes from the fake store.
 func (m *FakeNodeHandler) DeleteCollection(_ context.Context, opt metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return nil
