@@ -52,7 +52,7 @@ exit_code=0
 
 # Install go-licenses
 echo '[INFO] Installing go-licenses...'
-go install github.com/google/go-licenses@latest
+GO_LICENSES=$(go -C "${KUBE_ROOT}/hack/tools" tool -n go-licenses)
 
 # Fetching CNCF Approved List Of Licenses
 # Refer: https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md
@@ -63,7 +63,7 @@ jq -r '.licenses[] | select(.isDeprecatedLicenseId==false) .licenseId' "${ARTIFA
 
 # Scanning go-packages under the project & verifying against the CNCF approved list of licenses
 echo '[INFO] Starting license scan on go-packages...'
-go-licenses report ./... >> "${ARTIFACTS}"/licenses.csv 2>"${ARTIFACTS}"/logs/go-licenses.log
+"${GO_LICENSES}" report ./... >> "${ARTIFACTS}"/licenses.csv 2>"${ARTIFACTS}"/logs/go-licenses.log
 
 echo -e 'PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n' >> "${ARTIFACTS}"/approved_licenses.dump
 while IFS=, read -r GO_PACKAGE LICENSE_URL LICENSE_NAME; do

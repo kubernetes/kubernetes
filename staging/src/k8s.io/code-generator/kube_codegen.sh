@@ -160,8 +160,7 @@ function kube::codegen::gen_helpers() {
             defaulter-gen"${CODEGEN_VERSION_SPEC}"
             validation-gen"${CODEGEN_VERSION_SPEC}"
         )
-        # shellcheck disable=2046 # printf word-splitting is intentional
-        GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
+        GO111MODULE=on go install "${BINS[@]/#/k8s.io/code-generator/cmd/}"
     )
 
     # Deepcopy
@@ -424,8 +423,7 @@ function kube::codegen::gen_openapi() {
         BINS=(
             openapi-gen"${CODEGEN_VERSION_SPEC}"
         )
-        # shellcheck disable=2046 # printf word-splitting is intentional
-        GO111MODULE=on go install $(printf "k8s.io/kube-openapi/cmd/%s " "${BINS[@]}")
+        GO111MODULE=on go install "${BINS[@]/#/k8s.io/kube-openapi/cmd/}"
     )
 
     local input_pkgs=( "${extra_pkgs[@]:+"${extra_pkgs[@]}"}")
@@ -682,8 +680,7 @@ function kube::codegen::gen_client() {
             informer-gen"${CODEGEN_VERSION_SPEC}"
             lister-gen"${CODEGEN_VERSION_SPEC}"
         )
-        # shellcheck disable=2046 # printf word-splitting is intentional
-        GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
+        GO111MODULE=on go install "${BINS[@]/#/k8s.io/code-generator/cmd/}"
     )
 
     local group_versions=()
@@ -870,8 +867,7 @@ function kube::codegen::gen_register() {
         BINS=(
             register-gen"${CODEGEN_VERSION_SPEC}"
         )
-        # shellcheck disable=2046 # printf word-splitting is intentional
-        GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
+        GO111MODULE=on go install "${BINS[@]/#/k8s.io/code-generator/cmd/}"
     )
 
     # Register

@@ -13,8 +13,8 @@ dependencies:
   - name: "zeitgeist"
     version: "v0.5.4"
     refPaths:
-    - path: hack/verify-external-dependencies-version.sh
-      match: sigs.k8s.io/zeitgeist@v.*
+    - path: hack/tools/go.mod
+      match: sigs.k8s.io/zeitgeist v.*
 
   # CNI plugins
   - name: "cni"
