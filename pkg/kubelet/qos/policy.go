@@ -17,6 +17,7 @@ limitations under the License.
 package qos
 
 import (
+	"math/bits"
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +35,12 @@ const (
 	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -997
 	besteffortOOMScoreAdj int = 1000
+
+	// oomScoreAdjTieBreakFloor is the smallest memory request the
+	// KubeletOOMScoreAdjTieBreak nudge distinguishes. Nodes whose adj point
+	// (capacity/1000) is at or below this size already separate requests well
+	// enough, so the nudge is disabled there.
+	oomScoreAdjTieBreakFloor int64 = 64 * 1024 * 1024
 )
 
 // GetContainerOOMScoreAdjust returns the amount by which the OOM score of all processes in the
@@ -45,6 +52,22 @@ const (
 // OOMScoreAdjust should be calculated based on the allocated resources, so the pod argument should
 // contain the allocated resources in the spec.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+	return containerOOMScoreAdjust(pod, container, memoryCapacity,
+		utilfeature.DefaultFeatureGate.Enabled(features.KubeletOOMScoreAdjTieBreak))
+}
+
+// PossibleContainerOOMScoreAdjusts returns the oom_score_adj kubelet assigns to
+// the container with KubeletOOMScoreAdjTieBreak disabled and enabled, in that
+// order. It is meant for e2e tests, which cannot observe the node's feature
+// gates.
+func PossibleContainerOOMScoreAdjusts(pod *v1.Pod, container *v1.Container, memoryCapacity int64) []int {
+	return []int{
+		containerOOMScoreAdjust(pod, container, memoryCapacity, false),
+		containerOOMScoreAdjust(pod, container, memoryCapacity, true),
+	}
+}
+
+func containerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64, tieBreakEnabled bool) int {
 	if types.IsNodeCriticalPod(pod) {
 		// Only node critical pod should be the last to get killed.
 		return guaranteedOOMScoreAdj
@@ -86,22 +109,33 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
 	}
 
+	if tieBreakEnabled {
+		oomScoreAdjust = tieBreakOOMScoreAdjust(oomScoreAdjust, containerMemReq+remainingReqPerContainer, enforcedMemoryLimit(pod, container), memoryCapacity)
+	}
+
 	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
 	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
 	if isSidecarContainer(pod, container) {
-		// check min memory quantity in regular containers
-		minMemoryRequest := minRegularContainerMemory(pod)
+		var minMemoryOomScoreAdjust int64
+		if tieBreakEnabled {
+			// The tie-break makes the smallest request no longer imply the
+			// highest score, so compare against every regular container.
+			minMemoryOomScoreAdjust = maxRegularContainerOOMScoreAdjust(pod, remainingReqPerContainer, memoryCapacity)
+		} else {
+			// check min memory quantity in regular containers
+			minMemoryRequest := minRegularContainerMemory(pod)
 
-		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
-		// we add the per-container share of unallocated pod memory requests to the minimum memory request.
-		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
-		// calculation remains consistent
-		//  with how we handle pod-level memory requests for regular containers.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-			resourcehelper.IsPodLevelRequestsSet(pod) {
-			minMemoryRequest += remainingReqPerContainer
+			// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
+			// we add the per-container share of unallocated pod memory requests to the minimum memory request.
+			// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
+			// calculation remains consistent
+			//  with how we handle pod-level memory requests for regular containers.
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+				resourcehelper.IsPodLevelRequestsSet(pod) {
+				minMemoryRequest += remainingReqPerContainer
+			}
+			minMemoryOomScoreAdjust = 1000 - (1000*minMemoryRequest)/memoryCapacity
 		}
-		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
 		// the OOM adjustment for sidecar container will match
 		// or fall below the OOM score adjustment of regular containers in the Pod.
 		if oomScoreAdjust > minMemoryOomScoreAdjust {
@@ -119,6 +153,63 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+// tieBreakOOMScoreAdjust refines the linear Burstable oom_score_adj for
+// KubeletOOMScoreAdjTieBreak. memoryRequest is the effective request the linear
+// value was computed from, and memoryLimit the limit enforced on the
+// container's cgroup, or 0 if unlimited. The linear term is kept as is: one adj point is
+// worth capacity/1000 bytes of usage to the kernel, which is what makes
+// containers furthest over their request get killed first. Every adjustment
+// here is bounded by a few points so it cannot override that ordering by more
+// than a few adj points worth of memory.
+func tieBreakOOMScoreAdjust(linearOOMScoreAdjust, memoryRequest, memoryLimit, memoryCapacity int64) int64 {
+	// Requests smaller than one adj point collapse to the same score. Spend
+	// one point per doubling of request inside that range, and no more.
+	maxNudge := log2Floor(memoryCapacity / 1000 / oomScoreAdjTieBreakFloor)
+	adj := linearOOMScoreAdjust - min(log2Floor(memoryRequest/oomScoreAdjTieBreakFloor), maxNudge)
+
+	// A container whose enforced limit is within its request can never be
+	// over its request, so ranking it below others does not conflict with
+	// killing over-request containers first. The spec limit is not enough:
+	// a shared DRA memory claim raises the cgroup limit above the request.
+	if memoryLimit > 0 && memoryLimit <= memoryRequest {
+		adj -= maxNudge + 1
+	}
+	return adj
+}
+
+// maxRegularContainerOOMScoreAdjust returns the highest tie-broken
+// oom_score_adj among the regular containers in pod, before clamping.
+func maxRegularContainerOOMScoreAdjust(pod *v1.Pod, remainingReqPerContainer, memoryCapacity int64) int64 {
+	var maxAdj int64
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		memReq := getEffectiveContainerMemoryRequest(pod, c) + remainingReqPerContainer
+		adj := tieBreakOOMScoreAdjust(1000-(1000*memReq)/memoryCapacity, memReq, enforcedMemoryLimit(pod, c), memoryCapacity)
+		if i == 0 || adj > maxAdj {
+			maxAdj = adj
+		}
+	}
+	return maxAdj
+}
+
+// enforcedMemoryLimit returns the memory limit kubelet sets on the container's
+// cgroup in bytes, or 0 if unlimited.
+func enforcedMemoryLimit(pod *v1.Pod, container *v1.Container) int64 {
+	draAllocations := v1.ResourceList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		draAllocations = resourcehelper.GetContainerDRAAllocations(pod, container.Name)
+	}
+	return GetContainerMemoryLimit(pod, container, draAllocations).Value()
+}
+
+// log2Floor returns floor(log2(x)), or 0 for x < 1.
+func log2Floor(x int64) int64 {
+	if x < 1 {
+		return 0
+	}
+	return int64(bits.Len64(uint64(x))) - 1
 }
 
 // isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
