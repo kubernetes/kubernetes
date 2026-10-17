@@ -10870,7 +10870,8 @@ func newPodGroupQueueInUnschedulable(t *testing.T, ctx context.Context, hint fwk
 }
 
 // TestPreQueueingHint_GroupPreCheck verifies that in the narrowed path preCheck
-// sees every member of the group a hinted pod resolves to. The hint names one
+// sees every member of the group a hinted pod resolves to, including members of
+// other leaf PodGroups under the same CompositePodGroup root. The hint names one
 // member; preCheck rejects the group if it contains rejectUID. An unrelated
 // unschedulable pod checks that the narrowed path ran: the all-pods path would
 // collect it. The all-pods path is then run with the same preCheck, and must
@@ -10879,6 +10880,12 @@ func TestPreQueueingHint_GroupPreCheck(t *testing.T) {
 	podGroupGates := featuregatetesting.FeatureOverrides{
 		features.SchedulerPreQueueingHints: true,
 		features.GenericWorkload:           true,
+	}
+	compositePodGroupGates := featuregatetesting.FeatureOverrides{
+		features.SchedulerPreQueueingHints:       true,
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
 	}
 	tests := []struct {
 		name          string
@@ -10901,6 +10908,38 @@ func TestPreQueueingHint_GroupPreCheck(t *testing.T) {
 			gates:         podGroupGates,
 			newQueue:      newPodGroupQueueInUnschedulable,
 			hinted:        "pgpod1",
+			rejectUID:     "nobody",
+			wantCollected: true,
+		},
+		{
+			name:          "CompositePodGroup: preCheck rejects a member that was not hinted",
+			gates:         compositePodGroupGates,
+			newQueue:      newCPGQueueInUnschedulable,
+			hinted:        "cpgpod1",
+			rejectUID:     "cpgpod2",
+			wantCollected: false,
+		},
+		{
+			name:          "CompositePodGroup: preCheck accepts",
+			gates:         compositePodGroupGates,
+			newQueue:      newCPGQueueInUnschedulable,
+			hinted:        "cpgpod1",
+			rejectUID:     "nobody",
+			wantCollected: true,
+		},
+		{
+			name:          "CompositePodGroup: preCheck rejects a member of another leaf PodGroup",
+			gates:         compositePodGroupGates,
+			newQueue:      newCPGQueueInUnschedulable,
+			hinted:        "cpgpod1",
+			rejectUID:     "cpgpod3",
+			wantCollected: false,
+		},
+		{
+			name:          "CompositePodGroup: preCheck accepts, hinted pod in another leaf PodGroup",
+			gates:         compositePodGroupGates,
+			newQueue:      newCPGQueueInUnschedulable,
+			hinted:        "cpgpod3",
 			rejectUID:     "nobody",
 			wantCollected: true,
 		},
@@ -10996,6 +11035,8 @@ func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	cpgName := "root-cpg"
 	pgName := "pg1"
@@ -11013,8 +11054,8 @@ func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 		{PluginName: "testPlugin", QueueingHintFn: queueHintReturnQueue, PreQueueingHintFn: preQueueingHintFn},
 	}
 
-	// A standalone pod that the hint does NOT include; it must stay put, proving
-	// narrowing is active under CPG (without narrowing, all pods would be moved).
+	// A standalone pod that the hint does NOT include; it must stay put, showing
+	// the hint narrows requeueing under CPG.
 	other := st.MakePod().Name("other").Namespace("ns1").UID("other").Obj()
 
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2},
@@ -11060,27 +11101,30 @@ func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 }
 
 // newCPGQueueInUnschedulable builds a queue with a root CompositePodGroup (root-cpg)
-// whose leaf PodGroup (pg1) has members cpgpod1/cpgpod2, moves the root CPG entity
-// into the unschedulable pool (rejected by "testPlugin"), and returns the queue and
-// the root CPG lookup.
+// with two leaf PodGroups, pg1 (cpgpod1, cpgpod2) and pg2 (cpgpod3), moves the root
+// CPG entity into the unschedulable pool (rejected by "testPlugin"), and returns the
+// queue and the root CPG lookup.
 func newCPGQueueInUnschedulable(t *testing.T, ctx context.Context, hint fwk.PreQueueingHintFn) (*PriorityQueue, *framework.QueuedPodGroupInfo) {
 	t.Helper()
 	logger := klog.FromContext(ctx)
-	cpgName, pgName := "root-cpg", "pg1"
+	cpgName := "root-cpg"
 	cpg := st.MakeCompositePodGroup().Name(cpgName).Namespace("ns1").Obj()
-	pg := st.MakePodGroup().Name(pgName).Namespace("ns1").ParentCompositePodGroup(cpgName).Obj()
-	pod1 := st.MakePod().Name("cpgpod1").Namespace("ns1").UID("cpgpod1").PodGroupName(pgName).Obj()
-	pod2 := st.MakePod().Name("cpgpod2").Namespace("ns1").UID("cpgpod2").PodGroupName(pgName).Obj()
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup(cpgName).Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup(cpgName).Obj()
+	pod1 := st.MakePod().Name("cpgpod1").Namespace("ns1").UID("cpgpod1").PodGroupName("pg1").Obj()
+	pod2 := st.MakePod().Name("cpgpod2").Namespace("ns1").UID("cpgpod2").PodGroupName("pg1").Obj()
+	pod3 := st.MakePod().Name("cpgpod3").Namespace("ns1").UID("cpgpod3").PodGroupName("pg2").Obj()
 
 	m := makeEmptyQueueingHintMapPerProfile()
 	m[""][nodeAdd] = []*QueueingHintFunction{
 		{PluginName: "testPlugin", QueueingHintFn: queueHintReturnQueue, PreQueueingHintFn: hint},
 	}
-	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2},
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2, pod3},
 		WithQueueingHintMapPerProfile(m))
 	q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpg))
-	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
-	for _, pod := range []*v1.Pod{pod1, pod2} {
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg1))
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg2))
+	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
 		q.Add(ctx, pod)
 	}
 
@@ -11104,6 +11148,8 @@ func TestPreQueueingHint_CompositePodGroupDedup(t *testing.T) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	hint := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
 		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
@@ -11117,31 +11163,6 @@ func TestPreQueueingHint_CompositePodGroupDedup(t *testing.T) {
 	q.lock.Unlock()
 	if len(entities) != 1 {
 		t.Errorf("expected the CPG root collected exactly once, got %d entities", len(entities))
-	}
-}
-
-// TestPreQueueingHint_CompositePodGroupPreCheck verifies preCheck is applied to the
-// resolved CPG root entity in the narrowed path.
-func TestPreQueueingHint_CompositePodGroupPreCheck(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints:       true,
-		features.GenericWorkload:                 true,
-		features.CompositePodGroup:               true,
-		features.TopologyAwareWorkloadScheduling: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	hint := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "cpgpod1", Namespace: "ns1"}}}, nil
-	}
-	q, cpgLookup := newCPGQueueInUnschedulable(t, ctx, hint)
-
-	// preCheck rejects the CPG root, so it must not be collected/moved.
-	preCheck := func(entity framework.QueuedEntityInfo) bool { return false }
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), preCheck)
-
-	if q.unschedulableEntities.get(cpgLookup) == nil {
-		t.Errorf("CPG root should remain unschedulable when preCheck rejects it")
 	}
 }
 
