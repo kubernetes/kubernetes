@@ -18,7 +18,9 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -82,27 +84,42 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 		podClient.DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 		ginkgo.By("verifying the pod is no longer in the allocated pods list")
-		result = f.ClientSet.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			Name(pod.Spec.NodeName).
-			SubResource("proxy").
-			Suffix("allocatedPods").
-			Do(ctx)
+		// The kubelet processes pod deletion asynchronously after the API server
+		// deletion, so poll until the allocated pods list reflects the deletion or
+		// the timeout is reached.
+		framework.ExpectNoError(framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			result := f.ClientSet.CoreV1().RESTClient().Get().
+				Resource("nodes").
+				Name(pod.Spec.NodeName).
+				SubResource("proxy").
+				Suffix("allocatedPods").
+				Do(ctx)
 
-		framework.ExpectNoError(result.Error(), "failed to query allocated endpoint list after deletion")
-
-		statusCode = 0
-		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK))
-
-		var allocatedPodListAfterDelete v1.PodList
-		framework.ExpectNoError(result.Into(&allocatedPodListAfterDelete), "failed to decode response into pod list after deletion")
-
-		for _, p := range allocatedPodListAfterDelete.Items {
-			if p.Name == pod.Name && p.Namespace == pod.Namespace {
-				framework.Failf("Pod %s/%s still found in allocated pods list after deletion", pod.Namespace, pod.Name)
+			if err := result.Error(); err != nil {
+				return fmt.Errorf("failed to query allocated endpoint list after deletion: %w", err)
 			}
-		}
+
+			statusCode := 0
+			result.StatusCode(&statusCode)
+			if statusCode != http.StatusOK {
+				return fmt.Errorf("unexpected status code: %d", statusCode)
+			}
+
+			var allocatedPodListAfterDelete v1.PodList
+			if err := result.Into(&allocatedPodListAfterDelete); err != nil {
+				return fmt.Errorf("failed to decode response into pod list after deletion: %w", err)
+			}
+
+			for _, p := range allocatedPodListAfterDelete.Items {
+				if p.Name == pod.Name && p.Namespace == pod.Namespace {
+					return fmt.Errorf(
+						"pod %s/%s still found in allocated pods list after deletion",
+						pod.Namespace, pod.Name,
+					)
+				}
+			}
+			return nil
+		}).WithTimeout(f.Timeouts.PodDelete).WithPolling(time.Second).Should(gomega.Succeed()))
 	})
 
 	ginkgo.It("should not change allocated pod resources when a resize is deferred", func(ctx context.Context) {
