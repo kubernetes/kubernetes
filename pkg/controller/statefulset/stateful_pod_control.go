@@ -102,14 +102,28 @@ func (om *realStatefulPodControlObjectManager) GetPod(namespace, podName string)
 }
 
 func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error {
-	pod, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	ctx := context.TODO()
+	livePod, err := om.client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		livePod = &v1.Pod{}
+	} else {
+		livePod = livePod.DeepCopy()
+	}
+	livePod.Name = pod.Name
+	livePod.Namespace = pod.Namespace
+	livePod.Labels = pod.Labels
+	livePod.Spec.Volumes = pod.Spec.Volumes
+	updatedPod, err := om.client.CoreV1().Pods(pod.Namespace).Update(ctx, livePod, metav1.UpdateOptions{})
 	if err == nil {
 		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
 		om.consistencyStore.WroteAt(
 			ssNamespacedName,
 			ss.UID,
 			podGroupResource,
-			pod.ResourceVersion,
+			updatedPod.ResourceVersion,
 		)
 	}
 	return err

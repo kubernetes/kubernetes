@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/cobra"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -531,17 +530,9 @@ func (c ControllerContext) NewClient(name string) (kubernetes.Interface, error) 
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
+//
+//go:generate go test k8s.io/kubernetes/test/utils/informertrim -update-informer-trim
 func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
-	// Informer transform to trim ManagedFields for memory efficiency.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
-			}
-		}
-		return obj, nil
-	}
-
 	versionedClient, err := rootClientBuilder.Client("shared-informers")
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
@@ -552,7 +543,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create informer name: %w", err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithInformerName(informerName))
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trimInformerObject), informers.WithInformerName(informerName))
 
 	metadataConfig, err := rootClientBuilder.Config("metadata-informers")
 	if err != nil {
@@ -564,7 +555,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
 	}
 
-	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
+	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trimInformerObject))
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
