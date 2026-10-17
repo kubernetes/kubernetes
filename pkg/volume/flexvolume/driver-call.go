@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -124,10 +125,10 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 
 	cmd := dc.plugin.runner.Command(execPath, dc.args...)
 
-	timeout := false
+	var timeout atomic.Bool
 	if dc.Timeout > 0 {
 		timer := time.AfterFunc(dc.Timeout, func() {
-			timeout = true
+			timeout.Store(true)
 			cmd.Stop()
 		})
 		defer timer.Stop()
@@ -135,7 +136,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 
 	output, execErr := cmd.CombinedOutput()
 	if execErr != nil {
-		if timeout {
+		if timeout.Load() {
 			return nil, errTimeout
 		}
 		_, err := handleCmdResponse(dc.Command, output)
