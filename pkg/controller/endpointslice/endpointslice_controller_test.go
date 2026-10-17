@@ -192,8 +192,8 @@ func TestSyncServiceNoSelector(t *testing.T) {
 		},
 	})
 
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err)
 	assert.Empty(t, client.Actions())
 }
@@ -251,7 +251,7 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			client, esController := newController(t, []string{"node-1"}, time.Duration(0))
-			logger, _ := ktesting.NewTestContext(t)
+			_, ctx := ktesting.NewTestContext(t)
 
 			pod := newPod(1, namespace, true, 0, false)
 			err := esController.podStore.Add(pod)
@@ -260,7 +260,7 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 			err = esController.serviceStore.Add(tc.service)
 			require.NoError(t, err)
 
-			err = esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
+			err = esController.syncService(ctx, fmt.Sprintf("%s/%s", namespace, serviceName))
 			require.NoError(t, err)
 			assert.Empty(t, client.Actions())
 
@@ -285,8 +285,8 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 		},
 	})
 
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err)
 	assert.Empty(t, client.Actions())
 }
@@ -334,8 +334,8 @@ func TestSyncServiceMissing(t *testing.T) {
 	missingServiceKey := endpointsliceutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
 	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointsliceutil.ServiceState{}
 
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, missingServiceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", namespace, missingServiceName))
 
 	// nil should be returned when the service doesn't exist
 	require.NoError(t, err, "Expected no error syncing service")
@@ -382,8 +382,8 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	service := createService(t, esController, ns, serviceName)
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
@@ -412,9 +412,9 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 		t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 	}
 
-	logger, _ = ktesting.NewTestContext(t)
+	_, ctx = ktesting.NewTestContext(t)
 	numActionsBefore := len(client.Actions())
-	err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+	err = esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
 
 	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
@@ -503,8 +503,8 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	}
 
 	numActionsBefore := len(client.Actions())
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
 
 	if len(client.Actions()) != numActionsBefore+2 {
@@ -1294,8 +1294,8 @@ func TestSyncService(t *testing.T) {
 			_, err := esController.client.CoreV1().Services(testcase.service.Namespace).Create(context.TODO(), testcase.service, metav1.CreateOptions{})
 			require.NoError(t, err, "Expected no error creating service")
 
-			logger, _ := ktesting.NewTestContext(t)
-			err = esController.syncService(logger, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
+			_, ctx := ktesting.NewTestContext(t)
+			err = esController.syncService(ctx, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
 			require.NoError(t, err)
 
 			// last action should be to create endpoint slice
@@ -1765,8 +1765,8 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 			epSlice2.Generation = testcase.trackerGenerationNumber
 			esController.endpointSliceTracker.Update(epSlice2)
 
-			logger, _ := ktesting.NewTestContext(t)
-			err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
+			_, ctx := ktesting.NewTestContext(t)
+			err = esController.syncService(ctx, fmt.Sprintf("%s/%s", ns, serviceName))
 			// Check if we got a StaleInformerCache error
 			if endpointslicepkg.IsStaleInformerCacheErr(err) != testcase.expectError {
 				t.Fatalf("Expected error because informer cache is outdated")
@@ -1944,8 +1944,8 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 				}
 			}
 
-			logger, _ := ktesting.NewTestContext(t)
-			esController.checkNodeTopologyDistribution(logger)
+			_, ctx := ktesting.NewTestContext(t)
+			esController.checkNodeTopologyDistribution(ctx)
 
 			if esController.serviceQueue.Len() != tc.expectedQueueLen {
 				t.Errorf("Expected %d services to be queued, got %d", tc.expectedQueueLen, esController.serviceQueue.Len())
@@ -2004,13 +2004,13 @@ func TestUpdateNode(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
 		Status:     nodeReadyStatus,
 	}
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	esController.nodeStore.Add(node1)
 	esController.nodeStore.Add(node2)
 	esController.addNode()
 	esController.addNode()
 	assert.Equal(t, 1, esController.topologyQueue.Len())
-	esController.processNextTopologyWorkItem(logger)
+	esController.processNextTopologyWorkItem(ctx)
 	assert.Equal(t, 0, esController.topologyQueue.Len())
 	// The Nodes don't have the zone label, AddHints should fail.
 	_, _, eventsBuilders := esController.topologyCache.AddHints(logger, sliceInfo)
@@ -2028,7 +2028,7 @@ func TestUpdateNode(t *testing.T) {
 	esController.updateNode(node1, updateNode1)
 	esController.updateNode(node2, updateNode2)
 	assert.Equal(t, 1, esController.topologyQueue.Len())
-	esController.processNextTopologyWorkItem(logger)
+	esController.processNextTopologyWorkItem(ctx)
 	assert.Equal(t, 0, esController.topologyQueue.Len())
 	_, _, eventsBuilders = esController.topologyCache.AddHints(logger, sliceInfo)
 	require.Len(t, eventsBuilders, 1)
@@ -2048,8 +2048,8 @@ func standardSyncService(t *testing.T, esController *endpointSliceController, na
 	t.Helper()
 	createService(t, esController, namespace, serviceName)
 
-	logger, _ := ktesting.NewTestContext(t)
-	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
+	_, ctx := ktesting.NewTestContext(t)
+	err := esController.syncService(ctx, fmt.Sprintf("%s/%s", namespace, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
 }
 
@@ -2214,14 +2214,14 @@ func TestSyncServiceServiceRecreated(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	_, controller := newController(t, []string{"node-1"}, 1*time.Second)
 
 	// Simulate tracker tracking an old slice from previous service UID
 	controller.endpointSliceTracker.Update(oldES)
 
 	// Syncing recreated service with new UID must not fail with stale informer cache
-	err := controller.syncService(logger, "default/recreated-svc")
+	err := controller.syncService(ctx, "default/recreated-svc")
 	if err != nil {
 		t.Fatalf("Expected no error syncing recreated service, got: %v", err)
 	}
