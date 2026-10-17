@@ -848,11 +848,44 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+		newWatchDecoder(r.watchDecoderForRequest(), watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
+}
+
+const (
+	watchDecoderEnv                                      = "KUBE_WATCH_DECODER"
+	watchDecoderConcurrent                               = "ConcurrentDecoder"
+	watchDecoderConcurrentWithOutputQueue                = "ConcurrentDecoderWithOutputQueue"
+	watchDecoderConcurrentWithFixedWorkersAndOutputQueue = "ConcurrentDecoderWithFixedWorkersAndOutputQueue"
+)
+
+func (r *Request) watchDecoderForRequest() string {
+	if r.isWatchListRequest() {
+		return os.Getenv(watchDecoderEnv)
+	}
+	return ""
+}
+
+// isWatchListRequest reports whether this request carries the wire-level
+// marker used by Reflector WatchList requests.
+func (r *Request) isWatchListRequest() bool {
+	return r.params.Get("sendInitialEvents") == "true"
+}
+
+func newWatchDecoder(decoder string, stream streaming.Decoder, object runtime.Decoder) watch.Decoder {
+	switch decoder {
+	case watchDecoderConcurrent:
+		return restclientwatch.NewConcurrentDecoder(stream, object)
+	case watchDecoderConcurrentWithOutputQueue:
+		return restclientwatch.NewConcurrentDecoderWithOutputQueue(stream, object)
+	case watchDecoderConcurrentWithFixedWorkersAndOutputQueue:
+		return restclientwatch.NewConcurrentDecoderWithFixedWorkersAndOutputQueue(stream, object)
+	default:
+		return restclientwatch.NewDecoder(stream, object)
+	}
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,

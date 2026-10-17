@@ -163,6 +163,7 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
 }
 
 var _ fmt.Stringer = new(Config)

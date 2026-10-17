@@ -76,6 +76,26 @@ func TestNewRequestSetsAccept(t *testing.T) {
 	}
 }
 
+func TestWatchDecoderForRequest(t *testing.T) {
+	t.Setenv(watchDecoderEnv, watchDecoderConcurrent)
+	r := &Request{params: url.Values{}}
+
+	if r.isWatchListRequest() {
+		t.Fatal("isWatchListRequest() = true for a regular watch")
+	}
+	if got := r.watchDecoderForRequest(); got != "" {
+		t.Fatalf("watchDecoderForRequest() = %q, want empty for a regular watch", got)
+	}
+
+	r.params.Set("sendInitialEvents", "true")
+	if !r.isWatchListRequest() {
+		t.Fatal("isWatchListRequest() = false for a WatchList request")
+	}
+	if got := r.watchDecoderForRequest(); got != watchDecoderConcurrent {
+		t.Fatalf("watchDecoderForRequest() = %q, want %q for a WatchList request", got, watchDecoderConcurrent)
+	}
+}
+
 func clientForFunc(fn clientFunc) *http.Client {
 	return &http.Client{
 		Transport: fn,
