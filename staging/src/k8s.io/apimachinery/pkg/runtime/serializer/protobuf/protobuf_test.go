@@ -178,3 +178,118 @@ func (ta *testAllocator) Allocate(n uint64) []byte {
 	ta.allocateCount++
 	return ta.buf
 }
+
+func TestSerializerDecode(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "Carp"}
+	carp := &testapigroupv1.Carp{
+		TypeMeta: metav1.TypeMeta{APIVersion: "group/version", Kind: "Carp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+		},
+		Spec: testapigroupv1.CarpSpec{
+			Subdomain: "carp.k8s.io",
+		},
+	}
+
+	testCases := []struct {
+		name string
+		in   runtime.Object
+		into runtime.Object
+	}{
+		{
+			name: "decode into a typed obj",
+			in:   carp,
+			into: &testapigroupv1.Carp{},
+		},
+		{
+			name: "decode into a runtime.Unknown obj without aliasing input data",
+			in:   carp,
+			into: &runtime.Unknown{},
+		},
+		{
+			name: "decode empty Raw (0x12, 0x00) into a runtime.Unknown obj without aliasing input data",
+			in:   &runtime.Unknown{TypeMeta: runtime.TypeMeta{APIVersion: "group/version", Kind: "Carp"}, Raw: []byte{}},
+			into: &runtime.Unknown{},
+		},
+		{
+			name: "decode nil Raw into a runtime.Unknown obj without aliasing input data",
+			in:   &runtime.Unknown{TypeMeta: runtime.TypeMeta{APIVersion: "group/version", Kind: "Carp"}, Raw: nil},
+			into: &runtime.Unknown{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			creater := &mockCreater{obj: &testapigroupv1.Carp{}}
+			typer := &mockTyper{gvk: &gvk}
+			target := NewSerializer(creater, typer)
+
+			writer := &bytes.Buffer{}
+			if err := target.Encode(tc.in, writer); err != nil {
+				t.Fatal(err)
+			}
+			data := bytes.Clone(writer.Bytes())
+
+			obj, _, err := target.Decode(data, &gvk, tc.into)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if intoUnknown, ok := obj.(*runtime.Unknown); ok {
+				if len(intoUnknown.Raw) == 0 && cap(intoUnknown.Raw) != 0 {
+					t.Fatalf("cap(intoUnknown.Raw) = %d, want 0 for empty/nil Raw", cap(intoUnknown.Raw))
+				}
+				rawCopy := bytes.Clone(intoUnknown.Raw)
+				// to ensure callers decoding into runtime.Unknown can safely retain Raw, mutating data must not mutate intoUnknown.Raw
+				for i := range data {
+					data[i] ^= 0xff
+				}
+				if !reflect.DeepEqual(intoUnknown.Raw, rawCopy) {
+					t.Fatal("data mismatch, mutating input buffer mutated intoUnknown.Raw")
+				}
+				return
+			}
+
+			if !reflect.DeepEqual(obj, carp) {
+				t.Fatal("data mismatch, decoded object is different than encoded object")
+			}
+		})
+	}
+}
+
+func BenchmarkSerializerDecode(b *testing.B) {
+	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "Carp"}
+	creater := &mockCreater{obj: &testapigroupv1.Carp{}}
+	typer := &mockTyper{gvk: &gvk}
+	target := NewSerializer(creater, typer)
+
+	obj := &testapigroupv1.Carp{
+		TypeMeta: metav1.TypeMeta{APIVersion: "group/version", Kind: "Carp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+			Annotations: map[string]string{
+				"payload": string(bytes.Repeat([]byte("a"), 20*1024)),
+			},
+		},
+		Spec: testapigroupv1.CarpSpec{
+			Subdomain: "carp.k8s.io",
+		},
+	}
+
+	writer := &bytes.Buffer{}
+	if err := target.Encode(obj, writer); err != nil {
+		b.Fatal(err)
+	}
+	data := writer.Bytes()
+
+	var into testapigroupv1.Carp
+	b.ReportAllocs()
+	b.SetBytes(int64(len(data)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, err := target.Decode(data, &gvk, &into); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
