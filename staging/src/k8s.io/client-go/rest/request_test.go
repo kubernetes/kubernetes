@@ -55,6 +55,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
@@ -73,6 +75,17 @@ func TestNewRequestSetsAccept(t *testing.T) {
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
 	if r.headers.Get("Accept") != "application/other, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
+	// DropManagedFields set directly still needs the ManagedFieldsOptOutClient feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{DropManagedFields: true}, nil).Verb("get")
+	req, err := r.newHTTPRequest(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Header.Get("Accept") != "application/json, */*" {
+		t.Errorf("unexpected headers: %#v", req.Header)
 	}
 }
 
