@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1921,6 +1922,47 @@ func TestReconcilePodStatus(t *testing.T) {
 	syncer.SetPodStatus(logger, testPod, changedPodStatus)
 	syncer.syncBatch(ctx, true)
 	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+}
+
+func TestGetPodStatusDataRace(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	client := fake.NewSimpleClientset(pod)
+	m := newTestManager(client)
+	m.podManager.(mutablePodManager).AddPod(pod)
+	status := v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			},
+		},
+	}
+	m.SetPodStatus(logger, pod, status)
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		for range 1000 {
+			s, _ := m.GetPodStatus(pod.UID)
+			m.SetPodStatus(logger, pod, s)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		for range 1000 {
+			s, _ := m.GetPodStatus(pod.UID)
+			for i := range s.Conditions {
+				_ = s.Conditions[i].LastTransitionTime
+			}
+		}
+	}()
+	close(start)
+	wg.Wait()
 }
 
 func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
