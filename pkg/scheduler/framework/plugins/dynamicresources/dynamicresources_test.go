@@ -2847,6 +2847,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"dont-add-allocation-timestamp": {
+			enableDRAExtendedResource:         true,
 			disableDRADeviceBindingConditions: true,
 			pod:                               podWithClaimName,
 			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
@@ -4146,6 +4147,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				})
 			}
 			if tc.disableDRADeviceBindingConditions {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, false)
 			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
@@ -5141,7 +5143,7 @@ func TestAllocatorSelection(t *testing.T) {
 		},
 		"DeviceBindingAndStatus": {
 			features:             "AllAlpha=false,AllBeta=false,DRAResourceClaimDeviceStatus=true,DRADeviceBindingConditions=true",
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 		"DeviceTaints": {
 			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",

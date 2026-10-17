@@ -1690,6 +1690,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions": {
 			oldObj:    obj,
@@ -1701,6 +1702,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
 			oldObj:    obj,
@@ -1724,6 +1726,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-optional-node-operations": {
 			oldObj:    obj,
@@ -1779,6 +1782,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-exist-fields-allocation-timestamp-disable-feature-gate": {
 			oldObj:    objWithAllocationTimestamp,
@@ -1790,6 +1794,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {
