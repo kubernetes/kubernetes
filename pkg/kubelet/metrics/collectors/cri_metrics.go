@@ -113,7 +113,14 @@ func (c *criMetricsCollector) criMetricToProm(logger klog.Logger, m *runtimeapi.
 
 	typ := criTypeToProm[m.MetricType]
 
-	pm, err := metrics.NewConstMetric(desc, typ, float64(m.GetValue().Value), m.LabelValues...)
+	// Prefer double_value for metrics carrying fractional values. Producers set
+	// double_value for such metrics and also populate value for back-compat.
+	val := float64(m.GetValue().GetValue())
+	if dv := m.GetDoubleValue(); dv != nil {
+		val = dv.GetValue()
+	}
+
+	pm, err := metrics.NewConstMetric(desc, typ, val, m.LabelValues...)
 	if err != nil {
 		logger.Error(err, "Error getting CRI prometheus metric", "descriptor", desc.String())
 		return nil, err
