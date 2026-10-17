@@ -320,8 +320,8 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
-	return nil
+func (cm *containerManagerImpl) GetAllocatableDevices(logger klog.Logger) []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices(logger))
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
