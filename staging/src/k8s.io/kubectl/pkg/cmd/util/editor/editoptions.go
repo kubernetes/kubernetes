@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,14 +119,20 @@ func NewEditOptions(editMode EditMode, ioStreams genericiooptions.IOStreams) *Ed
 }
 
 type editPrinterOptions struct {
-	printFlags *genericclioptions.PrintFlags
-	ext        string
-	addHeader  bool
+	printFlags        *genericclioptions.PrintFlags
+	ext               string
+	addHeader         bool
+	showManagedFields bool
 }
 
 func (e *editPrinterOptions) Complete(fromPrintFlags *genericclioptions.PrintFlags) error {
 	if e.printFlags == nil {
 		return fmt.Errorf("missing PrintFlags in editor printer options")
+	}
+
+	if fromPrintFlags != nil && fromPrintFlags.JSONYamlPrintFlags != nil {
+		e.printFlags.JSONYamlPrintFlags.ShowManagedFields = fromPrintFlags.JSONYamlPrintFlags.ShowManagedFields
+		e.showManagedFields = fromPrintFlags.JSONYamlPrintFlags.ShowManagedFields
 	}
 
 	// bind output format from existing printflags
@@ -359,12 +366,20 @@ func (o *EditOptions) Run() error {
 			containsError = false
 			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
-			// we need to add back managedFields to both updated and original object
-			if err := o.restoreManagedFields(updatedInfos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
-			}
-			if err := o.restoreManagedFields(infos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
+			if o.editPrinterOptions.showManagedFields {
+				// we are already showing managed fields and no need to restore it.
+				// but we need to verify that user does not make any changes on managed fields.
+				if err := o.verifyManagedFieldsUnchanged(updatedInfos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+			} else {
+				// we need to add back managedFields to both updated and original object
+				if err := o.restoreManagedFields(updatedInfos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+				if err := o.restoreManagedFields(infos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
 			}
 
 			// need to make sure the original namespace wasn't changed while editing
@@ -470,7 +485,7 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 	o.managedFields = make(map[types.UID][]metav1.ManagedFieldsEntry)
 	if meta.IsListType(obj) {
 		err := meta.EachListItem(obj, func(obj runtime.Object) error {
-			uid, mf, err := clearManagedFields(obj)
+			uid, mf, err := o.clearManagedFields(obj)
 			if err != nil {
 				return err
 			}
@@ -479,7 +494,7 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 		})
 		return err
 	}
-	uid, mf, err := clearManagedFields(obj)
+	uid, mf, err := o.clearManagedFields(obj)
 	if err != nil {
 		return err
 	}
@@ -487,14 +502,32 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 	return nil
 }
 
-func clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
+func (o *EditOptions) clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
 	metaObjs, err := meta.Accessor(obj)
 	if err != nil {
 		return "", nil, err
 	}
 	mf := metaObjs.GetManagedFields()
-	metaObjs.SetManagedFields(nil)
+	if !o.editPrinterOptions.showManagedFields {
+		metaObjs.SetManagedFields(nil)
+	}
 	return metaObjs.GetUID(), mf, nil
+}
+
+// verifyManagedFieldsUnchanged rejects edits to managedFields when they were shown
+// via --show-managed-fields, since kubectl edit never sends them to the server.
+func (o *EditOptions) verifyManagedFieldsUnchanged(infos []*resource.Info) error {
+	for _, info := range infos {
+		metaObjs, err := meta.Accessor(info.Object)
+		if err != nil {
+			return err
+		}
+		mf := o.managedFields[metaObjs.GetUID()]
+		if !apiequality.Semantic.DeepEqual(mf, metaObjs.GetManagedFields()) {
+			return fmt.Errorf("managed fields can not be edited")
+		}
+	}
+	return nil
 }
 
 func (o *EditOptions) restoreManagedFields(infos []*resource.Info) error {

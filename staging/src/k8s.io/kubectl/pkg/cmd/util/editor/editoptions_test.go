@@ -17,6 +17,8 @@ limitations under the License.
 package editor
 
 import (
+	"bytes"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -468,6 +470,115 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 			o := &EditOptions{}
 			if err := o.visitToPatch(tt.args.originalInfos, tt.args.patchVisitor, tt.args.results); !tt.checkErr(err) {
 				t.Errorf("EditOptions.visitToPatch() %s error = %v", tt.name, err)
+			}
+		})
+	}
+}
+
+func TestEditPrinterOptionsShowManagedFields(t *testing.T) {
+	for _, show := range []bool{true, false} {
+		t.Run(fmt.Sprintf("show=%v", show), func(t *testing.T) {
+			o := NewEditOptions(NormalEditMode, genericiooptions.NewTestIOStreamsDiscard())
+			o.PrintFlags.JSONYamlPrintFlags.ShowManagedFields = show
+			if err := o.editPrinterOptions.Complete(o.PrintFlags); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if o.editPrinterOptions.showManagedFields != show {
+				t.Errorf("expected showManagedFields=%v, got %v", show, o.editPrinterOptions.showManagedFields)
+			}
+			if o.editPrinterOptions.printFlags.JSONYamlPrintFlags.ShowManagedFields != show {
+				t.Errorf("expected printer ShowManagedFields=%v, got %v", show, o.editPrinterOptions.printFlags.JSONYamlPrintFlags.ShowManagedFields)
+			}
+
+			pod := &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:          "foo",
+					ManagedFields: []metav1.ManagedFieldsEntry{{Manager: "test-manager"}},
+				},
+			}
+			buf := &bytes.Buffer{}
+			if err := o.editPrinterOptions.PrintObj(pod, buf); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got := strings.Contains(buf.String(), "test-manager"); got != show {
+				t.Errorf("expected managedFields printed=%v, got output:\n%s", show, buf.String())
+			}
+		})
+	}
+}
+
+func TestEditShowManagedFields(t *testing.T) {
+	newObj := func(mf []interface{}) *unstructured.Unstructured {
+		metadata := map[string]interface{}{
+			"name": "foo",
+			"uid":  "12345",
+		}
+		if mf != nil {
+			metadata["managedFields"] = mf
+		}
+		return &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   metadata,
+		}}
+	}
+	originalMF := []interface{}{
+		map[string]interface{}{
+			"manager":    "test",
+			"operation":  "Apply",
+			"apiVersion": "v1",
+		},
+	}
+
+	tests := map[string]struct {
+		edited    *unstructured.Unstructured
+		expectErr bool
+	}{
+		"managedFields kept": {
+			edited: newObj([]interface{}{
+				map[string]interface{}{
+					"manager":    "test",
+					"operation":  "Apply",
+					"apiVersion": "v1",
+				},
+			}),
+		},
+		"managedFields changed": {
+			edited: newObj([]interface{}{
+				map[string]interface{}{
+					"manager":    "changed",
+					"operation":  "Apply",
+					"apiVersion": "v1",
+				},
+			}),
+			expectErr: true,
+		},
+		"managedFields removed": {
+			edited:    newObj(nil),
+			expectErr: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := NewEditOptions(NormalEditMode, genericiooptions.NewTestIOStreamsDiscard())
+			o.editPrinterOptions.showManagedFields = true
+
+			original := newObj(originalMF)
+			if err := o.extractManagedFields(original); err != nil {
+				t.Fatalf("unexpected extraction error: %v", err)
+			}
+			if len(original.GetManagedFields()) == 0 {
+				t.Fatalf("expected managedFields to be kept on the object when shown")
+			}
+
+			err := o.verifyManagedFieldsUnchanged([]*resource.Info{{Object: test.edited}})
+			if test.expectErr && err == nil {
+				t.Errorf("expected error, got none")
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
