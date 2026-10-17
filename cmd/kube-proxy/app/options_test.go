@@ -590,6 +590,132 @@ kind: KubeProxyConfiguration
 				return c
 			}(),
 		},
+		"kubeadm-iptables": {
+			config: `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+  qps: 0
+clusterCIDR: 10.244.0.0/16
+configSyncPeriod: 0s
+conntrack:
+  maxPerCore: null
+  min: null
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+detectLocalMode: ""
+enableProfiling: false
+healthzBindAddress: ""
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  strictARP: false
+  syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
+kind: KubeProxyConfiguration
+metricsBindAddress: ""
+mode: "iptables"
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+showHiddenMetricsForVersion: ""
+`,
+			flags: []string{
+				"--hostname-override=node1",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.BindAddress = "0.0.0.0"
+				c.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
+				c.DetectLocal.ClusterCIDRs = []string{"10.244.0.0/16"}
+				c.DetectLocalMode = kubeproxyconfig.LocalModeClusterCIDR
+				c.Mode = "iptables"
+				c.HostnameOverride = "node1"
+				return c
+			}(),
+		},
+		"legacy-flags": {
+			flags: []string{
+				"--kubeconfig=/var/lib/kube-proxy/kubeconfig.conf",
+				"--cluster-cidr=10.244.0.0/16",
+				"--proxy-mode=ipvs",
+				"--hostname-override=node1",
+				"--ipvs-scheduler=rr",
+				"--ipvs-strict-arp=true",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
+				c.DetectLocal.ClusterCIDRs = []string{"10.244.0.0/16"}
+				c.DetectLocalMode = kubeproxyconfig.LocalModeClusterCIDR
+				c.Mode = "ipvs"
+				c.HostnameOverride = "node1"
+				c.IPVS.Scheduler = "rr"
+				c.IPVS.StrictARP = true
+				return c
+			}(),
+		},
+		"ipv6": {
+			config: `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: "::"
+clientConnection:
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+clusterCIDR: fd00:1::/64
+kind: KubeProxyConfiguration
+metricsBindAddress: "[::1]:10249"
+mode: "iptables"
+`,
+			flags: []string{
+				"--hostname-override=node1",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.BindAddress = "::"
+				c.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
+				c.DetectLocal.ClusterCIDRs = []string{"fd00:1::/64"}
+				c.DetectLocalMode = kubeproxyconfig.LocalModeClusterCIDR
+				c.MetricsBindAddress = "[::1]:10249"
+				c.HealthzBindAddress = "[::]:10256"
+				c.Mode = "iptables"
+				c.HostnameOverride = "node1"
+				return c
+			}(),
+		},
+		"dualstack": {
+			config: `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+clientConnection:
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+clusterCIDR: 10.244.0.0/16,fd00:1::/64
+kind: KubeProxyConfiguration
+mode: "iptables"
+`,
+			flags: []string{
+				"--hostname-override=node1",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.BindAddress = "0.0.0.0"
+				c.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
+				c.DetectLocal.ClusterCIDRs = []string{"10.244.0.0/16", "fd00:1::/64"}
+				c.DetectLocalMode = kubeproxyconfig.LocalModeClusterCIDR
+				c.Mode = "iptables"
+				c.HostnameOverride = "node1"
+				return c
+			}(),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			options := NewOptions()
