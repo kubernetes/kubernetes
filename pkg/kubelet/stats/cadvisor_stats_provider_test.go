@@ -903,6 +903,84 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *containerfs.InodesUsed)
 }
 
+func TestCadvisorListPodStatsWithFilteredContainers(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		phase            v1.PodPhase
+		statusFound      bool
+		started          bool
+		containerRunning bool
+		cgroupsRemoved   bool
+		wantPod          bool
+	}{
+		{name: "crashloop", phase: v1.PodRunning, statusFound: true, started: true, wantPod: true},
+		{name: "restarted", phase: v1.PodRunning, statusFound: true, started: true, containerRunning: true, wantPod: true},
+		{name: "succeeded", phase: v1.PodSucceeded, statusFound: true, started: true},
+		{name: "failed", phase: v1.PodFailed, statusFound: true, started: true},
+		{name: "pending", phase: v1.PodPending, statusFound: true, started: true},
+		{name: "deleted", started: true},
+		{name: "cgroups removed", phase: v1.PodRunning, statusFound: true, started: true, cgroupsRemoved: true},
+		{name: "missing start time", phase: v1.PodRunning, statusFound: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t).Context
+			const podName, namespace = "crashloop", "test"
+			podRef := statsapi.PodReference{Name: podName, Namespace: namespace, UID: "UID" + podName}
+			infos := map[string]cadvisorapi.ContainerInfo{
+				"/":        getTestContainerInfo(0, "", "", ""),
+				"/infra":   getTerminatedContainerInfo(1000, podName, namespace, kubelettypes.PodInfraContainerName),
+				"/app-old": getTerminatedContainerInfo(2000, podName, namespace, "app"),
+				"/app":     getTerminatedContainerInfo(3000, podName, namespace, "app"),
+			}
+			if tc.containerRunning {
+				infos["/app"] = getTestContainerInfo(3000, podName, namespace, "app")
+			}
+			if tc.cgroupsRemoved {
+				delete(infos, "/infra")
+				delete(infos, "/app-old")
+				delete(infos, "/app")
+			}
+			mockCadvisor := cadvisortest.NewMockInterface(t)
+			mockCadvisor.EXPECT().RootFsInfo().Return(cadvisorapi.FsInfo{}, nil)
+			mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(cadvisorapi.FsInfo{}, nil)
+			mockCadvisor.EXPECT().ContainerInfoV2("/", cadvisorapi.RequestOptions{
+				IdType: cadvisorapi.TypeName, Count: 2, Recursive: true,
+			}).Return(infos, nil)
+			podStatus := v1.PodStatus{Phase: tc.phase}
+			if tc.started {
+				started := metav1.Now()
+				podStatus.StartTime = &started
+			}
+			mockStatus := statustest.NewMockPodStatusProvider(t)
+			mockStatus.EXPECT().GetPodStatus(types.UID(podRef.UID)).Return(podStatus, tc.statusFound).Maybe()
+			usedBytes := uint64(42)
+			volumeStats := []statsapi.VolumeStats{{
+				Name:    "data",
+				PVCRef:  &statsapi.PVCReference{Name: "data", Namespace: namespace},
+				FsStats: statsapi.FsStats{UsedBytes: &usedBytes},
+			}}
+			resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: serverstats.PodVolumeStats{PersistentVolumes: volumeStats}}
+			p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+			pods, err := p.ListPodStats(ctx)
+			require.NoError(t, err)
+			if !tc.wantPod {
+				require.Empty(t, pods)
+				return
+			}
+			require.Len(t, pods, 1)
+			assert.Equal(t, podRef, pods[0].PodRef)
+			assert.Equal(t, *podStatus.StartTime, pods[0].StartTime)
+			assert.Equal(t, volumeStats, pods[0].VolumeStats)
+			if tc.containerRunning {
+				require.Len(t, pods[0].Containers, 1)
+				assert.Equal(t, "app", pods[0].Containers[0].Name)
+			} else {
+				assert.Empty(t, pods[0].Containers)
+			}
+		})
+	}
+}
+
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	ctx := ktesting.Init(t).Context
 	const (
