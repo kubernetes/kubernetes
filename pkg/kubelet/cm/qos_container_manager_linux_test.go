@@ -821,3 +821,95 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestSetHugePagesConfig(t *testing.T) {
+	hp2Mi := v1.ResourceName("hugepages-2Mi")
+	hp1Gi := v1.ResourceName("hugepages-1Gi")
+	const pageSizeBytes2Mi = int64(2 * 1024 * 1024)
+	const pageSizeBytes1Gi = int64(1024 * 1024 * 1024)
+	const unbounded = int64(1 << 62)
+
+	type perSize struct {
+		pageSize int64
+		expected int64
+	}
+
+	testCases := []struct {
+		name        string
+		allocatable v1.ResourceList
+		guaranteed  []perSize
+		burstable   []perSize
+		bestEffort  []perSize
+	}{
+		{
+			name: "2Mi hugepages in allocatable: Guaranteed gets capped, others unbounded",
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+				hp2Mi:             resource.MustParse("64Mi"),
+			},
+			guaranteed: []perSize{{pageSizeBytes2Mi, 64 * 1024 * 1024}},
+			burstable:  []perSize{{pageSizeBytes2Mi, unbounded}},
+			bestEffort: []perSize{{pageSizeBytes2Mi, unbounded}},
+		},
+		{
+			name: "2Mi and 1Gi hugepages in allocatable",
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+				hp2Mi:             resource.MustParse("64Mi"),
+				hp1Gi:             resource.MustParse("2Gi"),
+			},
+			guaranteed: []perSize{
+				{pageSizeBytes2Mi, 64 * 1024 * 1024},
+				{pageSizeBytes1Gi, 2 * 1024 * 1024 * 1024},
+			},
+			burstable:  []perSize{{pageSizeBytes2Mi, unbounded}, {pageSizeBytes1Gi, unbounded}},
+			bestEffort: []perSize{{pageSizeBytes2Mi, unbounded}, {pageSizeBytes1Gi, unbounded}},
+		},
+		{
+			name: "no hugepages in allocatable: all tiers unbounded",
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+			},
+			guaranteed: []perSize{{pageSizeBytes2Mi, unbounded}},
+			burstable:  []perSize{{pageSizeBytes2Mi, unbounded}},
+			bestEffort: []perSize{{pageSizeBytes2Mi, unbounded}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &qosContainerManagerImpl{
+				getNodeAllocatable: func() v1.ResourceList {
+					return tc.allocatable
+				},
+			}
+
+			configs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSGuaranteed: {ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBurstable:  {ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBestEffort: {ResourceParameters: &ResourceConfig{}},
+			}
+
+			err := m.setHugePagesConfig(configs)
+			require.NoError(t, err)
+
+			checkLimits := func(qos v1.PodQOSClass, checks []perSize) {
+				t.Helper()
+				hpl := configs[qos].ResourceParameters.HugePageLimit
+				require.NotNil(t, hpl, "%s HugePageLimit should not be nil", qos)
+				for _, c := range checks {
+					got, ok := hpl[c.pageSize]
+					assert.True(t, ok, "%s should have entry for page size %d", qos, c.pageSize)
+					assert.Equal(t, c.expected, got, "%s page size %d limit mismatch", qos, c.pageSize)
+				}
+			}
+
+			checkLimits(v1.PodQOSGuaranteed, tc.guaranteed)
+			checkLimits(v1.PodQOSBurstable, tc.burstable)
+			checkLimits(v1.PodQOSBestEffort, tc.bestEffort)
+		})
+	}
+}
