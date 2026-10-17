@@ -888,26 +888,31 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		}
 	}
 
-	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set).
-	// Count any targets in that range  that are unavailable. Select the (MaxUnavailable - Unavailable)
-	// Pods, in order with respect to their ordinal for termination.
-	// Delete those pods and count the successful deletions.
-	// Update the status with the correct number of deletions.
+	// Walk all replicas for UnavailableReplicas (whole StatefulSet). Only pods in the
+	// update range (ordinals >= partition / updateMin) consume the maxUnavailable budget
+	// (KEP-961); pods below the partition are not rolling-update candidates. Then select
+	// up to (maxUnavailable - unavailable) pods in that range for termination, high ordinal first.
 	unavailablePods := 0
+	unavailablePodsTotal := 0
 	// For Parallel pod management, additionally count old and unavailable, within the maxUnavailable limit.
 	unavailablePodsNeedingUpdate := 0
 	for target := len(replicas) - 1; target >= 0; target-- {
 		pod := replicas[target]
-		if isUnavailable(pod, set.Spec.MinReadySeconds, now) {
-			unavailablePods++
-			if set.Spec.PodManagementPolicy == apps.ParallelPodManagement &&
-				getPodRevision(pod) != updateRevision.Name &&
-				!isTerminating(pod) {
-				unavailablePodsNeedingUpdate++
-			}
+		if !isUnavailable(pod, set.Spec.MinReadySeconds, now) {
+			continue
+		}
+		unavailablePodsTotal++
+		if target < updateMin {
+			continue
+		}
+		unavailablePods++
+		if set.Spec.PodManagementPolicy == apps.ParallelPodManagement &&
+			getPodRevision(pod) != updateRevision.Name &&
+			!isTerminating(pod) {
+			unavailablePodsNeedingUpdate++
 		}
 	}
-	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePods))
+	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePodsTotal))
 
 	// short circuit only when we're above the maxUnavailable budget and for
 	// Parallel pod management there is no chance to make progress
