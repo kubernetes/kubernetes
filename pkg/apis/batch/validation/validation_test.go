@@ -3506,7 +3506,11 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
 		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
-	mkJob := func(sched *batch.JobSchedulingConfiguration) batch.Job {
+	mkJob := func(sched *batch.JobSchedulingConfiguration, schedulingGroup bool) batch.Job {
+		template := validPodTemplateSpec
+		if schedulingGroup {
+			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
+		}
 		return batch.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
 			Spec: batch.JobSpec{
@@ -3515,7 +3519,7 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 				// not trip the minCount<=parallelism check; these cases only exercise
 				// the basic/gang variant immutability.
 				Parallelism: ptr.To[int32](8),
-				Template:    validPodTemplateSpec,
+				Template:    template,
 				Scheduling:  sched,
 			},
 		}
@@ -3523,10 +3527,13 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	// Only an in-place basic<->gang variant switch is rejected; adding or removing
 	// spec.scheduling is left to declarative validation, and gang minCount is mutable.
 	policyPath := field.NewPath("spec", "scheduling", "schedulingPolicy")
+	schedulingPath := field.NewPath("spec", "scheduling")
 	cases := map[string]struct {
-		old    *batch.JobSchedulingConfiguration
-		update *batch.JobSchedulingConfiguration
-		err    *field.Error
+		old      *batch.JobSchedulingConfiguration
+		update   *batch.JobSchedulingConfiguration
+		oldSG    bool
+		updateSG bool
+		err      *field.Error
 	}{
 		"unchanged basic is valid": {
 			old:    basic(),
@@ -3558,13 +3565,25 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			update: basic(),
 			err:    field.Invalid(policyPath, nil, ""),
 		},
+		"adding scheduling when schedulingGroup is set is rejected": {
+			oldSG:    true,
+			update:   basic(),
+			updateSG: true,
+			err:      field.Invalid(schedulingPath, nil, ""),
+		},
+		"both scheduling and schedulingGroup already present is allowed": {
+			old:      basic(),
+			update:   basic(),
+			oldSG:    true,
+			updateSG: true,
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
 		t.Run(k, func(t *testing.T) {
-			old := mkJob(tc.old)
+			old := mkJob(tc.old, tc.oldSG)
 			old.ResourceVersion = "1"
-			update := mkJob(tc.update)
+			update := mkJob(tc.update, tc.updateSG)
 			update.ResourceVersion = "2"
 			errs := ValidateJobUpdate(&update, &old, JobValidationOptions{})
 			var wantErrs field.ErrorList
@@ -3600,13 +3619,18 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		}
 	}
 	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
-	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration) *batch.Job {
+	schedulingPath := field.NewPath("spec", "scheduling")
+	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration, schedulingGroup bool) *batch.Job {
+		template := validPodTemplateSpec
+		if schedulingGroup {
+			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
+		}
 		return &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
 			Spec: batch.JobSpec{
 				Selector:    validSelector,
 				Parallelism: parallelism,
-				Template:    validPodTemplateSpec,
+				Template:    template,
 				Scheduling:  sched,
 			},
 		}
@@ -3614,10 +3638,11 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 	minCountPath := field.NewPath("spec", "scheduling", "schedulingPolicy", "gang", "minCount")
 
 	cases := map[string]struct {
-		parallelism *int32
-		sched       *batch.JobSchedulingConfiguration
-		opts        JobValidationOptions
-		err         *field.Error
+		parallelism     *int32
+		sched           *batch.JobSchedulingConfiguration
+		schedulingGroup bool
+		opts            JobValidationOptions
+		err             *field.Error
 	}{
 		"no scheduling": {
 			parallelism: ptr.To[int32](4),
@@ -3667,12 +3692,22 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 			sched:       basicAll,
 			err:         field.Invalid(disruptionModePath, nil, ""),
 		},
+		"scheduling with schedulingGroup is rejected": {
+			parallelism:     ptr.To[int32](4),
+			sched:           basic,
+			schedulingGroup: true,
+			err:             field.Invalid(schedulingPath, nil, ""),
+		},
+		"schedulingGroup alone is allowed": {
+			parallelism:     ptr.To[int32](4),
+			schedulingGroup: true,
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.opts.RequirePrefixedLabels = true
-			errs := ValidateJobCreate(mkJob(tc.parallelism, tc.sched), tc.opts)
+			errs := ValidateJobCreate(mkJob(tc.parallelism, tc.sched, tc.schedulingGroup), tc.opts)
 			var wantErrs field.ErrorList
 			if tc.err != nil {
 				wantErrs = append(wantErrs, tc.err)
