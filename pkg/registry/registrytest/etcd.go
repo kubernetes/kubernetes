@@ -19,11 +19,14 @@ package registrytest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
@@ -44,9 +47,30 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	if err != nil {
 		t.Fatalf("Error while making storage factory: %v", err)
 	}
-	resourceConfig, err := factory.NewConfig(resource, nil)
+	resourceConfig, err := factory.NewConfig(resource, internalExampleFor(resource))
 	if err != nil {
 		t.Fatalf("Error while finding storage destination: %v", err)
 	}
 	return resourceConfig, server
+}
+
+// internalExampleFor returns an instance of the internal type behind the
+// resource. The storage factory needs it to calculate the storage version, and
+// falls back to the group's preferred version when it is nil.
+func internalExampleFor(resource schema.GroupResource) runtime.Object {
+	internal := schema.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if gvk.GroupVersion() != internal {
+			continue
+		}
+		if plural, _ := meta.UnsafeGuessKindToResource(gvk); plural.Resource != resource.Resource {
+			continue
+		}
+		example, err := legacyscheme.Scheme.New(gvk)
+		if err != nil {
+			return nil
+		}
+		return example
+	}
+	return nil
 }
