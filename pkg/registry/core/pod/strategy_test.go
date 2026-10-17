@@ -818,6 +818,26 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantRequests: api.ResourceList{api.ResourceName("example.com/gpu"): resource.MustParse("1")},
 			wantLimits:   nil,
 		},
+		{
+			name:                "limit defaulting is not blocked by an ephemeral container",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					// Ephemeral containers cannot specify resources and must not
+					// take part in pod-level limit defaulting.
+					EphemeralContainers: []api.EphemeralContainer{
+						{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debugger"}},
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
 	}
 
 	for _, tc := range tests {
