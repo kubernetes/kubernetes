@@ -6585,6 +6585,100 @@ exit 0
 		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.Succeed(), "liveness and readiness probes should run after startup succeeds")
 	})
 
+	ginkgo.It("should keep a container not started and not ready across a kubelet restart until its startup probe succeeds", func(ctx context.Context) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "startup-pending-kubelet-restart",
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: ptr.To[int64](2),
+				Containers: []v1.Container{
+					{
+						Name:    "busybox",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sleep", "3600"},
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"test", "-f", "/tmp/startup-ready"},
+								},
+							},
+							PeriodSeconds:    1,
+							FailureThreshold: 1000,
+						},
+					},
+				},
+			},
+		}
+
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
+
+		ginkgo.By("Waiting for the container to be running but not started")
+		err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "container running but not started", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) != 1 {
+					return false, nil
+				}
+				status := p.Status.ContainerStatuses[0]
+				return status.State.Running != nil && status.Started != nil && !*status.Started && !status.Ready, nil
+			})
+		framework.ExpectNoError(err)
+
+		// The grace period for kubelet startup is 10 seconds. Waiting past it makes the
+		// container look like one that survived the kubelet restart.
+		time.Sleep(11 * time.Second)
+
+		notStarted := func(p *v1.Pod) error {
+			if len(p.Status.ContainerStatuses) != 1 {
+				return nil
+			}
+			status := p.Status.ContainerStatuses[0]
+			if status.Started != nil && *status.Started {
+				return fmt.Errorf("container %q is started before its startup probe succeeded", status.Name)
+			}
+			if status.Ready {
+				return fmt.Errorf("container %q is ready before its startup probe succeeded", status.Name)
+			}
+			return nil
+		}
+
+		stopCh := make(chan struct{})
+		errCh := watchPodStatusDuringKubeletRestart(ctx, f, pod, stopCh, notStarted)
+
+		ginkgo.By("Restarting the kubelet")
+		restartKubelet := mustStopKubelet(ctx, f)
+		restartKubelet(ctx)
+
+		ginkgo.By("Verifying the container stays not started and not ready")
+		gomega.Consistently(ctx, func(ctx context.Context) error {
+			p, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			return notStarted(p)
+		}, 10*time.Second, f.Timeouts.Poll).Should(gomega.Succeed())
+
+		close(stopCh)
+		for err := range errCh {
+			framework.ExpectNoError(err, "pod status check failed during kubelet restart")
+		}
+
+		ginkgo.By("Allowing the startup probe to succeed")
+		_, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "busybox", "touch", "/tmp/startup-ready")
+		framework.ExpectNoError(err, "failed to allow the startup probe to succeed: %s", stderr)
+
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "container started and ready", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) != 1 {
+					return false, nil
+				}
+				status := p.Status.ContainerStatuses[0]
+				return status.Started != nil && *status.Started && status.Ready && status.RestartCount == 0, nil
+			})
+		framework.ExpectNoError(err)
+	})
+
 	ginkgo.When("a Pod is running", func() {
 		testKubeletRestart := func(ctx context.Context, pod *v1.Pod) {
 			client := e2epod.NewPodClient(f)
