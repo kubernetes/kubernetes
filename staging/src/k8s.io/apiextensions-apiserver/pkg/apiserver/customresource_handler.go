@@ -387,6 +387,17 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			time.Sleep(2 * time.Second)
 		}
 
+		// The above sleep (and ordinary request latency) can widen the gap between the
+		// terminating check done at the top of ServeHTTP and the create call below, letting
+		// a create slip in after CRD deletion has started. Re-check against the latest CRD
+		// right before admission to keep that window as small as possible.
+		// See https://github.com/kubernetes/kubernetes/issues/99181.
+		if !terminating {
+			if freshCRD, err := r.crdLister.Get(crd.Name); err == nil && freshCRD.UID == crd.UID {
+				terminating = !freshCRD.DeletionTimestamp.IsZero() || apiextensionshelpers.IsCRDConditionTrue(freshCRD, apiextensionsv1.Terminating)
+			}
+		}
+
 		a := r.admission
 		if terminating {
 			a = &forbidCreateAdmission{delegate: a}
