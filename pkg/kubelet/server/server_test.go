@@ -2260,9 +2260,8 @@ func TestServeHTTPRequestDurationMetric(t *testing.T) {
 }
 
 // TestGetExecWebSocketHandlerSelection verifies that getExec selects the
-// translating handler (WebSocket v5 ↔ SPDY) when ExtendWebSocketsToKubelet
-// is enabled and a v5 request arrives, and the plain UpgradeAwareHandler
-// otherwise.
+// translating handler (WebSocket v5 ↔ SPDY) when a v5 request arrives, and the
+// plain UpgradeAwareHandler otherwise.
 //
 // Observable difference: the translating handler accepts v5 WebSocket directly
 // and echoes "v5.channel.k8s.io" back in the 101 response. Without it, the
@@ -2270,38 +2269,29 @@ func TestServeHTTPRequestDurationMetric(t *testing.T) {
 // only lists v4/legacy subprotocols and rejects the v5 upgrade entirely
 // (gorilla receives a non-101 response → "bad handshake").
 // When the client uses v4, the UpgradeAwareHandler proxies the upgrade to the
-// streaming server which accepts v4, so the connection succeeds even when the
-// gate is enabled.
+// streaming server which accepts v4, so the connection succeeds.
 func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		subprotocols           []string // defaults to v5 if nil
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		subprotocols        []string // defaults to v5 if nil
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses translating handler, v5 negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "v5.channel.k8s.io",
-			expectMetricInc:        true,
+			name:                "v5 request uses translating handler, v5 negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "v5.channel.k8s.io",
+			expectMetricInc:     true,
 		},
 		{
-			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
-		},
-		{
-			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// When the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
 			// returns false so getExec falls through to the plain UpgradeAwareHandler, which proxies the
 			// request to the streaming server. The streaming server understands v4 and accepts it.
-			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
-			enableExtendWebSockets: true,
-			subprotocols:           []string{"v4.channel.k8s.io"},
-			expectDialError:        false,
-			expectedSubprotocol:    "v4.channel.k8s.io",
+			name:                "v4 request uses UpgradeAwareHandler, v4 negotiated",
+			subprotocols:        []string{"v4.channel.k8s.io"},
+			expectDialError:     false,
+			expectedSubprotocol: "v4.channel.k8s.io",
 		},
 	}
 
@@ -2315,8 +2305,6 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			ss.fakeRuntime.execFunc = func(_ string, _ []string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
 				stdout.Close() //nolint:errcheck
@@ -2360,38 +2348,30 @@ kubelet_websocket_streaming_requests_total{subresource="exec"} 1
 }
 
 // TestGetAttachWebSocketHandlerSelection verifies that getAttach selects the
-// translating handler when ExtendWebSocketsToKubelet is enabled and a v5
-// request arrives, analogous to TestGetExecWebSocketHandlerSelection.
+// translating handler when a v5 request arrives, analogous to
+// TestGetExecWebSocketHandlerSelection.
 func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		subprotocols           []string // defaults to v5 if nil
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		subprotocols        []string // defaults to v5 if nil
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses translating handler, v5 negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "v5.channel.k8s.io",
-			expectMetricInc:        true,
+			name:                "v5 request uses translating handler, v5 negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "v5.channel.k8s.io",
+			expectMetricInc:     true,
 		},
 		{
-			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
-		},
-		{
-			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// When the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
 			// returns false so getAttach falls through to the plain UpgradeAwareHandler, which proxies the
 			// request to the streaming server. The streaming server understands v4 and accepts it.
-			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
-			enableExtendWebSockets: true,
-			subprotocols:           []string{"v4.channel.k8s.io"},
-			expectDialError:        false,
-			expectedSubprotocol:    "v4.channel.k8s.io",
+			name:                "v4 request uses UpgradeAwareHandler, v4 negotiated",
+			subprotocols:        []string{"v4.channel.k8s.io"},
+			expectDialError:     false,
+			expectedSubprotocol: "v4.channel.k8s.io",
 		},
 	}
 
@@ -2405,8 +2385,6 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			ss.fakeRuntime.attachFunc = func(_ string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
 				stdout.Close() //nolint:errcheck
@@ -2450,39 +2428,26 @@ kubelet_websocket_streaming_requests_total{subresource="attach"} 1
 }
 
 // TestGetPortForwardWebSocketHandlerSelection verifies that getPortForward
-// selects the tunneling handler when ExtendWebSocketsToKubelet is enabled and
-// the client sends the WebSocket tunneling subprotocol ("SPDY/3.1+portforward.k8s.io"),
-// and the plain UpgradeAwareHandler otherwise.
+// selects the tunneling handler when the client sends the WebSocket tunneling
+// subprotocol ("SPDY/3.1+portforward.k8s.io").
 //
-// When the gate is enabled, getPortForward skips portforward.NewV4Options (which
-// would reject a request with no port parameter) and wraps the proxy with a
-// TunnelingHandler that translates the WebSocket tunneling protocol to SPDY.
-// The streaming server speaks SPDY portforward and responds with 101; the
-// tunneling handler translates that back to a WebSocket 101 with the tunneling
-// subprotocol.
-//
-// When the gate is disabled, portforward.NewV4Options is called on the WebSocket
-// request, which has no port query parameter, causing a 400 Bad Request before
-// the WebSocket upgrade is attempted.
+// getPortForward skips portforward.NewV4Options (which would reject a request
+// with no port parameter) and wraps the proxy with a TunnelingHandler that
+// translates the WebSocket tunneling protocol to SPDY. The streaming server
+// speaks SPDY portforward and responds with 101; the tunneling handler
+// translates that back to a WebSocket 101 with the tunneling subprotocol.
 func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses tunneling handler, tunneling subprotocol negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "SPDY/3.1+portforward.k8s.io",
-			expectMetricInc:        true,
-		},
-		{
-			name:                   "feature gate disabled rejects tunneling request (no port parameter)",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
+			name:                "tunneling request uses tunneling handler, tunneling subprotocol negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "SPDY/3.1+portforward.k8s.io",
+			expectMetricInc:     true,
 		},
 	}
 
@@ -2496,8 +2461,6 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			portForwardURL := strings.Replace(fw.testHTTPServer.URL, "http://", "ws://", 1) +
 				"/portForward/default/foo"
