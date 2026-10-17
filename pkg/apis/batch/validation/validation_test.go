@@ -3509,7 +3509,7 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	mkJob := func(sched *batch.JobSchedulingConfiguration, schedulingGroup bool) batch.Job {
 		template := validPodTemplateSpec
 		if schedulingGroup {
-			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: ptr.To("byo-pg")}
+			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
 		}
 		return batch.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
@@ -3623,7 +3623,7 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration, schedulingGroup bool) *batch.Job {
 		template := validPodTemplateSpec
 		if schedulingGroup {
-			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: ptr.To("byo-pg")}
+			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
 		}
 		return &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
