@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/apiserver/pkg/util/proxy"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -473,20 +474,20 @@ func isValidAddress(ctx context.Context, ep *discovery.Endpoint, pods rest.Gette
 	if err != nil {
 		return err
 	}
-	pod, ok := obj.(*api.Pod)
-	if !ok {
+	pod, err := podutil.Accessor(obj)
+	if err != nil {
 		return fmt.Errorf("failed to cast to pod: %v", obj)
 	}
 	if pod == nil {
 		return fmt.Errorf("pod is missing, skipping (%s/%s)", ep.TargetRef.Namespace, ep.TargetRef.Name)
 	}
-	for _, podIP := range pod.Status.PodIPs {
+	for _, podIP := range pod.GetStatusPodIPs() {
 		// (Addresses is an array but only Addresses[0] is used.)
 		if podIP.IP == ep.Addresses[0] {
 			return nil
 		}
 	}
-	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.Status.PodIPs, ep.Addresses[0], ep.TargetRef.Namespace, ep.TargetRef.Name)
+	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.GetStatusPodIPs(), ep.Addresses[0], ep.TargetRef.Namespace, ep.TargetRef.Name)
 }
 
 // normalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not

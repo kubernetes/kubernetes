@@ -1371,7 +1371,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Pod",
-		ToSelectableFields(&api.Pod{}),
+		ToSelectableFields(podutil.MustAccessor(&api.Pod{})),
 		nil,
 	)
 }
@@ -1697,7 +1697,7 @@ func TestGetPodIP(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			podIP := getPodIP(tc.pod)
+			podIP := getPodIP(podutil.MustAccessor(tc.pod))
 			if podIP != tc.expectedIP {
 				t.Errorf("expected pod ip:%v does not match actual %v", tc.expectedIP, podIP)
 			}
