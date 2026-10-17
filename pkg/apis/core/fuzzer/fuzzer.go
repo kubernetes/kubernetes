@@ -407,6 +407,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.Secret, c randfill.Continue) {
 			c.FillNoCustom(s) // fuzz self without calling this function again
 			s.Type = core.SecretTypeOpaque
+			// StringData is a write-only field folded into Data and cleared by defaulting.
+			s.StringData = nil
 		},
 		func(r *core.RBDVolumeSource, c randfill.Continue) {
 			r.RBDPool = c.String(0)
@@ -551,6 +553,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if ss.AllocateLoadBalancerNodePorts == nil {
 				ss.AllocateLoadBalancerNodePorts = ptr.To(true)
+			}
+		},
+		func(s *core.NodeSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
+			// PodCIDR and PodCIDRs[0] are kept in sync by defaulting
+			if len(s.PodCIDR) > 0 {
+				s.PodCIDRs = []string{s.PodCIDR}
+			} else {
+				s.PodCIDRs = nil
 			}
 		},
 		func(s *core.NodeStatus, c randfill.Continue) {
