@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -282,6 +283,75 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				g.Expect(apiCalled[criproxy.ListContainers]).To(gomega.BeFalseBecause("ListContainers should not be called"))
 				g.Expect(apiCalled[criproxy.ListPodSandbox]).To(gomega.BeFalseBecause("ListPodSandbox should not be called"))
 			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should report streaming and cached fallback for both CRI services", func(ctx context.Context) {
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				framework.ExpectNoError(resetCRIProxyInjector(e2eCriProxy))
+				restartKubelet(ctx, true)
+				waitForKubeletToStart(ctx, f)
+			})
+
+			var runtimeUnsupported, imageUnsupported atomic.Bool
+			var runtimeStreams, imageStreams, runtimeLists, imageLists atomic.Int32
+			framework.ExpectNoError(addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers, criproxy.StreamPodSandboxes, criproxy.StreamContainerStats,
+					criproxy.StreamPodSandboxStats, criproxy.StreamPodSandboxMetrics:
+					runtimeStreams.Add(1)
+					if runtimeUnsupported.Load() {
+						return status.Error(codes.Unimplemented, "runtime streaming not supported")
+					}
+				case criproxy.StreamImages:
+					imageStreams.Add(1)
+					if imageUnsupported.Load() {
+						return status.Error(codes.Unimplemented, "image streaming not supported")
+					}
+				case criproxy.ListContainers, criproxy.ListPodSandbox, criproxy.ListContainerStats,
+					criproxy.ListPodSandboxStats, criproxy.ListPodSandboxMetrics:
+					runtimeLists.Add(1)
+				case criproxy.ListImages:
+					imageLists.Add(1)
+				}
+				return nil
+			}))
+
+			// A fresh CRI client clears fallback cached by earlier tests.
+			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
+
+			expectStreamingMetrics := func(runtimeValue, imageValue float64) {
+				ginkgo.GinkgoHelper()
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					scraped, err := getKubeletMetrics(ctx)
+					g.Expect(err).NotTo(gomega.HaveOccurred())
+					g.Expect(scraped).To(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+						"kubelet_cri_streaming_enabled": gstruct.MatchAllElements(sampleLabelID, gstruct.Elements{
+							`kubelet_cri_streaming_enabled{service="runtime"}`: timelessSample(runtimeValue),
+							`kubelet_cri_streaming_enabled{service="image"}`:   timelessSample(imageValue),
+						}),
+					}))
+				}).WithPolling(time.Second).WithTimeout(2 * time.Minute).Should(gomega.Succeed())
+			}
+
+			expectStreamingMetrics(1, 1)
+			runtimeUnsupported.Store(true)
+			expectStreamingMetrics(0, 1)
+			imageUnsupported.Store(true)
+			expectStreamingMetrics(0, 0)
+
+			// Restoring support must leave each service on its cached unary path.
+			runtimeStreamCount, imageStreamCount := runtimeStreams.Load(), imageStreams.Load()
+			runtimeListCount, imageListCount := runtimeLists.Load(), imageLists.Load()
+			runtimeUnsupported.Store(false)
+			imageUnsupported.Store(false)
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				g.Expect(runtimeLists.Load()).To(gomega.BeNumerically(">", runtimeListCount))
+				g.Expect(imageLists.Load()).To(gomega.BeNumerically(">", imageListCount))
+			}).WithPolling(time.Second).WithTimeout(2 * time.Minute).Should(gomega.Succeed())
+			expectStreamingMetrics(0, 0)
+			gomega.Expect(runtimeStreams.Load()).To(gomega.Equal(runtimeStreamCount), "runtime fallback should remain cached")
+			gomega.Expect(imageStreams.Load()).To(gomega.Equal(imageStreamCount), "image fallback should remain cached")
 		})
 
 		ginkgo.It("should handle mid-stream errors", func(ctx context.Context) {
