@@ -447,9 +447,9 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			// another driver in the batch failed, setPrepared was
 			// skipped) would end up with the devices duplicated.
 			err := m.cache.withLock(logger, func() error {
-				info, exists := m.cache.get(claim.Name, claim.Namespace)
-				if !exists {
-					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
+				info, err := m.getClaimInfoOfPreparedClaim(claim)
+				if err != nil {
+					return err
 				}
 				info.resetDevices(plugin.DriverName())
 				for _, device := range result.GetDevices() {
@@ -475,9 +475,9 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	err = m.cache.withLock(logger, func() error {
 		// Mark all pod claims as prepared.
 		for _, claim := range resourceClaims {
-			info, exists := m.cache.get(claim.Name, claim.Namespace)
-			if !exists {
-				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
+			info, err := m.getClaimInfoOfPreparedClaim(claim)
+			if err != nil {
+				return err
 			}
 			info.setPrepared()
 		}
@@ -496,6 +496,21 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	}
 
 	return nil
+}
+
+// getClaimInfoOfPreparedClaim returns the cache entry for a claim whose
+// NodePrepareResources call just returned. The cache lock is not held during
+// that call, so the claim may have been unprepared and re-created under the same
+// name in the meantime. The caller must hold the cache lock.
+func (m *Manager) getClaimInfoOfPreparedClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error) {
+	info, exists := m.cache.get(claim.Name, claim.Namespace)
+	if !exists {
+		return nil, fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
+	}
+	if info.ClaimUID != claim.UID {
+		return nil, fmt.Errorf("ResourceClaim %s was replaced while being prepared (UID %s, now %s)", klog.KObj(claim), claim.UID, info.ClaimUID)
+	}
+	return info, nil
 }
 
 func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
