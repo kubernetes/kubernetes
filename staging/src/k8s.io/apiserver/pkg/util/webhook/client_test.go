@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -91,7 +90,7 @@ func allowHTTP2(nextProtos []string) bool {
 		return true
 	}
 	for _, p := range nextProtos {
-		if p == http2.NextProtoTLS {
+		if p == "h2" {
 			// the transport explicitly allowed http/2
 			return true
 		}
