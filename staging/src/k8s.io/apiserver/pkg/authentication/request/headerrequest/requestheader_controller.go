@@ -177,8 +177,9 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "controller", c.name)
+	defer logger.Info("Shutting down controller", "controller", c.name)
 
 	go c.configmapInformer.Run(ctx.Done())
 
@@ -188,7 +189,7 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 	}
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	<-ctx.Done()
 }
@@ -201,35 +202,35 @@ func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error 
 		// ignore, authConfigMap is nil now
 		return nil
 	case errors.IsForbidden(err):
-		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
-			c.configmapName, c.configmapNamespace, c.configmapNamespace, authenticationRoleName)
+		klog.FromContext(ctx).Info("Unable to get ConfigMap; usually fixed by creating a role binding",
+			"configMap", klog.KRef(c.configmapNamespace, c.configmapName),
+			"command", fmt.Sprintf("kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA", c.configmapNamespace, authenticationRoleName))
 		return err
 	case err != nil:
 		return err
 	}
-	return c.syncConfigMap(configMap)
+	return c.syncConfigMap(ctx, configMap)
 }
 
-func (c *RequestHeaderAuthRequestController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *RequestHeaderAuthRequestController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
+func (c *RequestHeaderAuthRequestController) processNextWorkItem(ctx context.Context) bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.sync()
+	err := c.sync(ctx)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", dsKey, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Failed to sync request header ConfigMap", "key", dsKey)
 	c.queue.AddRateLimited(dsKey)
 
 	return true
@@ -237,22 +238,22 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 
 // sync reads the config and propagates the changes to exportedRequestHeaderBundle
 // which is exposed by the set of methods that are used to fill RequestHeaderConfig struct
-func (c *RequestHeaderAuthRequestController) sync() error {
+func (c *RequestHeaderAuthRequestController) sync(ctx context.Context) error {
 	configMap, err := c.configmapLister.Get(c.configmapName)
 	if err != nil {
 		return err
 	}
-	return c.syncConfigMap(configMap)
+	return c.syncConfigMap(ctx, configMap)
 }
 
-func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.ConfigMap) error {
+func (c *RequestHeaderAuthRequestController) syncConfigMap(ctx context.Context, configMap *corev1.ConfigMap) error {
 	hasChanged, newRequestHeaderBundle, err := c.hasRequestHeaderBundleChanged(configMap)
 	if err != nil {
 		return err
 	}
 	if hasChanged {
 		c.exportedRequestHeaderBundle.Store(newRequestHeaderBundle)
-		klog.V(2).Infof("Loaded a new request header values for %v", c.name)
+		klog.FromContext(ctx).V(2).Info("Loaded new request header values", "controller", c.name)
 	}
 	return nil
 }
