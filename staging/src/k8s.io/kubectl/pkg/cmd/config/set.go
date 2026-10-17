@@ -250,6 +250,12 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 					return nil
 				}
 
+				// Pointer fields like exec and auth-provider hold whole structs that can't be built from a single value,
+				// and the parser doesn't allow navigating into them.
+				if currFieldValue.Kind() == reflect.Pointer {
+					return fmt.Errorf("can't set %s to a value, use kubectl config set-credentials to configure it", currStep.stepValue)
+				}
+
 				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
 			}
 		}
