@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -271,6 +272,9 @@ func (o *ReconcileOptions) RunReconcile() error {
 				result, err = reconcileOptions.Run()
 				return err
 			})
+			if err != nil {
+				return err
+			}
 			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1.ClusterRoleBinding:
@@ -290,6 +294,9 @@ func (o *ReconcileOptions) RunReconcile() error {
 				result, err = reconcileOptions.Run()
 				return err
 			})
+			if err != nil {
+				return err
+			}
 			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1beta1.Role,
