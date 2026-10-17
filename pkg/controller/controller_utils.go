@@ -409,6 +409,118 @@ func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *U
 	return &UIDTrackingControllerExpectations{ControllerExpectationsInterface: ce, uidStore: cache.NewStore(UIDSetKeyFunc)}
 }
 
+// controllerExpectationsUID records the UID of the controller that set expectations for a
+// given controller key (namespace/name). It is used by
+// ControllerExpectationsWithUID to detect when a controller has been deleted
+// and recreated under the same namespace/name (i.e. its UID changed), in which
+// case any previously recorded expectations are stale and must be discarded.
+type controllerExpectationsUID struct {
+	key string
+	uid types.UID
+}
+
+// controllerExpectationsUIDKeyFunc is the key function used by the UID store of
+// ControllerExpectationsWithUID.
+var controllerExpectationsUIDKeyFunc = func(obj interface{}) (string, error) {
+	if u, ok := obj.(*controllerExpectationsUID); ok {
+		return u.key, nil
+	}
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
+}
+
+// ControllerExpectationsWithUID augments a ControllerExpectationsInterface so
+// that, in addition to the add/del expectation counts, it remembers the UID of
+// the controller that set them.
+//
+// Expectations are keyed only by namespace/name (see KeyFunc), so if a
+// controller is deleted and a new one with the same name is created, the new
+// incarnation has a different UID but would otherwise inherit the stale
+// expectations of the old one, causing the controller to wait on events that
+// will never (or no longer) arrive.
+//
+// Use the *WithUID methods instead of the plain ones: they record the UID when
+// expectations are set, and SatisfiedExpectationsWithUID discards the stale
+// expectations (and forces a sync) whenever the UID no longer matches.
+type ControllerExpectationsWithUID struct {
+	ControllerExpectationsInterface
+
+	// uidStoreLock protects uidStore.
+	uidStoreLock sync.Mutex
+	// uidStore maps a controller key to the UID of the controller that last set
+	// expectations for it.
+	uidStore cache.Store
+}
+
+// NewControllerExpectationsWithUID returns a ControllerExpectationsWithUID that
+// wraps the given ControllerExpectationsInterface.
+func NewControllerExpectationsWithUID(ce ControllerExpectationsInterface) *ControllerExpectationsWithUID {
+	return &ControllerExpectationsWithUID{
+		ControllerExpectationsInterface: ce,
+		uidStore:                        cache.NewStore(controllerExpectationsUIDKeyFunc),
+	}
+}
+
+// recordUID stores the controller UID for the given key, replacing any
+// previously recorded UID. The caller must hold uidStoreLock.
+func (u *ControllerExpectationsWithUID) recordUID(controllerKey string, uid types.UID) error {
+	return u.uidStore.Add(&controllerExpectationsUID{controllerKey, uid})
+}
+
+// SetExpectationsWithUID registers new expectations for the given controller and
+// remembers the controller's UID alongside them.
+func (u *ControllerExpectationsWithUID) SetExpectationsWithUID(logger klog.Logger, controllerKey string, uid types.UID, add, del int) error {
+	u.uidStoreLock.Lock()
+	defer u.uidStoreLock.Unlock()
+	if err := u.recordUID(controllerKey, uid); err != nil {
+		return err
+	}
+	return u.ControllerExpectationsInterface.SetExpectations(logger, controllerKey, add, del)
+}
+
+// ExpectCreationsWithUID registers creation expectations for the given
+// controller and remembers the controller's UID.
+func (u *ControllerExpectationsWithUID) ExpectCreationsWithUID(logger klog.Logger, controllerKey string, uid types.UID, adds int) error {
+	return u.SetExpectationsWithUID(logger, controllerKey, uid, adds, 0)
+}
+
+// ExpectDeletionsWithUID registers deletion expectations for the given
+// controller and remembers the controller's UID.
+func (u *ControllerExpectationsWithUID) ExpectDeletionsWithUID(logger klog.Logger, controllerKey string, uid types.UID, dels int) error {
+	return u.SetExpectationsWithUID(logger, controllerKey, uid, 0, dels)
+}
+
+// SatisfiedExpectationsWithUID returns true if the controller identified by
+// controllerKey and uid should sync. It behaves like SatisfiedExpectations, but
+// additionally discards any stale expectations when the controller's UID changed
+// since they were set (i.e. the controller was deleted and recreated), returning
+// true so the new incarnation syncs and sets fresh expectations.
+func (u *ControllerExpectationsWithUID) SatisfiedExpectationsWithUID(logger klog.Logger, controllerKey string, uid types.UID) bool {
+	u.uidStoreLock.Lock()
+	defer u.uidStoreLock.Unlock()
+
+	if stored, exists, err := u.uidStore.GetByKey(controllerKey); err == nil && exists {
+		if stored.(*controllerExpectationsUID).uid != uid {
+			logger.V(4).Info("Controller UID changed, discarding stale expectations", "controller", controllerKey, "oldUID", stored.(*controllerExpectationsUID).uid, "newUID", uid)
+			u.ControllerExpectationsInterface.DeleteExpectations(logger, controllerKey)
+			_ = u.uidStore.Delete(stored)
+			return true
+		}
+	}
+	return u.ControllerExpectationsInterface.SatisfiedExpectations(logger, controllerKey)
+}
+
+// DeleteExpectationsWithUID deletes the expectations and the recorded UID for
+// the given controller key.
+func (u *ControllerExpectationsWithUID) DeleteExpectationsWithUID(logger klog.Logger, controllerKey string) {
+	u.uidStoreLock.Lock()
+	defer u.uidStoreLock.Unlock()
+
+	u.ControllerExpectationsInterface.DeleteExpectations(logger, controllerKey)
+	if stored, exists, err := u.uidStore.GetByKey(controllerKey); err == nil && exists {
+		_ = u.uidStore.Delete(stored)
+	}
+}
+
 // Reasons for pod events
 const (
 	// FailedCreatePodReason is added in an event and in a replica set condition
