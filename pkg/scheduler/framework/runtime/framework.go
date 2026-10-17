@@ -1151,8 +1151,8 @@ func (f *frameworkImpl) RunFilterPlugins(
 		}
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsRejected() {
-				// Filter plugins are not supposed to return any status other than
-				// Success or Unschedulable.
+				// Filter plugins are expected to return Success or a rejection status
+				// (Unschedulable, UnschedulableAndUnresolvable, or Pending).
 				status = fwk.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
 			}
 			status.SetPlugin(pl.Name())
