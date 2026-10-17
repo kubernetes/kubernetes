@@ -42,9 +42,14 @@ var (
 	ClusterDefaults = clientcmdapi.Cluster{Server: getDefaultServer()}
 	// DefaultClientConfig represents the legacy behavior of this package for defaulting
 	// DEPRECATED will be replace
-	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
-		ClusterDefaults: ClusterDefaults,
-	}, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	DefaultClientConfig = DirectClientConfig{
+		config:      *clientcmdapi.NewConfig(),
+		contextName: "",
+		overrides: &ConfigOverrides{
+			ClusterDefaults: ClusterDefaults,
+		},
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 )
 
 // getDefaultServer returns a default setting for DefaultClientConfig
@@ -97,17 +102,33 @@ type DirectClientConfig struct {
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
 func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) OverridingClientConfig {
-	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  config.CurrentContext,
+		overrides:    overrides,
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
 func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, nil, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  contextName,
+		overrides:    overrides,
+		configAccess: configAccess,
+	}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
 func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:         config,
+		contextName:    contextName,
+		overrides:      overrides,
+		fallbackReader: fallbackReader,
+		configAccess:   configAccess,
+	}
 }
 
 // NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
@@ -117,7 +138,10 @@ func NewClientConfigFromBytes(configBytes []byte) (OverridingClientConfig, error
 		return nil, err
 	}
 
-	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
+	return &DirectClientConfig{
+		config:    *config,
+		overrides: &ConfigOverrides{},
+	}, nil
 }
 
 // RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
