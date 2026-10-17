@@ -101,27 +101,30 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		workerLoopPeriod: time.Second,
 	}
 
-	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err := serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			e.onServiceUpdate(cur)
 		},
 		DeleteFunc: e.onServiceDelete,
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
-	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { e.onPodUpdate(nil, obj) },
 		UpdateFunc: e.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { e.onPodUpdate(obj, nil) },
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
-	_, _ = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
