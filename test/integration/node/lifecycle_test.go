@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,6 +31,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -679,22 +681,30 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	// Poll briefly to confirm the pod is NOT evicted immediately.
 	// It has a 2-second toleration window so deletion timestamp must not be
 	// set within the first 500ms.
-	evictedEarly := false
-	_ = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 500*time.Millisecond, false,
+	observedPod := false
+	var lastGetErr error
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 500*time.Millisecond, false,
 		func(ctx context.Context) (bool, error) {
 			p, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, fmt.Errorf("pod disappeared during its first 500ms of toleration: %w", err)
+				}
+				lastGetErr = err
 				return false, nil
 			}
+			observedPod = true
 			if p.DeletionTimestamp != nil {
-				evictedEarly = true
-				return true, nil
+				return false, fmt.Errorf("pod was evicted before its TolerationSeconds window expired")
 			}
 			return false, nil
 		},
 	)
-	if evictedEarly {
-		t.Error("Pod was evicted before its TolerationSeconds window expired")
+	if err != nil && (!errors.Is(err, context.DeadlineExceeded) || testCtx.Ctx.Err() != nil) {
+		t.Fatalf("Failed to verify the pod remained during its first 500ms of toleration: %v", err)
+	}
+	if !observedPod {
+		t.Fatalf("No successful Pod GET during the first 500ms of toleration (last error: %v)", lastGetErr)
 	}
 
 	// The toleration window is 2 seconds. When it expires, the controller will

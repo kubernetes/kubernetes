@@ -201,6 +201,10 @@ type Controller struct {
 	// guarded by podEvictionLock. The generation prevents a worker from
 	// relinquishing ownership after an update requested reconciliation.
 	podEvictionTokens map[string]podEvictionState
+
+	// podEvictionRetryScheduleHook allows tests to pause a retry after it has
+	// evaluated current state but before it transfers ownership to timed work.
+	podEvictionRetryScheduleHook func()
 }
 
 func (tc *Controller) deletePodHandler() func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
@@ -355,6 +359,20 @@ func (tc *Controller) forgetPodEvictionRetry(item podEvictionItem, generation ui
 		return true
 	}
 	return false
+}
+
+// transferPodEvictionRetryToTimedWork schedules work only while item and its
+// captured generation still own the pod. Holding podEvictionLock through
+// AddWork makes the ownership check atomic with concurrent cancellation.
+func (tc *Controller) transferPodEvictionRetryToTimedWork(ctx context.Context, item podEvictionItem, generation uint64, args *WorkArgs, createdAt, fireAt time.Time) (bool, bool) {
+	key := item.podRef.NamespacedName.String()
+	tc.podEvictionLock.Lock()
+	defer tc.podEvictionLock.Unlock()
+	current, ok := tc.podEvictionTokens[key]
+	if !ok || current.item != item || current.generation != generation {
+		return false, false
+	}
+	return true, tc.taintEvictionQueue.AddWork(ctx, args, createdAt, fireAt)
 }
 
 func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
@@ -597,7 +615,7 @@ func (tc *Controller) podEvictionWorker(ctx context.Context) {
 				return
 			}
 
-			if err := tc.processPodEvictionRetry(ctx, item); err != nil {
+			if err := tc.processPodEvictionRetry(ctx, item, generation); err != nil {
 				logger.V(3).Info("Pod eviction failed, will retry", "pod", item.podRef, "err", err)
 				currentGeneration, current := tc.podEvictionRetryGeneration(item)
 				switch {
@@ -633,7 +651,7 @@ func (tc *Controller) podEvictionWorker(ctx context.Context) {
 //     Schedule a fresh timed worker via taintEvictionQueue.
 //
 // Returns a non-nil error only for transient failures that should be retried.
-func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvictionItem) error {
+func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvictionItem, generation uint64) error {
 	logger := klog.FromContext(ctx)
 	podRef := item.podRef
 	pod, err := tc.podLister.Pods(podRef.Namespace).Get(podRef.Name)
@@ -685,7 +703,11 @@ func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvict
 		if decision.keepExisting {
 			return nil
 		}
-		if tc.taintEvictionQueue.AddWork(ctx, newPodEvictionWorkArgs(podRef.Name, podRef.Namespace, podRef.UID, pod.Spec.NodeName, decision.taintSet), decision.startTime, decision.triggerTime) {
+		if tc.podEvictionRetryScheduleHook != nil {
+			tc.podEvictionRetryScheduleHook()
+		}
+		ownsRetry, ownsTimedWork := tc.transferPodEvictionRetryToTimedWork(ctx, item, generation, newPodEvictionWorkArgs(podRef.Name, podRef.Namespace, podRef.UID, pod.Spec.NodeName, decision.taintSet), decision.startTime, decision.triggerTime)
+		if !ownsRetry || ownsTimedWork {
 			return nil
 		}
 		return fmt.Errorf("pod eviction retry for %s found conflicting scheduled work", podRef)
@@ -738,8 +760,8 @@ func (tc *Controller) worker(ctx context.Context, worker int) {
 
 // PodUpdated is used to notify the controller about Pod changes.
 // oldPod is nil for pod additions; newPod is nil for pod deletions.
-// The call is a no-op when neither the pod's tolerations nor its node name
-// have changed, to avoid spurious queue entries on unrelated updates.
+// The call is a no-op when the pod's UID, tolerations, and node name are
+// unchanged, to avoid spurious queue entries on unrelated updates.
 func (tc *Controller) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	podName := ""
 	podNamespace := ""
@@ -759,7 +781,7 @@ func (tc *Controller) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 		newTolerations = newPod.Spec.Tolerations
 	}
 
-	if oldPod != nil && newPod != nil && helper.Semantic.DeepEqual(oldTolerations, newTolerations) && oldPod.Spec.NodeName == newPod.Spec.NodeName {
+	if oldPod != nil && newPod != nil && oldPod.UID == newPod.UID && helper.Semantic.DeepEqual(oldTolerations, newTolerations) && oldPod.Spec.NodeName == newPod.Spec.NodeName {
 		return
 	}
 	updateItem := podUpdateItem{
