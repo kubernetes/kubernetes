@@ -1931,6 +1931,259 @@ func TestETPClusterIngressIPServiceWithRequireDualStack(t *testing.T) {
 	testDualStackService(t, false, v1.IPFamilyPolicyRequireDualStack, v1.ServiceExternalTrafficPolicyCluster)
 }
 
+func TestOnTopologyChange(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	assert.Nil(t, proxier.topologyLabels, "topologyLabels should be nil initially")
+
+	topologyLabels := map[string]string{
+		v1.LabelTopologyZone: "zone-a",
+	}
+	proxier.OnTopologyChange(topologyLabels)
+
+	proxier.mu.Lock()
+	assert.Equal(t, "zone-a", proxier.topologyLabels[v1.LabelTopologyZone], "topologyLabels should be updated")
+	proxier.mu.Unlock()
+}
+
+func TestTopologyAwareZoneHintFiltering(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Set topology labels on the proxier (simulates OnTopologyChange)
+	proxier.topologyLabels = map[string]string{
+		v1.LabelTopologyZone: "zone-a",
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	// Create endpoints with zone hints: one in zone-a, one in zone-b
+	// Both are remote endpoints (no NodeName set)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{epIpAddressRemote}, // 192.168.2.3 - in zone-a
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
+				},
+				{
+					Addresses: []string{"192.168.2.4"}, // in zone-b
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-b"}},
+					},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo")
+	// A load balancer should have been created with only the zone-a endpoint
+	assert.NotEmpty(t, svcInfo.hnsID, "Expected ClusterIP LB to be created")
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	assert.Nil(t, err, "Failed to fetch loadbalancer")
+	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
+	// Only the zone-a endpoint should be in the load balancer
+	assert.Equal(t, 1, len(lb.HostComputeEndpoints), "Expected 1 endpoint in LB (zone-a only)")
+}
+
+func TestTopologyFallbackWhenNoMatchingZone(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Set topology labels with zone-c, which has no endpoints
+	proxier.topologyLabels = map[string]string{
+		v1.LabelTopologyZone: "zone-c",
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	// Create endpoints only in zone-a and zone-b (NOT zone-c)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{epIpAddressRemote},
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
+				},
+				{
+					Addresses: []string{"192.168.2.4"},
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-b"}},
+					},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo")
+	// When no endpoints match the node's zone, CategorizeEndpoints falls back
+	// to all ready endpoints (no topology filtering)
+	assert.NotEmpty(t, svcInfo.hnsID, "Expected ClusterIP LB to be created")
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	assert.Nil(t, err, "Failed to fetch loadbalancer")
+	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
+	// Both endpoints should be included since topology hint was ignored (no matching zone)
+	assert.Equal(t, 2, len(lb.HostComputeEndpoints), "Expected 2 endpoints in LB (fallback, no topology filtering)")
+}
+
+func TestTopologyWithETPLocal(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 30001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Set topology labels
+	proxier.topologyLabels = map[string]string{
+		v1.LabelTopologyZone: "zone-a",
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+
+	// Create endpoints: one local (zone-a), one remote (zone-a), one remote (zone-b)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{epIpAddressLocal1},
+					NodeName:  ptr.To(testNodeName), // local
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
+				},
+				{
+					Addresses: []string{epIpAddressRemote}, // remote, zone-a
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	hcnMock := (proxier.hcn).(*fakehcn.HcnMock)
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, networkId, epIpAddressLocal1, macAddressLocal1, prefixLen)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo")
+
+	// ClusterIP LB should use topology-filtered cluster endpoints (zone-a = both local + remote)
+	assert.NotEmpty(t, svcInfo.hnsID, "Expected ClusterIP LB to be created")
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	assert.Nil(t, err, "Failed to fetch ClusterIP loadbalancer")
+	assert.NotNil(t, lb, "ClusterIP loadbalancer should not be nil")
+	assert.Equal(t, 2, len(lb.HostComputeEndpoints), "ClusterIP LB should have 2 endpoints (both in zone-a)")
+
+	// NodePort LB should use only local endpoints (ETP:Local)
+	assert.NotEmpty(t, svcInfo.nodePorthnsID, "Expected NodePort LB to be created")
+	nodeLB, err := proxier.hcn.GetLoadBalancerByID(svcInfo.nodePorthnsID)
+	assert.Nil(t, err, "Failed to fetch NodePort loadbalancer")
+	assert.NotNil(t, nodeLB, "NodePort loadbalancer should not be nil")
+	assert.Equal(t, 1, len(nodeLB.HostComputeEndpoints), "NodePort LB should have 1 endpoint (local only, ETP:Local)")
+}
+
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }
