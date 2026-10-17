@@ -678,6 +678,22 @@ Usage:
     kubectl exec test-agnhost -- /agnhost porter
 ```
 
+### regression-issue-74839
+
+Reproduces [kubernetes/kubernetes#74839](https://github.com/kubernetes/kubernetes/issues/74839),
+used to check that a proxy implementation is not vulnerable to the invalid conntrack state bug.
+
+The subcommand listens on TCP port `9000`. For every connection established with the pod IPs, it
+injects a TCP packet whose sequence number is out of the connection window. The pod IPs are read
+from the `POD_IP` and `POD_IPS` environment variables (for example, set through the downward API).
+The container needs the `NET_RAW` capability.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost regression-issue-74839
+```
+
 ### resource-consumer-controller
 
 This subcommand starts an HTTP server that spreads requests around resource consumers. The HTTP server has the same endpoints and usage as the one spawned by the ``resource-consumer`` subcommand.

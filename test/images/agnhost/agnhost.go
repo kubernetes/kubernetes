@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/podcertificatesigner"
 	portforwardtester "k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
 	"k8s.io/kubernetes/test/images/agnhost/porter"
+	regressionissue74839 "k8s.io/kubernetes/test/images/agnhost/regression-issue-74839"
 	resconsumerctrl "k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller"
 	servehostname "k8s.io/kubernetes/test/images/agnhost/serve-hostname"
 	tcpreset "k8s.io/kubernetes/test/images/agnhost/tcp-reset"
@@ -88,6 +89,7 @@ func main() {
 	rootCmd.AddCommand(pause.CmdPause)
 	rootCmd.AddCommand(porter.CmdPorter)
 	rootCmd.AddCommand(portforwardtester.CmdPortForwardTester)
+	rootCmd.AddCommand(regressionissue74839.CmdRegressionIssue74839)
 	rootCmd.AddCommand(resconsumerctrl.CmdResourceConsumerController)
 	rootCmd.AddCommand(servehostname.CmdServeHostname)
 	rootCmd.AddCommand(testwebserver.CmdTestWebserver)
