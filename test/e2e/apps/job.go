@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"time"
 
@@ -40,11 +41,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -52,6 +55,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -1530,7 +1534,7 @@ done`}
 		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
-	framework.It("should create Workload and PodGroup for gang-eligible Job",
+	framework.It("should create a Basic Workload and PodGroup for a Job without spec.scheduling and run it to completion",
 		framework.WithFeatureGate(features.GenericWorkload),
 		framework.WithFeatureGate(features.WorkloadWithJob),
 		func(ctx context.Context) {
@@ -1595,6 +1599,11 @@ done`}
 			gomega.Expect(hasJobOwner).To(gomega.BeTrueBecause("PodGroup should have Job ownerReference with UID %s", job.UID))
 			gomega.Expect(hasWorkloadOwner).To(gomega.BeTrueBecause("PodGroup should have Workload ownerReference with UID %s", workload.UID))
 
+			ginkgo.By("Verifying the Workload and PodGroup use the Basic policy")
+			gomega.Expect(workload.Spec.PodGroupTemplates).To(gomega.HaveLen(1), "expected a single PodGroupTemplate")
+			gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Basic).NotTo(gomega.BeNil(), "Workload template should use the Basic policy")
+			gomega.Expect(podGroup.Spec.SchedulingPolicy.Basic).NotTo(gomega.BeNil(), "PodGroup should use the Basic policy")
+
 			ginkgo.By("Verifying pods have schedulingGroup set")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pods, listErr := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
@@ -1611,6 +1620,11 @@ done`}
 					if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
 						return fmt.Errorf("pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
 					}
+					if !slices.ContainsFunc(pod.OwnerReferences, func(ref metav1.OwnerReference) bool {
+						return ref.Kind == "PodGroup" && ref.UID == podGroup.UID
+					}) {
+						return fmt.Errorf("pod %s has no ownerReference to PodGroup %s", pod.Name, podGroup.Name)
+					}
 				}
 				return nil
 			}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
@@ -1625,6 +1639,183 @@ done`}
 			gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 			gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
 			gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		})
+
+	framework.It("should bind no pod of a gang Job until there is capacity for minCount pods",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.WorkloadWithJob),
+		func(ctx context.Context) {
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, 2)
+			framework.ExpectNoError(err, "get schedulable nodes")
+			if len(nodes.Items) < 2 {
+				e2eskipper.Skipf("Requires at least 2 schedulable nodes, got %d", len(nodes.Items))
+			}
+			parallelism := int32(2)
+			labelKey := "e2e-job-gang-" + f.Namespace.Name
+
+			ginkgo.By("Creating a gang Job whose pods each need a separate labeled node")
+			job := e2ejob.NewTestJob("succeed", "gang-capacity", v1.RestartPolicyNever, parallelism, parallelism, nil, 6)
+			job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+			job.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
+				},
+			}
+			job.Spec.Template.Spec.NodeSelector = map[string]string{labelKey: "true"}
+			job.Spec.Template.Spec.Affinity = &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+						LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{batchv1.JobNameLabel: job.Name}},
+						TopologyKey:   v1.LabelHostname,
+					}},
+				},
+			}
+
+			ginkgo.By("Labeling one node, which fits only one pod of the gang")
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodes.Items[0].Name, labelKey, "true")
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodes.Items[0].Name, labelKey)
+			job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "create job in namespace: %s", f.Namespace.Name)
+			waitForJobPodGroup(ctx, f.ClientSet, job, func(*schedulingv1beta1.PodGroup) bool { return true })
+
+			boundPods := func(ctx context.Context) (int, error) {
+				pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+				if err != nil {
+					return 0, err
+				}
+				bound := 0
+				for _, pod := range pods.Items {
+					if pod.Spec.NodeName != "" {
+						bound++
+					}
+				}
+				return bound, nil
+			}
+			gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
+				pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+				if err != nil {
+					return 0, err
+				}
+				return len(pods.Items), nil
+			}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(int(parallelism)), "expected %d job pods", parallelism)
+			ginkgo.By("Ensuring no pod of the gang is bound")
+			gomega.Consistently(ctx, boundPods).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.BeZero(), "no pod of the gang may be bound before minCount pods fit")
+
+			ginkgo.By("Labeling a second node, so every pod of the gang fits")
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodes.Items[1].Name, labelKey, "true")
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodes.Items[1].Name, labelKey)
+
+			ginkgo.By("Waiting for the Job to complete")
+			err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, parallelism)
+			framework.ExpectNoError(err, "ensure job completion in namespace: %s", f.Namespace.Name)
+		})
+
+	framework.It("should recreate the PodGroup of a gang Job resumed after suspension and run it to completion",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.WorkloadWithJob),
+		func(ctx context.Context) {
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, 1)
+			framework.ExpectNoError(err, "get schedulable nodes")
+			parallelism := int32(2)
+			labelKey := "e2e-job-gang-" + f.Namespace.Name
+
+			ginkgo.By("Creating a gang Job whose pods select a node label no node has yet")
+			job := e2ejob.NewTestJob("succeed", "gang-suspend", v1.RestartPolicyNever, parallelism, parallelism, nil, 6)
+			job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+			job.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
+				},
+			}
+			job.Spec.Template.Spec.NodeSelector = map[string]string{labelKey: "true"}
+			job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "create job in namespace: %s", f.Namespace.Name)
+			workload := waitForJobWorkload(ctx, f.ClientSet, job)
+			first := waitForJobPodGroup(ctx, f.ClientSet, job, func(*schedulingv1beta1.PodGroup) bool { return true })
+
+			ginkgo.By("Suspending the Job")
+			framework.ExpectNoError(updateJobSuspendWithRetries(ctx, f, job, new(true)), "suspend job")
+			ginkgo.By("Waiting for the PodGroup to be deleted")
+			waitForJobPodGroupGone(ctx, f.ClientSet, job)
+			gomega.Expect(waitForJobWorkload(ctx, f.ClientSet, job).UID).To(gomega.Equal(workload.UID), "the Workload must be kept while suspended")
+
+			ginkgo.By("Labeling a node and resuming the Job")
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodes.Items[0].Name, labelKey, "true")
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodes.Items[0].Name, labelKey)
+			framework.ExpectNoError(updateJobSuspendWithRetries(ctx, f, job, new(false)), "resume job")
+
+			ginkgo.By("Waiting for a replacement PodGroup")
+			replacement := waitForJobPodGroup(ctx, f.ClientSet, job, func(pg *schedulingv1beta1.PodGroup) bool {
+				return pg.UID != first.UID && pg.DeletionTimestamp == nil
+			})
+			gomega.Expect(replacement.Spec.SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "replacement PodGroup should use the Gang policy")
+
+			ginkgo.By("Waiting for the Job to complete")
+			err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, parallelism)
+			framework.ExpectNoError(err, "ensure job completion in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring the pods joined the replacement PodGroup")
+			pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "get pod list for job")
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != v1.PodSucceeded {
+					continue
+				}
+				gomega.Expect(pod.OwnerReferences).To(gomega.ContainElement(gomega.HaveField("UID", replacement.UID)),
+					"pod %s should be owned by the replacement PodGroup %s", pod.Name, replacement.Name)
+			}
+		})
+
+	framework.It("should keep the PodGroup of a delegated Job when a sibling Job selecting the same template is deleted",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.WorkloadWithJob),
+		func(ctx context.Context) {
+			const templateName = "workers"
+
+			ginkgo.By("Creating a Workload with a shared template")
+			workload, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).Create(ctx, &schedulingv1beta1.Workload{
+				ObjectMeta: metav1.ObjectMeta{Name: "shared-workload"},
+				Spec: schedulingv1beta1.WorkloadSpec{
+					PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+						Name: templateName,
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+							Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
+						},
+					}},
+				},
+			}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create workload in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Creating two Jobs that select the shared template")
+			var jobs []*batchv1.Job
+			for _, name := range []string{"sibling-a", "sibling-b"} {
+				job := e2ejob.NewTestJob("notTerminate", name, v1.RestartPolicyNever, 1, 1, nil, 6)
+				job.Annotations = map[string]string{
+					apischeduling.WorkloadNameAnnotation:      workload.Name,
+					apischeduling.GroupTemplateNameAnnotation: templateName,
+				}
+				job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+				framework.ExpectNoError(err, "create job %s in namespace: %s", name, f.Namespace.Name)
+				jobs = append(jobs, job)
+			}
+			podGroupA := waitForJobPodGroup(ctx, f.ClientSet, jobs[0], func(*schedulingv1beta1.PodGroup) bool { return true })
+			podGroupB := waitForJobPodGroup(ctx, f.ClientSet, jobs[1], func(*schedulingv1beta1.PodGroup) bool { return true })
+			gomega.Expect(podGroupA.Name).NotTo(gomega.Equal(podGroupB.Name), "sibling Jobs must get distinct PodGroups")
+
+			ginkgo.By("Deleting the first Job")
+			err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Delete(ctx, jobs[0].Name, metav1.DeleteOptions{
+				PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+			})
+			framework.ExpectNoError(err, "delete job %s", jobs[0].Name)
+			waitForJobPodGroupGone(ctx, f.ClientSet, jobs[0])
+
+			ginkgo.By("Ensuring the sibling's PodGroup and the shared Workload are kept")
+			got, err := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).Get(ctx, podGroupB.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get PodGroup %s", podGroupB.Name)
+			gomega.Expect(got.UID).To(gomega.Equal(podGroupB.UID), "sibling PodGroup must not be replaced")
+			gomega.Expect(got.DeletionTimestamp).To(gomega.BeNil(), "sibling PodGroup must not be deleted")
+			_, err = f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).Get(ctx, workload.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "the shared Workload must be kept")
 		})
 
 	/*
@@ -1880,4 +2071,79 @@ func findConditionByType(list []batchv1.JobCondition, cType batchv1.JobCondition
 		}
 	}
 	return nil
+}
+
+func waitForJobWorkload(ctx context.Context, c clientset.Interface, job *batchv1.Job) *schedulingv1beta1.Workload {
+	var workload *schedulingv1beta1.Workload
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		list, err := c.SchedulingV1beta1().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for i := range list.Items {
+			if metav1.IsControlledBy(&list.Items[i], job) {
+				workload = &list.Items[i]
+				return nil
+			}
+		}
+		return fmt.Errorf("no Workload controlled by Job %s", job.Name)
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
+	return workload
+}
+
+func waitForJobPodGroup(ctx context.Context, c clientset.Interface, job *batchv1.Job, match func(*schedulingv1beta1.PodGroup) bool) *schedulingv1beta1.PodGroup {
+	var podGroup *schedulingv1beta1.PodGroup
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		list, err := c.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for i := range list.Items {
+			if metav1.IsControlledBy(&list.Items[i], job) && match(&list.Items[i]) {
+				podGroup = &list.Items[i]
+				return nil
+			}
+		}
+		return fmt.Errorf("no matching PodGroup controlled by Job %s", job.Name)
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
+	return podGroup
+}
+
+func waitForJobSchedulingObjectsGone(ctx context.Context, c clientset.Interface, job *batchv1.Job) {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		workloads, err := c.SchedulingV1beta1().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for i := range workloads.Items {
+			if metav1.IsControlledBy(&workloads.Items[i], job) {
+				return fmt.Errorf("found Workload %s controlled by Job %s", workloads.Items[i].Name, job.Name)
+			}
+		}
+		podGroups, err := c.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for i := range podGroups.Items {
+			if metav1.IsControlledBy(&podGroups.Items[i], job) {
+				return fmt.Errorf("found PodGroup %s controlled by Job %s", podGroups.Items[i].Name, job.Name)
+			}
+		}
+		return nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
+}
+
+func waitForJobPodGroupGone(ctx context.Context, c clientset.Interface, job *batchv1.Job) {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		list, err := c.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for i := range list.Items {
+			if metav1.IsControlledBy(&list.Items[i], job) {
+				return fmt.Errorf("found PodGroup %s controlled by Job %s", list.Items[i].Name, job.Name)
+			}
+		}
+		return nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
 }
