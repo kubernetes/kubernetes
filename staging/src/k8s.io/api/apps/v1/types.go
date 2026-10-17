@@ -358,7 +358,7 @@ const (
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
 	// type of statefulset condition.
-	// +optional
+	// +required
 	Type StatefulSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional
@@ -597,7 +597,7 @@ const (
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// type of deployment condition.
-	// +optional
+	// +required
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional
@@ -796,7 +796,7 @@ type DaemonSetConditionType string
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 type DaemonSetCondition struct {
 	// type of DaemonSet condition.
-	// +optional
+	// +required
 	Type DaemonSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional
@@ -993,7 +993,7 @@ const (
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetCondition struct {
 	// type of replica set condition.
-	// +optional
+	// +required
 	Type ReplicaSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ReplicaSetConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional

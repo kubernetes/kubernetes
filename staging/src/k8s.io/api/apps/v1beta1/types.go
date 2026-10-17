@@ -390,7 +390,7 @@ type StatefulSetConditionType string
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
 	// type of statefulset condition.
-	// +optional
+	// +required
 	Type StatefulSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional
@@ -659,7 +659,7 @@ const (
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// type of deployment condition.
-	// +optional
+	// +required
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// +optional
