@@ -76,7 +76,7 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
-
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -177,6 +177,7 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDERR: %v", err)
 		}
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -366,6 +367,92 @@ apiserver_stream_translator_requests_total{code="200"} 1
 	}
 }
 
+// TestStreamTranslator_UpstreamWithoutStatus checks that a session which the upstream
+// SPDY server ends without writing a status reaches the websocket client as an error,
+// and is counted as one, instead of as a successful run.
+func TestStreamTranslator_UpstreamWithoutStatus(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
+	// Create upstream fake SPDY server, which closes the connection without
+	// writing a status.
+	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if _, err := httpstream.Handshake(req, w, []string{rcconstants.StreamProtocolV4Name}); err != nil {
+			t.Errorf("error on handshake: %v", err)
+			return
+		}
+		replies := make(chan (<-chan struct{}), 2)
+		conn := spdy.NewResponseUpgrader().UpgradeResponse(w, req, func(_ httpstream.Stream, replySent <-chan struct{}) error {
+			replies <- replySent
+			return nil
+		})
+		if conn == nil {
+			t.Error("error upgrading the connection")
+			return
+		}
+		defer conn.Close()
+		// The translator opens the error stream and STDOUT, and waits for the
+		// reply to each. Close once both replies are out.
+		for range 2 {
+			select {
+			case replySent := <-replies:
+				<-replySent
+			case <-conn.CloseChan():
+				return
+			case <-time.After(wait.ForeverTestTimeout):
+				return
+			}
+		}
+	}))
+	defer spdyServer.Close()
+	// Create StreamTranslatorHandler, which points upstream to fake SPDY server, and
+	// create a test server using the StreamTranslatorHandler.
+	spdyLocation, err := url.Parse(spdyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
+	}
+	spdyTransport, err := fakeTransport()
+	if err != nil {
+		t.Fatalf("Unexpected error creating transport: %v", err)
+	}
+	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, Options{Stdout: true})
+	streamTranslatorServer := httptest.NewServer(streamTranslator)
+	defer streamTranslatorServer.Close()
+	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
+	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
+	}
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
+	if err != nil {
+		t.Fatalf("unexpected error creating websocket executor: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: io.Discard})
+	if err == nil {
+		t.Fatal("expected an error for a session that ended without a status, but received none")
+	}
+	// The translator's own SPDY client returns the error, and the translator
+	// sends it to the websocket client as an internal error status. The prefix
+	// tells that status apart from the websocket client finding its own error
+	// stream empty.
+	expectedError := "Internal error occurred: connection closed before the command's status was received; the output may be incomplete"
+	if err.Error() != expectedError {
+		t.Errorf("expected error (%s), got (%s)", expectedError, err)
+	}
+	// Validate the streamtranslator metrics; a session without a status is a 500.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="500"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestStreamTranslator_MultipleReadChannels tests two streams (STDOUT, STDERR) reading from
 // the connections at the same time.
 func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
@@ -391,6 +478,7 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -496,6 +584,7 @@ func TestStreamTranslator_ThrottleReadChannels(t *testing.T) {
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -635,6 +724,7 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 			actualTerminalSize := <-ctx.resizeChan
 			actualTerminalSizes = append(actualTerminalSizes, actualTerminalSize)
 		}
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -968,6 +1058,15 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 		}
 		_, err = stream.Write(bs)
 		return err
+	}
+}
+
+// writeSuccessStatus ends a fake v4 or v5 session the way a server does: with a
+// status on the error stream. Without it the client reports the session as cut.
+func writeSuccessStatus(t *testing.T, writeStatus func(*apierrors.StatusError) error) {
+	t.Helper()
+	if err := writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+		t.Errorf("error writing status: %v", err)
 	}
 }
 
