@@ -53,7 +53,7 @@ func getDefaultPlugins() *v1.Plugins {
 				// idle ResourceClaim than it is to evict some Pod that might
 				// be doing useful work.
 				{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
-				{Name: names.DefaultPreemption},
+				{Name: names.DefaultPreemption, Weight: ptr.To[int32](100)},
 				{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 				{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 				{Name: names.DefaultBinder},

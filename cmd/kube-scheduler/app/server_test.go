@@ -284,15 +284,22 @@ leaderElection:
 						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "DefaultPreemption"},
 						{Name: "VolumeBinding"},
 						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
 					}
 					plugins.Score.Enabled = []config.Plugin{
+						{Name: "DefaultPreemption", Weight: 1},
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 						{Name: "DynamicResources", Weight: 1},
+					}
+					plugins.Reserve.Enabled = []config.Plugin{
+						{Name: "DefaultPreemption"},
+						{Name: "VolumeBinding"},
+						{Name: "DynamicResources"},
 					}
 					return plugins
 				}(),

@@ -508,7 +508,7 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 							return preemptPodFn(ctx, c, preemptor, victim, pluginName)
 						}
 
-						return preemptionPlugin, nil
+						return &delayedPreemptionPlugin{DefaultPreemption: preemptionPlugin, name: delayedPreemptionPluginName}, nil
 					})
 					if err != nil {
 						t.Fatalf("Error registering a filter: %v", err)
@@ -737,6 +737,17 @@ func contains(pods []fwk.PodInfo, podName string) bool {
 		}
 	}
 	return false
+}
+
+// delayedPreemptionPlugin wraps DefaultPreemption to override Name() so that
+// NewFramework's ScorePlugin weight check matches the custom registered plugin name.
+type delayedPreemptionPlugin struct {
+	*defaultpreemption.DefaultPreemption
+	name string
+}
+
+func (pl *delayedPreemptionPlugin) Name() string {
+	return pl.name
 }
 
 type mockPreBindPlugin struct{}
