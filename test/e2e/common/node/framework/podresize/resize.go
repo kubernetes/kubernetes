@@ -293,6 +293,27 @@ func addResourceList(des, src v1.ResourceList) {
 	}
 }
 
+// ApplyPodLevelLimitsToContainer applies pod-level resource limits to the container's
+// resource limits when container-level limits are not explicitly set.
+// This mirrors the Kubelet behavior where containers inherit pod-level limits.
+func ApplyPodLevelLimitsToContainer(container *v1.Container, podResources *v1.ResourceRequirements) {
+	if podResources == nil || podResources.Limits == nil {
+		return
+	}
+	if container.Resources.Limits.Cpu().IsZero() && !podResources.Limits.Cpu().IsZero() {
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = make(v1.ResourceList)
+		}
+		container.Resources.Limits[v1.ResourceCPU] = podResources.Limits.Cpu().DeepCopy()
+	}
+	if container.Resources.Limits.Memory().IsZero() && !podResources.Limits.Memory().IsZero() {
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = make(v1.ResourceList)
+		}
+		container.Resources.Limits[v1.ResourceMemory] = podResources.Limits.Memory().DeepCopy()
+	}
+}
+
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
@@ -301,6 +322,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	var errs []error
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
+		ApplyPodLevelLimitsToContainer(&tc, pod.Spec.Resources)
 		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2))
 	}
 	return utilerrors.NewAggregate(errs)
