@@ -577,6 +577,18 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state CycleState, pod *v1.Pod, nodeInfo NodeInfo) *Status
 }
 
+// NodeLocalFilterPlugin is an optional interface for Filter plugins to declare whether
+// their Filter evaluation on a candidate node depends only on that node's state.
+// For backwards compatibility, Filter plugins that do not implement this interface
+// are treated as cross-node (IsNodeLocal() == false) by default.
+type NodeLocalFilterPlugin interface {
+	FilterPlugin
+	// IsNodeLocal returns true if the plugin's Filter evaluation on a node
+	// depends only on the candidate node, or false if it can depend on
+	// cross-node pod state.
+	IsNodeLocal() bool
+}
+
 // PostFilterPlugin is an interface for "PostFilter" plugins. These plugins are called
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {
