@@ -446,6 +446,61 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	return limits
 }
 
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
+// Overhead is added to the total only when the container request is non-zero.
+// Use PodResourcesOptions to control pod-level vs container-level resource handling.
+func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName, opts PodResourcesOptions) resource.Quantity {
+	requestQuantity := resource.Quantity{}
+
+	switch resourceName {
+	case v1.ResourceCPU:
+		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
+	case v1.ResourceMemory, v1.ResourceStorage, v1.ResourceEphemeralStorage:
+		requestQuantity = resource.Quantity{Format: resource.BinarySI}
+	default:
+		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
+	}
+
+	optsNoOverhead := opts
+	optsNoOverhead.ExcludeOverhead = true
+
+	if rQuantity, ok := PodRequests(pod, optsNoOverhead)[resourceName]; ok {
+		requestQuantity.Add(rQuantity)
+	}
+
+	// Add overhead for running a pod to the sum of requests if the resource total is non-zero.
+	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
+			requestQuantity.Add(podOverhead)
+		}
+	}
+
+	return requestQuantity
+}
+
+// GetResourceRequest finds and returns the request value for a specific resource.
+// For v1.ResourcePods it always returns 1.
+// For v1.ResourceCPU it returns the milli-value; for all other resources the raw value.
+func GetResourceRequest(pod *v1.Pod, resourceName v1.ResourceName, opts PodResourcesOptions) int64 {
+	if resourceName == v1.ResourcePods {
+		return 1
+	}
+
+	requestQuantity := GetResourceRequestQuantity(pod, resourceName, opts)
+
+	if resourceName == v1.ResourceCPU {
+		return requestQuantity.MilliValue()
+	}
+
+	return requestQuantity.Value()
+}
+
 // addResourceList adds the resources in newList to list.
 func addResourceList(list, newList v1.ResourceList) {
 	for name, quantity := range newList {

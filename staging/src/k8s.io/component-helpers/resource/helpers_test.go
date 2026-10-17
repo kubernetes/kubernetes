@@ -4709,3 +4709,141 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 		t.Errorf("expected SupportedPodLevelResources to contain CPU")
 	}
 }
+
+func TestIsHugePageResourceName(t *testing.T) {
+	cases := []struct {
+		name     v1.ResourceName
+		expected bool
+	}{
+		{v1.ResourceCPU, false},
+		{v1.ResourceMemory, false},
+		{v1.ResourceEphemeralStorage, false},
+		{"hugepages-2Mi", true},
+		{"hugepages-1Gi", true},
+		{"requests.hugepages-2Mi", false},
+	}
+	for _, tc := range cases {
+		if got := IsHugePageResourceName(tc.name); got != tc.expected {
+			t.Errorf("IsHugePageResourceName(%q) = %v, want %v", tc.name, got, tc.expected)
+		}
+	}
+}
+
+func TestGetResourceRequestQuantity(t *testing.T) {
+	cases := []struct {
+		cName        string
+		pod          *v1.Pod
+		resourceName v1.ResourceName
+		opts         PodResourcesOptions
+		expected     resource.Quantity
+	}{
+		{
+			cName:        "cpu request",
+			pod:          getPod("c", podResources{cpuRequest: "9"}),
+			resourceName: v1.ResourceCPU,
+			expected:     resource.MustParse("9"),
+		},
+		{
+			cName:        "memory request",
+			pod:          getPod("c", podResources{memoryRequest: "90Mi"}),
+			resourceName: v1.ResourceMemory,
+			expected:     resource.MustParse("90Mi"),
+		},
+		{
+			cName:        "overhead only — no request, overhead not added",
+			pod:          getPod("c", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName: v1.ResourceCPU,
+			expected:     resource.Quantity{Format: resource.DecimalSI},
+		},
+		{
+			cName:        "cpu request + overhead",
+			pod:          getPod("c", podResources{cpuRequest: "2", cpuOverhead: "5"}),
+			resourceName: v1.ResourceCPU,
+			expected:     resource.MustParse("7"),
+		},
+		{
+			cName:        "memory request + overhead",
+			pod:          getPod("c", podResources{memoryRequest: "1024", memoryOverhead: "5"}),
+			resourceName: v1.ResourceMemory,
+			expected:     resource.MustParse("1029"),
+		},
+		{
+			cName:        "cpu request + overhead excluded",
+			pod:          getPod("c", podResources{cpuRequest: "2", cpuOverhead: "5"}),
+			resourceName: v1.ResourceCPU,
+			opts:         PodResourcesOptions{ExcludeOverhead: true},
+			expected:     resource.MustParse("2"),
+		},
+		{
+			cName: "pod-level cpu request overrides container",
+			pod: func() *v1.Pod {
+				p := getPod("c", podResources{cpuRequest: "8"})
+				req := resource.MustParse("10")
+				p.Spec.Resources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: req},
+				}
+				return p
+			}(),
+			resourceName: v1.ResourceCPU,
+			opts:         PodResourcesOptions{SkipContainerLevelResources: true},
+			expected:     resource.MustParse("10"),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.cName, func(t *testing.T) {
+			got := GetResourceRequestQuantity(tc.pod, tc.resourceName, tc.opts)
+			if got.Cmp(tc.expected) != 0 {
+				t.Errorf("got %v, want %v", got.String(), tc.expected.String())
+			}
+		})
+	}
+}
+
+func TestGetResourceRequest(t *testing.T) {
+	cases := []struct {
+		cName        string
+		pod          *v1.Pod
+		resourceName v1.ResourceName
+		opts         PodResourcesOptions
+		expected     int64
+	}{
+		{
+			cName:        "cpu millivalue",
+			pod:          getPod("c", podResources{cpuRequest: "9"}),
+			resourceName: v1.ResourceCPU,
+			expected:     9000,
+		},
+		{
+			cName:        "memory bytes",
+			pod:          getPod("c", podResources{memoryRequest: "90Mi"}),
+			resourceName: v1.ResourceMemory,
+			expected:     94371840,
+		},
+		{
+			cName:        "pods resource always 1",
+			pod:          getPod("c", podResources{}),
+			resourceName: v1.ResourcePods,
+			expected:     1,
+		},
+		{
+			cName:        "cpu request + overhead",
+			pod:          getPod("c", podResources{cpuRequest: "2", cpuOverhead: "5"}),
+			resourceName: v1.ResourceCPU,
+			expected:     7000,
+		},
+		{
+			cName:        "overhead only — not counted",
+			pod:          getPod("c", podResources{cpuOverhead: "5"}),
+			resourceName: v1.ResourceCPU,
+			expected:     0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.cName, func(t *testing.T) {
+			got := GetResourceRequest(tc.pod, tc.resourceName, tc.opts)
+			if got != tc.expected {
+				t.Errorf("got %d, want %d", got, tc.expected)
+			}
+		})
+	}
+}
