@@ -81,6 +81,7 @@
       steadyState: false
       duration: 0s # unused
   - name: empty_100nodes
+    labels: [performance]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
@@ -89,6 +90,7 @@
       steadyState: true
       duration: 10s
   - name: half_100nodes
+    labels: [performance]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
