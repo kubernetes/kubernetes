@@ -61,7 +61,7 @@ Look through the PR list with [SIG cli](https://github.com/kubernetes/kubernetes
 ### At the start of the dev cycle
 
 - Write planned features for each release
-  - Use the [template](../template.md)
+  - Use the [template](../roadmap/template.md)
 
 ### During code-freeze
 
