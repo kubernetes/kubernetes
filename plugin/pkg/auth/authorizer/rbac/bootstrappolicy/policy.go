@@ -671,7 +671,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
+			// Modifying status.allocation and status.reservedFor requires binding permission.
 			rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+			// Scheduler may clear status.devices during deallocation; the arbitrary-node
+			// prefix is appropriate because the scheduler runs outside of any specific node.
+			rbacv1helpers.NewRule("arbitrary-node:update", "arbitrary-node:patch").Groups(resourceGroup).Resources("resourceclaims/driver").RuleOrDie(),
 		)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
