@@ -26,7 +26,9 @@ import (
 	"go/printer"
 	"go/token"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	customreflect "k8s.io/code-generator/third_party/forked/golang/reflect"
@@ -80,6 +82,9 @@ type OptionalFunc func(name string) bool
 func RewriteGeneratedGogoProtobufFile(file string, extractFn ExtractFunc, optionalFn OptionalFunc, header []byte, dropGogo bool) error {
 	return rewriteFile(file, header, func(fset *token.FileSet, file *ast.File) error {
 		cmap := ast.NewCommentMap(fset, file, file.Comments)
+
+		// must run before generated types are dropped, since it reads their fields
+		rewriteAnyFields(file)
 
 		// transform methods that point to optional maps or slices
 		for _, d := range file.Decls {
@@ -612,4 +617,274 @@ func (v replacePackageVisitor) Visit(n ast.Node) ast.Visitor {
 		return nil
 	}
 	return v
+}
+
+// anyRuntimePackage provides the helpers that interface-typed fields, which
+// go-to-protobuf maps to google.protobuf.Any, are marshaled through.
+const anyRuntimePackage = "k8s.io/apimachinery/pkg/runtime/protoany"
+
+// anyGoPackages are the Go packages protoc-gen-gogo may emit google.protobuf.Any
+// as, depending on the go_package of the any.proto it was given.
+var anyGoPackages = map[string]string{
+	`"google.golang.org/protobuf/types/known/anypb"`: "anypb",
+	`"github.com/gogo/protobuf/types"`:               "types",
+}
+
+type anyFieldKind int
+
+const (
+	anySingle anyFieldKind = iota + 1
+	anyList
+)
+
+// rewriteAnyFields rewrites the marshalers protoc-gen-gogo produces for
+// google.protobuf.Any fields so they operate on the Go interface the field
+// really has, by routing them through anyRuntimePackage. Returns true if the
+// file was changed.
+func rewriteAnyFields(file *ast.File) bool {
+	alias, importSpec := findAnyImport(file)
+	if importSpec == nil {
+		return false
+	}
+	fieldsByType := findAnyFields(file, alias)
+	if len(fieldsByType) == 0 {
+		return false
+	}
+
+	for _, d := range file.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ident, _, ok := receiver(fn)
+		if !ok || len(fn.Recv.List[0].Names) != 1 {
+			continue
+		}
+		fields, ok := fieldsByType[ident.Name]
+		if !ok {
+			continue
+		}
+		ast.Walk(&anyFieldVisitor{
+			recv:   fn.Recv.List[0].Names[0].Name,
+			fields: fields,
+			alias:  alias,
+		}, fn.Body)
+	}
+
+	// The generated struct types are the only remaining users of the Any
+	// import, and they are dropped later, so swap it for the runtime helpers.
+	importSpec.Name = ast.NewIdent(filepath.Base(anyRuntimePackage))
+	importSpec.Path.Value = strconv.Quote(anyRuntimePackage)
+	return true
+}
+
+func findAnyImport(file *ast.File) (alias string, spec *ast.ImportSpec) {
+	for _, d := range file.Decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.IMPORT {
+			continue
+		}
+		for _, s := range gd.Specs {
+			is, ok := s.(*ast.ImportSpec)
+			if !ok || is.Path == nil {
+				continue
+			}
+			name, ok := anyGoPackages[is.Path.Value]
+			if !ok {
+				continue
+			}
+			if is.Name != nil {
+				name = is.Name.Name
+			}
+			return name, is
+		}
+	}
+	return "", nil
+}
+
+// findAnyFields returns, per generated struct, the fields typed *alias.Any or []*alias.Any.
+func findAnyFields(file *ast.File, alias string) map[string]map[string]anyFieldKind {
+	result := map[string]map[string]anyFieldKind{}
+	for _, d := range file.Decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.TYPE {
+			continue
+		}
+		for _, s := range gd.Specs {
+			ts, ok := s.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			for _, f := range st.Fields.List {
+				var kind anyFieldKind
+				switch t := f.Type.(type) {
+				case *ast.StarExpr:
+					if isAnyTypeExpr(t, alias) {
+						kind = anySingle
+					}
+				case *ast.ArrayType:
+					if t.Len == nil && isAnyTypeExpr(t.Elt, alias) {
+						kind = anyList
+					}
+				}
+				if kind == 0 {
+					continue
+				}
+				if result[ts.Name.Name] == nil {
+					result[ts.Name.Name] = map[string]anyFieldKind{}
+				}
+				for _, n := range f.Names {
+					result[ts.Name.Name][n.Name] = kind
+				}
+			}
+		}
+	}
+	return result
+}
+
+// isAnyTypeExpr matches *alias.Any.
+func isAnyTypeExpr(e ast.Expr, alias string) bool {
+	star, ok := e.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	return isFieldSelector(star.X, alias, "Any")
+}
+
+// anyFieldVisitor rewrites, within one method of a type with Any fields:
+//
+//	X.Size()                                    -> protoany.Size(X)
+//	X.MarshalToSizedBuffer(b)                   -> protoany.MarshalToSizedBuffer(X, b)
+//	X.Unmarshal(b)                              -> protoany.Unmarshal(b, &X)
+//	if m.F == nil { m.F = &anypb.Any{} }        -> (removed)
+//	append(m.F, &anypb.Any{})                   -> append(m.F, nil)
+//	strings.Replace(s, "Any", "anypb.Any", 1)   -> s
+//
+// where X is m.F, m.F[i], or the value variable of a range over m.F.
+type anyFieldVisitor struct {
+	recv      string
+	fields    map[string]anyFieldKind
+	alias     string
+	rangeVars map[string]struct{}
+}
+
+func (v *anyFieldVisitor) Visit(n ast.Node) ast.Visitor {
+	switch t := n.(type) {
+	case *ast.BlockStmt:
+		t.List = v.dropAnyNilInits(t.List)
+	case *ast.CaseClause:
+		// Unmarshal's per-field logic lives directly in switch cases.
+		t.Body = v.dropAnyNilInits(t.Body)
+	case *ast.RangeStmt:
+		if v.isField(t.X, anyList) {
+			if value, ok := t.Value.(*ast.Ident); ok && value.Name != "_" {
+				nested := *v
+				nested.rangeVars = map[string]struct{}{value.Name: {}}
+				for k := range v.rangeVars {
+					nested.rangeVars[k] = struct{}{}
+				}
+				ast.Walk(&nested, t.Body)
+				return nil
+			}
+		}
+	case *ast.CallExpr:
+		v.rewriteCall(t)
+	}
+	return v
+}
+
+func (v *anyFieldVisitor) rewriteCall(call *ast.CallExpr) {
+	if isIdent(call.Fun, "append") && len(call.Args) == 2 && v.isField(call.Args[0], anyList) && v.isNewAny(call.Args[1]) {
+		call.Args[1] = ast.NewIdent("nil")
+		return
+	}
+
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+	if isIdent(sel.X, "strings") && sel.Sel.Name == "Replace" && len(call.Args) == 4 {
+		// gogo's String() qualifies the type name; there is no Any type to name.
+		if lit, ok := call.Args[2].(*ast.BasicLit); ok && lit.Value == strconv.Quote(v.alias+".Any") {
+			if inner, ok := call.Args[0].(*ast.CallExpr); ok {
+				*call = *inner
+			}
+		}
+		return
+	}
+	if !v.isAnyValue(sel.X) {
+		return
+	}
+	helper := func(name string) ast.Expr {
+		return &ast.SelectorExpr{X: ast.NewIdent(filepath.Base(anyRuntimePackage)), Sel: ast.NewIdent(name)}
+	}
+	switch sel.Sel.Name {
+	case "Size":
+		call.Fun, call.Args = helper("Size"), []ast.Expr{sel.X}
+	case "MarshalToSizedBuffer":
+		call.Fun, call.Args = helper("MarshalToSizedBuffer"), append([]ast.Expr{sel.X}, call.Args...)
+	case "Unmarshal":
+		call.Fun, call.Args = helper("Unmarshal"), append(call.Args, &ast.UnaryExpr{Op: token.AND, X: sel.X})
+	}
+}
+
+// isField matches recv.F where F is an Any field of the given kind.
+func (v *anyFieldVisitor) isField(e ast.Expr, kind anyFieldKind) bool {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok || !isIdent(sel.X, v.recv) {
+		return false
+	}
+	return v.fields[sel.Sel.Name] == kind
+}
+
+// isAnyValue matches an expression holding a single Any value.
+func (v *anyFieldVisitor) isAnyValue(e ast.Expr) bool {
+	switch t := e.(type) {
+	case *ast.Ident:
+		_, ok := v.rangeVars[t.Name]
+		return ok
+	case *ast.IndexExpr:
+		return v.isField(t.X, anyList)
+	default:
+		return v.isField(e, anySingle)
+	}
+}
+
+// isNewAny matches &alias.Any{}.
+func (v *anyFieldVisitor) isNewAny(e ast.Expr) bool {
+	u, ok := e.(*ast.UnaryExpr)
+	if !ok || u.Op != token.AND {
+		return false
+	}
+	lit, ok := u.X.(*ast.CompositeLit)
+	return ok && len(lit.Elts) == 0 && isFieldSelector(lit.Type, v.alias, "Any")
+}
+
+func (v *anyFieldVisitor) dropAnyNilInits(list []ast.Stmt) []ast.Stmt {
+	stmts := list[:0]
+	for _, s := range list {
+		if !v.isAnyNilInit(s) {
+			stmts = append(stmts, s)
+		}
+	}
+	return stmts
+}
+
+// isAnyNilInit matches `if m.F == nil { m.F = &alias.Any{} }`, which would
+// otherwise assign a concrete Any into the interface field before decoding.
+func (v *anyFieldVisitor) isAnyNilInit(s ast.Stmt) bool {
+	ifStmt, ok := s.(*ast.IfStmt)
+	if !ok || ifStmt.Init != nil || ifStmt.Else != nil || len(ifStmt.Body.List) != 1 {
+		return false
+	}
+	cond, ok := ifStmt.Cond.(*ast.BinaryExpr)
+	if !ok || cond.Op != token.EQL || !v.isField(cond.X, anySingle) || !isIdent(cond.Y, "nil") {
+		return false
+	}
+	assign, ok := ifStmt.Body.List[0].(*ast.AssignStmt)
+	return ok && len(assign.Lhs) == 1 && len(assign.Rhs) == 1 && v.isField(assign.Lhs[0], anySingle) && v.isNewAny(assign.Rhs[0])
 }

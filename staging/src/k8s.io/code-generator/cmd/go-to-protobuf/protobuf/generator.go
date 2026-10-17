@@ -438,7 +438,19 @@ type protoField struct {
 
 var (
 	errUnrecognizedType = fmt.Errorf("did not recognize the provided type")
+
+	// anyProtoType is the well-known type Go interfaces are mapped to, since the
+	// concrete type behind an interface is only known at runtime.
+	anyProtoType = types.Name{Path: "google/protobuf/any.proto", Package: "google.protobuf", Name: "Any"}
 )
+
+// isInterface returns true if t is an interface, or an alias (such as any) of one.
+func isInterface(t *types.Type) bool {
+	for t != nil && t.Kind == types.Alias {
+		t = t.Underlying
+	}
+	return t != nil && t.Kind == types.Interface
+}
 
 func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 	// TODO: when we enable proto3, also include other fundamental types in the google.protobuf package
@@ -449,6 +461,9 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 	// 		Name: types.Name{Path: "google/protobuf/timestamp.proto", Package: "google.protobuf", Name: "Timestamp"},
 	// 	}, true
 	// }
+	if isInterface(t) {
+		return &types.Type{Name: anyProtoType, Kind: types.Protobuf}, true
+	}
 	switch t.Kind {
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
@@ -476,6 +491,14 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 
 func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *types.Type) error {
 	var err error
+	// Checked before the kind switch so aliases of interfaces (e.g. any) don't
+	// pick up a casttype, which gogo only permits on scalar fields.
+	if isInterface(t) {
+		field.Type, err = locator.ProtoTypeFor(t)
+		// a nil interface is a legitimate value, so the message must stay a pointer
+		field.Nullable = true
+		return err
+	}
 	switch t.Kind {
 	case types.Protobuf:
 		field.Type, err = locator.ProtoTypeFor(t)
