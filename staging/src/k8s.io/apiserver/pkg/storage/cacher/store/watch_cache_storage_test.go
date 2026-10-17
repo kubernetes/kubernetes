@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -186,6 +187,79 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if !ok || val.(*Element).Object.(*mockObject).val != "30" {
 		t.Fatalf("Unexpected element in snapshot at RV 30")
 	}
+}
+
+// Cache observes every write, so it knows the state at every RV
+// from the compacted one up to the latest one it observed.
+func TestWatchCacheStorageExactRVsAfterCompact(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	s := NewWatchCacheStorage(&cache.Indexers{})
+	write := func(rv int) {
+		_, err := s.UpdateStore(watch.Added, testStorageElement(fmt.Sprint(rv), "", rv), uint64(rv))
+		require.NoError(t, err)
+	}
+	bookmark := s.UpdateResourceVersion
+
+	write(10)
+	write(20)
+	bookmark(25)
+	assert.Equal(t, "10-25", servedExactRVs(t, s))
+
+	t.Log("Compact between writes")
+	s.Compact(15)
+	// TODO: Expect 15-25, write at RV 10 is the state at RV 15.
+	assert.Equal(t, "20-25", servedExactRVs(t, s))
+
+	t.Log("Compact past last write")
+	s.Compact(22)
+	// TODO: Expect 22-25, write at RV 20 is the state at RV 22.
+	assert.Equal(t, "none", servedExactRVs(t, s))
+	bookmark(30)
+	// TODO: Expect 22-30.
+	assert.Equal(t, "none", servedExactRVs(t, s))
+
+	t.Log("Write after compact past last write")
+	write(40)
+	// TODO: Expect 22-40.
+	assert.Equal(t, "40-40", servedExactRVs(t, s))
+
+	t.Log("Compact past latest observed RV")
+	s.Compact(50)
+	assert.Equal(t, "none", servedExactRVs(t, s))
+	bookmark(55)
+	// TODO: Expect 50-55, bookmark tells write at RV 40 is the state at RV 50.
+	assert.Equal(t, "none", servedExactRVs(t, s))
+}
+
+// servedExactRVs returns range of RVs, up to the latest observed, that storage
+// can serve, after validating the state it serves for each of them.
+func servedExactRVs(t *testing.T, s *WatchCacheStorage) string {
+	t.Helper()
+	latest, err := s.LatestSnapshot().OrderedListPrefix("", "")
+	require.NoError(t, err)
+	var served []uint64
+	for rv := uint64(1); rv <= s.LatestSnapshot().ResourceVersion(); rv++ {
+		snapshot, err := s.GetExactSnapshotLocked(rv)
+		require.Equal(t, s.CanServeExactRV(rv), err == nil, "rv: %d", rv)
+		if err != nil {
+			continue
+		}
+		var writtenUntilRV []interface{}
+		for _, elem := range latest {
+			if uint64(elem.(*Element).Object.(fakeObj).rv) <= rv {
+				writtenUntilRV = append(writtenUntilRV, elem)
+			}
+		}
+		state, err := snapshot.OrderedListPrefix("", "")
+		require.NoError(t, err)
+		require.Equal(t, writtenUntilRV, state, "rv: %d", rv)
+		served = append(served, rv)
+	}
+	if len(served) == 0 {
+		return "none"
+	}
+	require.Len(t, served, int(served[len(served)-1]-served[0]+1), "expected continuous range: %v", served)
+	return fmt.Sprintf("%d-%d", served[0], served[len(served)-1])
 }
 
 type mockObject struct {
