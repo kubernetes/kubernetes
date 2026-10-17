@@ -34325,6 +34325,13 @@ func schema_k8sio_api_discovery_v1_EndpointConditions(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
+					"processing": {
+						SchemaProps: spec.SchemaProps{
+							Description: "processing indicates that this endpoint is processing existing connections. A nil value should be interpreted as \"true\".",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -34712,6 +34719,13 @@ func schema_k8sio_api_discovery_v1beta1_EndpointConditions(ref common.ReferenceC
 					"terminating": {
 						SchemaProps: spec.SchemaProps{
 							Description: "terminating indicates that this endpoint is terminating. A nil value indicates an unknown state. Consumers should interpret this unknown state to mean that the endpoint is not terminating.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"processing": {
+						SchemaProps: spec.SchemaProps{
+							Description: "processing indicates that this endpoint is processing existing connections. A nil value should be interpreted as \"true\".",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

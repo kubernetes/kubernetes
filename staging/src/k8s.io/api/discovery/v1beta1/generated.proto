@@ -110,6 +110,11 @@ message EndpointConditions {
   // to mean that the endpoint is not terminating.
   // +optional
   optional bool terminating = 3;
+
+  // processing indicates that this endpoint is processing existing connections.
+  // A nil value should be interpreted as "true".
+  // +optional
+  optional bool processing = 4;
 }
 
 // EndpointHints provides hints describing how an endpoint should be consumed.
