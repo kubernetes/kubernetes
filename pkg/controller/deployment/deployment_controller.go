@@ -121,7 +121,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		Recorder:   dc.eventRecorder,
 	}
 
-	_, _ = dInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err := dInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addDeployment(logger, obj)
 		},
@@ -133,7 +133,10 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 			dc.deleteDeployment(logger, obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	_, _ = rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	if err != nil {
+		return nil, err
+	}
+	_, err = rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addReplicaSet(logger, obj)
 		},
@@ -144,11 +147,17 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 			dc.deleteReplicaSet(logger, obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	if err != nil {
+		return nil, err
+	}
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			dc.deletePod(logger, obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, err
+	}
 
 	dc.syncHandler = dc.syncDeployment
 	dc.enqueueDeployment = dc.enqueue
