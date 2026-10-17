@@ -1,0 +1,869 @@
+# The following labels are used in this file:
+#
+# - integration-test: test cases to run as the integration test.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+
+# 2LevelCompositePodGroupsBasicScheduling benchmarks scheduling throughput when both CompositePodGroup
+# and its children PodGroups use basic scheduling policy, allowing pods and groups to be scheduled independently without quorum.
+- name: 2LevelCompositePodGroupsBasicScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-basic-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-basic-ns-0
+    templatePath: templates/composite-podgroup.yaml
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $initPodGroups
+    namespace: cpg-basic-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+  - opcode: createPods
+    # Create pods belonging to child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-basic-ns-0
+    podTemplatePath: templates/pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initRootCompositePodGroups: 2
+      initPodGroups: 4
+      childrenPodGroupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 100Nodes_4Trees_2Level_8PodGroups_24Pods
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initRootCompositePodGroups: 4
+      initPodGroups: 8
+      childrenPodGroupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_8000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      podsPerGroup: 500
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_12000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      podsPerGroup: 750
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_16000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      podsPerGroup: 1000
+  - name: 5000Nodes_2Trees_2Level_64PodGroups_6400Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 64
+      childrenPodGroupsPerCPG: 32
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_128PodGroups_12800Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 128
+      childrenPodGroupsPerCPG: 64
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_256PodGroups_25600Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 256
+      childrenPodGroupsPerCPG: 128
+      podsPerGroup: 100
+
+# 2LevelCompositePodGroupsGangScheduling benchmarks all-or-nothing scheduling throughput of CompositePodGroups
+# where both the CompositePodGroups (minGroupCount) and children PodGroups (minCount) enforce gang quorum.
+- name: 2LevelCompositePodGroupsGangScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-gang-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-gang-ns-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 1000
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $initPodGroups
+    namespace: cpg-gang-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      minCount: $minCount
+      priority: 1000
+  - opcode: createPods
+    # Create pods with reference to the child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-gang-ns-0
+    podTemplatePath: templates/pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+      cpuRequest: 100m
+  workloads:
+  - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initRootCompositePodGroups: 2
+      initPodGroups: 4
+      childrenPodGroupsPerCPG: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 100Nodes_4Trees_2Level_8PodGroups_24Pods
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initRootCompositePodGroups: 4
+      initPodGroups: 8
+      childrenPodGroupsPerCPG: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_8000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_12000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      minCount: 750
+      podsPerGroup: 750
+  - name: 5000Nodes_4Trees_2Level_16PodGroups_16000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 4
+      initPodGroups: 16
+      childrenPodGroupsPerCPG: 4
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_2Trees_2Level_64PodGroups_6400Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 64
+      childrenPodGroupsPerCPG: 32
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_128PodGroups_12800Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 128
+      childrenPodGroupsPerCPG: 64
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_256PodGroups_25600Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 256
+      childrenPodGroupsPerCPG: 128
+      minCount: 100
+      podsPerGroup: 100
+
+# 2LevelCompositePodGroupsSchedulingWithPreemption benchmarks scheduling with preemption, where a high-priority
+# CompositePodGroup and its children PodGroups preempt low-priority pods.
+# Standard node capacity is 4000m CPU. Low-priority pods request 40m CPU each.
+# Preemptor pods request 3970m CPU each, forcing eviction of all low-priority pods.
+- name: 2LevelCompositePodGroupsSchedulingWithPreemption
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: cpg-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-preempt-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 1000
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $initPodGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      priority: 1000
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+      priority: 1000
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initRootCompositePodGroups: 1
+      initPodGroups: 2
+      childrenPodGroupsPerCPG: 2
+      minCount: 1
+      podsPerGroup: 1
+      gangCpuRequest: 3970m
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initRootCompositePodGroups: 1
+      initPodGroups: 10
+      childrenPodGroupsPerCPG: 10
+      minCount: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initRootCompositePodGroups: 10
+      initPodGroups: 20
+      childrenPodGroupsPerCPG: 2
+      minCount: 5
+      podsPerGroup: 5
+      gangCpuRequest: 3970m
+
+# 2LevelCompositePodGroupsSchedulingWithGroupsPreemption benchmarks hierarchical preemption where a high-priority 
+# CompositePodGroup hierarchy (priority 10000) preempts lower-priority hierarchies (priority 1000).
+# Standard node capacity is 4000m CPU. Low-priority gang pods request 600m CPU (priority 1000).
+# High-priority gang pods request 3500m CPU (priority 10000), forcing eviction of low-priority
+# CompositePodGroup member pods across the nodes.
+- name: 2LevelCompositePodGroupsSchedulingWithGroupsPreemption
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 2
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $lowPriorityCPGs
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-preempt-1
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 1000
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $lowPriorityGroups
+    namespace: cpg-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      priority: 1000
+      minCount: $minCount
+  - opcode: createPods
+    countParam: $lowPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-1
+    podTemplatePath: templates/pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $lowPriorityCpuRequest
+      hostPortBase: 8000
+      priority: 1000
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $highPriorityCPGs
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-preempt-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 10000
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $highPriorityGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      priority: 10000
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $highPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $highPriorityCpuRequest
+      hostPortBase: 9000
+      priority: 10000
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_2LowPriorityCPGs
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      lowPriorityCPGs: 2
+      lowPriorityGroups: 4
+      highPriorityCPGs: 1
+      highPriorityGroups: 2
+      childrenPodGroupsPerCPG: 2
+      minCount: 1
+      podsPerGroup: 1
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_5LowPriorityCPGs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityCPGs: 5
+      lowPriorityGroups: 50
+      highPriorityCPGs: 1
+      highPriorityGroups: 10
+      childrenPodGroupsPerCPG: 10
+      minCount: 10
+      podsPerGroup: 10
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_50LowPriorityCPGs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityCPGs: 50
+      lowPriorityGroups: 100
+      highPriorityCPGs: 10
+      highPriorityGroups: 20
+      childrenPodGroupsPerCPG: 2
+      minCount: 5
+      podsPerGroup: 5
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+
+# 2LevelCompositePodGroupsSchedulingWithPreemptionAndAffinityConstraints benchmarks scheduling CompositePodGroup hierarchy with preemption under pod affinity constraints.
+# Standard node capacity is 4000m CPU. High-priority anchor pods (priority 10000) are spread 1 per node via hostPort.
+# Low-priority victim pods (priority 0) fill remaining node capacity. Preemptor gang pods (priority 10000)
+# have required podAffinity to anchor pods and request 3970m CPU, forcing preemption of co-located low-priority pods on target nodes.
+- name: 2LevelCompositePodGroupsSchedulingWithPreemptionAndAffinityConstraints
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 3
+  # create high priority anchor pods
+  - opcode: createPods
+    countParam: $initNodes
+    podTemplatePath: templates/pod-anchor-high-priority.yaml
+    namespace: cpg-preempt-2
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initNodes
+  # create low priority pods that will be preempted
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: cpg-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-preempt-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 10000
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $initPodGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      priority: 10000
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/pod-gang-affinity.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 10000
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initRootCompositePodGroups: 1
+      initPodGroups: 2
+      childrenPodGroupsPerCPG: 2
+      minCount: 1
+      podsPerGroup: 1
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initRootCompositePodGroups: 1
+      initPodGroups: 10
+      childrenPodGroupsPerCPG: 10
+      minCount: 10
+      podsPerGroup: 10
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initRootCompositePodGroups: 10
+      initPodGroups: 20
+      childrenPodGroupsPerCPG: 2
+      minCount: 5
+      podsPerGroup: 5
+
+# 2LevelCompositePodGroupsWithTopologyAwareScheduling benchmarks hierarchical topology-aware scheduling.
+# Enforces a two-tier topology constraint: the root CPG requires all member groups to fit within
+# the same zone (topology.kubernetes.io/zone), while child PodGroups require member pods to fit
+# within the same rack (topology.kubernetes.io/rack).
+- name: 2LevelCompositePodGroupsWithTopologyAwareScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/tas-node.yaml
+  - opcode: createNamespaces
+    prefix: cpg-tas-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 2
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-tas-ns-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      topologyKey: topology.kubernetes.io/zone
+  - opcode: createPodGroups
+    # Level 2 represents leaf podgroups children of the root composite podgroup.
+    countParam: $initPodGroups
+    namespace: cpg-tas-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 1
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      minCount: $minCount
+      topologyKey: topology.kubernetes.io/rack
+  - opcode: createPods
+    # Create pods with reference to the child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-tas-ns-0
+    podTemplatePath: templates/pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initRootCompositePodGroups: 2
+      initPodGroups: 4
+      childrenPodGroupsPerCPG: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_2Trees_2Level_8PodGroups_4000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 8
+      childrenPodGroupsPerCPG: 4
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_2Trees_2Level_8PodGroups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 8
+      childrenPodGroupsPerCPG: 4
+      minCount: 750
+      podsPerGroup: 750
+  - name: 5000Nodes_2Trees_2Level_8PodGroups_8000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 8
+      childrenPodGroupsPerCPG: 4
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_2Trees_2Level_64PodGroups_6400Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 64
+      childrenPodGroupsPerCPG: 32
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_128PodGroups_12800Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 128
+      childrenPodGroupsPerCPG: 64
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_2Level_256PodGroups_25600Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 256
+      childrenPodGroupsPerCPG: 128
+      minCount: 100
+      podsPerGroup: 100
+
+# 3LevelCompositePodGroupsScheduling benchmarks scheduling throughput for 3-level CompositePodGroup hierarchies.
+# These typically represent JobSets.
+- name: 3LevelCompositePodGroupsScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-3level-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    # Level 2 represents the children composite podgroups.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 3
+    childrenCompositePodGroupsPerCPGParam: $childrenCompositePodGroupsPerCPG
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-3level-ns-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 1000
+  - opcode: createPodGroups
+    # Level 3 represents leaf podgroups children of composite podgroups in level 2.
+    countParam: $initPodGroups
+    namespace: cpg-3level-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 2
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      minCount: $minCount
+      priority: 1000
+  - opcode: createPods
+    # Pods belonging to leaf PodGroups
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-3level-ns-0
+    podTemplatePath: templates/pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+      cpuRequest: 100m
+  workloads:
+  - name: 10Nodes_2Trees_3Level_16PodGroups_48Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initRootCompositePodGroups: 2
+      initPodGroups: 16
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_2Trees_3Level_16PodGroups_8000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 16
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_2Trees_3Level_16PodGroups_12000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 16
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 750
+      podsPerGroup: 750
+  - name: 5000Nodes_2Trees_3Level_16PodGroups_16000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 16
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_2Trees_3Level_64PodGroups_6400Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 64
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 16
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_3Level_128PodGroups_12800Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 128
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 32
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_3Level_256PodGroups_25600Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 256
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 64
+      minCount: 100
+      podsPerGroup: 100
+
+# 4LevelCompositePodGroupsScheduling benchmarks scheduling throughput for 4-level CompositePodGroup hierarchies.
+# These typically represent Disaggregated Sets.
+- name: 4LevelCompositePodGroupsScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-4level-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Level 1 represents the root composite podgroup.
+    # Levels 2 and 3 represent the children composite podgroups.
+    rootCountParam: $initRootCompositePodGroups
+    depth: 4
+    childrenCompositePodGroupsPerCPGParam: $childrenCompositePodGroupsPerCPG
+    childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
+    namespace: cpg-4level-ns-0
+    templatePath: templates/composite-podgroup.yaml
+    templateParams:
+      gang: true
+      priority: 1000
+  - opcode: createPodGroups
+    # Level 4 represents leaf podgroups children of the composite podgroups in level 3.
+    countParam: $initPodGroups
+    namespace: cpg-4level-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      parentLevel: 3
+      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
+      minCount: $minCount
+      priority: 1000
+  - opcode: createPods
+    # Pods belonging to leaf PodGroups
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-4level-ns-0
+    podTemplatePath: templates/pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+      cpuRequest: 100m
+  workloads:
+  - name: 10Nodes_2Trees_4Level_32PodGroups_96Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initRootCompositePodGroups: 2
+      initPodGroups: 32
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_2Trees_4Level_32PodGroups_16000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 32
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_2Trees_4Level_32PodGroups_24000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 32
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 750
+      podsPerGroup: 750
+  - name: 5000Nodes_2Trees_4Level_32PodGroups_32000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 32
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 4
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_2Trees_4Level_64PodGroups_6400Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 64
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 8
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_4Level_128PodGroups_12800Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 128
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 16
+      minCount: 100
+      podsPerGroup: 100
+  - name: 5000Nodes_2Trees_4Level_256PodGroups_25600Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initRootCompositePodGroups: 2
+      initPodGroups: 256
+      childrenCompositePodGroupsPerCPG: 2
+      childrenPodGroupsPerCPG: 32
+      minCount: 100
+      podsPerGroup: 100
