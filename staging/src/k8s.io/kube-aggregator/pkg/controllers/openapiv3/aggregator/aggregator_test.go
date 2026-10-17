@@ -78,6 +78,95 @@ func (h testV3APIService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// testExternalAPIService mimics a real extension API server (e.g. metrics-server): in addition
+// to its own group/version path, it also advertises the generic "apis" and "version" discovery
+// paths that any server built on the generic apiserver library exposes for itself.
+type testExternalAPIService struct {
+	gvPath string
+}
+
+var _ http.Handler = testExternalAPIService{}
+
+func (h testExternalAPIService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/openapi/v3" {
+		group := &handler3.OpenAPIV3Discovery{
+			Paths: map[string]handler3.OpenAPIV3DiscoveryGroupVersion{
+				h.gvPath:  {ServerRelativeURL: "/openapi/v3/" + h.gvPath},
+				"apis":    {ServerRelativeURL: "/openapi/v3/apis?hash=from-" + h.gvPath},
+				"version": {ServerRelativeURL: "/openapi/v3/version?hash=from-" + h.gvPath},
+			},
+		}
+		j, _ := json.Marshal(group)
+		w.Write(j)
+		return
+	}
+	w.Write([]byte(`{"openapi":"3.0.0","info":{"title":"Kubernetes","version":"unversioned"}}`))
+}
+
+// TestV3ExternalAPIServiceDoesNotHijackGenericPaths guards against a bug where any registered
+// external APIService could advertise the generic "apis"/"version" discovery paths (which every
+// generic-apiserver-based backend exposes for itself) and nondeterministically win them over the
+// real ones depending on map iteration order. See https://github.com/kubernetes/kubernetes/issues/140152.
+func TestV3ExternalAPIServiceDoesNotHijackGenericPaths(t *testing.T) {
+	downloader := Downloader{}
+	pathHandler := mux.NewPathRecorderMux("aggregator_test")
+	var serveHandler http.Handler = pathHandler
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
+	if err != nil {
+		t.Error(err)
+	}
+
+	services := []struct {
+		name string
+		spec v1.APIServiceSpec
+	}{
+		{"v1beta1.metrics.k8s.io", v1.APIServiceSpec{Group: "metrics.k8s.io", Version: "v1beta1", Service: &v1.ServiceReference{Name: "metrics-server", Namespace: "kube-system"}}},
+		{"v1alpha1.keda.sh", v1.APIServiceSpec{Group: "keda.sh", Version: "v1alpha1", Service: &v1.ServiceReference{Name: "keda", Namespace: "keda"}}},
+	}
+	for _, svc := range services {
+		apiService := &v1.APIService{Spec: svc.spec}
+		apiService.Name = svc.name
+		gvPath := getGroupVersionStringFromAPIService(*apiService)
+		specProxier.AddUpdateAPIService(testExternalAPIService{gvPath: gvPath}, apiService)
+		if err := specProxier.UpdateAPIServiceSpec(svc.name); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	data := sendReq(t, serveHandler, "/openapi/v3")
+	groupVersionList := handler3.OpenAPIV3Discovery{}
+	if err := json.Unmarshal(data, &groupVersionList); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, svc := range services {
+		gvPath := getGroupVersionStringFromAPIService(v1.APIService{Spec: svc.spec})
+		if _, ok := groupVersionList.Paths[gvPath]; !ok {
+			t.Errorf("expected %s to be in group version list", gvPath)
+		}
+	}
+
+	// Neither external APIService should be allowed to claim the generic "apis"/"version"
+	// paths; nothing else registered them in this test, so they must be absent entirely.
+	if _, ok := groupVersionList.Paths["apis"]; ok {
+		t.Error("expected \"apis\" not to be hijacked by an external APIService")
+	}
+	if _, ok := groupVersionList.Paths["version"]; ok {
+		t.Error("expected \"version\" not to be hijacked by an external APIService")
+	}
+
+	// A direct request for the generic path must not be routed to either external APIService.
+	req, err := http.NewRequest("GET", "/openapi/v3/apis", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := responsewriter.NewInMemoryResponseWriter()
+	serveHandler.ServeHTTP(writer, req)
+	if writer.RespCode() != http.StatusNotFound {
+		t.Errorf("expected /openapi/v3/apis to 404 since no service legitimately owns it, got %d", writer.RespCode())
+	}
+}
+
 type testV2APIService struct{}
 
 var _ http.Handler = testV2APIService{}
