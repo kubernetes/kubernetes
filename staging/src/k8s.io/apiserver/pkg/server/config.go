@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -395,6 +396,12 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+
+	// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization
+	ConditionalAuthorizationRequestClassifier genericapifilters.ConditionalAuthorizationRequestClassifier
+
+	// ConditionsEnforcerPluginEnabled is set to true by AdmissionOptions when the admission plugin is enabled
+	ConditionsEnforcerPluginEnabled bool
 }
 
 func init() {
@@ -1037,7 +1044,22 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := apiHandler
 
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) && c.Authorization.ConditionalAuthorizationRequestClassifier != nil && c.Authorization.ConditionsEnforcerPluginEnabled {
+		var err error
+		handler, err = genericapifilters.WithConditionsAwareAuthorization(handler, c.Authorization.Authorizer, c.Serializer, c.Authorization.ConditionalAuthorizationRequestClassifier)
+		if err != nil {
+			// An error is only returned if the feature gate is off, or the classifier is nil, but that is never the case in this branch,
+			// so this is in practice unreachable.
+			panic(err)
+		}
+	} else {
+		handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) && !c.Authorization.ConditionsEnforcerPluginEnabled {
+		klog.Warningf("ConditionalAuthorization feature gate is on, but the %s admission plugin is disabled", conditionsenforcer.PluginName)
+	}
+
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {

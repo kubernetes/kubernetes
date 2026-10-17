@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -33,11 +35,11 @@ import (
 )
 
 type REST struct {
-	authorizer authorizer.UnconditionalAuthorizer
+	authorizer authorizer.Authorizer
 	scheme     *runtime.Scheme
 }
 
-func NewREST(authorizer authorizer.UnconditionalAuthorizer, scheme *runtime.Scheme) *REST {
+func NewREST(authorizer authorizer.Authorizer, scheme *runtime.Scheme) *REST {
 	return &REST{authorizer, scheme}
 }
 
@@ -88,14 +90,29 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	}
 
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(subjectAccessReview.Spec)
-	decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
-	subjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: (decision == authorizer.DecisionAllow),
-		Denied:  (decision == authorizer.DecisionDeny),
-		Reason:  reason,
+	versionedAO, supportsConditionalAuthorization, supportsUnconditionalAuthorization, err := authorizationutil.ResolveAuthorizationOptions(subjectAccessReview.Spec.AuthorizationOptions)
+	if err != nil {
+		return nil, err
 	}
-	subjectAccessReview.Status.EvaluationError = authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes)
+
+	switch {
+	case supportsConditionalAuthorization:
+		conditionsAwareDecision := r.authorizer.ConditionsAwareAuthorize(ctx, authorizationAttributes)
+		subjectAccessReview.Status = authorizationutil.ConditionsAwareDecisionToSARStatus(ctx, authorizationAttributes, conditionsAwareDecision)
+	case supportsUnconditionalAuthorization:
+		// conditions-unaware flow, feature gate is off or client does not support conditions
+		decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
+		subjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         decision == authorizer.DecisionAllow,
+			Denied:          decision == authorizer.DecisionDeny,
+			Reason:          reason,
+			EvaluationError: authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes),
+		}
+	default:
+		// the HandledDecisionTypes was neither [Allow, ConditionsMap, Deny, NoOpinion, Union] or [Allow, Deny, NoOpinion], reject it.
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("unsupported client-handled decision types: %v", sets.List(authorizationv1.GetHandledDecisionTypes(versionedAO))))
+	}
 
 	return subjectAccessReview, nil
 }
