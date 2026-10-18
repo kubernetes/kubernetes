@@ -1802,6 +1802,121 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: compression_duration_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Time spent compressing and decompressing storage values, not counting any
+    encryption at rest or the wait for a decompression slot.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  buckets:
+  - 5e-06
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  - 0.04096
+  - 0.08192
+  - 0.16384
+  - 0.32768
+  - 0.65536
+  - 1.31072
+  - 2.62144
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_format_errors_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage compression frames that failed their checksum or did not
+    parse, by resource.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_inflation_wait_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Time spent waiting for a decompression slot.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1e-05
+  - 4e-05
+  - 0.00016
+  - 0.00064
+  - 0.00256
+  - 0.01024
+  - 0.04096
+  - 0.16384
+  - 0.65536
+  - 2.62144
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: apiserver_storage_compression_last_config_info
+  help: Information about the last loaded storage compression configuration, with
+    its hash as a label, split by apiserver identity.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - apiserver_id_hash
+  - hash
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_operations_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage compression operations by resource, operation and outcome.
+    The outcome tells compressed, stored verbatim and unframed values apart.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - outcome
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_rewrites_needed_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of reads that reported a value stale because its compression framing
+    disagreed with the policy, by resource and direction.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - direction
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_unsupported_algorithm_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage values read whose compression algorithm this apiserver does
+    not implement, by resource. A newer apiserver wrote them.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: storage_consistency_checks_total
   namespace: apiserver
   help: Counter for status of consistency checks between etcd and watch cache
