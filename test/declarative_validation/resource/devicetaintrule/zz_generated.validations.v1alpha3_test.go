@@ -70,6 +70,9 @@ func init() {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.conditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
 			"status.conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},

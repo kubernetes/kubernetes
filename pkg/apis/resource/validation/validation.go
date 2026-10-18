@@ -2020,7 +2020,7 @@ func ValidateDeviceTaintRuleStatusUpdate(rule, oldRule *resource.DeviceTaintRule
 	allErrs = corevalidation.ValidateObjectMetaUpdate(&rule.ObjectMeta, &oldRule.ObjectMeta, field.NewPath("metadata")) // Covers invalid name changes.
 	allErrs = append(allErrs, metav1validation.ValidateConditions(rule.Status.Conditions, fldPath.Child("conditions"))...)
 	if len(rule.Status.Conditions) > resource.DeviceTaintRuleStatusMaxConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(rule.Status.Conditions), resource.DeviceTaintRuleStatusMaxConditions))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(rule.Status.Conditions), resource.DeviceTaintRuleStatusMaxConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
