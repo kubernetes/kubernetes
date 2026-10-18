@@ -18,6 +18,7 @@ package meta
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -304,6 +305,15 @@ func MkCondition(tweaks ...func(*metav1.Condition)) metav1.Condition {
 		tweak(&c)
 	}
 	return c
+}
+
+// MkConditions returns count valid conditions with distinct types.
+func MkConditions(count int) []metav1.Condition {
+	conditions := make([]metav1.Condition, 0, count)
+	for i := range count {
+		conditions = append(conditions, MkCondition(TweakType(fmt.Sprintf("Type%d", i))))
+	}
+	return conditions
 }
 
 func TweakType(condType string) func(*metav1.Condition) {
