@@ -3867,6 +3867,173 @@ func TestPreEnqueue(t *testing.T) {
 	}
 }
 
+func TestPreEnqueue_DeferredResizePodGroupMember(t *testing.T) {
+	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
+
+	pg1 := st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj()
+	podPGroup1 := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj()
+	resizePodGroup1 := st.MakePod().Name("p_resize").UID("p_resize").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg1").Priority(highPriority).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+
+	tests := []struct {
+		name                   string
+		podToTriggerPreemption *v1.Pod
+		podToCheck             *v1.Pod
+		triggerPodGroup        bool
+		features               feature.Features
+		wantStatus             *fwk.Status
+	}{
+		{
+			name:                   "resize member's own preemption in flight returns UnschedulableAndUnresolvable",
+			podToTriggerPreemption: resizePodGroup1,
+			podToCheck:             resizePodGroup1,
+			triggerPodGroup:        false,
+			features: feature.Features{
+				EnableAsyncPreemption:                              true,
+				EnableGenericWorkload:                              true,
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished"),
+		},
+		{
+			name:                   "only its group's preemption in flight returns nil",
+			podToTriggerPreemption: podPGroup1,
+			podToCheck:             resizePodGroup1,
+			triggerPodGroup:        true,
+			features: feature.Features{
+				EnableAsyncPreemption:                              true,
+				EnableGenericWorkload:                              true,
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantStatus: nil,
+		},
+		{
+			name:                   "gate off falls back to group branch",
+			podToTriggerPreemption: podPGroup1,
+			podToCheck:             resizePodGroup1,
+			triggerPodGroup:        true,
+			features: feature.Features{
+				EnableAsyncPreemption:                              true,
+				EnableGenericWorkload:                              true,
+				EnableInPlacePodVerticalScalingSchedulerPreemption: false,
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                              tt.features.EnableGenericWorkload,
+				features.InPlacePodVerticalScalingSchedulerPreemption: tt.features.EnableInPlacePodVerticalScalingSchedulerPreemption,
+			})
+			pods := []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			}
+			filteredNodesStatuses := framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable))
+
+			podItems := []v1.Pod{*pods[0]}
+			cs := clientsetfake.NewClientset(&v1.PodList{Items: podItems})
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			if err := podInformer.GetStore().Add(tt.podToTriggerPreemption); err != nil {
+				t.Fatal(err)
+			}
+			if err := podInformer.GetStore().Add(pods[0]); err != nil {
+				t.Fatal(err)
+			}
+
+			pgInfo := newPGInfo(pg1, podPGroup1)
+			allPgs := []*v1beta1.PodGroup{pg1}
+			pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			if err := pgInformer.GetStore().Add(pg1); err != nil {
+				t.Fatal(err)
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, false)
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg1))
+
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()}, allPgs, nil)
+
+			schedFwk, err := tf.NewFramework(ctx, registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithPodGroupManager(cache),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return preemption.NewPreemptionManager(fh, tt.features)
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			p, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFwk, tt.features)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			finishPreemption := make(chan struct{})
+			executor := p.Executor.(*preemption.Executor)
+			executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+				<-finishPreemption
+				return false, nil
+			}
+
+			state := framework.NewCycleState()
+			if _, status, _ := schedFwk.RunPreFilterPlugins(ctx, state, tt.podToTriggerPreemption); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+
+			if tt.triggerPodGroup {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					nodeInfo, _ := schedFwk.SnapshotSharedLister().NodeInfos().Get("node1")
+					if len(nodeInfo.GetPods()) == 0 {
+						triggerPodInfo, _ := framework.NewPodInfo(tt.podToTriggerPreemption)
+						return &fwk.PodGroupAssignments{
+							ProposedAssignments: []fwk.ProposedAssignment{
+								&mockProposedAssignment{
+									podInfo:    triggerPodInfo,
+									nodeName:   "node1",
+									cycleState: framework.NewCycleState(),
+								},
+							},
+						}, fwk.NewStatus(fwk.Success)
+					}
+					return nil, fwk.NewStatus(fwk.Unschedulable, "need to preempt")
+				}
+				p.PodGroupPostFilter(ctx, state, pgInfo, pgSchedulingFunc)
+			} else {
+				p.PostFilter(ctx, state, tt.podToTriggerPreemption, filteredNodesStatuses)
+			}
+
+			status := p.PreEnqueue(ctx, tt.podToCheck)
+			close(finishPreemption)
+
+			if diff := cmp.Diff(tt.wantStatus, status); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
 
