@@ -153,7 +153,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
-		metrics.PreemptionAttempts.Inc()
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod) {
+			metrics.ResizePreemptionAttempts.Inc()
+		} else {
+			metrics.PreemptionAttempts.Inc()
+		}
 	}()
 
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)

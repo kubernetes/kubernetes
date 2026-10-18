@@ -235,11 +235,16 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventUnscheduledPodAdd.Label())()
+	isDeferredResize := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
+	event := framework.EventUnscheduledPodAdd.Label()
+	if isDeferredResize {
+		event = framework.AssignedPodResize
+	}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), event)()
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
+	if isDeferredResize {
 		// Deferred resize pods are already running: the assigned-pod cache path owns their pod group
 		// membership, and they aren't new members to announce.
 		sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)

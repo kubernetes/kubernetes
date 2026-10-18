@@ -288,7 +288,11 @@ func (sched *Scheduler) schedulingAlgorithm(
 	start time.Time,
 ) (ScheduleResult, *fwk.Status) {
 	defer func() {
-		metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(podInfo.Pod) {
+			metrics.ResizeSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+		} else {
+			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+		}
 	}()
 
 	pod := podInfo.Pod
@@ -442,15 +446,17 @@ func (sched *Scheduler) bindingCycle(
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
-	metrics.PodScheduled(schedFramework.ProfileName(), metrics.SinceInSeconds(start))
-	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
-	if assumedPodInfo.InitialAttemptTimestamp != nil {
-		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
-	}
-	// Count pods scheduled after being flushed from unschedulableEntities
-	if assumedPodInfo.WasFlushedFromUnschedulable {
-		logger.V(4).Info("Pod scheduled after flush from unschedulableEntities", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
-		metrics.PodScheduledAfterFlush.Inc()
+	if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(assumedPod) {
+		metrics.PodScheduled(schedFramework.ProfileName(), metrics.SinceInSeconds(start))
+		metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
+		if assumedPodInfo.InitialAttemptTimestamp != nil {
+			metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
+		}
+		// Count pods scheduled after being flushed from unschedulableEntities
+		if assumedPodInfo.WasFlushedFromUnschedulable {
+			logger.V(4).Info("Pod scheduled after flush from unschedulableEntities", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
+			metrics.PodScheduledAfterFlush.Inc()
+		}
 	}
 	// Run "postbind" plugins.
 	schedFramework.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
@@ -797,16 +803,19 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		reason = v1.PodReasonUnschedulable
 	}
 
-	switch reason {
-	case v1.PodReasonUnschedulable:
-		metrics.PodUnschedulable(podFwk.ProfileName(), metrics.SinceInSeconds(start))
-	case v1.PodReasonSchedulerError:
-		metrics.PodScheduleError(podFwk.ProfileName(), metrics.SinceInSeconds(start))
-	}
-
 	pod := podInfo.Pod
 	nominatedPodInfo := podInfo.PodInfo
 	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
+
+	if !isDeferredResize {
+		switch reason {
+		case v1.PodReasonUnschedulable:
+			metrics.PodUnschedulable(podFwk.ProfileName(), metrics.SinceInSeconds(start))
+		case v1.PodReasonSchedulerError:
+			metrics.PodScheduleError(podFwk.ProfileName(), metrics.SinceInSeconds(start))
+		}
+	}
+
 	err := status.AsError()
 	errMsg := status.Message()
 

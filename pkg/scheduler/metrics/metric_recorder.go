@@ -29,6 +29,8 @@ type Entity interface {
 	Size() int
 	// Type returns the entity type (e.g. "pod", "podgroup", or "compositepodgroup").
 	Type() fwk.EntityKeyType
+	// IsResize returns true if the entity represents a deferred in-place pod resize.
+	IsResize() bool
 }
 
 // MetricRecorder represents a metric recorder which maintains a metric through Add(), Remove(), Update(), and Clear().
@@ -47,39 +49,44 @@ var _ MetricRecorder = &QueuedEntitiesRecorder{}
 
 // QueuedEntitiesRecorder is an implementation of MetricRecorder.
 type QueuedEntitiesRecorder struct {
-	pods     metrics.GaugeMetric
-	entities func(entityType string) metrics.GaugeMetric
+	pods       metrics.GaugeMetric
+	resizePods metrics.GaugeMetric
+	entities   func(entityType, operation string) metrics.GaugeMetric
 }
 
-// NewActiveEntitiesRecorder returns ActivePods and ActiveEntities in a Prometheus metric fashion.
+// NewActiveEntitiesRecorder returns ActivePods, ActiveResizePods, and ActiveEntities in a Prometheus metric fashion.
 func NewActiveEntitiesRecorder() *QueuedEntitiesRecorder {
 	return &QueuedEntitiesRecorder{
-		pods:     ActivePods(),
-		entities: ActiveEntities,
+		pods:       ActivePods(),
+		resizePods: ActiveResizePods(),
+		entities:   ActiveEntities,
 	}
 }
 
-// NewUnschedulableEntitiesRecorder returns UnschedulablePods and UnschedulableEntities in a Prometheus metric fashion.
+// NewUnschedulableEntitiesRecorder returns UnschedulablePods, UnschedulableResizePods, and UnschedulableEntities in a Prometheus metric fashion.
 func NewUnschedulableEntitiesRecorder() *QueuedEntitiesRecorder {
 	return &QueuedEntitiesRecorder{
-		pods:     UnschedulablePods(),
-		entities: UnschedulableEntities,
+		pods:       UnschedulablePods(),
+		resizePods: UnschedulableResizePods(),
+		entities:   UnschedulableEntities,
 	}
 }
 
-// NewBackoffEntitiesRecorder returns BackoffPods and BackoffEntities in a Prometheus metric fashion.
+// NewBackoffEntitiesRecorder returns BackoffPods, BackoffResizePods, and BackoffEntities in a Prometheus metric fashion.
 func NewBackoffEntitiesRecorder() *QueuedEntitiesRecorder {
 	return &QueuedEntitiesRecorder{
-		pods:     BackoffPods(),
-		entities: BackoffEntities,
+		pods:       BackoffPods(),
+		resizePods: BackoffResizePods(),
+		entities:   BackoffEntities,
 	}
 }
 
-// NewGatedEntitiesRecorder returns GatedPods and GatedEntities in a Prometheus metric fashion.
+// NewGatedEntitiesRecorder returns GatedPods, GatedResizePods, and GatedEntities in a Prometheus metric fashion.
 func NewGatedEntitiesRecorder() *QueuedEntitiesRecorder {
 	return &QueuedEntitiesRecorder{
-		pods:     GatedPods(),
-		entities: GatedEntities,
+		pods:       GatedPods(),
+		resizePods: GatedResizePods(),
+		entities:   GatedEntities,
 	}
 }
 
@@ -97,17 +104,25 @@ func EntityTypeToLabel(entityType fwk.EntityKeyType) string {
 }
 
 // Add records the addition of an entity.
-// It increments pending pods and queued entities metric counters.
+// It increments pending pods (or pending resize pods) and queued entities metric counters.
 func (r *QueuedEntitiesRecorder) Add(entity Entity) {
-	r.pods.Add(float64(entity.Size()))
-	r.entities(EntityTypeToLabel(entity.Type())).Inc()
+	if entity.IsResize() {
+		r.resizePods.Add(float64(entity.Size()))
+	} else {
+		r.pods.Add(float64(entity.Size()))
+	}
+	r.entities(EntityTypeToLabel(entity.Type()), OperationToLabel(entity.IsResize())).Inc()
 }
 
 // Remove records the removal of an entity.
-// It decrements pending pods and queued entities metric counters.
+// It decrements pending pods (or pending resize pods) and queued entities metric counters.
 func (r *QueuedEntitiesRecorder) Remove(entity Entity) {
-	r.pods.Add(-float64(entity.Size()))
-	r.entities(EntityTypeToLabel(entity.Type())).Dec()
+	if entity.IsResize() {
+		r.resizePods.Add(-float64(entity.Size()))
+	} else {
+		r.pods.Add(-float64(entity.Size()))
+	}
+	r.entities(EntityTypeToLabel(entity.Type()), OperationToLabel(entity.IsResize())).Dec()
 }
 
 // Update records the update of an entity.
@@ -115,15 +130,21 @@ func (r *QueuedEntitiesRecorder) Remove(entity Entity) {
 // It shouldn't update queued entities metric, because the entity type cannot be changed, and an entity will always be a single object.
 func (r *QueuedEntitiesRecorder) Update(oldEntity, newEntity Entity) {
 	diff := newEntity.Size() - oldEntity.Size()
-	r.pods.Add(float64(diff))
+	if newEntity.IsResize() {
+		r.resizePods.Add(float64(diff))
+	} else {
+		r.pods.Add(float64(diff))
+	}
 }
 
-// Clear resets pending pods and queued entities metric counters to 0.
+// Clear resets pending pods, pending resize pods, and queued entities metric counters to 0.
 func (r *QueuedEntitiesRecorder) Clear() {
 	r.pods.Set(float64(0))
-	r.entities(Pod).Set(float64(0))
-	r.entities(PodGroup).Set(float64(0))
-	r.entities(CompositePodGroup).Set(float64(0))
+	r.resizePods.Set(float64(0))
+	r.entities(Pod, OperationInitialPlacement).Set(float64(0))
+	r.entities(Pod, OperationPodResize).Set(float64(0))
+	r.entities(PodGroup, OperationInitialPlacement).Set(float64(0))
+	r.entities(CompositePodGroup, OperationInitialPlacement).Set(float64(0))
 }
 
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread
