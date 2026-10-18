@@ -813,7 +813,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnque
 		return s
 	}
 	// Only increment metric and insert if not already incremented for this plugin
-	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
+	if !pInfo.IsResize() && !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	}
 	if pInfo.UnschedulablePlugins == nil {
@@ -932,7 +932,11 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
 	}
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
+	event := framework.EventUnscheduledPodAdd.Label()
+	if pInfo.IsResize() {
+		event = framework.AssignedPodResize
+	}
+	if added := p.moveToActiveQ(logger, pInfo, event, false, nil); added {
 		p.activeQ.broadcast()
 	}
 }
@@ -1173,8 +1177,10 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 
 	p.activeQ.clearPoppedEntity()
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
-	for plugin := range rejectorPlugins {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+	if !pInfo.IsResize() {
+		for plugin := range rejectorPlugins {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+		}
 	}
 
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
@@ -1515,6 +1521,9 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 // which are both UnschedulablePlugins and PendingPlugins.
 func decreaseUnschedulableReasonMetric(entity framework.QueuedEntityInfo) {
 	for pInfo := range entity.ForEachPodInfo() {
+		if pInfo.IsResize() {
+			continue
+		}
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
@@ -1607,7 +1616,7 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 
 	// Check unschedulableEntities
 	if entity := p.unschedulableEntities.get(pInfoLookup); entity != nil {
-		p.unschedulableEntities.delete(pInfoLookup, entity.Gated())
+		p.unschedulableEntities.delete(entity, entity.Gated())
 		// Drop metric for deleted pod.
 		decreaseUnschedulableReasonMetric(entity)
 	}
