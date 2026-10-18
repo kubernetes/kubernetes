@@ -22,6 +22,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/podcertificatesmldsa"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/poddefaultnetworknone"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/volumebindmountoptions"
@@ -42,4 +43,5 @@ var AllFeatures = []types.Feature{
 	volumebindmountoptions.Feature,
 	draoptionalnodeoperations.Feature,
 	podcertificatesmldsa.Feature,
+	poddefaultnetworknone.Feature,
 }
