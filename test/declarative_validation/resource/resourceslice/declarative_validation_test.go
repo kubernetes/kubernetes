@@ -111,6 +111,16 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("taints").Index(0).Child("effect"), "").MarkBeta(),
 					},
 				},
+				// spec.devices[%d].taints
+				"valid: at limit taints": {
+					input: mkResourceSliceWithDevices(tweakDeviceTaints(resource.DeviceTaintsMaxLength)),
+				},
+				"invalid: too many taints": {
+					input: mkResourceSliceWithDevices(tweakDeviceTaints(resource.DeviceTaintsMaxLength + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), resource.DeviceTaintsMaxLength+1, resource.DeviceTaintsMaxLength).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
 				// spec.Devices[%].attribute
 				"valid: device attribute int": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/int", resource.DeviceAttribute{IntValue: ptr.To[int64](123)})),
@@ -616,6 +626,18 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkResourceSliceWithDevices(),
 					update: mkResourceSliceWithDevices(),
 				},
+				// spec.devices[%d].taints
+				"valid update: at limit taints": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceTaints(resource.DeviceTaintsMaxLength)),
+				},
+				"invalid update: too many taints": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceTaints(resource.DeviceTaintsMaxLength + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), resource.DeviceTaintsMaxLength+1, resource.DeviceTaintsMaxLength).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
 				// spec.devices[%d].bindingConditions
 				"valid update: at limit binding conditions": {
 					old:    mkResourceSliceWithDevices(),
@@ -1006,6 +1028,18 @@ func tweakBindingConditions(count int) func(*resource.ResourceSlice) {
 func tweakDeviceTaintEffect(effect string) func(*resource.ResourceSlice) {
 	return func(rs *resource.ResourceSlice) {
 		rs.Spec.Devices[0].Taints[0].Effect = resource.DeviceTaintEffect(effect)
+	}
+}
+
+func tweakDeviceTaints(count int) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Devices[0].Taints = []resource.DeviceTaint{}
+		for i := 0; i < count; i++ {
+			rs.Spec.Devices[0].Taints = append(rs.Spec.Devices[0].Taints, resource.DeviceTaint{
+				Key:    fmt.Sprintf("key%d", i),
+				Effect: resource.DeviceTaintEffectNoSchedule,
+			})
+		}
 	}
 }
 
