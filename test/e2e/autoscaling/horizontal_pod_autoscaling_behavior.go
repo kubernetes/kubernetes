@@ -73,7 +73,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
-				rc, int32(targetCPUUtilizationPercent), 1, 3,
+				rc, int32(targetCPUUtilizationPercent), 1, 5,
 				e2eautoscaling.HPABehaviorWithStabilizationWindows(upScaleStabilization, downScaleStabilization),
 			)
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
@@ -82,8 +82,8 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 			// for stabilization logic before lowering the consumption
 			ginkgo.By("triggering scale up to record a recommendation")
 			// Keep demand above maxReplicas to maintain the high recommendation.
-			rc.ConsumeCPU(usageForReplicas(4))
-			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+			rc.ConsumeCPU(usageForReplicas(6))
+			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("triggering scale down by lowering consumption")
 			rc.ConsumeCPU(usageForReplicas(2))
