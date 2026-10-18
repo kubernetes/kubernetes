@@ -1937,7 +1937,8 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "defaultNetwork": "defaultNetworkValue"
       }
     },
     "ttlSecondsAfterFinished": 8,
