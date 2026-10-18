@@ -412,7 +412,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return fmt.Errorf("error opening directory %s: %s", existingPath, err)
 	}
 	if !mount.PathWithinBase(fullExistingPath, base) {
-		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
+		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, base)
 	}
 
 	klog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
