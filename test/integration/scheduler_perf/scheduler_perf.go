@@ -177,6 +177,7 @@ var (
 		names.PrioritySort,
 		names.DefaultBinder,
 		names.DefaultPreemption,
+		names.DeferredPodScheduling,
 		names.DynamicResources,
 		names.GangScheduling,
 		names.ImageLocality,
