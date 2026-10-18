@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -143,8 +144,12 @@ func TestEventSeries(t *testing.T) {
 	broadcaster.StartRecordingToSink(stopCh)
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+	selector := fields.SelectorFromSet(fields.Set{
+		"regarding.name": testPod.Name,
+		"regarding.uid":  string(testPod.UID),
+	}).String()
 	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
+		events, err := client.EventsV1().Events(testPod.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 		if err != nil {
 			return false, err
 		}
