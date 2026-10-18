@@ -60,8 +60,9 @@ func (dc *DeploymentController) sync(ctx context.Context, d *apps.Deployment, rs
 		return err
 	}
 	if err := dc.scale(ctx, d, newRS, oldRSs); err != nil {
-		// If we get an error while trying to scale, the deployment will be requeued
-		// so we can abort this resync
+		if !d.Spec.Paused {
+			return dc.syncRolloutStatusAfter(ctx, err, append(oldRSs, newRS), newRS, d)
+		}
 		return err
 	}
 
