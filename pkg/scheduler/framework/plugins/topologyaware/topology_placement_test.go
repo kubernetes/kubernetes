@@ -272,6 +272,22 @@ func TestGeneratePlacements(t *testing.T) {
 			wantPlacementNodes: map[string][]string{},
 			wantStatus:         fwk.Success,
 		},
+		"with already scheduled pods in conflicting domains when one domain is empty": {
+			podGroupInfo: makePodGroup("topology"),
+			scheduledPodGroupPods: []scheduledPod{
+				{assignedNode: "node2"},
+				{assignedNode: "node3"},
+			},
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d2").Obj(),
+				st.MakeNode().Name("node1").Label("topology", "d1").Obj(),
+			},
+			otherNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Label("topology", "").Obj(),
+				st.MakeNode().Name("node3").Label("topology", "d1").Obj(),
+			},
+			wantStatus: fwk.Error,
+		},
 		"for cpg with pods already scheduled in conflicting domains across separate pod groups, returns error": {
 			podGroupInfo: makeCompositePodGroup("topology"),
 			scheduledPodGroupPods: []scheduledPod{
