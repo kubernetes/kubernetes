@@ -40,6 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/testutil"
@@ -63,7 +64,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -297,7 +297,7 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	useStreaming := e2eskipper.IsFeatureGateEnabled(features.CRIListStreaming)
+	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
 	r, err := remote.NewRemoteRuntimeServiceBuilder().
 		WithEndpoint(runtimeEndpoint).
 		WithConnectionTimeout(connectionTimeout).
@@ -476,7 +476,11 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 // This must be in a non-"_test" file to pass
 // make verify WHAT=test-featuregates
 func withFeatureGate(feature featuregate.Feature, desired bool) func() {
-	return framework.SetFeatureGateDuringTest(feature, desired)
+	current := utilfeature.DefaultFeatureGate.Enabled(feature)
+	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
+	return func() {
+		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
+	}
 }
 
 // waitForAllContainerRemoval waits until all the containers on a given pod are really gone.

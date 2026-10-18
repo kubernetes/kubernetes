@@ -13,6 +13,3 @@ rules:
       - k8s.io/kubernetes/test/e2e/testing-manifests
       - k8s.io/kubernetes/test/e2e_node
       - k8s.io/kubernetes/test/utils
-  - selectorRegexp: ^k8s[.]io/apiserver/pkg/util/feature$
-    forbiddenPrefixes:
-      - k8s.io/apiserver/pkg/util/feature
