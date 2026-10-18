@@ -537,16 +537,17 @@ func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event fwk.ClusterE
 }
 
 // isPodGroupMember returns true if the pod is a member of a pod group.
+// Callers must pass a Pod with populated Status.Conditions (not a partial lookup skeleton) so deferred resize pods are detected.
 func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
-	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled {
+	if !p.isGenericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
+		return false
+	}
+	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
 		// Deferred resize pods must be queued and evaluated individually rather than as a pod group because they are
 		// already running on assigned nodes and undergo atomic individual resource adjustments rather than group gang-scheduling.
-		// TODO: This implementation will be reevaluated in beta.
-		if resource.IsPodResizeDeferred(pod) {
-			return false
-		}
+		return false
 	}
-	return p.isGenericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
+	return true
 }
 
 // isEntityWorthRequeuing calls isPodWorthRequeuing for all pods belonging to the entity and returns the highest queueing strategy.

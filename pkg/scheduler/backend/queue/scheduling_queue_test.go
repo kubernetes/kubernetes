@@ -10710,7 +10710,7 @@ func TestPriorityQueue_DeferredPodGroupCompatibility(t *testing.T) {
 	}{
 		{
 			name: "deferred pod with scheduling group is queued individually",
-			pod: st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName("pg1").
+			pod: st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").PodGroupName("pg1").
 				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
 			expectIsGroupMember: false,
 		},
