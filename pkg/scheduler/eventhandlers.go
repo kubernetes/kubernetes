@@ -129,7 +129,7 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
-	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
+	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) && !sched.profilesWithoutDeferredPodScheduling.Has(pod.Spec.SchedulerName)
 	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
 		sched.addPodToSchedulingQueue(pod)
 	}
@@ -152,7 +152,7 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	}
 
 	if assignedPod(oldPod) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) && !sched.profilesWithoutDeferredPodScheduling.Has(newPod.Spec.SchedulerName) {
 			oldDeferred := resource.IsPodResizeDeferred(oldPod)
 			newDeferred := resource.IsPodResizeDeferred(newPod)
 

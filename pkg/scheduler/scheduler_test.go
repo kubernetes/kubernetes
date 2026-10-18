@@ -1580,3 +1580,67 @@ informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1
 		t.Error(err)
 	}
 }
+
+func TestDeferredResizeQueueingByProfile(t *testing.T) {
+	newProfile := func(name string, filter ...schedulerapi.Plugin) schedulerapi.KubeSchedulerProfile {
+		return schedulerapi.KubeSchedulerProfile{
+			SchedulerName: name,
+			Plugins: &schedulerapi.Plugins{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: names.PrioritySort}}},
+				Filter:    schedulerapi.PluginSet{Enabled: filter},
+				Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: names.DefaultBinder}}},
+			},
+		}
+	}
+
+	tests := []struct {
+		profile       string
+		expectInQueue bool
+	}{
+		{profile: "with-deferred-pod-scheduling", expectInQueue: true},
+		{profile: "without-deferred-pod-scheduling", expectInQueue: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.profile, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := fake.NewClientset()
+			sched, err := New(ctx, client, informers.NewSharedInformerFactory(client, 0), nil,
+				profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})),
+				WithProfiles(
+					newProfile("with-deferred-pod-scheduling", schedulerapi.Plugin{Name: names.DeferredPodScheduling}),
+					newProfile("without-deferred-pod-scheduling"),
+				),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+
+			pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).Obj()
+			deferredPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+			resizedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+			checkQueue := func(step string) {
+				t.Helper()
+				if _, inQueue := sched.SchedulingQueue.GetPod(ctx, pod.Name, pod.Namespace, nil); inQueue != tt.expectInQueue {
+					t.Errorf("%s: got inQueue=%v, want inQueue=%v", step, inQueue, tt.expectInQueue)
+				}
+			}
+
+			sched.addPod(deferredPod)
+			checkQueue("add with deferred resize")
+			// The queue adds a pod it doesn't hold on Update, so an unqueued deferred pod must not get there.
+			sched.updatePod(deferredPod, resizedPod)
+			checkQueue("resize while deferred")
+			sched.deletePod(resizedPod)
+
+			sched.addPod(pod)
+			sched.updatePod(pod, deferredPod)
+			checkQueue("transition to deferred resize")
+		})
+	}
+}
