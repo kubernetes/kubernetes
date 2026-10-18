@@ -1350,7 +1350,7 @@ func (NodeList) SwaggerDoc() map[string]string {
 
 var map_NodePodPreemptionPolicy = map[string]string{
 	"":                        "NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.",
-	"disableResizePreemption": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.",
+	"disableResizePreemption": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).",
 }
 
 func (NodePodPreemptionPolicy) SwaggerDoc() map[string]string {
@@ -1425,7 +1425,7 @@ var map_NodeSpec = map[string]string{
 	"taints":              "taints if specified, is the node's taints.",
 	"configSource":        "configSource previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. Deprecated. This feature is removed.",
 	"externalID":          "externalID is deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966",
-	"podPreemptionPolicy": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.",
+	"podPreemptionPolicy": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
