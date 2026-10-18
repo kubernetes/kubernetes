@@ -2381,7 +2381,9 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	startTime := time.Now()
 	s := <-waitingPod.s
-	metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !resource.IsPodResizeDeferred(pod) {
+		metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}
 
 	if !s.IsSuccess() {
 		if s.IsRejected() {

@@ -76,7 +76,7 @@ var (
 
 // AllClusterEventLabels returns all possible cluster event labels given to the metrics.
 func AllClusterEventLabels() []string {
-	labels := []string{UnschedulableTimeout, ForceActivate}
+	labels := []string{UnschedulableTimeout, ForceActivate, AssignedPodResize}
 	for _, r := range allResources {
 		for _, a := range basicActionTypes {
 			labels = append(labels, fwk.ClusterEvent{Resource: r, ActionType: a}.Label())
@@ -548,6 +548,8 @@ type QueuedEntityInfo interface {
 	Gated() bool
 	// Size returns the number of pods in the entity.
 	Size() int
+	// IsResize returns true if the entity represents a deferred in-place pod resize.
+	IsResize() bool
 	// IncAttempts increments the number of schedule attempts in QueueingParams.
 	IncAttempts()
 	// SetInitialAttemptTimestamp sets the initial attempt timestamp in QueueingParams.
@@ -704,6 +706,11 @@ func (pqi *QueuedPodInfo) Type() fwk.EntityKeyType {
 	return fwk.PodKeyType
 }
 
+func (pqi *QueuedPodInfo) IsResize() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		resourcehelper.IsPodResizeDeferred(pqi.Pod)
+}
+
 func (pqi *QueuedPodInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
 	return func(yield func(*QueuedPodInfo) bool) {
 		_ = yield(pqi)
@@ -805,6 +812,10 @@ type QueuedPodGroupInfo struct {
 
 func (pgqi *QueuedPodGroupInfo) Type() fwk.EntityKeyType {
 	return pgqi.PodGroupInfo.GetType()
+}
+
+func (pgqi *QueuedPodGroupInfo) IsResize() bool {
+	return false
 }
 
 // AddPod adds a pod to the queued pod group info, if the pod belongs to the pod group.

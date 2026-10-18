@@ -42,6 +42,8 @@ const (
 	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
+	// AssignedPodResize is the event when an assigned pod with a deferred resize is added to the scheduling queue.
+	AssignedPodResize = "AssignedPodResize"
 )
 
 var (

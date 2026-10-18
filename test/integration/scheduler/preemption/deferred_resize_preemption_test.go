@@ -30,11 +30,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	compresource "k8s.io/component-helpers/resource"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	schedmetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -48,6 +51,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 		features.InPlacePodVerticalScalingSchedulerPreemption: true,
 		features.DRANodeAllocatableResources:                  true,
 	})
+	registerResizeMetrics()
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
@@ -530,6 +534,11 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			}
 			pods = append(pods, preemptorPod)
 
+			scheduleAttemptsBefore := getScheduleAttemptsTotal(t)
+			unschedulablePodsBefore, _ := testutil.GetGaugeMetricValue(schedmetrics.UnschedulablePods())
+			preemptionAttemptsBefore, _ := testutil.GetCounterMetricValue(schedmetrics.PreemptionAttempts)
+			resizePreemptionAttemptsBefore, _ := testutil.GetCounterMetricValue(schedmetrics.ResizePreemptionAttempts)
+
 			// Update status of preemptor pod to simulate it running and being deferred.
 			// Allocated CPU/Mem is set to 100m/100, while Spec request is higher.
 			preemptorPod.Status.Phase = v1.PodRunning
@@ -664,13 +673,17 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 				}
 			} else {
 				// Wait for the scheduling attempt to complete and park the pod in the unschedulable queue,
-				// then confirm non-terminating victims were not evicted.
+				// then confirm non-terminating victims were not evicted and scheduler_queued_entities reflects it.
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 					qPod, found := queue.GetPod(ctx, preemptorPod.Name, preemptorPod.Namespace, nil)
-					return found && qPod.Attempts >= 1, nil
+					unschedResizePods, _ := testutil.GetGaugeMetricValue(schedmetrics.UnschedulableEntities(schedmetrics.Pod, schedmetrics.OperationPodResize))
+					return found && qPod.Attempts >= 1 && unschedResizePods >= 1, nil
 				})
 				if err != nil {
-					t.Errorf("Expected unschedulable preemptor pod to complete at least 1 scheduling attempt and remain in queue: %v", err)
+					t.Errorf("Expected unschedulable preemptor pod to complete at least 1 scheduling attempt and increment scheduler_queued_entities{entity=\"pod\",operation=\"pod_resize\",queue=\"unschedulable\"}: %v", err)
+				}
+				if unschedulablePods, err := testutil.GetGaugeMetricValue(schedmetrics.UnschedulablePods()); err != nil || unschedulablePods != unschedulablePodsBefore {
+					t.Errorf("Expected scheduler_pending_pods{queue=\"unschedulable\"} to stay at %v, got %v (err: %v)", unschedulablePodsBefore, unschedulablePods, err)
 				}
 				for _, p := range tt.existingPods {
 					if tt.terminatingByPreemptionPods[p.Name] {
@@ -701,6 +714,20 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 				}
 			}
 
+			if got := getScheduleAttemptsTotal(t) - scheduleAttemptsBefore; got != 0 {
+				t.Errorf("Expected scheduler_schedule_attempts_total delta to be 0 for deferred resize pod, got %v", got)
+			}
+			preemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(schedmetrics.PreemptionAttempts)
+			if got := preemptionAttemptsAfter - preemptionAttemptsBefore; got != 0 {
+				t.Errorf("Expected PreemptionAttempts delta to be 0 for deferred resize pod, got %v", got)
+			}
+			resizePreemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(schedmetrics.ResizePreemptionAttempts)
+			if !tt.expectEvaluationCompletedImmediately {
+				if got := resizePreemptionAttemptsAfter - resizePreemptionAttemptsBefore; got < 1 {
+					t.Errorf("Expected ResizePreemptionAttempts delta >= 1 when deferred resize triggers PostFilter, got %v", got)
+				}
+			}
+
 			// Verify NominatedNodeName on preemptor pod status (retains empty for deferred pods)
 			updatedPreemptor, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, preemptorPod.Name, metav1.GetOptions{})
 			if err != nil {
@@ -722,6 +749,34 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			}
 		})
 	}
+}
+
+// registerResizeMetrics registers the metrics that metrics.Register skips while
+// InPlacePodVerticalScalingSchedulerPreemption is disabled. Register runs once per process,
+// so an earlier test may have run it with the gate off.
+func registerResizeMetrics() {
+	schedmetrics.Register()
+	// Each returns AlreadyRegisteredError if Register ran with the gate on.
+	_ = legacyregistry.Register(schedmetrics.ResizeSchedulingAlgorithmLatency)
+	_ = legacyregistry.Register(schedmetrics.ResizePreemptionAttempts)
+	_ = legacyregistry.Register(schedmetrics.ResizePreemptionVictims)
+}
+
+func getScheduleAttemptsTotal(t *testing.T) float64 {
+	t.Helper()
+	mfs, err := schedmetrics.GetGather().Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+	var total float64
+	for _, mf := range mfs {
+		if mf.GetName() == "scheduler_schedule_attempts_total" {
+			for _, m := range mf.GetMetric() {
+				total += m.GetCounter().GetValue()
+			}
+		}
+	}
+	return total
 }
 
 func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext, idx int, nodeCPUCapacity, otherPodCPURequest, deferredPodCPURequest, deferredPodCPUAllocated string, disableResizePreemption bool) (*v1.Pod, *v1.Pod, *v1.Pod) {

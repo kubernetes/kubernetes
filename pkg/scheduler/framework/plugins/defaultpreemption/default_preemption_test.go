@@ -51,6 +51,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -903,7 +904,32 @@ func TestPostFilter(t *testing.T) {
 					t.Errorf("Unexpected PreFilter Status: %v", status)
 				}
 
+				metrics.Register()
+				testRegistry := componentmetrics.NewKubeRegistry()
+				testRegistry.MustRegister(metrics.PreemptionAttempts, metrics.ResizePreemptionAttempts)
+				preemptionAttemptsBefore, _ := testutil.GetCounterMetricValue(metrics.PreemptionAttempts)
+				resizePreemptionAttemptsBefore, _ := testutil.GetCounterMetricValue(metrics.ResizePreemptionAttempts)
+
 				gotResult, gotStatus := p.PostFilter(ctx, state, tt.pod, tt.filteredNodesStatuses)
+
+				preemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(metrics.PreemptionAttempts)
+				resizePreemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(metrics.ResizePreemptionAttempts)
+				if tt.features.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(tt.pod) {
+					if diff := resizePreemptionAttemptsAfter - resizePreemptionAttemptsBefore; diff != 1 {
+						t.Errorf("Expected ResizePreemptionAttempts delta to be 1, got %v", diff)
+					}
+					if diff := preemptionAttemptsAfter - preemptionAttemptsBefore; diff != 0 {
+						t.Errorf("Expected PreemptionAttempts delta to be 0 for deferred resize pod, got %v", diff)
+					}
+				} else {
+					if diff := preemptionAttemptsAfter - preemptionAttemptsBefore; diff != 1 {
+						t.Errorf("Expected PreemptionAttempts delta to be 1, got %v", diff)
+					}
+					if diff := resizePreemptionAttemptsAfter - resizePreemptionAttemptsBefore; diff != 0 {
+						t.Errorf("Expected ResizePreemptionAttempts delta to be 0 for initial placement pod, got %v", diff)
+					}
+				}
+
 				// As we cannot compare two errors directly due to miss the equal method for how to compare two errors, so just need to compare the reasons.
 				if gotStatus.Code() == fwk.Error {
 					if diff := cmp.Diff(tt.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {

@@ -2138,7 +2138,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				return nil, tt.evaluationStatus
 			}
 			expectedStatus := tt.evaluationStatus.Code().String()
-			stateBefore := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus, metrics.OperationInitialPlacement)
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -2148,7 +2148,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus, metrics.OperationInitialPlacement)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {

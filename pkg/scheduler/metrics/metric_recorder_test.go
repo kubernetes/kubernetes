@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	fwk "k8s.io/kube-scheduler/framework"
 )
@@ -35,8 +36,9 @@ import (
 var _ MetricRecorder = &fakePodsRecorder{}
 
 type testEntity struct {
-	size int
-	t    fwk.EntityKeyType
+	size     int
+	t        fwk.EntityKeyType
+	isResize bool
 }
 
 func (te *testEntity) Size() int {
@@ -45,6 +47,10 @@ func (te *testEntity) Size() int {
 
 func (te *testEntity) Type() fwk.EntityKeyType {
 	return te.t
+}
+
+func (te *testEntity) IsResize() bool {
+	return te.isResize
 }
 
 type fakePodsRecorder struct {
@@ -236,8 +242,19 @@ func TestEntityTypeToLabel(t *testing.T) {
 	}
 }
 
-func TestQueuedEntitiesRecorder(t *testing.T) {
+// registerResizeMetrics registers the metrics that Register skips while
+// InPlacePodVerticalScalingSchedulerPreemption is disabled. Register runs once per process,
+// so an earlier test may have run it with the gate off.
+func registerResizeMetrics() {
 	Register()
+	// Each returns AlreadyRegisteredError if Register ran with the gate on.
+	_ = legacyregistry.Register(ResizeSchedulingAlgorithmLatency)
+	_ = legacyregistry.Register(ResizePreemptionAttempts)
+	_ = legacyregistry.Register(ResizePreemptionVictims)
+}
+
+func TestQueuedEntitiesRecorder(t *testing.T) {
+	registerResizeMetrics()
 
 	recorder := NewActiveEntitiesRecorder()
 	recorder.Clear()
@@ -246,6 +263,7 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 	pInfo2 := &testEntity{size: 5, t: "podgroup"}
 	pInfo3 := &testEntity{size: 1, t: "pod"}
 	pInfo4 := &testEntity{size: 10, t: "compositepodgroup"}
+	resizePInfo := &testEntity{size: 1, t: "pod", isResize: true}
 	updatedPInfo2 := &testEntity{size: 8, t: "podgroup"}
 	updatedPInfo4 := &testEntity{size: 12, t: "compositepodgroup"}
 
@@ -261,16 +279,18 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				recorder.Add(pInfo2)
 				recorder.Add(pInfo3)
 				recorder.Add(pInfo4)
+				recorder.Add(resizePInfo)
 			},
 			want: `
 				# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods; 'pending' means number of pods in pendingPodGroupPods.
 				# TYPE scheduler_pending_pods gauge
 				scheduler_pending_pods{queue="active"} 17
-				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type and operation ('initial_placement' or 'pod_resize'). 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
-				scheduler_queued_entities{entity="pod",queue="active"} 2
-				scheduler_queued_entities{entity="podgroup",queue="active"} 1
+				scheduler_queued_entities{entity="compositepodgroup",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="pod",operation="initial_placement",queue="active"} 2
+				scheduler_queued_entities{entity="podgroup",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="pod",operation="pod_resize",queue="active"} 1
 			`,
 		},
 		{
@@ -278,16 +298,18 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 			op: func() {
 				recorder.Remove(pInfo1)
 				recorder.Remove(pInfo4)
+				recorder.Remove(resizePInfo)
 			},
 			want: `
 				# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods; 'pending' means number of pods in pendingPodGroupPods.
 				# TYPE scheduler_pending_pods gauge
 				scheduler_pending_pods{queue="active"} 6
-				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type and operation ('initial_placement' or 'pod_resize'). 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
-				scheduler_queued_entities{entity="pod",queue="active"} 1
-				scheduler_queued_entities{entity="podgroup",queue="active"} 1
+				scheduler_queued_entities{entity="compositepodgroup",operation="initial_placement",queue="active"} 0
+				scheduler_queued_entities{entity="pod",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="pod",operation="pod_resize",queue="active"} 0
 			`,
 		},
 		{
@@ -301,11 +323,12 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods; 'pending' means number of pods in pendingPodGroupPods.
 				# TYPE scheduler_pending_pods gauge
 				scheduler_pending_pods{queue="active"} 21
-				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type and operation ('initial_placement' or 'pod_resize'). 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
-				scheduler_queued_entities{entity="pod",queue="active"} 1
-				scheduler_queued_entities{entity="podgroup",queue="active"} 1
+				scheduler_queued_entities{entity="compositepodgroup",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="pod",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",operation="initial_placement",queue="active"} 1
+				scheduler_queued_entities{entity="pod",operation="pod_resize",queue="active"} 0
 			`,
 		},
 		{
@@ -317,11 +340,12 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods; 'pending' means number of pods in pendingPodGroupPods.
 				# TYPE scheduler_pending_pods gauge
 				scheduler_pending_pods{queue="active"} 0
-				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type and operation ('initial_placement' or 'pod_resize'). 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
-				scheduler_queued_entities{entity="pod",queue="active"} 0
-				scheduler_queued_entities{entity="podgroup",queue="active"} 0
+				scheduler_queued_entities{entity="compositepodgroup",operation="initial_placement",queue="active"} 0
+				scheduler_queued_entities{entity="pod",operation="initial_placement",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",operation="initial_placement",queue="active"} 0
+				scheduler_queued_entities{entity="pod",operation="pod_resize",queue="active"} 0
 			`,
 		},
 	}

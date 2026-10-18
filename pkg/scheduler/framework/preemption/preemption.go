@@ -93,15 +93,15 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Fea
 func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (_ fwk.PreemptionCandidate, _ *fwk.PostFilterResult, status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String(), metrics.OperationToLabel(isResize)).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
-	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
 	evaluatedUID := pod.UID
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
