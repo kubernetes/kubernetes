@@ -1763,10 +1763,12 @@ func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 	snapshot := internalcache.NewSnapshot([]*v1.Pod{p3}, []*v1.Node{node1})
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	f, err := tf.NewFramework(
 		ctx,
 		registeredPlugins, "",
-		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithPodNominator(queue),
+		frameworkruntime.WithPodActivator(queue),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
@@ -2102,10 +2104,12 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			snapshot := internalcache.NewSnapshot([]*v1.Pod{victimPod}, []*v1.Node{node})
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			fh, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPodNominator(queue),
+				frameworkruntime.WithPodActivator(queue),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
