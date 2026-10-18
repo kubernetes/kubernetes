@@ -544,7 +544,6 @@ func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled {
 		// Deferred resize pods must be queued and evaluated individually rather than as a pod group because they are
 		// already running on assigned nodes and undergo atomic individual resource adjustments rather than group gang-scheduling.
-		// TODO: This implementation will be reevaluated in beta.
 		if resource.IsPodResizeDeferred(pod) {
 			return false
 		}

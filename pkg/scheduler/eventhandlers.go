@@ -165,7 +165,8 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 				// When an assigned pod is no longer deferred,
 				// remove it from the scheduling queue so the scheduler stops evaluating preemption for it.
 				logger.V(3).Info("Assigned pod is no longer deferred, removing from scheduling queue", "pod", klog.KObj(newPod))
-				sched.deletePodFromSchedulingQueue(newPod, false)
+				// Pass the deferred version that was queued; otherwise the queue would look for newPod in its pod group.
+				sched.deletePodFromSchedulingQueue(oldPod, false)
 			} else if oldDeferred && newDeferred {
 				// If the pod's spec mutates while queued for a deferred resize (e.g., resource requests updated), update its queue representation.
 				logger.V(3).Info("Assigned pod spec changed while deferred, updating scheduling queue", "pod", klog.KObj(newPod))
@@ -235,6 +236,12 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
+		// Deferred resize pods are already running: the assigned-pod cache path owns their pod group
+		// membership, and they aren't new members to announce.
+		sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
+		return
+	}
 	sched.Cache.AddPodGroupMember(pod)
 	if sched.podGroupHierarchyTracker != nil {
 		sched.podGroupHierarchyTracker.AddPod(logger, pod)
@@ -373,6 +380,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
 		// In that case, we need to notify about the release of resources that were held by different assume/nomination
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
+		return
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
+		// Deferred resize pods are assigned: the assigned-pod cache path owns their pod group membership.
 		return
 	}
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)

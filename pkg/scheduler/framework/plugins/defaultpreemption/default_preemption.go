@@ -26,6 +26,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -159,7 +160,10 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
+	// A deferred resize preempts as an individual pod (see PriorityQueue.isPodGroupMember),
+	// so its preemption is tracked under the pod's UID, not the group's.
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(p)
+	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload && !isResize {
 		var rootUID types.UID
 		if !pl.fts.EnableCompositePodGroup {
 			pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
