@@ -1068,8 +1068,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				// NodeDeclaredFeatures adds fwk.Update
 				fwk.AssignedPod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:   fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
-				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature; DeferredPodScheduling adds fwk.UpdateNodePreemptionPolicy
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature | fwk.UpdateNodePreemptionPolicy,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1104,7 +1104,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
 				fwk.UnscheduledPod:        fwk.Add,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature | fwk.UpdateNodePreemptionPolicy,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,

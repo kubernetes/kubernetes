@@ -9473,7 +9473,7 @@
       "description": "NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.",
       "properties": {
         "disableResizePreemption": {
-          "description": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.",
+          "description": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).",
           "items": {
             "type": "string"
           },
@@ -9604,7 +9604,7 @@
         },
         "podPreemptionPolicy": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodePodPreemptionPolicy",
-          "description": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate."
+          "description": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default)."
         },
         "providerID": {
           "description": "providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",

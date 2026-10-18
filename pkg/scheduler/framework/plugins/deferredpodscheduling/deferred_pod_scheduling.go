@@ -42,6 +42,7 @@ var _ fwk.FilterPlugin = &DeferredPodScheduling{}
 var _ fwk.EnqueueExtensions = &DeferredPodScheduling{}
 var _ fwk.BindPlugin = &DeferredPodScheduling{}
 var _ fwk.RelevancePlugin = &DeferredPodScheduling{}
+var _ fwk.SignPlugin = &DeferredPodScheduling{}
 
 const (
 	Name                                  = names.DeferredPodScheduling
@@ -57,9 +58,22 @@ func (pl *DeferredPodScheduling) IsRelevantForPodResize() bool {
 	return true
 }
 
+// SignPod returns Unschedulable for pods with deferred resize since their scheduling
+// depends on pod-specific resize requests, and nil for regular pods so opportunistic
+// batching remains enabled for the default scheduler profile.
+func (pl *DeferredPodScheduling) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with deferred resize are not signable")
+	}
+	return nil, nil
+}
+
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *DeferredPodScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption {
+		return nil, nil
+	}
 	return []fwk.ClusterEventWithHint{
 		{
 			Event:          fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodePreemptionPolicy},

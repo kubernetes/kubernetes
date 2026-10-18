@@ -293,6 +293,9 @@ leaderElection:
 						{Name: "TaintToleration", Weight: 1},
 						{Name: "DynamicResources", Weight: 1},
 					}
+					plugins.Bind.Enabled = []config.Plugin{
+						{Name: "DefaultBinder"},
+					}
 					return plugins
 				}(),
 			},

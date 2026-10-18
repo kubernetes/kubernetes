@@ -5801,7 +5801,7 @@ type NodeSpec struct {
 	DoNotUseExternalID string
 
 	// PodPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +featureGate=InPlacePodVerticalScalingSchedulerPreemption
 	// +optional
 	PodPreemptionPolicy *NodePodPreemptionPolicy
@@ -5810,7 +5810,7 @@ type NodeSpec struct {
 // NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.
 type NodePodPreemptionPolicy struct {
 	// DisableResizePreemption lists the owners that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +optional
 	DisableResizePreemption []string
 }
