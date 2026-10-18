@@ -24,6 +24,7 @@ import (
 
 type ActionLabel string
 type ErrorLabel string
+type PeriodSourceLabel string
 
 const (
 	ActionLabelScaleUp   ActionLabel = "scale_up"
@@ -35,6 +36,11 @@ const (
 	// ErrorLabelInternal represents an error from an internal computation or communication with other component.
 	ErrorLabelInternal ErrorLabel = "internal"
 	ErrorLabelNone     ErrorLabel = "none"
+
+	// PeriodSourceGlobal represents an HPA that uses the controller-wide sync period.
+	PeriodSourceGlobal PeriodSourceLabel = "global"
+	// PeriodSourceSpec represents an HPA that sets spec.syncPeriodSeconds.
+	PeriodSourceSpec PeriodSourceLabel = "spec"
 )
 
 // Monitor records some metrics so that people can monitor HPA controller.
@@ -45,6 +51,7 @@ type Monitor interface {
 	ObserveHPADeletion()
 	ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32)
 	ObserveHPARequeueSkips(group string, resource string)
+	ObserveReconciliationDelayRatio(source PeriodSourceLabel, ratio float64)
 }
 
 type monitor struct{}
@@ -82,4 +89,10 @@ func (r *monitor) ObserveDesiredReplicas(namespace, hpaName string, desiredRepli
 
 func (r *monitor) ObserveHPARequeueSkips(group string, resource string) {
 	HPARequeueSkips.WithLabelValues(group, resource).Inc()
+}
+
+// ObserveReconciliationDelayRatio records the ratio of the observed delay to the
+// requested delay before a periodic reconciliation.
+func (r *monitor) ObserveReconciliationDelayRatio(source PeriodSourceLabel, ratio float64) {
+	ReconciliationDelayRatio.WithLabelValues(string(source)).Observe(ratio)
 }

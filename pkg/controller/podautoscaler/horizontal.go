@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -116,6 +117,15 @@ type HorizontalController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	// rateLimiter is the rate limiter of queue. It holds the requeue interval
+	// of HPAs that set spec.syncPeriodSeconds.
+	rateLimiter *PerItemIntervalRateLimiter
+
+	// requeues tracks pending periodic requeues to measure their delay.
+	requeues *requeueTracker
+
+	clock clock.PassiveClock
+
 	// Latest unstabilized recommendations for each autoscaler.
 	recommendations     map[string][]timestampedRecommendation
 	recommendationsLock sync.Mutex
@@ -165,6 +175,7 @@ func NewHorizontalController(
 		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
+	rateLimiter := NewDefaultHPARateLimiter(resyncPeriod)
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
@@ -173,12 +184,15 @@ func NewHorizontalController(
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
 		monitor:                      monitor.New(),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(resyncPeriod),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Logger: &logger,
 				Name:   "horizontalpodautoscaler",
 			},
 		),
+		rateLimiter:         rateLimiter,
+		requeues:            newRequeueTracker(),
+		clock:               clock.RealClock{},
 		mapper:              mapper,
 		recommendations:     map[string][]timestampedRecommendation{},
 		recommendationsLock: sync.Mutex{},
@@ -261,6 +275,12 @@ func (a *HorizontalController) updateHPA(oldObj, curObj interface{}) {
 		return
 	}
 
+	// Refresh the requeue interval before enqueueing, so that the rate-limited
+	// requeue below already uses the current spec.syncPeriodSeconds.
+	if key, err := controller.KeyFunc(curHPA); err == nil {
+		a.refreshSyncPeriod(key, curHPA)
+	}
+
 	// When HPAGeneration is enabled, the API server bumps Generation on spec
 	// mutations, so we can use it to distinguish spec changes from status-only
 	// updates. Spec changes trigger immediate reconciliation; status-only
@@ -302,8 +322,10 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		a.monitor.ObserveHPAAddition()
 	}
 
-	// Add the HPA to the queue for immediate processing. Deduplication is handled
-	// by the queue: if the key is already queued or being processed, this is a no-op.
+	a.markEventDriven(key)
+
+	// The queue deduplicates pending keys and schedules another pass if the key
+	// is currently being processed.
 	a.queue.Add(key)
 }
 
@@ -329,12 +351,20 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 
 	// TODO: could we leak if we fail to get the key?
 	a.queue.Forget(key)
+	a.forgetSyncPeriod(key)
 
 	// Remove HPA and attached selector.
 	hpaKey := selectors.Parse(key)
 	a.selectorTracker.Delete(hpaKey.Namespace, hpaKey)
 	// Observe HPA deletion
 	a.monitor.ObserveHPADeletion()
+
+	// Serialize history cleanup with any reconciliation still in progress,
+	// without waiting for a potentially hour-long periodic requeue.
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableSyncPeriod) {
+		a.markEventDriven(key)
+		a.queue.Add(key)
+	}
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {
@@ -351,6 +381,8 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer a.queue.Done(key)
 
+	a.observeRequeueDelay(ctx, key)
+
 	deleted, err := a.reconcileKey(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -365,6 +397,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	// removed from queue. If we didn't add request here then in this case one request would be dropped
 	// and HPA would process after 2 x resyncPeriod.
 	if !deleted {
+		a.recordRequeue(key)
 		a.queue.AddRateLimited(key)
 	}
 
@@ -585,12 +618,15 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 		delete(a.scaleDownEvents, key)
 		a.scaleDownEventsLock.Unlock()
 
+		a.forgetSyncPeriod(key)
+
 		return true, nil
 	}
 	if err != nil {
 		return false, err
 	}
 
+	a.refreshSyncPeriod(key, hpa)
 	return false, a.reconcileAutoscaler(ctx, hpa, key)
 }
 
