@@ -207,7 +207,8 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		}
 		victimPods = append(victimPods, victim)
 	}
-	if len(victimPods) == 0 {
+	// Nominations still need clearing even if every victim is already terminating.
+	if len(victimPods) == 0 && len(c.Nodes()) == 0 {
 		cancel()
 		return
 	}
@@ -240,9 +241,9 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
-				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
-				// Pods may get stuck in the unschedulable pod pool in the worst case.
+			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory || len(victimPods) == 0 {
+				// Victims already terminating may disappear while nomination cleanup still gates the preemptor.
+				// Retry when an API call fails or no future victim deletion event is guaranteed.
 				e.fh.Activate(logger, preemptor.Pods())
 			}
 		}()
@@ -260,7 +261,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			// We do not return as this error is not critical.
 		}
 
-		preemptLastVictim := true
+		preemptLastVictim := len(victimPods) > 0
 		if len(victimPods) > 1 {
 			// In order to prevent requesting preemption of the same pod multiple times for the same preemptor,
 			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
