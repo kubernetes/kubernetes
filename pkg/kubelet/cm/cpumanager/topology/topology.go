@@ -135,28 +135,29 @@ func (d CPUDetails) UncoreInNUMANodes(ids ...int) cpuset.CPUSet {
 	return cpuset.New(unCoreIDs...)
 }
 
-// CoresNeededInUncoreCache returns either the full list of all available unique core IDs associated with the given
-// UnCoreCache IDs in this CPUDetails or subset that matches the ask.
-func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, ids ...int) cpuset.CPUSet {
-	coreIDs := d.coresInUncoreCache(ids...)
-	if coreIDs.Size() <= numCoresNeeded {
-		return coreIDs
-	}
-	tmpCoreIDs := coreIDs.List()
-	return cpuset.New(tmpCoreIDs[:numCoresNeeded]...)
+// FreeCoresInUncoreCache returns the cores in the given UncoreCache IDs whose CPUs are all
+// present in this CPUDetails, compared against each core's siblings in allCPUs.
+func (d CPUDetails) FreeCoresInUncoreCache(allCPUs CPUDetails, ids ...int) cpuset.CPUSet {
+	coresInUncore := d.filterCoresMatching(func(info CPUInfo) bool {
+		return slices.Contains(ids, info.UncoreCacheID)
+	})
+	free := cpuCountByCore(d, coresInUncore)
+	total := cpuCountByCore(allCPUs, coresInUncore)
+	fullCores := slices.DeleteFunc(coresInUncore.UnsortedList(), func(coreID int) bool {
+		return free[coreID] != total[coreID]
+	})
+	return cpuset.New(fullCores...)
 }
 
-// Helper function that just gets the cores
-func (d CPUDetails) coresInUncoreCache(ids ...int) cpuset.CPUSet {
-	var coreIDs []int
-	for _, id := range ids {
-		for _, info := range d {
-			if info.UncoreCacheID == id {
-				coreIDs = append(coreIDs, info.CoreID)
-			}
+// cpuCountByCore counts CPUs per core for the given cores only, avoiding CPUsByCore's whole-node map.
+func cpuCountByCore(d CPUDetails, restriction cpuset.CPUSet) map[int]int {
+	count := make(map[int]int, restriction.Size())
+	for _, info := range d {
+		if restriction.Contains(info.CoreID) {
+			count[info.CoreID]++
 		}
 	}
-	return cpuset.New(coreIDs...)
+	return count
 }
 
 // CPUsInUncoreCaches returns all the logical CPU IDs associated with the given

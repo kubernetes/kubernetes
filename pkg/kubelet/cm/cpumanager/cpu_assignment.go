@@ -609,33 +609,40 @@ func (a *cpuAccumulator) takeFullUncore(uncoreID int) {
 }
 
 func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
-	// determine the number of cores needed whether SMT/hyperthread is enabled or disabled
-	numCoresNeeded := (a.numCPUsNeeded + a.topo.CPUsPerCore() - 1) / a.topo.CPUsPerCore()
+	freeCores := a.details.FreeCoresInUncoreCache(a.topo.CPUDetails, uncoreID)
+	cpusByCore := a.details.KeepOnly(a.details.CPUsInUncoreCaches(uncoreID)).CPUsByCore()
 
-	// determine the N number of free cores (physical cpus) within the UncoreCache, then
-	// determine the M number of free cpus (virtual cpus) that correspond with the free cores
-	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
-	freeCPUs := a.details.CPUsInCores(freeCores.UnsortedList()...)
-
-	// when SMT/hyperthread is enabled and remaining cpu requirement is an odd integer value:
-	// sort the free CPUs that were determined based on the cores that have available cpus.
-	// if the amount of free cpus is greather than the cpus needed, we can drop the last cpu
-	// since the odd integer request will only require one out of the two free cpus that
-	// correspond to the last core
-	if a.numCPUsNeeded%2 != 0 && a.topo.CPUsPerCore() > 1 {
-		// we sort freeCPUs to ensure we pack virtual cpu allocations, meaning we allocate
-		// whole core's worth of cpus as much as possible to reduce smt-misalignment
-		sortFreeCPUs := freeCPUs.List()
-		if len(sortFreeCPUs) > a.numCPUsNeeded {
-			// if we are in takePartialUncore, the accumulator is not satisfied after
-			// takeFullUncore, so freeCPUs.Size() can't be < 1
-			sortFreeCPUs = sortFreeCPUs[:freeCPUs.Size()-1]
+	// Count each core's actual CPUs since hybrid topologies mix core widths.
+	// Take whole cores while they fit and the remainder from the narrowest core
+	// that can cover it, so at most one core is split.
+	var cpus []int
+	remaining := a.numCPUsNeeded
+	splitCore := -1
+	for _, core := range freeCores.List() {
+		if remaining == 0 {
+			break
 		}
-		freeCPUs = cpuset.New(sortFreeCPUs...)
+		coreCPUs := cpusByCore[core]
+		if len(coreCPUs) <= remaining {
+			cpus = append(cpus, coreCPUs...)
+			remaining -= len(coreCPUs)
+			continue
+		}
+		if splitCore == -1 || len(coreCPUs) < len(cpusByCore[splitCore]) {
+			splitCore = core
+		}
 	}
+	if remaining > 0 && splitCore != -1 {
+		// any core skipped above is wider than what is still needed
+		coreCPUs := cpusByCore[splitCore]
+		sort.Ints(coreCPUs)
+		cpus = append(cpus, coreCPUs[:remaining]...)
+		remaining = 0
+	}
+	freeCPUs := cpuset.New(cpus...)
 
-	// claim the cpus if the free cpus within the UncoreCache can satisfy the needed cpus
-	claimed := (a.numCPUsNeeded == freeCPUs.Size())
+	// claim the cpus only if the UncoreCache can satisfy the whole request
+	claimed := (remaining == 0)
 	a.logger.V(4).Info("takePartialUncore: trying to claim partial uncore",
 		"uncore", uncoreID,
 		"claimed", claimed,
