@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -319,15 +318,15 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with nil DisruptionMode",
-			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			gpg:  NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{}),
 			want: false,
 		},
 		{
 			name: "CompositePodGroup with Single DisruptionMode",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
-						Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{
+						Single: &schedulingv1beta1.SingleCompositeDisruptionMode{},
 					},
 				},
 			}),
@@ -335,10 +334,10 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with All DisruptionMode",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
-						All: &schedulingv1alpha3.AllCompositeDisruptionMode{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{
+						All: &schedulingv1beta1.AllCompositeDisruptionMode{},
 					},
 				},
 			}),
@@ -390,15 +389,15 @@ func TestGenericPodGroup_HasDisruptionModeSingle(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with nil DisruptionMode",
-			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			gpg:  NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{}),
 			want: false,
 		},
 		{
 			name: "CompositePodGroup with Single DisruptionMode",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
-						Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{
+						Single: &schedulingv1beta1.SingleCompositeDisruptionMode{},
 					},
 				},
 			}),
@@ -406,10 +405,10 @@ func TestGenericPodGroup_HasDisruptionModeSingle(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with All DisruptionMode",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
-						All: &schedulingv1alpha3.AllCompositeDisruptionMode{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{
+						All: &schedulingv1beta1.AllCompositeDisruptionMode{},
 					},
 				},
 			}),
@@ -450,9 +449,9 @@ func TestGenericPodGroup_GetWorkloadName(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with WorkloadRef",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					WorkloadRef: &schedulingv1beta1.WorkloadReference{
 						WorkloadName: "wl-cpg",
 					},
 				},
@@ -500,10 +499,10 @@ func TestGenericPodGroup_IsGang(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Basic SchedulingPolicy",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.CompositeBasicSchedulingPolicy{},
 					},
 				},
 			}),
@@ -511,10 +510,10 @@ func TestGenericPodGroup_IsGang(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Gang SchedulingPolicy",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.CompositeGangSchedulingPolicy{MinGroupCount: 2},
 					},
 				},
 			}),
@@ -561,10 +560,10 @@ func TestGenericPodGroup_IsBasic(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Basic SchedulingPolicy",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.CompositeBasicSchedulingPolicy{},
 					},
 				},
 			}),
@@ -572,10 +571,10 @@ func TestGenericPodGroup_IsBasic(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Gang SchedulingPolicy",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.CompositeGangSchedulingPolicy{MinGroupCount: 2},
 					},
 				},
 			}),
@@ -622,10 +621,10 @@ func TestGenericPodGroup_GetMinCount(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Gang policy returns minGroupCount",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 3},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.CompositeGangSchedulingPolicy{MinGroupCount: 3},
 					},
 				},
 			}),
@@ -633,10 +632,10 @@ func TestGenericPodGroup_GetMinCount(t *testing.T) {
 		},
 		{
 			name: "CompositePodGroup with Basic policy returns 1",
-			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-				Spec: schedulingv1alpha3.CompositePodGroupSpec{
-					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+			gpg: NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
+				Spec: schedulingv1beta1.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.CompositeBasicSchedulingPolicy{},
 					},
 				},
 			}),

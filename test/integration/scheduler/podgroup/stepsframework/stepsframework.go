@@ -23,8 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,15 +141,15 @@ type Step struct {
 	// CreateNodes is use to create nodes in the cluster.
 	CreateNodes []*v1.Node
 	// CreatePodGroup is use to create a pod group and wait for it to be ready.
-	CreatePodGroup *schedulingapi.PodGroup
+	CreatePodGroup *schedulingv1beta1.PodGroup
 	// UpdatePodGroup is used to update an existing pod group and wait for it to propagate.
-	UpdatePodGroup *schedulingapi.PodGroup
+	UpdatePodGroup *schedulingv1beta1.PodGroup
 	// DeletePodGroup is used to delete a pod group by name and wait for it to propagate.
 	DeletePodGroup string
 	// CreateCompositePodGroup is used to create a composite pod group and wait for it to be ready.
-	CreateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	CreateCompositePodGroup *schedulingv1beta1.CompositePodGroup
 	// UpdateCompositePodGroup is used to update an existing composite pod group and wait for it to propagate.
-	UpdateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	UpdateCompositePodGroup *schedulingv1beta1.CompositePodGroup
 	// DeleteCompositePodGroup is used to delete a composite pod group by name and wait for it to propagate.
 	DeleteCompositePodGroup string
 	// CreatePods is use to create pods in the cluster.
@@ -158,7 +157,7 @@ type Step struct {
 	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
 	CreatePodsInOrder []*v1.Pod
 	// CreateWorkloads is use to create workloads in the cluster.
-	CreateWorkloads []*schedulingapi.Workload
+	CreateWorkloads []*schedulingv1beta1.Workload
 	// DeletePods is used to delete pods from the cluster and wait for it to propagate.
 	DeletePods []string
 	// UpdatePod is used to mutate any field of the pod.
@@ -248,7 +247,7 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 			return false, err
 		}
 		for _, c := range pg.Status.Conditions {
-			if c.Type == schedulingapi.PodGroupInitiallyScheduled &&
+			if c.Type == schedulingv1beta1.PodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
 				if messageContains == "" || strings.Contains(c.Message, messageContains) {
 					return true, nil
@@ -261,7 +260,7 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 
 func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason, messageContains string) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
-		cpg, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+		cpg, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -269,7 +268,7 @@ func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name st
 			return false, err
 		}
 		for _, c := range cpg.Status.Conditions {
-			if c.Type == schedulingv1alpha3.CompositePodGroupInitiallyScheduled &&
+			if c.Type == schedulingv1beta1.CompositePodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
 				if messageContains == "" || strings.Contains(c.Message, messageContains) {
 					return true, nil
@@ -355,16 +354,16 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 	return nil
 }
 
-func createCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1alpha3.CompositePodGroup) error {
+func createCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1beta1.CompositePodGroup) error {
 	cs := testCtx.ClientSet
 	cpgCopy := cpg.DeepCopy()
 	cpgCopy.Namespace = ns
-	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create composite pod group %s: %w", cpgCopy.Name, err)
 	}
 	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 		func(_ context.Context) (bool, error) {
-			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			_, err := testCtx.InformerFactory.Scheduling().V1beta1().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return false, nil
@@ -380,23 +379,23 @@ func createCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *sch
 	return nil
 }
 
-func updateCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1alpha3.CompositePodGroup) error {
+func updateCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1beta1.CompositePodGroup) error {
 	cs := testCtx.ClientSet
 	cpgCopy := cpg.DeepCopy()
 	cpgCopy.Namespace = ns
 
-	existing, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(testCtx.Ctx, cpgCopy.Name, metav1.GetOptions{})
+	existing, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Get(testCtx.Ctx, cpgCopy.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get existing composite pod group %s for update: %w", cpgCopy.Name, err)
 	}
 	cpgCopy.ResourceVersion = existing.ResourceVersion
 
-	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Update(testCtx.Ctx, cpgCopy, metav1.UpdateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Update(testCtx.Ctx, cpgCopy, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("failed to update composite pod group %s: %w", cpgCopy.Name, err)
 	}
 	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 		func(_ context.Context) (bool, error) {
-			listerCPG, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			listerCPG, err := testCtx.InformerFactory.Scheduling().V1beta1().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
 			if err != nil {
 				return false, err
 			}
@@ -412,7 +411,7 @@ func updateCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *sch
 	return nil
 }
 
-func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi.PodGroup) error {
+func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingv1beta1.PodGroup) error {
 	cs := testCtx.ClientSet
 	pgCopy := pg.DeepCopy()
 	pgCopy.Namespace = ns
@@ -437,7 +436,7 @@ func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	return nil
 }
 
-func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi.PodGroup) error {
+func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingv1beta1.PodGroup) error {
 	cs := testCtx.ClientSet
 	pgCopy := pg.DeepCopy()
 	pgCopy.Namespace = ns
@@ -502,7 +501,7 @@ func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) er
 }
 
 func deleteCompositePodGroup(testCtx *testutils.TestContext, ns string, cpgName string) error {
-	cpgs := testCtx.ClientSet.SchedulingV1alpha3().CompositePodGroups(ns)
+	cpgs := testCtx.ClientSet.SchedulingV1beta1().CompositePodGroups(ns)
 	// PodGroupProtection admission adds a finalizer and no controller removes it here.
 	// NotFound is an error on purpose: a delete step that deletes nothing is a broken test.
 	if _, err := cpgs.Patch(testCtx.Ctx, cpgName, types.MergePatchType, clearFinalizersPatch, metav1.PatchOptions{}); err != nil {
@@ -513,7 +512,7 @@ func deleteCompositePodGroup(testCtx *testutils.TestContext, ns string, cpgName 
 	}
 	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 		func(_ context.Context) (bool, error) {
-			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgName)
+			_, err := testCtx.InformerFactory.Scheduling().V1beta1().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
@@ -529,7 +528,7 @@ func deleteCompositePodGroup(testCtx *testutils.TestContext, ns string, cpgName 
 	return nil
 }
 
-func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingapi.Workload) error {
+func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingv1beta1.Workload) error {
 	cs := testCtx.ClientSet
 	for _, wl := range wls {
 		wlCopy := wl.DeepCopy()
@@ -747,10 +746,10 @@ func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pg
 	for _, pgName := range pgNames {
 		expectedMsg := messages[pgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, expectedMsg))
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingv1beta1.PodGroupReasonUnschedulable, expectedMsg))
 		if err != nil {
 			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
-				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, expectedMsg, err)
+				pgName, metav1.ConditionFalse, schedulingv1beta1.PodGroupReasonUnschedulable, expectedMsg, err)
 		}
 	}
 	return nil
@@ -761,10 +760,10 @@ func waitForPodGroupsError(testCtx *testutils.TestContext, ns string, pgNames []
 	for _, pgName := range pgNames {
 		expectedMsg := messages[pgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, expectedMsg))
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingv1beta1.PodGroupReasonPodGroupError, expectedMsg))
 		if err != nil {
 			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
-				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, expectedMsg, err)
+				pgName, metav1.ConditionFalse, schedulingv1beta1.PodGroupReasonPodGroupError, expectedMsg, err)
 		}
 	}
 	return nil
@@ -775,10 +774,10 @@ func waitForCompositePodGroupsUnschedulable(testCtx *testutils.TestContext, ns s
 	for _, cpgName := range cpgNames {
 		expectedMsg := messages[cpgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, expectedMsg))
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1beta1.CompositePodGroupReasonUnschedulable, expectedMsg))
 		if err != nil {
 			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
-				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, expectedMsg, err)
+				cpgName, metav1.ConditionFalse, schedulingv1beta1.CompositePodGroupReasonUnschedulable, expectedMsg, err)
 		}
 	}
 	return nil
@@ -789,10 +788,10 @@ func waitForCompositePodGroupsError(testCtx *testutils.TestContext, ns string, c
 	for _, cpgName := range cpgNames {
 		expectedMsg := messages[cpgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError, expectedMsg))
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1beta1.CompositePodGroupReasonCompositePodGroupError, expectedMsg))
 		if err != nil {
 			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
-				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError, expectedMsg, err)
+				cpgName, metav1.ConditionFalse, schedulingv1beta1.CompositePodGroupReasonCompositePodGroupError, expectedMsg, err)
 		}
 	}
 	return nil

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1066,7 +1065,7 @@ type compositePodGroupListerImpl struct {
 }
 
 // Get returns the cached pod group object.
-func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1beta1.CompositePodGroup, error) {
 	if !l.cache.compositePodGroupEnabled {
 		return nil, fmt.Errorf("composite pod group feature gate is disabled")
 	}

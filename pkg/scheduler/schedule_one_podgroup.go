@@ -27,7 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -310,8 +310,8 @@ func (sched *Scheduler) validatePodGroupSubtree(
 ) error {
 	// CompositePodGroup nodes cannot be at depth WorkloadMaxTreeDepth as they have to contain a PodGroup as a child,
 	// breaking the depth constraint.
-	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1alpha3.WorkloadMaxTreeDepth {
-		return newValidationErrorf("hierarchy depth exceeds maximum allowed depth %d at %q", schedulingv1alpha3.WorkloadMaxTreeDepth, podGroupInfo.GetKey())
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1beta1.WorkloadMaxTreeDepth {
+		return newValidationErrorf("hierarchy depth exceeds maximum allowed depth %d at %q", schedulingv1beta1.WorkloadMaxTreeDepth, podGroupInfo.GetKey())
 	}
 
 	if err := validateChildPodGroup(podGroupInfo, parent); err != nil {

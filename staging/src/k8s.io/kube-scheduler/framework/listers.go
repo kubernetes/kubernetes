@@ -19,8 +19,7 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -68,7 +67,7 @@ type SharedLister interface {
 // PodGroupLister provides read access to cached pod group objects.
 type PodGroupLister interface {
 	// Get returns the PodGroup with the given namespace and name.
-	Get(namespace, name string) (*schedulingapi.PodGroup, error)
+	Get(namespace, name string) (*schedulingv1beta1.PodGroup, error)
 }
 
 // MutableSnapshotSharedLister interface represents a lister that allows mutating snapshot and restoring it afterwards.
@@ -102,7 +101,7 @@ type PodGroupStateLister interface {
 // CompositePodGroupLister provides read access to cached composite pod group objects.
 type CompositePodGroupLister interface {
 	// Get returns the CompositePodGroup with the given namespace and name.
-	Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error)
+	Get(namespace, name string) (*schedulingv1beta1.CompositePodGroup, error)
 }
 
 // CompositePodGroupStateLister provides read access to composite pod group states.

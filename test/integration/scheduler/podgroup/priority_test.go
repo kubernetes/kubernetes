@@ -186,6 +186,40 @@ func TestPodGroupPriorityClassPreemptionPolicy(t *testing.T) {
 				return new(v1.PreemptionPolicy(*group.Spec.PreemptionPolicy))
 			},
 		},
+		{
+			name: "v1beta1/CompositePodGroup",
+			create: func(t *testing.T, name, className string, policy *v1.PreemptionPolicy) error {
+				group := &schedulingv1beta1.CompositePodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: name},
+					Spec: schedulingv1beta1.CompositePodGroupSpec{
+						PriorityClassName: className,
+						SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+							Basic: &schedulingv1beta1.CompositeBasicSchedulingPolicy{},
+						},
+						WorkloadRef: &schedulingv1beta1.WorkloadReference{
+							WorkloadName: "workload",
+							TemplateName: "template",
+						},
+					},
+				}
+				if policy != nil {
+					group.Spec.PreemptionPolicy = new(schedulingv1beta1.PreemptionPolicy(*policy))
+				}
+				_, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Create(t.Context(), group, metav1.CreateOptions{})
+				return err
+			},
+			getPolicy: func(t *testing.T, name string) *v1.PreemptionPolicy {
+				t.Helper()
+				group, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if group.Spec.PreemptionPolicy == nil {
+					return nil
+				}
+				return new(v1.PreemptionPolicy(*group.Spec.PreemptionPolicy))
+			},
+		},
 	} {
 		t.Run(resource.name, func(t *testing.T) {
 			for _, tc := range []struct {
@@ -270,7 +304,7 @@ func TestPodGroupPreemptionPolicyCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating PodGroup: %v", err)
 			}
-			originalCPG, err := client.SchedulingV1alpha3().CompositePodGroups(metav1.NamespaceDefault).Create(t.Context(),
+			originalCPG, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Create(t.Context(),
 				st.MakeCompositePodGroup().Name("cpg").WorkloadRef("workload", "template").BasicPolicy().Obj(), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("creating CompositePodGroup: %v", err)
@@ -299,12 +333,20 @@ func TestPodGroupPreemptionPolicyCompatibility(t *testing.T) {
 			if alphaPG.UID != originalPG.UID || alphaPG.Spec.PreemptionPolicy != nil {
 				t.Fatalf("expected original v1alpha3 PodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaPG.UID, alphaPG.Spec.PreemptionPolicy)
 			}
-			cpg, err := client.SchedulingV1alpha3().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
+
+			cpg, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("reading CompositePodGroup after restart: %v", err)
 			}
 			if cpg.UID != originalCPG.UID || cpg.Spec.PreemptionPolicy != nil {
 				t.Fatalf("expected original CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", cpg.UID, cpg.Spec.PreemptionPolicy)
+			}
+			alphaCPG, err := client.SchedulingV1alpha3().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("reading v1alpha3 CompositePodGroup after restart: %v", err)
+			}
+			if alphaCPG.UID != originalCPG.UID || alphaCPG.Spec.PreemptionPolicy != nil {
+				t.Fatalf("expected original v1alpha3 CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaCPG.UID, alphaCPG.Spec.PreemptionPolicy)
 			}
 
 			for _, group := range []*fwk.GenericPodGroup{fwk.NewGenericPodGroup(pg), fwk.NewGenericCompositePodGroup(cpg)} {

@@ -21,8 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -104,7 +103,7 @@ func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1
 
 // isSchedulableAfterPodGroupUpdated triggers re-enqueueing of the group's pods if the minCount requirement has decreased.
 func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	oldPodGroup, newPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
+	oldPodGroup, newPodGroup, err := util.As[*schedulingv1beta1.PodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -138,7 +137,7 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, 
 }
 
 func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
+	_, addedPodGroup, err := util.As[*schedulingv1beta1.PodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -155,7 +154,7 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, po
 }
 
 func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedCPG, err := util.As[*schedulingv1alpha3.CompositePodGroup](oldObj, newObj)
+	_, addedCPG, err := util.As[*schedulingv1beta1.CompositePodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -173,7 +172,7 @@ func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.L
 
 // isSchedulableAfterCompositePodGroupUpdated triggers re-enqueueing of the group's pods if the minGroupCount requirement has decreased.
 func (pl *GangScheduling) isSchedulableAfterCompositePodGroupUpdated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	oldCPG, newCPG, err := util.As[*schedulingv1alpha3.CompositePodGroup](oldObj, newObj)
+	oldCPG, newCPG, err := util.As[*schedulingv1beta1.CompositePodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}

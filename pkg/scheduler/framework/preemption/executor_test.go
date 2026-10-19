@@ -27,7 +27,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -336,9 +335,9 @@ func TestPrepareCandidate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"},
 			Spec:       schedulingv1beta1.PodGroupSpec{Priority: &highPriority},
 		}
-		compositePodGroupPreemptor = &schedulingv1alpha3.CompositePodGroup{
+		compositePodGroupPreemptor = &schedulingv1beta1.CompositePodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"},
-			Spec:       schedulingv1alpha3.CompositePodGroupSpec{Priority: &highPriority},
+			Spec:       schedulingv1beta1.CompositePodGroupSpec{Priority: &highPriority},
 		}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
@@ -987,7 +986,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 				Obj()
 		preemptorPodGroups = map[fwk.EntityKeyType]*fwk.GenericPodGroup{
 			fwk.PodGroupKeyType:          fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}),
-			fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+			fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
 		}
 		testPods = []*v1.Pod{
 			victim1,
@@ -1290,7 +1289,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			victims: []*v1.Pod{
 				makeVictim(failVictimNamePrefix),
 			},
-			preemptorGenericPodGroup:             fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"}}),
+			preemptorGenericPodGroup:             fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"}}),
 			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
 			expectSuccessfulPreemption:           false,
 			expectPreemptionAttemptForLastVictim: true,
@@ -1516,7 +1515,7 @@ func TestPreemptPod(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	preemptorPodGroups := map[fwk.EntityKeyType]*fwk.GenericPodGroup{
 		fwk.PodGroupKeyType:          fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}),
-		fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}),
+		fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}),
 	}
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(), st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()}
 
@@ -1646,7 +1645,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
 	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
-	preemptorCompositePodGroup := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", UID: "cpg"}}
+	preemptorCompositePodGroup := &schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", UID: "cpg"}}
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
@@ -2124,7 +2123,7 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 		},
 		{
 			name:                     metrics.CompositePodGroup,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
 		},
 	}
 
