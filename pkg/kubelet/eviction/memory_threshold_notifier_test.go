@@ -29,9 +29,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const testCgroupPath = "/sys/fs/cgroups/memory"

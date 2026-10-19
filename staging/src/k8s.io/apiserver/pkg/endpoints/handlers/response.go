@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -56,17 +57,21 @@ type watchEmbeddedEncoder struct {
 	tableOptions *metav1.TableOptions
 	scope        *RequestScope
 
+	// drop lists the field paths omitted from the encoded object.
+	drop []string
+
 	// identifier of the encoder, computed lazily
 	identifier runtime.Identifier
 }
 
-func newWatchEmbeddedEncoder(ctx context.Context, encoder runtime.Encoder, target *schema.GroupVersionKind, tableOptions *metav1.TableOptions, scope *RequestScope) *watchEmbeddedEncoder {
+func newWatchEmbeddedEncoder(ctx context.Context, encoder runtime.Encoder, target *schema.GroupVersionKind, tableOptions *metav1.TableOptions, drop []string, scope *RequestScope) *watchEmbeddedEncoder {
 	return &watchEmbeddedEncoder{
 		encoder:      encoder,
 		ctx:          ctx,
 		target:       target,
 		tableOptions: tableOptions,
 		scope:        scope,
+		drop:         drop,
 	}
 }
 
@@ -79,7 +84,7 @@ func (e *watchEmbeddedEncoder) Encode(obj runtime.Object, w io.Writer) error {
 }
 
 func (e *watchEmbeddedEncoder) doEncode(obj runtime.Object, w io.Writer) error {
-	result, err := doTransformObject(e.ctx, obj, e.tableOptions, e.target, e.scope)
+	result, err := doTransformObject(e.ctx, obj, e.tableOptions, e.target, e.drop, e.scope)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
 		result = obj
@@ -112,22 +117,26 @@ type watchEmbeddedEncoderIdentifier struct {
 	Target    string              `json:"target,omitempty"`
 	Options   metav1.TableOptions `json:"options,omitempty"`
 	NoHeaders bool                `json:"noHeaders,omitempty"`
+	Drop      []string            `json:"drop,omitempty"`
 }
 
 func (e *watchEmbeddedEncoder) embeddedIdentifier() runtime.Identifier {
-	if e.target == nil {
-		// If no conversion is performed, we effective only use
+	if e.target == nil && len(e.drop) == 0 {
+		// If no transformation is performed, we effective only use
 		// the embedded identifier.
 		return e.encoder.Identifier()
 	}
 	identifier := watchEmbeddedEncoderIdentifier{
 		Name:    "watch-embedded",
 		Encoder: string(e.encoder.Identifier()),
-		Target:  e.target.String(),
+		Drop:    e.drop,
 	}
-	if e.target.Kind == "Table" && e.tableOptions != nil {
-		identifier.Options = *e.tableOptions
-		identifier.NoHeaders = e.tableOptions.NoHeaders
+	if e.target != nil {
+		identifier.Target = e.target.String()
+		if e.target.Kind == "Table" && e.tableOptions != nil {
+			identifier.Options = *e.tableOptions
+			identifier.NoHeaders = e.tableOptions.NoHeaders
+		}
 	}
 
 	result, err := json.Marshal(identifier)
@@ -244,9 +253,15 @@ func (e *watchEncoder) typeIdentifier(eventType watch.EventType) runtime.Identif
 }
 
 // doTransformResponseObject is used for handling all requests, including watch.
-func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, scope *RequestScope) (runtime.Object, error) {
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, drop []string, scope *RequestScope) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
+	}
+
+	// Drop before converting, so Table and PartialObjectMetadata omit the
+	// fields too. The watchEmbeddedEncoder identifier accounts for drop.
+	if slices.Contains(drop, "metadata.managedFields") {
+		obj = dropManagedFields(obj)
 	}
 
 	switch {
@@ -330,7 +345,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, req *http
 
 	var obj runtime.Object
 	do := func() {
-		obj, err = doTransformObject(ctx, result, options, mediaType.Convert, scope)
+		obj, err = doTransformObject(ctx, result, options, mediaType.Convert, mediaType.Drop, scope)
 	}
 	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
 

@@ -33,6 +33,8 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -41,8 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"k8s.io/utils/cpuset"
 )
 
@@ -3319,6 +3319,249 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			} else {
 				if strings.Contains(logs, expectedLog) {
 					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func findHintForMask(hints []topologymanager.TopologyHint, mask bitmask.BitMask) *topologymanager.TopologyHint {
+	for i := range hints {
+		if hints[i].NUMANodeAffinity.IsEqual(mask) {
+			return &hints[i]
+		}
+	}
+	return nil
+}
+
+// expectedHintScore is the Score the hint for a given NUMA mask should carry.
+type expectedHintScore struct {
+	mask  bitmask.BitMask
+	score int64
+}
+
+func TestGenerateCPUTopologyHintsScore(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}
+
+	testCases := []struct {
+		description    string
+		topo           *topology.CPUTopology
+		reservedCPUs   cpuset.CPUSet
+		usableCPUs     cpuset.CPUSet
+		reusableCPUs   cpuset.CPUSet
+		freeCPUs       cpuset.CPUSet
+		request        int
+		expectedScores []expectedHintScore
+	}{
+		{
+			description:  "nothing assigned, symmetric NUMA, all scores are 1",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			request:      1,
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 1},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 1},
+			},
+		},
+		{
+			description:  "2 of 4 assigned on NUMA 0, score reflects utilization",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(2, 3, 4, 5, 6, 7),
+			request:      1,
+			// NUMA 0: 4 allocatable, 2 free, 2 assigned → 2*100/4 = 50
+			// NUMA 1: 4 allocatable, 4 free, 0 assigned → max(1, 0) = 1
+			// NUMA {0,1}: 8 allocatable, 6 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+		{
+			description:  "asymmetric reserved CPUs, partial assignment",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(0, 1),
+			usableCPUs:   cpuset.New(3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(3, 4, 5, 6, 7),
+			request:      1,
+			// NUMA 0: allocatable={2,3}=2, free_on_0={3}=1, assigned=1 → 1*100/2 = 50
+			// NUMA 1: allocatable={4,5,6,7}=4, free_on_1={4,5,6,7}=4, assigned=0 → max(1,0)=1
+			// NUMA {0,1}: allocatable=6, free=5, assigned=1 → 1*100/6 = 16
+			//
+			// This case pins the cross-NUMA semantic: a hint spanning both nodes
+			// scores the span as one pool (16), not the mean of the per-node
+			// scores (25). The span weights each node by the capacity it
+			// contributes, so the larger and emptier node 1 dominates, which is
+			// right: a container placed on {0,1} allocates from both nodes as a
+			// single pool. Reserving CPUs on one node only is what makes the two
+			// readings diverge here; with equally sized nodes they coincide,
+			// which is why every other case in this table agrees with both.
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 16},
+			},
+		},
+		{
+			description:  "full utilization via reusable CPUs, score 100",
+			topo:         topoSingleSocketHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(),
+			reusableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			freeCPUs:     cpuset.New(),
+			request:      1,
+			// NUMA 0: 8 allocatable, 0 free, 8 assigned → 8*100/8 = 100
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 100},
+			},
+		},
+		{
+			description:  "3 of 4 assigned on each NUMA, high utilization",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(3, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(3, 7),
+			request:      1,
+			// NUMA 0: 4 allocatable, 1 free, 3 assigned → 3*100/4 = 75
+			// NUMA 1: 4 allocatable, 1 free, 3 assigned → 3*100/4 = 75
+			// NUMA {0,1}: 8 allocatable, 2 free, 6 assigned → 6*100/8 = 75
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 75},
+				{mask: newNUMAAffinity(1), score: 75},
+				{mask: newNUMAAffinity(0, 1), score: 75},
+			},
+		},
+		{
+			// Hint regeneration: the usable set is the allocation the container
+			// already holds, which is not free. Scoring off it would report
+			// NUMA 0 as 50% used when it is in fact full.
+			description:  "regeneration, usable set differs from free set",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(0, 1),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(4, 5, 6, 7),
+			request:      2,
+			// NUMA 0: 4 allocatable, 0 free, 4 assigned → 4*100/4 = 100
+			// NUMA {0,1}: 8 allocatable, 4 free, 4 assigned → 4*100/8 = 50
+			// NUMA 1 generates no hint: none of the usable CPUs live there.
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 100},
+				{mask: newNUMAAffinity(0, 1), score: 50},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			p := staticPolicy{
+				topology:     tc.topo,
+				reservedCPUs: tc.reservedCPUs,
+				numaNodes:    tc.topo.CPUDetails.NUMANodes().List(),
+			}
+			hints := p.generateCPUTopologyHints(tc.usableCPUs, tc.reusableCPUs, tc.freeCPUs, tc.request)
+
+			if len(hints) != len(tc.expectedScores) {
+				t.Errorf("expected %d hints, got %d: %v", len(tc.expectedScores), len(hints), hints)
+			}
+			for _, expected := range tc.expectedScores {
+				hint := findHintForMask(hints, expected.mask)
+				if hint == nil {
+					t.Errorf("expected a hint for NUMA %v but found none", expected.mask.GetBits())
+					continue
+				}
+				if hint.Score != expected.score {
+					t.Errorf("NUMA %v: expected Score %d, got %d", expected.mask.GetBits(), expected.score, hint.Score)
+				}
+			}
+		})
+	}
+}
+
+// TestRegeneratedCPUTopologyHintsScore covers the hint regeneration path taken
+// after a kubelet restart, when the container already holds an allocation. The
+// Score has to describe the node, not the caller: the already allocated CPUs are
+// passed in as the usable set, but they are assigned, not free.
+func TestRegeneratedCPUTopologyHintsScore(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each.
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}.
+	//
+	// The container holds {0,1}; another pod holds {2,3}. NUMA 0 is therefore
+	// full and NUMA 1 entirely free.
+	//
+	// NUMA 0:     4 allocatable, 0 free, 4 assigned → 4*100/4 = 100
+	// NUMA {0,1}: 8 allocatable, 4 free, 4 assigned → 4*100/8 = 50
+	//
+	// Scoring off the usable set instead would claim 50 and 75: NUMA 0 half
+	// empty when it is full.
+	// NUMA 1 generates no hint: the container holds nothing there.
+	expectedHints := []topologymanager.TopologyHint{
+		{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true, Score: 100},
+		{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: false, Score: 50},
+	}
+
+	newState := func() *mockState {
+		return &mockState{
+			assignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer": cpuset.New(0, 1),
+				},
+			},
+			defaultCPUSet: cpuset.New(4, 5, 6, 7),
+		}
+	}
+
+	testCases := []struct {
+		description string
+		getHints    func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	}{
+		{
+			description: "container scope",
+			getHints: func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+				return p.GetTopologyHints(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+			},
+		},
+		{
+			description: "pod scope",
+			getHints: func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+				return p.GetPodTopologyHints(logger, st, pod, lifecycle.AddOperation)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoDualSocketNoHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			pod := makePod("fakePod", "fakeContainer", "2", "2")
+			hints := tc.getHints(logger, policy, newState(), pod)[string(v1.ResourceCPU)]
+
+			if len(hints) != len(expectedHints) {
+				t.Fatalf("expected %d regenerated hints, got %d: %v", len(expectedHints), len(hints), hints)
+			}
+			for i, expected := range expectedHints {
+				// Asserting on Preferred too: the regenerated hints must still
+				// point at the existing allocation.
+				if !hints[i].NUMANodeAffinity.IsEqual(expected.NUMANodeAffinity) ||
+					hints[i].Preferred != expected.Preferred ||
+					hints[i].Score != expected.Score {
+					t.Errorf("hint %d: expected %v, got %v", i, expected, hints[i])
 				}
 			}
 		})

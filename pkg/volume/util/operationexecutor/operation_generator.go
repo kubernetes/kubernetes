@@ -883,6 +883,11 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		// use hostutil.PathIsDevice to check if the path is a device,
 		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
+		// Note: this in-use safety check only takes effect on platforms with a
+		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
+		// hostutil.DeviceOpened always report (false, nil), so the check is a
+		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
+		// VolumeID on Windows rather than a device path.
 		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
@@ -1357,6 +1362,11 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// use hostutil.PathIsDevice to check if the path is a device,
 		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
+		// Note: this in-use safety check only takes effect on platforms with a
+		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
+		// hostutil.DeviceOpened always report (false, nil), so the check is a
+		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
+		// VolumeID on Windows rather than a device path.
 		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
@@ -2186,6 +2196,9 @@ func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) erro
 }
 
 // isDeviceOpened checks the device status if the device is in use anywhere else on the system
+// The check is meaningful only on platforms with a device node tree (Linux): on Windows,
+// hostutil.PathIsDevice and hostutil.DeviceOpened always report (false, nil), so this
+// unconditionally reports the device as not in use; detach proceeds without the check.
 func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) (bool, error) {
 	isDevicePath, devicePathErr := hostUtil.PathIsDevice(deviceToDetach.DevicePath)
 	var deviceOpened bool

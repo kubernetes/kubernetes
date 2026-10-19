@@ -77,6 +77,7 @@ type PodDisruptionBudgetSpec struct {
 // UnhealthyPodEvictionPolicyType defines the criteria for when unhealthy pods
 // should be considered for eviction.
 // +enum
+// +k8s:validation-gen-nolint
 type UnhealthyPodEvictionPolicyType string
 
 const (

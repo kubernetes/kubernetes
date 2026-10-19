@@ -27,17 +27,17 @@ import (
 //
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 type LimitRangeItemApplyConfiguration struct {
-	// Type of resource that this limit applies to.
+	// type of resource that this limit applies to.
 	Type *corev1.LimitType `json:"type,omitempty"`
-	// Max usage constraints on this kind by resource name.
+	// max usage constraints on this kind by resource name.
 	Max *corev1.ResourceList `json:"max,omitempty"`
-	// Min usage constraints on this kind by resource name.
+	// min usage constraints on this kind by resource name.
 	Min *corev1.ResourceList `json:"min,omitempty"`
-	// Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.
+	// default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.
 	Default *corev1.ResourceList `json:"default,omitempty"`
-	// DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.
+	// defaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.
 	DefaultRequest *corev1.ResourceList `json:"defaultRequest,omitempty"`
-	// MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
+	// maxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
 	MaxLimitRequestRatio *corev1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 

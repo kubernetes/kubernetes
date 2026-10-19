@@ -26,10 +26,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
 	clienttesting "k8s.io/client-go/testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -79,7 +82,7 @@ func TestPrependAppendReactor(t *testing.T) {
 	qux := &clienttesting.SimpleReactor{Verb: "qux"}
 
 	d := NewDryRun()
-	lenBefore := len(d.fakeClient.Fake.ReactionChain)
+	lenBefore := len(d.fake.ReactionChain)
 	d.PrependReactor(foo).PrependReactor(bar).
 		AppendReactor(baz).AppendReactor(qux)
 
@@ -93,12 +96,12 @@ func TestPrependAppendReactor(t *testing.T) {
 	}
 	expectedLen := lenBefore + len(expectedIdx)
 
-	if len(d.fakeClient.Fake.ReactionChain) != expectedLen {
+	if len(d.fake.ReactionChain) != expectedLen {
 		t.Fatalf("expected len of reactor chain: %d, got: %d",
-			expectedLen, len(d.fakeClient.Fake.ReactionChain))
+			expectedLen, len(d.fake.ReactionChain))
 	}
 
-	for actual, r := range d.fakeClient.Fake.ReactionChain {
+	for actual, r := range d.fake.ReactionChain {
 		s := r.(*clienttesting.SimpleReactor)
 		expected, exists := expectedIdx[s.Verb]
 		if exists {
@@ -544,5 +547,137 @@ func TestDecodeUnstructuredIntoAPIObject(t *testing.T) {
 				t.Errorf("object differs (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestFakeClientRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	d := NewDryRun().WithWriter(io.Discard).WithDefaultMarshalFunction().
+		WithServerVersion(&version.Info{GitVersion: "v1.99.0"})
+	client := d.FakeClient()
+	cms := client.CoreV1().ConfigMaps(metav1.NamespaceSystem)
+
+	tests := []struct {
+		name    string
+		call    func() error
+		wantErr func(error) bool
+	}{
+		{
+			name: "server version",
+			call: func() error {
+				v, err := client.Discovery().ServerVersion()
+				if err != nil {
+					return err
+				}
+				if v.GitVersion != "v1.99.0" {
+					return errors.Errorf("expected server version v1.99.0, got %s", v.GitVersion)
+				}
+				return nil
+			},
+		},
+		{
+			name: "create",
+			call: func() error {
+				_, err := cms.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+					Name: "foo", Labels: map[string]string{"app": "foo"},
+				}}, metav1.CreateOptions{})
+				return err
+			},
+		},
+		{
+			name: "create existing",
+			call: func() error {
+				_, err := cms.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, metav1.CreateOptions{})
+				return err
+			},
+			wantErr: apierrors.IsAlreadyExists,
+		},
+		{
+			name: "update",
+			call: func() error {
+				_, err := cms.Update(ctx, &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"app": "foo"}},
+					Data:       map[string]string{"k": "v"},
+				}, metav1.UpdateOptions{})
+				return err
+			},
+		},
+		{
+			name: "patch",
+			call: func() error {
+				_, err := cms.Patch(ctx, "foo", types.MergePatchType, []byte(`{"data":{"k2":"v2"}}`), metav1.PatchOptions{})
+				return err
+			},
+		},
+		{
+			name: "get",
+			call: func() error {
+				cm, err := cms.Get(ctx, "foo", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				want := map[string]string{"k": "v", "k2": "v2"}
+				if diff := cmp.Diff(want, cm.Data); diff != "" {
+					return errors.Errorf("data differs (-want,+got):\n%s", diff)
+				}
+				return nil
+			},
+		},
+		{
+			name: "list with label selector",
+			call: func() error {
+				if _, err := cms.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, metav1.CreateOptions{}); err != nil {
+					return err
+				}
+				list, err := cms.List(ctx, metav1.ListOptions{LabelSelector: "app=foo"})
+				if err != nil {
+					return err
+				}
+				if len(list.Items) != 1 || list.Items[0].Name != "foo" {
+					return errors.Errorf("expected only configmap foo, got %v", list.Items)
+				}
+				return nil
+			},
+		},
+		{
+			name: "invalid label selector",
+			call: func() error {
+				_, err := cms.List(ctx, metav1.ListOptions{LabelSelector: "app in ("})
+				return err
+			},
+			wantErr: apierrors.IsBadRequest,
+		},
+		{
+			name: "delete",
+			call: func() error {
+				return cms.Delete(ctx, "foo", metav1.DeleteOptions{})
+			},
+		},
+		{
+			name: "get deleted",
+			call: func() error {
+				_, err := cms.Get(ctx, "foo", metav1.GetOptions{})
+				return err
+			},
+			wantErr: apierrors.IsNotFound,
+		},
+		{
+			name: "watch is not supported",
+			call: func() error {
+				_, err := cms.Watch(ctx, metav1.ListOptions{})
+				return err
+			},
+			wantErr: apierrors.IsMethodNotSupported,
+		},
+	}
+	// The cases share one store and run in order.
+	for _, tc := range tests {
+		err := tc.call()
+		switch {
+		case tc.wantErr == nil && err != nil:
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		case tc.wantErr != nil && !tc.wantErr(err):
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
 	}
 }

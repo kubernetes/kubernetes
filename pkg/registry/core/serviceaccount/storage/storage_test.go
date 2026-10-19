@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -133,7 +133,7 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 			Name:      serviceAccount.Name,
 			Namespace: serviceAccount.Namespace,
 		},
-		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: 3600},
+		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: new(int64(3600))},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed calling /token endpoint for service account: %v", err)

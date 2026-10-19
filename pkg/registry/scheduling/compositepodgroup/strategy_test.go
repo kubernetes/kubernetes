@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -57,9 +58,9 @@ var (
 	}
 
 	fieldImmutableError             = "field is immutable"
+	notAllowedToUnsetError          = "field cannot be cleared once set"
 	minCountError                   = "must be greater than or equal to 1"
 	subdomainNameError              = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	maximumError                    = "must be less than or equal to"
 	oneOfError                      = "must specify one of: `basic`, `gang`"
 	multipleSchedulingPoliciesError = "must specify exactly one of: `basic`, `gang`"
 	multipleDisruptionModesError    = "must specify exactly one of: `single`, `all`"
@@ -206,13 +207,17 @@ func TestStrategyCreate(t *testing.T) {
 				return cpg
 			}(),
 		},
-		"too high priority": {
+		"system-node-critical priority": {
 			obj: func() *scheduling.CompositePodGroup {
 				cpg := cpg.DeepCopy()
-				cpg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return cpg
 			}(),
-			expectValidationError: maximumError,
+			expectObj: func() *scheduling.CompositePodGroup {
+				cpg := cpg.DeepCopy()
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return cpg
+			}(),
 		},
 		"multiple topology constraints": {
 			obj:                   compositePodGroupWithSchedulingConstraints("foo", "bar"),
@@ -355,14 +360,13 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing min group count in gang scheduling policy not allowed": {
+		"changing min group count in gang scheduling policy is allowed": {
 			oldObj: cpg,
 			newObj: func() *scheduling.CompositePodGroup {
 				newCpg := cpg.DeepCopy()
 				newCpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 4
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: cpg,
@@ -373,7 +377,7 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError, notAllowedToUnsetError},
 		},
 		"changing disruption mode not allowed": {
 			oldObj:                 cpg,

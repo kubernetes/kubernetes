@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -31,6 +32,11 @@ const (
 	volumeSnapshot                       string = "VolumeSnapshot"
 	deprecatedStorageClassAnnotationsMsg        = `deprecated since v1.8; use "storageClassName" attribute instead`
 )
+
+func hasFractionalBytes(value resource.Quantity) bool {
+	_, exact := value.AsScale(0)
+	return !exact
+}
 
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
@@ -207,13 +213,13 @@ func GetWarningsForPersistentVolumeClaimSpec(fieldPath *field.Path, pvSpec core.
 
 	var warnings []string
 	requestValue := pvSpec.Resources.Requests[core.ResourceStorage]
-	if requestValue.MilliValue()%int64(1000) != int64(0) {
+	if hasFractionalBytes(requestValue) {
 		warnings = append(warnings, fmt.Sprintf(
 			"%s: fractional byte value %q is invalid, must be an integer",
 			fieldPath.Child("resources").Child("requests").Key(core.ResourceStorage.String()), requestValue.String()))
 	}
 	limitValue := pvSpec.Resources.Limits[core.ResourceStorage]
-	if limitValue.MilliValue()%int64(1000) != int64(0) {
+	if hasFractionalBytes(limitValue) {
 		warnings = append(warnings, fmt.Sprintf(
 			"%s: fractional byte value %q is invalid, must be an integer",
 			fieldPath.Child("resources").Child("limits").Key(core.ResourceStorage.String()), limitValue.String()))

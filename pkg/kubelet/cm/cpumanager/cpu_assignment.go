@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"sort"
 
 	"k8s.io/klog/v2"
@@ -731,7 +732,10 @@ func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopC
 	var helper func(n []int, k int, start int, accum []int, f func([]int) LoopControl) LoopControl
 	helper = func(n []int, k int, start int, accum []int, f func([]int) LoopControl) LoopControl {
 		if k == 0 {
-			return f(accum)
+			// Pass a copy of accum to f() to prevent slice reference bugs.
+			// This ensures that each subset is independent and won't be
+			// overwritten by subsequent iterations.
+			return f(slices.Clone(accum))
 		}
 		for i := start; i <= len(n)-k; i++ {
 			control := helper(n, k-1, i+1, append(accum, n[i]), f)

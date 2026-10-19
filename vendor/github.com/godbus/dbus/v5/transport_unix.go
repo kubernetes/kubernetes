@@ -1,4 +1,4 @@
-//go:build !windows && !solaris
+//go:build !windows && !solaris && !js
 
 package dbus
 
@@ -184,8 +184,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	dec.align(8)
-	body := make([]byte, t.rdr.BodyLen)
-	if _, err = io.ReadFull(t.rdr, body); err != nil {
+	body, err := readFull(t.rdr, nil, int(t.rdr.BodyLen))
+	if err != nil {
 		return nil, err
 	}
 	r.Reset(body)

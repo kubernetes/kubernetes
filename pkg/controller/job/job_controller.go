@@ -51,13 +51,13 @@ import (
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/job/util"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -657,6 +657,8 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	jm.enqueueLabelSelector(jobObj)
 
 	key := cache.MetaObjectToName(jobObj).String()
+	// Delete expectations for the Job so a replacement with the same name starts clean.
+	jm.expectations.DeleteExpectations(logger, key)
 	err := jm.podBackoffStore.removeBackoffRecord(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error removing backoff record %w", err))
@@ -1240,8 +1242,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
 				utilruntime.HandleError(err)
-			}
-			if podutil.IsPodReady(pod) {
+			} else if podutil.IsPodReady(pod) {
 				atomic.AddInt32(&deletedReady, 1)
 			}
 		}(pods[i])
@@ -1293,10 +1294,11 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 					return
 				}
 			}
-			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil {
+			err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job)
+			if err != nil {
 				failDelete(pod, err)
 			}
-			if podutil.IsPodReady(pod) {
+			if podutil.IsPodReady(pod) && (err == nil || apierrors.IsNotFound(err)) {
 				atomic.AddInt32(&deletedReady, 1)
 			}
 		}(pods[i])
@@ -1933,8 +1935,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 							// this error since all subsequent creations will fail.
 							return
 						}
-					}
-					if err != nil {
+
 						defer utilruntime.HandleError(err)
 						// Decrement the expected number of creates because the informer won't observe this pod
 						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
@@ -1942,8 +1943,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						atomic.AddInt32(&active, -1)
 						errCh <- err
 						atomic.AddInt32(&creationsFailed, 1)
+					} else {
+						atomic.AddInt32(&creationsSucceeded, 1)
 					}
-					atomic.AddInt32(&creationsSucceeded, 1)
 				}()
 			}
 			wait.Wait()

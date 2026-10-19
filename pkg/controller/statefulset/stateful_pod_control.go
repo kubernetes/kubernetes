@@ -32,9 +32,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this

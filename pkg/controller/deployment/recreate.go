@@ -37,17 +37,9 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 
 	// scale down old replica sets.
 	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(ctx, activeOldRSs, d)
-	if err != nil {
-		return err
-	}
-	if scaledDown {
-		// Update DeploymentStatus.
-		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
-	}
-
-	// Do not process a deployment when it has old pods running.
-	if oldPodsRunning(newRS, oldRSs, podMap) {
-		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
+	// Old pods must be gone before the new RS is scaled up.
+	if err != nil || scaledDown || oldPodsRunning(newRS, oldRSs, podMap) {
+		return dc.syncRolloutStatusAfter(ctx, err, allRSs, newRS, d)
 	}
 
 	// If we need to create a new RS, create it now.
@@ -60,18 +52,15 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 	}
 
 	// scale up new replica set.
-	if _, err := dc.scaleUpNewReplicaSetForRecreate(ctx, newRS, d); err != nil {
-		return err
-	}
-
-	if util.DeploymentComplete(d, &d.Status) {
+	_, err = dc.scaleUpNewReplicaSetForRecreate(ctx, newRS, d)
+	if err == nil && util.DeploymentComplete(d, &d.Status) {
 		if err := dc.cleanupDeployment(ctx, oldRSs, d); err != nil {
 			return err
 		}
 	}
 
 	// Sync deployment status.
-	return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
+	return dc.syncRolloutStatusAfter(ctx, err, allRSs, newRS, d)
 }
 
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate".

@@ -403,7 +403,13 @@ func collectRules(node *typeNode) fieldRules {
 		record(path, n.typeKeyIterations.Functions) // keys validate at parent path
 
 		for _, fld := range n.fields {
-			walkChild(fld, joinPath(path, fld.jsonName), false, false)
+			name := fld.jsonName
+			if name == "" && path == "" {
+				// In a root type, the generated code names an embedded
+				// field after its type.
+				name = fld.name
+			}
+			walkChild(fld, joinPath(path, name), false, false)
 		}
 		if n.elem != nil && !skipElem {
 			walkChild(n.elem, joinPath(path, "[*]"), false, false)
@@ -444,7 +450,9 @@ func collectRules(node *typeNode) fieldRules {
 func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, suffix string) {
 	if len(fg.Emits) > 0 {
 		for _, e := range fg.Emits {
-			path := basePath + suffix + e.PathFragment
+			// The root fldPath is nil, so a ".name" fragment on an empty
+			// basePath must not add a leading ".".
+			path := strings.TrimPrefix(basePath+suffix+e.PathFragment, ".")
 			rules[path] = append(rules[path], rule{
 				ErrorType: string(e.Type),
 				Origin:    e.Origin,
@@ -460,6 +468,14 @@ func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, s
 			for _, child := range a.Functions {
 				recordRules(rules, basePath, child, suffix+a.PathFragment)
 			}
+		case validators.SliceLiteral:
+			recordRules(rules, basePath, validators.FunctionGen{Args: a.Elements}, suffix)
+		case validators.StructLiteral:
+			var values []any
+			for _, f := range a.Fields {
+				values = append(values, f.Value)
+			}
+			recordRules(rules, basePath, validators.FunctionGen{Args: values}, suffix)
 		}
 	}
 }

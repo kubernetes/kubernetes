@@ -1,0 +1,17 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 06ae150447c..78a1b2c9001 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -650,9 +650,9 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
+ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+ 	_, matchesSingle := opts.Predicate.MatchesSingle()
+ 	matchesSingle = matchesSingle && !opts.Recursive
+-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+-		return w.getIntervalFromStoreLocked(key, matchesSingle)
+-	}
++	// BUG REVERT (#134831): do not force reading from store snapshot when
++	// SendInitialEvents=true, so WatchList with resourceVersion > 0 serves
++	// raw history events (including Modified and Deleted) before the initial bookmark.
+ 
+ 	if resourceVersion == 0 {
+ 		if opts.SendInitialEvents == nil {

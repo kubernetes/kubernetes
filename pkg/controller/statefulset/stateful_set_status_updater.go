@@ -25,9 +25,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 // StatefulSetStatusUpdaterInterface is an interface used to update the StatefulSetStatus associated with a StatefulSet.

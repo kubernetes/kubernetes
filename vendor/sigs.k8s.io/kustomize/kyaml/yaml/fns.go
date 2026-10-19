@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	yaml "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 )
@@ -850,12 +849,31 @@ func ErrorIfInvalid(rn *RNode, kind yaml.Kind) error {
 
 	if kind == yaml.MappingNode {
 		if len(rn.YNode().Content)%2 != 0 {
+			content := rn.YNode().Content
 			return errors.Errorf(
-				"yaml MappingNodes must have even length contents: %v", spew.Sdump(rn))
+				"yaml MappingNodes must have even length contents: content length %d, content summary: %s",
+				len(content), mappingNodeContentSummary(content))
 		}
 	}
 
 	return nil
+}
+
+func mappingNodeContentSummary(content []*yaml.Node) string {
+	if len(content) == 0 {
+		return "[]"
+	}
+	summary := make([]string, 0, len(content))
+	for i, node := range content {
+		if node == nil {
+			summary = append(summary, fmt.Sprintf("%d:<nil>", i))
+			continue
+		}
+		summary = append(summary, fmt.Sprintf(
+			"%d:{kind:%s tag:%q value:%q}",
+			i, nodeKindString(node.Kind), node.Tag, node.Value))
+	}
+	return "[" + strings.Join(summary, ", ") + "]"
 }
 
 // IsListIndex returns true if p is an index into a Val.

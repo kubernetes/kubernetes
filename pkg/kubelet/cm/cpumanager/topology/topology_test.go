@@ -23,7 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/cpuset"
 )
 

@@ -29,6 +29,8 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+
+	"google.golang.org/grpc/internal/mem"
 )
 
 // A Buffer represents a reference counted piece of data (in bytes) that can be
@@ -63,8 +65,6 @@ type Buffer interface {
 }
 
 var (
-	bufferPoolingThreshold = 1 << 10
-
 	bufferObjectPool = sync.Pool{New: func() any { return new(buffer) }}
 )
 
@@ -72,7 +72,7 @@ var (
 // equal to the threshold for buffer pooling. This is used to determine whether
 // to pool buffers or allocate them directly.
 func IsBelowBufferPoolingThreshold(size int) bool {
-	return size <= bufferPoolingThreshold
+	return size <= mem.BufferPoolingThreshold
 }
 
 type buffer struct {

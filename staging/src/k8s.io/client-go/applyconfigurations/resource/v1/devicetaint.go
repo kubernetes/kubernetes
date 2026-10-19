@@ -30,20 +30,20 @@ import (
 // any claim which does not tolerate the taint and, through the claim,
 // to pods using the claim.
 type DeviceTaintApplyConfiguration struct {
-	// The taint key to be applied to a device.
+	// key is the taint key to be applied to a device.
 	// Must be a label name.
 	Key *string `json:"key,omitempty"`
-	// The taint value corresponding to the taint key.
+	// value is the taint value corresponding to the taint key.
 	// Must be a label value.
 	Value *string `json:"value,omitempty"`
-	// The effect of the taint on claims that do not tolerate the taint
+	// effect is the effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
 	//
 	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
 	// nodes is not valid here. More effects may get added in the future.
 	// Consumers must treat unknown effects like None.
 	Effect *resourcev1.DeviceTaintEffect `json:"effect,omitempty"`
-	// TimeAdded represents the time at which the taint was added or
+	// timeAdded represents the time at which the taint was added or
 	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
 	//

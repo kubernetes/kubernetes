@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/admission/v1"
@@ -43,6 +42,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/integration/etcd"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // Admission test framework copied from test/integration/apiserver/admissionwebhook/admission_test.go
@@ -61,13 +61,13 @@ const (
 // DIFF: Added interface to replace direct *holder usage in testContext to be
 // able to inject a policy-specific holder
 type admissionTestExpectationHolder interface {
-	reset(t *testing.T)
+	reset(t testutils.TB)
 	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool)
-	verify(t *testing.T)
+	verify(t testutils.TB)
 }
 
 type testContext struct {
-	t *testing.T
+	t testutils.TB
 
 	// DIFF: Changed from *holder to interface
 	admissionHolder admissionTestExpectationHolder
@@ -202,7 +202,7 @@ type webhookOptions struct {
 type holder struct {
 	lock sync.RWMutex
 
-	t *testing.T
+	t testutils.TB
 
 	supportedVersions []string
 	// DIFF: Warning handler removed in policy test.
@@ -229,7 +229,7 @@ type holder struct {
 	recorded map[webhookOptions]*admissionRequest
 }
 
-func (h *holder) reset(t *testing.T) {
+func (h *holder) reset(t testutils.TB) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.t = t
@@ -352,7 +352,7 @@ func (h *holder) record(version string, phase string, converted bool, request *a
 	h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = request
 }
 
-func (h *holder) verify(t *testing.T) {
+func (h *holder) verify(t testutils.TB) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

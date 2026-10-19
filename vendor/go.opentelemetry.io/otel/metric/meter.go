@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package metric // import "go.opentelemetry.io/otel/metric"
+package metric
 
 import (
 	"context"
@@ -320,7 +320,7 @@ type Observer interface {
 	ObserveInt64(obsrv Int64Observable, value int64, opts ...ObserveOption)
 }
 
-// Registration is an token representing the unique registration of a callback
+// Registration is a token representing the unique registration of a callback
 // for a set of instruments with a Meter.
 //
 // Warning: Methods may be added to this interface in minor releases. See

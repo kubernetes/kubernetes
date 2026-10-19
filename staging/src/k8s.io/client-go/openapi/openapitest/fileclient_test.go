@@ -17,6 +17,7 @@ limitations under the License.
 package openapitest_test
 
 import (
+	"os"
 	"testing"
 
 	"k8s.io/client-go/openapi/openapitest"
@@ -68,6 +69,9 @@ func TestOpenAPIEmbeddedTest(t *testing.T) {
 }
 
 func TestOpenAPITest(t *testing.T) {
+	if _, err := os.Stat("testdata"); os.IsNotExist(err) {
+		t.Skip("testdata directory not found on disk")
+	}
 	client := openapitest.NewFileClient("testdata")
 
 	// make sure we get paths

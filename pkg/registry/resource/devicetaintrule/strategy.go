@@ -81,6 +81,22 @@ func (*deviceTaintRuleStrategy) Validate(ctx context.Context, obj runtime.Object
 }
 
 func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	rule := obj.(*resource.DeviceTaintRule)
+	return warningsForDeviceTaintRule(rule)
+}
+
+// warningsForDeviceTaintRule returns a warning when spec.deviceSelector is
+// present but empty (driver, pool, and device all unset). Such a selector
+// matches every device from every driver in the cluster, which is easy to
+// trigger by mistake. See https://github.com/kubernetes/kubernetes/issues/141422.
+func warningsForDeviceTaintRule(rule *resource.DeviceTaintRule) []string {
+	sel := rule.Spec.DeviceSelector
+	if sel != nil && sel.Driver == nil && sel.Pool == nil && sel.Device == nil {
+		return []string{
+			field.NewPath("spec", "deviceSelector").String() +
+				": an empty selector matches every device from every driver in the cluster",
+		}
+	}
 	return nil
 }
 
@@ -124,7 +140,8 @@ func (*deviceTaintRuleStrategy) ValidateUpdate(ctx context.Context, obj, old run
 }
 
 func (*deviceTaintRuleStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	rule := obj.(*resource.DeviceTaintRule)
+	return warningsForDeviceTaintRule(rule)
 }
 
 func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {

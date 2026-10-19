@@ -71,32 +71,27 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration,
 
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
-		grpc.WithBlock(),
 		grpc.WithTransportCredentials(transportCreds),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	conn, err := grpc.DialContext(ctx, addr, opts...)
-
+	// The passthrough resolver hands the address to the dialer unchanged, as
+	// grpc.DialContext did; NewClient would otherwise default to the dns resolver.
+	conn, err := grpc.NewClient("passthrough:///"+addr, opts...)
 	if err != nil {
-		if err == context.DeadlineExceeded {
-			klog.V(4).ErrorS(err, "failed to connect grpc service due to timeout", "addr", addr, "service", service, "timeout", timeout)
-			return probe.Failure, fmt.Sprintf("timeout: failed to connect service %q within %v: %+v", addr, timeout, err), nil
-		} else {
-			klog.V(4).ErrorS(err, "failed to connect grpc service", "service", addr)
-			return probe.Failure, fmt.Sprintf("error: failed to connect service at %q: %+v", addr, err), nil
-		}
+		klog.V(4).ErrorS(err, "failed to create grpc client", "addr", addr, "service", service)
+		return probe.Failure, fmt.Sprintf("error: failed to create grpc client for %q: %+v", addr, err), nil
 	}
 
 	defer func() {
 		_ = conn.Close()
 	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	client := grpchealth.NewHealthClient(conn)
 
@@ -108,6 +103,9 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration,
 		stat, ok := status.FromError(err)
 		if ok {
 			switch stat.Code() {
+			case codes.Unavailable:
+				klog.V(4).ErrorS(err, "failed to connect grpc service", "addr", addr, "service", service)
+				return probe.Failure, fmt.Sprintf("error: failed to connect service at %q: %s", addr, stat.Message()), nil
 			case codes.Unimplemented:
 				klog.V(4).ErrorS(err, "server does not implement the grpc health protocol (grpc.health.v1.Health)", "addr", addr, "service", service)
 				return probe.Failure, fmt.Sprintf("error: this server does not implement the grpc health protocol (grpc.health.v1.Health): %s", stat.Message()), nil

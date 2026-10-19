@@ -26,7 +26,7 @@ package v1
 // also ask for several identical devices. With FirstAvailable it is also
 // possible to provide a prioritized list of requests.
 type DeviceRequestApplyConfiguration struct {
-	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
+	// name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
 	//
 	// References using the name in the DeviceRequest will uniquely
@@ -37,12 +37,12 @@ type DeviceRequestApplyConfiguration struct {
 	//
 	// Must be a DNS label.
 	Name *string `json:"name,omitempty"`
-	// Exactly specifies the details for a single request that must
+	// exactly specifies the details for a single request that must
 	// be met exactly for the request to be satisfied.
 	//
 	// One of Exactly or FirstAvailable must be set.
 	Exactly *ExactDeviceRequestApplyConfiguration `json:"exactly,omitempty"`
-	// FirstAvailable contains subrequests, of which exactly one will be
+	// firstAvailable contains subrequests, of which exactly one will be
 	// selected by the scheduler. It tries to
 	// satisfy them in the order in which they are listed here. So if
 	// there are two entries in the list, the scheduler will only check

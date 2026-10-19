@@ -510,7 +510,7 @@ func TestFeatureGateMetrics(t *testing.T) {
 	}
 	require.NoError(t, f.Add(fMap))
 	require.NoError(t, f.SetFromMap(map[string]bool{"TestAlphaEnabled": true, "TestBetaDisabled": false}))
-	f.AddMetrics()
+	f.AddMetrics(featuremetrics.RecordFeatureInfo)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedOutput), testedMetrics...); err != nil {
 		t.Fatal(err)
 	}
@@ -1344,7 +1344,7 @@ func TestVersionedFeatureGateMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, f.SetFromMap(map[string]bool{"TestAlphaEnabled": true, "TestBetaDisabled": false}))
-	f.AddMetrics()
+	f.AddMetrics(featuremetrics.RecordFeatureInfo)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedOutput), testedMetrics...); err != nil {
 		t.Fatal(err)
 	}

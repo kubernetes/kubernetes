@@ -30,7 +30,6 @@
 # allocation from the matching suffix.
 - name: SchedulingWithResourceClaimTemplateListAttributes
   featureGates:
-    DynamicResourceAllocation: true
     DRAListTypeAttributes: true
   workloadTemplate:
   - opcode: createNodes

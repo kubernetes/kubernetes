@@ -45,6 +45,7 @@ type CertificateSigningRequest struct {
 	// Other fields are derived by Kubernetes and cannot be modified by users.
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the derived information about the request.

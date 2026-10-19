@@ -15,7 +15,6 @@
 package storage
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/coreos/go-semver/semver"
@@ -110,18 +109,12 @@ func (st *storage) Sync() error {
 func (st *storage) MinimalEtcdVersion() *semver.Version {
 	st.mux.Lock()
 	defer st.mux.Unlock()
-	walsnap := walpb.Snapshot{}
 
-	sn, err := st.s.Load()
-	if err != nil && !errors.Is(err, snap.ErrNoSnapshot) {
+	walsnap, err := st.w.LatestSnapshotEntry()
+	if err != nil {
 		panic(err)
 	}
-	if sn != nil {
-		walsnap.Index = sn.Metadata.Index
-		walsnap.Term = sn.Metadata.Term
-		walsnap.ConfState = sn.Metadata.GetConfState()
-	}
-	w, err := st.w.Reopen(st.lg, &walsnap)
+	w, err := st.w.Reopen(st.lg, walsnap)
 	if err != nil {
 		panic(err)
 	}

@@ -1340,7 +1340,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault)),
 		update: mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault+"1")),
 		errs: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "namespace"), nil, ""),
+			field.Invalid(field.NewPath("metadata", "namespace"), nil, "").WithOrigin("immutable").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "update selector",

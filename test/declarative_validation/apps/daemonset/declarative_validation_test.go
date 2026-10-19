@@ -86,6 +86,26 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(0)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(2147483648)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {

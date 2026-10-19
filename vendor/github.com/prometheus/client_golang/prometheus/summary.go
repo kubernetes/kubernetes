@@ -25,7 +25,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"github.com/beorn7/perks/quantile"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -337,8 +336,8 @@ func (s *summary) Write(out *dto.Metric) error {
 	s.bufMtx.Unlock()
 
 	s.flushColdBuf()
-	sum.SampleCount = proto.Uint64(s.cnt)
-	sum.SampleSum = proto.Float64(s.sum)
+	sum.SampleCount = new(s.cnt)
+	sum.SampleSum = new(s.sum)
 
 	for _, rank := range s.sortedObjectives {
 		var q float64
@@ -348,8 +347,8 @@ func (s *summary) Write(out *dto.Metric) error {
 			q = s.headStream.Query(rank)
 		}
 		qs = append(qs, &dto.Quantile{
-			Quantile: proto.Float64(rank),
-			Value:    proto.Float64(q),
+			Quantile: new(rank),
+			Value:    new(q),
 		})
 	}
 
@@ -512,8 +511,8 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	}
 
 	sum := &dto.Summary{
-		SampleCount:      proto.Uint64(count),
-		SampleSum:        proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		SampleCount:      new(count),
+		SampleSum:        new(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
 		CreatedTimestamp: s.createdTs,
 	}
 
@@ -718,13 +717,13 @@ func (s *constSummary) Write(out *dto.Metric) error {
 	}
 	qs := make([]*dto.Quantile, 0, len(s.quantiles))
 
-	sum.SampleCount = proto.Uint64(s.count)
-	sum.SampleSum = proto.Float64(s.sum)
+	sum.SampleCount = new(s.count)
+	sum.SampleSum = new(s.sum)
 
 	for rank, q := range s.quantiles {
 		qs = append(qs, &dto.Quantile{
-			Quantile: proto.Float64(rank),
-			Value:    proto.Float64(q),
+			Quantile: new(rank),
+			Value:    new(q),
 		})
 	}
 

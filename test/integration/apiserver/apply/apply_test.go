@@ -2351,7 +2351,7 @@ func TestApplyUnsetExclusivelyOwnedFields(t *testing.T) {
 		t.Fatalf("Failed to convert response object to Deployment")
 	}
 	if *deployment.Spec.Replicas != 1 {
-		t.Errorf("Expected deployment.spec.replicas to be 1 (default value), but got %d", deployment.Spec.Replicas)
+		t.Errorf("Expected deployment.spec.replicas to be 1 (default value), but got %d", *deployment.Spec.Replicas)
 	}
 	if len(deployment.Spec.Template.Spec.Hostname) != 0 {
 		t.Errorf("Expected deployment.spec.template.spec.hostname to be unset, but got %s", deployment.Spec.Template.Spec.Hostname)
@@ -2460,7 +2460,7 @@ func TestApplyUnsetSharedFields(t *testing.T) {
 		t.Fatalf("Failed to convert response object to Deployment")
 	}
 	if *deployment.Spec.Replicas != 3 {
-		t.Errorf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
+		t.Errorf("Expected deployment.spec.replicas to be 3, but got %d", *deployment.Spec.Replicas)
 	}
 	if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
 		t.Errorf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
@@ -2580,7 +2580,7 @@ func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
 		t.Fatalf("Failed to convert response object to Deployment")
 	}
 	if *deployment.Spec.Replicas != 4 {
-		t.Errorf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
+		t.Errorf("Expected deployment.spec.replicas to be 4, but got %d", *deployment.Spec.Replicas)
 	}
 }
 

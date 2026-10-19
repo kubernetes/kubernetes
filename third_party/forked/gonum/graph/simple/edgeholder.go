@@ -4,8 +4,9 @@ import "k8s.io/kubernetes/third_party/forked/gonum/graph"
 
 // edgeHolder represents a set of edges, with no more than one edge to or from a particular neighbor node
 type edgeHolder interface {
-	// Visit invokes visitor with each edge and the id of the neighbor node in the edge
-	Visit(visitor func(neighbor int, edge graph.Edge))
+	// Visit invokes visitor with each edge and the id of the neighbor node in the edge,
+	// stopping as soon as visitor returns false
+	Visit(visitor func(neighbor int, edge graph.Edge) (shouldContinue bool))
 	// Delete removes edges to or from the specified neighbor
 	Delete(neighbor int) edgeHolder
 	// Set stores the edge to or from the specified neighbor
@@ -22,12 +23,14 @@ type sliceEdgeHolder struct {
 	edges []graph.Edge
 }
 
-func (e *sliceEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge)) {
+func (e *sliceEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge) (shouldContinue bool)) {
 	for _, edge := range e.edges {
-		if edge.From().ID() == e.self {
-			visitor(edge.To().ID(), edge)
-		} else {
-			visitor(edge.From().ID(), edge)
+		id := edge.From().ID()
+		if id == e.self {
+			id = edge.To().ID()
+		}
+		if !visitor(id, edge) {
+			return
 		}
 	}
 }
@@ -100,9 +103,11 @@ func (e *sliceEdgeHolder) Len() int {
 // mapEdgeHolder holds a map of neighbors to edges
 type mapEdgeHolder map[int]graph.Edge
 
-func (e mapEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge)) {
+func (e mapEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge) (shouldContinue bool)) {
 	for neighbor, edge := range e {
-		visitor(neighbor, edge)
+		if !visitor(neighbor, edge) {
+			return
+		}
 	}
 }
 func (e mapEdgeHolder) Delete(neighbor int) edgeHolder {

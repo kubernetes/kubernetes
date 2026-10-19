@@ -33,9 +33,9 @@ import (
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 type ResourceClaimTemplateApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Describes the ResourceClaim that is to be generated.
+	// spec describes the ResourceClaim that is to be generated.
 	//
 	// This field is immutable. A ResourceClaim will get created by the
 	// control plane for a Pod when needed and then not get updated

@@ -25,11 +25,13 @@ import (
 
 // IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
 // Inconsistent and different names make it hard to read and review code
-// DEPRECATED: use genericiooptions.IOStreams
+//
+// Deprecated: use genericiooptions.IOStreams
 type IOStreams = genericiooptions.IOStreams
 
 // NewTestIOStreams returns a valid IOStreams and in, out, errout buffers for unit tests
-// DEPRECATED: use genericiooptions.NewTestIOStreams
+//
+// Deprecated: use genericiooptions.NewTestIOStreams
 func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -43,7 +45,8 @@ func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffe
 }
 
 // NewTestIOStreamsDiscard returns a valid IOStreams that just discards
-// DEPRECATED: use genericiooptions.NewTestIOStreamsDiscard
+//
+// Deprecated: use genericiooptions.NewTestIOStreamsDiscard
 func NewTestIOStreamsDiscard() genericiooptions.IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{

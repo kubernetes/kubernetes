@@ -224,11 +224,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid negative priority": {
 			input: mkValidWorkload(setPriority(0, -2147483648)),
 		},
-		"too high priority": {
+		"valid priority above user-defined maximum": {
 			input: mkValidWorkload(setPriority(0, scheduling.HighestUserDefinablePriority+1)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("maximum"),
-			},
+		},
+		"valid system-cluster-critical priority": {
+			input: mkValidWorkload(setPriority(0, scheduling.SystemCriticalPriority)),
+		},
+		"valid system-node-critical priority": {
+			input: mkValidWorkload(setPriority(0, scheduling.SystemCriticalPriority+1000)),
 		},
 		"valid PreemptionPolicy": {
 			input:                          mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
@@ -522,14 +525,20 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec"), nil, "detected multiple priority configurations").MarkFromImperative(),
 			},
 		},
-		"nested pg invalid priority max": {
+		"nested pg valid priority above user-defined maximum": {
 			input:                         mkValidWorkload(setCPGPriority(0, scheduling.HighestUserDefinablePriority+1), setNestedPGPriority(0, 0, scheduling.HighestUserDefinablePriority+1)),
 			enableTopologyAwareScheduling: true,
 			enableCompositePodGroup:       true,
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("maximum"),
-				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("maximum"),
-			},
+		},
+		"nested pg valid system-cluster-critical priority": {
+			input:                         mkValidWorkload(setCPGPriority(0, scheduling.SystemCriticalPriority), setNestedPGPriority(0, 0, scheduling.SystemCriticalPriority)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+		},
+		"nested pg valid system-node-critical priority": {
+			input:                         mkValidWorkload(setCPGPriority(0, scheduling.SystemCriticalPriority+1000), setNestedPGPriority(0, 0, scheduling.SystemCriticalPriority+1000)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
 		},
 		"nested pg too many resourceClaims": {
 			input:                           mkValidWorkload(setNestedPGManyResourceClaims(0, 0, scheduling.MaxPodGroupResourceClaims+1)),
@@ -909,6 +918,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"invalid update of gang minCount to 0": {
+			oldObj:    mkValidWorkload(setResourceVersion("1")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setPodGroupMinCount(0, 0)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), ""),
+			},
+		},
 		"invalid update of gang minCount": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setPodGroupMinCount(0, -1)),
@@ -921,6 +937,30 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic to gang policy": {
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
+			updateObj: mkValidWorkload(setResourceVersion("1")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic policy with neither basic nor gang": {
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), clearPodGroupPolicy(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"invalid update from basic policy with both basic and gang": {
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setBothPolicies(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
 			},
 		},
@@ -1260,6 +1300,94 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
 			},
 		},
+		"invalid update cpg from gang to basic policy": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGGangPolicy(0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+			},
+		},
+		"invalid update cpg from basic to gang policy": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGGangPolicy(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+			},
+		},
+		"invalid update cpg gang policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGGangPolicy(0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGPolicyBoth(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"invalid update cpg basic policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGPolicyBoth(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"cpg valid update of gang minGroupCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, 3)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg invalid update of gang minGroupCount to 0": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minGroupCount"), ""),
+			},
+		},
+		"cpg invalid update of gang minGroupCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setCPGMinGroupCount(0, -1)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minGroupCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"cpg valid update of nested pg gang minCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 3)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg invalid update of nested pg gang minCount to 0": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), ""),
+			},
+		},
+		"cpg invalid update of nested pg gang minCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, -1)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
 		"invalid update nested pg from gang to basic policy": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate()),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
@@ -1270,6 +1398,16 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
 			},
 		},
+		"invalid update nested pg from basic to gang policy": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 1)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+			},
+		},
 		"invalid update nested pg with neither basic nor gang": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate()),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), clearNestedPGPolicy(0, 0)),
@@ -1278,6 +1416,120 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+			},
+		},
+		"invalid update nested pg from basic with neither basic nor gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), clearNestedPGPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"invalid update nested pg gang policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate()),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGPolicyBoth(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"invalid update nested pg basic policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGPolicyBoth(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"nested cpg valid update of gang minGroupCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, 3)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"nested cpg invalid update of gang minGroupCount to 0": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minGroupCount"), ""),
+			},
+		},
+		"nested cpg invalid update of gang minGroupCount": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, 5)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGMinGroupCount(0, 0, -1)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minGroupCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nested cpg invalid update from gang to basic policy": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub")),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+			},
+		},
+		"nested cpg invalid update from basic to gang policy": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGGangPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+			},
+		},
+		"nested cpg invalid update with neither basic nor gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub")),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), clearNestedCPGPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+			},
+		},
+		"nested cpg invalid update from basic with neither basic nor gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), clearNestedCPGPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"nested cpg invalid update gang policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub")),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGPolicyBoth(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
+		"nested cpg invalid update basic policy with both basic and gang": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGPolicyBoth(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be set once unset").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
 			},
 		},
 		"valid update with unchanged nested pg PreemptionPolicy": {
@@ -1790,6 +2042,53 @@ func setCPGPolicyEmpty(idx int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
 		addCompositePodGroupTemplate()(obj)
 		obj.Spec.CompositePodGroupTemplates[idx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{}
+	}
+}
+
+func setCPGPolicyBoth(idx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[idx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+			Gang:  &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+		}
+	}
+}
+
+func setNestedCPGMinGroupCount(cidx, nestedCidx int, count int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy.Gang.MinGroupCount = int32(count)
+	}
+}
+
+func setNestedCPGBasicPolicy(cidx, nestedCidx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+		}
+	}
+}
+
+func setNestedCPGGangPolicy(cidx, nestedCidx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Gang: &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+		}
+	}
+}
+
+func clearNestedCPGPolicy(cidx, nestedCidx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{}
+	}
+}
+
+func setNestedCPGPolicyBoth(cidx, nestedCidx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+			Gang:  &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+		}
 	}
 }
 

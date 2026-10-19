@@ -561,7 +561,7 @@ type DaemonSet struct {
 }
 
 const (
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
+	// Deprecated: DefaultDaemonSetUniqueLabelKey is used instead.
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.

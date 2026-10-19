@@ -34,7 +34,8 @@ type WorkloadSpecApplyConfiguration struct {
 	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	PodGroupTemplates []PodGroupTemplateApplyConfiguration `json:"podGroupTemplates,omitempty"`
 	// compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
+	// Existing templates may still be updated where their individual fields allow it.
 	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	//
 	// This field is used only when the CompositePodGroup feature gate is enabled.

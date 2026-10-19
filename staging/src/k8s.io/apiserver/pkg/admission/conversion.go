@@ -59,6 +59,14 @@ func (v *VersionedAttributes) GetObject() runtime.Object {
 	return v.Attributes.GetObject()
 }
 
+// GetOldObject overrides the Attributes.GetOldObject()
+func (v *VersionedAttributes) GetOldObject() runtime.Object {
+	if v.VersionedOldObject.object != nil {
+		return v.VersionedOldObject.object
+	}
+	return v.Attributes.GetOldObject()
+}
+
 // ConvertToGVK converts object to the desired gvk.
 func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o ObjectInterfaces) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so

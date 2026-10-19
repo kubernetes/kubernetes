@@ -116,7 +116,7 @@ func NewEndpointsInformerWithOptions(client kubernetes.Interface, namespace stri
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedEndpointsInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) EndpointsIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpointss"}
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apicorev1.Endpoints](cache.NewSharedIndexInformerWithOptions(

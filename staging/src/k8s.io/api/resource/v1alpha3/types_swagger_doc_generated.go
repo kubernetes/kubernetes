@@ -29,7 +29,7 @@ package v1alpha3
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CELDeviceSelector = map[string]string{
 	"":           "CELDeviceSelector contains a CEL expression for selecting a device.",
-	"expression": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+	"expression": "expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 }
 
 func (CELDeviceSelector) SwaggerDoc() map[string]string {
@@ -38,7 +38,7 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 
 var map_DeviceSelector = map[string]string{
 	"":    "DeviceSelector must have exactly one field set.",
-	"cel": "CEL contains a CEL expression for selecting a device.",
+	"cel": "cel contains a CEL expression for selecting a device.",
 }
 
 func (DeviceSelector) SwaggerDoc() map[string]string {
@@ -47,10 +47,10 @@ func (DeviceSelector) SwaggerDoc() map[string]string {
 
 var map_DeviceTaint = map[string]string{
 	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
-	"key":       "The taint key to be applied to a device. Must be a label name.",
-	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added or (only in a DeviceTaintRule) the effect was modified. Added automatically during create or update if not set.\n\nIn addition, in a DeviceTaintRule a value provided during an update gets replaced with the current time if the provided value is the same as the old one and the new effect is different. Changing the key and/or value while keeping the effect unchanged is possible and does not update the time stamp because the eviction which uses it is either already started (NoExecute) or not started yet (NoEffect, NoSchedule).",
+	"key":       "key is the taint key to be applied to a device. Must be a label name.",
+	"value":     "value is the taint value corresponding to the taint key. Must be a label value.",
+	"effect":    "effect is the effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
+	"timeAdded": "timeAdded represents the time at which the taint was added or (only in a DeviceTaintRule) the effect was modified. Added automatically during create or update if not set.\n\nIn addition, in a DeviceTaintRule a value provided during an update gets replaced with the current time if the provided value is the same as the old one and the new effect is different. Changing the key and/or value while keeping the effect unchanged is possible and does not update the time stamp because the eviction which uses it is either already started (NoExecute) or not started yet (NoEffect, NoSchedule).",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
@@ -59,9 +59,9 @@ func (DeviceTaint) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintRule = map[string]string{
 	"":         "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
-	"metadata": "Standard object metadata",
-	"spec":     "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
-	"status":   "Status provides information about what was requested in the spec.",
+	"metadata": "metadata is the standard object metadata.",
+	"spec":     "spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
+	"status":   "status provides information about what was requested in the spec.",
 }
 
 func (DeviceTaintRule) SwaggerDoc() map[string]string {
@@ -80,8 +80,8 @@ func (DeviceTaintRuleList) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintRuleSpec = map[string]string{
 	"":               "DeviceTaintRuleSpec specifies the selector and one taint.",
-	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
-	"taint":          "The taint that gets applied to matching devices.",
+	"deviceSelector": "deviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
+	"taint":          "taint is the taint that gets applied to matching devices.",
 }
 
 func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
@@ -90,7 +90,7 @@ func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintRuleStatus = map[string]string{
 	"":           "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
-	"conditions": "Conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
+	"conditions": "conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
 }
 
 func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
@@ -99,9 +99,9 @@ func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintSelector = map[string]string{
 	"":       "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
-	"driver": "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
-	"pool":   "If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
-	"device": "If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+	"driver": "driver is the driver name. If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
+	"pool":   "pool is the pool name. If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+	"device": "device is the name of the device. If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
 }
 
 func (DeviceTaintSelector) SwaggerDoc() map[string]string {
@@ -110,10 +110,10 @@ func (DeviceTaintSelector) SwaggerDoc() map[string]string {
 
 var map_PartitionTypeStatus = map[string]string{
 	"":            "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.",
-	"attribute":   "Attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
-	"type":        "Type is the partition type value (e.g. \"Full\" or \"Half\").",
-	"total":       "Total is the number of devices of this partition type in the pool.",
-	"allocatable": "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
+	"attribute":   "attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
+	"type":        "type is the partition type value (e.g. \"Full\" or \"Half\").",
+	"total":       "total is the number of devices of this partition type in the pool.",
+	"allocatable": "allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
 }
 
 func (PartitionTypeStatus) SwaggerDoc() map[string]string {
@@ -122,18 +122,18 @@ func (PartitionTypeStatus) SwaggerDoc() map[string]string {
 
 var map_PoolStatus = map[string]string{
 	"":                   "PoolStatus contains status information for a single resource pool.",
-	"driver":             "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
-	"poolName":           "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
-	"generation":         "Generation is the pool generation observed across all ResourceSlices in this pool. Only the latest generation is reported. During a generation rollout, if not all slices at the latest generation have been published, the pool is included with a validationError and device counts unset.",
-	"resourceSliceCount": "ResourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.",
-	"totalDevices":       "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices. May be unset when validationError is set.",
-	"allocatedDevices":   "AllocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated. May be unset when validationError is set.",
-	"availableDevices":   "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available. May be unset when validationError is set.",
-	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
-	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
-	"validationError":    "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
-	"partitionSummary":   "PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
-	"shareableSummary":   "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
+	"driver":             "driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+	"poolName":           "poolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
+	"generation":         "generation is the pool generation observed across all ResourceSlices in this pool. Only the latest generation is reported. During a generation rollout, if not all slices at the latest generation have been published, the pool is included with a validationError and device counts unset.",
+	"resourceSliceCount": "resourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.",
+	"totalDevices":       "totalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices. May be unset when validationError is set.",
+	"allocatedDevices":   "allocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated. May be unset when validationError is set.",
+	"availableDevices":   "availableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available. May be unset when validationError is set.",
+	"unavailableDevices": "unavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
+	"nodeName":           "nodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
+	"validationError":    "validationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
+	"partitionSummary":   "partitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
+	"shareableSummary":   "shareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
 }
 
 func (PoolStatus) SwaggerDoc() map[string]string {
@@ -142,9 +142,9 @@ func (PoolStatus) SwaggerDoc() map[string]string {
 
 var map_ResourcePoolStatusRequest = map[string]string{
 	"":         "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
-	"metadata": "Standard object metadata",
-	"spec":     "Spec defines the filters for which pools to include in the status. The spec is immutable once created.",
-	"status":   "Status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
+	"metadata": "metadata is the standard object metadata.",
+	"spec":     "spec defines the filters for which pools to include in the status. The spec is immutable once created.",
+	"status":   "status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
 }
 
 func (ResourcePoolStatusRequest) SwaggerDoc() map[string]string {
@@ -163,10 +163,10 @@ func (ResourcePoolStatusRequestList) SwaggerDoc() map[string]string {
 
 var map_ResourcePoolStatusRequestSpec = map[string]string{
 	"":                              "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
-	"driver":                        "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
-	"poolName":                      "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
-	"limit":                         "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
-	"defaultPartitionTypeAttribute": "DefaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+	"driver":                        "driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+	"poolName":                      "poolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+	"limit":                         "limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+	"defaultPartitionTypeAttribute": "defaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
 }
 
 func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
@@ -175,9 +175,9 @@ func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
 
 var map_ResourcePoolStatusRequestStatus = map[string]string{
 	"":           "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
-	"poolCount":  "PoolCount is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
-	"pools":      "Pools contains the first `spec.limit` matching pools, sorted by driver then pool name. If `len(pools) < poolCount`, the list was truncated. When omitted, no pools matched the request filters.",
-	"conditions": "Conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+	"poolCount":  "poolCount is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
+	"pools":      "pools contains the first `spec.limit` matching pools, sorted by driver then pool name. If `len(pools) < poolCount`, the list was truncated. When omitted, no pools matched the request filters.",
+	"conditions": "conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
 }
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {
@@ -186,10 +186,10 @@ func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {
 
 var map_ShareableCapacityStatus = map[string]string{
 	"":          "ShareableCapacityStatus reports aggregate amounts for a single shareable capacity key.",
-	"name":      "Name is the capacity name.",
-	"total":     "Total is the sum of this capacity across shareable devices in the pool.",
-	"consumed":  "Consumed is the amount drawn by current allocations.",
-	"available": "Available is Total minus Consumed, never negative.",
+	"name":      "name is the capacity name.",
+	"total":     "total is the sum of this capacity across shareable devices in the pool.",
+	"consumed":  "consumed is the amount drawn by current allocations.",
+	"available": "available is Total minus Consumed, never negative.",
 }
 
 func (ShareableCapacityStatus) SwaggerDoc() map[string]string {
@@ -198,9 +198,9 @@ func (ShareableCapacityStatus) SwaggerDoc() map[string]string {
 
 var map_ShareableSummaryStatus = map[string]string{
 	"":                          "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
-	"fullyAvailableDevices":     "FullyAvailableDevices is the number of shareable devices with no capacity consumed.",
-	"partiallyAvailableDevices": "PartiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
-	"capacity":                  "Capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
+	"fullyAvailableDevices":     "fullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+	"partiallyAvailableDevices": "partiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+	"capacity":                  "capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
 }
 
 func (ShareableSummaryStatus) SwaggerDoc() map[string]string {

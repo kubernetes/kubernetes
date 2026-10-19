@@ -142,7 +142,11 @@ func parseEmbeddedUnion(t *types.Type) ([]union, []error) {
 // embedded types.
 func parseUnionStruct(t *types.Type) (*union, []error) {
 	errors := []error{}
-	if gengo.ExtractCommentTags("+", t.CommentLines)[tagUnionMember] == nil {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagUnionMember}, t.CommentLines)
+	if err != nil {
+		return nil, []error{err}
+	}
+	if tags[tagUnionMember] == nil {
 		return nil, nil
 	}
 
@@ -157,11 +161,16 @@ func parseUnionStruct(t *types.Type) (*union, []error) {
 			errors = append(errors, fmt.Errorf("union structures can't have embedded fields: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
+		memberTags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagUnionDeprecated, tagUnionDiscriminator}, m.CommentLines)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("%v.%v: %w", t.Name, m.Name, err))
+			continue
+		}
+		if memberTags[tagUnionDeprecated] != nil {
 			errors = append(errors, fmt.Errorf("union struct can't have unionDeprecated members: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
+		if memberTags[tagUnionDiscriminator] != nil {
 			errors = append(errors, u.setDiscriminator(jsonName)...)
 		} else {
 			if optional, err := isOptional(&m); !optional || err != nil {
@@ -187,14 +196,19 @@ func parseUnionMembers(t *types.Type) (*union, []error) {
 		if shouldInlineMembers(&m) {
 			continue
 		}
-		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
+		tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagUnionDiscriminator, tagUnionMember, tagUnionDeprecated}, m.CommentLines)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("%v.%v: %w", t.Name, m.Name, err))
+			continue
+		}
+		if tags[tagUnionDiscriminator] != nil {
 			errors = append(errors, u.setDiscriminator(jsonName)...)
 		}
-		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionMember] != nil {
+		if tags[tagUnionMember] != nil {
 			errors = append(errors, fmt.Errorf("union tag is not accepted on struct members: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
+		if tags[tagUnionDeprecated] != nil {
 			if optional, err := isOptional(&m); !optional || err != nil {
 				errors = append(errors, fmt.Errorf("union members must be optional: %v.%v", t.Name, m.Name))
 			}

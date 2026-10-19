@@ -34,8 +34,6 @@ func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 		name:        names.DeviceTaintEvictionController,
 		constructor: newDeviceTaintEvictionController,
 		requiredFeatureGates: []featuregate.Feature{
-			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
-			features.DynamicResourceAllocation,
 			features.DRADeviceTaints,
 		},
 	}
@@ -69,9 +67,6 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 		name:        names.ResourceClaimController,
 		aliases:     []string{"resource-claim-controller"},
 		constructor: newResourceClaimController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
-		},
 	}
 }
 

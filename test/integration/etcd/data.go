@@ -260,13 +260,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/certificates/v1alpha1
-		gvr("certificates.k8s.io", "v1alpha1", "clustertrustbundles"): {
-			Stub:              `{"metadata": {"name": "example.com:signer:abcd"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
-			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abcd",
-			ExpectedGVK:       gvkP("certificates.k8s.io", "v1beta1", "ClusterTrustBundle"),
-			IntroducedVersion: "1.26",
-			RemovedVersion:    "1.37",
-		},
 		gvr("certificates.k8s.io", "v1alpha1", "podcertificaterequests"): {
 			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}}`,
 			ExpectedEtcdPath:  "/registry/podcertificaterequests/" + namespace + "/req-1",
@@ -326,7 +319,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/leasecandidates/" + namespace + "/leasecandidatev1alpha2",
 			ExpectedGVK:       gvkP("coordination.k8s.io", "v1beta1", "LeaseCandidate"),
 			IntroducedVersion: "1.32",
-			RemovedVersion:    "1.38",
 		},
 		// --
 
@@ -336,14 +328,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/evictionrequests/" + namespace + "/pod-eviction-request",
 			ExpectedGVK:       gvkP("lifecycle.k8s.io", "v1alpha1", "EvictionRequest"),
 			IntroducedVersion: "1.37",
-			RemovedVersion:    "1.43",
 		},
 		gvr("lifecycle.k8s.io", "v1alpha1", "evictions"): {
 			Stub:              `{"metadata": {"name": "pod-1-my-workload"}, "spec": {"target": {"pod": {"name": "my-workload", "uid": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}}}}`,
 			ExpectedEtcdPath:  "/registry/evictions/" + namespace + "/pod-1-my-workload",
 			ExpectedGVK:       gvkP("lifecycle.k8s.io", "v1alpha1", "Eviction"),
 			IntroducedVersion: "1.37",
-			RemovedVersion:    "1.43",
 		},
 		// --
 
@@ -608,14 +598,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1",
 			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.32",
-			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
 			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.32",
-			RemovedVersion:    "1.38",
 		},
 		// --
 
@@ -731,7 +719,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
 			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceTaintRule"),
 			IntroducedVersion: "1.33",
-			RemovedVersion:    "1.39",
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourcepoolstatusrequests"): {
 			Stub:              `{"metadata": {"name": "rpsr1name"}, "spec": {"driver": "test-driver.example.com"}}`,
@@ -739,7 +726,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			StatusStub:        `{"status": {"poolCount": 0}}`,
 			MutatedStatusStub: `{"status": {"poolCount": 1}}`,
 			IntroducedVersion: "1.36",
-			RemovedVersion:    "1.42",
 		},
 		// --
 
@@ -969,9 +955,9 @@ func validateStorageData(etcdStorageData map[schema.GroupVersionResource]Storage
 			continue
 		}
 		version := key.Version
-		if strings.Contains(version, "alpha") || strings.Contains(version, "beta") {
+		if strings.Contains(version, "beta") {
 			if storageData.RemovedVersion == "" {
-				panic(fmt.Sprintf("Error. Non-GA resource %s must have a removed version", key.String()))
+				panic(fmt.Sprintf("Error. Beta resource %s must have a removed version", key.String()))
 			}
 		}
 		if storageData.IntroducedVersion == "" {
@@ -1007,7 +993,7 @@ type StorageData struct {
 	ExpectedEtcdPath  string                   // Expected location of object in etcd, do not use any variables, constants, etc to derive this value - always supply the full raw string
 	ExpectedGVK       *schema.GroupVersionKind // The GVK that we expect this object to be stored as - leave this nil to use the default
 	IntroducedVersion string                   // The version that this type is introduced
-	RemovedVersion    string                   // The version that this type is removed. May be empty for stable resources
+	RemovedVersion    string                   // The version that this type is removed. May be empty for alpha or stable resources
 }
 
 const defaultStatusStub = `{"status": {"conditions": [{"type": "MyStatus", "status":"True", "lastTransitionTime": "2020-01-01T00:00:00Z", "reason": "MyReason", "message": "some message"}]}}`

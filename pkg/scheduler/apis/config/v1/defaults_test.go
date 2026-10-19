@@ -676,8 +676,8 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
-			name:     "default DynamicResources",
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			name:     "default TopologyAwareWorkloadScheduling",
+			features: map[featuregate.Feature]bool{features.GenericWorkload: true, features.TopologyAwareWorkloadScheduling: true},
 			config:   &configv1.KubeSchedulerConfiguration{},
 			expected: &configv1.KubeSchedulerConfiguration{
 				Parallelism: ptr.To[int32](16),
@@ -686,7 +686,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       ptr.To(true),
+					LeaderElect:       new(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -699,14 +699,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: ptr.To[int64](1),
-				PodMaxBackoffSeconds:     ptr.To[int64](10),
+				PercentageOfNodesToScore:      ptr.To[int32](config.DefaultPercentageOfNodesToScore),
+				PercentageOfPlacementsToScore: ptr.To[int32](config.DefaultPercentageOfPlacementsToScore),
+				PodInitialBackoffSeconds:      ptr.To[int64](1),
+				PodMaxBackoffSeconds:          ptr.To[int64](10),
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
-						SchedulerName: ptr.To("default-scheduler"),
+						SchedulerName: new("default-scheduler"),
 					},
 				},
 			},
@@ -716,6 +716,10 @@ func TestSchedulerDefaults(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
+			if len(tc.features) > 0 && len(tc.expected.Profiles) > 0 {
+				// Recompute plugin defaults after enabling feature gates for this test.
+				tc.expected.Profiles[0].Plugins = getDefaultPlugins()
+			}
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)

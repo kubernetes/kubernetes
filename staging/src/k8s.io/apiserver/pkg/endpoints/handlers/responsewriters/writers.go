@@ -37,17 +37,24 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/tracing"
 	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
-// StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
+// resourceStreamer is the method set of k8s.io/apiserver/pkg/registry/rest.ResourceStreamer. It is
+// declared here so that this package does not import registry/rest, which pulls the admission and
+// CEL packages into every binary that serves /flagz or /statusz. writers_test.go asserts that the
+// two interfaces stay assignable to each other.
+type resourceStreamer interface {
+	InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
+}
+
+// StreamObject performs input stream negotiation from a rest.ResourceStreamer and writes that to the response.
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
-func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
+func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream resourceStreamer, w http.ResponseWriter, req *http.Request) {
 	out, flush, contentType, err := stream.InputStream(req.Context(), gv.String(), req.Header.Get("Accept"))
 	if err != nil {
 		ErrorNegotiated(err, s, gv, w, req)
@@ -297,7 +304,7 @@ func (w *deferredResponseWriter) Close() (err error) {
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
-	stream, ok := object.(rest.ResourceStreamer)
+	stream, ok := object.(resourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
 		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {

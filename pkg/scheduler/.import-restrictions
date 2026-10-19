@@ -10,7 +10,7 @@ rules:
     allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/features$
     allowedPrefixes: [ "" ]
-  - selectorRegexp: ^k8s[.]io/kubernetes/test/utils/ktesting($|/)
+  - selectorRegexp: ^k8s[.]io/kubernetes/ktesting($|/)
     allowedPrefixes: [ "" ]
 
   # Allow internal pkg/scheduler packages and subpackages

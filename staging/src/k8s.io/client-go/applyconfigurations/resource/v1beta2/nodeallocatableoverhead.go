@@ -29,10 +29,10 @@ import (
 // Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.
 // Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.
 type NodeAllocatableOverheadApplyConfiguration struct {
-	// PerPod is overhead applied once per pod referencing the claim on this node.
+	// perPod is overhead applied once per pod referencing the claim on this node.
 	// This is a flat overhead incurred for every pod referencing the claim.
 	PerPod *resource.Quantity `json:"perPod,omitempty"`
-	// PerContainer is applied per container reference to the claim.
+	// perContainer is applied per container reference to the claim.
 	// This models overhead scaling linearly with the number of containers actively using the device.
 	// When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing
 	// the claim is computed as:

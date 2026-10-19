@@ -66,10 +66,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	metricsutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testRESTMapper struct {
@@ -1039,10 +1039,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(wg.Wait)
 	logger := tCtx.Logger()
 
 	alwaysStarted := make(chan struct{})

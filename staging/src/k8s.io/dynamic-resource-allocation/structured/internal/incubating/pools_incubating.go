@@ -412,7 +412,11 @@ func poolHasBindingConditions(pool Pool) bool {
 // - current generation is obsolete -> no further checking
 // - all slices with the generation in the pool
 //
-// Future TODO: detect inconsistent ResourceSliceCount, also in poolIsInvalid.
+// Not checked: consistency of a pool generation's ResourceSliceCount, meaning
+// slices that disagree on the declared count or outnumber it. The count still
+// decides completeness. The extra cross-slice check was considered in
+// https://github.com/kubernetes/kubernetes/pull/141118 and left out to keep the
+// allocation path cheap. Drivers must publish consistent counts.
 func checkSlicesInPool(slices []*resourceapi.ResourceSlice, poolID PoolID, generation int64) (bool, []*resourceapi.ResourceSlice) {
 	// A cached index by pool ID would make this more efficient.
 	// It may be needed long-term to support features which always have to consider all slices.

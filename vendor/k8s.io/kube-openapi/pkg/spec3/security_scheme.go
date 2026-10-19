@@ -21,7 +21,7 @@ import (
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/swag/jsonutils"
 
 	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -98,7 +98,7 @@ func (o *OAuthFlow) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return swag.ConcatJSON(b1, b2), nil
+	return jsonutils.ConcatJSON(b1, b2), nil
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON

@@ -32,7 +32,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -61,6 +60,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	"k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook/converter"
@@ -257,7 +257,7 @@ type svmTest struct {
 	filePathForEncryptionConfig string
 }
 
-func svmSetup(ctx context.Context, t *testing.T, allowedCodes ...int32) *svmTest {
+func svmSetup(ctx context.Context, t ktesting.TB, allowedCodes ...int32) *svmTest {
 	t.Helper()
 
 	filePathForEncryptionConfig, err := createEncryptionConfig(t, resources["initialEncryptionConfig"])
@@ -329,7 +329,7 @@ func svmSetup(ctx context.Context, t *testing.T, allowedCodes ...int32) *svmTest
 	return svmTest
 }
 
-func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) string {
+func createKubeConfigFileForRestConfig(t utils.TB, restConfig *rest.Config) string {
 	t.Helper()
 
 	clientConfig := kubeconfig.CreateKubeConfig(restConfig)
@@ -343,7 +343,7 @@ func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) st
 
 // assertNoInvalidSVMControllerResponses checks that the SVM controller only received
 // expected HTTP response codes. Pass allowedCodes to permit codes beyond OK and Conflict.
-func (svm *svmTest) assertNoInvalidSVMControllerResponses(t *testing.T, allowedCodes ...int32) {
+func (svm *svmTest) assertNoInvalidSVMControllerResponses(t utils.TB, allowedCodes ...int32) {
 	t.Helper()
 	validCodes := sets.New[int32](http.StatusOK, http.StatusConflict)
 	for _, code := range allowedCodes {
@@ -361,7 +361,7 @@ func (svm *svmTest) assertNoInvalidSVMControllerResponses(t *testing.T, allowedC
 	})
 }
 
-func createEncryptionConfig(t *testing.T, encryptionConfig string) (
+func createEncryptionConfig(t utils.TB, encryptionConfig string) (
 	filePathForEncryptionConfig string,
 	err error,
 ) {
@@ -382,7 +382,7 @@ func createEncryptionConfig(t *testing.T, encryptionConfig string) (
 	return tempDir, nil
 }
 
-func (svm *svmTest) createSecret(ctx context.Context, t *testing.T, name, namespace string) (*corev1.Secret, error) {
+func (svm *svmTest) createSecret(ctx context.Context, t utils.TB, name, namespace string) (*corev1.Secret, error) {
 	t.Helper()
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -397,7 +397,7 @@ func (svm *svmTest) createSecret(ctx context.Context, t *testing.T, name, namesp
 	return svm.client.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 }
 
-func (svm *svmTest) getRawSecretFromETCD(t *testing.T, namespace, name string) ([]byte, error) {
+func (svm *svmTest) getRawSecretFromETCD(t utils.TB, namespace, name string) ([]byte, error) {
 	t.Helper()
 	secretETCDPath := getETCDPathForResource(t, svm.storageConfig.Prefix, "", "secrets", namespace, name)
 	etcdResponse, err := svm.readRawRecordFromETCD(t, secretETCDPath)
@@ -407,7 +407,7 @@ func (svm *svmTest) getRawSecretFromETCD(t *testing.T, namespace, name string) (
 	return etcdResponse.Kvs[0].Value, nil
 }
 
-func getETCDPathForResource(t *testing.T, storagePrefix, group, resource, namespaceName, name string) string {
+func getETCDPathForResource(t utils.TB, storagePrefix, group, resource, namespaceName, name string) string {
 	t.Helper()
 	groupResource := resource
 	if group != "" {
@@ -419,7 +419,7 @@ func getETCDPathForResource(t *testing.T, storagePrefix, group, resource, namesp
 	return fmt.Sprintf("/%s/%s/%s/%s", storagePrefix, groupResource, namespaceName, name)
 }
 
-func (svm *svmTest) readRawRecordFromETCD(t *testing.T, path string) (*clientv3.GetResponse, error) {
+func (svm *svmTest) readRawRecordFromETCD(t utils.TB, path string) (*clientv3.GetResponse, error) {
 	t.Helper()
 	rawClient, etcdClient, err := integration.GetEtcdClients(svm.server.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
@@ -441,7 +441,7 @@ func (svm *svmTest) readRawRecordFromETCD(t *testing.T, path string) (*clientv3.
 	return response, nil
 }
 
-func (svm *svmTest) getRawCRFromETCD(t *testing.T, crdGroup, crdName, namespace, name string) ([]byte, error) {
+func (svm *svmTest) getRawCRFromETCD(t utils.TB, crdGroup, crdName, namespace, name string) ([]byte, error) {
 	t.Helper()
 	crdETCDPath := getETCDPathForResource(t, svm.storageConfig.Prefix, crdGroup, crdName, namespace, name)
 	etcdResponse, err := svm.readRawRecordFromETCD(t, crdETCDPath)
@@ -451,7 +451,7 @@ func (svm *svmTest) getRawCRFromETCD(t *testing.T, crdGroup, crdName, namespace,
 	return etcdResponse.Kvs[0].Value, nil
 }
 
-func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newContent []byte) {
+func (svm *svmTest) updateFile(t utils.TB, configDir, filename string, newContent []byte) {
 	t.Helper()
 	// Create a temporary file
 	tempFile, err := os.CreateTemp(configDir, "tempfile")
@@ -477,7 +477,7 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 	}
 }
 
-func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr metav1.GroupResource) (
+func (svm *svmTest) createSVMResource(ctx context.Context, t utils.TB, name string, gr metav1.GroupResource) (
 	*svmv1.StorageVersionMigration,
 	error,
 ) {
@@ -499,7 +499,7 @@ func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name st
 		Create(ctx, svmResource, metav1.CreateOptions{})
 }
 
-func (svm *svmTest) getSVM(ctx context.Context, t *testing.T, name string) (
+func (svm *svmTest) getSVM(ctx context.Context, t utils.TB, name string) (
 	*svmv1.StorageVersionMigration,
 	error,
 ) {
@@ -509,7 +509,7 @@ func (svm *svmTest) getSVM(ctx context.Context, t *testing.T, name string) (
 		Get(ctx, name, metav1.GetOptions{})
 }
 
-func setupAudit(t *testing.T) (
+func setupAudit(t utils.TB) (
 	policyFile *os.File,
 	logFile *os.File,
 ) {
@@ -532,7 +532,7 @@ func setupAudit(t *testing.T) (
 	return policyFile, logFile
 }
 
-func (svm *svmTest) getAutomaticReloadSuccessTotal(ctx context.Context, t *testing.T) int {
+func (svm *svmTest) getAutomaticReloadSuccessTotal(ctx context.Context, t utils.TB) int {
 	t.Helper()
 
 	copyConfig := rest.CopyConfig(svm.server.ClientConfig)
@@ -565,7 +565,7 @@ func (svm *svmTest) getAutomaticReloadSuccessTotal(ctx context.Context, t *testi
 	return 0
 }
 
-func (svm *svmTest) isEncryptionConfigFileUpdated(ctx context.Context, t *testing.T, metricBeforeUpdate int) bool {
+func (svm *svmTest) isEncryptionConfigFileUpdated(ctx context.Context, t utils.TB, metricBeforeUpdate int) bool {
 	t.Helper()
 
 	err := wait.PollUntilContextTimeout(
@@ -587,7 +587,7 @@ func (svm *svmTest) isEncryptionConfigFileUpdated(ctx context.Context, t *testin
 // 2. The audit log contains patch events for the given secret.
 func (svm *svmTest) waitForResourceMigration(
 	ctx context.Context,
-	t *testing.T,
+	t utils.TB,
 	svmName, name string,
 	expectedEvents int,
 ) bool {
@@ -690,7 +690,7 @@ func (svm *svmTest) waitForResourceMigration(
 	return true
 }
 
-func (svm *svmTest) countMatchingAuditEvents(t *testing.T, f func(utils.AuditEvent) bool) int {
+func (svm *svmTest) countMatchingAuditEvents(t utils.TB, f func(utils.AuditEvent) bool) int {
 	t.Helper()
 
 	var seen int
@@ -702,7 +702,7 @@ func (svm *svmTest) countMatchingAuditEvents(t *testing.T, f func(utils.AuditEve
 	return seen
 }
 
-func (svm *svmTest) getAuditEvents(t *testing.T) []utils.AuditEvent {
+func (svm *svmTest) getAuditEvents(t utils.TB) []utils.AuditEvent {
 	t.Helper()
 
 	stream, err := os.Open(svm.logFile.Name())
@@ -724,7 +724,7 @@ func (svm *svmTest) getAuditEvents(t *testing.T) []utils.AuditEvent {
 }
 
 func (svm *svmTest) createCRD(
-	t *testing.T,
+	t utils.TB,
 	name, group string,
 	certCtx *certContext,
 	crdVersions []apiextensionsv1.CustomResourceDefinitionVersion,
@@ -778,7 +778,7 @@ func (svm *svmTest) createCRD(
 
 func (svm *svmTest) updateCRD(
 	ctx context.Context,
-	t *testing.T,
+	t utils.TB,
 	crdName string,
 	updatesCRDVersions []apiextensionsv1.CustomResourceDefinitionVersion,
 	expectedServingVersions []string,
@@ -799,7 +799,7 @@ func (svm *svmTest) updateCRD(
 
 func (svm *svmTest) waitForCRDUpdate(
 	ctx context.Context,
-	t *testing.T,
+	t utils.TB,
 	crdKind string,
 	expectedServingVersions []string,
 	expectedStorageVersion string,
@@ -885,7 +885,7 @@ func (svm *svmTest) createCR(ctx context.Context, t testingT, crName, version st
 	return crdUnstructured
 }
 
-func (svm *svmTest) getCR(ctx context.Context, t *testing.T, crName, version string) *unstructured.Unstructured {
+func (svm *svmTest) getCR(ctx context.Context, t utils.TB, crName, version string) *unstructured.Unstructured {
 	t.Helper()
 
 	crdResource := schema.GroupVersionResource{
@@ -902,7 +902,7 @@ func (svm *svmTest) getCR(ctx context.Context, t *testing.T, crName, version str
 	return cr
 }
 
-func (svm *svmTest) listCR(ctx context.Context, t *testing.T, version string) error {
+func (svm *svmTest) listCR(ctx context.Context, t utils.TB, version string) error {
 	t.Helper()
 
 	crdResource := schema.GroupVersionResource{
@@ -929,7 +929,7 @@ func (svm *svmTest) deleteCR(ctx context.Context, t testingT, name, version stri
 	}
 }
 
-func (svm *svmTest) createConversionWebhook(ctx context.Context, t *testing.T, certCtx *certContext) context.CancelFunc {
+func (svm *svmTest) createConversionWebhook(ctx context.Context, t utils.TB, certCtx *certContext) context.CancelFunc {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -974,7 +974,7 @@ func (svm *svmTest) createConversionWebhook(ctx context.Context, t *testing.T, c
 	}()
 
 	serverCtx, cancel := context.WithCancel(ctx)
-	go func(ctx context.Context, t *testing.T) {
+	go func(ctx context.Context, t utils.TB) {
 		<-ctx.Done()
 		// Context was cancelled, shutdown the server
 		if err := server.Shutdown(context.Background()); err != nil {
@@ -991,7 +991,7 @@ type certContext struct {
 	signingCert []byte
 }
 
-func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
+func (svm *svmTest) setupServerCert(t utils.TB) *certContext {
 	t.Helper()
 	certDir, err := os.MkdirTemp("", "test-e2e-server-cert")
 	if err != nil {
@@ -1015,7 +1015,7 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	if err != nil {
 		t.Fatalf("Failed to create a temp file for ca cert generation %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, caCertFile)
+	defer utiltesting.CloseAndRemove(t, caCertFile)
 	if err := os.WriteFile(caCertFile.Name(), utils.EncodeCertPEM(signingCert), 0644); err != nil {
 		t.Fatalf("Failed to write CA cert %v", err)
 	}
@@ -1040,7 +1040,7 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	if err != nil {
 		t.Fatalf("Failed to create a temp file for cert generation %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, certFile)
+	defer utiltesting.CloseAndRemove(t, certFile)
 	keyFile, err := os.CreateTemp(certDir, "server.key")
 	if err != nil {
 		t.Fatalf("Failed to create a temp file for key generation %v", err)
@@ -1055,7 +1055,7 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	if err = os.WriteFile(keyFile.Name(), privateKeyPEM, 0644); err != nil {
 		t.Fatalf("Failed to write key file %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, keyFile)
+	defer utiltesting.CloseAndRemove(t, keyFile)
 	return &certContext{
 		cert:        utils.EncodeCertPEM(signedCert),
 		key:         privateKeyPEM,
@@ -1063,7 +1063,7 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	}
 }
 
-func (svm *svmTest) crdMigrated(t *testing.T, crdName string) bool {
+func (svm *svmTest) crdMigrated(t utils.TB, crdName string) bool {
 	t.Helper()
 
 	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{})
@@ -1081,7 +1081,7 @@ func (svm *svmTest) crdMigrated(t *testing.T, crdName string) bool {
 	return len(crd.Status.StoredVersions) == 1 && crd.Status.StoredVersions[0] == storedVersion
 }
 
-func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bool {
+func (svm *svmTest) isCRStoredAtVersion(t utils.TB, version, crName string) bool {
 	t.Helper()
 
 	data, err := svm.getRawCRFromETCD(t, crdGroup, crdName+"s", defaultNamespace, crName)
@@ -1099,7 +1099,7 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 	return obj.GetAPIVersion() == fmt.Sprintf("%s/%s", crdGroup, version)
 }
 
-func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, crdName, triggerCRName string) bool {
+func (svm *svmTest) isCRDMigrated(ctx context.Context, t utils.TB, crdSVMName, crdName, triggerCRName string) bool {
 	t.Helper()
 
 	var triggerOnce sync.Once
@@ -1159,7 +1159,7 @@ type versions struct {
 	isRVUpdated bool
 }
 
-func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, crVersions map[string]versions, getCRVersion string) {
+func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t utils.TB, crVersions map[string]versions, getCRVersion string) {
 	t.Helper()
 
 	for crName, version := range crVersions {
@@ -1191,7 +1191,7 @@ func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, c
 	}
 }
 
-func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
+func (svm *svmTest) createChaos(ctx context.Context, t utils.TB) {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(ctx)
 

@@ -413,13 +413,6 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
-	watchEvent := c.convertToWatchEvent(event)
-	if watchEvent == nil {
-		// Watcher is not interested in that object.
-		return time.Time{}, time.Time{}
-	}
-	builtAt = c.clock.Now()
-
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
 	// c.done is close or not.
@@ -438,6 +431,13 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	default:
 	}
 
+	watchEvent := c.convertToWatchEvent(event)
+	if watchEvent == nil {
+		// Watcher is not interested in that object.
+		return time.Time{}, time.Time{}
+	}
+	builtAt = c.clock.Now()
+
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
@@ -447,11 +447,29 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
 
+	resourceVersion, err := c.processInitialEvents(cacheInterval, resourceVersion)
+	if err != nil {
+		return
+	}
+	// At this point we already start processing incoming watch events.
+	// However, the init event can still be processed because their serialization
+	// and sending to the client happens asynchrnously.
+	// TODO: As describe in the KEP, we would like to estimate that by delaying
+	//   the initialization signal proportionally to the number of events to
+	//   process, but we're leaving this to the tuning phase.
+	utilflowcontrol.WatchInitialized(ctx)
+	c.processIncomingEvents(ctx, resourceVersion)
+}
+
+func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, error) {
+	if cacheInterval == nil {
+		return resourceVersion, nil
+	}
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
@@ -476,8 +494,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	}
 
 	initEventCount := 0
-	for {
-		event, err := cacheInterval.Next()
+	for event, err := range cacheInterval.All() {
 		if err != nil {
 			// An error indicates that the cache interval
 			// has been invalidated and can no longer serve
@@ -494,10 +511,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 			// custom clients, the cost of it is something that we
 			// are fully accepting.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-			return
-		}
-		if event == nil {
-			break
+			return resourceVersion, err
 		}
 		c.sendWatchCacheEvent(event)
 
@@ -528,18 +542,10 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
 	}
-	c.process(ctx, resourceVersion)
+	return resourceVersion, nil
 }
 
-func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
-	// At this point we already start processing incoming watch events.
-	// However, the init event can still be processed because their serialization
-	// and sending to the client happens asynchrnously.
-	// TODO: As describe in the KEP, we would like to estimate that by delaying
-	//   the initialization signal proportionally to the number of events to
-	//   process, but we're leaving this to the tuning phase.
-	utilflowcontrol.WatchInitialized(ctx)
-
+func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersion uint64) {
 	for {
 		select {
 		case event, ok := <-c.input:

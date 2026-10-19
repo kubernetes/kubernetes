@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -40,11 +41,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -722,10 +723,9 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
 			}
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			p, err := NewFit(tCtx, &test.args, fh, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled})
 			tCtx.ExpectNoError(err, "create fit plugin")
 			cycleState := framework.NewCycleState()
@@ -741,7 +741,7 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 
 			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
 			state := computePodResourceRequest(test.pod, opts)
-			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts, test.pod)
+			gotInsufficientResources := helper.FitsRequest(&state.Resource, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts, test.pod)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				tCtx.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
@@ -1261,10 +1261,9 @@ func testFitScore(tCtx ktesting.TContext) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			args := test.nodeResourcesFitArgs
 			p, err := NewFit(tCtx, &args, fh, plfeature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
@@ -2439,10 +2438,9 @@ func testFitSignPod(tCtx ktesting.TContext) {
 				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
 			}
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnableDRAExtendedResource: !test.disableDRAExtendedResource,
@@ -3266,10 +3264,9 @@ func TestDeferredResizeFit(t *testing.T) {
 			nodeInfo.SetNode(&node)
 
 			fh, _ := runtime.NewFramework(tCtx, nil, nil)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnablePodLevelResources:                            true,

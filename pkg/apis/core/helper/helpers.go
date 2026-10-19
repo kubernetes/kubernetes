@@ -68,18 +68,25 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 }
 
 // IsHugePageResourceValueDivisible returns true if the resource value of storage is
-// integer multiple of page size.
+// integer multiple of page size. A value outside the int64 range is not.
 func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
 	pageSize, err := HugePageSizeFromResourceName(name)
 	if err != nil {
 		return false
 	}
 
-	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+	milli, ok := pageSize.AsMilliInt64()
+	if pageSize.Sign() <= 0 || !ok || milli%1000 != 0 {
 		return false
 	}
+	// milli is a positive multiple of 1000, so this is the page size in whole bytes.
+	size := milli / 1000
 
-	return quantity.Value()%pageSize.Value() == 0
+	value, ok := quantity.AsScaledInt64(0)
+	if !ok {
+		return false
+	}
+	return value%size == 0
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota

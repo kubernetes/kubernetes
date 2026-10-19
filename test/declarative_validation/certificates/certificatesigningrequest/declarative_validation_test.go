@@ -132,6 +132,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	staticCSRPEM := newCSRPEM(t)
+
 	testCases := map[string]struct {
 		old          api.CertificateSigningRequest
 		update       api.CertificateSigningRequest
@@ -139,17 +141,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		subresources []string
 	}{
 		"no change in conditions - valid": {
-			old:          makeValidCSR(withApprovedCondition()),
-			update:       makeValidCSR(withApprovedCondition()),
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition()),
 			subresources: []string{"/", "/approval", "/status"},
 		},
 		"ratcheting: approved+denied conditions unchanged - valid": {
-			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
-			update:       makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
 			subresources: []string{"/", "/approval", "/status"},
 		},
-		"ratcheting: approved+denied conditions, change spec - valid": {
+		"ratcheting: approved+denied conditions, change spec - invalid": {
 			old: makeValidCSR(
+				withRequestPEM(staticCSRPEM),
 				withApprovedCondition(),
 				withDeniedCondition(),
 				func(csr *api.CertificateSigningRequest) {
@@ -157,6 +160,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				},
 			),
 			update: makeValidCSR(
+				withRequestPEM(staticCSRPEM),
 				withApprovedCondition(),
 				withDeniedCondition(),
 				func(csr *api.CertificateSigningRequest) {
@@ -164,25 +168,44 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				},
 			),
 			subresources: []string{"/", "/approval", "/status"},
+			expectedErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec"),
+					nil,
+					"field is immutable",
+				).WithOrigin("immutable").MarkAlpha(),
+			},
 		},
 		"ratcheting: approved+denied conditions, add failed condition - valid": {
-			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
-			update:       makeValidCSR(withApprovedCondition(), withDeniedCondition(), withFailedCondition()),
-			subresources: []string{"/", "/approval", "/status"},
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition(), withFailedCondition()),
+			subresources: []string{"/approval", "/status"},
 		},
 		"ratcheting: approved+denied conditions, swapped order - valid": {
-			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
-			update:       makeValidCSR(withDeniedCondition(), withApprovedCondition()),
-			subresources: []string{"/", "/approval", "/status"},
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withDeniedCondition(), withApprovedCondition()),
+			subresources: []string{"/approval", "/status"},
+		},
+		"status is immutable for non approval or status subresource requests": {
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition(), withFailedCondition()),
+			subresources: []string{"/"},
+			expectedErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("status"),
+					makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition(), withFailedCondition()).Status,
+					"field is immutable",
+				).MarkFromImperative(),
+			},
 		},
 		"add approved condition - valid": {
-			old:          makeValidCSR(),
-			update:       makeValidCSR(withApprovedCondition()),
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM)),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition()),
 			subresources: []string{"/approval"}, // Can only add Approved and Denied conditions on /approval subresource
 		},
 		"add approved+denied conditions - invalid": {
-			old:    makeValidCSR(),
-			update: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			old:    makeValidCSR(withRequestPEM(staticCSRPEM)),
+			update: makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withDeniedCondition()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkBeta(),
 			},
@@ -190,6 +213,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"ratcheting: approved+denied conditions, modify condition reason - valid": {
 			old: makeValidCSR(
+				withRequestPEM(staticCSRPEM),
 				func(csr *api.CertificateSigningRequest) {
 					csr.Status.Conditions = []api.CertificateSigningRequestCondition{
 						{Type: api.CertificateApproved, Status: core.ConditionTrue, Reason: "OldReason"},
@@ -198,6 +222,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				},
 			),
 			update: makeValidCSR(
+				withRequestPEM(staticCSRPEM),
 				func(csr *api.CertificateSigningRequest) {
 					csr.Status.Conditions = []api.CertificateSigningRequestCondition{
 						{Type: api.CertificateApproved, Status: core.ConditionTrue, Reason: "NewReason"},
@@ -208,31 +233,43 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			subresources: []string{"/approval"}, // Can only modify Approved and Denied conditions on /approval subresource
 		},
 		"ratcheting: allow existing duplicate types - valid": {
-			old:          makeValidCSR(withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
-			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
+			old:          makeValidCSR(withRequestPEM(staticCSRPEM), withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withRequestPEM(staticCSRPEM), withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
 			subresources: []string{"/status"},
 		},
 		"spec.usages: nil = invalid on update": {
-			old:    makeValidCSR(),
-			update: makeValidCSR(tweakUsages(nil)),
+			old:    makeValidCSR(withRequestPEM(staticCSRPEM)),
+			update: makeValidCSR(withRequestPEM(staticCSRPEM), tweakUsages(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "usages"), "").MarkAlpha(),
+				field.Invalid(
+					field.NewPath("spec"),
+					nil,
+					"field is immutable",
+				).WithOrigin("immutable").MarkAlpha(),
 			},
 			subresources: []string{"/"},
 		},
 		"spec.usages: empty = invalid on update": {
-			old:    makeValidCSR(),
-			update: makeValidCSR(tweakUsages([]api.KeyUsage{})),
+			old:    makeValidCSR(withRequestPEM(staticCSRPEM)),
+			update: makeValidCSR(withRequestPEM(staticCSRPEM), tweakUsages([]api.KeyUsage{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "usages"), "").MarkAlpha(),
+				field.Invalid(
+					field.NewPath("spec"),
+					nil,
+					"field is immutable",
+				).WithOrigin("immutable").MarkAlpha(),
 			},
 			subresources: []string{"/"},
 		},
 		"spec.usages: unknown value = invalid": {
-			old:    makeValidCSR(),
-			update: makeValidCSR(tweakUsages([]api.KeyUsage{"unknown"})),
+			old:    makeValidCSR(withRequestPEM(staticCSRPEM)),
+			update: makeValidCSR(withRequestPEM(staticCSRPEM), tweakUsages([]api.KeyUsage{"unknown"})),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "usages").Index(0), api.KeyUsage("unknown"), allValidUsages).MarkAlpha(),
+				field.Invalid(
+					field.NewPath("spec"),
+					nil,
+					"field is immutable",
+				).WithOrigin("immutable").MarkAlpha(),
 			},
 			subresources: []string{"/"},
 		},
@@ -353,6 +390,12 @@ func withFailedCondition() func(*api.CertificateSigningRequest) {
 			Type:   api.CertificateFailed,
 			Status: core.ConditionTrue,
 		})
+	}
+}
+
+func withRequestPEM(request []byte) func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Spec.Request = request
 	}
 }
 

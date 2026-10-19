@@ -96,9 +96,9 @@ linters:
             - "!**/exporters/zipkin/**"
           deny:
             - pkg: go.opentelemetry.io/otel/semconv
-              desc: "Use go.opentelemetry.io/otel/semconv/v1.41.0 instead. If a newer semconv version has been released, update the depguard rule."
+              desc: "Use go.opentelemetry.io/otel/semconv/v1.43.0 instead. If a newer semconv version has been released, update the depguard rule."
           allow:
-            - go.opentelemetry.io/otel/semconv/v1.41.0
+            - go.opentelemetry.io/otel/semconv/v1.43.0
     gocritic:
       disabled-checks:
         - appendAssign
@@ -143,8 +143,7 @@ linters:
         - name: constant-logical-expr
         - name: context-as-argument
           arguments:
-            - allow-types-before: '*testing.T'
-          disabled: true
+            - allow-types-before: '*testing.T,*testing.B'
         - name: context-keys-type
         - name: deep-exit
         - name: defer
@@ -231,13 +230,6 @@ linters:
           - revive
         path: schema/v.*/types/.*
         text: avoid meaningless package names
-      # TODO: Having appropriate comments for exported objects helps development,
-      # even for objects in internal packages. Appropriate comments for all
-      # exported objects should be added and this exclusion removed.
-      - linters:
-          - revive
-        path: .*internal/.*
-        text: exported (method|function|type|const) (.+) should have comment or be unexported
       # Yes, they are, but it's okay in a test.
       - linters:
           - revive
@@ -273,7 +265,10 @@ formatters:
     - golines
   settings:
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
+        clothe-returns: true
+        balance-calls: true
     goimports:
       local-prefixes:
         - go.opentelemetry.io/otel

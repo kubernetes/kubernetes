@@ -77,16 +77,13 @@ func TestPruneXML(t *testing.T) {
 func TestPruneTESTS(t *testing.T) {
 	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/gci" timestamp="">
+	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/apiserver/pkg/endpoints/filters/impersonation" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride/ETCD-SERVERS_is_not_set_-_default_override" time="0.950000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride/ETCD-SERVERS_and_ETCD_SERVERS_OVERRIDES_are_set" time="0.660000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride" time="1.610000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions/storage_options_are_supplied" time="0.860000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions/storage_options_are_not_supplied" time="0.280000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions" time="1.140000"></testcase>
+		<testcase classname="k8s.io/apiserver/pkg/endpoints/filters/impersonation" name="TestFOO" time="0.950000"></testcase>
+		<testcase classname="k8s.io/apiserver/pkg/endpoints/filters/impersonation" name="TestBAR" time="0.950000"></testcase>
+		<testcase classname="k8s.io/apiserver/pkg/endpoints/filters/impersonation" name="TestXXX" time="0.950000"></testcase>
 	</testsuite>
 	<testsuite tests="2" failures="1" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery" timestamp="">
 		<properties>
@@ -137,17 +134,16 @@ func TestPruneTESTS(t *testing.T) {
 </testsuites>`
 
 	// This test uses the real OWNERS files from k/k because those exist.
-	// The downside it that OWNERS changes (not unlikely in the case of cluster/gce)
-	// imply changing this test data.
+	// The downside it that OWNERS changes imply changing this test data.
 	//
 	// Fake packages have no source and thus no OWNERS.
 	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="6" failures="0" time="5.50000" name="[sig-cloud-provider] k8s.io/kubernetes/cluster/gce" timestamp="">
+	<testsuite tests="6" failures="0" time="5.50000" name="[sig-auth] k8s.io/apiserver/pkg/endpoints/filters" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="[sig-cloud-provider] k8s.io/kubernetes/cluster/gce" name="gci" time="5.50000"></testcase>
+		<testcase classname="[sig-auth] k8s.io/apiserver/pkg/endpoints/filters" name="impersonation" time="5.50000"></testcase>
 	</testsuite>
 	<testsuite tests="2" failures="1" time="30.050000" name="[sig-api-machinery] k8s.io/kubernetes/test/integration" timestamp="">
 		<properties>
@@ -203,9 +199,9 @@ func TestAddOwner(t *testing.T) {
 			wantPrefix: "[sig-api-machinery] ",
 		},
 		{
-			name:       "finds sig-cloud-provider for gce package",
+			name:       "finds inherited sig-testing for gce package",
 			pkg:        "k8s.io/kubernetes/cluster/gce/gci",
-			wantPrefix: "[sig-cloud-provider] ",
+			wantPrefix: "[sig-testing] ",
 		},
 	}
 

@@ -367,6 +367,7 @@ message CSINodeSpec {
 message CSINodeStatus {
   // storageHealth contains backend health reports for CSI drivers registered on the node.
   // +optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=name
   // +patchMergeKey=name
@@ -481,22 +482,22 @@ message StorageClass {
 
   // provisioner indicates the type of the provisioner.
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
-  // +k8s:beta(since: "1.37")=+k8s:immutable
+  // +k8s:required
+  // +k8s:immutable
   optional string provisioner = 2;
 
   // parameters holds the parameters for the provisioner that should
   // create volumes of this storage class.
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:immutable
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:immutable
+  // +k8s:optional
   map<string, string> parameters = 3;
 
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:immutable
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:immutable
+  // +k8s:optional
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -514,8 +515,8 @@ message StorageClass {
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:immutable
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:immutable
+  // +k8s:optional
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -542,12 +543,14 @@ message StorageClassList {
 message StorageHealth {
   // name is the CSI driver name, matching CSINodeDriver.name.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string name = 1;
 
   // healthConditions are the adverse storage backend conditions reported by the CSI driver.
   // At most 16 conditions may be reported.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.38")=+k8s:optional
   repeated StorageHealthCondition healthConditions = 2;
 }
 
@@ -562,6 +565,9 @@ message StorageHealthCondition {
   // reason is a brief CamelCase machine-parseable reason.
   // Maximum permitted length of a reason is 256 characters.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
+  // +k8s:alpha(since: "1.38")=+k8s:format=k8s-condition-reason
   optional string reason = 2;
 
   // message is a human-readable description.

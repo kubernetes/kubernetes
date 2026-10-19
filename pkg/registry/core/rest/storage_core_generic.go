@@ -85,71 +85,79 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, opts...)
 	}
 
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	resourceQuotaStorage, resourceQuotaStatusStorage, err := resourcequotastore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-	secretStorage, err := secretstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	configMapStorage, err := configmapstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
-			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
-			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
-	}
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
 	storage := map[string]rest.Storage{}
+
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 		storage[resource] = eventStorage
 	}
 
 	if resource := "resourcequotas"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		resourceQuotaStorage, resourceQuotaStatusStorage, err := resourcequotastore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 		storage[resource] = resourceQuotaStorage
 		storage[resource+"/status"] = resourceQuotaStatusStorage
 	}
 
+	var secretGetter rest.Getter
+	if resource := "secrets"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		secretStorage, err := secretstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+		secretGetter = secretStorage.Store
+		storage[resource] = secretStorage
+	}
+
+	if resource := "configmaps"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		configMapStorage, err := configmapstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+		storage[resource] = configMapStorage
+	}
+
 	if resource := "namespaces"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 		storage[resource] = namespaceStorage
 		storage[resource+"/status"] = namespaceStatusStorage
 		storage[resource+"/finalize"] = namespaceFinalizeStorage
 	}
 
-	if resource := "secrets"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = secretStorage
-	}
-
 	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		var serviceAccountStorage *serviceaccountstore.REST
+		var err error
+		if c.ServiceAccountIssuer != nil {
+			// The ServiceAccount storage reads secrets to mint legacy tokens,
+			// so it needs the secret store even when secrets are not served.
+			if secretGetter == nil {
+				secretStorage, err := secretstore.NewREST(restOptionsGetter)
+				if err != nil {
+					return genericapiserver.APIGroupInfo{}, err
+				}
+				secretGetter = secretStorage.Store
+			}
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretGetter, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
+		} else {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
+		}
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
 			storage[resource+"/token"] = serviceAccountStorage.Token
 		}
-	}
-
-	if resource := "configmaps"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = configMapStorage
 	}
 
 	if len(storage) > 0 {

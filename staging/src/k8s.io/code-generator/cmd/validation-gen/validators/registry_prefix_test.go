@@ -65,7 +65,7 @@ func TestRegistryTagPrefix(t *testing.T) {
 			tv := &fakeTagValidator{name: "fake"}
 			reg := &registry{}
 			reg.addTagValidator(tv)
-			reg.init(&generator.Context{}, nil, tc.prefix)
+			reg.init(&generator.Context{}, nil, tc.prefix, nil)
 
 			if got := tv.cfg.TagPrefix; got != tc.prefix {
 				t.Errorf("Config.TagPrefix = %q, want %q", got, tc.prefix)
@@ -113,7 +113,7 @@ func TestRegistryTagPrefix(t *testing.T) {
 func TestRegistryUnknownNestedTag(t *testing.T) {
 	reg := &registry{}
 	reg.addTagValidator(&fakeTagValidator{name: "fake"})
-	reg.init(&generator.Context{}, nil, "xyz:")
+	reg.init(&generator.Context{}, nil, "xyz:", nil)
 
 	// A nested tag is only checked when its validations are extracted.
 	nested := codetags.Tag{Name: "xyz:missing", ValueType: codetags.ValueTypeNone}
@@ -132,5 +132,5 @@ func TestRegistryDuplicateTag(t *testing.T) {
 			t.Errorf("init() panic = %v, want registered twice", r)
 		}
 	}()
-	reg.init(&generator.Context{}, nil, "xyz:")
+	reg.init(&generator.Context{}, nil, "xyz:", nil)
 }

@@ -34,8 +34,8 @@ import (
 	"testing"
 	"time"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -62,7 +63,6 @@ import (
 	svcacct "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -1228,7 +1228,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
 		}
 		key := jwks.Keys[0]
-		tok, err := jwt.ParseSigned(token)
+		tok, err := jwt.ParseSigned(token, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 		if err != nil {
 			t.Fatalf("could not parse token %q: %v", token, err)
 		}
@@ -2212,7 +2212,7 @@ func checkExpiration(t *testing.T, treq *authenticationv1.TokenRequest, expected
 		t.Errorf("unexpected nil expiration seconds.")
 	}
 	if *treq.Spec.ExpirationSeconds != expectedExpiration {
-		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", treq.Spec.ExpirationSeconds, expectedExpiration)
+		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", *treq.Spec.ExpirationSeconds, expectedExpiration)
 	}
 }
 

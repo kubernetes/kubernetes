@@ -49,9 +49,9 @@ import (
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestInsecurePodLogs(t *testing.T) {
@@ -353,7 +353,7 @@ func generateClientCert(t *testing.T) testCerts {
 		NotBefore:    caCert.NotBefore,
 		SerialNumber: serial,
 		NotAfter:     time.Now().Add(time.Hour).UTC(),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	clientCertDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, clientCertKey.Public(), caPrivateKey)

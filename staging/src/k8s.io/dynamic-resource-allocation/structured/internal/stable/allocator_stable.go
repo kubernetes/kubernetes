@@ -484,10 +484,10 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
 		for _, pool := range pools {
 			if pool.IsIncomplete {
-				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.name(), pool.PoolID)
+				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated%w", klog.KObj(claim), request.name(), pool.PoolID, internal.ErrFailedAllocationOnNode)
 			}
 			if pool.IsInvalid {
-				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid", klog.KObj(claim), request.name(), pool.PoolID)
+				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid%w", klog.KObj(claim), request.name(), pool.PoolID, internal.ErrFailedAllocationOnNode)
 			}
 
 			for _, slice := range pool.DeviceSlicesTargetingNode {
@@ -1324,7 +1324,6 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
-				c.Value = c.Value.DeepCopy()
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1392,7 +1391,6 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				c.Value = c.Value.DeepCopy()
 				consumedCountersForCounterSet[name] = c
 				continue
 			}

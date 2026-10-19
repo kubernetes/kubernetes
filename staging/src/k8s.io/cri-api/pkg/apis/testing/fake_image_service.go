@@ -21,7 +21,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -244,10 +244,15 @@ func (r *FakeImageService) ImageFsInfo(_ context.Context) (*runtimeapi.ImageFsIn
 
 // AssertImagePulledWithAuth validates whether the image was pulled with auth and asserts if it wasn't.
 func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, failMsg string) {
+	t.Helper()
 	r.Lock()
 	defer r.Unlock()
-	expected := &pulledImage{imageSpec: image, authConfig: auth}
-	assert.Contains(t, r.pulledImages, expected, failMsg)
+	for _, p := range r.pulledImages {
+		if proto.Equal(p.imageSpec, image) && proto.Equal(p.authConfig, auth) {
+			return
+		}
+	}
+	t.Errorf("%s: image %v was not pulled with auth %v", failMsg, image, auth)
 }
 
 type pulledImage struct {

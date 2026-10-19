@@ -41,10 +41,15 @@ func init() {
 			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
@@ -112,7 +117,6 @@ func init() {
 			},
 			"spec.compositePodGroupTemplates[*].podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.compositePodGroupTemplates[*].podGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
@@ -167,7 +171,6 @@ func init() {
 			},
 			"spec.compositePodGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.compositePodGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
@@ -233,7 +236,6 @@ func init() {
 			},
 			"spec.podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.podGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},

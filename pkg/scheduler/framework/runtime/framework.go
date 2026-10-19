@@ -85,19 +85,21 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
 
-	clientSet        clientset.Interface
-	kubeConfig       *restclient.Config
-	eventRecorder    events.EventRecorderLogger
-	informerFactory  informers.SharedInformerFactory
-	sharedDRAManager fwk.SharedDRAManager
-	podGroupManager  fwk.PodGroupManager
-	logger           klog.Logger
+	clientSet                      clientset.Interface
+	kubeConfig                     *restclient.Config
+	eventRecorder                  events.EventRecorderLogger
+	informerFactory                informers.SharedInformerFactory
+	sharedDRAManager               fwk.SharedDRAManager
+	sharedPodGroupHierarchyTracker fwk.PodGroupHierarchyTracker
+	podGroupManager                fwk.PodGroupManager
+	logger                         klog.Logger
 
 	sharedCSIManager fwk.CSIManager
 
-	metricsRecorder          *metrics.MetricAsyncRecorder
-	profileName              string
-	percentageOfNodesToScore *int32
+	metricsRecorder               *metrics.MetricAsyncRecorder
+	profileName                   string
+	percentageOfNodesToScore      *int32
+	percentageOfPlacementsToScore *int32
 
 	extenders []fwk.Extender
 	fwk.PodNominator
@@ -106,6 +108,8 @@ type frameworkImpl struct {
 	apiCacher     fwk.APICacher
 
 	parallelizer fwk.Parallelizer
+
+	preemptionManager fwk.PreemptionManager
 
 	batch *OpportunisticBatch
 
@@ -150,27 +154,30 @@ func (f *frameworkImpl) Extenders() []fwk.Extender {
 }
 
 type frameworkOptions struct {
-	componentConfigVersion string
-	clientSet              clientset.Interface
-	kubeConfig             *restclient.Config
-	eventRecorder          events.EventRecorderLogger
-	informerFactory        informers.SharedInformerFactory
-	sharedDRAManager       fwk.SharedDRAManager
-	sharedCSIManager       fwk.CSIManager
-	snapshotSharedLister   fwk.SharedLister
-	mutableSnapshotLister  fwk.MutableSnapshotSharedLister
-	metricsRecorder        *metrics.MetricAsyncRecorder
-	podNominator           fwk.PodNominator
-	podActivator           fwk.PodActivator
-	extenders              []fwk.Extender
-	captureProfile         CaptureProfile
-	parallelizer           parallelize.Parallelizer
-	waitingPods            *waitingPodsMap
-	podsInPreBind          *podsInPreBindMap
-	apiDispatcher          *apidispatcher.APIDispatcher
-	podGroupManager        fwk.PodGroupManager
-	maxBatchAge            time.Duration
-	logger                 *klog.Logger
+	componentConfigVersion         string
+	clientSet                      clientset.Interface
+	kubeConfig                     *restclient.Config
+	eventRecorder                  events.EventRecorderLogger
+	informerFactory                informers.SharedInformerFactory
+	sharedDRAManager               fwk.SharedDRAManager
+	sharedPodGroupHierarchyTracker fwk.PodGroupHierarchyTracker
+	sharedCSIManager               fwk.CSIManager
+	snapshotSharedLister           fwk.SharedLister
+	mutableSnapshotLister          fwk.MutableSnapshotSharedLister
+	metricsRecorder                *metrics.MetricAsyncRecorder
+	podNominator                   fwk.PodNominator
+	podActivator                   fwk.PodActivator
+	extenders                      []fwk.Extender
+	captureProfile                 CaptureProfile
+	parallelizer                   parallelize.Parallelizer
+	waitingPods                    *waitingPodsMap
+	podsInPreBind                  *podsInPreBindMap
+	apiDispatcher                  *apidispatcher.APIDispatcher
+	podGroupManager                fwk.PodGroupManager
+	maxBatchAge                    time.Duration
+	logger                         *klog.Logger
+
+	preemptionManagerFactory PreemptionManagerFactory
 }
 
 // Option for the frameworkImpl.
@@ -218,6 +225,13 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 func WithSharedDRAManager(sharedDRAManager fwk.SharedDRAManager) Option {
 	return func(o *frameworkOptions) {
 		o.sharedDRAManager = sharedDRAManager
+	}
+}
+
+// WithSharedPodGroupHierarchyTracker sets SharedPodGroupHierarchyTracker for the framework.
+func WithSharedPodGroupHierarchyTracker(sharedPodGroupHierarchyTracker fwk.PodGroupHierarchyTracker) Option {
+	return func(o *frameworkOptions) {
+		o.sharedPodGroupHierarchyTracker = sharedPodGroupHierarchyTracker
 	}
 }
 
@@ -280,6 +294,15 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 func WithPodGroupManager(podGroupManager fwk.PodGroupManager) Option {
 	return func(o *frameworkOptions) {
 		o.podGroupManager = podGroupManager
+	}
+}
+
+// PreemptionManagerFactory defines a factory function to create a PreemptionManager given a Handle.
+type PreemptionManagerFactory func(fh fwk.Handle) fwk.PreemptionManager
+
+func WithPreemptionManager(f PreemptionManagerFactory) Option {
+	return func(o *frameworkOptions) {
+		o.preemptionManagerFactory = f
 	}
 }
 
@@ -355,25 +378,30 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		logger = *options.logger
 	}
 	f := &frameworkImpl{
-		registry:              r,
-		snapshotSharedLister:  options.snapshotSharedLister,
-		mutableSnapshotLister: options.mutableSnapshotLister,
-		sharedCSIManager:      options.sharedCSIManager,
-		waitingPods:           options.waitingPods,
-		podsInPreBind:         options.podsInPreBind,
-		clientSet:             options.clientSet,
-		kubeConfig:            options.kubeConfig,
-		eventRecorder:         options.eventRecorder,
-		informerFactory:       options.informerFactory,
-		sharedDRAManager:      options.sharedDRAManager,
-		metricsRecorder:       options.metricsRecorder,
-		extenders:             options.extenders,
-		PodNominator:          options.podNominator,
-		PodActivator:          options.podActivator,
-		apiDispatcher:         options.apiDispatcher,
-		podGroupManager:       options.podGroupManager,
-		parallelizer:          options.parallelizer,
-		logger:                logger,
+		registry:                       r,
+		snapshotSharedLister:           options.snapshotSharedLister,
+		mutableSnapshotLister:          options.mutableSnapshotLister,
+		sharedCSIManager:               options.sharedCSIManager,
+		waitingPods:                    options.waitingPods,
+		podsInPreBind:                  options.podsInPreBind,
+		clientSet:                      options.clientSet,
+		kubeConfig:                     options.kubeConfig,
+		eventRecorder:                  options.eventRecorder,
+		informerFactory:                options.informerFactory,
+		sharedDRAManager:               options.sharedDRAManager,
+		sharedPodGroupHierarchyTracker: options.sharedPodGroupHierarchyTracker,
+		metricsRecorder:                options.metricsRecorder,
+		extenders:                      options.extenders,
+		PodNominator:                   options.podNominator,
+		PodActivator:                   options.podActivator,
+		apiDispatcher:                  options.apiDispatcher,
+		podGroupManager:                options.podGroupManager,
+		parallelizer:                   options.parallelizer,
+		logger:                         logger,
+	}
+
+	if options.preemptionManagerFactory != nil {
+		f.preemptionManager = options.preemptionManagerFactory(f)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -394,6 +422,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 	f.profileName = profile.SchedulerName
 	f.percentageOfNodesToScore = profile.PercentageOfNodesToScore
+	f.percentageOfPlacementsToScore = profile.PercentageOfPlacementsToScore
 	if profile.Plugins == nil {
 		return f, nil
 	}
@@ -410,10 +439,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 	outputProfile := config.KubeSchedulerProfile{
-		SchedulerName:            f.profileName,
-		PercentageOfNodesToScore: f.percentageOfNodesToScore,
-		Plugins:                  profile.Plugins,
-		PluginConfig:             make([]config.PluginConfig, 0, len(pg)),
+		SchedulerName:                 f.profileName,
+		PercentageOfNodesToScore:      f.percentageOfNodesToScore,
+		PercentageOfPlacementsToScore: f.percentageOfPlacementsToScore,
+		Plugins:                       profile.Plugins,
+		PluginConfig:                  make([]config.PluginConfig, 0, len(pg)),
 	}
 
 	f.pluginsMap = make(map[string]fwk.Plugin)
@@ -1323,7 +1353,8 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
+	logger := klog.FromContext(ctx)
+	nominatedPodInfos := fh.NominatedPodsForNode(logger, nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -2352,6 +2383,11 @@ func (f *frameworkImpl) HasScorePlugins() bool {
 	return len(f.scorePlugins) > 0
 }
 
+// HasPlacementScorePlugins returns true if at least one placementScore plugin is defined.
+func (f *frameworkImpl) HasPlacementScorePlugins() bool {
+	return len(f.placementScorePlugins) > 0
+}
+
 // PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
 func (f *frameworkImpl) PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin {
 	return f.podGroupPostFilterPlugins
@@ -2410,6 +2446,11 @@ func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 	return f.sharedDRAManager
 }
 
+// SharedPodGroupHierarchyTracker returns the SharedPodGroupHierarchyTracker of the framework.
+func (f *frameworkImpl) SharedPodGroupHierarchyTracker() fwk.PodGroupHierarchyTracker {
+	return f.sharedPodGroupHierarchyTracker
+}
+
 // SharedCSIManager returns the SharedCSIManager of the framework.
 func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
 	return f.sharedCSIManager
@@ -2452,6 +2493,11 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 	return f.percentageOfNodesToScore
 }
 
+// PercentageOfPlacementsToScore returns percentageOfPlacementsToScore associated to a profile.
+func (f *frameworkImpl) PercentageOfPlacementsToScore() *int32 {
+	return f.percentageOfPlacementsToScore
+}
+
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() fwk.Parallelizer {
 	return f.parallelizer
@@ -2474,6 +2520,11 @@ func (f *frameworkImpl) APICacher() fwk.APICacher {
 		return nil
 	}
 	return f.apiCacher
+}
+
+// PreemptionManager returns PreemptionManager that can be used to customize preemption logic.
+func (f *frameworkImpl) PreemptionManager() fwk.PreemptionManager {
+	return f.preemptionManager
 }
 
 // TotalBatchedPods returns the total number of batched pods. Used only for tests

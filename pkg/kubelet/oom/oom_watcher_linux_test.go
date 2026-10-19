@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/third_party/forked/cadvisor/oomparser"
 
 	"github.com/stretchr/testify/assert"

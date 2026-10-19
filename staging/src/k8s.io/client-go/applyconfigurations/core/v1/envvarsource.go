@@ -23,17 +23,17 @@ package v1
 //
 // EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSourceApplyConfiguration struct {
-	// Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+	// fieldRef selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
 	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
 	FieldRef *ObjectFieldSelectorApplyConfiguration `json:"fieldRef,omitempty"`
-	// Selects a resource of the container: only resources limits and requests
+	// resourceFieldRef selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
 	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty"`
-	// Selects a key of a ConfigMap.
+	// configMapKeyRef selects a key of a ConfigMap.
 	ConfigMapKeyRef *ConfigMapKeySelectorApplyConfiguration `json:"configMapKeyRef,omitempty"`
-	// Selects a key of a secret in the pod's namespace
+	// secretKeyRef selects a key of a secret in the pod's namespace
 	SecretKeyRef *SecretKeySelectorApplyConfiguration `json:"secretKeyRef,omitempty"`
-	// FileKeyRef selects a key of the env file.
+	// fileKeyRef selects a key of the env file.
 	// Requires the EnvFiles feature gate to be enabled.
 	FileKeyRef *FileKeySelectorApplyConfiguration `json:"fileKeyRef,omitempty"`
 }

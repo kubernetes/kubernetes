@@ -70,6 +70,7 @@ import (
 	remote "k8s.io/cri-client/pkg"
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -121,7 +122,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -147,9 +147,8 @@ type fakeImageGCManager struct {
 	images.ImageGCManager
 }
 
-func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
-	// ImageGCManager interface does not accept a context parameter.
-	return f.fakeImageService.ListImages(context.TODO())
+func (f *fakeImageGCManager) GetImageList(ctx context.Context) ([]kubecontainer.Image, error) {
+	return f.fakeImageService.ListImages(ctx)
 }
 
 type TestKubelet struct {
@@ -4995,6 +4994,7 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 	tCtx := ktesting.Init(t)
 
 	logger := klog.FromContext(tCtx)
@@ -5003,15 +5003,16 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	quantity200Mi := resource.MustParse("200Mi")
 
 	tests := []struct {
-		name                         string
-		enableMemoryVolumeResizeGate bool
-		initialVolumes               []v1.Volume
-		resizedVolumes               []v1.Volume
-		expectResizeAction           bool
+		name           string
+		initialVolumes []v1.Volume
+		resizedVolumes []v1.Volume
+		// Limits are gated on allocation, and an immutable one is treated as gated too. This test never
+		// allocates the resize, so a limit that changes is not the allocated one, and the change is
+		// pending.
+		allocatedDiffersFromDesired bool
 	}{
 		{
-			name:                         "feature gate disabled: memory volume size limit changed",
-			enableMemoryVolumeResizeGate: false,
+			name: "memory volume size limit increased",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5034,38 +5035,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: memory volume size limit increased",
-			enableMemoryVolumeResizeGate: true,
-			initialVolumes: []v1.Volume{
-				{
-					Name: "vol-1",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &quantity100Mi,
-						},
-					},
-				},
-			},
-			resizedVolumes: []v1.Volume{
-				{
-					Name: "vol-1",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &quantity200Mi,
-						},
-					},
-				},
-			},
-			expectResizeAction: true,
-		},
-		{
-			name:                         "feature gate enabled: memory volume size limit decreased",
-			enableMemoryVolumeResizeGate: true,
+			name: "memory volume size limit decreased",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5088,11 +5061,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: true,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: memory volume size limit unchanged",
-			enableMemoryVolumeResizeGate: true,
+			name: "memory volume size limit unchanged",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5115,11 +5087,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: false,
 		},
 		{
-			name:                         "feature gate enabled: non-memory backed emptyDir volume limit changed",
-			enableMemoryVolumeResizeGate: true,
+			name: "non-memory backed emptyDir volume limit changed",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5142,18 +5113,16 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: pod with no volumes",
-			enableMemoryVolumeResizeGate: true,
-			initialVolumes:               nil,
-			resizedVolumes:               nil,
-			expectResizeAction:           false,
+			name:                        "pod with no volumes",
+			initialVolumes:              nil,
+			resizedVolumes:              nil,
+			allocatedDiffersFromDesired: false,
 		},
 		{
-			name:                         "feature gate enabled: disk-backed emptyDir volume limit changed (implicit default medium)",
-			enableMemoryVolumeResizeGate: true,
+			name: "disk-backed emptyDir volume limit changed (implicit default medium)",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5174,11 +5143,13 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			// The api server would reject this resize request in validation so in practice
+			// this test case wouldn't happen. This test verifies that UpdatePodFromAllocation
+			// treats immutable fields the same as 'gated on allocation' fields.
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: multiple volumes, one memory-backed limit changed",
-			enableMemoryVolumeResizeGate: true,
+			name: "multiple volumes, one memory-backed limit changed",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5217,14 +5188,12 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: true,
+			allocatedDiffersFromDesired: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tt.enableMemoryVolumeResizeGate)
-
 			testPod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
@@ -5246,10 +5215,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{resizedPod})
 
 			allocatedPod, wasUpdated := kubelet.allocationManager.UpdatePodFromAllocation(resizedPod.DeepCopy())
-			assert.Equal(t, tt.expectResizeAction, wasUpdated)
-			assert.Equal(t, tt.expectResizeAction, kubelet.allocationManager.HasPendingResizes())
+			assert.Equal(t, tt.allocatedDiffersFromDesired, wasUpdated)
+			assert.Equal(t, tt.allocatedDiffersFromDesired, kubelet.allocationManager.HasPendingResizes())
 
-			if tt.expectResizeAction {
+			if tt.allocatedDiffersFromDesired {
 				// Reverted back to the initial (old) limit!
 				assert.Equal(t, initialPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value())
 			} else if len(resizedPod.Spec.Volumes) > 0 && resizedPod.Spec.Volumes[0].EmptyDir != nil && resizedPod.Spec.Volumes[0].EmptyDir.SizeLimit != nil {
@@ -5757,4 +5726,50 @@ func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
+}
+
+func TestStaticPodURLHeaderAndKeys(t *testing.T) {
+	const secretBearer = "Bearer static-pod-url-secret-must-not-leak"
+	const secretAPIKey = "super-secret-api-key-must-not-leak"
+
+	tests := []struct {
+		name       string
+		headers    map[string][]string
+		wantKeys   []string
+		wantAbsent []string
+	}{
+		{
+			name:       "Authorization bearer not leaked in keys",
+			headers:    map[string][]string{"Authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer},
+		},
+		{
+			name:       "multiple sensitive headers not leaked in keys",
+			headers:    map[string][]string{"Authorization": {secretBearer}, "X-API-Key": {secretAPIKey}},
+			wantKeys:   []string{"Authorization", "X-Api-Key"}, // http.CanonicalHeaderKey: X-API-Key → X-Api-Key
+			wantAbsent: []string{secretBearer, secretAPIKey},
+		},
+		{
+			name:       "lowercase input canonicalized",
+			headers:    map[string][]string{"authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer, "authorization"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, keys := staticPodURLHeaderAndKeys(tc.headers)
+			require.ElementsMatch(t, tc.wantKeys, keys)
+
+			// Verify no secret values appear in the keys.
+			keysStr := strings.Join(keys, " ")
+			for _, absent := range tc.wantAbsent {
+				if strings.Contains(keysStr, absent) {
+					t.Fatalf("header keys contain %q which must not be present\ngot keys: %v", absent, keys)
+				}
+			}
+		})
+	}
 }

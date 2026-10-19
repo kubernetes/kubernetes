@@ -57,6 +57,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
@@ -78,7 +79,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -490,7 +490,12 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	tCtx.Logf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames)
 	d.Nodes = make(map[string]KubeletPlugin)
 
-	tCtx = tCtx.WithCancel()
+	// The driver must keep running until TearDown explicitly cancels it via
+	// d.cleanup, regardless of whether tCtx itself gets cancelled earlier
+	// (e.g. because the sub-test that called SetUp has already ended while
+	// TearDown, registered as a cleanup callback, still needs the driver to
+	// be up).
+	tCtx = tCtx.WithoutCancel().WithCancel()
 	logger := klog.FromContext(tCtx)
 	logger = klog.LoggerWithValues(logger, "driverName", d.Name)
 	if d.InstanceSuffix != "" {

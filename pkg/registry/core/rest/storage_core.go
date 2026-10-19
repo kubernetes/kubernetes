@@ -39,7 +39,6 @@ import (
 	admissionregistrationv1client "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -93,25 +92,18 @@ type ServicesConfig struct {
 	IPRepairInterval time.Duration
 }
 
-type rangeRegistries struct {
-	clusterIP          rangeallocation.RangeRegistry
-	secondaryClusterIP rangeallocation.RangeRegistry
-	nodePort           rangeallocation.RangeRegistry
-}
-
 type legacyProvider struct {
 	Config
 
-	primaryServiceClusterIPAllocator ipallocator.Interface
-	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
-	serviceNodePortAllocator         *portallocator.PortAllocator
-	authorizer                       authorizer.UnconditionalAuthorizer
+	serviceClusterIPAllocators map[api.IPFamily]ipallocator.Interface
+	serviceNodePortAllocator   *portallocator.PortAllocator
+	authorizer                 authorizer.UnconditionalAuthorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
 func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
-	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
+	nodePortRegistry, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +111,9 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 	p := &legacyProvider{
 		Config: c,
 
-		primaryServiceClusterIPAllocator: serviceClusterIPAllocator,
-		serviceClusterIPAllocators:       serviceIPAllocators,
-		serviceNodePortAllocator:         serviceNodePortAllocator,
-		authorizer:                       authorizer,
+		serviceClusterIPAllocators: serviceIPAllocators,
+		serviceNodePortAllocator:   serviceNodePortAllocator,
+		authorizer:                 authorizer,
 	}
 
 	// create service node port repair controller
@@ -130,34 +121,29 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 	if err != nil {
 		return nil, err
 	}
-	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
+	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, nodePortRegistry).RunUntil
 
 	// create service cluster ip repair controller
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
-			c.Services.IPRepairInterval,
-			client.CoreV1(),
-			client.EventsV1(),
-			&c.Services.ClusterIPRange,
-			rangeRegistries.clusterIP,
-			&c.Services.SecondaryClusterIPRange,
-			rangeRegistries.secondaryClusterIP,
-		).RunUntil
-	} else {
-		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
-			c.Services.IPRepairInterval,
-			client,
-			c.Informers.Core().V1().Services(),
-			c.Informers.Networking().V1().ServiceCIDRs(),
-			c.Informers.Networking().V1().IPAddresses(),
-		).RunUntil
-	}
+	p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
+		c.Services.IPRepairInterval,
+		client,
+		c.Informers.Core().V1().Services(),
+		c.Informers.Networking().V1().ServiceCIDRs(),
+		c.Informers.Networking().V1().IPAddresses(),
+	).RunUntil
 
 	return p, nil
 }
 
 func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+	genericConfigSource := apiResourceConfigSource
+	if p.ServiceAccountIssuer != nil {
+		// the serviceaccounts storage built below replaces the generic one, so
+		// keep the generic provider from building a storage that would only be
+		// discarded: each one stands up its own etcd watch cache.
+		genericConfigSource = serviceAccountsDisabled{apiResourceConfigSource}
+	}
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(genericConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -207,9 +193,15 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
+	var primaryClusterIPFamily api.IPFamily
+	if netutils.IsIPv4CIDR(&p.Services.ClusterIPRange) {
+		primaryClusterIPFamily = api.IPv4Protocol
+	} else {
+		primaryClusterIPFamily = api.IPv6Protocol
+	}
 	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
-		p.primaryServiceClusterIPAllocator.IPFamily(),
+		primaryClusterIPFamily,
 		p.serviceClusterIPAllocators,
 		p.serviceNodePortAllocator,
 		p.EndpointSliceGetter,
@@ -278,12 +270,10 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		}
 	}
 
-	// potentially override generic storage for service account (with pod support)
+	// use the storage for service account with pod support, built above
 	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		// don't leak go routines
-		storage[resource].Destroy()
-		if storage[resource+"/token"] != nil {
-			storage[resource+"/token"].Destroy()
+		if _, ok := storage[resource]; ok {
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("%s storage was already built by the generic provider", resource)
 		}
 
 		storage[resource] = serviceAccountStorage
@@ -333,156 +323,50 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	return apiGroupInfo, nil
 }
 
-func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
+func (c *Config) newServiceIPAllocators() (nodePortRegistry rangeallocation.RangeRegistry, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
+	var primaryClusterIPAllocator, secondaryClusterIPAllocator ipallocator.Interface
 	clusterIPAllocators = map[api.IPFamily]ipallocator.Interface{}
 
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"), &api.Service{})
 	if err != nil {
-		return rangeRegistries{}, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	serviceClusterIPRange := c.Services.ClusterIPRange
 	if serviceClusterIPRange.IP == nil {
-		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
+		return nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		primaryClusterIPAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
-			var mem allocator.Snapshottable
-			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
-			// TODO etcdallocator package to return a storage interface via the storageFactory
-			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
-			if err != nil {
-				return nil, err
-			}
-			registries.clusterIP = etcd
-			return etcd, nil
-		})
-		if err != nil {
-			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
-		}
-	} else {
-		networkingv1Client, err := networkingv1client.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return rangeRegistries{}, nil, nil, nil, err
-		}
-		var bitmapAllocator ipallocator.Interface
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-			bitmapAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
-				mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
-				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
-				if err != nil {
-					return nil, err
-				}
-				// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
-				// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
-				// the ResourceVersion of the opaque API object is zero.
-				rangeRegistry, err := etcd.Get()
-				if err != nil {
-					return nil, err
-				}
-				rangeRegistry.Range = serviceClusterIPRange.String()
-				if len(rangeRegistry.ResourceVersion) == 0 {
-					klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
-					err := etcd.CreateOrUpdate(rangeRegistry)
-					if err != nil {
-						return nil, err
-					}
-				}
-				registries.clusterIP = etcd
-				return etcd, nil
-			})
-			if err != nil {
-				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %w", err)
-			}
+	networkingv1Client, err := networkingv1client.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
-		}
-		// TODO(aojea) Revisit the initialization of the allocators
-		// since right now it depends on the service-cidr flags and
-		// sets the default IPFamily that may not be coherent with the
-		// existing default ServiceCIDR
-		primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
-			networkingv1Client,
-			c.Informers.Networking().V1().ServiceCIDRs(),
-			c.Informers.Networking().V1().IPAddresses(),
-			netutils.IsIPv6CIDR(&serviceClusterIPRange),
-			bitmapAllocator,
-		)
-		if err != nil {
-			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
-		}
+	// TODO(aojea) Revisit the initialization of the allocators
+	// since right now it depends on the service-cidr flags and
+	// sets the default IPFamily that may not be coherent with the
+	// existing default ServiceCIDR
+	primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+		networkingv1Client,
+		c.Informers.Networking().V1().ServiceCIDRs(),
+		c.Informers.Networking().V1().IPAddresses(),
+		netutils.IsIPv6CIDR(&serviceClusterIPRange),
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %w", err)
 	}
 	primaryClusterIPAllocator.EnableMetrics()
 	clusterIPAllocators[primaryClusterIPAllocator.IPFamily()] = primaryClusterIPAllocator
 
-	var secondaryClusterIPAllocator ipallocator.Interface
 	if c.Services.SecondaryClusterIPRange.IP != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-			var err error
-			secondaryClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
-				var mem allocator.Snapshottable
-				mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
-				// TODO etcdallocator package to return a storage interface via the storageFactory
-				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
-				if err != nil {
-					return nil, err
-				}
-				registries.secondaryClusterIP = etcd
-				return etcd, nil
-			})
-			if err != nil {
-				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
-			}
-		} else {
-			networkingv1Client, err := networkingv1client.NewForConfig(c.LoopbackClientConfig)
-			if err != nil {
-				return rangeRegistries{}, nil, nil, nil, err
-			}
-			var bitmapAllocator ipallocator.Interface
-			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-				bitmapAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
-					mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
-					// TODO etcdallocator package to return a storage interface via the storageFactory
-					etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
-					if err != nil {
-						return nil, err
-					}
-					// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
-					// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
-					// the ResourceVersion of the opaque API object is zero.
-					rangeRegistry, err := etcd.Get()
-					if err != nil {
-						return nil, err
-					}
-					rangeRegistry.Range = c.Services.SecondaryClusterIPRange.String()
-					if len(rangeRegistry.ResourceVersion) == 0 {
-						klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
-						err := etcd.CreateOrUpdate(rangeRegistry)
-						if err != nil {
-							return nil, err
-						}
-					}
-					registries.secondaryClusterIP = etcd
-					return etcd, nil
-				})
-				if err != nil {
-					return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %w", err)
-				}
-			}
-			// TODO(aojea) Revisit the initialization of the allocators
-			// since right now it depends on the service-cidr flags and
-			// sets the default IPFamily that may not be coherent with the
-			// existing default ServiceCIDR
-			secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
-				networkingv1Client,
-				c.Informers.Networking().V1().ServiceCIDRs(),
-				c.Informers.Networking().V1().IPAddresses(),
-				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
-				bitmapAllocator,
-			)
-			if err != nil {
-				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
-			}
+		secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+			networkingv1Client,
+			c.Informers.Networking().V1().ServiceCIDRs(),
+			c.Informers.Networking().V1().IPAddresses(),
+			netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+		)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %w", err)
 		}
 		secondaryClusterIPAllocator.EnableMetrics()
 		clusterIPAllocators[secondaryClusterIPAllocator.IPFamily()] = secondaryClusterIPAllocator
@@ -495,11 +379,11 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		if err != nil {
 			return nil, err
 		}
-		registries.nodePort = etcd
+		nodePortRegistry = etcd
 		return etcd, nil
 	})
 	if err != nil {
-		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster port allocator: %v", err)
+		return nil, nil, nil, fmt.Errorf("cannot create cluster port allocator: %w", err)
 	}
 	nodePortAllocator.EnableMetrics()
 
@@ -555,6 +439,29 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 
 func (p *legacyProvider) GroupName() string {
 	return api.GroupName
+}
+
+var serviceAccountsResource = corev1.SchemeGroupVersion.WithResource("serviceaccounts")
+
+// serviceAccountsDisabled reports core/v1 serviceaccounts as not enabled, so a
+// caller that builds that storage itself can keep another provider from
+// building one too.
+type serviceAccountsDisabled struct {
+	serverstorage.APIResourceConfigSource
+}
+
+func (s serviceAccountsDisabled) ResourceEnabled(resource schema.GroupVersionResource) bool {
+	if resource == serviceAccountsResource {
+		return false
+	}
+	return s.APIResourceConfigSource.ResourceEnabled(resource)
+}
+
+func (s serviceAccountsDisabled) ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool {
+	if resource == serviceAccountsResource {
+		return false
+	}
+	return s.APIResourceConfigSource.ResourceExplicitlyEnabled(resource)
 }
 
 type componentStatusStorage struct {

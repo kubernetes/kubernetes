@@ -1539,14 +1539,12 @@ func Register() {
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			legacyregistry.MustRegister(
-				DRAOperationsDuration,
-				DRAGRPCOperationsDuration,
-				DRANodePrepareSkipsTotal,
-				DRANodeUnprepareSkipsTotal,
-			)
-		}
+		legacyregistry.MustRegister(
+			DRAOperationsDuration,
+			DRAGRPCOperationsDuration,
+			DRANodePrepareSkipsTotal,
+			DRANodeUnprepareSkipsTotal,
+		)
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
 

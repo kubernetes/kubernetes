@@ -50,11 +50,11 @@ func (t *JobUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	t.job = e2ejob.NewTestJob("neverTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := e2ejob.CreateJob(ctx, f.ClientSet, t.namespace, t.job)
 	t.job = job
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Job %q in namespace %q", t.job.Name, t.namespace)
 
 	ginkgo.By("Ensuring active pods == parallelism")
 	err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, t.namespace, job.Name, 2)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for pods to run for Job %q in namespace %q", job.Name, t.namespace)
 }
 
 // Test verifies that the Jobs Pods are running after the an upgrade
@@ -62,10 +62,10 @@ func (t *JobUpgradeTest) Test(ctx context.Context, f *framework.Framework, done 
 	<-done
 	ginkgo.By("Ensuring job is running")
 	err := ensureJobRunning(ctx, f.ClientSet, t.namespace, t.job.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify running Job %q in namespace %q", t.job.Name, t.namespace)
 	ginkgo.By("Ensuring active pods == parallelism")
 	err = ensureAllJobPodsRunning(ctx, f.ClientSet, t.namespace, t.job.Name, 2)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify all pods are running for Job %q in namespace %q", t.job.Name, t.namespace)
 }
 
 // Teardown cleans up any remaining resources.

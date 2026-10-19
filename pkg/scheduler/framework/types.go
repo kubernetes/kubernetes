@@ -789,15 +789,16 @@ func (pqi *QueuedPodInfo) HasPodsWithPendingPlugins() bool {
 type QueuedPodGroupInfo struct {
 	*PodGroupInfo
 	QueueingParams
-	// QueuedPodInfos are the pod group pods that are currently queued.
+	// queuedPodInfos are the pod group pods that are currently queued.
 	// This map is keyed by pod group keys in the same format as framework.PodGroupKey function.
 	// Its values are slices of corresponding leaf pod group's queued pods.
 	// The order of the pods in the slice is deterministic and based on the priority and timestamp.
 	//
-	// Note: QueuedPodGroupInfo manages QueuedPodInfos' metadata in podsWithPendingPlugins.
-	// Any mutation to QueuedPodGroupInfo should not be done directly,
-	// but through AddPod, Update and RemovePod methods.
-	QueuedPodInfos map[fwk.EntityKey][]*QueuedPodInfo
+	// QueuedPodGroupInfo has to keep it in sync with the pods' metadata
+	// in podsWithPendingPlugins and with the leaf pod groups' UnscheduledPods.
+	// Use AddPod, Update and RemovePod to mutate it, and PodInfosForGroup, ForEachPodInfo
+	// or ForEachGroupAndPodInfos to read it.
+	queuedPodInfos map[fwk.EntityKey][]*QueuedPodInfo
 	// podsWithPendingPlugins stores pod names for pods in this pod group that have pending plugins.
 	podsWithPendingPlugins sets.Set[string]
 }
@@ -815,13 +816,13 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 		return
 	}
 
-	if pgqi.QueuedPodInfos == nil {
-		pgqi.QueuedPodInfos = make(map[fwk.EntityKey][]*QueuedPodInfo)
+	if pgqi.queuedPodInfos == nil {
+		pgqi.queuedPodInfos = make(map[fwk.EntityKey][]*QueuedPodInfo)
 	}
 
-	index, _ := slices.BinarySearchFunc(pgqi.QueuedPodInfos[key], pInfo, PodGroupMemberPodsOrderingFunc)
+	index, _ := slices.BinarySearchFunc(pgqi.queuedPodInfos[key], pInfo, PodGroupMemberPodsOrderingFunc)
 
-	pgqi.QueuedPodInfos[key] = slices.Insert(pgqi.QueuedPodInfos[key], index, pInfo)
+	pgqi.queuedPodInfos[key] = slices.Insert(pgqi.queuedPodInfos[key], index, pInfo)
 	leafPG.UnscheduledPods = slices.Insert(leafPG.UnscheduledPods, index, pInfo.Pod)
 
 	if pInfo.PendingPlugins.Len() > 0 {
@@ -836,7 +837,7 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 // In case of hierarchy, we need to go to all leaf PodGroups.
 func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	list, exists := pgqi.QueuedPodInfos[key]
+	list, exists := pgqi.queuedPodInfos[key]
 	if !exists {
 		return nil
 	}
@@ -845,9 +846,12 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 	for i, p := range list {
 		if p.Pod.Name == pod.Name && p.Pod.Namespace == pod.Namespace {
 			removed = p
-			pgqi.QueuedPodInfos[key] = slices.Delete(list, i, i+1)
-			if len(pgqi.QueuedPodInfos[key]) == 0 {
-				delete(pgqi.QueuedPodInfos, key)
+			pgqi.queuedPodInfos[key] = slices.Delete(list, i, i+1)
+			if len(pgqi.queuedPodInfos[key]) == 0 {
+				delete(pgqi.queuedPodInfos, key)
+				if len(pgqi.queuedPodInfos) == 0 {
+					pgqi.queuedPodInfos = nil
+				}
 			}
 			break
 		}
@@ -866,6 +870,9 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 	for i, p := range leafPG.UnscheduledPods {
 		if p.Name == pod.Name && p.Namespace == pod.Namespace {
 			leafPG.UnscheduledPods = slices.Delete(leafPG.UnscheduledPods, i, i+1)
+			if len(leafPG.UnscheduledPods) == 0 {
+				leafPG.UnscheduledPods = nil
+			}
 			break
 		}
 	}
@@ -887,15 +894,7 @@ func (pgqi *QueuedPodGroupInfo) HasPodsWithPendingPlugins() bool {
 }
 
 func (pgqi *QueuedPodGroupInfo) HasQueuedPodInfos() bool {
-	if len(pgqi.QueuedPodInfos) == 0 {
-		return false
-	}
-	for _, list := range pgqi.QueuedPodInfos {
-		if len(list) > 0 {
-			return true
-		}
-	}
-	return false
+	return len(pgqi.queuedPodInfos) > 0
 }
 
 // PodGroupMemberPodsOrderingFunc orders pod group member pods by priority (descending),
@@ -934,7 +933,7 @@ func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
 
 func (pgqi *QueuedPodGroupInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
 	return func(yield func(*QueuedPodInfo) bool) {
-		for _, list := range pgqi.QueuedPodInfos {
+		for _, list := range pgqi.queuedPodInfos {
 			for _, pInfo := range list {
 				if !yield(pInfo) {
 					return
@@ -944,9 +943,33 @@ func (pgqi *QueuedPodGroupInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
 	}
 }
 
+// PodInfosForGroup returns the queued pods of the leaf pod group identified by key,
+// ordered by PodGroupMemberPodsOrderingFunc. It returns nil if the pod group has no queued pods.
+//
+// The returned slice aliases the internal storage and must be treated as read-only:
+// use AddPod, RemovePod or Update to mutate the pod group.
+func (pgqi *QueuedPodGroupInfo) PodInfosForGroup(key fwk.EntityKey) []*QueuedPodInfo {
+	return pgqi.queuedPodInfos[key]
+}
+
+// ForEachGroupAndPodInfos iterates over the leaf pod groups that have queued pods,
+// yielding the pod group key and its queued pods.
+//
+// The yielded slices alias the internal storage and must be treated as read-only:
+// use AddPod, RemovePod or Update to mutate the pod group.
+func (pgqi *QueuedPodGroupInfo) ForEachGroupAndPodInfos() iter.Seq2[fwk.EntityKey, []*QueuedPodInfo] {
+	return func(yield func(fwk.EntityKey, []*QueuedPodInfo) bool) {
+		for key, list := range pgqi.queuedPodInfos {
+			if !yield(key, list) {
+				return
+			}
+		}
+	}
+}
+
 func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
 	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	list, exists := pgqi.QueuedPodInfos[key]
+	list, exists := pgqi.queuedPodInfos[key]
 	if !exists {
 		return nil, fmt.Errorf("pod %s/%s to update not found in the queued group info", pod.Namespace, pod.Name)
 	}
@@ -979,7 +1002,7 @@ func (pgqi *QueuedPodGroupInfo) Gated() bool {
 
 func (pgqi *QueuedPodGroupInfo) Size() int {
 	size := 0
-	for _, pInfos := range pgqi.QueuedPodInfos {
+	for _, pInfos := range pgqi.queuedPodInfos {
 		size += len(pInfos)
 	}
 	return size
@@ -987,10 +1010,8 @@ func (pgqi *QueuedPodGroupInfo) Size() int {
 
 func (pgqi *QueuedPodGroupInfo) IncAttempts() {
 	pgqi.Attempts++
-	for _, pInfos := range pgqi.QueuedPodInfos {
-		for _, pInfo := range pInfos {
-			pInfo.IncAttempts()
-		}
+	for pInfo := range pgqi.ForEachPodInfo() {
+		pInfo.IncAttempts()
 	}
 }
 
@@ -1001,19 +1022,15 @@ func (pgqi *QueuedPodGroupInfo) SetInitialAttemptTimestamp(t time.Time) {
 	// A new pod might get added to the pod group, even after the initial
 	// attempt timestamp has been set. We need to always try to set the initial
 	// attempt timestamp for all member pods.
-	for _, pInfos := range pgqi.QueuedPodInfos {
-		for _, pInfo := range pInfos {
-			pInfo.SetInitialAttemptTimestamp(t)
-		}
+	for pInfo := range pgqi.ForEachPodInfo() {
+		pInfo.SetInitialAttemptTimestamp(t)
 	}
 }
 
 func (pgqi *QueuedPodGroupInfo) SetWasFlushedFromUnschedulable(flushed bool) {
 	pgqi.WasFlushedFromUnschedulable = flushed
-	for _, pInfos := range pgqi.QueuedPodInfos {
-		for _, pInfo := range pInfos {
-			pInfo.SetWasFlushedFromUnschedulable(flushed)
-		}
+	for pInfo := range pgqi.ForEachPodInfo() {
+		pInfo.SetWasFlushedFromUnschedulable(flushed)
 	}
 }
 
@@ -1035,7 +1052,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// AddSubtree adds a subtree to the queued pod group info hierarchy and maintains its order.
 // It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
 func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	parentKey, ok := subtree.GetParentKey()
@@ -1045,12 +1062,13 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 
 	parent, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, parentKey)
 	if parent != nil {
-		for _, child := range parent.Children {
+		for _, child := range parent.children {
 			if child.GetKey() == subtree.GetKey() {
 				return
 			}
 		}
-		parent.Children = append(parent.Children, subtree)
+		parent.children = append(parent.children, subtree)
+		parent.sortChildren()
 	}
 }
 
@@ -1071,9 +1089,9 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) 
 	}
 
 	if parent != nil {
-		for i, child := range parent.Children {
+		for i, child := range parent.children {
 			if child.GetKey() == gpg.GetKey() {
-				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+				parent.children = append(parent.children[:i], parent.children[i+1:]...)
 				break
 			}
 		}
@@ -1089,7 +1107,7 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 	if curr.GetKey() == key {
 		return curr, parent
 	}
-	for _, child := range curr.Children {
+	for _, child := range curr.children {
 		if n, p := findTreeNodeAndParent(child, curr, key); n != nil {
 			return n, p
 		}
@@ -1098,22 +1116,26 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 }
 
 // deleteSubtreePods recursively traverses the subtree starting at the given node and removes
-// all encountered PodGroups from the pgqi.QueuedPodInfos map.
+// all encountered PodGroups from the pgqi.queuedPodInfos map.
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
 	removedPods := make([]*QueuedPodInfo, 0)
 	if curr.GetType() == fwk.PodGroupKeyType {
+		curr.UnscheduledPods = nil
 		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
-		if pods, ok := pgqi.QueuedPodInfos[key]; ok {
+		if pods, ok := pgqi.queuedPodInfos[key]; ok {
 			removedPods = append(removedPods, pods...)
 			for _, pInfo := range pods {
 				pgqi.removePodPendingPlugins(pInfo)
 			}
-			delete(pgqi.QueuedPodInfos, key)
+			delete(pgqi.queuedPodInfos, key)
+			if len(pgqi.queuedPodInfos) == 0 {
+				pgqi.queuedPodInfos = nil
+			}
 		}
 		return removedPods
 	}
-	for _, child := range curr.Children {
+	for _, child := range curr.children {
 		removedPods = append(removedPods, pgqi.deleteSubtreePods(child)...)
 	}
 	return removedPods
@@ -1131,45 +1153,62 @@ type PodGroupInfo struct {
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
-	// Children are the child pod groups of this pod group. Only composite pod groups have children.
-	Children []*PodGroupInfo
+	// children are the child pod groups of this pod group. Only composite pod groups have children.
+	// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
+	// To read children, use Children() or GetChildren().
+	children []*PodGroupInfo
 }
 
-// GetUnscheduledPods returns the unscheduled pods for this pod group.
+// NewPodGroupInfo returns a PodGroupInfo for GenericPodGroup and given children, ordered by creation timestamp, name, and entity type.
+// Callers must not retain or mutate the children slice, since NewPodGroupInfo doesn't create a copy but takes ownership of it.
+func NewPodGroupInfo(gpg *fwk.GenericPodGroup, children ...*PodGroupInfo) *PodGroupInfo {
+	pgi := &PodGroupInfo{GenericPodGroup: gpg, children: children}
+	pgi.sortChildren()
+	return pgi
+}
+
+// GetAllUnscheduledPods returns the unscheduled pods for this pod group.
 // For composite pod groups, this method recursively aggregates the unscheduled pods
 // from all leaf pod groups in the hierarchy.
-func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
+func (pgi *PodGroupInfo) GetAllUnscheduledPods() []*v1.Pod {
 	if pgi.PodGroup != nil {
 		return pgi.UnscheduledPods
 	}
 	var pods []*v1.Pod
-	for _, child := range pgi.Children {
-		pods = append(pods, child.GetUnscheduledPods()...)
+	for _, child := range pgi.children {
+		pods = append(pods, child.GetAllUnscheduledPods()...)
 	}
 	return pods
 }
 
+// Children returns the child pod groups of this pod group, ordered by creation timestamp, name, and entity type.
+//
+// The returned slice aliases the internal storage and must be treated as read-only.
+// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
+func (pgi *PodGroupInfo) Children() []*PodGroupInfo {
+	return pgi.children
+}
+
+// GetChildren returns the child pod groups of this pod group, ordered by creation timestamp, name, and entity type.
+//
+// The returned slice is a copy of the children, typed as fwk.PodGroupInfo and must be treated as read-only.
+// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
 func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
-	if len(pgi.Children) == 0 {
+	if len(pgi.children) == 0 {
 		return nil
 	}
-	children := make([]fwk.PodGroupInfo, len(pgi.Children))
-	for i, child := range pgi.GetChildGroups() {
+	children := make([]fwk.PodGroupInfo, len(pgi.children))
+	for i, child := range pgi.children {
 		children[i] = child
 	}
 	return children
 }
 
-func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
-	if pgi.CompositePodGroup == nil {
-		// Only CompositePodGroups have children groups.
-		return nil
-	}
-	result := make([]*PodGroupInfo, len(pgi.Children))
-	copy(result, pgi.Children)
-	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
-	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
-	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
+// sortChildren sorts the children of this composite pod group in-place by creation
+// timestamp, then name, then entity type to have a tie-breaker that enforces deterministic order.
+// Leaf pod groups have no children, so this is a no-op for them.
+func (pgi *PodGroupInfo) sortChildren() {
+	slices.SortFunc(pgi.children, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
 		if aTime.Before(bTime) {
@@ -1190,7 +1229,6 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		}
 		return 0
 	})
-	return result
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to

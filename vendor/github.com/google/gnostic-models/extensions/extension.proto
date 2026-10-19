@@ -42,7 +42,7 @@ option java_package = "org.gnostic.v1";
 option objc_class_prefix = "GNX";
 
 // The Go package name.
-option go_package = "./extensions;gnostic_extension_v1";
+option go_package = "github.com/google/gnostic-models/extensions;gnostic_extension_v1";
 
 // The version number of Gnostic.
 message Version {

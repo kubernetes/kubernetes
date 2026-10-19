@@ -30,19 +30,25 @@ import (
 // The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive.
 // Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
 type NodeAllocatableMappingApplyConfiguration struct {
-	// CapacityKey references a capacity name defined as a key in the
+	// capacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
 	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
 	// (for a specific claim allocation) determines the base quantity for
 	// the node allocatable resource. `capacityMultiplier` must also be set and is
 	// multiplied with the base quantity.
+	//
 	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
 	// and this field is set to "dra.example.com/memory", then for a claim allocation
 	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
 	// node allocatable resource mapping will be "4Gi".
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
+	//
+	// In this example, "dra.example.com/memory" is a fictional standardized capacity name.
+	// For driver-specific capacities the driver name can be omitted.
+	// As defined for consumedCapacity, the capacity consumption may be recorded
+	// there with or without the driver name.
 	CapacityKey *resourcev1beta1.QualifiedName `json:"capacityKey,omitempty"`
-	// CapacityMultiplier is used as a multiplier for the allocated capacity consumed.
+	// capacityMultiplier is used as a multiplier for the allocated capacity consumed.
 	// It is only valid if `capacityKey` is set.
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
 	// For example, if a Device's capacity "dra.example.com/cores" is consumed,
@@ -50,7 +56,7 @@ type NodeAllocatableMappingApplyConfiguration struct {
 	// {ResourceName: "cpu", capacityKey: "dra.example.com/cores", capacityMultiplier: "2"}.
 	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	CapacityMultiplier *resource.Quantity `json:"capacityMultiplier,omitempty"`
-	// DeviceMultiplier is used as a multiplier for the allocated device count in the claim.
+	// deviceMultiplier is used as a multiplier for the allocated device count in the claim.
 	// The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`.
 	// For example, a DRA driver representing each cache complex (CCX) as a device would have
 	// {ResourceName: "cpu", deviceMultiplier: "8"} in its `nodeAllocatableResources`.

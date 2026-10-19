@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -521,7 +521,7 @@ func TestRunOp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			client := fake.NewSimpleClientset()
-			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()

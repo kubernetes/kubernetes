@@ -80,8 +80,9 @@ func (g *UndirectedGraph) RemoveNode(n graph.Node) {
 	}
 	delete(g.nodes, n.ID())
 
-	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) (shouldContinue bool) {
 		g.edges[neighbor] = g.edges[neighbor].Delete(n.ID())
+		return true
 	})
 	delete(g.edges, n.ID())
 
@@ -159,15 +160,16 @@ func (g *UndirectedGraph) Edges() []graph.Edge {
 
 	seen := make(map[[2]int]struct{})
 	for _, u := range g.edges {
-		u.Visit(func(neighbor int, e graph.Edge) {
+		u.Visit(func(neighbor int, e graph.Edge) (shouldContinue bool) {
 			uid := e.From().ID()
 			vid := e.To().ID()
 			if _, ok := seen[[2]int{uid, vid}]; ok {
-				return
+				return true
 			}
 			seen[[2]int{uid, vid}] = struct{}{}
 			seen[[2]int{vid, uid}] = struct{}{}
 			edges = append(edges, e)
+			return true
 		})
 	}
 
@@ -182,9 +184,10 @@ func (g *UndirectedGraph) From(n graph.Node) []graph.Node {
 
 	nodes := make([]graph.Node, g.edges[n.ID()].Len())
 	i := 0
-	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) (shouldContinue bool) {
 		nodes[i] = g.nodes[neighbor]
 		i++
+		return true
 	})
 
 	return nodes

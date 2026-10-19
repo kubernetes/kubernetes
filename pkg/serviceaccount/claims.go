@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

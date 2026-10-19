@@ -2370,14 +2370,12 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 
 func Test_mutatePodAffinity(t *testing.T) {
 	tests := []struct {
-		name               string
-		pod                *api.Pod
-		wantPod            *api.Pod
-		featureGateEnabled bool
+		name    string
+		pod     *api.Pod
+		wantPod *api.Pod
 	}{
 		{
-			name:               "matchLabelKeys are merged into labelSelector with In and mismatchLabelKeys are merged with NotIn",
-			featureGateEnabled: true,
+			name: "matchLabelKeys are merged into labelSelector with In and mismatchLabelKeys are merged with NotIn",
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -2556,8 +2554,7 @@ func Test_mutatePodAffinity(t *testing.T) {
 			},
 		},
 		{
-			name:               "keys, which are not found in Pod labels, are ignored",
-			featureGateEnabled: true,
+			name: "keys, which are not found in Pod labels, are ignored",
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -2616,8 +2613,7 @@ func Test_mutatePodAffinity(t *testing.T) {
 			},
 		},
 		{
-			name:               "matchLabelKeys is ignored if the labelSelector is nil",
-			featureGateEnabled: true,
+			name: "matchLabelKeys is ignored if the labelSelector is nil",
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -2650,59 +2646,6 @@ func Test_mutatePodAffinity(t *testing.T) {
 						PodAffinity: &api.PodAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 								{
-									MatchLabelKeys:    []string{"country"},
-									MismatchLabelKeys: []string{"city"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "the feature gate is disabled and matchLabelKeys is ignored",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Kyoto",
-					},
-				},
-				Spec: api.PodSpec{
-					Affinity: &api.Affinity{
-						PodAffinity: &api.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											"region": "Asia",
-										},
-									},
-									MatchLabelKeys:    []string{"country"},
-									MismatchLabelKeys: []string{"city"},
-								},
-							},
-						},
-					},
-				},
-			},
-			wantPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Kyoto",
-					},
-				},
-				Spec: api.PodSpec{
-					Affinity: &api.Affinity{
-						PodAffinity: &api.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											"region": "Asia",
-										},
-									},
 									MatchLabelKeys:    []string{"country"},
 									MismatchLabelKeys: []string{"city"},
 								},
@@ -2716,11 +2659,6 @@ func Test_mutatePodAffinity(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.featureGateEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-			}
-
 			pod := tc.pod
 			mutatePodAffinity(pod)
 			if diff := cmp.Diff(tc.wantPod.Spec.Affinity, pod.Spec.Affinity); diff != "" {
@@ -4979,7 +4917,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: false,
-				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -4988,9 +4925,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
-					},
 					ContainerStatuses: []api.ContainerStatus{
 						{Resources: &api.ResourceRequirements{}},
 					},
@@ -5007,7 +4941,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: true,
-				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5016,9 +4949,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
-					},
 					ContainerStatuses: []api.ContainerStatus{
 						{Resources: &api.ResourceRequirements{}},
 					},
@@ -5351,9 +5281,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "preserve old ResourceClaimStatuses when misbehaving client clears them on terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
@@ -5377,9 +5304,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "preserve old ResourceClaimStatuses when omitted on non-terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
@@ -5403,9 +5327,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "allow explicit empty-slice removal of ResourceClaimStatuses on non-terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
@@ -5561,7 +5482,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+			if v, ok := tc.features[features.InPlacePodVerticalScaling]; ok && !v {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)

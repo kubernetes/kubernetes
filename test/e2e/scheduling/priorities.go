@@ -105,9 +105,9 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 		framework.ExpectNoErrorWithOffset(0, err)
 
 		err = framework.CheckTestingNSDeletedExcept(ctx, cs, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for other test namespaces to be deleted before testing scheduling in %q", ns)
 		err = e2epod.WaitForPodsRunningReady(ctx, cs, metav1.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for %d pods in namespace %q to become running and ready", systemPodsNo, metav1.NamespaceSystem)
 
 		// skip if the most utilized node has less than the cri-o minMemLimit available
 		// otherwise we will not be able to run the test pod once all nodes are balanced
@@ -130,7 +130,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 		k := v1.LabelHostname
 		ginkgo.By("Verifying the node has a label " + k)
 		node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Node %q", nodeName)
 		if _, hasLabel := node.Labels[k]; !hasLabel {
 			// If the label is not exists, label all nodes for testing.
 
@@ -154,7 +154,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 
 		// make the nodes have balanced cpu,mem usage
 		err = createBalancedPodForNodes(ctx, f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "balance node resource usage before testing scheduling priorities")
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"
 		pod = createPausePod(ctx, f, pausePodConfig{
@@ -192,9 +192,9 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 			},
 		})
 		ginkgo.By("Wait the pod becomes running")
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", pod.Name, f.Namespace.Name)
 		labelPod, err := cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Pod %q in namespace %q", labelPodName, ns)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
 		gomega.Expect(labelPod.Spec.NodeName).ToNot(gomega.Equal(nodeName))
 	})
@@ -202,7 +202,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func(ctx context.Context) {
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(ctx, f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "balance node resource usage before testing scheduling priorities")
 		// Apply 10 taints to first node
 		nodeName := nodeList.Items[0].Name
 
@@ -249,11 +249,11 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 			Name:        tolerationPodName,
 			Tolerations: tolerations,
 		})
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(ctx, tolerationPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Pod %q in namespace %q", tolerationPodName, ns)
 		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
@@ -282,13 +282,13 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 			var nodes []v1.Node
 			for _, nodeName := range nodeNames {
 				node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "get Node %q", nodeName)
 				nodes = append(nodes, *node)
 			}
 
 			// Make the nodes have balanced cpu,mem usage.
 			err := createBalancedPodForNodes(ctx, f, cs, ns, nodes, podRequestedResource, 0.5)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "balance node resource usage before testing scheduling priorities")
 
 			replicas := 4
 			podLabel := "e2e-pts-score"

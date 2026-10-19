@@ -25,10 +25,10 @@ import (
 	"net"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -178,6 +178,7 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 	case "RS256", "ES256", "ES384", "ES512":
 		// OK

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -37,11 +38,49 @@ type Operation struct {
 
 // Request represents an input invocation to the storage interface.
 type Request struct {
-	Op            OpType
-	Key           string
-	Object        runtime.Object
-	GetOptions    storage.GetOptions
-	Preconditions *storage.Preconditions
+	Op      OpType
+	Key     string
+	Create  CreateRequest
+	Get     GetRequest
+	List    ListRequest
+	Delete  DeleteRequest
+	Update  UpdateRequest
+	Compact CompactRequest
+}
+
+// CreateRequest contains parameters specific to Create operations.
+type CreateRequest struct {
+	Object runtime.Object
+}
+
+// GetRequest contains parameters specific to Get operations.
+type GetRequest struct {
+	Options storage.GetOptions
+}
+
+// ListRequest contains parameters specific to GetList operations.
+type ListRequest struct {
+	Options storage.ListOptions
+}
+
+// DeleteRequest contains parameters specific to Delete operations.
+type DeleteRequest struct {
+	Preconditions        *storage.Preconditions
+	ValidateDeletion     storage.ValidateObjectFunc
+	CachedExistingObject runtime.Object
+}
+
+// UpdateRequest contains parameters specific to Update / GuaranteedUpdate operations.
+type UpdateRequest struct {
+	UpdateFunc           storage.UpdateFunc
+	IgnoreNotFound       bool
+	Preconditions        *storage.Preconditions
+	CachedExistingObject runtime.Object
+}
+
+// CompactRequest contains parameters specific to Compact operations.
+type CompactRequest struct {
+	ResourceVersion string
 }
 
 // Describe formats the operation for debugging and visualization.
@@ -67,9 +106,24 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> Invalid %s", r.Op, r.Key, errStr)
 		case storage.IsCorruptObject(output.Err):
 			return fmt.Sprintf("%s(%s) -> Corrupt", r.Op, r.Key)
+		case storage.IsTooLargeResourceVersion(output.Err):
+			return fmt.Sprintf("%s(%s) -> Too Large RV", r.Op, r.Key)
 		default:
-			return fmt.Sprintf("%s(%s) -> Unknown Error", r.Op, r.Key)
+			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
+	}
+	if r.Op == OpCompact {
+		return fmt.Sprintf("%s(RV=%s) -> OK", r.Op, r.Compact.ResourceVersion)
+	}
+	if r.Op == OpList {
+		accessor, err := meta.ListAccessor(output.Object)
+		if err != nil {
+			panic(err)
+		}
+		if r.List.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s, Match=%s) -> RV: %s, Items: %d", r.Op, r.Key, r.List.Options.ResourceVersion, r.List.Options.ResourceVersionMatch, accessor.GetResourceVersion(), meta.LenList(output.Object))
+		}
+		return fmt.Sprintf("%s(%s) -> RV: %s, Items: %d", r.Op, r.Key, accessor.GetResourceVersion(), meta.LenList(output.Object))
 	}
 	accessor, err := meta.Accessor(output.Object)
 	if err != nil {
@@ -79,16 +133,21 @@ func (r Request) Describe(output Response) string {
 	case OpCreate:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	case OpDelete:
-		if r.Preconditions != nil {
-			if r.Preconditions.ResourceVersion != nil && *r.Preconditions.ResourceVersion != "" {
-				return fmt.Sprintf("%s(if RV(%s) ==%s) -> Deleted", r.Op, r.Key, *r.Preconditions.ResourceVersion)
+		if r.Delete.Preconditions != nil {
+			if r.Delete.Preconditions.ResourceVersion != nil && *r.Delete.Preconditions.ResourceVersion != "" {
+				return fmt.Sprintf("%s(if RV(%s) ==%s) -> Deleted", r.Op, r.Key, *r.Delete.Preconditions.ResourceVersion)
 			}
-			if r.Preconditions.UID != nil && *r.Preconditions.UID != "" {
-				return fmt.Sprintf("%s(if UID(%s) == %s) -> Deleted", r.Op, r.Key, *r.Preconditions.UID)
+			if r.Delete.Preconditions.UID != nil && *r.Delete.Preconditions.UID != "" {
+				return fmt.Sprintf("%s(if UID(%s) == %s) -> Deleted", r.Op, r.Key, *r.Delete.Preconditions.UID)
 			}
 		}
 		return fmt.Sprintf("%s(%s) -> Deleted", r.Op, r.Key)
 	case OpGet:
+		if r.Get.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s) -> RV: %s, UID: %s", r.Op, r.Key, r.Get.Options.ResourceVersion, accessor.GetResourceVersion(), accessor.GetUID())
+		}
+		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
+	case OpUpdate:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	default:
 		return fmt.Sprintf("%s(%s) -> RV: %s", r.Op, r.Key, accessor.GetResourceVersion())
@@ -99,13 +158,44 @@ func (r Request) Describe(output Response) string {
 type OpType string
 
 const (
-	OpCreate OpType = "Create"
-	OpDelete OpType = "Delete"
-	OpGet    OpType = "Get"
+	OpCreate  OpType = "Create"
+	OpDelete  OpType = "Delete"
+	OpGet     OpType = "Get"
+	OpList    OpType = "List"
+	OpUpdate  OpType = "Update"
+	OpCompact OpType = "Compact"
 )
 
 // Response represents the output/result from the storage interface invocation.
 type Response struct {
 	Object runtime.Object
 	Err    error
+}
+
+// Change is a write the model applied to a single key. PrevObject is nil for a
+// create and Object is nil for a delete. Like etcd3 and the cacher, deciding
+// what a watcher with a predicate receives requires both objects.
+type Change struct {
+	Key             string
+	ResourceVersion uint64
+	Object          runtime.Object
+	PrevObject      runtime.Object
+}
+
+// WatchRequest contains parameters for a watch stream, exactly as passed to storage.Interface.Watch.
+type WatchRequest struct {
+	Key     string
+	Options storage.ListOptions
+}
+
+// WatchResponse contains the events and any terminal error received from a watch stream.
+type WatchResponse struct {
+	Events []watch.Event
+	Err    error
+}
+
+// WatchOperation captures a recorded watch operation with its request and response.
+type WatchOperation struct {
+	Request  WatchRequest
+	Response WatchResponse
 }

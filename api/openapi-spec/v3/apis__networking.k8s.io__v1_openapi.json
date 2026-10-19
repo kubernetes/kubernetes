@@ -5,17 +5,17 @@
         "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
         "properties": {
           "apiGroup": {
-            "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
+            "description": "apiGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
             "type": "string"
           },
           "kind": {
             "default": "",
-            "description": "Kind is the type of resource being referenced",
+            "description": "kind is the type of resource being referenced",
             "type": "string"
           },
           "name": {
             "default": "",
-            "description": "Name is the name of resource being referenced",
+            "description": "name is the name of resource being referenced",
             "type": "string"
           }
         },
@@ -291,6 +291,9 @@
             "description": "spec is the desired state of the IngressClass. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -388,6 +391,9 @@
             "description": "parameters is a link to a custom resource containing additional configuration for the controller. This is optional if the controller does not require extra parameters."
           }
         },
+        "required": [
+          "controller"
+        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1.IngressList": {
@@ -485,10 +491,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "port",
-          "protocol"
-        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1.IngressRule": {

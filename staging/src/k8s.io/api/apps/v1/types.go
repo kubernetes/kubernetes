@@ -67,6 +67,7 @@ type StatefulSet struct {
 
 // PodManagementPolicyType defines the policy for creating pods under a stateful set.
 // +enum
+// +k8s:validation-gen-nolint
 type PodManagementPolicyType string
 
 const (
@@ -97,6 +98,7 @@ type StatefulSetUpdateStrategy struct {
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the StatefulSet controller.
 // +enum
+// +k8s:validation-gen-nolint
 type StatefulSetUpdateStrategyType string
 
 const (
@@ -134,7 +136,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 	// maxUnavailable is the maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Absolute number is calculated from percentage by rounding down. This can not be 0.
 	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
 	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
 	// will be counted towards MaxUnavailable.
@@ -483,6 +485,7 @@ type DeploymentStrategy struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type DeploymentStrategyType string
 
 const (
@@ -643,6 +646,7 @@ type DaemonSetUpdateStrategy struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type DaemonSetUpdateStrategyType string
 
 const (

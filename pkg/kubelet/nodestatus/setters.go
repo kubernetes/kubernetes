@@ -388,12 +388,12 @@ func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 // imageListFunc is expected to return a list of images sorted in descending order by image size.
 // nodeStatusMaxImages is ignored if set to -1.
 func Images(nodeStatusMaxImages int32,
-	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
+	imageListFunc func(context.Context) ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
 		// Update image list of this node
 		var imagesOnNode []v1.ContainerImage
-		containerImages, err := imageListFunc()
+		containerImages, err := imageListFunc(ctx)
 		if err != nil {
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -234,7 +234,7 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
-		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.DeviceID]()
 		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
@@ -242,13 +242,11 @@ claims:
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
 				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-				allocatedDevices.Insert(deviceID)
 				if result.ShareID == nil {
 					allocatedDevices.Insert(deviceID)
 					continue
 				}
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
-				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				allocatedSharedDeviceIDs.Insert(deviceID)
 				claimedCapacity := result.ConsumedCapacity
 				if claimedCapacity != nil {
 					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)

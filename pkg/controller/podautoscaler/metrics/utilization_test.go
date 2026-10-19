@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,6 +94,62 @@ func TestResourceUtilizationRatio(t *testing.T) {
 			expectedRawAverageValue:    0,
 			expectedErr:                fmt.Errorf("no metrics returned matched known pods"),
 		},
+		{
+			name: "metrics and requests totals exceed int64",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: math.MaxInt64/2 + 1}, "test-pod-1": {Value: math.MaxInt64/2 + 1},
+			},
+			requests: map[string]int64{
+				"test-pod-0": math.MaxInt64/2 + 1, "test-pod-1": math.MaxInt64/2 + 1,
+			},
+			targetUtilization:          50,
+			expectedUtilizationRatio:   2,
+			expectedCurrentUtilization: 100,
+			expectedRawAverageValue:    math.MaxInt64/2 + 1,
+			expectedErr:                nil,
+		},
+		{
+			name: "metrics total times 100 exceeds int64",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: 1 << 62},
+			},
+			requests: map[string]int64{
+				"test-pod-0": 1 << 62,
+			},
+			targetUtilization:          50,
+			expectedUtilizationRatio:   2,
+			expectedCurrentUtilization: 100,
+			expectedRawAverageValue:    1 << 62,
+			expectedErr:                nil,
+		},
+		{
+			name: "utilization percentage exceeds int32",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: 1 << 40},
+			},
+			requests: map[string]int64{
+				"test-pod-0": 1,
+			},
+			targetUtilization:          50,
+			expectedUtilizationRatio:   float64(math.MaxInt32) / 50,
+			expectedCurrentUtilization: math.MaxInt32,
+			expectedRawAverageValue:    1 << 40,
+			expectedErr:                nil,
+		},
+		{
+			name: "metrics total exceeds int64 and percentage exceeds int32",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: math.MaxInt64/2 + 1}, "test-pod-1": {Value: math.MaxInt64/2 + 1},
+			},
+			requests: map[string]int64{
+				"test-pod-0": 1, "test-pod-1": 1,
+			},
+			targetUtilization:          50,
+			expectedUtilizationRatio:   float64(math.MaxInt32) / 50,
+			expectedCurrentUtilization: math.MaxInt32,
+			expectedRawAverageValue:    math.MaxInt64/2 + 1,
+			expectedErr:                nil,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -130,6 +187,24 @@ func TestMetricUsageRatio(t *testing.T) {
 			targetUsage:          10000,
 			expectedUsageRatio:   .75,
 			expectedCurrentUsage: 7500,
+		},
+		{
+			name: "metrics total exceeds int64",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: math.MaxInt64/2 + 1}, "test-pod-1": {Value: math.MaxInt64/2 + 1},
+			},
+			targetUsage:          math.MaxInt64/2 + 1,
+			expectedUsageRatio:   1,
+			expectedCurrentUsage: math.MaxInt64/2 + 1,
+		},
+		{
+			name: "metrics total exceeds int64 with mixed values",
+			metrics: PodMetricsInfo{
+				"test-pod-0": {Value: math.MaxInt64}, "test-pod-1": {Value: math.MaxInt64}, "test-pod-2": {Value: 0},
+			},
+			targetUsage:          math.MaxInt64 / 3,
+			expectedUsageRatio:   2,
+			expectedCurrentUsage: math.MaxInt64 / 3 * 2,
 		},
 	}
 	for _, tc := range testCases {

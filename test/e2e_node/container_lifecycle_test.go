@@ -1087,7 +1087,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								Image: defaultImage,
 								Command: ExecCommand(regular1, execCommand{
 									Delay:    10,
-									ExitCode: -1,
+									ExitCode: 1,
 								}),
 							},
 						},
@@ -1597,7 +1597,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								Image: defaultImage,
 								Command: ExecCommand(regular1, execCommand{
 									Delay:    20,
-									ExitCode: -1,
+									ExitCode: 1,
 								}),
 							},
 						},

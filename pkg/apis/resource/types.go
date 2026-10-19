@@ -73,9 +73,6 @@ const (
 //
 // For resources that are not local to a node, the node name is not set. Instead,
 // the driver may use a node selector to specify where the devices are available.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceSlice struct {
 	metav1.TypeMeta
 	// Standard object metadata
@@ -527,11 +524,18 @@ type NodeAllocatableMapping struct {
 	// (for a specific claim allocation) determines the base quantity for
 	// the node allocatable resource. `capacityMultiplier` must also be set and is
 	// multiplied with the base quantity.
+	//
 	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
 	// and this field is set to "dra.example.com/memory", then for a claim allocation
 	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
 	// node allocatable resource mapping will be "4Gi".
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
+	//
+	// In this example, "dra.example.com/memory" is a fictional standardized capacity name.
+	// For driver-specific capacities the driver name can be omitted.
+	// As defined for consumedCapacity, the capacity consumption may be recorded
+	// there with or without the driver name.
+	//
 	// +optional
 	CapacityKey *QualifiedName
 
@@ -947,9 +951,6 @@ type ResourceSliceList struct {
 // with specific properties, this is how that request is expressed. The status
 // stanza tracks whether this claim has been satisfied and what specific
 // resources have been allocated.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaim struct {
 	metav1.TypeMeta
 	// Standard object metadata
@@ -1355,6 +1356,17 @@ type CapacityRequirements struct {
 	// This is semantically equivalent to a CEL selector with
 	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
 	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
+	//
+	// The domain prefix can be omitted, in which case it defaults to the driver of the
+	// device under evaluation. For example, "bandwidth: 1Gi" is equivalent to
+	// "<driver>/bandwidth: 1Gi" for a device published by driver "<driver>", regardless of
+	// which other, differently-domained "bandwidth" capacities that device might also have.
+	// To request one of those, the domain must be given explicitly, for example
+	// "example.com/bandwidth". Requesting the same driver capacity with and without
+	// the driver name as domain, for example "bandwidth: 1Gi" and "<driver>/bandwidth: 2Gi", is
+	// ambiguous and causes scheduling to fail with an error. For the sake of consistency
+	// there's no exception for such a conflict where the value is the same - that is still
+	// an error.
 	//
 	// When a requestPolicy is defined, the requested amount is adjusted upward
 	// to the nearest valid value based on the policy.
@@ -1977,6 +1989,8 @@ type DeviceRequestAllocationResult struct {
 	//
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
+	// The domain prefix in the capacity name may be omitted if it is
+	// the same as the driver name.
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
@@ -2044,9 +2058,6 @@ type ResourceClaimList struct {
 // device configuration and selectors. It can be referenced in
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type DeviceClass struct {
 	metav1.TypeMeta
 	// Standard object metadata
@@ -2123,9 +2134,6 @@ type DeviceClassList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaimTemplate struct {
 	metav1.TypeMeta
 	// Standard object metadata

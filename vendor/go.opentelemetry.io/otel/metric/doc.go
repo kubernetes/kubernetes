@@ -201,4 +201,4 @@ fully implement all the API interfaces when a user updates their API.
 [OpenTelemetry documentation]: https://opentelemetry.io/docs/concepts/signals/metrics/
 [GetMeterProvider]: https://pkg.go.dev/go.opentelemetry.io/otel#GetMeterProvider
 */
-package metric // import "go.opentelemetry.io/otel/metric"
+package metric

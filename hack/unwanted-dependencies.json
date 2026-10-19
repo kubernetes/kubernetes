@@ -8,6 +8,10 @@
       "github.com/google/cel-go": {
         "version": "v0.29.2",
         "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
+      },
+      "github.com/grpc-ecosystem/grpc-gateway/v2": {
+        "version": "v2.29.0",
+        "reason": "pin to v2.29.0 until grpc-gateway drops go-openapi, see grpc-ecosystem/grpc-gateway#7343 and #7325; v2.30.0 pulls in go-openapi analysis, spec, strfmt and validate"
       }
     },
     "unwantedModules": {
@@ -18,6 +22,7 @@
       "cloud.google.com/go/storage": "cloud dependency",
       "dario.cat/mergo": "see https://github.com/kubernetes/kubernetes/issues/107499",
       "github.com/GoogleCloudPlatform/k8s-cloud-provider": "cloud dependency",
+      "github.com/NYTimes/gziphandler": "forked into kube-openapi pkg/internal/third_party; last release 2019, go 1.11",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/asaskevich/govalidator": "see https://github.com/kubernetes/kubernetes/issues/128573",
@@ -111,7 +116,6 @@
         "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/prometheus/common",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -120,23 +124,11 @@
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-        "go.opentelemetry.io/otel/metric",
-        "go.opentelemetry.io/otel/sdk",
-        "go.opentelemetry.io/otel/trace",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
-        "k8s.io/kube-openapi",
-        "k8s.io/utils",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
+        "k8s.io/utils"
       ],
       "github.com/envoyproxy/protoc-gen-validate": [
         "google.golang.org/grpc"
@@ -148,7 +140,6 @@
         "k8s.io/code-generator"
       ],
       "github.com/golang/protobuf": [
-        "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
@@ -156,16 +147,23 @@
         "google.golang.org/grpc",
         "google.golang.org/protobuf"
       ],
+      "github.com/google/btree": [
+        "github.com/peterbourgon/diskv/v3"
+      ],
+      "github.com/google/s2a-go": [
+        "google.golang.org/grpc"
+      ],
+      "github.com/googleapis/enterprise-certificate-proxy": [
+        "google.golang.org/grpc"
+      ],
+      "github.com/googleapis/gax-go/v2": [
+        "google.golang.org/grpc"
+      ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang"
       ],
       "github.com/klauspost/compress": [
         "github.com/prometheus/client_golang"
-      ],
-      "github.com/mailru/easyjson": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/modern-go/concurrent": [
         "github.com/prometheus/client_golang"
@@ -181,6 +179,9 @@
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
+      "google.golang.org/api": [
+        "google.golang.org/grpc"
+      ],
       "gopkg.in/yaml.v3": [
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
@@ -189,7 +190,6 @@
         "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/prometheus/common",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -198,22 +198,10 @@
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-        "go.opentelemetry.io/otel/metric",
-        "go.opentelemetry.io/otel/sdk",
-        "go.opentelemetry.io/otel/trace",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
-        "go.uber.org/zap",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
+        "go.uber.org/zap"
       ]
     },
     "unwantedVendored": [

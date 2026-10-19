@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/code-generator/cmd/validation-gen/args"
 	"k8s.io/code-generator/cmd/validation-gen/generators"
+	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
@@ -54,7 +55,11 @@ func main() {
 	}
 
 	if args.PrintDocs {
-		if err := generators.PrintDocs(os.Stdout, args.TagPrefix); err != nil {
+		extensions, err := validators.LoadExtensions(args.ExtensionsFiles)
+		if err != nil {
+			klog.Fatalf("Failed loading validation extensions: %v", err)
+		}
+		if err := generators.PrintDocs(os.Stdout, args.TagPrefix, extensions); err != nil {
 			klog.Fatalf("Error: %v", err)
 		}
 		os.Exit(0)

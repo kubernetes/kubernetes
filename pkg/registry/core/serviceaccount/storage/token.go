@@ -49,6 +49,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -243,7 +244,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			admissionReviewAPIGroup := attestations[authenticationapi.AttestationAdmissionReviewAPIGroups][0]
 			audience := req.Spec.Audiences[0]
 
-			req.Spec.ExpirationSeconds = min(req.Spec.ExpirationSeconds, maxAdmissionReviewWebhookTokenExpirationSeconds)
+			req.Spec.ExpirationSeconds = new(min(ptr.Deref(req.Spec.ExpirationSeconds, 0), maxAdmissionReviewWebhookTokenExpirationSeconds))
 
 			if err := r.authorizeAdmissionWebhookAuthnTokenRequest(newCtx, svcacct, admissionReviewAPIGroup); err != nil {
 				return nil, err
@@ -269,10 +270,12 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		}
 	}
 
-	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
+	exp := ptr.Deref(req.Spec.ExpirationSeconds, 0)
+	if r.maxExpirationSeconds > 0 && exp > r.maxExpirationSeconds {
 		// only positive value is valid
-		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
-		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
+		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", exp, r.maxExpirationSeconds))
+		exp = r.maxExpirationSeconds
+		req.Spec.ExpirationSeconds = new(exp)
 	}
 
 	// Tweak expiration for safe transition of projected service account token.
@@ -280,8 +283,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	// Fail after hard-coded extended expiration time.
 	// Only perform the extension when token is pod-bound.
 	var warnAfter int64
-	exp := req.Spec.ExpirationSeconds
-	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
+	if r.extendExpiration && pod != nil && exp == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
 		exp = r.maxExtendedExpirationSeconds
 	}
@@ -299,7 +301,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	out := req.DeepCopy()
 	out.Status = authenticationapi.TokenRequestStatus{
 		Token:               tokdata,
-		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
+		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(ptr.Deref(out.Spec.ExpirationSeconds, 0)) * time.Second)},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
 		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, authenticationtokenjwt.CredentialIDForJTI(sc.ID))

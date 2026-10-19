@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -131,7 +132,7 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 				continue
 			}
 
-			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
 				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
 			}
 		}

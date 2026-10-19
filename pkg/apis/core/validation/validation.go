@@ -1320,8 +1320,17 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			switch source.PodCertificate.KeyType {
 			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":
 				// ok
+			case "MLDSA44", "MLDSA65", "MLDSA87":
+				if !opts.AllowMLDSAPodCertificateKeyTypes {
+					allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				}
 			default:
-				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				supportedKeyTypes := []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}
+				if opts.AllowMLDSAPodCertificateKeyTypes {
+					supportedKeyTypes = append(supportedKeyTypes, "MLDSA44", "MLDSA65", "MLDSA87")
+				}
+
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, supportedKeyTypes))
 			}
 
 			if source.PodCertificate.MaxExpirationSeconds != nil {
@@ -4632,6 +4641,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
+	AllowMLDSAPodCertificateKeyTypes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4831,8 +4842,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.ActiveDeadlineSeconds != nil {
 		value := *spec.ActiveDeadlineSeconds
-		if value < 1 || value > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)))
+		if value < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)).WithOrigin("minimum").MarkCoveredByDeclarative())
+		} else if value > math.MaxInt32 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)).WithOrigin("maximum").MarkCoveredByDeclarative())
 		}
 	}
 
@@ -5852,6 +5865,9 @@ var updatablePodSpecFields = []string{
 	"`spec.activeDeadlineSeconds`",
 	"`spec.tolerations` (only additions to existing tolerations)",
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+	"`spec.schedulingGates` (only deletions of existing scheduling gates)",
+	"`spec.nodeSelector` (only additions, and only while the pod has scheduling gates)",
+	"`spec.affinity.nodeAffinity` (only while the pod has scheduling gates)",
 }
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
@@ -5867,8 +5883,12 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// 1.  spec.containers[*].image
 	// 2.  spec.initContainers[*].image
 	// 3.  spec.activeDeadlineSeconds
-	// 4.  spec.terminationGracePeriodSeconds
-	// 5.  spec.schedulingGates
+	// 4.  spec.tolerations (only additions)
+	// 5.  spec.terminationGracePeriodSeconds (only negative -> 1)
+	// 6.  spec.schedulingGates (only deletions)
+	// 7.  spec.nodeSelector (only additions, only while gated)
+	// 8.  spec.affinity.nodeAffinity (only while gated)
+	// Keep this list in sync with updatablePodSpecFields.
 
 	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
 	allErrs = append(allErrs, containerErrs...)
@@ -8528,19 +8548,46 @@ func ValidateResourceQuotaStatus(status *core.ResourceQuotaStatus, fld *field.Pa
 }
 
 func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	return validateResourceQuotaSpec(resourceQuotaSpec, nil, fld)
+}
+
+// validateResourceQuotaSpec validates a spec against the hard limits the object
+// already stores, oldHard, which is nil on create. Nothing is mutated.
+func validateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, oldHard core.ResourceList, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	fldPath := fld.Child("hard")
-	for k, v := range resourceQuotaSpec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	allErrs = append(allErrs, validateResourceQuotaResourceList(resourceQuotaSpec.Hard, fld.Child("hard"), oldHard)...)
 
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
 	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
 
 	return allErrs
+}
+
+// validateResourceQuotaResourceList validates every name in values, and every
+// value that none of the stored lists holds under the same key. Nothing is mutated.
+func validateResourceQuotaResourceList(values core.ResourceList, fldPath *field.Path, stored ...core.ResourceList) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k, v := range values {
+		resPath := fldPath.Key(string(k))
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
+		// A value the object already holds was accepted when it was stored.
+		if isStoredQuantity(k, v, stored) {
+			continue
+		}
+		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
+	}
+	return allErrs
+}
+
+// isStoredQuantity reports whether one of the lists holds name with the same value.
+func isStoredQuantity(name core.ResourceName, value resource.Quantity, lists []core.ResourceList) bool {
+	for _, list := range lists {
+		if old, ok := list[name]; ok && old.Cmp(value) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // isIntegerResourceValue reports whether q may be used where whole units are
@@ -8570,7 +8617,7 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 // ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceQuotaSpec(&newResourceQuota.Spec, oldResourceQuota.Spec.Hard, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
 	fldPath := field.NewPath("spec", "scopes")
@@ -8595,18 +8642,9 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 	if len(newResourceQuota.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
 	}
-	fldPath := field.NewPath("status", "hard")
-	for k, v := range newResourceQuota.Status.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
-	fldPath = field.NewPath("status", "used")
-	for k, v := range newResourceQuota.Status.Used {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	// The quota controller copies spec.hard into status.hard, so a stored spec value counts as stored here too.
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Hard, field.NewPath("status", "hard"), oldResourceQuota.Status.Hard, oldResourceQuota.Spec.Hard)...)
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Used, field.NewPath("status", "used"), oldResourceQuota.Status.Used)...)
 	return allErrs
 }
 

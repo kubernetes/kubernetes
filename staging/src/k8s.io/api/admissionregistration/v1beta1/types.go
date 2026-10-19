@@ -27,6 +27,7 @@ type Rule = v1.Rule
 
 // ScopeType specifies a scope for a Rule.
 // +enum
+// +k8s:validation-gen-nolint
 type ScopeType = v1.ScopeType
 
 const (
@@ -648,6 +649,7 @@ type MatchResources struct {
 
 // ValidationAction specifies a policy enforcement action.
 // +enum
+// +k8s:validation-gen-nolint
 type ValidationAction string
 
 const (
@@ -684,7 +686,6 @@ type NamedRuleWithOperations struct {
 // +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingWebhookConfiguration
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -725,7 +726,6 @@ type ValidatingWebhookConfigurationList struct {
 // +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingWebhookConfiguration
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 MutatingWebhookConfiguration instead.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -1085,6 +1085,7 @@ type MutatingWebhook struct {
 // ReinvocationPolicyType specifies what type of policy is used when other admission plugins also perform
 // modifications.
 // +enum
+// +k8s:validation-gen-nolint
 type ReinvocationPolicyType = v1.ReinvocationPolicyType
 
 const (
@@ -1103,6 +1104,7 @@ type RuleWithOperations = v1.RuleWithOperations
 
 // OperationType specifies an operation for a request.
 // +enum
+// +k8s:validation-gen-nolint
 type OperationType = v1.OperationType
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
@@ -1351,6 +1353,7 @@ type Mutation struct {
 
 // PatchType specifies the type of patch operation for a mutation.
 // +enum
+// +k8s:validation-gen-nolint
 type PatchType string
 
 const (

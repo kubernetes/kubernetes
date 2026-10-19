@@ -56,6 +56,22 @@ API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 API_LOGFILE=${API_LOGFILE:-${TMP_DIR}/openapi-api-server.log}
 
+# Omit enums from the spec, which is used to generate clients, until
+# https://github.com/kubernetes/kubernetes/issues/109177 is resolved.
+# Set KUBE_OPENAPI_SPEC_KEEP_ENUMS=true to keep them.
+KUBE_OPENAPI_SPEC_KEEP_ENUMS=${KUBE_OPENAPI_SPEC_KEEP_ENUMS:-false}
+OPENAPI_ENUM_FILTER='.'
+if [[ "${KUBE_OPENAPI_SPEC_KEEP_ENUMS}" != "true" ]]; then
+  # A non-array "enum" is a JSONSchemaProps property, not enum values.
+  OPENAPI_ENUM_FILTER='walk(
+    if type == "object" then
+      (if (.enum | type) == "array" then del(.enum) else . end)
+      | if (.description | type) == "string" then
+          .description |= sub("\\s*Possible enum values:[\\s\\S]*$"; "")
+        else . end
+    else . end)'
+fi
+
 kube::etcd::start
 
 echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
@@ -70,7 +86,6 @@ if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
 fi
 
 # Start kube-apiserver
-# omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
 # KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA ensures that the OpenAPI is updated with all APIs
 # that are intended to be removed at a particular release during alpha. 
@@ -82,7 +97,7 @@ KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA=${KUBE_APISERVER_STRICT_REMO
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true,AllBeta=true,OpenAPIEnums=false \
+  --feature-gates=AllAlpha=true,AllBeta=true \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
@@ -114,7 +129,7 @@ kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 rm -f "${OPENAPI_ROOT_DIR}/swagger.json"
 curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' \
   "https://${API_HOST}:${API_PORT}/openapi/v2" \
-  | jq -S '.info.version="unversioned"' \
+  | jq -S '.info.version="unversioned" | '"${OPENAPI_ENUM_FILTER}" \
   > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}/v3 for OpenAPI v3"
@@ -135,7 +150,7 @@ curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' \
     OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
     curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' \
       "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" \
-      | jq -S '.info.version="unversioned"' \
+      | jq -S '.info.version="unversioned" | '"${OPENAPI_ENUM_FILTER}" \
       > "$OPENAPI_PATH"
 
     if [[ "${group}" == "api"* ]]; then

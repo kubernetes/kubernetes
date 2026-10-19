@@ -131,6 +131,15 @@ func Validate_CertificateSigningRequest(
 					return nil
 				}
 			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_CertificateSigningRequestSpec(ctx, op, fldPath, obj, oldObj)...)
 			return

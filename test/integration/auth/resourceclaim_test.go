@@ -38,7 +38,6 @@ import (
 
 func TestResourceClaimGranularStatusAuthorization(t *testing.T) {
 	// Enable Feature Gates Globally for the test run
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimGranularStatusAuthorization, true)
 

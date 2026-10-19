@@ -21,7 +21,12 @@ limitations under the License.
 // +k8s:validation-gen-nolint
 package minimum
 
-import "k8s.io/code-generator/cmd/validation-gen/testscheme"
+import (
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/code-generator/cmd/validation-gen/testscheme"
+)
 
 var localSchemeBuilder = testscheme.New()
 
@@ -53,6 +58,16 @@ type BasicStruct struct {
 	Uint32Field uint32 `json:"uint32Field"`
 	// +k8s:minimum=1
 	Uint64Field uint64 `json:"uint64Field"`
+
+	// +k8s:minimum="1s"
+	DurationField time.Duration `json:"durationField"`
+	// +k8s:minimum="100ms"
+	DurationPtrField *time.Duration `json:"durationPtrField"`
+
+	// +k8s:minimum=1
+	QuantityField resource.Quantity `json:"quantityField"`
+	// +k8s:minimum="1Gi"
+	QuantityPtrField *resource.Quantity `json:"quantityPtrField"`
 
 	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`

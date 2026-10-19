@@ -245,3 +245,52 @@ func TestMutationCacheOnDeleteClearsStaleMutation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, items, "OnDelete must clear the mutation; ByIndex must return nothing")
 }
+
+// racingIndexer removes objects from the wrapped Indexer on the first GetByKey
+// call, simulating an informer that processes a delete event concurrently with
+// a ByIndex call. This is possible because processDeltas updates the indexer
+// before invoking the event handlers, so the indexer is not serialized against
+// the mutation cache lock held by ByIndex.
+type racingIndexer struct {
+	Indexer
+	deleteOnNextGet []interface{}
+}
+
+func (r *racingIndexer) GetByKey(key string) (interface{}, bool, error) {
+	for _, obj := range r.deleteOnNextGet {
+		if err := r.Indexer.Delete(obj); err != nil {
+			return nil, false, err
+		}
+	}
+	r.deleteOnNextGet = nil
+	return r.Indexer.GetByKey(key)
+}
+
+// TestMutationCacheByIndexConcurrentDelete verifies that ByIndex returns a
+// cached replacement when the indexed object with the same key disappears
+// between IndexKeys and GetByKey.
+func TestMutationCacheByIndexConcurrentDelete(t *testing.T) {
+	byNameIndex := "by-name"
+	indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{
+		byNameIndex: func(obj interface{}) ([]string, error) {
+			return []string{obj.(*v1.Pod).Name}, nil
+		},
+	})
+
+	// The informer still has the old instance when ByIndex starts.
+	oldPod := makeMutationTestPod("pod", "uid-1", "1")
+	require.NoError(t, indexer.Add(oldPod))
+
+	racer := &racingIndexer{Indexer: indexer}
+	mc := NewIntegerResourceVersionMutationCache(klog.Background(), NewStore(MetaNamespaceKeyFunc), racer, time.Minute, true /* includeAdds */)
+
+	// Simulate recreating the pod under the same name.
+	replacementPod := makeMutationTestPod("pod", "uid-2", "2")
+	mc.Mutation(replacementPod)
+
+	// Delete oldPod when ByIndex calls GetByKey, after IndexKeys returns its key.
+	racer.deleteOnNextGet = []interface{}{oldPod}
+	items, err := mc.ByIndex(byNameIndex, "pod")
+	require.NoError(t, err)
+	require.Equal(t, []interface{}{replacementPod}, items)
+}

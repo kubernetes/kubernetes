@@ -276,6 +276,7 @@ func TestQuantityDocExamples(t *testing.T) {
 		// A decimal quantity is not capped at 2^63-1 in magnitude.
 		{"18446744073709551616", "18446744073709551616"},
 		// A binarySI one is: 8Ei is 2^63, and parses as 2^63-1.
+		// TODO(#141166): Fix to cap at 8Ei (9223372036854775808).
 		{"8Ei", "9223372036854775807"},
 		// No quantity is limited to three decimal places.
 		{"1.2345", "1234500u"},

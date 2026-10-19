@@ -94,6 +94,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"reflectType":                    c.Universe.Type(reflectType),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
+		"shardingSelector":               c.Universe.Type(shardingSelector),
 		"stringsBuilder":                 c.Universe.Type(stringsBuilder),
 		"syncMutex":                      c.Universe.Type(syncMutex),
 		"timeDuration":                   c.Universe.Type(timeDuration),
@@ -120,6 +121,7 @@ type sharedInformerFactory struct {
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
 	transform {{.cacheTransformFunc|raw}}
+	shardSelector {{.shardingSelector|raw}}
 	informerName *{{.cacheInformerName|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
@@ -163,6 +165,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector {{.shardingSelector|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -316,6 +326,9 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   if f.transform != nil {
     informer.SetTransform(f.transform)
   }
+  if f.shardSelector != nil {
+    informer.SetShardSelector(f.shardSelector)
+  }
   f.informers[informerType] = informer
 
   return informer
@@ -334,17 +347,17 @@ var sharedInformerFactoryInterface = `
 //	defer factory.Shutdown()    // Returns immediately if nothing was started.
 //	genericInformer := factory.ForResource(resource)
 //	typedInformer := factory.SomeAPIGroup().V1().SomeType()
-//	handle, err := typeInformer.Informer().AddEventHandler(...)
+//	handle, err := typedInformer.Informer().AddEventHandler(...)
 //	if err != nil {
 //	    return fmt.Errorf("register event handler: %v", err)
 //	}
-//	defer typeInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
+//	defer typedInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
 //	factory.StartWithContext(ctx)                            // Start processing these informers.
 //	synced := factory.WaitForCacheSyncWithContext(ctx)
 //	if err := synced.AsError(); err != nil {
 //	    return err
 //	}
-//	for v := range synced {
+//	for v := range synced.Synced {
 //	    // Only if desired log some information similar to this.
 //	    fmt.Fprintf(os.Stdout, "cache synced: %s", v)
 //	}

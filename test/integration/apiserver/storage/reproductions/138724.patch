@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..3091f2a8814 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -1210,7 +1210,9 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, ke
+ 
+ 	if kv == nil {
+ 		if !ignoreNotFound {
+-			return nil, storage.NewKeyNotFoundError(key, rev)
++			// BUG REVERT (#138724): return ResourceVersion=0 on KeyNotFoundError
++			// during Delete/GuaranteedUpdate instead of tracking the etcd revision.
++			return nil, storage.NewKeyNotFoundError(key, 0)
+ 		}
+ 		if err := runtime.SetZeroValue(state.obj); err != nil {
+ 			return nil, err

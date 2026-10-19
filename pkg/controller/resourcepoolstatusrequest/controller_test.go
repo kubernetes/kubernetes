@@ -27,6 +27,7 @@ import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -859,14 +860,18 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 	taintRule := makeDeviceTaintRule("rule-1", driver, "pool-1", "device-0", resourcev1.DeviceTaintEffectNoSchedule)
 
 	testCases := map[string]struct {
-		slices           []*resourcev1.ResourceSlice
-		claims           []*resourcev1.ResourceClaim
-		rules            []*resourcev1.DeviceTaintRule
-		enableTaintRules bool
-		wantTotal        int32
-		wantAllocated    int32
-		wantAvailable    int32
-		wantUnavailable  int32
+		slices []*resourcev1.ResourceSlice
+		claims []*resourcev1.ResourceClaim
+		rules  []*resourcev1.DeviceTaintRule
+		// disableTaintRules simulates a pre-1.38 cluster where the
+		// DRADeviceTaintRules gate could still be turned off; the gate is
+		// GA-locked to true from 1.38 onward, so this pins the emulated
+		// version back to 1.37 to exercise that behavior.
+		disableTaintRules bool
+		wantTotal         int32
+		wantAllocated     int32
+		wantAvailable     int32
+		wantUnavailable   int32
 	}{
 		// Three claims reference the same physical device; it must count once.
 		"repeated claims on one device count once": {
@@ -901,23 +906,27 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			slices:    taintedSlices(resourcev1.DeviceTaintEffectNone),
 			wantTotal: 5, wantAvailable: 5, wantUnavailable: 0,
 		},
-		// A matching DeviceTaintRule applies only when its gate is enabled.
+		// A matching DeviceTaintRule applies now that the gate is GA-locked
+		// to true.
 		"taint rule applies when gate is enabled": {
-			slices:           plainSlices,
-			rules:            []*resourcev1.DeviceTaintRule{taintRule},
-			enableTaintRules: true,
-			wantTotal:        4, wantAvailable: 3, wantUnavailable: 1,
-		},
-		"taint rule ignored when gate is disabled": {
 			slices:    plainSlices,
 			rules:     []*resourcev1.DeviceTaintRule{taintRule},
-			wantTotal: 4, wantAvailable: 4, wantUnavailable: 0,
+			wantTotal: 4, wantAvailable: 3, wantUnavailable: 1,
+		},
+		"taint rule ignored when gate is disabled": {
+			slices:            plainSlices,
+			rules:             []*resourcev1.DeviceTaintRule{taintRule},
+			disableTaintRules: true,
+			wantTotal:         4, wantAvailable: 4, wantUnavailable: 0,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, tc.enableTaintRules)
+			if tc.disableTaintRules {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, false)
+			}
 			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), tc.slices, tc.claims, tc.rules...))
 			if got := derefInt32(pool.TotalDevices); got != tc.wantTotal {
 				t.Errorf("TotalDevices = %d, want %d", got, tc.wantTotal)

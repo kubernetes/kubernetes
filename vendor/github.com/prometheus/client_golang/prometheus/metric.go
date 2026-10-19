@@ -22,7 +22,6 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
-	"google.golang.org/protobuf/proto"
 )
 
 var separatorByteSlice = []byte{model.SeparatorByte} // For convenient use with xxhash.
@@ -153,7 +152,7 @@ type timestampedMetric struct {
 
 func (m timestampedMetric) Write(pb *dto.Metric) error {
 	e := m.Metric.Write(pb)
-	pb.TimestampMs = proto.Int64(m.t.Unix()*1000 + int64(m.t.Nanosecond()/1000000))
+	pb.TimestampMs = new(m.t.Unix()*1000 + int64(m.t.Nanosecond()/1000000))
 	return e
 }
 
@@ -209,8 +208,8 @@ func (m *withExemplarsMetric) Write(pb *dto.Metric) error {
 			} else {
 				// The +Inf bucket should be explicitly added if there is an exemplar for it, similar to non-const histogram logic in https://github.com/prometheus/client_golang/blob/main/prometheus/histogram.go#L357-L365.
 				b := &dto.Bucket{
-					CumulativeCount: proto.Uint64(h.GetSampleCount()),
-					UpperBound:      proto.Float64(math.Inf(1)),
+					CumulativeCount: new(h.GetSampleCount()),
+					UpperBound:      new(math.Inf(1)),
 					Exemplar:        e,
 				}
 				h.Bucket = append(h.Bucket, b)

@@ -84,6 +84,7 @@ var CSISuites = append(BaseSuites,
 	},
 	InitSnapshottableTestSuite,
 	InitSnapshotMetadataTestSuite,
+	InitSnapshotMetadataStressTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
 	InitPvcDeletionPerformanceTestSuite,
@@ -125,7 +126,7 @@ func getVolumeOpCounts(ctx context.Context, c clientset.Interface, config *rest.
 
 	nodeLimit := 25
 
-	metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, true, false, true, false, false, false)
+	metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, c, config, true, false, true, false, false, false)
 
 	if err != nil {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)

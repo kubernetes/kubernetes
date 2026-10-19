@@ -27,7 +27,7 @@ import (
 //
 // Counter describes a quantity associated with a device.
 type CounterApplyConfiguration struct {
-	// Value defines how much of a certain device counter is available.
+	// value defines how much of a certain device counter is available.
 	Value *resource.Quantity `json:"value,omitempty"`
 }
 

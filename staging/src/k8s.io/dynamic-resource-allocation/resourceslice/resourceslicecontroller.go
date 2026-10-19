@@ -127,6 +127,11 @@ type Controller struct {
 	// Optional pool name to reconcile.
 	reconcilePoolWithName string
 
+	// validateQualifiedNames controls whether validatePool checks
+	// attribute and capacity names for redundant driver domain qualification.
+	// See [Options.ValidateQualifiedNames].
+	validateQualifiedNames bool
+
 	// usePoolNameFieldSelector is disabled when the API server rejects the
 	// spec.pool.name field selector. Access must be atomic because List and Watch
 	// can run concurrently.
@@ -283,10 +288,17 @@ type Options struct {
 
 	// ErrorHandler will get called whenever the controller encounters
 	// a problem while trying to publish ResourceSlices. The controller
-	// will retry once the handler returns. What the handler does with
+	// will retry transient errors once the handler returns. Publishing
+	// of invalid ResourceSlices stops until the slices are replaced.
+	//
+	// What the handler does with
 	// that information is up to the handler. It could log the error,
 	// replace the slices if they cannot be published (see below),
 	// or force the program running the controller to fail by exiting.
+	//
+	// The handler runs on the controller's worker without holding any
+	// locks, so it may call Update to replace the resources. It must not
+	// call Stop because Stop waits for the worker.
 	//
 	// If some fields were dropped because the cluster does not support
 	// the feature they depend on, then the error is or wraps an
@@ -294,6 +306,19 @@ type Options struct {
 	// type:
 	//    var droppedFields *resourceslice.DroppedFieldsError
 	//    if errors.As(err, &droppedFields) { ... do something with droppedFields ... }
+	//
+	// Such truncated ResourceSlices do not get published automatically
+	// again. That such a situation occurred shows that the driver was not
+	// configured correctly or depends on features not supported by the
+	// cluster. The right solution would be to reconfigure or redeploy
+	// the driver. Upgrading a cluster to enable new features should be done
+	// in this order:
+	//
+	//  - apiserver with new feature enabled
+	//  - rest of control plane
+	//  - DRA driver using new feature
+	//
+	// Downgrading must follow the reverse order.
 	//
 	// The default is [utilruntime.HandleErrorWithContext] which just logs
 	// the problem.
@@ -306,6 +331,10 @@ type Options struct {
 	// This enables node-owned slices that remain cluster-visible via
 	// NodeSelector or AllNodes.
 	//
+	// Other pools in the desired resources are reported through ErrorHandler
+	// and are not published. If the desired resources do not have the pool
+	// with this name, its ResourceSlices get deleted.
+	//
 	// Beware that this has a performance impact on the cluster
 	// because all nodes have to receive all ResourceSlices of
 	// the driver. Without this option, each node only receives
@@ -313,6 +342,16 @@ type Options struct {
 	//
 	// Empty means the default behavior.
 	ReconcilePoolWithName string
+
+	// ValidateQualifiedNames enables rejecting attribute and capacity names
+	// that are explicitly qualified with the driver's own domain (e.g.
+	// "<driverName>/foo" instead of just "foo"). Such names are redundant
+	// and can lead to inconsistent conflict resolution if both the
+	// qualified and unqualified form are published for the same device.
+	//
+	// Enabled by default. Set to false only if a driver has an existing,
+	// intentional reason to publish qualified names for its own domain.
+	ValidateQualifiedNames *bool
 }
 
 // DroppedFieldsError is reported through the ErrorHandler in [Options] if
@@ -386,6 +425,14 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		disabled = append(disabled, "DRAOptionalNodeOperations")
 	}
 
+	// NodeAllocatableResources is dropped when DRANodeAllocatableResources is disabled.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if len(err.DesiredSlice.Spec.Devices[i].NodeAllocatableResources) > 0 && len(err.ActualSlice.Spec.Devices[i].NodeAllocatableResources) == 0 {
+			disabled = append(disabled, "DRANodeAllocatableResources")
+			break
+		}
+	}
+
 	// Compatibility groups are dropped from within a device counter consumption,
 	// so a shorter list there (while the consumption itself is preserved)
 	// indicates that the DRADeviceCompatibilityGroups feature is disabled.
@@ -434,20 +481,6 @@ func (c *Controller) Update(resources *DriverResources) {
 	if resources == nil {
 		c.resources = &DriverResources{}
 	} else {
-		// If reconcilePoolWithName is set, we expect to reconcile only a single pool.
-		// Having additional pools is considered an error. However, an empty pool list
-		// is intentionally allowed and treated as "no slices to publish", which matches
-		// the default controller behavior.
-		if c.reconcilePoolWithName != "" {
-			_, ok := resources.Pools[c.reconcilePoolWithName]
-			if (ok && len(resources.Pools) > 1) || !ok && len(resources.Pools) > 0 {
-				c.errorHandler(context.Background(),
-					fmt.Errorf("ReconcilePoolWithName=%q, but found %d pools; expected exactly one pool with this name", c.reconcilePoolWithName, len(resources.Pools)),
-					"processing update DriverResources")
-				return
-			}
-		}
-
 		c.resources = resources.DeepCopy()
 		roundTaintTimeAdded(c.resources)
 	}
@@ -506,17 +539,18 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Controller{
-		cancel:                cancel,
-		resourceClient:        draclient.New(options.KubeClient),
-		coreClient:            options.KubeClient.CoreV1(),
-		driverName:            options.DriverName,
-		owner:                 options.Owner.DeepCopy(),
-		queue:                 options.Queue,
-		mutationCacheTTL:      ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
-		syncDelay:             ptr.Deref(options.SyncDelay, DefaultSyncDelay),
-		errorHandler:          options.ErrorHandler,
-		lastAddByPool:         make(map[string]time.Time),
-		reconcilePoolWithName: options.ReconcilePoolWithName,
+		cancel:                 cancel,
+		resourceClient:         draclient.New(options.KubeClient),
+		coreClient:             options.KubeClient.CoreV1(),
+		driverName:             options.DriverName,
+		owner:                  options.Owner.DeepCopy(),
+		queue:                  options.Queue,
+		mutationCacheTTL:       ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
+		syncDelay:              ptr.Deref(options.SyncDelay, DefaultSyncDelay),
+		errorHandler:           options.ErrorHandler,
+		lastAddByPool:          make(map[string]time.Time),
+		reconcilePoolWithName:  options.ReconcilePoolWithName,
+		validateQualifiedNames: ptr.Deref(options.ValidateQualifiedNames, true),
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -740,14 +774,37 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
-	if err := validateDriverResources(resources); err != nil {
-		c.errorHandler(ctx, err, "pool validation failed")
+	pool, ok := resources.Pools[poolName]
+
+	// The informer only sees slices of the ReconcilePoolWithName pool, so
+	// slices of other pools can neither be synced nor removed here.
+	if c.reconcilePoolWithName != "" && poolName != c.reconcilePoolWithName {
+		if ok {
+			c.errorHandler(ctx, fmt.Errorf("found pool %q, but ReconcilePoolWithName only allows pool %q", poolName, c.reconcilePoolWithName), "pool validation failed")
+		}
+		return nil
+	}
+
+	validateDriverName := c.driverName
+	if !c.validateQualifiedNames {
+		validateDriverName = ""
+	}
+	var validationErr error
+	if c.reconcilePoolWithName == "" {
+		// An invalid pool blocks all pools. Otherwise a device that moves
+		// out of it could get published twice.
+		validationErr = validateDriverResources(validateDriverName, resources)
+	} else if ok {
+		// Other pools never get published, so they don't need to be valid.
+		validationErr = validatePool(validateDriverName, poolName, pool)
+	}
+	if validationErr != nil {
+		c.errorHandler(ctx, validationErr, "pool validation failed")
 		// We only report the error through the error handler to prevent
 		// the controller from retrying.
 		return nil
 	}
 
-	pool, ok := resources.Pools[poolName]
 	if !ok {
 		if len(slices) > 0 {
 			// All are obsolete, pool does not exist anymore.

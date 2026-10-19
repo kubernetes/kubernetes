@@ -121,6 +121,10 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 			VolumeModifyStressTestOptions: &storageframework.VolumeModifyStressTestOptions{
 				NumPods: 10,
 			},
+			SnapshotMetadataStressTestOptions: &storageframework.SnapshotMetadataStressTestOptions{
+				NumPods:          3,
+				NumSnapshotPairs: 1,
+			},
 			VolumeGroupSnapshotStressTestOptions: &storageframework.VolumeGroupSnapshotStressTestOptions{
 				NumPods:      5,
 				NumSnapshots: 5,
@@ -370,6 +374,22 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 	if err != nil {
 		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
+	}
+
+	if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+		// Create snapshot metadata resources (CRD is already created by test runner script)
+		ginkgo.By("Creating snapshot metadata resources")
+		err = utils.CreateSnapshotMetadataResources(ctx, f, config.Driver.GetDriverInfo().Name, driverns)
+		if err != nil {
+			framework.Failf("failed to create snapshot metadata resources: %v", err)
+		}
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			ginkgo.By("Cleaning up snapshot metadata resources")
+			err = utils.CleanupSnapshotMetadataResources(ctx, f, config.Driver.GetDriverInfo().Name, driverns)
+			if err != nil {
+				framework.Logf("Warning: failed to cleanup snapshot metadata resources: %v", err)
+			}
+		})
 	}
 
 	cleanupFunc := generateDriverCleanupFunc(

@@ -20,16 +20,16 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/transport"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // AssertRequestResponseAsCBOR returns a transport.WrapperFunc that will report a test error if a
 // non-empty request or response body contains data that does not appear to be CBOR-encoded.
-func AssertRequestResponseAsCBOR(t testing.TB) transport.WrapperFunc {
+func AssertRequestResponseAsCBOR(t testutils.TB) transport.WrapperFunc {
 	unsupportedPatchContentTypes := sets.New(
 		"application/json-patch+json",
 		"application/merge-patch+json",

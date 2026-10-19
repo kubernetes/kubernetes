@@ -18,7 +18,9 @@ package fake
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -26,7 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/informers"
 )
 
 func TestNewSimpleClientset(t *testing.T) {
@@ -131,4 +138,83 @@ func TestManagedFieldClientset(t *testing.T) {
 		}, meta_v1.UpdateOptions{FieldManager: "test-manager-0"})
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{"k99": "v99"}, cm.Data)
+}
+
+func TestShardedSharedInformerFactory(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClientset()
+	const initialPods = 12
+	for i := range initialPods {
+		_, err := client.CoreV1().Pods("default").Create(ctx, &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: "default",
+				UID:       types.UID(fmt.Sprintf("uid-%d", i)),
+			},
+		}, meta_v1.CreateOptions{})
+		require.NoError(t, err)
+	}
+
+	const totalShards = 3
+	factories := make([]informers.SharedInformerFactory, totalShards)
+	selectors := make([]sharding.Selector, totalShards)
+
+	seenInitial := make(map[string]int, initialPods)
+	for shard := range totalShards {
+		sel, err := sharding.NewShardRangeSelector("object.metadata.uid", shard, totalShards)
+		require.NoError(t, err)
+		selectors[shard] = sel
+
+		factories[shard] = informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithShardSelector(sel))
+		_ = factories[shard].Core().V1().Pods().Informer()
+		factories[shard].Start(ctx.Done())
+		t.Cleanup(factories[shard].Shutdown)
+		require.NoError(t, factories[shard].WaitForCacheSyncWithContext(ctx).AsError())
+
+		pods, err := factories[shard].Core().V1().Pods().Lister().List(labels.Everything())
+		require.NoError(t, err)
+		for _, p := range pods {
+			matched, err := sel.Matches(p)
+			require.NoError(t, err)
+			require.True(t, matched, "shard %d received out-of-shard pod %s", shard, p.Name)
+			_, dup := seenInitial[p.Name]
+			require.False(t, dup, "pod %s duplicated across shards", p.Name)
+			seenInitial[p.Name] = shard
+		}
+	}
+	require.Len(t, seenInitial, initialPods)
+
+	// Create additional pods after sync to verify sharded Watch delivery through SharedInformerFactory.
+	const watchPods = 6
+	for offset := range watchPods {
+		i := initialPods + offset
+		_, err := client.CoreV1().Pods("default").Create(ctx, &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: "default",
+				UID:       types.UID(fmt.Sprintf("uid-%d", i)),
+			},
+		}, meta_v1.CreateOptions{})
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+		total := 0
+		for shard := range totalShards {
+			pods, err := factories[shard].Core().V1().Pods().Lister().List(labels.Everything())
+			if err != nil {
+				return false, err
+			}
+			for _, p := range pods {
+				matched, err := selectors[shard].Matches(p)
+				if err != nil || !matched {
+					return false, fmt.Errorf("shard %d received out-of-shard pod %s", shard, p.Name)
+				}
+			}
+			total += len(pods)
+		}
+		return total == initialPods+watchPods, nil
+	}))
 }

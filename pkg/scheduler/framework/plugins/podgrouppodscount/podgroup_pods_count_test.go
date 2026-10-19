@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -40,7 +41,6 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -286,7 +286,7 @@ func TestScorePlacement(t *testing.T) {
 					cpgPtrs[i] = &cpgs[i]
 				}
 
-				snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(pods, nil, pgPtrs, cpgPtrs)
+				snapshot := internalcache.NewTestSnapshotWithPodGroups(pods, nil, pgPtrs, cpgPtrs)
 
 				fh, _ := frameworkruntime.NewFramework(tCtx, nil, nil,
 					frameworkruntime.WithInformerFactory(informerFactory),

@@ -46,6 +46,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -98,6 +99,12 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
+	percentageOfPlacementsToScore int32
+
+	// shufflePlacements randomizes candidate placement order so the placement limit picks a fair
+	// subset. Set via New; nil disables shuffling to keep tests deterministic.
+	shufflePlacements func(placements []*fwk.Placement)
+
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -109,6 +116,8 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+	podGroupPreemptionPolicyEnabled                     bool
+	podGroupHierarchyTracker                            *gangscheduling.HierarchyTracker
 
 	algorithm *SchedulingAlgorithm
 }
@@ -126,6 +135,7 @@ type schedulerOptions struct {
 	kubeConfig             *restclient.Config
 	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
+	percentageOfPlacementsToScore     int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
 	podMaxInUnschedulablePodsDuration time.Duration
@@ -198,6 +208,16 @@ func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	}
 }
 
+// WithPercentageOfPlacementsToScore sets percentageOfPlacementsToScore for Scheduler.
+// The default value of 0 will use an adaptive percentage.
+func WithPercentageOfPlacementsToScore(percentageOfPlacementsToScore *int32) Option {
+	return func(o *schedulerOptions) {
+		if percentageOfPlacementsToScore != nil {
+			o.percentageOfPlacementsToScore = *percentageOfPlacementsToScore
+		}
+	}
+}
+
 // WithFrameworkOutOfTreeRegistry sets the registry for out-of-tree plugins. Those plugins
 // will be appended to the default registry.
 func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
@@ -261,6 +281,7 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
+	percentageOfPlacementsToScore:     schedulerapi.DefaultPercentageOfPlacementsToScore,
 	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
@@ -373,6 +394,8 @@ func New(ctx context.Context,
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
+		percentageOfPlacementsToScore:          options.percentageOfPlacementsToScore,
+		shufflePlacements:                      randShufflePlacements,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
@@ -382,8 +405,12 @@ func New(ctx context.Context,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
 	}
-	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
+	if err = sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore)); err != nil {
+		return nil, fmt.Errorf("initializing scheduling algorithm: %w", err)
+	}
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -604,6 +631,12 @@ func (sched *Scheduler) CurrentCycle() int64 {
 //
 // CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
 // after this call is still picked up.
-func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
-	sched.algorithm = NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
+	algorithm, err := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+	if err != nil {
+		return err
+	}
+
+	sched.algorithm = algorithm
+	return nil
 }

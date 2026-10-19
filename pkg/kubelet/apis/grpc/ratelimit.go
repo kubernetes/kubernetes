@@ -48,6 +48,16 @@ func LimiterUnaryServerInterceptor(limiter Limiter) grpc.UnaryServerInterceptor 
 	}
 }
 
+// LimiterStreamServerInterceptor returns a new stream server interceptor that performs request rate limiting.
+func LimiterStreamServerInterceptor(limiter Limiter) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if !limiter.Allow() {
+			return ErrorLimitExceeded
+		}
+		return handler(srv, ss)
+	}
+}
+
 // WithRateLimiter creates new rate limiter with unary interceptor.
 func WithRateLimiter(ctx context.Context, serviceName string, qps, burstTokens int32) grpc.ServerOption {
 	logger := klog.FromContext(ctx)

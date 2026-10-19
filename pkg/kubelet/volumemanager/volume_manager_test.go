@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 )
 
@@ -111,7 +111,6 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 			tCtx := ktesting.Init(t)
-			defer tCtx.Cancel("test has completed")
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 			go manager.Run(tCtx, sourcesReady)
 
@@ -238,7 +237,6 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
@@ -329,7 +327,6 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		0)
 
 	tCtx := ktesting.Init(t)
-	t.Cleanup(func() { tCtx.Cancel("test has completed") })
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 	podManager.SetPods([]*v1.Pod{pod})
@@ -366,7 +363,6 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-	defer tCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
@@ -457,7 +453,6 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 		tCtx := ktesting.Init(t)
-		defer tCtx.Cancel("test has completed")
 		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 		go manager.Run(tCtx, sourcesReady)
 
@@ -729,15 +724,14 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			podManager.SetPods(pods)
 
 			if test.podMode != "" {
-				for i := 0; i < test.numPods; i++ {
-					volumeName := v1.UniqueVolumeName(node.Status.VolumesAttached[i].Name)
-					go simulateVolumeInUseUpdate(volumeName, ctx.Done(), manager)
-				}
-
 				volumeMarkTimeout := 10*time.Second + time.Duration(test.numPods/10)*5*time.Second
 				err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, volumeMarkTimeout, true, func(context.Context) (bool, error) {
 					inUseVolumes := manager.GetVolumesInUse()
-					return len(inUseVolumes) == test.numPods, nil
+					if len(inUseVolumes) != test.numPods {
+						return false, nil
+					}
+					manager.MarkVolumesAsReportedInUse(inUseVolumes)
+					return true, nil
 				})
 
 				require.NoError(t, err, "Timeout waiting for all %d volumes to be marked as in-use", test.numPods)

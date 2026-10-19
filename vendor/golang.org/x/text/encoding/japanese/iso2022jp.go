@@ -14,6 +14,16 @@ import (
 )
 
 // ISO2022JP is the ISO-2022-JP encoding.
+//
+// Decoding accepts ISO-2022-JP as specified in RFC 2237,
+// which includes support for inputs which are not supported by
+// the intentionally more restrictive WHATWG Encoding Standard,
+// such as JIS X 0212 and half-width Katakana characters.
+//
+// Encoding always produces output that is valid according to WHATWG.
+//
+// Programs which forward inputs after parsing should take care to
+// re-encode the parsed input for forwarding.
 var ISO2022JP encoding.Encoding = &iso2022JP
 
 var iso2022JP = internal.Encoding{

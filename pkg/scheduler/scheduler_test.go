@@ -50,6 +50,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	utiltesting "k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -62,14 +63,15 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -359,7 +361,7 @@ func TestFailureHandler(t *testing.T) {
 
 				var got *v1.Pod
 				if tt.podUpdatedDuringScheduling {
-					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
+					pInfo, ok := queue.GetPod(ctx, testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
 					if !ok {
 						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
 					}
@@ -468,6 +470,51 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 	}
 }
 
+// TestWithPercentageOfPlacementsToScore tests scheduler's PercentageOfPlacementsToScore is set correctly.
+func TestWithPercentageOfPlacementsToScore(t *testing.T) {
+	tests := []struct {
+		name                                string
+		percentageOfPlacementsToScoreConfig *int32
+		wantedPercentageOfPlacementsToScore int32
+	}{
+		{
+			name:                                "percentageOfPlacementsScore is nil",
+			percentageOfPlacementsToScoreConfig: nil,
+			wantedPercentageOfPlacementsToScore: schedulerapi.DefaultPercentageOfPlacementsToScore,
+		},
+		{
+			name:                                "percentageOfPlacementsScore is not nil",
+			percentageOfPlacementsToScoreConfig: ptr.To[int32](10),
+			wantedPercentageOfPlacementsToScore: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			sched, err := New(
+				ctx,
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				WithPercentageOfPlacementsToScore(tt.percentageOfPlacementsToScoreConfig),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+			if sched.percentageOfPlacementsToScore != tt.wantedPercentageOfPlacementsToScore {
+				t.Errorf("scheduler.percentageOfPlacementsToScore = %v, want %v", sched.percentageOfPlacementsToScore, tt.wantedPercentageOfPlacementsToScore)
+			}
+		})
+	}
+}
+
 // getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
 func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
@@ -521,15 +568,18 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 	}
 
 	s := &Scheduler{
-		Cache:           cache,
-		client:          client,
-		StopEverything:  ctx.Done(),
-		SchedulingQueue: queue,
-		APIDispatcher:   apiDispatcher,
-		Profiles:        profile.Map{testSchedulerName: fwk},
-		logger:          logger,
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+		client:           client,
+		StopEverything:   ctx.Done(),
+		SchedulingQueue:  queue,
+		APIDispatcher:    apiDispatcher,
+		Profiles:         profile.Map{testSchedulerName: fwk},
+		logger:           logger,
 	}
-	s.initAlgorithm()
+	if err := s.initAlgorithm(); err != nil {
+		return nil, nil, err
+	}
 	s.applyDefaultHandlers()
 
 	return s, fwk, nil
@@ -861,7 +911,6 @@ func Test_UnionedGVKs(t *testing.T) {
 		plugins                         schedulerapi.PluginSet
 		want                            map[fwk.EventResource]fwk.ActionType
 		enableInPlacePodVerticalScaling bool
-		enableDynamicResourceAllocation bool
 		enableGenericWorkload           bool
 	}{
 		{
@@ -916,7 +965,6 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			enableGenericWorkload:           true,
 			enableInPlacePodVerticalScaling: true,
-			enableDynamicResourceAllocation: true,
 		},
 		{
 			name: "node plugin",
@@ -979,24 +1027,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[fwk.EventResource]fwk.ActionType{},
 		},
 		{
-			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
-			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
-				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.UpdatePodScaleDown,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
-				fwk.CSINode:               fwk.All - fwk.Delete,
-				fwk.CSIDriver:             fwk.Update,
-				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
-				fwk.PersistentVolume:      fwk.All - fwk.Delete,
-				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
-				fwk.StorageClass:          fwk.All - fwk.Delete,
-				fwk.VolumeAttachment:      fwk.Delete,
-			},
-			enableInPlacePodVerticalScaling: true,
-		},
-		{
-			name:    "plugins with default profile (queueingHint/DynamicResourceAllocation: enabled)",
+			name:    "plugins with default profile (InPlacePodVerticalScaling disabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
@@ -1013,7 +1044,6 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
-			enableDynamicResourceAllocation: true,
 		},
 		{
 			name:    "plugins with default profile",
@@ -1035,7 +1065,6 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
-			enableDynamicResourceAllocation: true,
 			enableInPlacePodVerticalScaling: true,
 		},
 		{
@@ -1074,27 +1103,13 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			enableGenericWorkload:           true,
 			enableInPlacePodVerticalScaling: true,
-			enableDynamicResourceAllocation: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginConfig := defaults.PluginConfigsV1
 
-			if !tt.enableDynamicResourceAllocation {
-				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
-				// StorageCapacityScoring is alpha in 1.33 (disabled by default).
-				// Strip Shape from VolumeBinding args to avoid validation failure.
-				// BindTimeoutSeconds: 600 is the default value of VolumeBindingArgs when StorageCapacityScoring is disabled.
-				pluginConfig = slices.Clone(pluginConfig)
-				for i := range pluginConfig {
-					if pluginConfig[i].Name == "VolumeBinding" {
-						pluginConfig[i].Args = &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 600}
-						break
-					}
-				}
-			} else if !tt.enableInPlacePodVerticalScaling {
+			if !tt.enableInPlacePodVerticalScaling {
 				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
@@ -1118,7 +1133,6 @@ func Test_UnionedGVKs(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
-				features.DynamicResourceAllocation: tt.enableDynamicResourceAllocation,
 			})
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -1164,6 +1178,9 @@ func newFramework(ctx context.Context, r frameworkruntime.Registry, profile sche
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
 		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false, false /* CompositePodGroup */)),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, plfeature.Features{})
+		}),
 	)
 }
 

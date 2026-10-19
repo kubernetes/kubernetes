@@ -23,12 +23,12 @@ package v1beta2
 //
 // DeviceTaintRuleSpec specifies the selector and one taint.
 type DeviceTaintRuleSpecApplyConfiguration struct {
-	// DeviceSelector defines which device(s) the taint is applied to.
+	// deviceSelector defines which device(s) the taint is applied to.
 	// All selector criteria must be satisfied for a device to
 	// match. The empty selector matches all devices. Without
 	// a selector, no devices are matches.
 	DeviceSelector *DeviceTaintSelectorApplyConfiguration `json:"deviceSelector,omitempty"`
-	// The taint that gets applied to matching devices.
+	// taint is the taint that gets applied to matching devices.
 	Taint *DeviceTaintApplyConfiguration `json:"taint,omitempty"`
 }
 

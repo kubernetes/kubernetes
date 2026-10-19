@@ -5,7 +5,7 @@
 <!-- Badges: release & docker images  -->
 <!-- Badges: code quality  -->
 <!-- Badges: license & compliance -->
-[![Release][release-badge]][release-url] [![Go Report Card][gocard-badge]][gocard-url] [![CodeFactor Grade][codefactor-badge]][codefactor-url] [![License][license-badge]][license-url]
+[![Release][release-badge]][release-url] [![CodeFactor Grade][codefactor-badge]][codefactor-url] [![License][license-badge]][license-url]
 <!-- Badges: documentation & support -->
 <!-- Badges: others & stats -->
 [![GoDoc][godoc-badge]][godoc-url] [![Discord Channel][discord-badge]][discord-url] [![go version][goversion-badge]][goversion-url] ![Top language][top-badge] ![Commits since latest release][commits-badge]
@@ -152,8 +152,6 @@ Maintainers can cut a new release by either:
 [release-badge]: https://badge.fury.io/gh/go-openapi%2Fjsonpointer.svg
 [release-url]: https://badge.fury.io/gh/go-openapi%2Fjsonpointer
 <!-- Badges: code quality  -->
-[gocard-badge]: https://goreportcard.com/badge/github.com/go-openapi/jsonpointer
-[gocard-url]: https://goreportcard.com/report/github.com/go-openapi/jsonpointer
 [codefactor-badge]: https://img.shields.io/codefactor/grade/github/go-openapi/jsonpointer
 [codefactor-url]: https://www.codefactor.io/repository/github/go-openapi/jsonpointer
 <!-- Badges: documentation & support -->

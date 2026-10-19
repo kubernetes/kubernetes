@@ -39,7 +39,6 @@ type CompositePodGroupSpecApplyConfiguration struct {
 	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
 	// schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
-	// This field is immutable.
 	SchedulingPolicy *CompositePodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
 	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.

@@ -25,7 +25,6 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +47,7 @@ import (
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
 
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -90,7 +90,7 @@ type TearDownFunc func()
 //   - ctx cancellation
 //   - TearDownFunc gets called (blocks until shutdown is complete)
 //   - the test ends and cleanup starts
-func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+func StartTestServer(ctx context.Context, t utils.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
 	// This code manages the lifecycle of ctx itself, via the explicit
 	// cancel call in tearDown below. It must not get canceled
 	// automatically once the test ends because TearDownFn still needs a
@@ -201,7 +201,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if len(featureOverrides) > 0 {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 	}
-	utilfeature.DefaultMutableFeatureGate.AddMetrics()
+	utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 
 	completedOptions, err := opts.Complete(ctx)
 	if err != nil {

@@ -142,6 +142,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
 	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
+	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("invalid")
 
 	// TODO(jpbetz): Add exact test cases
 	tests := []struct {
@@ -150,6 +151,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		ignoreNotFound       bool
 		expectNotFoundErr    bool
 		expectRVTooLarge     bool
+		expectedErr          error
 		expectedOut          *example.Pod
 		expectedAlternatives []*example.Pod
 		rv                   string
@@ -192,10 +194,20 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		expectRVTooLarge: true,
 		rv:               strconv.FormatInt(math.MaxInt64, 10),
 	}, {
+		name:        "invalid resource version",
+		key:         key,
+		expectedErr: invalidRVErr,
+		rv:          "invalid",
+	}, {
 		name:              "get non-existing",
 		key:               "/pods/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
+	}, {
+		name:        "get non-existing with resource version",
+		key:         "/pods/non-existing",
+		expectedErr: storage.NewKeyNotFoundError("/pods/non-existing", int64(lastUpdatedCurrentRV)),
+		rv:          fmt.Sprintf("%d", lastUpdatedCurrentRV),
 	}, {
 		name:              "get non-existing, ignore not found",
 		key:               "/pods/non-existing",
@@ -217,6 +229,10 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 
 			out := &example.Pod{}
 			err := store.Get(ctx, tt.key, storage.GetOptions{IgnoreNotFound: tt.ignoreNotFound, ResourceVersion: tt.rv}, out)
+			if tt.expectedErr != nil {
+				assert.Equal(t, tt.expectedErr, err)
+				return
+			}
 			if tt.expectNotFoundErr {
 				if err == nil || !storage.IsNotFound(err) {
 					t.Errorf("expecting not found error, but get: %v", err)
@@ -914,6 +930,23 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 		},
 		{
+			name:   "test List with limit and prefix without trailing slash",
+			prefix: "/pods/second",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []example.Pod{*createdPods[1]},
+			expectRV:                   currentRV,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
+			expectedRemainingItemCount: ptr.To[int64](1),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
+		},
+		{
 			name:   "test List with limit at current resource version",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
@@ -1410,6 +1443,62 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*updatedPod},
+		},
+		{
+			name:   "test List with indexed field selector returning one item, ensure only a single page returned",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+			},
+			expectedOut:    []example.Pod{*updatedPod},
+			expectRV:       currentRV,
+			expectContinue: !watchCacheEnabled,
+			expectContinueExact: func() string {
+				if watchCacheEnabled {
+					// TODO: index-backed cacher only scans the matching index bucket and omits the continue token when matching items equal limit.
+					return ""
+				}
+				return encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(mustAtoi(currentRV)))
+			}(),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
+		},
+		{
+			name:   "test List with indexed field selector returning one of multiple matching items, more pages in index",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", ""),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+			},
+			expectedOut:         []example.Pod{*createdPods[1]},
+			expectRV:            currentRV,
+			expectContinue:      true,
+			expectContinueExact: encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
+		},
+		{
+			name:   "test List with indexed field selector returning all matching items at the end of list, no more pages",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", ""),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       4,
+			},
+			expectedOut:    []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectRV:       currentRV,
+			expectContinue: false,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",

@@ -35,6 +35,9 @@ type GetFieldFunc[Tstruct any, Tfield any] func(*Tstruct) Tfield
 // fields.
 //
 // The fldPath passed to the validator includes the subfield name.
+//
+// A nil struct is not an error: this relocates a validation, it does not
+// assert that the path exists.
 func Subfield[Tstruct any, Tfield any](
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	newStruct, oldStruct *Tstruct,
@@ -42,6 +45,9 @@ func Subfield[Tstruct any, Tfield any](
 	equiv MatchFunc[Tfield],
 	validator ValidateFunc[Tfield],
 ) field.ErrorList {
+	if newStruct == nil {
+		return nil
+	}
 	var errs field.ErrorList
 	newVal := getField(newStruct)
 	var oldVal Tfield

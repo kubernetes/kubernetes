@@ -46,7 +46,7 @@ func (n *GoNameProvider) GetJSONNames(subject any) []string {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 	names := n.nameIndexFor(tpe)
 
 	res := make([]string, 0, len(names.jsonNames))
@@ -59,7 +59,7 @@ func (n *GoNameProvider) GetJSONNames(subject any) []string {
 
 // GetJSONName gets the json name for a go property name.
 func (n *GoNameProvider) GetJSONName(subject any, name string) (string, bool) {
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 
 	return n.GetJSONNameForType(tpe, name)
 }
@@ -77,7 +77,7 @@ func (n *GoNameProvider) GetJSONNameForType(tpe reflect.Type, name string) (stri
 
 // GetGoName gets the go name for a json property name.
 func (n *GoNameProvider) GetGoName(subject any, name string) (string, bool) {
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 
 	return n.GetGoNameForType(tpe, name)
 }
@@ -132,7 +132,7 @@ func buildGoNameIndex(tpe reflect.Type) nameIndex {
 //
 //nolint:gocognit // everything is inlined to help the compiler determine what escapes and what doesn't
 func collectGoFields(tpe reflect.Type) []fieldEntry {
-	if tpe.Kind() != reflect.Struct {
+	if tpe == nil || tpe.Kind() != reflect.Struct {
 		return nil
 	}
 

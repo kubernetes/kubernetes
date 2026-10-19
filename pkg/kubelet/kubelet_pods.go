@@ -124,19 +124,31 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 	return uint32(num1), uint32(num2), nil
 }
 
+// defaultKubeletMappings returns the range of IDs to use for user namespaces when there is no
+// specific configuration for the kubelet user. It is the entire ID range except the IDs below
+// idsPerPod and the last idsPerPod IDs.
+func defaultKubeletMappings(idsPerPod uint32) (uint32, uint32) {
+	firstID := idsPerPod
+	// The last idsPerPod IDs are left unmapped since the kernel considers user
+	// 2^32-1 an invalid user (see man 7 user_namespaces)
+	//
+	// We cast firstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	length := uint32((1 << 32) - uint64(firstID) - uint64(idsPerPod))
+	return firstID, length
+}
+
 // getKubeletMappings returns the range of IDs that can be used to configure user namespaces.
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below idsPerPod.
+// The default mapping includes the entire IDs range except IDs below idsPerPod and the
+// last idsPerPod IDs (since the last user in the range is invalid from the kernel's POV).
 func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	defaultFirstID := idsPerPod
-	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
-	// fires the overflow detection (go is not smart enough to realize that if we subtract a
-	// non-negative number, it fits in 32 bits).
-	// Then we cast it back to 32 bits, as this what the function returns.
-	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
+	defaultFirstID, defaultLen := defaultKubeletMappings(idsPerPod)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
@@ -161,7 +173,7 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	execName := "getsubids"
 	cmd, err := exec.LookPath(execName)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if goerrors.Is(err, exec.ErrNotFound) {
 			logger.V(2).Info("user namespaces: executable not found, using default mappings", "executable", execName, "err", err)
 			return defaultFirstID, defaultLen, nil
 		}
@@ -983,14 +995,20 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, err
 				}
 
-				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				var found bool
+				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
 				if err != nil {
+					// A missing file is equivalent to a missing key: the env var is
+					// simply not published when the reference is optional.
+					if optional && goerrors.Is(err, os.ErrNotExist) {
+						continue
+					}
 					logger.Error(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
 				}
 
 				// If the key was not found, and it's not optional, return an error
-				if runtimeVal == "" {
+				if !found {
 					if optional {
 						// If the key doesn't exist, and it's optional, skip this environment variable
 						continue
@@ -1142,10 +1160,8 @@ func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	// status manager and its tests.
 	// TODO: extend PodDeletionSafetyProvider interface and implement it
 	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
-			return true
-		}
+	if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
+		return true
 	}
 	return false
 }
@@ -1669,16 +1685,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	containerID, err := kl.validateContainerLogStatus(klog.FromContext(ctx), pod.Name, &podStatus, containerName, logOptions.Previous)
 	if err != nil {
 		return err
-	}
-
-	// Since v1.32, stdout may be nil if the stream is not requested.
-	if stdout != nil {
-		// Do a zero-byte write to stdout before handing off to the container runtime.
-		// This ensures at least one Write call is made to the writer when copying starts,
-		// even if we then block waiting for log output from the container.
-		if _, err := stdout.Write([]byte{}); err != nil {
-			return err
-		}
 	}
 
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)

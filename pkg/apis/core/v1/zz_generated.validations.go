@@ -1050,7 +1050,10 @@ func Validate_NodeSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.NodePodPreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1322,7 +1325,41 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.EphemeralContainers has no validation
 	// field corev1.PodSpec.RestartPolicy has no validation
 	// field corev1.PodSpec.TerminationGracePeriodSeconds has no validation
-	// field corev1.PodSpec.ActiveDeadlineSeconds has no validation
+
+	{ // field corev1.PodSpec.ActiveDeadlineSeconds
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 2147483647).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *int64 {
+				return oldObj.ActiveDeadlineSeconds
+			})
+		errs = append(errs, fn(fldPath.Child("activeDeadlineSeconds"), obj.ActiveDeadlineSeconds, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.DNSPolicy has no validation
 	// field corev1.PodSpec.NodeSelector has no validation
 	// field corev1.PodSpec.ServiceAccountName has no validation

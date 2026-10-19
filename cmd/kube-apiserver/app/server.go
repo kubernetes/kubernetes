@@ -35,6 +35,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/flagz"
+	"k8s.io/apiserver/pkg/server/signals"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -70,7 +72,7 @@ func init() {
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
-	ctx := genericapiserver.SetupSignalContext()
+	ctx := signals.SetupSignalContext()
 	featureGate := s.GenericServerRunOptions.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 
 	cmd := &cobra.Command{
@@ -112,7 +114,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
-			featureGate.(featuregate.MutableFeatureGate).AddMetrics()
+			featureGate.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 			// add component version metrics
 			s.GenericServerRunOptions.ComponentGlobalsRegistry.AddMetrics()
 			return Run(ctx, completedOptions)
