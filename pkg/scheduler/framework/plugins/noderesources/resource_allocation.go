@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -60,10 +61,29 @@ type resourceAllocationScorer struct {
 	useRequested bool
 	scorer       func(requested, allocated, allocatable []int64) int64
 	resources    []config.ResourceSpec
-	draFeatures  structured.Features
-	draManager   fwk.SharedDRAManager
+	// scalarResources[i] reports whether resources[i] is a scalar resource.
+	// Set together with resources by newResourceAllocationScorer.
+	scalarResources []bool
+	draFeatures     structured.Features
+	draManager      fwk.SharedDRAManager
 	// Caches for DRA-related computations
 	DRACaches
+}
+
+// newResourceAllocationScorer classifies the resources once, because
+// IsScalarResourceName runs a regexp for extended resources and scoring
+// would otherwise repeat it for every pod and node.
+func newResourceAllocationScorer(name string, scorer func(requested, allocated, allocatable []int64) int64, resources []config.ResourceSpec) *resourceAllocationScorer {
+	scalarResources := make([]bool, len(resources))
+	for i := range resources {
+		scalarResources[i] = schedutil.IsScalarResourceName(v1.ResourceName(resources[i].Name))
+	}
+	return &resourceAllocationScorer{
+		Name:            name,
+		scorer:          scorer,
+		resources:       resources,
+		scalarResources: scalarResources,
+	}
 }
 
 // buildNodeMatchCacheKey creates a string cache key for node matching results
@@ -170,6 +190,10 @@ func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 	podRequests []int64,
 	draPreScoreState *draPreScoreState,
 ) (requested []int64, allocated []int64, allocatable []int64) {
+	if len(r.scalarResources) != len(r.resources) {
+		panic(fmt.Sprintf("resourceAllocationScorer %q has %d resources but %d scalar flags; build it with newResourceAllocationScorer",
+			r.Name, len(r.resources), len(r.scalarResources)))
+	}
 	requested = make([]int64, len(r.resources))
 	allocated = make([]int64, len(r.resources))
 	allocatable = make([]int64, len(r.resources))
@@ -177,7 +201,7 @@ func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 		resource := v1.ResourceName(r.resources[i].Name)
 		// If it's an extended resource, and the pod doesn't request it.
 		// We don't fill the resource entry as an implication to bypass scoring on it.
-		if podRequests[i] == 0 && schedutil.IsScalarResourceName(resource) {
+		if podRequests[i] == 0 && r.scalarResources[i] {
 			continue
 		}
 		nodeAllocatable, nodeAllocated := r.calculateResourceAllocatableRequest(ctx, nodeInfo, resource, draPreScoreState)

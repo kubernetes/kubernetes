@@ -37,7 +37,7 @@ import (
 // of capacity, and prioritizes the host based on how close the two metrics are to each other.
 type BalancedAllocation struct {
 	handle fwk.Handle
-	resourceAllocationScorer
+	*resourceAllocationScorer
 }
 
 var _ fwk.PreScorePlugin = &BalancedAllocation{}
@@ -186,19 +186,17 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 		return nil, err
 	}
 
+	allocScorer := newResourceAllocationScorer(BalancedAllocationName, balancedResourceScorer, args.Resources)
+	allocScorer.enableInPlacePodVerticalScaling = fts.EnableInPlacePodVerticalScaling
+	allocScorer.enablePodLevelResources = fts.EnablePodLevelResources
+	allocScorer.enableDRAExtendedResource = fts.EnableDRAExtendedResource
+	allocScorer.useRequested = true
+	allocScorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
+	allocScorer.draManager = h.SharedDRAManager()
+
 	return &BalancedAllocation{
-		handle: h,
-		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                            BalancedAllocationName,
-			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-			enablePodLevelResources:         fts.EnablePodLevelResources,
-			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-			scorer:                          balancedResourceScorer,
-			useRequested:                    true,
-			resources:                       args.Resources,
-			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-			draManager: h.SharedDRAManager(),
-		},
+		handle:                   h,
+		resourceAllocationScorer: allocScorer,
 	}, nil
 }
 
