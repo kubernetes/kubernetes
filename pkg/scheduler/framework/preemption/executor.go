@@ -376,30 +376,22 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 
 // IsPodGroupWaitingForVictims returns true if previously preempted victims on the
 // pod group's nominated nodes are still terminating in the current snapshot.
-// For standalone PodGroups, the nominations and scheduled members must also satisfy minCount.
+// The nominations and scheduled members must also satisfy the scheduling policy
+// of the pod group and its children.
 func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	nominatedNodes := sets.New[string]()
-	nominatedPods := 0
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
 		if len(pod.Status.NominatedNodeName) > 0 {
 			nominatedNodes.Insert(pod.Status.NominatedNodeName)
-			nominatedPods++
 		}
 	}
-	if nominatedPods == 0 {
+	if len(nominatedNodes) == 0 {
 		return false
 	}
 
 	snapshot := e.fh.SnapshotSharedLister()
-	if pgInfo.GetType() == fwk.PodGroupKeyType && nominatedPods < pgInfo.GetMinCount() {
-		pgState, err := snapshot.PodGroupStates().Get(pgInfo.GetNamespace(), pgInfo.GetName())
-		if err != nil {
-			utilruntime.HandleErrorWithContext(context.Background(), err, "Failed to get pod group state while checking for terminating victims", "podGroup", klog.KRef(pgInfo.GetNamespace(), pgInfo.GetName()))
-			return false
-		}
-		if nominatedPods+pgState.ScheduledPodsCount() < pgInfo.GetMinCount() {
-			return false
-		}
+	if !podGroupNominationsSatisfyMinCount(pgInfo, snapshot.PodGroupStates()) {
+		return false
 	}
 
 	preemptorPriority := pgInfo.GetPriority()
@@ -417,6 +409,34 @@ func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	}
 
 	return false
+}
+
+func podGroupNominationsSatisfyMinCount(pgInfo fwk.PodGroupInfo, pgStates fwk.PodGroupStateLister) bool {
+	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
+		eligibleChildren := 0
+		for _, child := range pgInfo.GetChildren() {
+			if podGroupNominationsSatisfyMinCount(child, pgStates) {
+				eligibleChildren++
+			}
+		}
+		return eligibleChildren >= pgInfo.GetMinCount()
+	}
+
+	nominatedPods := 0
+	for _, pod := range pgInfo.GetAllUnscheduledPods() {
+		if len(pod.Status.NominatedNodeName) > 0 {
+			nominatedPods++
+		}
+	}
+	if nominatedPods >= pgInfo.GetMinCount() {
+		return true
+	}
+	pgState, err := pgStates.Get(pgInfo.GetNamespace(), pgInfo.GetName())
+	if err != nil {
+		utilruntime.HandleErrorWithContext(context.Background(), err, "Failed to get pod group state while checking for terminating victims", "podGroup", klog.KRef(pgInfo.GetNamespace(), pgInfo.GetName()))
+		return false
+	}
+	return nominatedPods+pgState.ScheduledPodsCount() >= pgInfo.GetMinCount()
 }
 
 // IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.

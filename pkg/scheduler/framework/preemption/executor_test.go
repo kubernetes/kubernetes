@@ -2340,20 +2340,27 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			pods,
 		)
 	}
-	makeGangPreemptor := func(minCount int32, nominatedNodes ...string) fwk.PodGroupInfo {
-		return newTestPodGroupInfo(
-			st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(highPriority).MinCount(minCount).Obj(),
-			nil,
-			makePreemptor(highPriority, nominatedNodes...).GetAllUnscheduledPods(),
+	makeGangPreemptor := func(name string, minCount int32, nominatedNodes ...string) *framework.PodGroupInfo {
+		return &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name(name).Namespace("default").Priority(highPriority).MinCount(minCount).Obj()),
+			UnscheduledPods: makePreemptor(highPriority, nominatedNodes...).GetAllUnscheduledPods(),
+		}
+	}
+	makeCompositePreemptor := func(name string, minGroupCount int32, children ...*framework.PodGroupInfo) *framework.PodGroupInfo {
+		return framework.NewPodGroupInfo(
+			fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name(name).Namespace("default").Priority(highPriority).MinGroupCount(minGroupCount).Obj()),
+			children...,
 		)
 	}
 
 	tests := []struct {
-		name          string
-		initPods      []*v1.Pod
-		initPodGroups []*schedulingv1beta1.PodGroup
-		preemptor     fwk.PodGroupInfo
-		want          bool
+		name                    string
+		enableCompositePodGroup bool
+		initPods                []*v1.Pod
+		initPodGroups           []*schedulingv1beta1.PodGroup
+		initCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
+		preemptor               fwk.PodGroupInfo
+		want                    bool
 	}{
 		{
 			name: "returns true when member has nominated node with lower-priority pod terminating by preemption",
@@ -2377,7 +2384,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(2, "", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 2, "", "node2"),
 			want:      false,
 		},
 		{
@@ -2386,7 +2393,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 				makeTerminatingVictim("victim1", "node1", lowPriority).Obj(),
 				makeTerminatingVictim("victim2", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(2, "node1", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 2, "node1", "node2"),
 			want:      true,
 		},
 		{
@@ -2394,7 +2401,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(1, "", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 1, "", "node2"),
 			want:      true,
 		},
 		{
@@ -2402,7 +2409,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(2, "node2", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 2, "node2", "node2"),
 			want:      true,
 		},
 		{
@@ -2411,7 +2418,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("preemptor-pg").Obj(),
 				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(2, "", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 2, "", "node2"),
 			want:      true,
 		},
 		{
@@ -2420,8 +2427,100 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("preemptor-pg").Obj(),
 				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
 			},
-			preemptor: makeGangPreemptor(3, "", "node2"),
+			preemptor: makeGangPreemptor("preemptor-pg", 3, "", "node2"),
 			want:      false,
+		},
+		{
+			name:                    "returns false when remaining nominations cannot satisfy minGroupCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 2,
+				makeGangPreemptor("child1", 1, ""),
+				makeGangPreemptor("child2", 1, "node2"),
+			),
+			want: false,
+		},
+		{
+			name:                    "returns false when nominated pods satisfy minGroupCount but nominated child groups do not",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 2,
+				makeGangPreemptor("child1", 2, "node2", "node2"),
+				makeGangPreemptor("child2", 1, ""),
+			),
+			want: false,
+		},
+		{
+			name:                    "returns true when remaining nominated child groups still satisfy minGroupCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 1,
+				makeGangPreemptor("child1", 1, ""),
+				makeGangPreemptor("child2", 1, "node2"),
+			),
+			want: true,
+		},
+		{
+			name:                    "returns true when scheduled child groups and nominations satisfy minGroupCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("child1").Obj(),
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 2,
+				makeGangPreemptor("child1", 1),
+				makeGangPreemptor("child2", 1, "node2"),
+			),
+			want: true,
+		},
+		{
+			name:                    "returns false when scheduled child members do not satisfy their minCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("child1").Obj(),
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 2,
+				makeGangPreemptor("child1", 2),
+				makeGangPreemptor("child2", 1, "node2"),
+			),
+			want: false,
+		},
+		{
+			name:                    "returns false when nested composite pod group cannot satisfy minGroupCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 1,
+				makeCompositePreemptor("child-cpg", 2,
+					makeGangPreemptor("child1", 1, ""),
+					makeGangPreemptor("child2", 1, "node2"),
+				),
+			),
+			want: false,
+		},
+		{
+			name:                    "returns true when nested composite pod group and scheduled child satisfy minGroupCount",
+			enableCompositePodGroup: true,
+			initPods: []*v1.Pod{
+				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("child3").Obj(),
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeCompositePreemptor("preemptor-cpg", 2,
+				makeCompositePreemptor("child-cpg", 1,
+					makeGangPreemptor("child1", 1, ""),
+					makeGangPreemptor("child2", 1, "node2"),
+				),
+				makeGangPreemptor("child3", 1),
+			),
+			want: true,
 		},
 		{
 			name: "returns false when no member has NominatedNodeName set",
@@ -2523,12 +2622,25 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               tt.enableCompositePodGroup,
 			})
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			tt.initPodGroups = append(tt.initPodGroups, tt.preemptor.GetPodGroup())
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, nil)
+			var addPreemptorGroups func(fwk.PodGroupInfo)
+			addPreemptorGroups = func(pgInfo fwk.PodGroupInfo) {
+				if pg := pgInfo.GetPodGroup(); pg != nil {
+					tt.initPodGroups = append(tt.initPodGroups, pg)
+					return
+				}
+				tt.initCompositePodGroups = append(tt.initCompositePodGroups, pgInfo.GetCompositePodGroup())
+				for _, child := range pgInfo.GetChildren() {
+					addPreemptorGroups(child)
+				}
+			}
+			addPreemptorGroups(tt.preemptor)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
 			fh := &fakeHandleForLister{
 				informerFactory: informerFactory,
 				snapshot:        snapshot,
