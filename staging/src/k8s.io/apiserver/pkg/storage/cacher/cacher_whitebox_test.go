@@ -3162,6 +3162,7 @@ func TestListIndexer(t *testing.T) {
 	t.Cleanup(terminate)
 	tests := []struct {
 		name               string
+		requestedName      string
 		requestedNamespace string
 		recursive          bool
 		fieldSelector      fields.Selector
@@ -3207,7 +3208,7 @@ func TestListIndexer(t *testing.T) {
 			name:               "request with namespace, field selector with non-matched metadata.namespace",
 			requestedNamespace: "namespace",
 			recursive:          true,
-			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
 		},
 		{
 			name:               "request with namespace, field selector with spec.nodename",
@@ -3259,19 +3260,129 @@ func TestListIndexer(t *testing.T) {
 		{
 			name:               "request with namespace, with field selector metadata.name",
 			requestedNamespace: "namespace",
+			recursive:          true,
 			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
 		},
 		{
 			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
 			requestedNamespace: "namespace",
+			recursive:          true,
 			fieldSelector: fields.SelectorFromSet(fields.Set{
 				"metadata.name":      "name",
 				"metadata.namespace": "namespace",
 			}),
 		},
 		{
+			name:               "request with namespace, with field selector metadata.name and non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
 			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
 			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+				"spec.nodeName":      "node",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=node"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "name", "metadata.namespace": "namespace"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, without field selector",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, field selector with matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, field selector with non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=other"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
 			fieldSelector: fields.SelectorFromSet(fields.Set{
 				"metadata.name":      "name",
 				"metadata.namespace": "namespace",
@@ -3280,19 +3391,168 @@ func TestListIndexer(t *testing.T) {
 			indexFields: []string{"spec.nodeName"},
 		},
 		{
-			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			name:               "non-recursive, request with name, request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedName:      "name",
 			requestedNamespace: "namespace",
+			recursive:          false,
 			fieldSelector: fields.AndSelectors(
 				fields.ParseSelectorOrDie("spec.nodeName!=node"),
 				fields.SelectorFromSet(fields.Set{"metadata.name": "name", "metadata.namespace": "namespace"}),
 			),
 			indexFields: []string{"spec.nodeName"},
 		},
+		{
+			name:               "recursive, request with name, request with namespace, without field selector",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, field selector with matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, field selector with non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=other"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:          "non-recursive, request without namespace, without field selector",
+			recursive:     false,
+			fieldSelector: fields.Everything(),
+		},
+		{
+			name:          "non-recursive, request without namespace, field selector with metadata.namespace",
+			recursive:     false,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:          "non-recursive, request without namespace, field selector with metadata.name",
+			recursive:     false,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:      "non-recursive, request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with namespace, without field selector",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "non-recursive, request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "non-recursive, request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name and matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name and non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
-			_, usedIndex, err := cacher.cacher.watchCache.WaitUntilFreshAndGetList(ctx, "/pods/"+tt.requestedNamespace, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
+			path := "/pods/"
+			if tt.requestedNamespace != "" {
+				path += tt.requestedNamespace
+				if tt.requestedName != "" {
+					path += "/" + tt.requestedName
+				}
+			}
+			_, usedIndex, err := cacher.cacher.watchCache.WaitUntilFreshAndGetList(ctx, path, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
