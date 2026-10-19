@@ -2500,12 +2500,11 @@ func TestRequestPreflightCheck(t *testing.T) {
 func TestThrottledLogger(t *testing.T) {
 	logger := klog.Background()
 	now := time.Now()
-	oldClock := globalThrottledLogger.clock
-	defer func() {
-		globalThrottledLogger.clock = oldClock
-	}()
 	clock := testingclock.NewFakeClock(now)
-	globalThrottledLogger.clock = clock
+	// attemptToLog records a lastLogTime per setting. Own the logger here
+	// instead of swapping the clock on the global one, so that state cannot
+	// outlive the test and throttle away a later run's messages.
+	throttled := newThrottledLogger(clock)
 
 	logMessages := 0
 	for i := 0; i < 1000; i++ {
@@ -2513,7 +2512,7 @@ func TestThrottledLogger(t *testing.T) {
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
+				if _, ok := throttled.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
