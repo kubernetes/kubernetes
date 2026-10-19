@@ -123,7 +123,7 @@ func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.P
 	if err != nil {
 		return err
 	}
-	desiredSize := calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
+	desiredSize := CalculateEmptyDirMemorySize(nodeAllocatable.Memory(), pod, spec.Volume.EmptyDir)
 
 	dir := getPath(pod.UID, spec.Name(), plugin.host)
 	mounter := plugin.host.GetMounter()

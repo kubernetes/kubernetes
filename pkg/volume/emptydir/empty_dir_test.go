@@ -1142,16 +1142,11 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			spec := &volume.Spec{
-				Volume: &v1.Volume{
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &testCase.emptyDirSizeLimit,
-						},
-					},
-				}}
-			result := calculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, spec, testCase.pod)
+			emptyDir := &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &testCase.emptyDirSizeLimit,
+			}
+			result := CalculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, testCase.pod, emptyDir)
 			if result.Cmp(testCase.expectedResult) != 0 {
 				t.Errorf("%s: Unexpected result.  Expected %v, got %v", testCaseName, testCase.expectedResult.String(), result.String())
 			}
