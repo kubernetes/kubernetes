@@ -18,6 +18,7 @@ package kuberc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -52,6 +53,8 @@ var (
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
 )
+
+var errAliasShadowsBuiltin = errors.New("alias shadows a built-in command")
 
 // compile-time check that these two types are aligned
 var _ = clientcmdapi.AllowlistEntry(config.AllowlistEntry{})
@@ -258,14 +261,12 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			continue
 		}
 
-		// do not allow shadowing built-ins
-		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
-			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
-			break
-		}
-
 		aliasCmd, err := buildAliasCommand(rootCmd, alias)
 		if err != nil {
+			if errors.Is(err, errAliasShadowsBuiltin) {
+				fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
+				break
+			}
 			return args, err
 		}
 
@@ -358,6 +359,11 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 // and returns a copy of it renamed to alias.Name, suitable for registration
 // in the command tree or for listing (e.g. in help output).
 func buildAliasCommand(rootCmd *cobra.Command, alias config.AliasOverride) (*cobra.Command, error) {
+	// do not allow shadowing built-ins
+	if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
+		return nil, errAliasShadowsBuiltin
+	}
+
 	commands := strings.Fields(alias.Command)
 	existingCmd, flags, err := rootCmd.Find(commands)
 	if err != nil {
