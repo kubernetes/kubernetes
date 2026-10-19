@@ -77,6 +77,35 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// ConnectionPool specifies options for maintaining a pool of connections
+	// to the endpoint, enabling traffic splitting across multiple kube-apiserver replicas
+	// behind an L4 load balancer.
+	ConnectionPool *ConnectionPoolConfig
+}
+
+// BalancingStrategy represents the load-balancing algorithm across pooled connections.
+type BalancingStrategy string
+
+const (
+	// PowerOfTwoChoices balances requests by picking two connections at random
+	// and selecting the one with fewer in-flight requests.
+	PowerOfTwoChoices BalancingStrategy = "PowerOfTwoChoices"
+
+	// RoundRobin balances requests sequentially across all pooled connections.
+	RoundRobin BalancingStrategy = "RoundRobin"
+)
+
+// ConnectionPoolConfig configures client-side connection pooling to create multiple
+// connections to the same endpoint and load balance across them.
+type ConnectionPoolConfig struct {
+	// Size is the number of underlying HTTP/2 connections in the pool.
+	// Must be > 1 to enable connection pooling.
+	Size int
+
+	// Strategy specifies the load balancing algorithm.
+	// Defaults to PowerOfTwoChoices if empty.
+	Strategy BalancingStrategy
 }
 
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.

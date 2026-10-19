@@ -64,6 +64,7 @@ type tlsCacheKey struct {
 	serverName         string
 	nextProtos         string
 	disableCompression bool
+	poolIndex          int
 	// these functions are wrapped to allow them to be used as map keys
 	getCert *GetCertHolder
 	dial    *DialHolder
@@ -74,15 +75,20 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, poolIndex:%d, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.poolIndex, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
+	return c.getWithPoolIndex(config, 0)
+}
+
+func (c *tlsTransportCache) getWithPoolIndex(config *Config, poolIndex int) (http.RoundTripper, error) {
 	key, canCache, err := tlsConfigKey(config)
 	if err != nil {
 		return nil, err
 	}
+	key.poolIndex = poolIndex
 
 	if canCache {
 		// Ensure we only create a single transport for the given TLS options
