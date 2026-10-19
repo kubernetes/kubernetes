@@ -26,16 +26,26 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+// registerAuthProviderPluginForTest registers a plugin in the package-level
+// registry and removes it again when the test ends. Without the removal a
+// second run in the same binary (go test -count=2, or a -shuffle rerun) fails
+// with "was registered twice".
+func registerAuthProviderPluginForTest(t *testing.T, name string, plugin Factory) {
+	t.Helper()
+	if err := RegisterAuthProviderPlugin(name, plugin); err != nil {
+		t.Fatalf("Unexpected error: failed to register %s: %v", name, err)
+	}
+	t.Cleanup(func() {
+		pluginsLock.Lock()
+		defer pluginsLock.Unlock()
+		delete(plugins, name)
+	})
+}
+
 func TestAuthPluginWrapTransport(t *testing.T) {
-	if err := RegisterAuthProviderPlugin("pluginA", pluginAProvider); err != nil {
-		t.Errorf("Unexpected error: failed to register pluginA: %v", err)
-	}
-	if err := RegisterAuthProviderPlugin("pluginB", pluginBProvider); err != nil {
-		t.Errorf("Unexpected error: failed to register pluginB: %v", err)
-	}
-	if err := RegisterAuthProviderPlugin("pluginFail", pluginFailProvider); err != nil {
-		t.Errorf("Unexpected error: failed to register pluginFail: %v", err)
-	}
+	registerAuthProviderPluginForTest(t, "pluginA", pluginAProvider)
+	registerAuthProviderPluginForTest(t, "pluginB", pluginBProvider)
+	registerAuthProviderPluginForTest(t, "pluginFail", pluginFailProvider)
 	testCases := []struct {
 		useWrapTransport bool
 		plugin           string
@@ -96,12 +106,8 @@ func TestAuthPluginWrapTransport(t *testing.T) {
 
 func TestAuthPluginPersist(t *testing.T) {
 	// register pluginA by a different name so we don't collide across tests.
-	if err := RegisterAuthProviderPlugin("pluginA2", pluginAProvider); err != nil {
-		t.Errorf("Unexpected error: failed to register pluginA: %v", err)
-	}
-	if err := RegisterAuthProviderPlugin("pluginPersist", pluginPersistProvider); err != nil {
-		t.Errorf("Unexpected error: failed to register pluginPersist: %v", err)
-	}
+	registerAuthProviderPluginForTest(t, "pluginA2", pluginAProvider)
+	registerAuthProviderPluginForTest(t, "pluginPersist", pluginPersistProvider)
 	fooBarConfig := map[string]string{"foo": "bar"}
 	testCases := []struct {
 		plugin                       string
@@ -173,9 +179,7 @@ func TestAuthPluginPersist(t *testing.T) {
 
 func Test_WhenNilPersister_NoOpPersisterIsAssigned(t *testing.T) {
 
-	if err := RegisterAuthProviderPlugin("anyPlugin", pluginPersistProvider); err != nil {
-		t.Errorf("unexpected error: failed to register 'anyPlugin': %v", err)
-	}
+	registerAuthProviderPluginForTest(t, "anyPlugin", pluginPersistProvider)
 	cfg := &clientcmdapi.AuthProviderConfig{
 		Name:   "anyPlugin",
 		Config: nil,
