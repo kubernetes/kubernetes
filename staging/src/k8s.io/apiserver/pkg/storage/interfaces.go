@@ -251,6 +251,11 @@ type Interface interface {
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
+	// Update updates key 'key' (of type 'destination') without retrying on storage transaction conflict.
+	Update(
+		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
+
 	// Stats returns storage stats.
 	Stats(ctx context.Context) (Stats, error)
 
@@ -338,6 +343,14 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// WatchWithoutPrevKV requests omission of previous values from etcd watch
+	// events. Deleted objects then contain only name, namespace, and the deletion
+	// resource version. It requires an object constructor and a reverse key
+	// function; etcd storage rejects the request if either is unavailable.
+	// This is intended for the watch cache, which retains the full previous object.
+	// It requires an empty predicate, is rejected by the cacher, and is ignored
+	// for non-watch requests.
+	WatchWithoutPrevKV bool
 	// RecordTimestamps requests that the storage layer wrap each emitted watch
 	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
 	// latency telemetry. This is intended for internal clients only (the watch
@@ -367,6 +380,10 @@ type DeleteOptions struct {
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
 	ExpectTransformOrDecodeError bool
+
+	// FailOnConflict, if enabled, deletes the cachedExistingObject without
+	// retrying on storage transaction conflict.
+	FailOnConflict bool
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
@@ -457,5 +474,6 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 // cluster-scoped resources, namespace is empty and name is non-empty. An error
 // is returned if the key cannot be parsed into a valid object identity.
 // A nil ReverseKeyFunc indicates that identity cannot be derived from the
-// key and callers must fall back to decoding the stored object.
+// key. Callers must decode the stored object or reject operations that require
+// key-derived identity.
 type ReverseKeyFunc func(key string) (name string, namespace string, err error)

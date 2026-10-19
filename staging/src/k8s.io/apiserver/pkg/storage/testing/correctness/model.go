@@ -119,11 +119,14 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	expected, next, change := s.execute(input)
 	switch input.Op {
 	case OpGet:
-		return s.validateGet(input.Get.Options, expected, output), s, nil
+		return s.validateGet(input.Key, input.Get.Options, expected, output), s, nil
 	case OpList:
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
 		if !reflect.DeepEqual(expected, output) {
+			if (input.Op == OpUpdate || input.Op == OpDelete) && storage.IsNotFound(expected.Err) && reflect.DeepEqual(Response{Err: storage.NewKeyNotFoundError(input.Key, int64(s.ResourceVersion))}, output) {
+				return true, next, change
+			}
 			return false, s, nil
 		}
 		return true, next, change
@@ -158,7 +161,7 @@ func (s *Model) execute(input Request) (Response, *Model, *Change) {
 	}
 }
 
-func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) bool {
+func (s *Model) validateGet(key string, opts storage.GetOptions, expected, output Response) bool {
 	if expected.Err != nil {
 		switch {
 		case storage.IsTooLargeResourceVersion(expected.Err):
@@ -174,7 +177,14 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch GetReadConsistency(opts) {
 	case ConsistencyConsistent:
-		return reflect.DeepEqual(expected, output)
+		if reflect.DeepEqual(expected, output) {
+			return true
+		}
+		if storage.IsNotFound(expected.Err) {
+			// Cacher returns NotFound errors without the underlying etcd prefix.
+			return reflect.DeepEqual(Response{Err: storage.NewKeyNotFoundError(key, int64(s.ResourceVersion))}, output)
+		}
+		return false
 	case ConsistencyNotOlderThan:
 		if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && storage.IsTooLargeResourceVersion(output.Err) {
 			return true

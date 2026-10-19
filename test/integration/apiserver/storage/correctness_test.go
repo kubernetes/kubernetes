@@ -30,9 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -237,6 +240,14 @@ func TestCorrectness(t *testing.T) {
 			},
 		},
 		{
+			name: "cacher without WatchFromStorageWithoutPrevKV",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, false)
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
 			// Covers cacher reinitialization and unready (Pending) state handling:
 			// - Watch expiration (410 Gone) and reconnect failure (cacher.startCaching WatchCacheInitializationErrors)
 			// - Reflector fallback from WatchList to listerWatcher.List and watchCache.Replace
@@ -255,8 +266,8 @@ func TestCorrectness(t *testing.T) {
 		{
 			// Covers watch delivery lag exceeding blockTimeout (3s):
 			// - watchCache.waitUntilFreshLocked timing out with TooLargeResourceVersionError
-			// - CacheDelegator.GetList catching TooLargeResourceVersionError on consistent reads (RV="") and falling back to etcd
-			// - Cacher.GetList (non-consistent RVCached) and Cacher.Get returning TooLargeResourceVersionError
+			// - CacheDelegator.Get and CacheDelegator.GetList catching TooLargeResourceVersionError on consistent reads (RV="") and falling back to etcd
+			// - Cacher.Get and Cacher.GetList (non-consistent RVCached) returning TooLargeResourceVersionError
 			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
 			name: "cacher with watch-delaying etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
@@ -264,23 +275,23 @@ func TestCorrectness(t *testing.T) {
 				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
-				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
-					"expected >3s watch delay to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+				require.True(tCtx, hasConsistentReadFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected >3s watch delay to trigger consistent read fallback to etcd or unary TooLargeResourceVersionError")
 			},
 		},
 		{
 			// Covers broken watch progress notifications when etcd revision advances outside the watched prefix:
 			// - ConditionalProgressRequester requesting watch progress every 100ms and handling RequestWatchProgress errors
 			// - Dropped progress bookmarks preventing watchCache.resourceVersion from advancing during an idle window (>3s),
-			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
+			//   causing waitUntilFreshLocked timeouts on Get and GetList (falling back to etcd on consistent reads) and WatchList
 			name: "cacher with bookmark-dropping etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
 				store, prefix := setupStore(tCtx)
 				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
-				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
-					"expected dropped progress bookmarks during >3s idle window to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+				require.True(tCtx, hasConsistentReadFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected dropped progress bookmarks during >3s idle window to trigger consistent read fallback to etcd or unary TooLargeResourceVersionError")
 				require.True(tCtx, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
 					"expected dropped progress bookmarks during >3s idle window to trigger WatchList StatusReasonTimeout error events")
 			},

@@ -523,6 +523,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
+	if opts.WatchWithoutPrevKV {
+		return nil, fmt.Errorf("watchWithoutPrevKV is not supported by the cacher")
+	}
 	key, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
@@ -710,9 +713,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	key, err := c.prepareKey(key, false)
 	if err != nil {
 		return err
-	}
-	if opts.ResourceVersion == "" {
-		return storage.NewInternalError(fmt.Errorf("cacher doesn't support consistent Get"))
 	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
@@ -1377,10 +1377,7 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
 		span := tracing.SpanFromContext(ctx)
-		c.watchCache.RLock()
-		span.AddEvent("watchCache locked acquired")
-		defer c.watchCache.RUnlock()
-		err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
+		err := c.watchCache.waitUntilFresh(ctx, requestedWatchRV)
 		if err != nil {
 			return err
 		}
