@@ -6462,7 +6462,8 @@
 - name: generated_placements_total
   subsystem: scheduler
   help: Number of candidate placements generated when scheduling pod groups, by scheduler
-    profile and entity type.
+    profile and entity type. For pod groups nested in a composite pod group, placements
+    are generated and counted once per evaluated parent placement.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6552,7 +6553,9 @@
   subsystem: scheduler
   help: Number of candidate placements evaluated when scheduling pod groups, by result,
     scheduler profile, and entity type. 'feasible' means the pod group fit into the
-    placement, while 'infeasible' means it did not.
+    placement, while 'infeasible' means it did not. For composite pod groups, nested
+    evaluations of child groups are also counted separately under their own entity
+    type.
   type: Counter
   stabilityLevel: ALPHA
   labels:

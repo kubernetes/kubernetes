@@ -35,7 +35,7 @@ func TestRecordGeneratedPlacements(t *testing.T) {
 	RecordGeneratedPlacements("test-profile", CompositePodGroup, 1)
 
 	want := `
-		# HELP scheduler_generated_placements_total [ALPHA] Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type.
+		# HELP scheduler_generated_placements_total [ALPHA] Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type. For pod groups nested in a composite pod group, placements are generated and counted once per evaluated parent placement.
 		# TYPE scheduler_generated_placements_total counter
 		scheduler_generated_placements_total{profile="test-profile",type="compositepodgroup"} 1
 		scheduler_generated_placements_total{profile="test-profile",type="podgroup"} 5
@@ -61,7 +61,7 @@ func TestObservePlacementEvaluation(t *testing.T) {
 	ObservePlacementEvaluation(InfeasibleResult, "test-profile", CompositePodGroup, 0.6)
 
 	wantCounter := `
-		# HELP scheduler_placement_evaluations_total [ALPHA] Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.
+		# HELP scheduler_placement_evaluations_total [ALPHA] Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not. For composite pod groups, nested evaluations of child groups are also counted separately under their own entity type.
 		# TYPE scheduler_placement_evaluations_total counter
 		scheduler_placement_evaluations_total{profile="test-profile",result="feasible",type="compositepodgroup"} 1
 		scheduler_placement_evaluations_total{profile="test-profile",result="feasible",type="podgroup"} 2

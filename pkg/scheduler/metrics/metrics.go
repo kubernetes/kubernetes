@@ -677,14 +677,14 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "generated_placements_total",
-			Help:           "Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type.",
+			Help:           "Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type. For pod groups nested in a composite pod group, placements are generated and counted once per evaluated parent placement.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"profile", "type"})
 	PlacementEvaluations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "placement_evaluations_total",
-			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not. For composite pod groups, nested evaluations of child groups are also counted separately under their own entity type.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result", "profile", "type"})
 	PlacementEvaluationDuration = metrics.NewHistogramVec(
