@@ -1667,17 +1667,25 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 }
 
 func TestPodGroupPreemptionClearsNominationsForTerminatingVictims(t *testing.T) {
-	for _, asyncAPICallsEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
+	for _, tt := range []struct {
+		asyncAPICallsEnabled bool
+		minCount             int32
+	}{
+		{asyncAPICallsEnabled: true, minCount: 1},
+		{asyncAPICallsEnabled: false, minCount: 1},
+		{asyncAPICallsEnabled: true, minCount: 2},
+		{asyncAPICallsEnabled: false, minCount: 2},
+	} {
+		t.Run(fmt.Sprintf("Async API calls enabled: %v/minCount: %d", tt.asyncAPICallsEnabled, tt.minCount), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:          true,
 				features.SchedulerAsyncPreemption: true,
-				features.SchedulerAsyncAPICalls:   asyncAPICallsEnabled,
+				features.SchedulerAsyncAPICalls:   tt.asyncAPICallsEnabled,
 			})
 
 			mockScorePlugin := "mockScorePlugin"
 			registry := make(frameworkruntime.Registry)
-			if err := registry.Register(mockScorePlugin, newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0})); err != nil {
+			if err := registry.Register(mockScorePlugin, newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 50, "node3": 0})); err != nil {
 				t.Fatalf("Failed to register score plugin: %v", err)
 			}
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -1709,14 +1717,22 @@ func TestPodGroupPreemptionClearsNominationsForTerminatingVictims(t *testing.T) 
 				st.MakePod().Name("victim2").Namespace(ns).Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
 			}
 			podGroups := []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("medium").Namespace(ns).MinCount(1).Priority(50).Obj(),
+				st.MakePodGroup().Name("medium").Namespace(ns).MinCount(tt.minCount).Priority(50).Obj(),
 				st.MakePodGroup().Name("high").Namespace(ns).MinCount(1).Priority(100).Obj(),
 			}
 			mediumPod := st.MakePod().Name("medium").Namespace(ns).PodGroupName("medium").Priority(50).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Obj()
+			mediumPods := []*v1.Pod{mediumPod}
+			targetNode, targetVictim := "node2", victims[1]
+			if tt.minCount == 2 {
+				nodes = append(nodes, st.MakeNode().Name("node3").Label(v1.LabelHostname, "node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj())
+				victims = append(victims, st.MakePod().Name("victim3").Namespace(ns).Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj())
+				mediumPods = append(mediumPods, st.MakePod().Name("medium2").Namespace(ns).PodGroupName("medium").Priority(50).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Obj())
+				targetNode, targetVictim = "node3", victims[2]
+			}
 			highPod := st.MakePod().Name("high").Namespace(ns).PodGroupName("high").Priority(100).NodeSelector(map[string]string{v1.LabelHostname: "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Obj()
 			ktesting.Init(t).CleanupCtx(func(tCtx ktesting.TContext) {
 				testutils.RemovePodFinalizersInNamespace(tCtx, cs, t, ns)
-				cleanupSharedPodGroupPreemptionResources(t, tCtx, cs, ns, victims, []*v1.Pod{mediumPod, highPod}, podGroups, nil, nil, nodes)
+				cleanupSharedPodGroupPreemptionResources(t, tCtx, cs, ns, victims, append(mediumPods, highPod), podGroups, nil, nil, nodes)
 			})
 
 			for _, node := range nodes {
@@ -1741,34 +1757,43 @@ func TestPodGroupPreemptionClearsNominationsForTerminatingVictims(t *testing.T) 
 					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 				}
 			}
-			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, mediumPod, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create medium-priority pod: %v", err)
+			for _, pod := range mediumPods {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create medium-priority pod %s: %v", pod.Name, err)
+				}
 			}
 
 			// The higher-priority group must see an already-terminating victim and an existing lower-priority nomination.
 			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-				pod, err := cs.CoreV1().Pods(ns).Get(ctx, mediumPod.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				if pod.Status.NominatedNodeName != "node1" {
-					return false, nil
-				}
-				victim, err := testCtx.Scheduler.Cache.GetPod(victims[0])
-				if err != nil {
-					return false, err
-				}
-				if victim.DeletionTimestamp == nil {
-					return false, nil
-				}
-				for _, nominatedPod := range testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(logger, "node1") {
-					if nominatedPod.GetPod().Name == mediumPod.Name && nominatedPod.GetPod().Namespace == ns {
-						return true, nil
+				for i, medium := range mediumPods {
+					pod, err := cs.CoreV1().Pods(ns).Get(ctx, medium.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					if pod.Status.NominatedNodeName != nodes[i].Name {
+						return false, nil
+					}
+					victim, err := testCtx.Scheduler.Cache.GetPod(victims[i])
+					if err != nil {
+						return false, err
+					}
+					if victim.DeletionTimestamp == nil {
+						return false, nil
+					}
+					nominated := false
+					for _, nominatedPod := range testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(logger, nodes[i].Name) {
+						if nominatedPod.GetPod().Name == medium.Name && nominatedPod.GetPod().Namespace == ns {
+							nominated = true
+							break
+						}
+					}
+					if !nominated {
+						return false, nil
 					}
 				}
-				return false, nil
+				return true, nil
 			}); err != nil {
-				t.Fatalf("Failed to wait for medium-priority nomination and terminating victim on node1: %v", err)
+				t.Fatalf("Failed to wait for medium-priority nominations and terminating victims: %v", err)
 			}
 
 			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPod, metav1.CreateOptions{}); err != nil {
@@ -1779,28 +1804,34 @@ func TestPodGroupPreemptionClearsNominationsForTerminatingVictims(t *testing.T) 
 			}
 
 			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-				pod, err := cs.CoreV1().Pods(ns).Get(ctx, mediumPod.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, err
+				nominatedNodes := sets.New[string]()
+				for _, medium := range mediumPods {
+					pod, err := cs.CoreV1().Pods(ns).Get(ctx, medium.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					nominatedNodes.Insert(pod.Status.NominatedNodeName)
 				}
-				if pod.Status.NominatedNodeName != "node2" {
+				if !nominatedNodes.Equal(sets.New("node2", targetNode)) {
 					return false, nil
 				}
-				victim, err := cs.CoreV1().Pods(ns).Get(ctx, victims[1].Name, metav1.GetOptions{})
+				victim, err := cs.CoreV1().Pods(ns).Get(ctx, targetVictim.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
 				return victim.DeletionTimestamp != nil, nil
 			}); err != nil {
-				t.Fatalf("Medium-priority pod did not preempt on node2 after losing its nomination on node1: %v", err)
+				t.Fatalf("Medium-priority group did not preempt on %s after losing its nomination on node1: %v", targetNode, err)
 			}
 
-			victim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, victims[0].Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Original victim must still exist while the medium-priority group preempts elsewhere: %v", err)
-			}
-			if victim.DeletionTimestamp == nil {
-				t.Fatal("Original victim should still be terminating")
+			for _, originalVictim := range victims[:tt.minCount] {
+				victim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, originalVictim.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Original victim %s must still exist while the medium-priority group preempts elsewhere: %v", originalVictim.Name, err)
+				}
+				if victim.DeletionTimestamp == nil {
+					t.Fatalf("Original victim %s should still be terminating", originalVictim.Name)
+				}
 			}
 		})
 	}

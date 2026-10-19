@@ -376,16 +376,34 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 
 // IsPodGroupWaitingForVictims returns true if previously preempted victims on the
 // pod group's nominated nodes are still terminating in the current snapshot.
+// For standalone PodGroups, the nominations and scheduled members must also satisfy minCount.
 func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	nominatedNodes := sets.New[string]()
+	nominatedPods := 0
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
 		if len(pod.Status.NominatedNodeName) > 0 {
 			nominatedNodes.Insert(pod.Status.NominatedNodeName)
+			nominatedPods++
+		}
+	}
+	if nominatedPods == 0 {
+		return false
+	}
+
+	snapshot := e.fh.SnapshotSharedLister()
+	if pgInfo.GetType() == fwk.PodGroupKeyType && nominatedPods < pgInfo.GetMinCount() {
+		pgState, err := snapshot.PodGroupStates().Get(pgInfo.GetNamespace(), pgInfo.GetName())
+		if err != nil {
+			utilruntime.HandleErrorWithContext(context.Background(), err, "Failed to get pod group state while checking for terminating victims", "podGroup", klog.KRef(pgInfo.GetNamespace(), pgInfo.GetName()))
+			return false
+		}
+		if nominatedPods+pgState.ScheduledPodsCount() < pgInfo.GetMinCount() {
+			return false
 		}
 	}
 
 	preemptorPriority := pgInfo.GetPriority()
-	nodeLister := e.fh.SnapshotSharedLister().NodeInfos()
+	nodeLister := snapshot.NodeInfos()
 	for nomNodeName := range nominatedNodes {
 		nodeInfo, err := nodeLister.Get(nomNodeName)
 		if err != nil || nodeInfo == nil {

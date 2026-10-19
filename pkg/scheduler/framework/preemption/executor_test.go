@@ -2340,6 +2340,13 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			pods,
 		)
 	}
+	makeGangPreemptor := func(minCount int32, nominatedNodes ...string) fwk.PodGroupInfo {
+		return newTestPodGroupInfo(
+			st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(highPriority).MinCount(minCount).Obj(),
+			nil,
+			makePreemptor(highPriority, nominatedNodes...).GetAllUnscheduledPods(),
+		)
+	}
 
 	tests := []struct {
 		name          string
@@ -2364,6 +2371,57 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			},
 			preemptor: makePreemptor(highPriority, "", "node1", "node2"),
 			want:      true,
+		},
+		{
+			name: "returns false when remaining nominations cannot satisfy the gang's minCount",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(2, "", "node2"),
+			want:      false,
+		},
+		{
+			name: "returns true when all gang members are nominated",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim1", "node1", lowPriority).Obj(),
+				makeTerminatingVictim("victim2", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(2, "node1", "node2"),
+			want:      true,
+		},
+		{
+			name: "returns true when remaining nominations still satisfy the gang's minCount",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(1, "", "node2"),
+			want:      true,
+		},
+		{
+			name: "returns true when multiple gang members are nominated to the same node",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(2, "node2", "node2"),
+			want:      true,
+		},
+		{
+			name: "returns true when scheduled members and remaining nominations satisfy the gang's minCount",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("preemptor-pg").Obj(),
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(2, "", "node2"),
+			want:      true,
+		},
+		{
+			name: "returns false when scheduled members and remaining nominations cannot satisfy the gang's minCount",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("scheduled").UID("scheduled").Namespace("default").Node("node1").Priority(highPriority).PodGroupName("preemptor-pg").Obj(),
+				makeTerminatingVictim("victim", "node2", lowPriority).Obj(),
+			},
+			preemptor: makeGangPreemptor(3, "", "node2"),
+			want:      false,
 		},
 		{
 			name: "returns false when no member has NominatedNodeName set",
@@ -2469,6 +2527,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			})
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			tt.initPodGroups = append(tt.initPodGroups, tt.preemptor.GetPodGroup())
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, nil)
 			fh := &fakeHandleForLister{
 				informerFactory: informerFactory,
