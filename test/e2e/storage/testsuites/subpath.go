@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -100,7 +101,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	type local struct {
 		config *storageframework.PerTestConfig
 
-		hostExec          storageutils.HostExec
+		hostExec          e2ehostexec.HostExec
 		resource          *storageframework.VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
@@ -126,7 +127,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		l.migrationCheck = newMigrationOpCheck(ctx, f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
-		l.hostExec = storageutils.NewHostExec(f)
+		l.hostExec = e2ehostexec.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
@@ -969,7 +970,7 @@ func TestPodContainerRestartWithConfigmapModified(ctx context.Context, f *framew
 
 }
 
-func testSubpathReconstruction(ctx context.Context, f *framework.Framework, hostExec storageutils.HostExec, pod *v1.Pod, forceDelete bool) {
+func testSubpathReconstruction(ctx context.Context, f *framework.Framework, hostExec e2ehostexec.HostExec, pod *v1.Pod, forceDelete bool) {
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
 	// Disruptive test run serially, we can cache all voluem global mount
@@ -1087,7 +1088,7 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 	}
 	gomega.Expect(podNode).NotTo(gomega.BeNil(), "pod node must be in the schedulable node list")
 
-	hostExec := storageutils.NewHostExec(f)
+	hostExec := e2ehostexec.NewHostExec(f)
 	ginkgo.DeferCleanup(hostExec.Cleanup)
 
 	subpathGlob := fmt.Sprintf("/var/lib/kubelet/pods/%s/volume-subpaths/*/*/*", pod.UID)

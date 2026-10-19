@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -41,7 +41,7 @@ var _ = SIGDescribe("crictl", framework.WithProvider("gce") /* `crictl` is not a
 			"crictl info",
 		}
 
-		hostExec := utils.NewHostExec(f)
+		hostExec := e2ehostexec.NewHostExec(f)
 
 		for _, testCase := range testCases {
 			for _, node := range nodes.Items {

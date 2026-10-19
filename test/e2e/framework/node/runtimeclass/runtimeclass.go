@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 )
@@ -60,7 +60,7 @@ func NewRuntimeClassPod(runtimeClassName string) *v1.Pod {
 func NodeSupportsPreconfiguredRuntimeClassHandler(ctx context.Context, f *framework.Framework) error {
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
-	hostExec := storageutils.NewHostExec(f)
+	hostExec := e2ehostexec.NewHostExec(f)
 	ginkgo.DeferCleanup(hostExec.Cleanup)
 
 	// This is a hacky check that greps the container runtime config to determine if the test-handler is the underlying container runtime config.
