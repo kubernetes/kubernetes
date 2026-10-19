@@ -181,7 +181,7 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: configureDropManagedFields(content)},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(scrubCBORContentConfigIfDisabled(content))},
 		Client:           client,
 	})
 }
@@ -462,6 +462,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
+	}
+	if r.contentConfig.DropManagedFields && strings.EqualFold(key, "Accept") && len(values) > 0 {
+		values = []string{acceptDroppingManagedFields(strings.Join(values, ","))}
 	}
 	r.headers.Del(key)
 	for _, value := range values {
@@ -998,13 +1001,6 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 		return nil, err
 	}
 	req.Header = r.headers
-	// Rewritten at send time because callers can replace the Accept header with SetHeader.
-	if r.contentConfig.DropManagedFields {
-		if accept := r.headers.Values("Accept"); len(accept) > 0 {
-			req.Header = r.headers.Clone()
-			req.Header.Set("Accept", acceptDroppingManagedFields(strings.Join(accept, ",")))
-		}
-	}
 	return req, nil
 }
 

@@ -177,6 +177,10 @@ func configureDropManagedFields(content ClientContentConfig) ClientContentConfig
 func acceptDroppingManagedFields(accept string) string {
 	clauses := goautoneg.ParseAccept(accept)
 	for i := range clauses {
+		// Leave alone media types mime.FormatMediaType can't format, like the OpenAPI protobuf types.
+		if mime.FormatMediaType(clauses[i].Type+"/"+clauses[i].SubType, nil) == "" {
+			return accept
+		}
 		if clauses[i].Params == nil {
 			clauses[i].Params = make(map[string]string, 1)
 		}

@@ -425,6 +425,15 @@ func TestDropManagedFieldsAccept(t *testing.T) {
 			wantAccept: "application/json; drop=metadata.managedFields,application/json; as=PartialObjectMetadata; drop=metadata.managedFields; g=meta.k8s.io; q=0.9; v=v1",
 		},
 		{
+			name:    "OpenAPI protobuf left alone",
+			enabled: true,
+			drop:    true,
+			request: func(c *RESTClient) *Request {
+				return c.Get().SetHeader("Accept", "application/com.github.proto-openapi.spec.v2@v1.0+protobuf")
+			},
+			wantAccept: "application/com.github.proto-openapi.spec.v2@v1.0+protobuf",
+		},
+		{
 			name:       "gate disabled",
 			enabled:    false,
 			drop:       true,

@@ -77,15 +77,18 @@ func TestNewRequestSetsAccept(t *testing.T) {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 
+	// A CBOR ContentType set directly still needs the ClientsAllowCBOR feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/cbor"}, nil).Verb("get")
+	if r.headers.Get("Accept") != "application/json, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
 	// DropManagedFields set directly still needs the ManagedFieldsOptOutClient feature gate.
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, false)
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{DropManagedFields: true}, nil).Verb("get")
-	req, err := r.newHTTPRequest(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if req.Header.Get("Accept") != "application/json, */*" {
-		t.Errorf("unexpected headers: %#v", req.Header)
+	if r.headers.Get("Accept") != "application/json, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 }
 
