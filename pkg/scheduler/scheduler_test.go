@@ -278,6 +278,22 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 }
 
+func TestWithFrameworkOutOfTreeRegistryCloned(t *testing.T) {
+	registry := frameworkruntime.Registry{
+		"Foo": defaultbinder.New,
+	}
+	opt := WithFrameworkOutOfTreeRegistry(registry)
+	registry["Bar"] = defaultbinder.New
+	delete(registry, "Foo")
+
+	opts := &schedulerOptions{}
+	opt(opts)
+
+	if diff := cmp.Diff(sets.New("Foo"), sets.KeySet(opts.frameworkOutOfTreeRegistry)); diff != "" {
+		t.Errorf("unexpected out-of-tree registry plugins (-want, +got):\n%s", diff)
+	}
+}
+
 func TestFailureHandler(t *testing.T) {
 	metrics.Register()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
