@@ -554,7 +554,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	}
 
 	// Determine the ResourceVersion to which the watch cache must be synchronized
-	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	watchRV, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
 	if err != nil {
 		return newErrWatcher(err), nil
 	}
@@ -592,23 +592,24 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	var cacheInterval *watchCacheInterval
 	var bookmarkAfterResourceVersion uint64
-	if shouldGetInitialEventsFromStore(requiredResourceVersion, opts) {
-		cacheInterval, err = c.watchCache.waitAndGetIntervalFromStoreLocked(ctx, requiredResourceVersion, key, opts)
+	if shouldGetInitialEventsFromStore(watchRV, opts) {
+		cacheInterval, err = c.watchCache.waitAndGetIntervalFromStoreLocked(ctx, watchRV, key, opts)
 		if err != nil {
 			return newErrWatcher(err), nil
 		}
 		if isListWatchRequest(opts) {
 			c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
-			bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
+			bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, watchRV, opts)
 		}
+		watchRV = c.watchCache.resourceVersion
 	} else {
-		if requiredResourceVersion == 0 {
+		if watchRV == 0 {
 			// SendInitialEvents = false and resourceVersion = 0
 			// means that the request would like to start watching
 			// from Any resourceVersion
-			requiredResourceVersion = c.watchCache.resourceVersion
+			watchRV = c.watchCache.resourceVersion
 		}
-		cacheInterval, err = c.watchCache.history.GetIntervalLocked(requiredResourceVersion, c.watchCache.RWMutex.RLocker())
+		cacheInterval, err = c.watchCache.history.GetIntervalLocked(watchRV, c.watchCache.RWMutex.RLocker())
 		if err != nil {
 			// To match the uncached watch implementation, once we have passed authn/authz/admission,
 			// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -660,7 +661,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	go watcher.process(ctx, cacheInterval, requiredResourceVersion)
+	go watcher.process(ctx, cacheInterval, watchRV)
 	return watcher, nil
 }
 
