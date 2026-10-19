@@ -322,6 +322,22 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	metrics.RecordResourceVersion(w.config.groupResource, rv)
 }
 
+// waitUntilFresh waits until cache is at least as fresh as given resourceVersion.
+func (w *watchCache) waitUntilFresh(ctx context.Context, resourceVersion uint64) error {
+	if resourceVersion == 0 {
+		return nil
+	}
+	span := tracing.SpanFromContext(ctx)
+	w.RLock()
+	span.AddEvent("watchCache locked acquired")
+	defer w.RUnlock()
+	if err := w.waitUntilFreshLocked(ctx, resourceVersion); err != nil {
+		return err
+	}
+	span.AddEvent("watchCache fresh enough")
+	return nil
+}
+
 // waitUntilFreshLocked waits until cache is at least as fresh as given resourceVersion.
 func (w *watchCache) waitUntilFreshLocked(ctx context.Context, resourceVersion uint64) error {
 	if resourceVersion == 0 || resourceVersion <= w.resourceVersion {
@@ -464,14 +480,10 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
 	span := tracing.SpanFromContext(ctx)
-	w.RLock()
-	span.AddEvent("watchCache locked acquired")
-	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, resourceVersion)
+	err := w.waitUntilFresh(ctx, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
-	span.AddEvent("watchCache fresh enough")
 
 	store, err := w.storage.GetExactSnapshotLocked(resourceVersion)
 	if err != nil {
@@ -502,20 +514,18 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion
 }
 
 func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
-	span := tracing.SpanFromContext(ctx)
-	w.RLock()
-	span.AddEvent("watchCache locked acquired")
-	defer w.RUnlock()
-	err = w.waitUntilFreshLocked(ctx, minResourceVersion)
+	err = w.waitUntilFresh(ctx, minResourceVersion)
 	if err != nil {
 		return nil, 0, "", err
 	}
-	span.AddEvent("watchCache fresh enough")
-	snap, index = w.getLatestSnapshotLocked(ctx, matchValues)
-	return snap, w.resourceVersion, index, nil
+	snap, index = w.getLatestSnapshot(ctx, matchValues)
+	if err := w.checkSnapshotMinResourceVersion(snap, minResourceVersion); err != nil {
+		return nil, 0, "", err
+	}
+	return snap, snap.ResourceVersion(), index, nil
 }
 
-func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
+func (w *watchCache) getLatestSnapshot(ctx context.Context, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
 	span := tracing.SpanFromContext(ctx)
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
@@ -525,14 +535,12 @@ func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, matchValues []
 		snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
 		if err == nil {
 			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
-			w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 			return snap, matchValue.IndexName
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap = w.storage.LatestSnapshot()
 	span.AddEvent("LatestSnapshot success")
-	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	return snap, ""
 }
 
@@ -544,6 +552,17 @@ func (w *watchCache) checkSnapshotResourceVersion(snap store.Snapshot, expectedR
 	if consistency.PanicOnCacheInconsistency {
 		panic(fmt.Sprintf("Watch cache snapshot resourceVersion mismatch, group: %q, resource: %q, snapshotResourceVersion: %d, expectedResourceVersion: %d", w.config.groupResource.Group, w.config.groupResource.Resource, snap.ResourceVersion(), expectedRV))
 	}
+}
+
+func (w *watchCache) checkSnapshotMinResourceVersion(snap store.Snapshot, minRV uint64) error {
+	if snap.ResourceVersion() >= minRV {
+		return nil
+	}
+	klog.ErrorS(nil, "Watch cache latest snapshot resourceVersion is less than minResourceVersion", "group", w.config.groupResource.Group, "resource", w.config.groupResource.Resource, "snapshotResourceVersion", snap.ResourceVersion(), "minResourceVersion", minRV)
+	if consistency.PanicOnCacheInconsistency {
+		panic(fmt.Sprintf("Watch cache latest snapshot resourceVersion (%d) is less than minResourceVersion (%d), group: %q, resource: %q", snap.ResourceVersion(), minRV, w.config.groupResource.Group, w.config.groupResource.Resource))
+	}
+	return storage.NewTooLargeResourceVersionError(minRV, snap.ResourceVersion(), resourceVersionTooHighRetrySeconds)
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
@@ -702,7 +721,8 @@ func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string,
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		snapshot, index := w.getLatestSnapshotLocked(ctx, opts.Predicate.MatcherIndex(ctx))
+		snapshot, index := w.getLatestSnapshot(ctx, opts.Predicate.MatcherIndex(ctx))
+		w.checkSnapshotResourceVersion(snapshot, w.resourceVersion)
 		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key), index, nil
 	}
 	snap := w.storage.LatestSnapshot()
