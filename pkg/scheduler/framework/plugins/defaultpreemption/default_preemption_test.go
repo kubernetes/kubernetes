@@ -35,7 +35,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1805,7 +1804,7 @@ func TestCustomSelection(t *testing.T) {
 		pod                *v1.Pod
 		pods               []*v1.Pod
 		podGroups          []*v1beta1.PodGroup
-		compositePodGroups []*v1alpha3.CompositePodGroup
+		compositePodGroups []*v1beta1.CompositePodGroup
 		features           feature.Features
 		expected           map[string][]string
 	}{
@@ -1973,7 +1972,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
+			compositePodGroups: []*v1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
@@ -1993,7 +1992,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
+			compositePodGroups: []*v1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
@@ -2030,7 +2029,7 @@ func TestCustomSelection(t *testing.T) {
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
-			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -2201,7 +2200,7 @@ func TestCustomOrdering(t *testing.T) {
 		preemptor          *v1.Pod
 		pods               []*v1.Pod
 		podGroups          []*v1beta1.PodGroup
-		compositePodGroups []*v1alpha3.CompositePodGroup
+		compositePodGroups []*v1beta1.CompositePodGroup
 		features           feature.Features
 		expectedPods       []string
 	}{
@@ -2301,7 +2300,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
+			compositePodGroups: []*v1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			features:     feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
@@ -2322,7 +2321,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePodGroup().Name("pg-large1").UID("pg-large1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg-large").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-large2").UID("pg-large2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg-large").Priority(lowPriority).Obj(),
 			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
+			compositePodGroups: []*v1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-small").UID("cpg-small").Namespace(v1.NamespaceDefault).DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakeCompositePodGroup().Name("cpg-large").UID("cpg-large").Namespace(v1.NamespaceDefault).DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
@@ -2360,7 +2359,7 @@ func TestCustomOrdering(t *testing.T) {
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
-			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.pods, nodes, tt.podGroups, tt.compositePodGroups)
@@ -2441,7 +2440,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		pod                 *v1.Pod
 		pods                []*v1.Pod
 		podGroups           []*v1beta1.PodGroup
-		compositePodGroups  []*v1alpha3.CompositePodGroup
+		compositePodGroups  []*v1beta1.CompositePodGroup
 		nodes               []string
 		features            feature.Features
 		nominatedNodeStatus *fwk.Status
@@ -2547,7 +2546,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
-			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 			registeredPlugins := []tf.RegisterPluginFunc{
@@ -3741,7 +3740,7 @@ func TestPreEnqueue(t *testing.T) {
 			}
 
 			var allPgs []*v1beta1.PodGroup
-			var allCpgs []*v1alpha3.CompositePodGroup
+			var allCpgs []*v1beta1.CompositePodGroup
 
 			if tt.pgInfo != nil {
 				pgs, cpgs := extractGroups(tt.pgInfo)
@@ -3760,7 +3759,7 @@ func TestPreEnqueue(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			cpgInformer := informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			cpgInformer := informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			for _, cpg := range allCpgs {
 				if err := cpgInformer.GetStore().Add(cpg); err != nil {
 					t.Fatal(err)
@@ -4031,7 +4030,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 			nodes := []*v1.Node{node}
 
 			var pg *v1beta1.PodGroup
-			var cpg *v1alpha3.CompositePodGroup
+			var cpg *v1beta1.CompositePodGroup
 			var client *clientsetfake.Clientset
 			var cache internalcache.Cache
 			var snapshot *internalcache.Snapshot
@@ -4044,18 +4043,18 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1beta1.PodGroup{pg}, nil)
 			} else {
 				priorityVal := highPriority
-				cpg = &v1alpha3.CompositePodGroup{
+				cpg = &v1beta1.CompositePodGroup{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cpg",
 						Namespace: "default",
 					},
-					Spec: v1alpha3.CompositePodGroupSpec{
+					Spec: v1beta1.CompositePodGroupSpec{
 						Priority: &priorityVal,
 					},
 				}
 				client = clientsetfake.NewClientset(pod)
 				cache = internalcache.New(ctx, nil, true, true /* compositePodGroupEnabled */)
-				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, nil, []*v1alpha3.CompositePodGroup{cpg})
+				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, nil, []*v1beta1.CompositePodGroup{cpg})
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -4165,7 +4164,7 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 		return nil, nil
 	}
 
-	cpg := &v1alpha3.CompositePodGroup{
+	cpg := &v1beta1.CompositePodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cpg",
 			Namespace: "default",
@@ -4329,7 +4328,7 @@ func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 }
 
 // newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
-func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
+func newCPGInfo(cpg *v1beta1.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
 	pgi := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
 	pgi.UnscheduledPods = pods
 	return pgi
@@ -4337,9 +4336,9 @@ func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupI
 
 // extractGroups is an auxiliary method to extract all PodGroups and CompositePodGroups
 // API objects from a PodGroupInfo, useful for setting up tests.
-func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1beta1.PodGroup, []*v1alpha3.CompositePodGroup) {
+func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1beta1.PodGroup, []*v1beta1.CompositePodGroup) {
 	var pgs []*v1beta1.PodGroup
-	var cpgs []*v1alpha3.CompositePodGroup
+	var cpgs []*v1beta1.CompositePodGroup
 
 	var traverse func(info *framework.PodGroupInfo)
 	traverse = func(info *framework.PodGroupInfo) {

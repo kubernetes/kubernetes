@@ -21,7 +21,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,19 +176,19 @@ func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t utiltesting
 }
 
 // CleanupCompositePodGroups deletes the given composite pod groups and waits for them to be actually deleted.
-func CleanupCompositePodGroups(ctx context.Context, cs clientset.Interface, t utiltesting.TB, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) {
+func CleanupCompositePodGroups(ctx context.Context, cs clientset.Interface, t utiltesting.TB, compositePodGroups []*schedulingv1beta1.CompositePodGroup) {
 	for _, cpg := range compositePodGroups {
 		patch := []byte(`{"metadata":{"finalizers":null}}`)
-		if _, err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Patch(ctx, cpg.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if _, err := cs.SchedulingV1beta1().CompositePodGroups(cpg.Namespace).Patch(ctx, cpg.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while removing finalizers from compositepodgroup %v/%v: %v", cpg.Namespace, cpg.Name, err)
 		}
-		if err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Delete(ctx, cpg.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := cs.SchedulingV1beta1().CompositePodGroups(cpg.Namespace).Delete(ctx, cpg.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting compositepodgroup %v/%v: %v", cpg.Namespace, cpg.Name, err)
 		}
 	}
 	for _, cpg := range compositePodGroups {
 		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-			_, err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Get(ctx, cpg.Name, metav1.GetOptions{})
+			_, err := cs.SchedulingV1beta1().CompositePodGroups(cpg.Namespace).Get(ctx, cpg.Name, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		}); err != nil {
 			t.Errorf("error while waiting for compositepodgroup %v/%v to get deleted: %v", cpg.Namespace, cpg.Name, err)

@@ -19,7 +19,6 @@ package workloadbuilder
 import (
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -170,7 +169,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 		cpgName      string
 		owners       []metav1.OwnerReference
 
-		verify func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1alpha3.CompositePodGroup)
+		verify func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1beta1.CompositePodGroup)
 	}{
 		{
 			name:     "materializes a top-level composite template",
@@ -180,7 +179,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 			},
 			cpgName: "job-abc-top-xyz",
 			owners:  owners,
-			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1alpha3.CompositePodGroup) {
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1beta1.CompositePodGroup) {
 				if cpg.Name != "job-abc-top-xyz" {
 					t.Errorf("unexpected name: %q", cpg.Name)
 				}
@@ -211,7 +210,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 				return &wl.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates[0]
 			},
 			cpgName: "job-abc-nested-xyz",
-			verify: func(t *testing.T, _ *schedulingv1beta1.Workload, cpg *schedulingv1alpha3.CompositePodGroup) {
+			verify: func(t *testing.T, _ *schedulingv1beta1.Workload, cpg *schedulingv1beta1.CompositePodGroup) {
 
 				if cpg.Spec.SchedulingPolicy.Basic == nil {
 					t.Error("expected basic policy copied from the nested template")
@@ -225,7 +224,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 				return &wl.Spec.CompositePodGroupTemplates[0]
 			},
 			cpgName: "cpg",
-			verify: func(t *testing.T, _ *schedulingv1beta1.Workload, cpg *schedulingv1alpha3.CompositePodGroup) {
+			verify: func(t *testing.T, _ *schedulingv1beta1.Workload, cpg *schedulingv1beta1.CompositePodGroup) {
 				if cpg.OwnerReferences != nil {
 					t.Errorf("expected no ownerReferences, got %+v", cpg.OwnerReferences)
 				}
@@ -238,7 +237,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 				return &wl.Spec.CompositePodGroupTemplates[0]
 			},
 			cpgName: "cpg",
-			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1alpha3.CompositePodGroup) {
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, cpg *schedulingv1beta1.CompositePodGroup) {
 				// Mutating the CompositePodGroup must not leak back into the template.
 				cpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 99
 				*cpg.Spec.Priority = 1
@@ -256,10 +255,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cpg, err := newCompositePodGroup(tt.workload, tt.pickTemplate(tt.workload), tt.cpgName, tt.owners)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			cpg := newCompositePodGroup(tt.workload, tt.pickTemplate(tt.workload), tt.cpgName, tt.owners)
 			tt.verify(t, tt.workload, cpg)
 		})
 	}

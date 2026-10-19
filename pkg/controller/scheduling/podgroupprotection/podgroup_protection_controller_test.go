@@ -24,7 +24,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	schedulinginformersv1alpha3 "k8s.io/client-go/informers/scheduling/v1alpha3"
+	schedulinginformersv1beta1 "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -64,12 +63,12 @@ func deletedPodGroup(pg *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup
 	return pg
 }
 
-func withCPGFinalizer(cpg *schedulingv1alpha3.CompositePodGroup) *schedulingv1alpha3.CompositePodGroup {
+func withCPGFinalizer(cpg *schedulingv1beta1.CompositePodGroup) *schedulingv1beta1.CompositePodGroup {
 	cpg.Finalizers = append(cpg.Finalizers, scheduling.CompositePodGroupProtectionFinalizer)
 	return cpg
 }
 
-func deletedCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *schedulingv1alpha3.CompositePodGroup {
+func deletedCompositePodGroup(cpg *schedulingv1beta1.CompositePodGroup) *schedulingv1beta1.CompositePodGroup {
 	cpg.DeletionTimestamp = &metav1.Time{}
 	return cpg
 }
@@ -87,11 +86,11 @@ func podGroupWithParent(name string, parentName string) *schedulingv1beta1.PodGr
 	return pg
 }
 
-func cpg(name string) *schedulingv1alpha3.CompositePodGroup {
+func cpg(name string) *schedulingv1beta1.CompositePodGroup {
 	return st.MakeCompositePodGroup().Name(name).Namespace(defaultNS).UID(name + "-uid").Obj()
 }
 
-func cpgWithParent(name, parentName string) *schedulingv1alpha3.CompositePodGroup {
+func cpgWithParent(name, parentName string) *schedulingv1beta1.CompositePodGroup {
 	group := cpg(name)
 	group.Spec.ParentCompositePodGroupName = &parentName
 	return group
@@ -447,9 +446,9 @@ func TestPodGroupProtectionController(t *testing.T) {
 				client := fake.NewClientset(test.initialObjects...)
 				informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 				pgInformer := informerFactory.Scheduling().V1beta1().PodGroups()
-				var cpgInformer schedulinginformersv1alpha3.CompositePodGroupInformer
+				var cpgInformer schedulinginformersv1beta1.CompositePodGroupInformer
 				if cpgEnabled {
-					cpgInformer = informerFactory.Scheduling().V1alpha3().CompositePodGroups()
+					cpgInformer = informerFactory.Scheduling().V1beta1().CompositePodGroups()
 				}
 				podInformer := informerFactory.Core().V1().Pods()
 
@@ -558,7 +557,7 @@ func TestCompositePodGroupProtectionController(t *testing.T) {
 			client := fake.NewClientset(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 			pgInformer := informerFactory.Scheduling().V1beta1().PodGroups()
-			cpgInformer := informerFactory.Scheduling().V1alpha3().CompositePodGroups()
+			cpgInformer := informerFactory.Scheduling().V1beta1().CompositePodGroups()
 			podInformer := informerFactory.Core().V1().Pods()
 
 			ctrl, err := NewPodGroupProtectionController(klog.FromContext(ctx), pgInformer, cpgInformer, podInformer, client, true)
@@ -573,7 +572,7 @@ func TestCompositePodGroupProtectionController(t *testing.T) {
 			// In order to reduce test flakiness, make sure that the object-to-delete is visible in the client set. Create a dummy CPG and PG to "warm up" the watch pipe.
 			// Since they are created after LIST (WaitForCacheSync), the informer must see them via WATCH before any deletions occur.
 			syncCPG := cpg("sync-cpg")
-			if _, err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Create(ctx, syncCPG, metav1.CreateOptions{}); err != nil {
+			if _, err := client.SchedulingV1beta1().CompositePodGroups(defaultNS).Create(ctx, syncCPG, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("creating sync cpg: %v", err)
 			}
 			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
@@ -601,13 +600,13 @@ func TestCompositePodGroupProtectionController(t *testing.T) {
 			}
 
 			if test.cpgToDelete != "" {
-				if err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Delete(ctx, test.cpgToDelete, metav1.DeleteOptions{}); err != nil {
+				if err := client.SchedulingV1beta1().CompositePodGroups(defaultNS).Delete(ctx, test.cpgToDelete, metav1.DeleteOptions{}); err != nil {
 					t.Fatalf("deleting composite pod group: %v", err)
 				}
 			}
 
 			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				cpg, err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Get(ctx, test.cpgToCheck, metav1.GetOptions{})
+				cpg, err := client.SchedulingV1beta1().CompositePodGroups(defaultNS).Get(ctx, test.cpgToCheck, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return !test.expectFinalizer, nil
 				}

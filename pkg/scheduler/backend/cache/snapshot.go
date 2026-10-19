@@ -22,7 +22,6 @@ import (
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -219,7 +218,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 
 // NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
 // It should be used only in the tests.
-func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) *Snapshot {
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1beta1.CompositePodGroup) *Snapshot {
 	s := NewSnapshot(pods, nodes)
 	genericPodGroups := make([]*fwk.GenericPodGroup, 0, len(compositePodGroups)+len(podGroups))
 	for _, cpg := range compositePodGroups {
@@ -436,7 +435,7 @@ type compositePodGroupSnapshotListerImpl struct {
 	snapshot *Snapshot
 }
 
-func (l *compositePodGroupSnapshotListerImpl) Get(namespace string, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+func (l *compositePodGroupSnapshotListerImpl) Get(namespace string, name string) (*schedulingv1beta1.CompositePodGroup, error) {
 	if !l.snapshot.compositePodGroupEnabled {
 		return nil, fmt.Errorf("composite pod group feature gate is disabled")
 	}

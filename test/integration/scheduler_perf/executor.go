@@ -35,8 +35,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,8 +46,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulingv1alpha3informers "k8s.io/client-go/informers/scheduling/v1alpha3"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	schedulingv1beta1informers "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
@@ -69,8 +67,8 @@ type WorkloadExecutor struct {
 	dataItems                    []DataItem
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
-	podGroupInformer             schedulinginformers.PodGroupInformer
-	compositePodGroupInformer    schedulingv1alpha3informers.CompositePodGroupInformer
+	podGroupInformer             schedulingv1beta1informers.PodGroupInformer
+	compositePodGroupInformer    schedulingv1beta1informers.CompositePodGroupInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
 	workload                     *Workload
@@ -217,7 +215,7 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 		maps.Copy(env, op.TemplateParams)
 		env["Index"] = index
 
-		obj := &schedulingapi.PodGroup{}
+		obj := &schedulingv1beta1.PodGroup{}
 		if _, err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
 			return fmt.Errorf("%s: %w", op.TemplatePath, err)
 		}
@@ -247,7 +245,7 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 	return nil
 }
 
-func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingapi.PodGroup, namespace, templatePath string) error {
+func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1beta1.PodGroup, namespace, templatePath string) error {
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 
 	defer cancel()
@@ -305,7 +303,7 @@ func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext,
 			}
 			env["ChildrenCount"] = childrenCount
 
-			obj := &schedulingv1alpha3.CompositePodGroup{}
+			obj := &schedulingv1beta1.CompositePodGroup{}
 			if _, err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
 				return fmt.Errorf("%s: %w", op.TemplatePath, err)
 			}
@@ -338,12 +336,12 @@ func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext,
 	return nil
 }
 
-func (e *WorkloadExecutor) createCompositePodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1alpha3.CompositePodGroup, namespace, templatePath string) error {
+func (e *WorkloadExecutor) createCompositePodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1beta1.CompositePodGroup, namespace, templatePath string) error {
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 
 	defer cancel()
 	for {
-		_, err := tCtx.Client().SchedulingV1alpha3().CompositePodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
+		_, err := tCtx.Client().SchedulingV1beta1().CompositePodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
 			FieldValidation: "Strict",
 		})
 
