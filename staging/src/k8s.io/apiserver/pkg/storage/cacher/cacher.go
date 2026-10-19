@@ -587,25 +587,22 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		identifier,
 	)
 
-	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
-	// the c.watchCache.RLock held otherwise we are at risk of a deadlock
-	// mainly because c.watchCache.processEvent method won't be able to make progress
-	//
-	// moreover even though the c.waitUntilWatchCacheFreshAndForceAllEvents acquires a lock
-	// it is safe to release the lock after the method finishes because we don't require
-	// any atomicity between the call to the method and further calls that actually get the events.
-	err = c.waitUntilWatchCacheFreshAndForceAllEvents(ctx, requiredResourceVersion, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
-	}
-
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
 	// on return from this function.
 	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
+	span.AddEvent("watchCache locked acquired")
 	defer c.watchCache.RUnlock()
+
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		err := c.watchCache.waitUntilFreshLocked(ctx, requiredResourceVersion)
+		if err != nil {
+			return newErrWatcher(err), nil
+		}
+		span.AddEvent("watchCache fresh enough")
+	}
 
 	var cacheInterval *watchCacheInterval
 	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)
@@ -1361,33 +1358,6 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 	}
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
 	return rv, err
-}
-
-// waitUntilWatchCacheFreshAndForceAllEvents waits until cache is at least
-// as fresh as given requestedWatchRV if sendInitialEvents was requested.
-// otherwise, we allow for establishing the connection because the clients
-// can wait for events without unnecessary blocking.
-func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) error {
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		// Here be dragons:
-		// Since the etcd feature checker needs to check all members
-		// to determine whether a given feature is supported,
-		// we may receive a positive response even if the feature is not supported.
-		//
-		// In this very rare scenario, the worst case will be that this
-		// request will wait for 3 seconds before it fails.
-		span := tracing.SpanFromContext(ctx)
-		c.watchCache.RLock()
-		span.AddEvent("watchCache locked acquired")
-		defer c.watchCache.RUnlock()
-		err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
-		if err != nil {
-			return err
-		}
-		span.AddEvent("watchCache fresh enough")
-		return nil
-	}
-	return nil
 }
 
 // Wait blocks until the cacher is Ready or Stopped, it returns an error if Stopped.
