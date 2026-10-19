@@ -591,18 +591,31 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	defer c.watchCache.RUnlock()
 
 	var cacheInterval *watchCacheInterval
-	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)
-	if err != nil {
-		// To match the uncached watch implementation, once we have passed authn/authz/admission,
-		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
-		// rather than a directly returned error.
-		return newErrWatcher(err), nil
+	var bookmarkAfterResourceVersion uint64
+	if shouldGetInitialEventsFromStore(requiredResourceVersion, opts) {
+		cacheInterval, err = c.watchCache.waitAndGetIntervalFromStoreLocked(ctx, requiredResourceVersion, key, opts)
+		if err != nil {
+			return newErrWatcher(err), nil
+		}
+		if isListWatchRequest(opts) {
+			c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
+			bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
+		}
+	} else {
+		if requiredResourceVersion == 0 {
+			// SendInitialEvents = false and resourceVersion = 0
+			// means that the request would like to start watching
+			// from Any resourceVersion
+			requiredResourceVersion = c.watchCache.resourceVersion
+		}
+		cacheInterval, err = c.watchCache.history.GetIntervalLocked(requiredResourceVersion, c.watchCache.RWMutex.RLocker())
+		if err != nil {
+			// To match the uncached watch implementation, once we have passed authn/authz/admission,
+			// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
+			// rather than a directly returned error.
+			return newErrWatcher(err), nil
+		}
 	}
-
-	if isListWatchRequest(opts) {
-		c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
-	}
-	bookmarkAfterResourceVersion := c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
 
 	addedWatcher := false
 	func() {

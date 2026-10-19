@@ -664,24 +664,6 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 	return w.history.suggestedWatchChannelSize(indexExists, triggerUsed)
 }
 
-// getAllEventsSinceLocked returns a watchCacheInterval that can be used to
-// retrieve events since a certain resourceVersion. This function assumes to
-// be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
-	if shouldGetInitialEventsFromStore(resourceVersion, opts) {
-		return w.waitAndGetIntervalFromStoreLocked(ctx, resourceVersion, key, opts)
-	}
-
-	if resourceVersion == 0 {
-		// SendInitialEvents = false and resourceVersion = 0
-		// means that the request would like to start watching
-		// from Any resourceVersion
-		resourceVersion = w.resourceVersion
-	}
-
-	return w.history.GetIntervalLocked(resourceVersion, w.RWMutex.RLocker())
-}
-
 func shouldGetInitialEventsFromStore(resourceVersion uint64, opts storage.ListOptions) bool {
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		return true
