@@ -37,17 +37,17 @@ import (
 
 // possible states of the cache watcher
 const (
-	// cacheWatcherWaitingForBookmark indicates the cacher
+	// needsBookmark indicates the cacher
 	// is waiting for a bookmark event with a specific RV set
-	cacheWatcherWaitingForBookmark = iota
+	needsBookmark = iota
 
 	// cacheWatcherBookmarkReceived indicates that the cacher
 	// has received a bookmark event with required RV
 	cacheWatcherBookmarkReceived
 
-	// cacheWatcherBookmarkSent indicates that the cacher
+	// bookmarkOK indicates that the cacher
 	// has already sent a bookmark event to a client
-	cacheWatcherBookmarkSent
+	bookmarkOK
 )
 
 // cacheWatcher implements watch.Interface
@@ -278,7 +278,7 @@ func (c *cacheWatcher) wasBookmarkAfterRvReceived() bool {
 // wasBookmarkAfterRvReceivedLocked checks if the given cacheWatcher
 // have seen a bookmark event >= bookmarkAfterResourceVersion
 func (c *cacheWatcher) wasBookmarkAfterRvReceivedLocked() bool {
-	return c.state != cacheWatcherWaitingForBookmark
+	return c.state != needsBookmark
 }
 
 // markBookmarkAfterRvAsReceived indicates that the given cacheWatcher
@@ -301,7 +301,7 @@ func (c *cacheWatcher) markBookmarkAfterRvAsReceived(event *watchCacheEvent) {
 // wasBookmarkAfterRvSentLocked checks if a bookmark event
 // with an RV >= the bookmarkAfterResourceVersion has been sent by this watcher
 func (c *cacheWatcher) wasBookmarkAfterRvSentLocked() bool {
-	return c.state == cacheWatcherBookmarkSent
+	return c.state == bookmarkOK
 }
 
 // wasBookmarkAfterRvSent same as wasBookmarkAfterRvSentLocked just acquires a lock
@@ -323,19 +323,9 @@ func (c *cacheWatcher) markBookmarkAfterRvSent(event *watchCacheEvent) {
 		c.stateMutex.Lock()
 		defer c.stateMutex.Unlock()
 		if !c.wasBookmarkAfterRvSentLocked() {
-			c.state = cacheWatcherBookmarkSent
+			c.state = bookmarkOK
 		}
 	}
-}
-
-// setBookmarkAfterResourceVersion sets the bookmarkAfterResourceVersion and the state associated with it
-func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion uint64) {
-	state := cacheWatcherWaitingForBookmark
-	if bookmarkAfterResourceVersion == 0 {
-		state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
-	}
-	c.state = state
-	c.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
 }
 
 // setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
@@ -447,7 +437,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, initialEventsEndBookmark *watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
@@ -455,6 +445,11 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	resourceVersion, err := c.processInitialEvents(cacheInterval, resourceVersion)
 	if err != nil {
 		return
+	}
+
+	// send bookmark after sending all events in cacheInterval for watchlist request
+	if initialEventsEndBookmark != nil {
+		c.sendWatchCacheEvent(initialEventsEndBookmark)
 	}
 	// At this point we already start processing incoming watch events.
 	// However, the init event can still be processed because their serialization
@@ -485,13 +480,6 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 	// consider increase size of result buffer in those cases.
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
-
-	// cacheInterval may be created from a version being more fresh than requested
-	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
-	// with lower resourceVersion from being delivered to ensure watch contract.
-	if cacheInterval.resourceVersion > resourceVersion {
-		resourceVersion = cacheInterval.resourceVersion
-	}
 
 	initEventCount := 0
 	for event, err := range cacheInterval.All() {
@@ -538,10 +526,6 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
 
-	// send bookmark after sending all events in cacheInterval for watchlist request
-	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
-	}
 	return resourceVersion, nil
 }
 

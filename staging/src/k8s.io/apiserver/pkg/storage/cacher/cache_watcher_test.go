@@ -69,7 +69,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
 	w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 0)
+	go w.process(context.Background(), intervalFromEvents(initEvents), nil, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -189,7 +189,7 @@ TestCase:
 		}
 
 		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		go w.process(context.Background(), intervalFromEvents(testCase.events), 0)
+		go w.process(context.Background(), intervalFromEvents(testCase.events), nil, 0)
 
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
@@ -241,7 +241,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
-		go w.process(ctx, nil, 0)
+		go w.process(ctx, nil, nil, 0)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
@@ -331,7 +331,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w.process(context.Background(), wci, uint64(numObjects-1))
+		w.process(context.Background(), wci, nil, uint64(numObjects-1))
 	}()
 
 	// We expect all init events to be delivered.
@@ -356,7 +356,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		w.setBookmarkAfterResourceVersion(0)
+		w.state = bookmarkOK
 		return w
 	}
 
@@ -423,7 +423,7 @@ func TestCacheWatcherDraining(t *testing.T) {
 		makeWatchCacheEvent(6),
 	}
 	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 1)
+	go w.process(context.Background(), intervalFromEvents(initEvents), nil, 1)
 	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
@@ -464,7 +464,7 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 		makeWatchCacheEvent(6),
 	}
 	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 1)
+	go w.process(context.Background(), intervalFromEvents(initEvents), nil, 1)
 	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
@@ -501,8 +501,8 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 		{Object: &v1.Pod{}},
 	}
 	w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	w.setBookmarkAfterResourceVersion(10)
-	go w.process(context.Background(), intervalFromEvents(initEvents), 0)
+	w.bookmarkAfterResourceVersion = 10
+	go w.process(context.Background(), intervalFromEvents(initEvents), nil, 0)
 
 	// get an event so that
 	// we know the w.process
@@ -569,8 +569,8 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	w = newCacheWatcher(2, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), fakeClock, "")
-	w.setBookmarkAfterResourceVersion(10)
-	go w.process(ctx, intervalFromEvents(initEvents), 0)
+	w.bookmarkAfterResourceVersion = 10
+	go w.process(ctx, intervalFromEvents(initEvents), nil, 0)
 	watchInitializationSignal.Wait()
 
 	// note that we can add three events even though the chanSize is two because
@@ -666,7 +666,7 @@ apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, id)
-		w.setBookmarkAfterResourceVersion(10)
+		w.bookmarkAfterResourceVersion = 10
 		return w
 	}
 
