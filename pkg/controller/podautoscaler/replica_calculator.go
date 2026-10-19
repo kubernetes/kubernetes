@@ -310,7 +310,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 	replicaCount = statusReplicas
 	if statusReplicas == 0 {
 		// Ratio is undefined when no pods are running; skip the tolerance check
-		// and go straight to the desired count. 
+		// and go straight to the desired count.
 		replicaCount = ceilToInt32(float64(usage) / float64(targetAverageUsage))
 	} else {
 		usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
@@ -400,7 +400,7 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	replicaCount = statusReplicas
 	if statusReplicas == 0 {
 		// Ratio is undefined when no pods are running; skip the tolerance check
-		// and go straight to the desired count. 
+		// and go straight to the desired count.
 		replicaCount = ceilToInt32(float64(usage) / float64(targetUsagePerPod))
 	} else {
 		usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
