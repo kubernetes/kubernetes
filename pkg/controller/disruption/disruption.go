@@ -54,6 +54,7 @@ import (
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/utils/clock"
 )
 
@@ -807,7 +808,7 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 	if !updated {
 		return nil
 	}
-	if _, err := dc.kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, newPod, metav1.UpdateOptions{}); err != nil {
+	if _, _, _, err := podutil.PatchPodStatus(ctx, dc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, newPod.Status); err != nil {
 		return err
 	}
 	logger.V(2).Info("Reset stale DisruptionTarget condition to False", "pod", klog.KObj(pod))

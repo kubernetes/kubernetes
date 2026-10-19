@@ -129,13 +129,23 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 			continue
 		}
 
-		// Pod will be modified, so making copy is required.
-		pod := pods[i].DeepCopy()
-		for _, cond := range pod.Status.Conditions {
+		for _, cond := range pods[i].Status.Conditions {
 			if cond.Type != v1.PodReady {
 				continue
 			}
+			if cond.Status == v1.ConditionFalse {
+				break
+			}
 
+			pod, err := kubeClient.CoreV1().Pods(pods[i].Namespace).Get(ctx, pods[i].Name, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					break
+				}
+				logger.Info("Failed to get status for pod", "pod", klog.KObj(pods[i]), "err", err)
+				errs = append(errs, err)
+				break
+			}
 			cond.Status = v1.ConditionFalse
 			if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
 				break
