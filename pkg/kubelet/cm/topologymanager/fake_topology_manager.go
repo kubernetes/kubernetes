@@ -91,6 +91,16 @@ func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) er
 	return nil
 }
 
+func (m *fakeManager) StageAdmit(context.Context, *lifecycle.PodAdmitAttributes) error {
+	return nil
+}
+
+func (m *fakeManager) CommitAdmit(context.Context, *lifecycle.PodAdmitAttributes) error {
+	return nil
+}
+
+func (m *fakeManager) AbortAdmit(context.Context, *lifecycle.PodAdmitAttributes) {}
+
 func (m *fakeManager) Admit(ctx context.Context, _ *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 	logger.Info("Topology Admit Handler")

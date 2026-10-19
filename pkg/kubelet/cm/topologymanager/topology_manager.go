@@ -84,6 +84,9 @@ func (e *PodLevelTopologyAffinityError) Type() string {
 type Manager interface {
 	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
+	// PodAdmitTransactionalHandler is implemented by Manager, so that hint providers
+	// can take part in the transaction of an admission.
+	lifecycle.PodAdmitTransactionalHandler
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
@@ -121,6 +124,22 @@ type HintProvider interface {
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
 	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
+}
+
+// AdmitTransactionalHintProvider is an optional extension of HintProvider for providers
+// that only prepare an assignment in Allocate and AllocatePod. The Topology
+// Manager forwards to them the calls of lifecycle.PodAdmitTransactionalHandler.
+type AdmitTransactionalHintProvider interface {
+	// StageAdmit checks that the assignment prepared for the pod can be
+	// committed and durably records it without making it effective.
+	StageAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error
+	// CommitAdmit makes the staged assignment of the pod effective. Once
+	// StageAdmit has succeeded, it must not fail for any reason StageAdmit
+	// could have detected.
+	CommitAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error
+	// AbortAdmit discards the assignment prepared or staged for the pod.
+	// It must be idempotent.
+	AbortAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation)
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -288,4 +307,39 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
+}
+
+func (m *manager) StageAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission transaction stage started", "pod", klog.KObj(attrs.Pod))
+
+	startTime := time.Now()
+	err := m.scope.StageAdmit(ctx, attrs.Pod, attrs.Operation)
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	logger.V(4).Info("Topology manager admission transaction stage completed", "pod", klog.KObj(attrs.Pod), "err", err)
+	return err
+}
+
+func (m *manager) CommitAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission transaction commit started", "pod", klog.KObj(attrs.Pod))
+
+	startTime := time.Now()
+	err := m.scope.CommitAdmit(ctx, attrs.Pod, attrs.Operation)
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	logger.V(4).Info("Topology manager admission transaction commit completed", "pod", klog.KObj(attrs.Pod), "err", err)
+	return err
+}
+
+func (m *manager) AbortAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission transaction abort started", "pod", klog.KObj(attrs.Pod))
+
+	startTime := time.Now()
+	m.scope.AbortAdmit(ctx, attrs.Pod, attrs.Operation)
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	logger.V(4).Info("Topology manager admission transaction abort completed", "pod", klog.KObj(attrs.Pod))
 }

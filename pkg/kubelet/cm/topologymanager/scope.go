@@ -18,6 +18,8 @@ package topologymanager
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	"k8s.io/api/core/v1"
@@ -52,6 +54,9 @@ type Scope interface {
 	RemoveContainer(logger klog.Logger, containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
+	// Scope forwards the admission transaction to the hint providers, so it has
+	// the methods of AdmitTransactionalHintProvider.
+	AdmitTransactionalHintProvider
 }
 
 type scope struct {
@@ -156,6 +161,47 @@ func (s *scope) allocateAlignedResources(ctx context.Context, pod *v1.Pod, conta
 		}
 	}
 	return nil
+}
+
+// StageAdmit stages the admission of the pod in every hint provider that
+// implements AdmitTransactionalHintProvider, stopping at the first failure.
+func (s *scope) StageAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error {
+	for _, provider := range s.hintProviders {
+		if tx, ok := provider.(AdmitTransactionalHintProvider); ok {
+			if err := tx.StageAdmit(ctx, pod, operation); err != nil {
+				return fmt.Errorf("hint provider %T failed to stage the %s of pod %s: %w", provider, operation, klog.KObj(pod), err)
+			}
+		}
+	}
+	return nil
+}
+
+// CommitAdmit commits the admission of the pod in every hint provider that
+// implements AdmitTransactionalHintProvider. A failing provider does not stop the others,
+// because the admission is accepted already.
+func (s *scope) CommitAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error {
+	var errs []error
+	for _, provider := range s.hintProviders {
+		if tx, ok := provider.(AdmitTransactionalHintProvider); ok {
+			if err := tx.CommitAdmit(ctx, pod, operation); err != nil {
+				errs = append(errs, fmt.Errorf("hint provider %T failed to commit the %s of pod %s: %w", provider, operation, klog.KObj(pod), err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// AbortAdmit aborts the admission of the pod in every hint provider that
+// implements AdmitTransactionalHintProvider.
+// Hints written by an aborted admission are not restored: they are only read
+// by Allocate and AllocatePod, after the next admission of the pod has
+// rewritten them.
+func (s *scope) AbortAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) {
+	for _, provider := range s.hintProviders {
+		if tx, ok := provider.(AdmitTransactionalHintProvider); ok {
+			tx.AbortAdmit(ctx, pod, operation)
+		}
+	}
 }
 
 func (s *scope) allocatePodAlignedResources(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
