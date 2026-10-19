@@ -72,6 +72,15 @@ type testApplyAlias[T supportedTypes] struct {
 	expectedErr        error
 }
 
+// readAndApply mirrors how cmd.go drives Preferences: Read once, then Apply the result.
+func readAndApply(p PreferencesHandler, rootCmd *cobra.Command, opts *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
+	prefs, err := p.Read(args, errOut)
+	if err != nil {
+		return args, err
+	}
+	return p.Apply(rootCmd, opts, prefs, args, errOut)
+}
+
 func TestApplyOverride(t *testing.T) {
 	tests := []testApplyOverride[string]{
 		{
@@ -870,7 +879,7 @@ func TestApplyOverride(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 
-			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			_, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1119,7 +1128,7 @@ func TestApplyOverrideBool(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			_, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1409,7 +1418,7 @@ func TestApplyAliasBool(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			lastArgs, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2613,7 +2622,7 @@ func TestApplyAlias(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			lastArgs, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2984,7 +2993,7 @@ users:
 			}, nil
 		}
 
-		_, err = p.Apply(rootCmd, opts, args, io.Discard)
+		_, err = readAndApply(p, rootCmd, opts, args, io.Discard)
 		require.NoError(t, err, "error applying preferences")
 
 		cfg, err := opts.ToRESTConfig()
@@ -3193,7 +3202,7 @@ credentialPluginPolicy: ""
 				return pref, nil
 			}
 
-			_, err := p.Apply(rootCmd, opts, args, io.Discard)
+			_, err := readAndApply(p, rootCmd, opts, args, io.Discard)
 			if test.shouldErr {
 				require.Error(t, err, "expected error, but error was nil")
 			} else {
@@ -3246,7 +3255,7 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 	errWriter := &bytes.Buffer{}
 	args := []string{"root", "kuberc", "view"}
 
-	_, err := pref.Apply(rootCmd, opts, args, errWriter)
+	_, err := readAndApply(pref, rootCmd, opts, args, errWriter)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}

@@ -370,13 +370,17 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	prefs, err := pref.Read(o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
 		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while reading preferences: %v\n", err)
+		// Invalid preferences are fatal only when a command is about to run with them;
+		// bare "kubectl" just shows help, so a warning is enough there.
+		if len(o.Arguments) > 1 {
+			os.Exit(1)
+		}
 	}
-	aliasCommandGroup := kuberc.GetAliasesCommandGroup(cmds, prefs)
-	groups = append(groups, aliasCommandGroup)
+	groups = append(groups, kuberc.GetAliasesCommandGroup(cmds, prefs))
 
-	_, err = pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
+	_, err = pref.Apply(cmds, kubeConfigFlags, prefs, o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
-		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err) //nolint:errcheck
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 		os.Exit(1)
 	}
 

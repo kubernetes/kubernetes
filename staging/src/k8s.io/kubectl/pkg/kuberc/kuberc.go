@@ -61,7 +61,7 @@ var _ = clientcmdapi.AllowlistEntry(config.AllowlistEntry{})
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
 	Read(args []string, errOut io.Writer) (*config.Preference, error)
-	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -119,21 +119,14 @@ func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference,
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
-	if len(args) <= 1 {
-		return args, nil
-	}
-
-	kuberc, err := p.Read(args, errOut)
-	if err != nil {
-		return args, err
-	} else if kuberc == nil {
+func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference, args []string, errOut io.Writer) ([]string, error) {
+	if len(args) <= 1 || kuberc == nil {
 		return args, nil
 	}
 
 	p.applyPluginPolicy(kubeConfigFlags, kuberc)
 
-	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
+	args, err := p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
 		return args, err
 	}
@@ -271,7 +264,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			break
 		}
 
-		aliasCmd, err := BuildAliasCommand(rootCmd, alias)
+		aliasCmd, err := buildAliasCommand(rootCmd, alias)
 		if err != nil {
 			return args, err
 		}
@@ -361,10 +354,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	return args, nil
 }
 
-// BuildAliasCommand resolves the underlying command referenced by alias.Command
+// buildAliasCommand resolves the underlying command referenced by alias.Command
 // and returns a copy of it renamed to alias.Name, suitable for registration
 // in the command tree or for listing (e.g. in help output).
-func BuildAliasCommand(rootCmd *cobra.Command, alias config.AliasOverride) (*cobra.Command, error) {
+func buildAliasCommand(rootCmd *cobra.Command, alias config.AliasOverride) (*cobra.Command, error) {
 	commands := strings.Fields(alias.Command)
 	existingCmd, flags, err := rootCmd.Find(commands)
 	if err != nil {
@@ -582,7 +575,7 @@ func registerAliasCommands(kubectl *cobra.Command, kuberc *config.Preference) (c
 
 	userDefinedCommands := []*cobra.Command{}
 	for _, alias := range kuberc.Aliases {
-		_, err := BuildAliasCommand(kubectl, alias)
+		_, err := buildAliasCommand(kubectl, alias)
 		if err != nil {
 			continue
 		}
