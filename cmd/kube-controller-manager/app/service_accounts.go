@@ -84,7 +84,7 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("error creating Tokens controller: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return newPausableControllerLoop(func(ctx context.Context) {
 		tokenController.Run(ctx, int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs))
-	}, controllerName), nil
+	}, controllerName, tokenController), nil
 }

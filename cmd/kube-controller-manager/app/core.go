@@ -578,10 +578,9 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, fmt.Errorf("error creating ServiceAccount controller: %w", err)
 	}
-
-	return newControllerLoop(func(ctx context.Context) {
+	return newPausableControllerLoop(func(ctx context.Context) {
 		sac.Run(ctx, 1)
-	}, controllerName), nil
+	}, controllerName, sac), nil
 }
 
 func newTTLControllerDescriptor() *ControllerDescriptor {

@@ -289,6 +289,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			logger.Error(err, "Error building controller context")
 			return err
 		}
+		if election != nil && recoveryEnabled {
+			controllerContext.PausableRegistrar = election.elector
+		}
 
 		// Prepare all controllers in advance.
 		controllers, err := BuildControllers(ctx, controllerContext, controllerDescriptors, unsecuredMux, healthzHandler)
@@ -542,6 +545,18 @@ type ControllerContext struct {
 	// manager's kubeconfig. It is empty when the kubeconfig refers to the CA
 	// by file (certificate-authority) rather than inline data.
 	KubeAPIServerCAData []byte
+
+	// PausableRegistrar receives the controllers BuildControllers builds that
+	// implement leaderelection.Pausable, so that they are paused while the
+	// controller manager is not leading and resumed once it leads again.
+	// It is nil unless leader election recovery is enabled.
+	PausableRegistrar PausableRegistrar
+}
+
+// PausableRegistrar is implemented by *leaderelection.LeaderElector, see
+// ControllerContext.PausableRegistrar.
+type PausableRegistrar interface {
+	RegisterPausable(leaderelection.Pausable)
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -717,6 +732,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	var (
 		controllers []Controller
 		checks      []healthz.HealthChecker
+		notPausable []string
 	)
 	buildController := func(controllerDesc *ControllerDescriptor) error {
 		controllerName := controllerDesc.Name()
@@ -743,6 +759,16 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		if healthCheckable, ok := ctrl.(controller.HealthCheckable); ok {
 			if realCheck := healthCheckable.HealthChecker(); realCheck != nil {
 				check = controllerhealthz.NamedHealthChecker(controllerName, realCheck)
+			}
+		}
+		// A controller that implements leaderelection.Pausable stops working
+		// while the controller manager is not leading. Any other controller
+		// keeps running and has its writes rejected by the write gate instead.
+		if controllerCtx.PausableRegistrar != nil {
+			if pausable, ok := ctrl.(leaderelection.Pausable); ok {
+				controllerCtx.PausableRegistrar.RegisterPausable(pausable)
+			} else {
+				notPausable = append(notPausable, controllerName)
 			}
 		}
 
@@ -781,6 +807,10 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		if err := buildController(controllerDesc); err != nil {
 			return nil, err
 		}
+	}
+
+	if len(notPausable) > 0 {
+		logger.Info("Controllers that keep running while the controller manager is not leading, with writes rejected by the write gate", "controllers", notPausable)
 	}
 
 	// Register the checks.

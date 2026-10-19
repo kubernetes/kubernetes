@@ -451,3 +451,66 @@ func TestLeaderElectionRecoveryEnabled(t *testing.T) {
 		})
 	}
 }
+
+type testPausable struct{ paused bool }
+
+func (p *testPausable) Pause()  { p.paused = true }
+func (p *testPausable) Resume() { p.paused = false }
+
+// TestBuildControllersRecoveryOptIn verifies that BuildControllers registers
+// the controllers that implement Pausable with the election, and only those,
+// so they are paused while the controller manager is not leading.
+func TestBuildControllersRecoveryOptIn(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pausable := &testPausable{}
+	specialPausable := &testPausable{}
+	pausableConstructor := func(p *testPausable) func(context.Context, ControllerContext, string) (Controller, error) {
+		return func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			return newPausableControllerLoop(func(context.Context) {}, controllerName, p), nil
+		}
+	}
+	plainConstructor := func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		return newControllerLoop(func(context.Context) {}, controllerName), nil
+	}
+	descriptors := map[string]*ControllerDescriptor{
+		"pausable": {name: "pausable", constructor: pausableConstructor(pausable)},
+		"plain":    {name: "plain", constructor: plainConstructor},
+		// Skipped by its constructor: nothing runs, so nothing to pause.
+		"skipped": {name: "skipped", constructor: func(context.Context, ControllerContext, string) (Controller, error) { return nil, nil }},
+		// Disabled by --controllers: never built.
+		"disabled": {name: "disabled", constructor: plainConstructor},
+		// Built through the special-handling path, like the tokens controller.
+		names.ServiceAccountTokenController: {name: names.ServiceAccountTokenController, constructor: pausableConstructor(specialPausable), requiresSpecialHandling: true},
+	}
+
+	t.Run("recovery enabled", func(t *testing.T) {
+		controllerCtx := ControllerContext{}
+		controllerCtx.ComponentConfig.Generic.Controllers = []string{"*", "-disabled"}
+		// The election is not leading, so registered controllers are paused at once.
+		controllerCtx.PausableRegistrar = notLeadingElection(t).elector
+
+		var healthChecks mockHealthCheckAdder
+		controllers, err := BuildControllers(ctx, controllerCtx, descriptors, nil, &healthChecks)
+		if err != nil {
+			t.Fatalf("unexpected error building controllers: %v", err)
+		}
+
+		if !pausable.paused || !specialPausable.paused {
+			t.Error("the pausable and the special-handling controllers must be registered with the election and paused while it is not leading")
+		}
+		// The plain controller is built and runs unpaused.
+		if len(controllers) != 3 {
+			t.Errorf("expected the pausable, plain and special-handling controllers to be built, got %d controllers", len(controllers))
+		}
+	})
+
+	t.Run("recovery disabled", func(t *testing.T) {
+		// Without a registrar nothing is recorded and building still works.
+		controllerCtx := ControllerContext{}
+		controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+		var healthChecks mockHealthCheckAdder
+		if _, err := BuildControllers(ctx, controllerCtx, descriptors, nil, &healthChecks); err != nil {
+			t.Fatalf("unexpected error building controllers: %v", err)
+		}
+	})
+}

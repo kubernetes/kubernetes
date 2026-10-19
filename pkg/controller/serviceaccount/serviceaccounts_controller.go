@@ -73,7 +73,7 @@ func NewServiceAccountsController(ctx context.Context, saInformer coreinformers.
 				Logger: &logger,
 				Name:   "serviceaccount",
 			},
-		),
+		).(pausableQueue[string]),
 	}
 
 	saHandler, _ := saInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
@@ -116,7 +116,7 @@ type ServiceAccountsController struct {
 	nsLister       corelisters.NamespaceLister
 	nsListerSynced cache.InformerSynced
 
-	queue workqueue.TypedRateLimitingInterface[string]
+	queue pausableQueue[string]
 }
 
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
@@ -180,6 +180,25 @@ func (c *ServiceAccountsController) runWorker(ctx context.Context) {
 	}
 }
 
+// pausableQueue is a rate limiting workqueue that can be paused, which the
+// default one is; see Pause.
+type pausableQueue[T comparable] interface {
+	workqueue.TypedRateLimitingInterface[T]
+	workqueue.Pausable
+}
+
+// Pause blocks the controller workqueue from dequeuing items while the leader
+// election write gate is closed.
+func (c *ServiceAccountsController) Pause() {
+	c.queue.Pause()
+}
+
+// Resume unblocks the controller workqueue after the leader election write gate
+// reopens.
+func (c *ServiceAccountsController) Resume() {
+	c.queue.Resume()
+}
+
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
 func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
@@ -193,7 +212,6 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 		c.queue.Forget(key)
 		return true
 	}
-
 	utilruntime.HandleErrorWithContext(ctx, err, "Service account work item failed", "item", key)
 	c.queue.AddRateLimited(key)
 
