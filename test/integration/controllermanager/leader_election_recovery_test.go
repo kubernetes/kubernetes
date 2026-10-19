@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -34,7 +35,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
+	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
@@ -53,27 +57,37 @@ func TestMain(m *testing.M) {
 	framework.EtcdMain(m.Run)
 }
 
-// TestLeaderElectionRecoveryWriteGate verifies that a gated client's write is
-// rejected with ErrWriteGateClosed while the elector is inactive, and succeeds
-// after the gate reopens.
-func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
+// TestLeaderElectionRecoveryWriteGateAndControllerPause verifies:
+//  1. A gated client's write is rejected with ErrWriteGateClosed while the elector
+//     is inactive, and succeeds after the gate reopens.
+//  2. A controller using workqueue pause stops dequeuing while the gate is closed
+//     and reconciles the backlog after the gate reopens.
+func TestLeaderElectionRecoveryWriteGateAndControllerPause(t *testing.T) {
 	apiServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(apiServer.TearDownFn)
+
+	adminClient, err := kubernetes.NewForConfig(apiServer.ClientConfig)
+	if err != nil {
+		t.Fatalf("failed to create admin client: %v", err)
+	}
 
 	var failLeaseRequests atomic.Bool
 	lockConfig := restclient.CopyConfig(apiServer.ClientConfig)
 	lockConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			if failLeaseRequests.Load() && strings.Contains(req.URL.Path, "/leases") {
-				return &http.Response{
-					StatusCode: http.StatusServiceUnavailable,
-					Header:     make(http.Header),
-					Body:       http.NoBody,
-					Request:    req,
-				}, nil
-			}
-			return rt.RoundTrip(req)
-		})
+		return &wrappingRoundTripper{
+			rt: rt,
+			fn: func(req *http.Request) (*http.Response, error) {
+				if failLeaseRequests.Load() && strings.Contains(req.URL.Path, "/leases") {
+					return &http.Response{
+						StatusCode: http.StatusServiceUnavailable,
+						Header:     make(http.Header),
+						Body:       http.NoBody,
+						Request:    req,
+					}, nil
+				}
+				return rt.RoundTrip(req)
+			},
+		}
 	})
 
 	rl, err := resourcelock.NewFromKubeconfig(
@@ -116,8 +130,28 @@ func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
 		t.Fatalf("failed to create LeaderElector: %v", err)
 	}
 
+	var controllerWriteAttemptsWhileClosed atomic.Int32
+	var gateClosed atomic.Bool
+	gateClosed.Store(true)
+
 	gatedConfig := restclient.CopyConfig(apiServer.ClientConfig)
 	gatedConfig.Wrap(le.WriteGate())
+	// Wrapped after the gate, so this sits outside it and sees every write
+	// attempt the controller makes, including the ones the gate rejects.
+	// Only writes under the namespace deleted during the outage are counted,
+	// so the test's own writes through the gated client do not pollute the
+	// pause assertion.
+	gatedConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return &wrappingRoundTripper{
+			rt: rt,
+			fn: func(req *http.Request) (*http.Response, error) {
+				if gateClosed.Load() && req.Method != http.MethodGet && req.Method != http.MethodHead && strings.Contains(req.URL.Path, "/namespaces/ns-during-outage") {
+					controllerWriteAttemptsWhileClosed.Add(1)
+				}
+				return rt.RoundTrip(req)
+			},
+		}
+	})
 
 	gatedClient, err := kubernetes.NewForConfig(gatedConfig)
 	if err != nil {
@@ -138,12 +172,58 @@ func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
 		t.Fatalf("expected ErrWriteGateClosed before leading, got: %v", err)
 	}
 
-	go le.Run(ctx)
+	// The namespace controller finalizes deleted namespaces, so a namespace
+	// deleted while it is paused stays Terminating until it resumes.
+	informerFactory := informers.NewSharedInformerFactory(gatedClient, 0)
+	metadataClient, err := metadata.NewForConfig(gatedConfig)
+	if err != nil {
+		t.Fatalf("failed to create gated metadata client: %v", err)
+	}
+	nsc := namespacecontroller.NewNamespaceController(
+		ctx,
+		gatedClient,
+		metadataClient,
+		gatedClient.Discovery().ServerPreferredNamespacedResources,
+		informerFactory.Core().V1().Namespaces(),
+		0,
+		corev1.FinalizerKubernetes,
+	)
+	le.RegisterPausable(nsc)
+
+	var wg sync.WaitGroup
+	defer func() {
+		cancel()
+		wg.Wait()
+		informerFactory.Shutdown()
+	}()
+
+	wg.Go(func() {
+		le.Run(ctx)
+	})
 
 	select {
 	case <-startedCh:
+		gateClosed.Store(false)
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for OnStartedLeading")
+	}
+
+	informerFactory.Start(ctx.Done())
+	wg.Go(func() {
+		nsc.Run(ctx, 1)
+	})
+
+	// Verify initial reconciliation while gate is open.
+	if _, err := adminClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "ns-before-outage"},
+	}, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create ns-before-outage: %v", err)
+	}
+	if err := adminClient.CoreV1().Namespaces().Delete(ctx, "ns-before-outage", metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("failed to delete ns-before-outage: %v", err)
+	}
+	if err := waitForNamespaceGone(ctx, adminClient, "ns-before-outage", 30*time.Second); err != nil {
+		t.Fatalf("expected ns-before-outage to be finalized while leading: %v", err)
 	}
 
 	// Simulate lease renewal outage so the renew deadline expires and the write gate closes.
@@ -155,9 +235,11 @@ func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
 	failLeaseRequests.Store(true)
 	select {
 	case <-stoppedCh:
+		gateClosed.Store(true)
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for OnStoppedLeading after lease renewal failure")
 	}
+	controllerWriteAttemptsWhileClosed.Store(0)
 
 	// Direct write on the gated client must be rejected with ErrWriteGateClosed while inactive.
 	_, err = gatedClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Create(ctx, &corev1.ConfigMap{
@@ -167,7 +249,31 @@ func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
 		t.Fatalf("expected ErrWriteGateClosed while inactive, got: %v", err)
 	}
 
+	// Delete a namespace while the gate is closed; the paused controller must
+	// not dequeue it, so it stays Terminating and no writes are attempted.
+	// This is a negative check, so it can only pass falsely, never flake.
+	if _, err := adminClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "ns-during-outage"},
+	}, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create ns-during-outage: %v", err)
+	}
+	if err := adminClient.CoreV1().Namespaces().Delete(ctx, "ns-during-outage", metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("failed to delete ns-during-outage: %v", err)
+	}
+	// The namespace controller holds every event for a 5s grace period
+	// before processing it, so the window has to outlast that for an
+	// unpaused controller to be caught.
+	time.Sleep(7 * time.Second)
+	ns, err := adminClient.CoreV1().Namespaces().Get(ctx, "ns-during-outage", metav1.GetOptions{})
+	if err != nil || ns.DeletionTimestamp == nil {
+		t.Fatalf("expected ns-during-outage to stay Terminating while paused, got ns=%v err=%v", ns, err)
+	}
+	if attempts := controllerWriteAttemptsWhileClosed.Load(); attempts != 0 {
+		t.Fatalf("expected 0 write attempts bypassing pause while gate was closed, got %d", attempts)
+	}
+
 	// Restore lease renewals so the elector recovers the lease and reopens the write gate.
+	gateClosed.Store(false)
 	failLeaseRequests.Store(false)
 
 	// Gated client write succeeds once the gate reopens.
@@ -183,6 +289,22 @@ func TestLeaderElectionRecoveryWriteGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected gated client write to succeed after gate reopened: %v", err)
 	}
+
+	// Paused controller resumes and finalizes the backlog item (ns-during-outage).
+	if err := waitForNamespaceGone(ctx, adminClient, "ns-during-outage", 30*time.Second); err != nil {
+		t.Fatalf("expected ns-during-outage to be finalized after recovery: %v", err)
+	}
+}
+
+// waitForNamespaceGone waits until the named namespace no longer exists.
+func waitForNamespaceGone(ctx context.Context, client kubernetes.Interface, name string, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := client.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 // TestKubeControllerManagerLeaderElectionRecovery verifies that kube-controller-manager
@@ -410,8 +532,15 @@ func waitForDefaultServiceAccount(ctx context.Context, client kubernetes.Interfa
 	})
 }
 
-type roundTripperFunc func(*http.Request) (*http.Response, error)
+type wrappingRoundTripper struct {
+	rt http.RoundTripper
+	fn func(*http.Request) (*http.Response, error)
+}
 
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+func (w *wrappingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return w.fn(req)
+}
+
+func (w *wrappingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return w.rt
 }
