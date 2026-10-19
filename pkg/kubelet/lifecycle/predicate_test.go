@@ -18,7 +18,7 @@ package lifecycle
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	goruntime "runtime"
 	"testing"
 
@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -295,19 +294,53 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 	}
 }
 
+func newTestNode(taints []v1.Taint, labels map[string]string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labels},
+		Spec:       v1.NodeSpec{Taints: taints},
+		Status: v1.NodeStatus{
+			Capacity:    makeResources(10, 20, 32, 0, 0, 0),
+			Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0),
+		},
+	}
+}
+
+func newPodWithNodeAffinity(key string) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key: key, Operator: v1.NodeSelectorOpExists,
+								}},
+						}},
+					},
+				},
+			},
+		},
+	}
+}
+
+func asStaticPod(pod *v1.Pod) *v1.Pod {
+	pod.Annotations = map[string]string{types.ConfigSourceAnnotationKey: types.FileSource}
+	return pod
+}
+
 func TestGeneralPredicates(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	noExecuteTaint := v1.Taint{Key: "bar", Effect: v1.TaintEffectNoExecute}
 	resourceTests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *schedulerframework.NodeInfo
-		cachedNode *v1.Node
-		syncNode   *v1.Node
-		name       string
-		reasons    []PredicateFailureReason
-		// wantSyncFetches is the number of synchronous (useCache == false) node fetches
-		// generalFilter is expected to perform.
-		wantSyncFetches int
-		featureGates    map[featuregate.Feature]bool
+		pod             *v1.Pod
+		nodeInfo        *schedulerframework.NodeInfo
+		cachedNode      *v1.Node
+		syncNode        *v1.Node
+		syncErr         error
+		name            string
+		reasons         []PredicateFailureReason
+		wantSyncFetches bool
 	}{
 		{
 			pod: &v1.Pod{},
@@ -316,11 +349,8 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "no resources/port/host requested always fits",
+			cachedNode: newTestNode(nil, nil),
+			name:       "no resources/port/host requested always fits",
 		},
 		{
 			pod: newResourcePod(v1.ResourceList{
@@ -332,10 +362,7 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			cachedNode: newTestNode(nil, nil),
 			reasons: []PredicateFailureReason{
 				&InsufficientResourceError{ResourceName: v1.ResourceCPU, Requested: 8, Used: 5, Capacity: 10},
 				&InsufficientResourceError{ResourceName: v1.ResourceMemory, Requested: 10, Used: 19, Capacity: 20},
@@ -343,28 +370,18 @@ func TestGeneralPredicates(t *testing.T) {
 			name: "not enough cpu and memory resource",
 		},
 		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeName: "machine2",
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			reasons: []PredicateFailureReason{&PredicateFailureError{nodename.Name, nodename.ErrReason}},
-			name:    "host not match",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "machine2"}},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode(nil, nil),
+			reasons:    []PredicateFailureReason{&PredicateFailureError{nodename.Name, nodename.ErrReason}},
+			name:       "host not match",
 		},
 		{
-			pod:      newPodWithPort(123),
-			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
-			name:    "hostport conflict",
+			pod:        newPodWithPort(123),
+			nodeInfo:   schedulerframework.NewNodeInfo(newPodWithPort(123)),
+			cachedNode: newTestNode(nil, nil),
+			reasons:    []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
+			name:       "hostport conflict",
 		},
 		{
 			pod: &v1.Pod{
@@ -376,181 +393,62 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Effect: v1.TaintEffectNoSchedule},
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			cachedNode: newTestNode([]v1.Taint{
+				{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+				noExecuteTaint,
+			}, nil),
 			name: "taint/toleration match",
 		},
 		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Effect: v1.TaintEffectNoSchedule},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoSchedule taint/toleration not match",
-			wantSyncFetches: 0,
+			pod:        &v1.Pod{},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode([]v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}, nil),
+			name:       "NoSchedule taint/toleration not match",
 		},
 		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			pod:             &v1.Pod{},
+			nodeInfo:        schedulerframework.NewNodeInfo(),
+			cachedNode:      newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			syncNode:        newTestNode([]v1.Taint{noExecuteTaint}, nil),
 			reasons:         []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
 			name:            "NoExecute taint/toleration not match",
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "baz", Effect: v1.TaintEffectPreferNoSchedule},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "PreferNoSchedule taint/toleration not match",
-			wantSyncFetches: 0,
+			pod:        &v1.Pod{},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode([]v1.Taint{{Key: "baz", Effect: v1.TaintEffectPreferNoSchedule}}, nil),
+			name:       "PreferNoSchedule taint/toleration not match",
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-			},
+			pod:      asStaticPod(&v1.Pod{}),
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Effect: v1.TaintEffectNoSchedule},
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			cachedNode: newTestNode([]v1.Taint{
+				{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+				noExecuteTaint,
+			}, nil),
 			name: "static pods ignore taints",
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "node affinity failure",
+			pod:        asStaticPod(newPodWithNodeAffinity("foo")),
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode(nil, nil),
+			syncNode:   newTestNode(nil, nil),
+			name:       "node affinity failure",
 			reasons: []PredicateFailureReason{
 				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
 			},
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-				Spec: v1.PodSpec{
-					NodeName: "some-node-name",
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "machine1",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec:   v1.NodeSpec{},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "node affinity failure on cached node and node name doesn't match",
+			pod: func() *v1.Pod {
+				pod := asStaticPod(newPodWithNodeAffinity("foo"))
+				pod.Spec.NodeName = "some-node-name"
+				return pod
+			}(),
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode(nil, nil),
+			name:       "node affinity failure on cached node and node name doesn't match",
 			// Ensure that both reasons are returned, because we do not fetch the node synchronously on multiple failures.
 			reasons: []PredicateFailureReason{
 				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
@@ -558,114 +456,28 @@ func TestGeneralPredicates(t *testing.T) {
 			},
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "machine1",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec:   v1.NodeSpec{},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			pod:             asStaticPod(newPodWithNodeAffinity("foo")),
+			nodeInfo:        schedulerframework.NewNodeInfo(),
+			cachedNode:      newTestNode(nil, nil),
+			syncNode:        newTestNode(nil, map[string]string{"foo": "bar"}),
 			name:            "node affinity failure on cached node, but not the fresh one",
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "machine1",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec:   v1.NodeSpec{},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "node affinity failure on fresh node, but not the cached one",
+			pod:        asStaticPod(newPodWithNodeAffinity("foo")),
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode(nil, map[string]string{"foo": "bar"}),
+			syncNode:   newTestNode(nil, nil),
+			name:       "node affinity failure on fresh node, but not the cached one",
 		},
 		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "NoExecute taint on cached node, gone on fresh node",
+			pod:        &v1.Pod{},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			syncNode:   newTestNode(nil, nil),
+			name:       "NoExecute taint on cached node, gone on fresh node",
 			// The informer cache lags behind a taint removal; the synchronous fetch must clear the failure.
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
 			// A provisioner removes its NoExecute registration taint, the scheduler binds
@@ -679,404 +491,73 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule},
-						{Key: "karpenter.sh/unregistered", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			cachedNode: newTestNode([]v1.Taint{
+				{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule},
+				{Key: "karpenter.sh/unregistered", Effect: v1.TaintEffectNoExecute},
+			}, nil),
+			syncNode:        newTestNode([]v1.Taint{{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule}}, nil),
 			name:            "registration NoExecute taint removed while a NoSchedule taint remains",
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			// Same scenario with the tolerations the DefaultTolerationSeconds admission
-			// plugin injects into every pod; they must not mask or match the stale taint.
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{Key: v1.TaintNodeNotReady, Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To[int64](300)},
-						{Key: v1.TaintNodeUnreachable, Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To[int64](300)},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "karpenter.sh/unregistered", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "registration NoExecute taint removed, pod carries default not-ready tolerations",
-			wantSyncFetches: 1,
+			pod:        &v1.Pod{},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode(nil, nil),
+			syncNode:   newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			name:       "NoExecute taint only on fresh node, cached node clean",
+			// The cached node admits the pod, so nothing triggers a fetch and the fresh taint is never seen.
+			wantSyncFetches: false,
 		},
 		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoExecute taint on cached node and still on fresh node",
-			reasons:         []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
-			wantSyncFetches: 1,
-		},
-		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec:       v1.NodeSpec{},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoExecute taint only on fresh node, cached node clean",
-			wantSyncFetches: 0,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeName: "machine2",
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "NoExecute taint on cached node and node name doesn't match",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "machine2"}},
+			nodeInfo:   schedulerframework.NewNodeInfo(),
+			cachedNode: newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			name:       "NoExecute taint on cached node and node name doesn't match",
 			// A node name mismatch is not fixable by a refetch, so no sync fetch happens and both reasons are kept.
 			reasons: []PredicateFailureReason{
 				&PredicateFailureError{nodename.Name, nodename.ErrReason},
 				&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch},
 			},
-			wantSyncFetches: 0,
+			wantSyncFetches: false,
 		},
 		{
-			pod: newResourcePod(v1.ResourceList{
-				v1.ResourceCPU: *resource.NewMilliQuantity(8, resource.DecimalSI),
-			}),
-			nodeInfo: schedulerframework.NewNodeInfo(
-				newResourcePod(v1.ResourceList{
-					v1.ResourceCPU: *resource.NewMilliQuantity(5, resource.DecimalSI),
-				})),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "NoExecute taint on cached node and not enough cpu",
-			reasons: []PredicateFailureReason{
-				&InsufficientResourceError{ResourceName: v1.ResourceCPU, Requested: 8, Used: 5, Capacity: 10},
-				&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch},
-			},
-			wantSyncFetches: 0,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "machine1",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec:   v1.NodeSpec{},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			pod:             newPodWithNodeAffinity("foo"),
+			nodeInfo:        schedulerframework.NewNodeInfo(),
+			cachedNode:      newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			syncNode:        newTestNode(nil, map[string]string{"foo": "bar"}),
 			name:            "NoExecute taint and node affinity failure on cached node, both resolved on fresh node",
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "machine1",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
+			pod:             newPodWithNodeAffinity("foo"),
+			nodeInfo:        schedulerframework.NewNodeInfo(),
+			cachedNode:      newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			syncNode:        newTestNode([]v1.Taint{noExecuteTaint}, map[string]string{"foo": "bar"}),
 			name:            "NoExecute taint and node affinity failure on cached node, fresh node still tainted",
 			reasons:         []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						types.ConfigSourceAnnotationKey: types.FileSource,
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "static pods ignore NoExecute taint on cached node without fetching",
-			wantSyncFetches: 0,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{Key: "bar", Operator: v1.TolerationOpExists},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoExecute taint tolerated with Exists operator",
-			wantSyncFetches: 0,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{Key: "foo", Operator: v1.TolerationOpEqual, Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoExecute taint tolerated with Equal operator",
-			wantSyncFetches: 0,
-		},
-		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "bar", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			// syncNode is nil, so the fake returns an error; the cached result must be kept.
+			pod:             &v1.Pod{},
+			nodeInfo:        schedulerframework.NewNodeInfo(),
+			cachedNode:      newTestNode([]v1.Taint{noExecuteTaint}, nil),
+			syncErr:         errors.New("sync fetch failed"),
 			name:            "NoExecute taint on cached node and sync fetch fails",
 			reasons:         []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
-			wantSyncFetches: 1,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{Key: "foo", Operator: v1.TolerationOpGt, Value: "3", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name:            "NoExecute taint tolerated with Gt operator, TaintTolerationComparisonOperators enabled",
-			featureGates:    map[featuregate.Feature]bool{features.TaintTolerationComparisonOperators: true},
-			wantSyncFetches: 0,
-		},
-		{
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{Key: "foo", Operator: v1.TolerationOpGt, Value: "3", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
-			cachedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			syncNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{Key: "foo", Value: "5", Effect: v1.TaintEffectNoExecute},
-					},
-				},
-				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
-			},
-			name: "NoExecute taint not tolerated with Gt operator, TaintTolerationComparisonOperators disabled",
-			// With the gate off a Gt toleration never matches, so the taint failure stands even after the refetch.
-			featureGates:    map[featuregate.Feature]bool{features.TaintTolerationComparisonOperators: false},
-			reasons:         []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
-			wantSyncFetches: 1,
+			wantSyncFetches: true,
 		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
-			for gate, value := range test.featureGates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, value)
-			}
 			test.nodeInfo.SetNode(test.cachedNode)
-			syncFetches := 0
+			syncFetches := false
 			w := &predicateAdmitHandler{getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
 				if useCache {
 					return test.cachedNode, nil
 				}
-				syncFetches++
-				if test.syncNode == nil {
-					// Fail loudly instead of handing SetNode a nil node: a row without a
-					// syncNode either expects no fetch or expects the fetch to fail.
-					return nil, fmt.Errorf("test %q has no syncNode but a synchronous node fetch was attempted", test.name)
+				syncFetches = true
+				if test.syncErr != nil {
+					return nil, test.syncErr
 				}
 				return test.syncNode, nil
 			}}
@@ -1085,7 +566,7 @@ func TestGeneralPredicates(t *testing.T) {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
 			if syncFetches != test.wantSyncFetches {
-				t.Errorf("unexpected number of synchronous node fetches: got %d, want %d", syncFetches, test.wantSyncFetches)
+				t.Errorf("unexpected synchronous node fetches: got %t, want %t", syncFetches, test.wantSyncFetches)
 			}
 		})
 	}
@@ -1172,9 +653,6 @@ func TestPredicateAdmitHandlerStaleTaint(t *testing.T) {
 						return test.cachedNode, nil
 					}
 					syncFetches++
-					if test.syncNode == nil {
-						return nil, fmt.Errorf("test %q has no syncNode but a synchronous node fetch was attempted", test.name)
-					}
 					return test.syncNode, nil
 				},
 				pluginResourceUpdateFunc: func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error { return nil },
