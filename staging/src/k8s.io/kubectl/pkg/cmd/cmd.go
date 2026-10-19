@@ -341,8 +341,6 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
 	groups = append(groups, pluginCommandGroup)
 
-	templates.ActsAsRootCommand(cmds, filters, groups...)
-
 	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmds, f)
 
@@ -367,11 +365,22 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		}
 		return existingPreRunE(cmd, args)
 	}
-	_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
+
+	// Register aliases under a separate command group.
+	prefs, err := pref.Read(o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while reading preferences: %v\n", err)
+	}
+	aliasCommandGroup := kuberc.GetAliasesCommandGroup(cmds, prefs)
+	groups = append(groups, aliasCommandGroup)
+
+	_, err = pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
 		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err) //nolint:errcheck
 		os.Exit(1)
 	}
+
+	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	return cmds
 }
