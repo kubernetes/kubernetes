@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -82,6 +83,9 @@ type RuntimeHelper interface {
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
 	ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error
+
+	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

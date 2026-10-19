@@ -112,18 +112,10 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 
 // ResizeEphemeralVolume resizes the volume on the node.
 func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod) error {
-	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
-		return fmt.Errorf("spec does not reference an emptyDir volume type")
-	}
-	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
-		return fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
-	}
-
-	nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+	desiredSize, err := plugin.EffectiveEphemeralVolumeLimit(spec, pod)
 	if err != nil {
 		return err
 	}
-	desiredSize := calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 
 	dir := getPath(pod.UID, spec.Name(), plugin.host)
 	mounter := plugin.host.GetMounter()

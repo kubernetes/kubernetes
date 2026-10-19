@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -32,15 +33,16 @@ import (
 
 // FakeRuntimeHelper implements RuntimeHelper interfaces for testing purposes.
 type FakeRuntimeHelper struct {
-	DNSServers      []string
-	DNSSearches     []string
-	DNSOptions      []string
-	HostName        string
-	HostDomain      string
-	PodContainerDir string
-	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
-	Err             error
-	PodStats        map[kubetypes.UID]*statsapi.PodStats
+	DNSServers                        []string
+	DNSSearches                       []string
+	DNSOptions                        []string
+	HostName                          string
+	HostDomain                        string
+	PodContainerDir                   string
+	RuntimeHandlers                   map[string]kubecontainer.RuntimeHandler
+	Err                               error
+	PodStats                          map[kubetypes.UID]*statsapi.PodStats
+	EffectiveEphemeralVolumeLimitFunc func(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -141,4 +143,12 @@ func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) erro
 // ResizeEphemeralVolume is not implemented
 func (f *FakeRuntimeHelper) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
 	return nil
+}
+
+// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+func (f *FakeRuntimeHelper) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	if f.EffectiveEphemeralVolumeLimitFunc != nil {
+		return f.EffectiveEphemeralVolumeLimitFunc(pod, volumeName)
+	}
+	return nil, nil
 }

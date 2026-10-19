@@ -595,6 +595,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		markOpts := MarkVolumeOpts{
 			PodName:             volumeToMount.PodName,
 			PodUID:              volumeToMount.Pod.UID,
+			Pod:                 volumeToMount.Pod,
 			VolumeName:          volumeToMount.VolumeName,
 			Mounter:             volumeMounter,
 			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,

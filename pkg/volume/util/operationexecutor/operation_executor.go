@@ -166,6 +166,7 @@ func NewOperationExecutor(
 type MarkVolumeOpts struct {
 	PodName             volumetypes.UniquePodName
 	PodUID              types.UID
+	Pod                 *v1.Pod
 	VolumeName          v1.UniqueVolumeName
 	Mounter             volume.Mounter
 	BlockVolumeMapper   volume.BlockVolumeMapper

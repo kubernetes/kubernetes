@@ -268,6 +268,8 @@ type ResizableEphemeralVolumePlugin interface {
 	VolumePlugin
 	// ResizeEphemeralVolume resizes the volume on the node.
 	ResizeEphemeralVolume(spec *Spec, pod *v1.Pod) error
+	// EffectiveEphemeralVolumeLimit returns the effective size limit for the volume.
+	EffectiveEphemeralVolumeLimit(spec *Spec, pod *v1.Pod) (*resource.Quantity, error)
 }
 
 // BlockVolumePlugin is an extend interface of VolumePlugin and is used for block volumes support.

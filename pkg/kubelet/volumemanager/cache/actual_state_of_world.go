@@ -887,7 +887,19 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 
 	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted && volumeSpec != nil && shouldRecordVolumeInActuatedState(volumeSpec.Volume) {
 		logger := klog.TODO()
-		if err := asw.actuatedState.SetPodVolume(logger, podUID, *volumeSpec.Volume); err != nil {
+		volToRecord := *volumeSpec.Volume
+		if markVolumeOpts.Pod != nil && asw.volumePluginMgr != nil && allocation.VolHasMemoryBackedEmptyDir(&volToRecord) {
+			if plugin, err := asw.volumePluginMgr.FindPluginBySpec(volumeSpec); err == nil && plugin != nil {
+				if resizablePlugin, ok := plugin.(volume.ResizableEphemeralVolumePlugin); ok {
+					if effectiveLimit, err := resizablePlugin.EffectiveEphemeralVolumeLimit(volumeSpec, markVolumeOpts.Pod); err == nil {
+						emptyDirCopy := *volToRecord.EmptyDir
+						emptyDirCopy.SizeLimit = effectiveLimit
+						volToRecord.EmptyDir = &emptyDirCopy
+					}
+				}
+			}
+		}
+		if err := asw.actuatedState.SetPodVolume(logger, podUID, volToRecord); err != nil {
 			logger.Error(err, "Failed to record pod volume in actuated state", "podUID", podUID, "volumeName", volumeSpec.Name())
 		}
 	}

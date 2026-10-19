@@ -154,6 +154,23 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	return sizeLimit
 }
 
+// EffectiveEphemeralVolumeLimit calculates the effective memory size limit for a memory-backed
+// emptyDir volume as the minimum of node allocatable memory, pod memory limit, and the volume's
+// sizeLimit.
+func (plugin *emptyDirPlugin) EffectiveEphemeralVolumeLimit(spec *volume.Spec, pod *v1.Pod) (*resource.Quantity, error) {
+	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
+		return nil, fmt.Errorf("spec does not reference an emptyDir volume type")
+	}
+	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
+		return nil, fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
+	}
+	nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+	if err != nil {
+		return nil, err
+	}
+	return calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod), nil
+}
+
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
@@ -161,11 +178,11 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
-			nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+			var err error
+			sizeLimit, err = plugin.EffectiveEphemeralVolumeLimit(spec, pod)
 			if err != nil {
 				return nil, err
 			}
-			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) {
 			mode = spec.Volume.EmptyDir.Mode
