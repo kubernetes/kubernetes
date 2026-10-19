@@ -664,33 +664,43 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 	return w.history.suggestedWatchChannelSize(indexExists, triggerUsed)
 }
 
-// getAllEventsSinceLocked returns a watchCacheInterval that can be used to
-// retrieve events since a certain resourceVersion. This function assumes to
-// be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+func shouldGetInitialEventsFromStore(resourceVersion uint64, opts storage.ListOptions) bool {
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
-		return interval, err
+		return true
 	}
-
-	if resourceVersion == 0 {
-		if opts.SendInitialEvents == nil {
-			// resourceVersion = 0 means that we don't require any specific starting point
-			// and we would like to start watching from ~now.
-			// However, to keep backward compatibility, we additionally need to return the
-			// current state and only then start watching from that point.
-			//
-			// TODO: In v2 api, we should stop returning the current state - #13969.
-			interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
-			return interval, err
-		}
-		// SendInitialEvents = false and resourceVersion = 0
-		// means that the request would like to start watching
-		// from Any resourceVersion
-		resourceVersion = w.resourceVersion
+	if resourceVersion == 0 && opts.SendInitialEvents == nil {
+		// resourceVersion = 0 means that we don't require any specific starting point
+		// and we would like to start watching from ~now.
+		// However, to keep backward compatibility, we additionally need to return the
+		// current state and only then start watching from that point.
+		//
+		// TODO: In v2 api, we should stop returning the current state - #13969.
+		return true
 	}
+	return false
+}
 
-	return w.history.GetIntervalLocked(resourceVersion, w.RWMutex.RLocker())
+// waitAndGetIntervalFromStoreLocked waits until the watchCache is at least as fresh
+// as minResourceVersion and returns a watchCacheInterval covering the entire storage state.
+// This function assumes to be called under the watchCache lock.
+func (w *watchCache) waitAndGetIntervalFromStoreLocked(ctx context.Context, minResourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+	// Here be dragons:
+	// Since the etcd feature checker needs to check all members
+	// to determine whether a given feature is supported,
+	// we may receive a positive response even if the feature is not supported.
+	//
+	// In this very rare scenario, the worst case will be that this
+	// request will wait for 3 seconds before it fails.
+	span := tracing.SpanFromContext(ctx)
+	if err := w.waitUntilFreshLocked(ctx, minResourceVersion); err != nil {
+		return nil, err
+	}
+	span.AddEvent("watchCache fresh enough")
+	interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+	if err != nil {
+		return nil, err
+	}
+	return interval, nil
 }
 
 // getIntervalFromStoreLocked returns a watchCacheInterval
