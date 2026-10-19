@@ -3073,11 +3073,9 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getBookMarkFn, err := cacher.getBookmarkAfterResourceVersionLockedFunc(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
-			require.NoError(t, err)
 			cacher.watchCache.RLock()
 			defer cacher.watchCache.RUnlock()
-			getBookMarkResourceVersion := getBookMarkFn()
+			getBookMarkResourceVersion := cacher.getBookmarkAfterResourceVersionLocked(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
 			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
