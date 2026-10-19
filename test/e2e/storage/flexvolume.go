@@ -67,64 +67,41 @@ func testFlexVolume(ctx context.Context, driver string, config e2evolume.TestCon
 	e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 }
 
-// installFlex installs the driver found at filePath on the node, and restarts
-// kubelet if 'restart' is true. If node is nil, installs on the master, and restarts
-// controller-manager if 'restart' is true.
-func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver, filePath string) {
+// installFlex installs the driver found at filePath on the node via hostExec.
+// If node is nil, installs on the master via SSH.
+func installFlex(ctx context.Context, c clientset.Interface, hostExec utils.HostExec, node *v1.Node, vendor, driver, filePath string) {
 	flexDir := getFlexDir(ctx, c, node, vendor, driver)
 	flexFile := path.Join(flexDir, driver)
 
-	host := ""
-	var err error
-	if node != nil {
-		host, err = e2enode.GetSSHExternalIP(node)
-		if err != nil {
-			host, err = e2enode.GetSSHInternalIP(node)
-		}
-	} else {
-		instanceWithPort := framework.APIAddress()
-		hostName := getHostFromHostPort(instanceWithPort)
-		host = net.JoinHostPort(hostName, e2essh.SSHPort)
-	}
-
-	framework.ExpectNoError(err)
-
-	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("mkdir -p %s", flexDir), true /*failOnError*/)
 
 	data, err := e2etestfiles.Read(filePath)
 	if err != nil {
 		framework.Fail(err.Error())
 	}
-	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("tee <<'EOF' %s\n%s\nEOF", flexFile, string(data)), true /*failOnError*/)
 
-	cmd = fmt.Sprintf("sudo chmod +x %s", flexFile)
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("chmod +x %s", flexFile), true /*failOnError*/)
 }
 
-func uninstallFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver string) {
+func uninstallFlex(ctx context.Context, c clientset.Interface, hostExec utils.HostExec, node *v1.Node, vendor, driver string) {
 	flexDir := getFlexDir(ctx, c, node, vendor, driver)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("rm -r %s", flexDir), false /*failOnError*/)
+}
 
-	host := ""
-	var err error
-	if node != nil {
-		host, err = e2enode.GetSSHExternalIP(node)
-		if err != nil {
-			host, err = e2enode.GetSSHInternalIP(node)
-		}
-	} else {
-		instanceWithPort := framework.APIAddress()
-		hostName := getHostFromHostPort(instanceWithPort)
-		host = net.JoinHostPort(hostName, e2essh.SSHPort)
+// runFlexCmd runs cmd as root on node via hostExec, or on the master via SSH if node is nil.
+func runFlexCmd(ctx context.Context, hostExec utils.HostExec, node *v1.Node, cmd string, failOnError bool) {
+	if node == nil {
+		host := net.JoinHostPort(getHostFromHostPort(framework.APIAddress()), e2essh.SSHPort)
+		sshAndLog(ctx, "sudo "+cmd, host, failOnError)
+		return
 	}
-
-	if host == "" {
-		framework.Failf("Error getting node ip : %v", err)
+	result, err := hostExec.Execute(ctx, cmd, node)
+	utils.LogResult(result)
+	framework.ExpectNoError(err)
+	if result.Code != 0 && failOnError {
+		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
 	}
-
-	cmd := fmt.Sprintf("sudo rm -r %s", flexDir)
-	sshAndLog(ctx, cmd, host, false /*failOnError*/)
 }
 
 // getFlexDir returns the flexvolume install dir used by the node's kubelet, or by
@@ -209,7 +186,8 @@ func getHostFromHostPort(hostPort string) string {
 
 var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// hostexec pods are privileged.
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 
@@ -218,11 +196,14 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 	var node *v1.Node
 	var config e2evolume.TestConfig
 	var suffix string
+	var hostExec utils.HostExec
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
-		e2eskipper.SkipUnlessSSHKeyPresent()
+
+		hostExec = utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		cs = f.ClientSet
 		ns = f.Namespace
@@ -242,22 +223,25 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs)
 	})
 
 	f.It("should be mountable when attachable", feature.Flexvolumes, func(ctx context.Context) {
+		// installing on the control plane still requires SSH.
+		e2eskipper.SkipUnlessSSHKeyPresent()
+
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
@@ -265,8 +249,8 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		time.Sleep(detachTimeout)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
-		uninstallFlex(ctx, cs, nil, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs)
 	})
 })
