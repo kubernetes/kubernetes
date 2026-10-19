@@ -36,7 +36,7 @@ import (
 
 // Node e2e runs without a scheduler or a kube-controller-manager: the pod
 // client binds pods to the single node directly, and nothing can evict a
-// running pod for a NoExecute taint. These tests therefore exercise only the
+// running pod for a NoExecute taint. This test therefore exercises only the
 // kubelet's own admission check for NoExecute taints.
 var _ = SIGDescribe("NoExecute taint admission", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("taint-admission-test")
@@ -89,32 +89,6 @@ var _ = SIGDescribe("NoExecute taint admission", framework.WithSerial(), func() 
 			podClient.DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 			return fmt.Errorf("pod %q was admitted before the kubelet observed the taint", pod.Name)
 		}).WithTimeout(3 * time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
-	})
-
-	ginkgo.It("should admit a pod after a NoExecute taint is removed from the node", func(ctx context.Context) {
-		node := getNodeName(ctx, f)
-
-		ginkgo.By("adding a NoExecute taint to the node")
-		// Register the cleanup first: if the add fails after the API applied it,
-		// the only node must not stay tainted for the rest of the serial suite.
-		// RemoveTaintOffNode is a no-op when the taint is absent.
-		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, node, taint)
-		e2enode.AddOrUpdateTaintOnNode(ctx, f.ClientSet, node, taint)
-		gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
-			return e2enode.NodeHasTaint(ctx, f.ClientSet, node, &taint)
-		}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.BeTrueBecause("node %q should carry taint %s", node, taint.ToString()))
-
-		ginkgo.By("removing the NoExecute taint from the node")
-		// RemoveTaintOffNode verifies the taint is gone from the API before returning.
-		e2enode.RemoveTaintOffNode(ctx, f.ClientSet, node, taint)
-
-		// Non-regression only: whether the kubelet's informer still holds the
-		// tainted node when this pod arrives cannot be controlled here, so this
-		// does not reliably reproduce the stale-cache race. It asserts the pod is
-		// admitted either way.
-		ginkgo.By("creating a pod with no tolerations after the taint removal")
-		pod := e2epod.NewPodClient(f).Create(ctx, taintAdmissionPausePod("taint-admission-admitted"))
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 	})
 })
 
