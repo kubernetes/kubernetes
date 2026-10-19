@@ -928,7 +928,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	return nil
 }
 
-// killRunningPodContainers kills all running pod's containers with sync results.
+// killRunningPodContainers kills all running pod's containers.
 func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) []*kubecontainer.SyncResult {
 	containersToKill := make(map[kubecontainer.ContainerID]containerToKillInfo, len(runningPod.Containers))
 	for _, container := range runningPod.Containers {
@@ -945,16 +945,13 @@ func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context
 		}
 		termOrdering = newTerminationOrdering(pod, runningContainerNames)
 	}
-	// Use runningPod for logging as the pod passed in could be *nil*.
-	podRef := klog.KRef(runningPod.Namespace, runningPod.Name)
-	return m.killContainers(ctx, pod, podRef, runningPod.ID, containersToKill, gracePeriodOverride, termOrdering)
+	return m.killContainers(ctx, pod, containersToKill, gracePeriodOverride, termOrdering)
 }
 
 // killContainers concurrently kills the given containers and returns a sync result for each of them,
 // in no particular order.
-// podRef and podUID are used for logging, since the pod passed in could be *nil* (e.g. when kubelet restarted).
 // ordering, if non-nil, is used to enforce termination ordering between the killed containers.
-func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.Pod, podRef klog.ObjectRef, podUID kubetypes.UID, containersToKill map[kubecontainer.ContainerID]containerToKillInfo, gracePeriodOverride *int64, ordering *terminationOrdering) []*kubecontainer.SyncResult {
+func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.Pod, containersToKill map[kubecontainer.ContainerID]containerToKillInfo, gracePeriodOverride *int64, ordering *terminationOrdering) []*kubecontainer.SyncResult {
 	logger := klog.FromContext(ctx)
 	containerResults := make(chan *kubecontainer.SyncResult, len(containersToKill))
 	var wg sync.WaitGroup
@@ -966,7 +963,7 @@ func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, gracePeriodOverride, ordering); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				logger.Error(err, "Kill container failed", "pod", podRef, "podUID", podUID,
+				logger.Error(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 					"containerName", containerInfo.name, "containerID", containerID)
 			}
 			containerResults <- killContainerResult

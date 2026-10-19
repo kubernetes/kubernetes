@@ -632,9 +632,22 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		ginkgo.When("all regular containers with PreStop hooks have their images updated", func() {
 			ginkgo.It("should call the PreStop hooks simultaneously", func(ctx context.Context) {
 				const (
-					numContainers  = 3
-					preStopSeconds = 10
+					numContainers = 3
+					// If the containers restart sequentially, the barrier will stall and the
+					// containers will be forcefully killed.
+					gracePeriodSeconds = 60
 				)
+
+				// The PreStop hook implements a barrier synchronization mechanism, in which
+				// the hook touches a file, then waits for all other hooks to touch their
+				// files before returning.
+				preStopGate := func(name string) []string {
+					return []string{"sh", "-c", fmt.Sprintf(
+						"touch /persistent/started-%[1]s; "+
+							"until [ \"$(ls /persistent | grep -c '^started-')\" -ge %[2]d ]; do sleep 0.1; done; "+
+							"touch /persistent/released-%[1]s",
+						name, numContainers)}
+				}
 
 				var containerNames []string
 				var containers []v1.Container
@@ -651,11 +664,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 						Lifecycle: &v1.Lifecycle{
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
-									Command: ExecCommand(prefixedName(PreStopPrefix, name), execCommand{
-										Delay:         preStopSeconds,
-										ExitCode:      0,
-										ContainerName: name,
-									}),
+									Command: preStopGate(name),
 								},
 							},
 						},
@@ -668,7 +677,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					},
 					Spec: v1.PodSpec{
 						RestartPolicy:                 v1.RestartPolicyAlways,
-						TerminationGracePeriodSeconds: ptr.To[int64](preStopSeconds + 30),
+						TerminationGracePeriodSeconds: ptr.To[int64](gracePeriodSeconds),
 						Containers:                    containers,
 					},
 				}
@@ -681,7 +690,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
 				ginkgo.By("Updating the image of every container")
-				start := time.Now()
 				client.Update(ctx, pod.Name, func(pod *v1.Pod) {
 					for i := range pod.Spec.Containers {
 						pod.Spec.Containers[i].Image = alternateImage
@@ -689,7 +697,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				})
 
 				ginkgo.By("Waiting for every container to restart with the updated image")
-				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "all containers restarted with the updated image", 2*time.Minute, func(pod *v1.Pod) (bool, error) {
+				// Wait long enough so that if the containers are restarted sequentially, each
+				// using its full grace period, the test fails on the following check instead
+				// of timing out here.
+				timeout := numContainers*gracePeriodSeconds*time.Second + 2*time.Minute
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "all containers restarted with the updated image", timeout, func(pod *v1.Pod) (bool, error) {
 					if len(pod.Status.ContainerStatuses) != numContainers {
 						return false, nil
 					}
@@ -701,26 +713,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					return true, nil
 				})
 				framework.ExpectNoError(err)
-				elapsed := time.Since(start)
 
-				ginkgo.By("Analyzing results")
-				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				results := parseOutput(ctx, f, pod)
-
-				// Every PreStop hook should start before any of the others exits.
-				for i := range containerNames {
-					for j := i + 1; j < len(containerNames); j++ {
-						framework.ExpectNoError(results.RunTogether(
-							prefixedName(PreStopPrefix, containerNames[i]),
-							prefixedName(PreStopPrefix, containerNames[j])))
-					}
+				ginkgo.By("Checking that every PreStop hook was called simultaneously")
+				files := strings.Fields(e2epod.ExecShellInContainer(f, pod.Name, containerNames[0], "ls /persistent"))
+				for _, name := range containerNames {
+					gomega.Expect(files).To(gomega.ContainElement("released-" + name))
 				}
-
-				// Killing the containers sequentially would take at least
-				// numContainers * preStopSeconds.
-				gomega.Expect(elapsed).To(gomega.BeNumerically("<", (numContainers-1)*preStopSeconds*time.Second),
-					"expected the containers to restart within %d seconds, got %s:\n%s", (numContainers-1)*preStopSeconds, elapsed, results)
 			})
 		})
 	})
