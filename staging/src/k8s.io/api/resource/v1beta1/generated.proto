@@ -487,7 +487,10 @@ message CapacityRequirements {
 message Counter {
   // value defines how much of a certain device counter is available.
   //
+  // Must be greater than or equal to zero.
+  //
   // +required
+  // +k8s:minimum=0
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
 }
 

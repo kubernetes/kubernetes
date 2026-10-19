@@ -257,7 +257,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "value defines how much of a certain device counter is available."
+            "description": "value defines how much of a certain device counter is available.\n\nMust be greater than or equal to zero."
           }
         },
         "required": [
