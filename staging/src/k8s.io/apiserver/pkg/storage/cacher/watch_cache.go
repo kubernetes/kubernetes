@@ -669,6 +669,18 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 // be called under the watchCache lock.
 func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		// Here be dragons:
+		// Since the etcd feature checker needs to check all members
+		// to determine whether a given feature is supported,
+		// we may receive a positive response even if the feature is not supported.
+		//
+		// In this very rare scenario, the worst case will be that this
+		// request will wait for 3 seconds before it fails.
+		span := tracing.SpanFromContext(ctx)
+		if err := w.waitUntilFreshLocked(ctx, resourceVersion); err != nil {
+			return nil, err
+		}
+		span.AddEvent("watchCache fresh enough")
 		interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
 		return interval, err
 	}
