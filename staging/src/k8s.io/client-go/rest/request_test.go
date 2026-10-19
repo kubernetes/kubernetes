@@ -2501,8 +2501,23 @@ func TestThrottledLogger(t *testing.T) {
 	logger := klog.Background()
 	now := time.Now()
 	oldClock := globalThrottledLogger.clock
+	// attemptToLog advances each setting's lastLogTime, which outlives the
+	// clock swap. Leaving it set makes a second run in the same binary
+	// (go test -count=2) compare a fresh fake clock against the previous
+	// run's timeline and suppress almost every message.
+	oldLogTimes := make([]time.Time, len(globalThrottledLogger.settings))
+	for i, setting := range globalThrottledLogger.settings {
+		setting.lock.RLock()
+		oldLogTimes[i] = setting.lastLogTime
+		setting.lock.RUnlock()
+	}
 	defer func() {
 		globalThrottledLogger.clock = oldClock
+		for i, setting := range globalThrottledLogger.settings {
+			setting.lock.Lock()
+			setting.lastLogTime = oldLogTimes[i]
+			setting.lock.Unlock()
+		}
 	}()
 	clock := testingclock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
