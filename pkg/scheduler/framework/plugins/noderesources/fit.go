@@ -64,27 +64,16 @@ const (
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
 		resources := strategy.Resources
-		return &resourceAllocationScorer{
-			Name:      string(config.LeastAllocated),
-			scorer:    leastResourceScorer(resources),
-			resources: resources,
-		}
+		return newResourceAllocationScorer(string(config.LeastAllocated), leastResourceScorer(resources), resources)
 	},
 	config.MostAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
 		resources := strategy.Resources
-		return &resourceAllocationScorer{
-			Name:      string(config.MostAllocated),
-			scorer:    mostResourceScorer(resources),
-			resources: resources,
-		}
+		return newResourceAllocationScorer(string(config.MostAllocated), mostResourceScorer(resources), resources)
 	},
 	config.RequestedToCapacityRatio: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
 		resources := strategy.Resources
-		return &resourceAllocationScorer{
-			Name:      string(config.RequestedToCapacityRatio),
-			scorer:    requestedToCapacityRatioScorer(resources, strategy.RequestedToCapacityRatio.Shape),
-			resources: resources,
-		}
+		return newResourceAllocationScorer(string(config.RequestedToCapacityRatio),
+			requestedToCapacityRatioScorer(resources, strategy.RequestedToCapacityRatio.Shape), resources)
 	},
 }
 
