@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -431,6 +432,26 @@ func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateDesc
 }
 
+// portHolders names the pods in pod's namespace that conflict with pod on any host port,
+// not necessarily the one reported first.
+// Pods from other namespaces are left out so the rejection doesn't reveal other tenants' pod names.
+func portHolders(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) string {
+	var holders []string
+	for _, podInfo := range nodeInfo.GetPods() {
+		existing := podInfo.GetPod()
+		if existing.Namespace != pod.Namespace {
+			continue
+		}
+		if !nodeports.Fits(pod, schedulerframework.NewNodeInfo(existing)) {
+			holders = append(holders, existing.Name)
+		}
+	}
+	if len(holders) == 0 {
+		return ""
+	}
+	return "; pods with conflicting host ports: " + strings.Join(holders, ", ")
+}
+
 // generalFilter checks a group of filterings that the kubelet cares about.
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	var reasons []PredicateFailureReason
@@ -452,8 +473,8 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 	if !nodename.Fits(pod, nodeInfo) {
 		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
 	}
-	if !nodeports.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
+	if reason := nodeports.ConflictReason(pod, nodeInfo); reason != "" {
+		reasons = append(reasons, &PredicateFailureError{nodeports.Name, reason + portHolders(pod, nodeInfo)})
 	}
 
 	// Check taint/toleration except for static pods

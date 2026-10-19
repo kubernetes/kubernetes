@@ -19,6 +19,8 @@ package nodeports
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,7 +51,14 @@ const (
 	preFilterStateKey = "PreFilter" + Name
 
 	// ErrReason when node ports aren't available.
+	//
+	// Deprecated: no longer reported as the status reason, which now starts with
+	// ErrReasonPortConflict and names the conflicting ports.
 	ErrReason = "node(s) didn't have free ports for the requested pod ports"
+
+	// ErrReasonPortConflict is the prefix of the reason reported on a port conflict.
+	// The conflicting ports are appended as " (protocol/hostIP:port)".
+	ErrReasonPortConflict = "node(s) port conflict for the requested pod ports"
 )
 
 type preFilterState []v1.ContainerPort
@@ -143,12 +152,15 @@ func (pl *NodePorts) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, po
 	for _, p := range ports {
 		portsInUse.Add(p.HostIP, string(p.Protocol), p.HostPort)
 	}
-	if fitsPorts(util.GetHostPorts(pod), portsInUse) {
+	conflict, found := findConflict(util.GetHostPorts(pod), portsInUse)
+	if !found {
 		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(4).Info("the deleted pod and the target pod have any common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	if loggerV := logger.V(4); loggerV.Enabled() {
+		loggerV.Info("the deleted pod and the target pod have common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "conflict", conflictDescription(conflict), "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	}
 	return fwk.Queue, nil
 }
 
@@ -162,9 +174,12 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 		return fwk.AsStatus(err)
 	}
 
-	fits := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
-	if !fits {
-		return fwk.NewStatus(fwk.Unschedulable, ErrReason)
+	portsInUse := nodeInfo.GetUsedPorts()
+	if conflict, found := findConflict(wantPorts, portsInUse); found {
+		if loggerV := klog.FromContext(ctx).V(4); loggerV.Enabled() {
+			loggerV.Info("Host port conflict", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "conflicts", conflictsDescription(findConflicts(wantPorts, portsInUse)))
+		}
+		return fwk.NewStatus(fwk.Unschedulable, conflictReason(conflict))
 	}
 
 	return nil
@@ -173,17 +188,103 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 // Fits checks if the pod has any ports conflicting with nodeInfo's ports.
 // It returns true if there are no conflicts (which means that pod fits the node), otherwise false.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
-	return fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+	_, found := findConflict(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+	return !found
 }
 
-func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) bool {
-	// try to see whether portsInUse and wantPorts will conflict or not
+// ConflictReason returns the reason describing the first port of the pod that conflicts with nodeInfo's ports,
+// or an empty string if there is no conflict.
+func ConflictReason(pod *v1.Pod, nodeInfo fwk.NodeInfo) string {
+	conflict, found := findConflict(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+	if !found {
+		return ""
+	}
+	return conflictReason(conflict)
+}
+
+// portConflict is a requested port together with the in-use host IP(s) it collides with.
+type portConflict struct {
+	protocol string
+	port     int32
+	wantIP   string
+	inUseIPs []string
+}
+
+func newPortConflict(cp v1.ContainerPort, portsInUse fwk.HostPortInfo) portConflict {
+	protocol, wantIP := string(cp.Protocol), cp.HostIP
+	if protocol == "" {
+		protocol = string(v1.ProtocolTCP)
+	}
+	if wantIP == "" {
+		wantIP = fwk.DefaultBindAllHostIP
+	}
+	return portConflict{
+		protocol: protocol,
+		port:     cp.HostPort,
+		wantIP:   wantIP,
+		inUseIPs: conflictingInUseIPs(portsInUse, wantIP, fwk.ProtocolPort{Protocol: protocol, Port: cp.HostPort}),
+	}
+}
+
+func findConflict(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (portConflict, bool) {
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			return false
+			return newPortConflict(cp, portsInUse), true
 		}
 	}
-	return true
+	return portConflict{}, false
+}
+
+func findConflicts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) []portConflict {
+	var conflicts []portConflict
+	for _, cp := range wantPorts {
+		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
+			conflicts = append(conflicts, newPortConflict(cp, portsInUse))
+		}
+	}
+	return conflicts
+}
+
+// conflictingInUseIPs mirrors HostPortInfo.CheckConflict: a wildcard request collides with any IP,
+// a specific request only with the same IP or the wildcard.
+func conflictingInUseIPs(portsInUse fwk.HostPortInfo, wantIP string, pp fwk.ProtocolPort) []string {
+	var ips []string
+	for ip, ports := range portsInUse {
+		if _, ok := ports[pp]; !ok {
+			continue
+		}
+		if wantIP == fwk.DefaultBindAllHostIP || ip == fwk.DefaultBindAllHostIP || ip == wantIP {
+			ips = append(ips, ip)
+		}
+	}
+	sort.Strings(ips)
+	return ips
+}
+
+// conflictDescription renders "TCP/0.0.0.0:80", or "TCP/127.0.0.1:80 conflicts with TCP/0.0.0.0:80"
+// when the in-use IP differs from the requested one.
+func conflictDescription(c portConflict) string {
+	d := fmt.Sprintf("%s/%s:%d", c.protocol, c.wantIP, c.port)
+	if len(c.inUseIPs) != 1 || c.inUseIPs[0] != c.wantIP {
+		inUse := make([]string, 0, len(c.inUseIPs))
+		for _, ip := range c.inUseIPs {
+			inUse = append(inUse, fmt.Sprintf("%s/%s:%d", c.protocol, ip, c.port))
+		}
+		d += " conflicts with " + strings.Join(inUse, ", ")
+	}
+	return d
+}
+
+func conflictsDescription(conflicts []portConflict) string {
+	descriptions := make([]string, 0, len(conflicts))
+	for _, c := range conflicts {
+		descriptions = append(descriptions, conflictDescription(c))
+	}
+	return strings.Join(descriptions, "; ")
+}
+
+func conflictReason(c portConflict) string {
+	return ErrReasonPortConflict + " (" + conflictDescription(c) + ")"
 }
 
 // New initializes a new plugin and returns it.
