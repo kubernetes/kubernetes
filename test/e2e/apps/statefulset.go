@@ -1297,7 +1297,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err)
 
@@ -1373,7 +1377,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err)
 
@@ -1450,7 +1458,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err)
 
