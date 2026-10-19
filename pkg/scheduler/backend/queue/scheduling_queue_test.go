@@ -5217,8 +5217,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 1
 			`,
 		},
 		{
@@ -5230,9 +5230,9 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="UnscheduledPodAdd",queue="active"} 1
 			`,
 		},
 		{
@@ -5253,8 +5253,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
-				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="backoff",type="podgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="ScheduleAttemptFailure",queue="backoff"} 1
 			`,
 		},
 		{
@@ -5275,8 +5275,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
-				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="podgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="ScheduleAttemptFailure",queue="unschedulable"} 1
 			`,
 		},
 		{
@@ -5294,7 +5294,7 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
 			`,
 		},
 		{
@@ -5311,8 +5311,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(pod, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
-				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="pod"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="ScheduleAttemptFailure",queue="unschedulable"} 1
 			`,
 		},
 		{
@@ -5324,7 +5324,7 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				queue.Add(tCtx, pInfos[6].Pod)
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="UnscheduledPodAdd",queue="active"} 1
 			`,
 		},
 		{
@@ -5346,8 +5346,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
-				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="backoff",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="ScheduleAttemptFailure",queue="backoff"} 1
 			`,
 		},
 		{
@@ -5369,8 +5369,8 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
-				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="compositepodgroup",event="ScheduleAttemptFailure",queue="unschedulable"} 1
 			`,
 		},
 	}
@@ -5438,8 +5438,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 1
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -5451,9 +5451,9 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 1
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -5474,8 +5474,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="podgroup"} 0
-				scheduler_queued_entities{queue="backoff",type="podgroup"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",queue="backoff"} 1
 			`,
 		},
 		{
@@ -5496,8 +5496,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="podgroup"} 0
-				scheduler_queued_entities{queue="unschedulable",type="podgroup"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",queue="unschedulable"} 1
 			`,
 		},
 		{
@@ -5517,8 +5517,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="podgroup"} 0
-				scheduler_queued_entities{queue="gated",type="podgroup"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",queue="gated"} 1
 			`,
 		},
 		{
@@ -5536,8 +5536,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 0
-				scheduler_queued_entities{queue="unschedulable",type="pod"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 0
+				scheduler_queued_entities{entity="pod",queue="unschedulable"} 1
 			`,
 		},
 		{
@@ -5553,8 +5553,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(pod, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 0
-				scheduler_queued_entities{queue="gated",type="pod"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 0
+				scheduler_queued_entities{entity="pod",queue="gated"} 1
 			`,
 		},
 		{
@@ -5574,9 +5574,9 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 0
-				scheduler_queued_entities{queue="backoff",type="pod"} 1
-				scheduler_queued_entities{queue="unschedulable",type="pod"} 0
+				scheduler_queued_entities{entity="pod",queue="active"} 0
+				scheduler_queued_entities{entity="pod",queue="backoff"} 1
+				scheduler_queued_entities{entity="pod",queue="unschedulable"} 0
 			`,
 		},
 		{
@@ -5597,8 +5597,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="pod"} 1
-				scheduler_queued_entities{queue="unschedulable",type="pod"} 0
+				scheduler_queued_entities{entity="pod",queue="active"} 1
+				scheduler_queued_entities{entity="pod",queue="unschedulable"} 0
 			`,
 		},
 		{
@@ -5621,9 +5621,9 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="podgroup"} 0
-				scheduler_queued_entities{queue="backoff",type="podgroup"} 1
-				scheduler_queued_entities{queue="unschedulable",type="podgroup"} 0
+				scheduler_queued_entities{entity="podgroup",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",queue="backoff"} 1
+				scheduler_queued_entities{entity="podgroup",queue="unschedulable"} 0
 			`,
 		},
 		{
@@ -5647,8 +5647,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
-				scheduler_queued_entities{queue="unschedulable",type="podgroup"} 0
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",queue="unschedulable"} 0
 			`,
 		},
 		{
@@ -5660,7 +5660,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.Add(tCtx, pInfos[6].Pod)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -5682,8 +5682,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="backoff",type="compositepodgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="backoff"} 1
 			`,
 		},
 		{
@@ -5703,8 +5703,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="unschedulable"} 1
 			`,
 		},
 		{
@@ -5723,8 +5723,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="gated",type="compositepodgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="gated"} 1
 			`,
 		},
 		{
@@ -5746,9 +5746,9 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="backoff",type="compositepodgroup"} 1
-				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="backoff"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="unschedulable"} 0
 			`,
 		},
 		{
@@ -5771,8 +5771,8 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 			},
 			want: `
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
-				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="unschedulable"} 0
 			`,
 		},
 	}

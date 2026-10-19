@@ -332,7 +332,7 @@ func InitMetrics() {
 			Name:           "queued_entities",
 			Help:           "Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"queue", "type"})
+		}, []string{"queue", "entity"})
 	InFlightEvents = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -455,7 +455,7 @@ func InitMetrics() {
 			Name:           "queue_incoming_entities_total",
 			Help:           "Number of scheduling entities added to scheduling queues by event, queue type, and entity type. Entity types are 'pod' (for individual pods that are not members of any podgroup), 'podgroup', or 'compositepodgroup'.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"queue", "event", "type"})
+		}, []string{"queue", "event", "entity"})
 
 	PermitWaitDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -772,24 +772,24 @@ func PendingPodGroupPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "pending"})
 }
 
-// ActiveEntities returns the queued entities metric with the queue label set to "active" and type label set to "pod", "podgroup", or "compositepodgroup".
+// ActiveEntities returns the queued entities metric with the queue label set to "active" and entity label set to "pod", "podgroup", or "compositepodgroup".
 func ActiveEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "active", "type": entityType})
+	return QueuedEntities.With(metrics.Labels{"queue": "active", "entity": entityType})
 }
 
-// BackoffEntities returns the queued entities metric with the queue label set to "backoff" and type label set to "pod", "podgroup", or "compositepodgroup".
+// BackoffEntities returns the queued entities metric with the queue label set to "backoff" and entity label set to "pod", "podgroup", or "compositepodgroup".
 func BackoffEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "backoff", "type": entityType})
+	return QueuedEntities.With(metrics.Labels{"queue": "backoff", "entity": entityType})
 }
 
-// UnschedulableEntities returns the queued entities metric with the queue label set to "unschedulable" and type label set to "pod", "podgroup", or "compositepodgroup".
+// UnschedulableEntities returns the queued entities metric with the queue label set to "unschedulable" and entity label set to "pod", "podgroup", or "compositepodgroup".
 func UnschedulableEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "unschedulable", "type": entityType})
+	return QueuedEntities.With(metrics.Labels{"queue": "unschedulable", "entity": entityType})
 }
 
-// GatedEntities returns the queued entities metric with the queue label set to "gated" and type label set to "pod", "podgroup", or "compositepodgroup".
+// GatedEntities returns the queued entities metric with the queue label set to "gated" and entity label set to "pod", "podgroup", or "compositepodgroup".
 func GatedEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "gated", "type": entityType})
+	return QueuedEntities.With(metrics.Labels{"queue": "gated", "entity": entityType})
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

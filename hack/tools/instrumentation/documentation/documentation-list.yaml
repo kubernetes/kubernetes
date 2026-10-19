@@ -6784,9 +6784,9 @@
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - entity
   - event
   - queue
-  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6802,8 +6802,8 @@
   type: Gauge
   stabilityLevel: ALPHA
   labels:
+  - entity
   - queue
-  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
