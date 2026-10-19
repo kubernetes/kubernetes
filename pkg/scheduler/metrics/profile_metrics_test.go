@@ -37,9 +37,9 @@ func TestRecordGeneratedPlacements(t *testing.T) {
 	want := `
 		# HELP scheduler_generated_placements_total [ALPHA] Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type. For pod groups nested in a composite pod group, placements are generated and counted once per evaluated parent placement.
 		# TYPE scheduler_generated_placements_total counter
-		scheduler_generated_placements_total{profile="test-profile",type="compositepodgroup"} 1
-		scheduler_generated_placements_total{profile="test-profile",type="podgroup"} 5
-		scheduler_generated_placements_total{profile="test-profile-2",type="podgroup"} 4
+		scheduler_generated_placements_total{entity="compositepodgroup",profile="test-profile"} 1
+		scheduler_generated_placements_total{entity="podgroup",profile="test-profile"} 5
+		scheduler_generated_placements_total{entity="podgroup",profile="test-profile-2"} 4
 	`
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(want), "scheduler_generated_placements_total"); err != nil {
 		t.Errorf("unexpected generated_placements_total metric output:\n%v", err)
@@ -63,12 +63,12 @@ func TestObservePlacementEvaluation(t *testing.T) {
 	wantCounter := `
 		# HELP scheduler_placement_evaluations_total [ALPHA] Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not. For composite pod groups, nested evaluations of child groups are also counted separately under their own entity type.
 		# TYPE scheduler_placement_evaluations_total counter
-		scheduler_placement_evaluations_total{profile="test-profile",result="feasible",type="compositepodgroup"} 1
-		scheduler_placement_evaluations_total{profile="test-profile",result="feasible",type="podgroup"} 2
-		scheduler_placement_evaluations_total{profile="test-profile",result="infeasible",type="compositepodgroup"} 1
-		scheduler_placement_evaluations_total{profile="test-profile",result="infeasible",type="podgroup"} 1
-		scheduler_placement_evaluations_total{profile="test-profile-2",result="feasible",type="podgroup"} 1
-		scheduler_placement_evaluations_total{profile="test-profile-2",result="infeasible",type="podgroup"} 1
+		scheduler_placement_evaluations_total{entity="compositepodgroup",profile="test-profile",result="feasible"} 1
+		scheduler_placement_evaluations_total{entity="compositepodgroup",profile="test-profile",result="infeasible"} 1
+		scheduler_placement_evaluations_total{entity="podgroup",profile="test-profile",result="feasible"} 2
+		scheduler_placement_evaluations_total{entity="podgroup",profile="test-profile",result="infeasible"} 1
+		scheduler_placement_evaluations_total{entity="podgroup",profile="test-profile-2",result="feasible"} 1
+		scheduler_placement_evaluations_total{entity="podgroup",profile="test-profile-2",result="infeasible"} 1
 	`
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantCounter), "scheduler_placement_evaluations_total"); err != nil {
 		t.Errorf("unexpected placement_evaluations_total metric output:\n%v", err)

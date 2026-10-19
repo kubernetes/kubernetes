@@ -3436,18 +3436,18 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 				}
 
 				baseLabels := map[string]string{"profile": "test-scheduler"}
-				fixedLabels := map[string]string{"profile": "test-scheduler", "type": metrics.PodGroup}
-				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "type": metrics.PodGroup}
-				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "type": metrics.PodGroup}
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", metrics.PodGroup, tt.expectedGeneratedPlacements)
+				fixedLabels := map[string]string{"profile": "test-scheduler", "entity": metrics.PodGroup}
+				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "entity": metrics.PodGroup}
+				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "entity": metrics.PodGroup}
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "entity", metrics.PodGroup, tt.expectedGeneratedPlacements)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.FeasibleResult, tt.expectedFeasibleEvaluations)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.InfeasibleResult, tt.expectedInfeasibleEvaluations)
 				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", feasibleLabels, tt.expectedFeasibleEvaluations)
 				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", infeasibleLabels, tt.expectedInfeasibleEvaluations)
 
 				// Verify compositepodgroup metrics are 0
-				cpgFixedLabels := map[string]string{"profile": "test-scheduler", "type": metrics.CompositePodGroup}
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", metrics.CompositePodGroup, 0)
+				cpgFixedLabels := map[string]string{"profile": "test-scheduler", "entity": metrics.CompositePodGroup}
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "entity", metrics.CompositePodGroup, 0)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", cpgFixedLabels, "result", metrics.FeasibleResult, 0)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", cpgFixedLabels, "result", metrics.InfeasibleResult, 0)
 			})
@@ -5019,11 +5019,11 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				wantFeas := tt.expectedFeasibleEvaluations[entityType]
 				wantInfeas := tt.expectedInfeasibleEvaluations[entityType]
 
-				fixedLabels := map[string]string{"profile": "test-scheduler", "type": entityType}
-				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "type": entityType}
-				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "type": entityType}
+				fixedLabels := map[string]string{"profile": "test-scheduler", "entity": entityType}
+				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "entity": entityType}
+				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "entity": entityType}
 
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", entityType, wantGen)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "entity", entityType, wantGen)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.FeasibleResult, wantFeas)
 				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.InfeasibleResult, wantInfeas)
 

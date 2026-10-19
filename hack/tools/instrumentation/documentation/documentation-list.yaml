@@ -6467,8 +6467,8 @@
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - entity
   - profile
-  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6527,9 +6527,9 @@
   type: Histogram
   stabilityLevel: ALPHA
   labels:
+  - entity
   - profile
   - result
-  - type
   buckets:
   - 0.001
   - 0.002
@@ -6559,9 +6559,9 @@
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - entity
   - profile
   - result
-  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics

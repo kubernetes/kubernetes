@@ -679,14 +679,14 @@ func InitMetrics() {
 			Name:           "generated_placements_total",
 			Help:           "Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type. For pod groups nested in a composite pod group, placements are generated and counted once per evaluated parent placement.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"profile", "type"})
+		}, []string{"profile", "entity"})
 	PlacementEvaluations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "placement_evaluations_total",
 			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not. For composite pod groups, nested evaluations of child groups are also counted separately under their own entity type.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile", "type"})
+		}, []string{"result", "profile", "entity"})
 	PlacementEvaluationDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -694,7 +694,7 @@ func InitMetrics() {
 			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result, scheduler profile, and entity type. For composite pod groups, this covers scheduling the whole subtree on the placement, including nested placement evaluations of child groups, which are also recorded separately under their own entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile", "type"})
+		}, []string{"result", "profile", "entity"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
