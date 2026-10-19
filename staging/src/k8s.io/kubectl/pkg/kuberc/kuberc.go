@@ -581,17 +581,11 @@ func registerAliasCommands(kubectl *cobra.Command, kuberc *config.Preference) (c
 
 	userDefinedCommands := []*cobra.Command{}
 	for _, alias := range kuberc.Aliases {
-		_, err := buildAliasCommand(kubectl, alias)
+		aliasCmd, err := buildAliasCommand(kubectl, alias)
 		if err != nil {
 			continue
 		}
-
-		userDefinedCommands = append(userDefinedCommands, &cobra.Command{
-			Use:                alias.Name,
-			Short:              buildFullAliasDescription(alias),
-			DisableFlagParsing: true,
-			Run:                func(cmd *cobra.Command, args []string) {},
-		})
+		userDefinedCommands = append(userDefinedCommands, aliasCmd)
 	}
 
 	return userDefinedCommands
