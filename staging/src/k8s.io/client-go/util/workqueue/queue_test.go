@@ -480,3 +480,236 @@ func BenchmarkQueue(b *testing.B) {
 		}
 	}
 }
+
+// notPausable hides the Pause and Resume methods of the queue it wraps.
+type notPausable[T comparable] struct {
+	workqueue.TypedInterface[T]
+}
+
+func TestQueuePauseAndResume(t *testing.T) {
+	t.Run("Get blocks while paused and unblocks on Resume, Add and Done work while paused", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		defer q.ShutDown()
+
+		// Dequeue an item before pausing so we can call Done while paused.
+		q.Add("in-flight")
+		inFlight, shutdown := q.Get()
+		if shutdown || inFlight != "in-flight" {
+			t.Fatalf("expected in-flight, got %q (shutdown=%v)", inFlight, shutdown)
+		}
+
+		q.Pause()
+
+		// Re-add in-flight item and add a new item while paused.
+		q.Add("in-flight")
+		q.Done(inFlight)
+		q.Add("queued-while-paused")
+
+		if q.Len() != 2 {
+			t.Fatalf("expected queue length 2 while paused, got %d", q.Len())
+		}
+
+		gotCh := make(chan string, 2)
+		go func() {
+			item1, quit := q.Get()
+			if quit {
+				return
+			}
+			q.Done(item1)
+			gotCh <- item1
+
+			item2, quit := q.Get()
+			if quit {
+				return
+			}
+			q.Done(item2)
+			gotCh <- item2
+		}()
+
+		select {
+		case item := <-gotCh:
+			t.Fatalf("Get returned %q while queue was paused", item)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		q.Resume()
+
+		for _, want := range []string{"in-flight", "queued-while-paused"} {
+			select {
+			case got := <-gotCh:
+				if got != want {
+					t.Fatalf("expected %q, got %q", want, got)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("timed out waiting for %q after Resume", want)
+			}
+		}
+	})
+
+	t.Run("ShutDown unblocks a paused Get", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		q.Add("item-1")
+		q.Pause()
+
+		shutdownCh := make(chan bool, 1)
+		go func() {
+			_, shutdown := q.Get()
+			shutdownCh <- shutdown
+		}()
+
+		select {
+		case <-shutdownCh:
+			t.Fatalf("Get returned before ShutDown while paused")
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		q.ShutDown()
+
+		select {
+		case shutdown := <-shutdownCh:
+			if !shutdown {
+				t.Fatalf("expected shutdown=true from paused Get after ShutDown")
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for paused Get to unblock on ShutDown")
+		}
+	})
+
+	t.Run("ShutDownWithDrain on a paused queue waits for in-flight items and does not hand out queued ones", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		q.Add("in-flight")
+		inFlight, shutdown := q.Get()
+		if shutdown || inFlight != "in-flight" {
+			t.Fatalf("expected in-flight, got %q (shutdown=%v)", inFlight, shutdown)
+		}
+		q.Pause()
+		q.Add("queued-while-paused")
+
+		workerCh := make(chan bool, 1)
+		go func() {
+			_, shutdown := q.Get()
+			workerCh <- shutdown
+		}()
+
+		drained := make(chan struct{})
+		go func() {
+			q.ShutDownWithDrain()
+			close(drained)
+		}()
+
+		// The worker is told to exit without receiving the queued item.
+		select {
+		case shutdown := <-workerCh:
+			if !shutdown {
+				t.Fatalf("expected shutdown=true from paused Get after ShutDownWithDrain")
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for paused Get to unblock on ShutDownWithDrain")
+		}
+
+		// Drain waits for the in-flight item to be marked Done.
+		select {
+		case <-drained:
+			t.Fatalf("ShutDownWithDrain returned while an item was still in flight")
+		case <-time.After(50 * time.Millisecond):
+		}
+		q.Done(inFlight)
+		select {
+		case <-drained:
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for ShutDownWithDrain to return after Done")
+		}
+	})
+
+	t.Run("Resume wakes every worker blocked in Get", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		defer q.ShutDown()
+
+		const workers = 3
+		gotCh := make(chan string, workers)
+		for range workers {
+			go func() {
+				item, quit := q.Get()
+				if !quit {
+					gotCh <- item
+				}
+			}()
+		}
+		// Let the workers park in Get on the empty queue, then pause and add
+		// one item per worker. Add wakes the workers, who park again because
+		// the queue is paused; let that settle before Resume so the test
+		// proves Resume itself wakes all of them.
+		time.Sleep(50 * time.Millisecond)
+		q.Pause()
+		for i := range workers {
+			q.Add(fmt.Sprintf("item-%d", i))
+		}
+		time.Sleep(50 * time.Millisecond)
+
+		q.Resume()
+		for i := range workers {
+			select {
+			case <-gotCh:
+			case <-time.After(time.Second):
+				t.Fatalf("worker %d was not woken by Resume", i)
+			}
+		}
+	})
+
+	t.Run("delaying and rate limiting queues are Pausable only when the wrapped queue is", func(t *testing.T) {
+		if _, ok := workqueue.TypedInterface[string](workqueue.NewTypedDelayingQueue[string]()).(workqueue.Pausable); !ok {
+			t.Errorf("expected a delaying queue over the default queue to implement Pausable")
+		}
+		if _, ok := workqueue.TypedInterface[string](workqueue.NewTypedRateLimitingQueue[string](workqueue.DefaultTypedControllerRateLimiter[string]())).(workqueue.Pausable); !ok {
+			t.Errorf("expected a rate limiting queue over the default queue to implement Pausable")
+		}
+
+		// A wrapper over a queue that cannot pause must not claim it can.
+		inner := notPausable[string]{TypedInterface: workqueue.NewTyped[string]()}
+		dq := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Queue: inner})
+		if _, ok := workqueue.TypedInterface[string](dq).(workqueue.Pausable); ok {
+			t.Errorf("delaying queue over a non-Pausable queue must not implement Pausable")
+		}
+		rq := workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[string](), workqueue.TypedRateLimitingQueueConfig[string]{DelayingQueue: dq})
+		if _, ok := workqueue.TypedInterface[string](rq).(workqueue.Pausable); ok {
+			t.Errorf("rate limiting queue over a non-Pausable delaying queue must not implement Pausable")
+		}
+		rq.ShutDown()
+	})
+
+	t.Run("rate limiting and delaying queues forward Pause and Resume", func(t *testing.T) {
+		q := workqueue.NewTypedRateLimitingQueue[string](workqueue.DefaultTypedControllerRateLimiter[string]())
+		defer q.ShutDown()
+		p, ok := workqueue.TypedInterface[string](q).(workqueue.Pausable)
+		if !ok {
+			t.Fatalf("expected rate limiting queue to implement Pausable")
+		}
+
+		q.Add("item")
+		p.Pause()
+
+		gotCh := make(chan string, 1)
+		go func() {
+			item, quit := q.Get()
+			if !quit {
+				q.Done(item)
+				gotCh <- item
+			}
+		}()
+		select {
+		case item := <-gotCh:
+			t.Fatalf("Get returned %q while the rate limiting queue was paused", item)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		p.Resume()
+		select {
+		case got := <-gotCh:
+			if got != "item" {
+				t.Fatalf("expected item, got %q", got)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for Get after Resume")
+		}
+	})
+}

@@ -37,6 +37,25 @@ type TypedInterface[T comparable] interface {
 	ShuttingDown() bool
 }
 
+// Pausable is an optional interface implemented by workqueues that support
+// pausing and resuming item retrieval via Get. Typed implements it; the
+// delaying and rate limiting queues implement it when the queue they wrap
+// does, so a type assertion to Pausable is only true when Pause takes effect.
+//
+// While a queue is paused only Get blocks. Add, Done and Forget keep working,
+// items added with AddAfter or AddRateLimited keep becoming ready, and all of
+// them are handed out once Resume is called. Pause returns immediately and
+// does not wait for items already handed to workers. Pause and Resume are
+// idempotent and not reference counted: a single Resume clears any number of
+// Pause calls. A queue that is shut down while paused tells its workers to
+// exit without handing out the items that were still queued.
+type Pausable interface {
+	// Pause blocks Get from returning items until Resume or ShutDown is called.
+	Pause()
+	// Resume unblocks Get so queued items can be retrieved again.
+	Resume()
+}
+
 // Queue is the underlying storage for items. The functions below are always
 // called from the same goroutine.
 type Queue[T comparable] interface {
@@ -209,6 +228,7 @@ type Typed[t comparable] struct {
 
 	shuttingDown bool
 	drain        bool
+	paused       bool
 
 	metrics queueMetrics[t]
 
@@ -268,11 +288,12 @@ func (q *Typed[T]) Len() int {
 func (q *Typed[T]) Get() (item T, shutdown bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
-	for q.queue.Len() == 0 && !q.shuttingDown {
+	for (q.queue.Len() == 0 || q.paused) && !q.shuttingDown {
 		q.cond.Wait()
 	}
-	if q.queue.Len() == 0 {
-		// We must be shutting down.
+	if q.queue.Len() == 0 || q.paused {
+		// We must be shutting down. A paused queue does not hand out the
+		// remaining items, see Pausable.
 		return *new(T), true
 	}
 
@@ -304,9 +325,32 @@ func (q *Typed[T]) Done(item T) {
 	}
 }
 
+// Pause stops Get from returning items until Resume or ShutDown is called.
+// Add and Done continue to work while the queue is paused. See Pausable.
+func (q *Typed[T]) Pause() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	q.paused = true
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *Typed[T]) Resume() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	if !q.paused {
+		return
+	}
+	q.paused = false
+	q.cond.Broadcast()
+}
+
 // ShutDown will cause q to ignore all new items added to it. Worker
 // goroutines will continue processing items in the queue until it is
-// empty and then receive the shutdown signal.
+// empty and then receive the shutdown signal. If the queue is paused,
+// queued items are not handed out and workers receive the shutdown signal
+// immediately (see Pausable).
 func (q *Typed[T]) ShutDown() {
 	defer q.wg.Wait()
 	q.stopOnce.Do(func() {
@@ -322,7 +366,9 @@ func (q *Typed[T]) ShutDown() {
 }
 
 // ShutDownWithDrain is equivalent to ShutDown but waits until all items
-// in the queue have been processed.
+// in the queue have been processed. If the queue is paused it waits only
+// for items already handed to workers; queued items are not drained (see
+// Pausable).
 // ShutDown can be called after ShutDownWithDrain to force
 // ShutDownWithDrain to stop waiting.
 // Workers must call Done on an item after processing it, otherwise
