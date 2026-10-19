@@ -78,6 +78,7 @@ func NewDelayingQueue() DelayingInterface {
 // NewTypedDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewTypedDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewTypedDelayingQueueWithConfig instead and specify a name.
+// The returned queue implements Pausable.
 func NewTypedDelayingQueue[T comparable]() TypedDelayingInterface[T] {
 	//nolint:logcheck // Cannot provide Logger here.
 	return NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[T]{})
@@ -99,7 +100,8 @@ func TypedNewDelayingQueue[T comparable]() TypedDelayingInterface[T] {
 }
 
 // NewTypedDelayingQueueWithConfig constructs a new workqueue with options to
-// customize different properties.
+// customize different properties. The returned queue implements Pausable when
+// the queue it wraps.
 func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConfig[T]) TypedDelayingInterface[T] {
 	logger := klog.Background()
 	if config.Logger != nil {
@@ -117,7 +119,11 @@ func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConf
 		})
 	}
 
-	return newDelayingQueue(logger, config.Clock, config.Queue, config.Name, config.MetricsProvider)
+	ret := newDelayingQueue(logger, config.Clock, config.Queue, config.Name, config.MetricsProvider)
+	if _, ok := config.Queue.(Pausable); ok {
+		return &pausableDelayingType[T]{ret}
+	}
+	return ret
 }
 
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to
@@ -251,6 +257,23 @@ func (q *delayingType[T]) ShutDown() {
 		close(q.stopCh)
 		q.heartbeat.Stop()
 	})
+}
+
+// pausableDelayingType is the delaying queue returned when the wrapped queue
+// implements Pausable, so that a delaying queue only satisfies Pausable when
+// Pause actually takes effect.
+type pausableDelayingType[T comparable] struct {
+	*delayingType[T]
+}
+
+// Pause stops Get from returning items until Resume or ShutDown is called.
+func (q *pausableDelayingType[T]) Pause() {
+	q.TypedInterface.(Pausable).Pause()
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *pausableDelayingType[T]) Resume() {
+	q.TypedInterface.(Pausable).Resume()
 }
 
 // AddAfter adds the given item to the work queue after the given delay
