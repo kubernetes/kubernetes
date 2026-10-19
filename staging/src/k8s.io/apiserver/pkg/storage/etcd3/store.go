@@ -457,33 +457,42 @@ func (s *store) conditionalDelete(
 			continue
 		}
 
-		startTime := time.Now()
-		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
-			GetOnFailure: true,
-		})
-		metrics.RecordEtcdRequest("delete", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
+		var success bool
+		origState, success, err = s.deleteOnce(ctx, key, out, origState, v, expectTransformOrDecodeError)
 		if err != nil {
 			return err
 		}
-		if !txnResp.Succeeded {
-			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
-			continue
+		if success {
+			return nil
 		}
-
-		if !expectTransformOrDecodeError {
-			err = s.decoder.Decode(origState.data, out, txnResp.Revision)
-			if err != nil {
-				recordDecodeError(s.groupResource, key)
-				return err
-			}
-		}
-		return nil
+		origStateIsCurrent = true
 	}
+}
+
+func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *objState, v reflect.Value, expectTransformOrDecodeError bool) (state *objState, success bool, err error) {
+	startTime := time.Now()
+	txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
+		GetOnFailure: true,
+	})
+	metrics.RecordEtcdRequest("delete", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
+	if err != nil {
+		return origState, success, err
+	}
+	success = txnResp.Succeeded
+	if !success {
+		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
+		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
+		return origState, success, err
+	}
+
+	if !expectTransformOrDecodeError {
+		err = s.decoder.Decode(origState.data, out, txnResp.Revision)
+		if err != nil {
+			recordDecodeError(s.groupResource, key)
+			return origState, success, err
+		}
+	}
+	return origState, success, nil
 }
 
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
@@ -522,7 +531,6 @@ func (s *store) GuaranteedUpdate(
 	}
 	span.AddEvent("initial value restored")
 
-	transformContext := authenticatedDataString(preparedKey)
 	for {
 		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
 			// If our data is already up to date, return the error
@@ -602,55 +610,67 @@ func (s *store) GuaranteedUpdate(
 			}
 		}
 
-		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
+		var success bool
+		origState, success, err = s.updateOnce(ctx, span, preparedKey, destination, origState, data, ttl, v, ignoreNotFound)
 		if err != nil {
-			span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
-			return storage.NewInternalError(err)
-		}
-		span.AddEvent("TransformToStorage succeeded")
-
-		var lease clientv3.LeaseID
-		if ttl != 0 {
-			lease, err = s.leaseManager.GetLease(ctx, int64(ttl))
-			if err != nil {
-				return err
-			}
-		}
-		span.AddEvent("Transaction prepared")
-
-		startTime := time.Now()
-
-		txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.rev, kubernetes.PutOptions{
-			GetOnFailure: true,
-			LeaseID:      lease,
-		})
-		metrics.RecordEtcdRequest("update", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
-		if err != nil {
-			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 			return err
 		}
-		span.AddEvent("Txn call completed")
-		span.AddEvent("Transaction committed")
-		if !txnResp.Succeeded {
-			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
-			if err != nil {
-				return err
-			}
-			span.AddEvent("Retry value restored")
-			origStateIsCurrent = true
-			continue
+		if success {
+			return nil
 		}
-
-		err = s.decoder.Decode(data, destination, txnResp.Revision)
-		if err != nil {
-			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			recordDecodeError(s.groupResource, preparedKey)
-			return err
-		}
-		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
-		return nil
+		origStateIsCurrent = true
 	}
+}
+
+func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey string, destination runtime.Object, origState *objState, data []byte, ttl uint64, v reflect.Value, ignoreNotFound bool) (state *objState, success bool, err error) {
+	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(preparedKey))
+	if err != nil {
+		span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
+		return origState, success, storage.NewInternalError(err)
+	}
+	span.AddEvent("TransformToStorage succeeded")
+
+	var lease clientv3.LeaseID
+	if ttl != 0 {
+		lease, err = s.leaseManager.GetLease(ctx, int64(ttl))
+		if err != nil {
+			return origState, success, err
+		}
+	}
+	span.AddEvent("Transaction prepared")
+
+	startTime := time.Now()
+
+	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.rev, kubernetes.PutOptions{
+		GetOnFailure: true,
+		LeaseID:      lease,
+	})
+	metrics.RecordEtcdRequest("update", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
+	if err != nil {
+		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
+		return origState, success, err
+	}
+	success = txnResp.Succeeded
+	span.AddEvent("Txn call completed")
+	span.AddEvent("Transaction committed")
+	if !success {
+		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
+		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
+		if err != nil {
+			return origState, success, err
+		}
+		span.AddEvent("Retry value restored")
+		return origState, false, nil
+	}
+
+	err = s.decoder.Decode(data, destination, txnResp.Revision)
+	if err != nil {
+		span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+		recordDecodeError(s.groupResource, preparedKey)
+		return origState, success, err
+	}
+	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
+	return origState, success, nil
 }
 
 func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
