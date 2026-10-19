@@ -18,6 +18,8 @@ package allocation
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -515,7 +517,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
+	ok, reason, message := m.canAdmitPod(ctx, buildPodAdmitAttributes(allocatedPods, pod, lifecycle.AddOperation))
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -554,22 +556,46 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
-	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	attrs := buildPodAdmitAttributes(m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	// Every path that does not reach the commit point aborts the transaction,
+	// including a rejection, which is not an error.
+	committed := false
+	defer func() {
+		if !committed {
+			m.abortAdmit(ctx, attrs)
+		}
+	}()
+	fit, reason, message := m.canAdmitPod(ctx, attrs)
 	if fit {
+		if err := m.stageAdmit(ctx, attrs); err != nil {
+			return false, err
+		}
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
 		}
+		committed = true
+		commitErr := m.commitAdmit(ctx, attrs)
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
 		if resizeRequested {
 			// Clear any errors that may have been surfaced from a previous resize and update the
 			// generation of the resize in-progress condition.
 			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+			if commitErr == nil {
+				m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+			}
 
 			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+
+			// The resize is accepted, so report the failure like a resize that cannot be actuated.
+			if commitErr != nil {
+				if generation, updated := m.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, commitErr.Error(), pod.Generation); updated {
+					msg := events.PodResizeErrorMsg(logger, pod, generation, commitErr.Error())
+					m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
+				}
+			}
 		}
 		return true, nil
 	}
@@ -619,28 +645,73 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 	return false
 }
 
+func buildPodAdmitAttributes(allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) *lifecycle.PodAdmitAttributes {
+	// Filter out the pod being evaluated.
+	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
+	return &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
+}
+
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
-// cannot. "pod" is new pod, while "pods" are all admitted pods
+// cannot. "attrs.Pod" is new pod, while "attrs.OtherPods" are all admitted pods,
+// "attrs.Operation" defines type of operation (Add or Resize).
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-// allocatedPods should represent the pods that have already been admitted, along with their
-// admitted (allocated) resources.
-func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+func (m *manager) canAdmitPod(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) (bool, string, string) {
 	logger := klog.FromContext(ctx)
-	// Filter out the pod being evaluated.
-	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
-
 	// If any handler rejects, the pod is rejected.
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
-			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
+			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", attrs.Operation)
 			return false, result.Reason, result.Message
 		}
 	}
 
 	return true, "", ""
+}
+
+// stageAdmit stages the admission in every admit handler that implements
+// lifecycle.PodAdmitTransactionalHandler, stopping at the first failure.
+func (m *manager) stageAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	logger := klog.FromContext(ctx)
+	for _, podAdmitHandler := range m.admitHandlers {
+		if tx, ok := podAdmitHandler.(lifecycle.PodAdmitTransactionalHandler); ok {
+			if err := tx.StageAdmit(ctx, attrs); err != nil {
+				logger.Info("Pod admission failed on stageAdmit", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "handler", fmt.Sprintf("%T", podAdmitHandler), "err", err, "operation", attrs.Operation)
+				return fmt.Errorf("admit handler %T failed to stage the %s of pod %s: %w", podAdmitHandler, attrs.Operation, klog.KObj(attrs.Pod), err)
+			}
+		}
+	}
+	return nil
+}
+
+// commitAdmit commits the staged admission in every admit handler that implements
+// lifecycle.PodAdmitTransactionalHandler, and returns the joined failures. A failing
+// handler does not stop the others, because the caller has already persisted the
+// allocation, which is not rolled back.
+func (m *manager) commitAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	logger := klog.FromContext(ctx)
+	var errs []error
+	for _, podAdmitHandler := range m.admitHandlers {
+		if tx, ok := podAdmitHandler.(lifecycle.PodAdmitTransactionalHandler); ok {
+			if err := tx.CommitAdmit(ctx, attrs); err != nil {
+				logger.Error(err, "Admit handler failed to commit the admission", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "handler", fmt.Sprintf("%T", podAdmitHandler), "operation", attrs.Operation)
+				errs = append(errs, fmt.Errorf("admit handler %T failed to commit the %s of pod %s: %w", podAdmitHandler, attrs.Operation, klog.KObj(attrs.Pod), err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// abortAdmit discards the prepared or staged admission in every admit handler that
+// implements lifecycle.PodAdmitTransactionalHandler, including handlers that did not get to
+// evaluate the pod.
+func (m *manager) abortAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) {
+	for _, podAdmitHandler := range m.admitHandlers {
+		if tx, ok := podAdmitHandler.(lifecycle.PodAdmitTransactionalHandler); ok {
+			tx.AbortAdmit(ctx, attrs)
+		}
+	}
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
