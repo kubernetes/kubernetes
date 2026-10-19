@@ -117,14 +117,14 @@ func TestObservePodGroupScheduleAttemptAndLatency(t *testing.T) {
 	want := `
 		# HELP scheduler_podgroup_schedule_attempts_total [ALPHA] Number of attempts to schedule pod group, by the result, scheduler profile and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.
 		# TYPE scheduler_podgroup_schedule_attempts_total counter
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="error",type="compositepodgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="error",type="podgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="scheduled",type="compositepodgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="scheduled",type="podgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="unschedulable",type="compositepodgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="unschedulable",type="podgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="waiting_on_preemption",type="compositepodgroup"} 1
-		scheduler_podgroup_schedule_attempts_total{profile="test-profile",result="waiting_on_preemption",type="podgroup"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="compositepodgroup",profile="test-profile",result="error"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="podgroup",profile="test-profile",result="error"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="compositepodgroup",profile="test-profile",result="scheduled"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="podgroup",profile="test-profile",result="scheduled"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="compositepodgroup",profile="test-profile",result="unschedulable"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="podgroup",profile="test-profile",result="unschedulable"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="compositepodgroup",profile="test-profile",result="waiting_on_preemption"} 1
+		scheduler_podgroup_schedule_attempts_total{entity="podgroup",profile="test-profile",result="waiting_on_preemption"} 1
 	`
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(want), "scheduler_podgroup_schedule_attempts_total"); err != nil {
 		t.Errorf("unexpected podgroup_schedule_attempts_total metric output:\n%v", err)
@@ -147,11 +147,11 @@ func TestObservePodGroupScheduleAttemptAndLatency(t *testing.T) {
 	} {
 		gotCount, err := testutil.GetHistogramMetricCount(PodGroupSchedulingLatency.WithLabelValues(tc.result, tc.profile, tc.entityType))
 		if err != nil {
-			t.Errorf("Failed to get sample count for podgroup_scheduling_attempt_duration_seconds{profile=%q,result=%q,type=%q}: %v", tc.profile, tc.result, tc.entityType, err)
+			t.Errorf("Failed to get sample count for podgroup_scheduling_attempt_duration_seconds{profile=%q,result=%q,entity=%q}: %v", tc.profile, tc.result, tc.entityType, err)
 			continue
 		}
 		if gotCount != tc.wantCount {
-			t.Errorf("podgroup_scheduling_attempt_duration_seconds{profile=%q,result=%q,type=%q}: got %d samples, want %d", tc.profile, tc.result, tc.entityType, gotCount, tc.wantCount)
+			t.Errorf("podgroup_scheduling_attempt_duration_seconds{profile=%q,result=%q,entity=%q}: got %d samples, want %d", tc.profile, tc.result, tc.entityType, gotCount, tc.wantCount)
 		}
 	}
 }
@@ -176,11 +176,11 @@ func TestPodGroupAlgorithmLatency(t *testing.T) {
 	} {
 		gotCount, err := testutil.GetHistogramMetricCount(PodGroupSchedulingAlgorithmLatency.WithLabelValues(tc.profile, tc.entityType))
 		if err != nil {
-			t.Errorf("Failed to get sample count for podgroup_scheduling_algorithm_duration_seconds{profile=%q,type=%q}: %v", tc.profile, tc.entityType, err)
+			t.Errorf("Failed to get sample count for podgroup_scheduling_algorithm_duration_seconds{profile=%q,entity=%q}: %v", tc.profile, tc.entityType, err)
 			continue
 		}
 		if gotCount != tc.wantCount {
-			t.Errorf("podgroup_scheduling_algorithm_duration_seconds{profile=%q,type=%q}: got %d samples, want %d", tc.profile, tc.entityType, gotCount, tc.wantCount)
+			t.Errorf("podgroup_scheduling_algorithm_duration_seconds{profile=%q,entity=%q}: got %d samples, want %d", tc.profile, tc.entityType, gotCount, tc.wantCount)
 		}
 	}
 }

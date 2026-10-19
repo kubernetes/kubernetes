@@ -10175,14 +10175,14 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 					lock.Unlock()
 
 					// Verify podgroup_schedule_attempts_total
-					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "type", tt.wantType, 1)
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "entity", tt.wantType, 1)
 					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "result", tt.wantResult, 1)
 
 					// Verify podgroup_scheduling_attempt_duration_seconds sample count
 					labels := map[string]string{
 						"result":  tt.wantResult,
 						"profile": "test-scheduler",
-						"type":    tt.wantType,
+						"entity":  tt.wantType,
 					}
 					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", labels, 1)
 
@@ -10191,8 +10191,8 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 					if tt.wantType == metrics.CompositePodGroup {
 						otherType = metrics.PodGroup
 					}
-					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", "type", otherType, 0)
-					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", map[string]string{"type": otherType}, 0)
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "entity", otherType, 0)
+					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", map[string]string{"entity": otherType}, 0)
 				})
 			}
 		})

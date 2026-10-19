@@ -601,7 +601,7 @@ func InitMetrics() {
 			Name:           "podgroup_schedule_attempts_total",
 			Help:           "Number of attempts to schedule pod group, by the result, scheduler profile and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile", "type"})
+		}, []string{"result", "profile", "entity"})
 	PodGroupSchedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -609,7 +609,7 @@ func InitMetrics() {
 			Help:           "Pod group scheduling attempt latency in seconds, by result, scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile", "type"})
+		}, []string{"result", "profile", "entity"})
 	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -617,7 +617,7 @@ func InitMetrics() {
 			Help:           "Pod group scheduling algorithm latency in seconds, by scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"profile", "type"})
+		}, []string{"profile", "entity"})
 
 	// Workload preemption
 	WorkloadPreemptionAttempts = metrics.NewCounterVec(
