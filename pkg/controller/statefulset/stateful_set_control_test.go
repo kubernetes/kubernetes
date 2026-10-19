@@ -1332,10 +1332,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 					unavailableInUpdateRange++
 				}
 			}
-			expectedPodsToBeDeleted := maxUnavailable.IntValue() - unavailableInUpdateRange
-			if expectedPodsToBeDeleted < 0 {
-				expectedPodsToBeDeleted = 0
-			}
+			expectedPodsToBeDeleted := max(0, maxUnavailable.IntValue()-unavailableInUpdateRange)
 
 			expectedPodsAfterUpdate := int(totalPods) - expectedPodsToBeDeleted
 
