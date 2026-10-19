@@ -61,11 +61,11 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("ClusterScopedWatch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestClusterScopedWatch(ctx, t, store)
+		storagetesting.RunTestClusterScopedWatch(ctx, t, store, false)
 	})
 	t.Run("NamespaceScopedWatch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
+		storagetesting.RunTestNamespaceScopedWatch(ctx, t, store, false)
 	})
 	t.Run("DeleteTriggerWatch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)

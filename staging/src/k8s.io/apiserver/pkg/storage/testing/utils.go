@@ -159,8 +159,8 @@ func testCheckResult(t *testing.T, w watch.Interface, expectEvent *watch.Event) 
 		case res := <-w.ResultChan():
 			t.Errorf("Unexpected: %#v event received, expected no events", res)
 		case <-time.After(100 * time.Millisecond):
-			return
 		}
+		return
 	}
 	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
 		expectNoDiff(t, "incorrect event", *expectEvent, actualEvent)

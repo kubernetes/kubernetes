@@ -591,14 +591,14 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantKeys:         []string{"/prefix/ns/pod1"},
 		},
 		{
-			name: "single object predicate with prefix key serves from lazy snapshot",
-			key:  "/prefix/",
+			name: "single key match with namespace selector serves from eager snapshot",
+			key:  "/prefix/ns/pod1",
 			opts: storage.ListOptions{
-				Recursive: true,
-				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantLazySnapshot: false,
+			wantKeys:         []string{"/prefix/ns/pod1"},
 		},
 		{
 			name: "single key with everything predicate serves from lazy snapshot",
@@ -609,6 +609,196 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			},
 			wantLazySnapshot: true,
 			wantKeys:         []string{"/prefix/ns/pod1"},
+		},
+		{
+			name: "single key with namespace predicate serves from lazy snapshot",
+			key:  "/prefix/ns/pod1",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1"},
+		},
+		{
+			name: "single object predicate with prefix key serves from lazy snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+		},
+		{
+			name: "namespace predicate with prefix key serves from lazy snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+		},
+		{
+			name: "single object and namespace predicate with prefix key serves from lazy snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+		},
+		{
+			name: "namespace predicate with namespace prefix key serves from lazy snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+		},
+		{
+			name: "single object predicate with namespace prefix key serves from lazy snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+		},
+		{
+			name: "single object and namespace predicate with namespace prefix key serves from lazy snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+		},
+		{
+			name: "everything predicate with object prefix key serves empty from lazy snapshot",
+			key:  "/prefix/ns/pod1/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.Everything,
+			},
+			wantLazySnapshot: true,
+			wantKeys:         nil,
+		},
+		{
+			name: "namespace predicate with object prefix key serves empty from lazy snapshot",
+			key:  "/prefix/ns/pod1/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         nil,
+		},
+		{
+			name: "single object predicate with object prefix key serves empty from lazy snapshot",
+			key:  "/prefix/ns/pod1/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         nil,
+		},
+		{
+			name: "single object and namespace predicate with object prefix key serves empty from lazy snapshot",
+			key:  "/prefix/ns/pod1/",
+			opts: storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         nil,
+		},
+		{
+			name: "prefix key with non-recursive everything predicate serves from lazy snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.Everything,
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+		},
+		{
+			name: "prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+		},
+		{
+			name: "prefix key with non-recursive single object predicate serves empty from eager snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+			},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
+		},
+		{
+			name: "prefix key with non-recursive single object and namespace predicate serves empty from eager snapshot",
+			key:  "/prefix/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
+		},
+		{
+			name: "namespace prefix key with non-recursive everything predicate serves from lazy snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.Everything,
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+		},
+		{
+			name: "namespace prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+		},
+		{
+			name: "namespace prefix key with non-recursive single object predicate serves empty from eager snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
+			},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
+		},
+		{
+			name: "namespace prefix key with non-recursive single object and namespace predicate serves empty from eager snapshot",
+			key:  "/prefix/ns/",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
+			},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
 		},
 	}
 	for _, tc := range cases {
