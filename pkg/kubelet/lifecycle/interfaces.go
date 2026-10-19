@@ -59,6 +59,36 @@ type PodAdmitHandler interface {
 	Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult
 }
 
+// PodAdmitTransactionalHandler is an optional extension of PodAdmitHandler for handlers
+// that prepare a resource assignment in Admit. Such an assignment must not
+// become effective before every handler has admitted the pod and the pod
+// allocation has been persisted, because a rejected resize leaves the pod
+// running and nothing else would clean the assignment up.
+//
+// After a successful admission the caller invokes StageAdmit, persists the
+// pod allocation and then invokes CommitAdmit. On any failure it invokes
+// AbortAdmit instead.
+//
+// StageAdmit is where a handler checks that it can commit, as in the prepare
+// phase of a two-phase commit. Once StageAdmit has succeeded, CommitAdmit must
+// not fail for any reason StageAdmit could have detected, because the pod
+// allocation persisted before CommitAdmit is not rolled back.
+type PodAdmitTransactionalHandler interface {
+	// StageAdmit checks that the assignment prepared in Admit can be committed
+	// and durably records it without making it effective, so that it can be
+	// completed or discarded after a kubelet restart depending on the
+	// persisted pod allocation.
+	StageAdmit(ctx context.Context, attrs *PodAdmitAttributes) error
+	// CommitAdmit makes the staged assignment effective. It is called only
+	// after the pod allocation has been persisted, so it must not fail for
+	// any reason StageAdmit could have detected.
+	CommitAdmit(ctx context.Context, attrs *PodAdmitAttributes) error
+	// AbortAdmit discards the assignment prepared in Admit and any record
+	// written by StageAdmit. It must be idempotent and safe to call when
+	// Admit did not prepare anything.
+	AbortAdmit(ctx context.Context, attrs *PodAdmitAttributes)
+}
+
 // PodAdmitTarget maintains a list of handlers to invoke.
 type PodAdmitTarget interface {
 	// AddPodAdmitHandler adds the specified handler.
