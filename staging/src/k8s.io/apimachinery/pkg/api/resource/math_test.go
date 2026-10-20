@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -273,16 +274,26 @@ func TestMaxMilliQuantity(t *testing.T) {
 // TestQuantityDocExamples pins the examples in the Quantity type doc.
 func TestQuantityDocExamples(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
-		// A decimal quantity is not capped at 2^63-1 in magnitude.
-		{"18446744073709551616", "18446744073709551616"},
-		// A binarySI one is: 8Ei is 2^63, and parses as 2^63-1.
+		// A binarySI quantity is capped at 2^63-1.
 		// TODO(#141166): Fix to cap at 8Ei (9223372036854775808).
 		{"8Ei", "9223372036854775807"},
-		// No quantity is limited to three decimal places.
-		{"1.2345", "1234500u"},
-		// Parsing rounds away from zero below nano.
+		// A decimalSI quantity is capped at 1.7976931348623157e308.
+		{"2" + strings.Repeat("0", 308), "179769313486231570e291"},
+		// A decimalExponent quantity is capped at 1.7976931348623157e308.
+		{"2e308", "179769313486231570e291"},
+		// A value rounds away from zero to a whole number of nanos.
+		{"1.5n", "2n"},
 		{"0.9n", "1n"},
 		{"-0.9n", "-1n"},
+		// Within the supported ranges the parsed value is exact.
+		{"18446744073709551616", "18446744073709551616"},
+		{"1.2345", "1234500u"},
+		// A decimalSI value whose exponent would be larger than E is written in
+		// exponent notation.
+		{"1000E", "1e21"},
+		// A binarySI value that no binary suffix can express as a whole number is
+		// written as decimalSI.
+		{"1.5Ki", "1536"},
 	} {
 		q := MustParse(tc.in)
 		if got := q.String(); got != tc.want {
