@@ -2214,6 +2214,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	genericfeatures.AllocatorPoolBufferCap: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2790,6 +2794,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.APIServerWebhookAuthenticationToken: {},
 
 	genericfeatures.APIServingWithRoutine: {},
+
+	genericfeatures.AllocatorPoolBufferCap: {},
 
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
 

@@ -401,6 +401,15 @@ func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
+// DefaultMaxPooledEncodeBufferSize is the largest encode buffer capacity, in
+// bytes, retained by the process-wide protobuf serialization pool
+// (runtime.AllocatorPool) when the AllocatorPoolBufferCap feature gate is
+// enabled: large enough to keep pooling typical single-object and
+// streamed-list item responses, small enough that a burst of near-limit
+// objects (the etcd object limit is 1.5MiB) cannot pin many megabytes of
+// encode buffers for the life of the process.
+const DefaultMaxPooledEncodeBufferSize = 256 * 1024
+
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
@@ -787,6 +796,11 @@ var defaultAllowedMediaTypes = []string{
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+	}
+	// The encode buffer pool is process-wide; every server in a delegation
+	// chain shares the same gate, so applying it per server is idempotent.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllocatorPoolBufferCap) {
+		runtime.SetMaxPooledBufferCapacity(DefaultMaxPooledEncodeBufferSize)
 	}
 	allowedMediaTypes := defaultAllowedMediaTypes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
