@@ -73,11 +73,14 @@ type PodSpecApplyConfiguration struct {
 	// Value must be a positive integer.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 	// dnsPolicy sets the DNS policy for the pod.
-	// Defaults to "ClusterFirst".
+	// Defaults to "ClusterFirst", or to "None" when defaultNetwork is "None".
 	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
+	// 'None' requires dnsConfig with at least one nameserver, except when
+	// defaultNetwork is "None", where it may be left out to get an empty
+	// resolver configuration.
 	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 	// nodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
@@ -103,6 +106,8 @@ type PodSpecApplyConfiguration struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// Equivalent to defaultNetwork: "Host"; the two fields are kept in sync
+	// by the API server.
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
 	// hostPID uses the host's pid namespace.
 	// Optional: Default to false.
@@ -170,7 +175,9 @@ type PodSpecApplyConfiguration struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 	// enableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
-	// Optional: Defaults to true.
+	// Optional: Defaults to true, or to false when defaultNetwork is "None".
+	// For pods with defaultNetwork "None", false also leaves out the
+	// KUBERNETES_* variables of the kubernetes service.
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty"`
 	// preemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
@@ -300,6 +307,23 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// defaultNetwork selects the pod's default network.
+	// "Pod" gives the pod its own network namespace attached to the default
+	// pod network, "Host" runs the pod in the host network namespace
+	// (equivalent to hostNetwork: true), and "None" gives the pod an
+	// isolated network namespace with only a loopback interface, not
+	// attached to the default pod network and with no automatic network
+	// plumbing.
+	// When unset, hostNetwork selects between "Pod" and "Host". Setting
+	// "Host" sets hostNetwork to true; when one of the two fields changes on
+	// a workload template the other is updated to match. "None" may not be
+	// combined with hostNetwork: true.
+	// When "None" is selected, dnsPolicy defaults to "None" and
+	// enableServiceLinks defaults to false (both may be overridden), and
+	// features that require a pod IP (hostPort, and httpGet, tcpSocket and
+	// grpc probes and lifecycle handlers) are forbidden.
+	// This field is immutable on Pods.
+	DefaultNetwork *corev1.PodDefaultNetwork `json:"defaultNetwork,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -715,5 +739,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithDefaultNetwork sets the DefaultNetwork field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultNetwork field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithDefaultNetwork(value corev1.PodDefaultNetwork) *PodSpecApplyConfiguration {
+	b.DefaultNetwork = &value
 	return b
 }
