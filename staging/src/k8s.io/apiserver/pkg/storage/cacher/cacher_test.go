@@ -511,12 +511,12 @@ func TestWatch(t *testing.T) {
 	t.Run("ClusterScopedWatch", func(t *testing.T) {
 		ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
 		t.Cleanup(terminate)
-		storagetesting.RunTestClusterScopedWatch(ctx, t, cacher, true)
+		storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 	})
 	t.Run("NamespaceScopedWatch", func(t *testing.T) {
 		ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 		t.Cleanup(terminate)
-		storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher, true)
+		storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 	})
 	t.Run("WatchDispatchBookmarkEvents", func(t *testing.T) {
 		ctx, cacher, terminate := testSetup(t)

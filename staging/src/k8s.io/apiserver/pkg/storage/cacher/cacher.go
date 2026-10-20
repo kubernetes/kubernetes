@@ -570,7 +570,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// to compute watcher.forget function (which has to happen under lock).
 	watcher := newCacheWatcher(
 		chanSize,
-		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
+		filterWithAttrsAndPrefixFunction(key, pred, opts.Recursive, c.groupResource),
 		emptyFunc,
 		c.versioner,
 		deadline,
@@ -1278,10 +1278,14 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, selector watchSelector
 	}
 }
 
-func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
+func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, recursive bool, groupResource schema.GroupResource) filterWithAttrsFunc {
 	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
 	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
-		if !key.HasPathPrefix(objKey, prefix) {
+		if recursive {
+			if !key.HasPathPrefix(objKey, prefix) {
+				return false
+			}
+		} else if objKey != prefix {
 			return false
 		}
 		if isSharded {
