@@ -497,7 +497,10 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
 	for _, value := range input {
-		value, _ = template.Indirect(value)
+		value, isNil := template.Indirect(value)
+		if isNil {
+			continue
+		}
 
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice and cannot be filtered", value)
