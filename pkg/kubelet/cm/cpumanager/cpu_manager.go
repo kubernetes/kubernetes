@@ -442,6 +442,13 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 		}
 	}
 
+	for podUID := range m.state.GetPendingResizes() {
+		if _, ok := activeContainers[podUID]; !ok {
+			rootLogger.V(2).Info("removing pending resize", "podUID", podUID)
+			m.state.DeletePendingResize(podUID)
+		}
+	}
+
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {

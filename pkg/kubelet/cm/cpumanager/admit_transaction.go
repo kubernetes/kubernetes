@@ -21,8 +21,10 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -44,6 +46,14 @@ type resizeTransaction struct {
 // The caller must hold m.Mutex.
 func (m *manager) admissionState(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) state.State {
 	if operation != lifecycle.ResizeOperation {
+		// An added pod first gets its pending resize resolved.
+		// This covers scenarion in which kubelet was restarted during resize and the pod is admitted again with Add after restart.
+		// If the resize was staged and allocation manager commmited new resources, we should apply those resources here.
+		// If kubelet was restarted before allocation manager committed new resources, pending resize must be cleared,
+		// as the Resize operation will be processed again.
+		if operation == lifecycle.AddOperation {
+			m.resolvePendingResize(logger, pod)
+		}
 		return m.state
 	}
 	podUID := string(pod.UID)
@@ -64,7 +74,7 @@ func (m *manager) admissionState(logger klog.Logger, pod *v1.Pod, operation life
 	return m.pendingResize.scratch
 }
 
-// StageAdmit checks that the resize prepared for the pod can still be committed.
+// StageAdmit records the resize prepared for the pod in the state as a pending resize, without applying it.
 func (m *manager) StageAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error {
 	if operation != lifecycle.ResizeOperation {
 		return nil
@@ -76,14 +86,18 @@ func (m *manager) StageAdmit(ctx context.Context, pod *v1.Pod, operation lifecyc
 	if err != nil || tx == nil {
 		return err
 	}
-	_, _, err = m.resizeDelta(tx)
-
-	// TODO: save resize information to checkpoint
-
-	return err
+	pending, changed := m.buildPendingResize(tx, pod)
+	if !changed {
+		return nil
+	}
+	if err := m.checkCPUsFree(pod, pending); err != nil {
+		return err
+	}
+	m.state.SetPendingResize(tx.podUID, pending)
+	return nil
 }
 
-// CommitAdmit applies the resize prepared for the pod to the state.
+// CommitAdmit applies the pending resize of the pod to the state.
 func (m *manager) CommitAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) error {
 	if operation != lifecycle.ResizeOperation {
 		return nil
@@ -97,29 +111,24 @@ func (m *manager) CommitAdmit(ctx context.Context, pod *v1.Pod, operation lifecy
 	}
 	m.pendingResize = nil
 
-	added, released, err := m.resizeDelta(tx)
-	if err != nil {
+	pending, staged := m.state.GetPendingResize(tx.podUID)
+	if !staged {
+		if _, changed := m.buildPendingResize(tx, pod); changed {
+			return fmt.Errorf("cannot commit the resize of pod %s (UID %s): it was not staged", klog.KObj(pod), pod.UID)
+		}
+		return nil
+	}
+	// Other pods may have released CPUs since the resize was staged, which the
+	// commit keeps, but none may have taken the CPUs the resize takes.
+	if err := m.checkCPUsFree(pod, pending); err != nil {
+		m.state.DeletePendingResize(tx.podUID)
 		return err
 	}
-	for containerName, cset := range tx.scratch.GetCPUAssignments()[tx.podUID] {
-		if current, ok := m.state.GetCPUSet(tx.podUID, containerName); !ok || !current.Equals(cset) {
-			m.state.SetCPUSet(tx.podUID, containerName, cset)
-		}
-	}
-	if cset, ok := tx.scratch.GetPodCPUSet(tx.podUID); ok {
-		if current, ok := m.state.GetPodCPUSet(tx.podUID); !ok || !current.Equals(cset) {
-			m.state.SetPodCPUSet(tx.podUID, cset)
-		}
-	}
-	// Other pods may have released CPUs since the resize was prepared, so the
-	// default CPU set is updated by the difference instead of being copied.
-	if !added.IsEmpty() || !released.IsEmpty() {
-		m.state.SetDefaultCPUSet(m.state.GetDefaultCPUSet().Difference(added).Union(released))
-	}
+	m.state.CommitPendingResize(tx.podUID)
 	return nil
 }
 
-// AbortAdmit discards the resize prepared for the pod.
+// AbortAdmit discards the resize prepared for the pod and its pending resize.
 func (m *manager) AbortAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) {
 	if operation != lifecycle.ResizeOperation {
 		return
@@ -130,6 +139,110 @@ func (m *manager) AbortAdmit(ctx context.Context, pod *v1.Pod, operation lifecyc
 	if m.pendingResize != nil && m.pendingResize.podUID == string(pod.UID) {
 		m.pendingResize = nil
 	}
+	if _, staged := m.state.GetPendingResize(string(pod.UID)); staged {
+		m.state.DeletePendingResize(string(pod.UID))
+	}
+}
+
+// resolvePendingResize completes or discards the resize of the pod staged
+// before a kubelet restart. An added pod carries its persisted allocation,
+// which includes the resize only if the resize was accepted.
+// The caller must hold m.Mutex.
+func (m *manager) resolvePendingResize(logger klog.Logger, pod *v1.Pod) {
+	pending, ok := m.state.GetPendingResize(string(pod.UID))
+	if !ok {
+		return
+	}
+	if err := m.checkPendingResize(pod, pending); err != nil {
+		logger.Info("Discarding the pending resize of the pod", "pod", klog.KObj(pod), "podUID", pod.UID, "reason", err)
+		m.state.DeletePendingResize(string(pod.UID))
+		return
+	}
+	logger.Info("Completing the pending resize of the pod, its allocation includes the resize", "pod", klog.KObj(pod), "podUID", pod.UID)
+	m.state.CommitPendingResize(string(pod.UID))
+}
+
+// checkPendingResize returns why the pending resize cannot be committed for
+// the pod with its allocated resources, or nil if it can.
+//
+// The static policy assigns a container as many exclusive CPUs as its integral
+// CPU request, and a resize changes them only together with the request. So the
+// size of a target CPU set tells whether the persisted allocation includes the
+// resize. The same holds for the pod-level assignment and the pod CPU request.
+// The caller must hold m.Mutex.
+func (m *manager) checkPendingResize(pod *v1.Pod, pending state.PendingResize) error {
+	for containerName, target := range pending.Containers {
+		container := findContainer(pod, containerName)
+		if container == nil {
+			return fmt.Errorf("container %q is not part of the pod", containerName)
+		}
+		if request := container.Resources.Requests[v1.ResourceCPU]; !requestsCPUs(request, target) {
+			return fmt.Errorf("container %q is allocated %s CPUs, the resize assigns it %d", containerName, request.String(), target.Size())
+		}
+	}
+	if pending.Pod != nil {
+		if request := podCPURequest(pod); !requestsCPUs(request, *pending.Pod) {
+			return fmt.Errorf("the pod is allocated %s CPUs, the resize assigns it %d", request.String(), pending.Pod.Size())
+		}
+	}
+	return m.checkCPUsFree(pod, pending)
+}
+
+// checkCPUsFree fails if a CPU the pending resize takes from the default CPU
+// set is no longer free. The caller must hold m.Mutex.
+func (m *manager) checkCPUsFree(pod *v1.Pod, pending state.PendingResize) error {
+	taken, _ := state.PendingResizeDelta(m.state.GetCPUAssignments(), m.state.GetPodCPUAssignments(), string(pod.UID), pending)
+	if free := m.state.GetDefaultCPUSet(); !taken.IsSubsetOf(free) {
+		return fmt.Errorf("cannot resize pod %s (UID %s): CPUs %s are no longer free", klog.KObj(pod), pod.UID, taken.Difference(free))
+	}
+	return nil
+}
+
+// buildPendingResize returns the pending resize that commits the transaction,
+// and false if the transaction changes no assignment.
+// The caller must hold m.Mutex.
+func (m *manager) buildPendingResize(tx *resizeTransaction, pod *v1.Pod) (state.PendingResize, bool) {
+	var pending state.PendingResize
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		target, ok := tx.scratch.GetCPUSet(tx.podUID, container.Name)
+		if !ok {
+			continue
+		}
+		if current, _ := m.state.GetCPUSet(tx.podUID, container.Name); current.Equals(target) {
+			continue
+		}
+		if pending.Containers == nil {
+			pending.Containers = make(map[string]cpuset.CPUSet)
+		}
+		pending.Containers[container.Name] = target
+	}
+	if target, ok := tx.scratch.GetPodCPUSet(tx.podUID); ok {
+		if current, _ := m.state.GetPodCPUSet(tx.podUID); !current.Equals(target) {
+			pending.Pod = &target
+		}
+	}
+	return pending, len(pending.Containers) > 0 || pending.Pod != nil
+}
+
+func findContainer(pod *v1.Pod, containerName string) *v1.Container {
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if container.Name == containerName {
+			return container
+		}
+	}
+	return nil
+}
+
+func podCPURequest(pod *v1.Pod) resource.Quantity {
+	if pod.Spec.Resources == nil {
+		return resource.Quantity{}
+	}
+	return pod.Spec.Resources.Requests[v1.ResourceCPU]
+}
+
+// requestsCPUs returns whether the CPU request is as many whole CPUs as the CPU set has.
+func requestsCPUs(request resource.Quantity, cset cpuset.CPUSet) bool {
+	return request.MilliValue() == int64(cset.Size())*1000
 }
 
 // getResizeTransaction returns the resize transaction of the pod, or nil if
@@ -142,29 +255,6 @@ func (m *manager) getResizeTransaction(pod *v1.Pod) (*resizeTransaction, error) 
 		return nil, fmt.Errorf("the resize transaction in progress belongs to pod UID %s, not to pod %s (UID %s)", m.pendingResize.podUID, klog.KObj(pod), pod.UID)
 	}
 	return m.pendingResize, nil
-}
-
-// resizeDelta returns the CPUs that committing the transaction takes from the
-// default CPU set and returns to it. It fails if a CPU to be taken is no
-// longer free. The caller must hold m.Mutex.
-func (m *manager) resizeDelta(tx *resizeTransaction) (added, released cpuset.CPUSet, err error) {
-	before := podCPUs(m.state, tx.podUID)
-	after := podCPUs(tx.scratch, tx.podUID)
-	added = after.Difference(before)
-	released = before.Difference(after)
-	if free := m.state.GetDefaultCPUSet(); !added.IsSubsetOf(free) {
-		return cpuset.New(), cpuset.New(), fmt.Errorf("cannot commit the resize of pod UID %s: CPUs %s are no longer free", tx.podUID, added.Difference(free))
-	}
-	return added, released, nil
-}
-
-// podCPUs returns all the CPUs assigned to the pod and its containers.
-func podCPUs(s state.Reader, podUID string) cpuset.CPUSet {
-	cpus, _ := s.GetPodCPUSet(podUID)
-	for _, cset := range s.GetCPUAssignments()[podUID] {
-		cpus = cpus.Union(cset)
-	}
-	return cpus
 }
 
 // cloneState returns an in-memory copy of the state.
