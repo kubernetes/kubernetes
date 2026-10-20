@@ -462,7 +462,6 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedClearedNominatedPods: []string{"nom-pod1-node1"},
 			expectedStatus:               nil,
 			expectedPreemptingMap:        sets.New(types.UID("preemptor")),
-			expectedActivatedPods:        map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "podgroup preemptor, all victims already being deleted clears lower priority nominated pods across candidate nodes",
@@ -486,7 +485,6 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedClearedNominatedPods: []string{"nom-pod1-node1", "nom-pod2-node2"},
 			expectedStatus:               nil,
 			expectedPreemptingMap:        sets.New(types.UID("pg1")),
-			expectedActivatedPods:        map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but victim is already deleted",
@@ -1673,6 +1671,10 @@ func TestPreemptPod(t *testing.T) {
 }
 
 func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *testing.T) {
+	metrics.Register()
+	testRegistry := componentmetrics.NewKubeRegistry()
+	testRegistry.MustRegister(metrics.PreemptionGoroutinesExecutionTotal)
+
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
 	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
@@ -1681,6 +1683,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
 	terminatingVictim := st.MakePod().Name("terminating-v").UID("terminating-v").Priority(midPriority).Node("node1").Terminating().Obj()
+	secondTerminatingVictim := st.MakePod().Name("terminating-v2").UID("terminating-v2").Priority(midPriority).Node("node1").Terminating().Obj()
 
 	tests := []struct {
 		name                        string
@@ -1689,32 +1692,59 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
-		deleteVictimDuringCleanup   bool
+		deleteVictimsDuringCleanup  int
 		preemptorGenericPodGroup    *fwk.GenericPodGroup
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool
 	}{
 		{
-			name:                      "terminating victim deleted during cleanup",
-			victimPods:                []*v1.Pod{terminatingVictim},
-			deleteVictimDuringCleanup: true,
-			wantPreemptorActivate:     true,
+			name:       "terminating victim still present",
+			victimPods: []*v1.Pod{terminatingVictim.DeepCopy()},
 		},
 		{
-			name:                      "terminating victim deleted during cleanup for pod group",
-			victimPods:                []*v1.Pod{terminatingVictim.DeepCopy()},
-			deleteVictimDuringCleanup: true,
-			preemptorGenericPodGroup:  fwk.NewGenericPodGroup(preemptorPodGroup),
-			preemptorPods:             []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
-			wantPreemptorActivate:     true,
+			name:                     "terminating victim still present for pod group",
+			victimPods:               []*v1.Pod{terminatingVictim.DeepCopy()},
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
 		},
 		{
-			name:                      "terminating victim deleted during cleanup for composite pod group",
-			victimPods:                []*v1.Pod{terminatingVictim.DeepCopy()},
-			deleteVictimDuringCleanup: true,
-			preemptorGenericPodGroup:  fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
-			preemptorPods:             []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
-			wantPreemptorActivate:     true,
+			name:                     "terminating victim still present for composite pod group",
+			victimPods:               []*v1.Pod{terminatingVictim.DeepCopy()},
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+		},
+		{
+			name:                       "one terminating victim deleted while another still exists",
+			victimPods:                 []*v1.Pod{terminatingVictim.DeepCopy(), secondTerminatingVictim.DeepCopy()},
+			deleteVictimsDuringCleanup: 1,
+		},
+		{
+			name:                       "all terminating victims deleted during cleanup",
+			victimPods:                 []*v1.Pod{terminatingVictim.DeepCopy(), secondTerminatingVictim.DeepCopy()},
+			deleteVictimsDuringCleanup: 2,
+			wantPreemptorActivate:      true,
+		},
+		{
+			name:                       "terminating victim deleted during cleanup",
+			victimPods:                 []*v1.Pod{terminatingVictim},
+			deleteVictimsDuringCleanup: 1,
+			wantPreemptorActivate:      true,
+		},
+		{
+			name:                       "terminating victim deleted during cleanup for pod group",
+			victimPods:                 []*v1.Pod{terminatingVictim.DeepCopy()},
+			deleteVictimsDuringCleanup: 1,
+			preemptorGenericPodGroup:   fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:              []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:      true,
+		},
+		{
+			name:                       "terminating victim deleted during cleanup for composite pod group",
+			victimPods:                 []*v1.Pod{terminatingVictim.DeepCopy()},
+			deleteVictimsDuringCleanup: 1,
+			preemptorGenericPodGroup:   fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
+			preemptorPods:              []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:      true,
 		},
 		{
 			name:                  "last waiting pod",
@@ -1778,7 +1808,6 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics.Register()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -1819,7 +1848,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 			requestStopper := make(chan struct{})
 			unblockCleanup := sync.OnceFunc(func() { close(requestStopper) })
 			defer unblockCleanup()
-			if !tt.deleteVictimDuringCleanup {
+			if tt.deleteVictimsDuringCleanup == 0 {
 				unblockCleanup()
 			}
 			nominator := &fakePodNominator{
@@ -1876,17 +1905,24 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 			}
 			candidate := newCandidate(&extenderv1.Victims{Pods: tt.victimPods}, "node1", 0, "node1")
 			victimIndexer := informerFactory.Core().V1().Pods().Informer().GetIndexer()
-			if tt.deleteVictimDuringCleanup {
-				if err := victimIndexer.Add(tt.victimPods[0]); err != nil {
-					t.Fatalf("Failed to add terminating victim to informer cache: %v", err)
+			for _, victim := range tt.victimPods {
+				if err := victimIndexer.Add(victim); err != nil {
+					t.Fatalf("Failed to add victim to informer cache: %v", err)
 				}
+			}
+			completedGoroutines := metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(metrics.GoroutineResultSuccess)
+			completedBefore, err := testutil.GetCounterMetricValue(completedGoroutines)
+			if err != nil {
+				t.Fatalf("Failed to get completed preemption goroutines: %v", err)
 			}
 			executor.prepareCandidateAsync(candidate, preemptor, "test-plugin")
 
-			if tt.deleteVictimDuringCleanup {
+			if tt.deleteVictimsDuringCleanup > 0 {
 				// Observe the final deletion while nomination cleanup still gates the preemptor.
-				if err := victimIndexer.Delete(tt.victimPods[0]); err != nil {
-					t.Fatalf("Failed to remove terminating victim from informer cache: %v", err)
+				for _, victim := range tt.victimPods[:tt.deleteVictimsDuringCleanup] {
+					if err := victimIndexer.Delete(victim); err != nil {
+						t.Fatalf("Failed to remove terminating victim from informer cache: %v", err)
+					}
 				}
 				if !executor.isRunningPreemption(preemptor.UID()) {
 					t.Fatal("Preemptor should remain gated until nomination cleanup completes")
@@ -1900,14 +1936,13 @@ func TestPrepareCandidateAsyncActivatesPreemptorWithoutVictimDeletionEvent(t *te
 				case <-time.After(wait.ForeverTestTimeout):
 					t.Fatal("Timed out waiting for preemptor activation")
 				}
-			} else {
-				if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-					executor.mu.RLock()
-					defer executor.mu.RUnlock()
-					return len(executor.preempting) == 0, nil
-				}); err != nil {
-					t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
-				}
+			}
+			// The counter is incremented after the deferred activation has completed.
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				completed, err := testutil.GetCounterMetricValue(completedGoroutines)
+				return completed > completedBefore, err
+			}); err != nil {
+				t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
 			}
 
 			mu.RLock()
@@ -2647,7 +2682,8 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			}
 			executor := NewExecutor(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
 
-			if got := executor.IsPodGroupWaitingForVictims(tt.preemptor); got != tt.want {
+			_, ctx := ktesting.NewTestContext(t)
+			if got := executor.IsPodGroupWaitingForVictims(ctx, tt.preemptor); got != tt.want {
 				t.Errorf("IsPodGroupWaitingForVictims() = %v, want %v", got, tt.want)
 			}
 		})
