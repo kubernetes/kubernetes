@@ -95,6 +95,7 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	newRS.Status = oldRS.Status
 
 	pod.DropDisabledTemplateFields(&newRS.Spec.Template, &oldRS.Spec.Template)
+	pod.SyncDefaultNetworkOnTemplateUpdate(&newRS.Spec.Template, &oldRS.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

@@ -86,6 +86,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldDaemonSet := old.(*apps.DaemonSet)
 
 	pod.DropDisabledTemplateFields(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	pod.SyncDefaultNetworkOnTemplateUpdate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
 
 	// update is not allowed to set status
 	newDaemonSet.Status = oldDaemonSet.Status

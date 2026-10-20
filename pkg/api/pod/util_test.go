@@ -4672,6 +4672,77 @@ func TestUseAllowPodDefaultNetwork(t *testing.T) {
 	}
 }
 
+func TestSyncDefaultNetworkOnUpdate(t *testing.T) {
+	spec := func(defaultNetwork *api.PodDefaultNetwork, hostNetwork bool) *api.PodSpec {
+		return &api.PodSpec{DefaultNetwork: defaultNetwork, HostNetwork: hostNetwork}
+	}
+	pod := new(api.PodDefaultNetworkPod)
+	host := new(api.PodDefaultNetworkHost)
+	none := new(api.PodDefaultNetworkNone)
+
+	for _, tc := range []struct {
+		name     string
+		old, new *api.PodSpec
+		want     *api.PodSpec
+	}{
+		// Nothing changed.
+		{name: "unchanged unset", old: spec(nil, false), new: spec(nil, false), want: spec(nil, false)},
+		{name: "unchanged Host", old: spec(host, true), new: spec(host, true), want: spec(host, true)},
+		{name: "unchanged None", old: spec(none, false), new: spec(none, false), want: spec(none, false)},
+
+		// Only hostNetwork changed: a client that does not know defaultNetwork.
+		{name: "unset, hostNetwork set", old: spec(nil, false), new: spec(nil, true), want: spec(nil, true)},
+		{name: "Pod, hostNetwork set", old: spec(pod, false), new: spec(pod, true), want: spec(host, true)},
+		{name: "Host, hostNetwork cleared", old: spec(host, true), new: spec(host, false), want: spec(pod, false)},
+		{name: "None, hostNetwork set is left for validation", old: spec(none, false), new: spec(none, true), want: spec(none, true)},
+
+		// Only defaultNetwork changed: a client that knows the field.
+		{name: "Host to Pod clears hostNetwork", old: spec(host, true), new: spec(pod, true), want: spec(pod, false)},
+		{name: "Host to None clears hostNetwork", old: spec(host, true), new: spec(none, true), want: spec(none, false)},
+		{name: "legacy host to Pod clears hostNetwork", old: spec(nil, true), new: spec(pod, true), want: spec(pod, false)},
+		{name: "legacy host to None clears hostNetwork", old: spec(nil, true), new: spec(none, true), want: spec(none, false)},
+		{name: "Pod to Host sets hostNetwork", old: spec(pod, false), new: spec(host, false), want: spec(host, true)},
+		{name: "unset to None", old: spec(nil, false), new: spec(none, false), want: spec(none, false)},
+
+		// Only defaultNetwork changed to unset: a full update from a client
+		// that does not know the field keeps the stored value.
+		{name: "None cleared by old client is kept", old: spec(none, false), new: spec(nil, false), want: spec(none, false)},
+		{name: "Host cleared by old client is kept", old: spec(host, true), new: spec(nil, true), want: spec(host, true)},
+		{name: "Pod cleared by old client is kept", old: spec(pod, false), new: spec(nil, false), want: spec(pod, false)},
+
+		// Both changed: left for validation.
+		{name: "Host cleared and hostNetwork cleared", old: spec(host, true), new: spec(nil, false), want: spec(nil, false)},
+		{name: "None to Pod with hostNetwork set", old: spec(none, false), new: spec(pod, true), want: spec(pod, true)},
+		{name: "Pod to Host with hostNetwork set", old: spec(pod, false), new: spec(host, true), want: spec(host, true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oldCopy := tc.old.DeepCopy()
+			got := tc.new.DeepCopy()
+			SyncDefaultNetworkOnUpdate(got, tc.old)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("unexpected spec (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(oldCopy, tc.old); diff != "" {
+				t.Errorf("old spec changed (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("nil specs", func(t *testing.T) {
+		SyncDefaultNetworkOnUpdate(nil, spec(host, true))
+		SyncDefaultNetworkOnUpdate(spec(host, true), nil)
+		SyncDefaultNetworkOnTemplateUpdate(nil, nil)
+	})
+
+	t.Run("template", func(t *testing.T) {
+		newTemplate := &api.PodTemplateSpec{Spec: *spec(pod, true)}
+		SyncDefaultNetworkOnTemplateUpdate(newTemplate, &api.PodTemplateSpec{Spec: *spec(host, true)})
+		if diff := cmp.Diff(spec(pod, false), &newTemplate.Spec); diff != "" {
+			t.Errorf("unexpected template spec (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 
