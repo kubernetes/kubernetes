@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -1547,4 +1548,51 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 		maxRV = max(maxRV, itemRV)
 	}
 	return maxRV
+}
+
+func TestWaitAndGetLatestSnapshotReplacedWithLowerRV(t *testing.T) {
+	prevPanic := consistency.PanicOnCacheInconsistency
+	t.Cleanup(func() {
+		consistency.PanicOnCacheInconsistency = prevPanic
+	})
+
+	s := newTestWatchCache(10, DefaultEventFreshDuration, testIndexers())
+	defer s.Stop()
+
+	pod10 := makeTestPod("pod1", 10)
+	_, podFields, err := s.config.getAttrsFunc(pod10)
+	require.NoError(t, err)
+	elem10 := &store.Element{
+		Key:    "/prefix/ns/pod1",
+		Object: pod10,
+		Fields: podFields,
+	}
+
+	for _, tc := range []struct {
+		name        string
+		matchValues []storage.MatchValue
+	}{
+		{
+			name: "latestSnapshot",
+		},
+		{
+			name:        "indexedSnapshot",
+			matchValues: []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "some-node"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, s.Replace([]interface{}{makeTestPod("pod1", 20)}, "20"))
+			// Simulate storage being replaced with a lower RV after waitUntilFresh checked s.resourceVersion.
+			require.NoError(t, s.storage.Replace([]*store.Element{elem10}, 10))
+
+			consistency.PanicOnCacheInconsistency = false
+			_, _, _, err := s.waitAndGetLatestSnapshot(context.Background(), 20, tc.matchValues)
+			require.True(t, storage.IsTooLargeResourceVersion(err), "expected TooLargeResourceVersion error, got: %v", err)
+
+			consistency.PanicOnCacheInconsistency = true
+			require.Panics(t, func() {
+				_, _, _, _ = s.waitAndGetLatestSnapshot(context.Background(), 20, tc.matchValues)
+			})
+		})
+	}
 }
