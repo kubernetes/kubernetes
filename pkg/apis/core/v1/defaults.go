@@ -207,9 +207,17 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
-		enableServiceLinks := v1.DefaultEnableServiceLinks
-		obj.Spec.EnableServiceLinks = &enableServiceLinks
+		// Isolated pods have no route to any Service by default.
+		if isDefaultNetworkNone(&obj.Spec) {
+			obj.Spec.EnableServiceLinks = new(false)
+		} else {
+			obj.Spec.EnableServiceLinks = new(v1.DefaultEnableServiceLinks)
+		}
 	}
+
+	// SetDefaults_PodSpec runs after this function, so mirror "Host" here as
+	// well: the hostPort defaulting below must see hostNetwork: true.
+	mirrorDefaultNetworkHost(&obj.Spec)
 
 	if obj.Spec.HostNetwork {
 		defaultHostNetworkPorts(&obj.Spec.Containers)
@@ -254,8 +262,14 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.ServiceAccountName = obj.DeprecatedServiceAccount
 	}
 	obj.DeprecatedServiceAccount = obj.ServiceAccountName
+
+	mirrorDefaultNetworkHost(obj)
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		if isDefaultNetworkNone(obj) {
+			obj.DNSPolicy = v1.DNSNone
+		} else {
+			obj.DNSPolicy = v1.DNSClusterFirst
+		}
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
@@ -445,6 +459,26 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 			}
 		}
 	}
+}
+
+// mirrorDefaultNetworkHost sets the legacy hostNetwork boolean when
+// defaultNetwork is "Host", so that components that read only the boolean
+// make the correct decision. An unset defaultNetwork is not materialized:
+// unset means "hostNetwork decides", which keeps stored objects unchanged on
+// gate enablement (see TestPodDefaults and TestWorkloadDefaults). The reverse
+// direction, and conflicting changes to both fields, are handled on update
+// by the registry strategies (pkg/api/pod.SyncDefaultNetworkOnUpdate), which
+// can compare against the stored object; defaulting cannot.
+func mirrorDefaultNetworkHost(spec *v1.PodSpec) {
+	if spec.DefaultNetwork != nil && *spec.DefaultNetwork == v1.PodDefaultNetworkHost {
+		spec.HostNetwork = true
+	}
+}
+
+// isDefaultNetworkNone reports whether the spec opts out of the default pod
+// network.
+func isDefaultNetworkNone(spec *v1.PodSpec) bool {
+	return spec.DefaultNetwork != nil && *spec.DefaultNetwork == v1.PodDefaultNetworkNone
 }
 
 func defaultHTTPGetProtocol(action *v1.HTTPGetAction) {
