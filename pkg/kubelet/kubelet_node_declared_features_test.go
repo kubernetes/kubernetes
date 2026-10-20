@@ -28,6 +28,7 @@ import (
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
@@ -110,4 +111,58 @@ func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
 	// ExtendWebSocketsToKubelet is GA and locked on, so the kubelet always declares it.
 	features := kubelet.discoverNodeDeclaredFeatures()
 	assert.Contains(t, features, "ExtendWebSocketsToKubelet")
+}
+
+// TestNetworkIsolatedPodsFeatureDiscovery covers the plumbing from the CRI
+// RuntimeFeatures through runtimeState to the declared feature: it is only
+// declared with the gate enabled and a runtime that reports the capability.
+func TestNetworkIsolatedPodsFeatureDiscovery(t *testing.T) {
+	testcases := []struct {
+		name            string
+		gate            bool
+		runtimeFeatures *kubecontainer.RuntimeFeatures
+		expectFeature   bool
+	}{
+		{
+			name:            "gate enabled, runtime supports it",
+			gate:            true,
+			runtimeFeatures: &kubecontainer.RuntimeFeatures{DefaultNetworkNone: true},
+			expectFeature:   true,
+		},
+		{
+			name:            "gate enabled, runtime does not support it",
+			gate:            true,
+			runtimeFeatures: &kubecontainer.RuntimeFeatures{},
+			expectFeature:   false,
+		},
+		{
+			name:          "gate enabled, runtime features unknown",
+			gate:          true,
+			expectFeature: false,
+		},
+		{
+			name:            "gate disabled, runtime supports it",
+			gate:            false,
+			runtimeFeatures: &kubecontainer.RuntimeFeatures{DefaultNetworkNone: true},
+			expectFeature:   false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, tc.gate)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.nodeDeclaredFeaturesFramework = ndf.New(ndffeatures.AllFeatures)
+			kubelet.runtimeState.setRuntimeFeatures(tc.runtimeFeatures)
+
+			declared := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expectFeature {
+				assert.Contains(t, declared, "NetworkIsolatedPods")
+			} else {
+				assert.NotContains(t, declared, "NetworkIsolatedPods")
+			}
+		})
+	}
 }
