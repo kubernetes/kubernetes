@@ -21,11 +21,13 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
@@ -34,11 +36,14 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -2671,6 +2676,152 @@ func Test_calculateEffectiveGracePeriod(t *testing.T) {
 			if gracePeriod != tc.expectedGracePeriod {
 				t.Errorf("Expected a grace period of %v, but was %v", tc.expectedGracePeriod, gracePeriod)
 			}
+		})
+	}
+}
+
+func TestPodWorkerErrorsMetric(t *testing.T) {
+	metrics.Register()
+
+	const metricHeader = `
+		# HELP kubelet_pod_worker_errors_total [ALPHA] Cumulative number of errors in pod worker sync operations. Broken down by operation type: create, update, sync, terminating, terminated
+		# TYPE kubelet_pod_worker_errors_total counter
+	`
+	syncErr := errors.New("sync error")
+	wrappedCanceled := utilerrors.NewAggregate([]error{context.Canceled})
+
+	testCases := []struct {
+		name                         string
+		updateType                   kubetypes.SyncPodType
+		runningPod                   bool
+		syncPodErr                   error
+		syncTerminatingPodErr        error
+		syncTerminatingRuntimePodErr error
+		syncTerminatedPodErr         error
+		wantMetrics                  string
+	}{
+		{
+			name:       "sync pod success does not increment metric",
+			updateType: kubetypes.SyncPodCreate,
+		},
+		{
+			name:       "sync pod context.Canceled does not increment metric",
+			updateType: kubetypes.SyncPodCreate,
+			syncPodErr: context.Canceled,
+		},
+		{
+			name:       "sync pod wrapped context.Canceled does not increment metric",
+			updateType: kubetypes.SyncPodUpdate,
+			syncPodErr: wrappedCanceled,
+		},
+		{
+			name:       "sync pod backoff error does not increment metric",
+			updateType: kubetypes.SyncPodSync,
+			syncPodErr: utilerrors.NewAggregate([]error{
+				kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, time.Now()),
+				kubecontainer.ErrImagePullBackOff,
+			}),
+		},
+		{
+			name:        "sync pod create error increments create label",
+			updateType:  kubetypes.SyncPodCreate,
+			syncPodErr:  syncErr,
+			wantMetrics: `kubelet_pod_worker_errors_total{operation_type="create"} 1`,
+		},
+		{
+			name:        "sync pod update error increments update label",
+			updateType:  kubetypes.SyncPodUpdate,
+			syncPodErr:  syncErr,
+			wantMetrics: `kubelet_pod_worker_errors_total{operation_type="update"} 1`,
+		},
+		{
+			name:        "sync pod sync error increments sync label",
+			updateType:  kubetypes.SyncPodSync,
+			syncPodErr:  syncErr,
+			wantMetrics: `kubelet_pod_worker_errors_total{operation_type="sync"} 1`,
+		},
+		{
+			name:                  "sync terminating pod error increments terminating label",
+			updateType:            kubetypes.SyncPodKill,
+			syncTerminatingPodErr: syncErr,
+			wantMetrics:           `kubelet_pod_worker_errors_total{operation_type="terminating"} 1`,
+		},
+		{
+			name:                  "sync terminating pod context.Canceled does not increment metric",
+			updateType:            kubetypes.SyncPodKill,
+			syncTerminatingPodErr: context.Canceled,
+		},
+		{
+			name:                         "sync terminating runtime pod error increments terminating label",
+			updateType:                   kubetypes.SyncPodKill,
+			runningPod:                   true,
+			syncTerminatingRuntimePodErr: syncErr,
+			wantMetrics:                  `kubelet_pod_worker_errors_total{operation_type="terminating"} 1`,
+		},
+		{
+			name:                 "sync terminated pod error increments terminated label",
+			updateType:           kubetypes.SyncPodKill,
+			syncTerminatedPodErr: syncErr,
+			wantMetrics:          `kubelet_pod_worker_errors_total{operation_type="terminated"} 1`,
+		},
+		{
+			name:                 "sync terminated pod context.Canceled does not increment metric",
+			updateType:           kubetypes.SyncPodKill,
+			syncTerminatedPodErr: context.Canceled,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			metrics.PodWorkerErrorsTotal.Reset()
+
+			podWorkers, _, _ := createPodWorkers(logger)
+			podWorkers.podSyncer = &podSyncerFuncs{
+				syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+					return false, nil, tc.syncPodErr
+				},
+				syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+					return tc.syncTerminatingPodErr
+				},
+				syncTerminatingRuntimePod: func(ctx context.Context, runningPod *kubecontainer.Pod) error {
+					return tc.syncTerminatingRuntimePodErr
+				},
+				syncTerminatedPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+					return tc.syncTerminatedPodErr
+				},
+			}
+
+			pod := newNamedPod("1", "ns", "test-pod", false)
+			if tc.runningPod {
+				podWorkers.UpdatePod(tCtx, UpdatePodOptions{
+					RunningPod: &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace},
+					UpdateType: tc.updateType,
+				})
+			} else {
+				if tc.updateType == kubetypes.SyncPodKill {
+					podWorkers.UpdatePod(tCtx, UpdatePodOptions{
+						Pod:        pod,
+						UpdateType: kubetypes.SyncPodCreate,
+					})
+					drainAllWorkers(podWorkers)
+				}
+				podWorkers.UpdatePod(tCtx, UpdatePodOptions{
+					Pod:        pod,
+					UpdateType: tc.updateType,
+				})
+			}
+			drainAllWorkers(podWorkers)
+
+			expected := ""
+			if tc.wantMetrics != "" {
+				expected = metricHeader + tc.wantMetrics + "\n"
+			}
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer,
+				strings.NewReader(expected),
+				"kubelet_"+metrics.PodWorkerErrorsTotalKey,
+			))
 		})
 	}
 }

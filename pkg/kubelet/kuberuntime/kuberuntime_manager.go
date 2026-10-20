@@ -1622,6 +1622,17 @@ func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx con
 //  8. Create init containers.
 //  9. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) (result kubecontainer.PodSyncResult) {
+	defer func() {
+		// Observe SyncResult error metrics, excluding expected backoff errors.
+		if result.SyncError != nil && !kubecontainer.IsBackoffError(result.SyncError) {
+			metrics.SyncResultErrorsTotal.WithLabelValues(metrics.SyncResultActionSyncPod).Inc()
+		}
+		for _, r := range result.SyncResults {
+			if r.Error != nil && !kubecontainer.IsBackoffError(r.Error) {
+				metrics.SyncResultErrorsTotal.WithLabelValues(string(r.Action)).Inc()
+			}
+		}
+	}()
 	logger := klog.FromContext(ctx)
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus, restartAllContainers)
@@ -2152,8 +2163,8 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	err := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
-	return err.Error()
+	result := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
+	return result.Error()
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.

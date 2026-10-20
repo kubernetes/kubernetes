@@ -5875,9 +5875,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 }
 
 func TestIncrementImageVolumeMetrics(t *testing.T) {
-	legacyregistry.Register(metrics.ImageVolumeRequestedTotal)      //nolint:errcheck
-	legacyregistry.Register(metrics.ImageVolumeMountedSucceedTotal) //nolint:errcheck
-	legacyregistry.Register(metrics.ImageVolumeMountedErrorsTotal)  //nolint:errcheck
+	metrics.Register()
 
 	testCases := map[string]struct {
 		err          error
@@ -7007,6 +7005,86 @@ func TestSysctlFiltering(t *testing.T) {
 			if !reflect.DeepEqual(test.expectedSysctls, config.Sysctls) {
 				t.Errorf("Expected sysctls %v, got %v", test.expectedSysctls, config.Sysctls)
 			}
+		})
+	}
+}
+
+func TestSyncResultErrorsMetric(t *testing.T) {
+	metrics.Register()
+
+	const metricHeader = `
+		# HELP kubelet_sync_result_errors_total [ALPHA] Cumulative number of SyncResult errors during pod sync. Broken down by action
+		# TYPE kubelet_sync_result_errors_total counter
+	`
+
+	testCases := []struct {
+		name        string
+		injectError string
+		wantMetrics string
+	}{
+		{
+			name: "SyncPod success does not increment metric",
+		},
+		{
+			name:        "RunPodSandbox failure increments CreatePodSandbox label",
+			injectError: "RunPodSandbox",
+			wantMetrics: fmt.Sprintf(`kubelet_sync_result_errors_total{action=%q} 1`, kubecontainer.CreatePodSandbox),
+		},
+		{
+			name:        "StartContainer failure increments StartContainer label",
+			injectError: "StartContainer",
+			wantMetrics: fmt.Sprintf(`kubelet_sync_result_errors_total{action=%q} 1`, kubecontainer.StartContainer),
+		},
+		{
+			name:        "top-level SyncError increments SyncPod label",
+			injectError: "PodSandboxStatus",
+			wantMetrics: fmt.Sprintf(`kubelet_sync_result_errors_total{action=%q} 1`, metrics.SyncResultActionSyncPod),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			metrics.SyncResultErrorsTotal.Reset()
+
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "foo1", Image: "busybox"},
+					},
+				},
+			}
+
+			if tc.injectError != "" {
+				fakeRuntime.InjectError(tc.injectError, errors.New("injected error"))
+			}
+
+			podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+			if tc.wantMetrics != "" {
+				require.Error(t, result.Error())
+			} else {
+				require.NoError(t, result.Error())
+			}
+
+			expected := ""
+			if tc.wantMetrics != "" {
+				expected = metricHeader + tc.wantMetrics + "\n"
+			}
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer,
+				strings.NewReader(expected),
+				"kubelet_"+metrics.SyncResultErrorsTotalKey,
+			))
 		})
 	}
 }
