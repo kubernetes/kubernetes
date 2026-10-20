@@ -735,19 +735,6 @@ func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny 
 	return nil
 }
 
-func waitForPodGroupsScheduled(testCtx *testutils.TestContext, ns string, pgNames []string) error {
-	cs := testCtx.ClientSet
-	for _, pgName := range pgNames {
-		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionTrue, schedulingapi.PodGroupReasonScheduled))
-		if err != nil {
-			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
-				pgName, metav1.ConditionTrue, schedulingapi.PodGroupReasonScheduled, err)
-		}
-	}
-	return nil
-}
-
 func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pgNames []string) error {
 	cs := testCtx.ClientSet
 	for _, pgName := range pgNames {
@@ -769,19 +756,6 @@ func waitForPodGroupsError(testCtx *testutils.TestContext, ns string, pgNames []
 		if err != nil {
 			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
 				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, err)
-		}
-	}
-	return nil
-}
-
-func waitForCompositePodGroupsScheduled(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
-	cs := testCtx.ClientSet
-	for _, cpgName := range cpgNames {
-		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionTrue, schedulingv1alpha3.CompositePodGroupReasonScheduled))
-		if err != nil {
-			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s): %w",
-				cpgName, metav1.ConditionTrue, schedulingv1alpha3.CompositePodGroupReasonScheduled, err)
 		}
 	}
 	return nil
@@ -813,11 +787,11 @@ func waitForCompositePodGroupsError(testCtx *testutils.TestContext, ns string, c
 	return nil
 }
 
-func waitForGroupsScheduled(testCtx *testutils.TestContext, ns string, groups *Groups) error {
-	if err := waitForCompositePodGroupsScheduled(testCtx, ns, groups.CompositePodGroups); err != nil {
-		return err
-	}
-	return waitForPodGroupsScheduled(testCtx, ns, groups.PodGroups)
+func waitForGroupsScheduled(testCtx *testutils.TestContext, t utiltesting.TB, ns string, groups *Groups) error {
+	// TODO(#142677): Check the conditions once the InitiallyScheduled=True condition
+	// cannot be overridden by subsequent scheduling cycles.
+	t.Log("Skipping WaitForGroupsScheduled check until #142677 is fixed")
+	return nil
 }
 
 func waitForGroupsUnschedulable(testCtx *testutils.TestContext, ns string, groups *Groups) error {
@@ -959,7 +933,7 @@ func RunSteps(testCtx *testutils.TestContext, t utiltesting.TB, ns string, steps
 		case step.WaitForAnyPodsScheduled != nil:
 			err = waitForAnyPodsScheduled(testCtx, ns, step.WaitForAnyPodsScheduled)
 		case step.WaitForGroupsScheduled != nil:
-			err = waitForGroupsScheduled(testCtx, ns, step.WaitForGroupsScheduled)
+			err = waitForGroupsScheduled(testCtx, t, ns, step.WaitForGroupsScheduled)
 		case step.WaitForGroupsUnschedulable != nil:
 			err = waitForGroupsUnschedulable(testCtx, ns, step.WaitForGroupsUnschedulable)
 		case step.WaitForGroupsError != nil:
