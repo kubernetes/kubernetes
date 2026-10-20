@@ -345,6 +345,12 @@ const (
 	// scheduler plugin configuration).
 	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
 
+	// owner: @ashvindeodhar
+	// kep: https://kep.k8s.io/5981
+	//
+	// Enables DRA sharing-affinity extraction and scheduling semantics.
+	DRASharingAffinity featuregate.Feature = "DRASharingAffinity"
+
 	// owner: @nojnhuh
 	// kep: https://kep.k8s.io/5729
 	//
@@ -1485,6 +1491,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRASharingAffinity: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAWorkloadResourceClaims: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
@@ -2492,6 +2502,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAResourcePoolStatus: {},
 
 	DRASchedulerFilterTimeout: {},
+
+	DRASharingAffinity: {DRAConsumableCapacity},
 
 	DRAWorkloadResourceClaims: {GenericWorkload},
 
