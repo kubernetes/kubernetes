@@ -383,8 +383,9 @@ func TestValidateDeviceCapacity(t *testing.T) {
 
 func TestQuantityKeyAsDec(t *testing.T) {
 	scenarios := map[string]struct {
-		quantity string
-		wantKey  string
+		quantity    string
+		quantityVal *apiresource.Quantity // if set, use this value instead of parsing the quantity string
+		wantKey     string
 	}{
 		"integer":                    {quantity: "1", wantKey: "1"},
 		"integer-with-decimal-point": {quantity: "1.0", wantKey: "1.0"},
@@ -393,12 +394,21 @@ func TestQuantityKeyAsDec(t *testing.T) {
 		"exponent":                   {quantity: "1e3", wantKey: "1000"},
 		"milli":                      {quantity: "100m", wantKey: "0.100"},
 		// TODO(#141166): The key must grow with the digits written, not the exponent. Expect a short key.
-		"large-exponent": {quantity: "1e100000", wantKey: "1" + strings.Repeat("0", 100000)},
+		// The large-exponent case is capped when parsed, so we load it directly to test how quantityKeyAsDec handles it.
+		"large-exponent": {quantityVal: apiresource.NewScaledQuantity(1, 100000), wantKey: "1" + strings.Repeat("0", 100000)},
+		// Parsed, the large-exponent case is capped at the ParseQuantity limit.
+		"large-exponent-capped": {quantity: "1e100000", wantKey: "17976931348623157" + strings.Repeat("0", 292)},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			if got := quantityKeyAsDec(apiresource.MustParse(scenario.quantity)); got != scenario.wantKey {
-				t.Errorf("quantityKeyAsDec(%s) = %q, want %q", scenario.quantity, got, scenario.wantKey)
+			var quantityVal apiresource.Quantity
+			if scenario.quantityVal != nil {
+				quantityVal = *scenario.quantityVal
+			} else {
+				quantityVal = apiresource.MustParse(scenario.quantity)
+			}
+			if got := quantityKeyAsDec(quantityVal); got != scenario.wantKey {
+				t.Errorf("quantityKeyAsDec(%s) = %q, want %q", quantityVal.String(), got, scenario.wantKey)
 			}
 		})
 	}
@@ -407,26 +417,33 @@ func TestQuantityKeyAsDec(t *testing.T) {
 func TestIsFractionalQuantity(t *testing.T) {
 	scenarios := map[string]struct {
 		quantity       string
+		quantityVal    *apiresource.Quantity // if set, use this value instead of parsing the quantity string
 		wantFractional bool
 	}{
-		"integer":          {quantity: "1", wantFractional: false},
-		"whole-milli":      {quantity: "1000m", wantFractional: false},
-		"binary-suffix":    {quantity: "1Ki", wantFractional: false},
-		"exponent":         {quantity: "1e3", wantFractional: false},
-		"large-exponent":   {quantity: "1e100000", wantFractional: false},
+		"integer":       {quantity: "1", wantFractional: false},
+		"whole-milli":   {quantity: "1000m", wantFractional: false},
+		"binary-suffix": {quantity: "1Ki", wantFractional: false},
+		"exponent":      {quantity: "1e3", wantFractional: false},
+		// The large-exponent case is capped when parsed, so we load it directly to test how isFractionalQuantity handles it.
+		"large-exponent":   {quantityVal: apiresource.NewScaledQuantity(1, 100000), wantFractional: false},
 		"decimal-fraction": {quantity: "1.5", wantFractional: true},
 		"fractional-milli": {quantity: "1500m", wantFractional: true},
 		"nano":             {quantity: "1n", wantFractional: true},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			q := apiresource.MustParse(scenario.quantity)
+			var q apiresource.Quantity
+			if scenario.quantityVal != nil {
+				q = *scenario.quantityVal
+			} else {
+				q = apiresource.MustParse(scenario.quantity)
+			}
 			if got := isFractionalQuantity(q); got != scenario.wantFractional {
-				t.Errorf("isFractionalQuantity(%s) = %v, want %v", scenario.quantity, got, scenario.wantFractional)
+				t.Errorf("isFractionalQuantity(%s) = %v, want %v", q.String(), got, scenario.wantFractional)
 			}
 			q.ToDec()
 			if got := isFractionalQuantity(q); got != scenario.wantFractional {
-				t.Errorf("isFractionalQuantity(%s) with the inf.Dec backend = %v, want %v", scenario.quantity, got, scenario.wantFractional)
+				t.Errorf("isFractionalQuantity(%s) with the inf.Dec backend = %v, want %v", q.String(), got, scenario.wantFractional)
 			}
 		})
 	}
@@ -435,9 +452,17 @@ func TestIsFractionalQuantity(t *testing.T) {
 // TODO(#141166): A whole value must not be rescaled. The large-exponent case
 // should cost about as much as the integer case.
 func BenchmarkIsFractionalQuantity(b *testing.B) {
-	for _, quantity := range []string{"1", "1.5", "1e100000"} {
-		q := apiresource.MustParse(quantity)
-		b.Run(quantity, func(b *testing.B) {
+	for _, bc := range []struct {
+		name string
+		q    apiresource.Quantity
+	}{
+		{name: "1", q: apiresource.MustParse("1")},
+		{name: "1.5", q: apiresource.MustParse("1.5")},
+		// The large-exponent case is capped when parsed, so we load it directly to measure it.
+		{name: "1e100000", q: *apiresource.NewScaledQuantity(1, 100000)},
+	} {
+		q := bc.q
+		b.Run(bc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				isFractionalQuantity(q)

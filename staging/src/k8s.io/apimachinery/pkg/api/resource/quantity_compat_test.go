@@ -25,8 +25,8 @@ import (
 // TestQuantityOutOfInt32ExponentCompatibility checks that spellings a <=1.37
 // apiserver could write, with an exponent outside the int32 range, still
 // decode. Those releases wrapped the exponent around int32. ParseQuantity now
-// saturates the scale instead. A value too large keeps its digits at the
-// largest scale, and a value too small rounds away from zero to 1n or -1n.
+// saturates the scale instead. A value too large then decodes as the decimal
+// cap, and a value too small rounds away from zero to 1n or -1n.
 func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 	testCases := []struct {
 		in          string
@@ -34,21 +34,22 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 		wantFitsI64 bool
 		wantString  string
 	}{
-		{in: "1e4294967296", wantString: "10e2147483646"},
-		{in: "1e4294967297", wantString: "10e2147483646"},
-		{in: "-1e4294967296", wantString: "-10e2147483646"},
+		{in: "1e4294967296", wantString: "179769313486231570e291"},
+		{in: "1e4294967297", wantString: "179769313486231570e291"},
+		{in: "-1e4294967296", wantString: "-179769313486231570e291"},
 		{in: "1e-4294967296", wantString: "1e-9"},
-		{in: "1e8589934592", wantString: "10e2147483646"},
+		{in: "1e8589934592", wantString: "179769313486231570e291"},
 		{in: "1e-9223372036854775808", wantString: "1e-9"},
 
 		// Fraction digits move the scale off the exponent, so these are the
 		// spellings at 2147483648 that a <=1.37 apiserver could write. Fraction
-		// digits bring three of these back into range, so they keep their value.
-		// The other is tiny and rounds to 1n.
-		{in: "1.25e2147483648", wantString: "1.25e2147483648"},
-		{in: "1.5e2147483648", wantString: "150e2147483646"},
+		// digits bring three of these back into range, but they are still larger
+		// than the decimal cap, so they decode as the cap. The other is tiny and
+		// rounds to 1n.
+		{in: "1.25e2147483648", wantString: "179769313486231570e291"},
+		{in: "1.5e2147483648", wantString: "179769313486231570e291"},
 		{in: "1.25e-2147483648", wantString: "1e-9"},
-		{in: "0.5e2147483648", wantString: "50e2147483646"},
+		{in: "0.5e2147483648", wantString: "179769313486231570e291"},
 	}
 
 	for _, tc := range testCases {
@@ -78,7 +79,7 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 
 			// Re-encoding writes what String returns. ParseQuantity keeps some
 			// stored spellings as written, and writes the rest in canonical form,
-			// including every value that saturation changed.
+			// including every value that saturation or the cap changed.
 			data, err := json.Marshal(&fromJSON)
 			if err != nil {
 				t.Fatalf("json.Marshal failed: %v", err)

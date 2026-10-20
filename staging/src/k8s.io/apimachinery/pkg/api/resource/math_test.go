@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -283,9 +284,23 @@ func TestQuantityDocExamples(t *testing.T) {
 		// Parsing rounds away from zero below nano.
 		{"0.9n", "1n"},
 		{"-0.9n", "-1n"},
-		// An exponent outside the int32 range saturates at the edge of that range.
-		{"1e4294967297", "10e2147483646"}, // 1e2147483647, in canonical form
-		{"1e-4294967297", "1e-9"},
+		{"1.5n", "2n"},
+		// A decimalSI or decimalExponent value is capped in magnitude at the
+		// limit, which String writes as 179769313486231570e291.
+		{"2e308", "179769313486231570e291"},
+		{"-2e308", "-179769313486231570e291"},
+		{"2" + strings.Repeat("0", 308), "179769313486231570e291"},
+		// A decimalSI or decimalExponent value keeps at most 29 significant
+		// digits.
+		{strings.Repeat("9", 30), "1e30"},
+		// An exponent outside the int32 range saturates, and then the caps and
+		// rounding above apply.
+		{"1e2147483648", "179769313486231570e291"},
+		{"1.25e-2147483647", "1e-9"},
+		// A decimalSI value whose canonical form needs an exponent above 18 is
+		// written in exponent notation.
+		{"1000E", "1e21"},
+		{"1500E", "1500E"},
 	} {
 		q := MustParse(tc.in)
 		if got := q.String(); got != tc.want {
