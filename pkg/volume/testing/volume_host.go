@@ -60,7 +60,6 @@ type fakeVolumeHost struct {
 	pluginMgr              *VolumePluginMgr
 	mounter                mount.Interface
 	hostUtil               hostutil.HostUtils
-	nodeLabels             map[string]string
 	nodeName               string
 	subpather              subpath.Interface
 	node                   *v1.Node
@@ -208,10 +207,7 @@ func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
 }
 
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
-	if f.nodeLabels == nil {
-		f.nodeLabels = map[string]string{"test-label": "test-value"}
-	}
-	return f.nodeLabels, nil
+	return map[string]string{"test-label": "test-value"}, nil
 }
 
 func (f *fakeVolumeHost) GetNodeName() types.NodeName {
