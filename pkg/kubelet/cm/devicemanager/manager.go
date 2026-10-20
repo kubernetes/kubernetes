@@ -470,6 +470,12 @@ func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName str
 	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices)
 }
 
+// Values reported in the health_state label of metrics.DevicePluginDevices.
+const (
+	healthStateHealthy   = "healthy"
+	healthStateUnhealthy = "unhealthy"
+)
+
 // GetCapacity is expected to be called when Kubelet updates its node status.
 // The first returned variable contains the registered device plugin resource capacity.
 // The second returned variable contains the registered device plugin resource allocatable.
@@ -500,6 +506,7 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
+			metrics.DevicePluginDevices.WithLabelValues(resourceName, healthStateHealthy).Set(float64(devices.Len()))
 		}
 	}
 	for resourceName, devices := range m.unhealthyDevices {
@@ -514,6 +521,7 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 			unhealthyCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			capacityCount.Add(unhealthyCount)
 			capacity[v1.ResourceName(resourceName)] = capacityCount
+			metrics.DevicePluginDevices.WithLabelValues(resourceName, healthStateUnhealthy).Set(float64(devices.Len()))
 		}
 	}
 
@@ -521,6 +529,10 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 		delete(m.endpoints, resourceName)
 		delete(m.healthyDevices, resourceName)
 		delete(m.unhealthyDevices, resourceName)
+		// Drop the series as well, otherwise the last observed counts are
+		// reported forever for a resource that no longer exists.
+		metrics.DevicePluginDevices.DeleteLabelValues(resourceName, healthStateHealthy)
+		metrics.DevicePluginDevices.DeleteLabelValues(resourceName, healthStateUnhealthy)
 	}
 
 	m.mutex.Unlock()
