@@ -25,12 +25,14 @@ import (
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
@@ -548,8 +550,8 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		t.Fatalf("Failed to add slice to informer: %v", err)
 	}
 
-	// syncRequest should always return an error for incomplete pools,
-	// letting processNextWorkItem handle retry counting and drop logic.
+	// While retries remain, syncRequest returns an error so the request is
+	// requeued and the driver has time to publish the remaining slices.
 	err = controller.syncRequest(ctx, "test-request")
 	if err == nil {
 		t.Fatal("Expected syncRequest to return error for incomplete pool requeue, got nil")
@@ -562,18 +564,41 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		}
 	}
 
-	// Even after retries are exhausted, syncRequest still returns an error;
-	// it is processNextWorkItem that decides to drop the key.
+	// Once retries are exhausted the partial status is written, so the request
+	// reaches a terminal state and PoolIncomplete is visible to the user.
+	// A zero-delay limiter counts the retries without waiting out the backoff.
+	controller.workqueue.ShutDown()
+	controller.workqueue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 0))
 	for range maxRetries {
 		controller.workqueue.AddRateLimited("test-request")
 		key, _ := controller.workqueue.Get()
 		controller.workqueue.Done(key)
 	}
 
-	fakeClient.ClearActions()
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to still return error for incomplete pools after retries exhausted")
+	if err := controller.syncRequest(ctx, "test-request"); err != nil {
+		t.Fatalf("Expected partial status to be written after retries exhausted, got error: %v", err)
+	}
+
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, "test-request", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("Expected status to be written after retries exhausted, got nil")
+	}
+	pool := requireSinglePool(t, *updated.Status)
+	if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, prefixPoolIncomplete) {
+		t.Errorf("Expected validationError with prefix %q, got %v", prefixPoolIncomplete, pool.ValidationError)
+	}
+	if pool.TotalDevices != nil || pool.ResourceSliceCount != nil {
+		t.Errorf("Expected device counts unset for incomplete pool, got totalDevices=%v resourceSliceCount=%v", pool.TotalDevices, pool.ResourceSliceCount)
+	}
+	cond := apimeta.FindStatusCondition(updated.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete)
+	if cond == nil || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("Expected Complete=True condition, got %+v", updated.Status.Conditions)
+	}
+	if want := "Calculated status for 1 pools (1 incomplete)"; cond.Message != want {
+		t.Errorf("Condition message = %q, want %q", cond.Message, want)
 	}
 }
 
@@ -635,6 +660,14 @@ func TestSyncRequestWritesStructuralViewError(t *testing.T) {
 	}
 	if !strings.HasPrefix(*ve, prefixPartitionTypeMissing) {
 		t.Errorf("Expected validationError with prefix %q, got %q", prefixPartitionTypeMissing, *ve)
+	}
+	// A structural error is not incompleteness; the message must not say so.
+	cond := apimeta.FindStatusCondition(updated.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete)
+	if cond == nil {
+		t.Fatalf("Expected Complete condition, got %+v", updated.Status.Conditions)
+	}
+	if want := "Calculated status for 1 pools (1 with validation errors)"; cond.Message != want {
+		t.Errorf("Condition message = %q, want %q", cond.Message, want)
 	}
 }
 
@@ -883,6 +916,16 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			},
 			wantTotal: 4, wantAllocated: 1, wantAvailable: 3,
 		},
+		// The claim outlives the device: the driver republished the pool
+		// without it. Counting the claim would push the tallies past total.
+		"allocation of unpublished device is ignored": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-2", "default", driver, "pool-1", "removed-device"),
+			},
+			wantTotal: 5, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 1,
+		},
 		// AdminAccess allocations are observers and must not move any tally.
 		"adminAccess claim is not an allocation": {
 			slices: plainSlices,
@@ -913,6 +956,41 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			rules:     []*resourcev1.DeviceTaintRule{taintRule},
 			wantTotal: 4, wantAvailable: 3, wantUnavailable: 1,
 		},
+		// A taint applied after allocation does not evict (NoSchedule), so the
+		// device is both allocated and tainted. It must count only as allocated,
+		// keeping total = allocated + unavailable + available.
+		"tainted allocated device counts as allocated only": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 5, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 1,
+		},
+		"all tainted devices allocated leaves none unavailable": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoExecute),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-2", "default", driver, "pool-1", "device-1"),
+			},
+			wantTotal: 5, wantAllocated: 2, wantAvailable: 3, wantUnavailable: 0,
+		},
+		"taint rule on allocated device counts as allocated only": {
+			slices: plainSlices,
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			rules:     []*resourcev1.DeviceTaintRule{taintRule},
+			wantTotal: 4, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 0,
+		},
+		// AdminAccess is not an allocation, so a tainted device with only an
+		// AdminAccess claim stays unavailable.
+		"tainted device with adminAccess claim stays unavailable": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAdminAccessClaim("admin-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 5, wantAllocated: 0, wantAvailable: 3, wantUnavailable: 2,
+		},
 		"taint rule ignored when gate is disabled": {
 			slices:            plainSlices,
 			rules:             []*resourcev1.DeviceTaintRule{taintRule},
@@ -939,6 +1017,9 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			}
 			if got := derefInt32(pool.UnavailableDevices); got != tc.wantUnavailable {
 				t.Errorf("UnavailableDevices = %d, want %d", got, tc.wantUnavailable)
+			}
+			if sum := derefInt32(pool.AllocatedDevices) + derefInt32(pool.UnavailableDevices) + derefInt32(pool.AvailableDevices); sum != derefInt32(pool.TotalDevices) {
+				t.Errorf("allocated + unavailable + available = %d, want TotalDevices %d", sum, derefInt32(pool.TotalDevices))
 			}
 		})
 	}
@@ -1418,5 +1499,19 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 				t.Errorf("capacity {total,consumed,available} = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// Incomplete pools are retried maxRetries times before the partial status is
+// written. The total wait must give a driver time to finish publishing, yet
+// stay within the 30s completion SLO.
+func TestRateLimiterRetryWindow(t *testing.T) {
+	limiter := newRateLimiter()
+	var total time.Duration
+	for range maxRetries {
+		total += limiter.When("request")
+	}
+	if want := 15500 * time.Millisecond; total != want {
+		t.Errorf("Total backoff over %d retries = %v, want %v", maxRetries, total, want)
 	}
 }

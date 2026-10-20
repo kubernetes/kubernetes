@@ -18,6 +18,7 @@ package dra
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -60,6 +62,7 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				tCtx.Run("LimitTruncation", testLimitTruncation)
 				tCtx.Run("FilterByPoolName", testFilterByPoolName)
 				tCtx.Run("ValidationErrors", testValidationErrors)
+				tCtx.Run("IncompletePoolTerminalStatus", testIncompletePoolTerminalStatus)
 				tCtx.Run("PartitionSummary", testPartitionSummary)
 				tCtx.Run("ShareableSummary", testShareableSummary)
 				// Note: RBAC enforcement is standard Kubernetes behavior tested in
@@ -413,6 +416,59 @@ func testShareableSummary(tCtx ktesting.TContext) {
 	}
 	if len(sh.Capacity) != 1 || sh.Capacity[0].Total.Cmp(resource.MustParse("80Gi")) != 0 {
 		tCtx.Errorf("capacity = %+v, want a single memory key totaling 80Gi", sh.Capacity)
+	}
+}
+
+// testIncompletePoolTerminalStatus verifies that a pool which never receives all
+// of its slices still gets a status once the controller gives up retrying, with
+// a PoolIncomplete validationError instead of device counts.
+func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
+	startResourcePoolStatusRequestController(tCtx)
+
+	driverName := "incomplete.example.com"
+	nodeName := "incomplete-node"
+
+	// Declares two slices but only one is ever published.
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "incomplete-slice"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driverName,
+			Pool:     resourceapi.ResourcePool{Name: "incomplete-pool", ResourceSliceCount: 2, Generation: 1},
+			NodeName: &nodeName,
+			Devices:  []resourceapi.Device{{Name: "device-1"}},
+		},
+	}
+	slice = must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, slice, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Delete, tCtx.Client().ResourceV1().ResourceSlices().Get, slice.Name)
+	})
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-incomplete"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: driverName},
+	}
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Create, request, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Delete, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
+	})
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourcev1alpha3.ResourcePoolStatusRequest, error) {
+		return tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
+	}).WithTimeout(30*time.Second).Should(
+		gomega.HaveField("Status.Pools", gomega.HaveLen(1)),
+		"request with a never-completing pool should still reach a terminal status",
+	)
+
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name, metav1.GetOptions{})
+	pool := request.Status.Pools[0]
+	if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, "PoolIncomplete:") {
+		tCtx.Errorf("expected PoolIncomplete validationError, got %v", pool.ValidationError)
+	}
+	if pool.TotalDevices != nil || pool.ResourceSliceCount != nil {
+		tCtx.Errorf("expected device counts unset for incomplete pool, got totalDevices=%v resourceSliceCount=%v", pool.TotalDevices, pool.ResourceSliceCount)
+	}
+	if !apimeta.IsStatusConditionTrue(request.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete) {
+		tCtx.Errorf("expected Complete=True condition, got %+v", request.Status.Conditions)
 	}
 }
 
