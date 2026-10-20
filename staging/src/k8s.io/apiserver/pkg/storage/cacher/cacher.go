@@ -612,6 +612,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
 		bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
 	}
+	watcher.input <- watcherInput{interval: cacheInterval}
 
 	addedWatcher := false
 	func() {
@@ -656,7 +657,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	go watcher.process(ctx, cacheInterval, requiredResourceVersion)
+	go watcher.process(ctx, requiredResourceVersion)
 	return watcher, nil
 }
 
