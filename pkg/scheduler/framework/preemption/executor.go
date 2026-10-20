@@ -385,18 +385,13 @@ func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 
 	preemptorPriority := pgInfo.GetPriority()
 	nodeLister := e.fh.SnapshotSharedLister().NodeInfos()
-	pgs := e.fh.SnapshotSharedLister().PodGroups()
-	var cpgs fwk.CompositePodGroupLister
-	if e.fts.EnableCompositePodGroup {
-		cpgs = e.fh.SnapshotSharedLister().CompositePodGroups()
-	}
 	for nomNodeName := range nominatedNodes {
 		nodeInfo, err := nodeLister.Get(nomNodeName)
 		if err != nil || nodeInfo == nil {
 			continue
 		}
 		for _, p := range nodeInfo.GetPods() {
-			if getPodPriority(p.GetPod(), pgs, cpgs) < preemptorPriority && PodTerminatingByPreemption(p.GetPod()) {
+			if corev1helpers.PodPriority(p.GetPod()) < preemptorPriority && PodTerminatingByPreemption(p.GetPod()) {
 				return true
 			}
 		}

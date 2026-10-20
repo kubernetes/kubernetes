@@ -61,12 +61,7 @@ func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo f
 		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
 	}
 
-	podGroupSnapshot := m.snapshot.PodGroups()
-	var compositePodGroupSnapshot fwk.CompositePodGroupLister
-	if m.fts.EnableCompositePodGroup {
-		compositePodGroupSnapshot = m.snapshot.CompositePodGroups()
-	}
-	victims, err := getWorkloadPreemptionVictims(logger, m.snapshot, podGroupSnapshot, compositePodGroupSnapshot)
+	victims, err := getWorkloadPreemptionVictims(logger, m.snapshot)
 	if err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("failed to get victims: %w", err))
 	}
