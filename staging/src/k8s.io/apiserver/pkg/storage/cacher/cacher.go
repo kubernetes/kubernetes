@@ -607,8 +607,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(err), nil
 	}
 
-	c.setInitialEventsEndBookmarkIfRequested(cacheInterval, opts, c.watchCache.resourceVersion)
-	bookmarkAfterResourceVersion := c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
+	var bookmarkAfterResourceVersion uint64
+	if isListWatchRequest(opts) {
+		c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
+		bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
+	}
 
 	addedWatcher := false
 	func() {
@@ -1312,10 +1315,6 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 //
 // Must be called under the watchCache lock.
 func (c *Cacher) getBookmarkAfterResourceVersionLocked(parsedResourceVersion, requiredResourceVersion uint64, opts storage.ListOptions) uint64 {
-	if !isListWatchRequest(opts) {
-		return 0
-	}
-
 	switch {
 	case len(opts.ResourceVersion) == 0:
 		return requiredResourceVersion
@@ -1360,24 +1359,22 @@ func (c *Cacher) Wait(ctx context.Context) error {
 	return c.ready.wait(ctx)
 }
 
-// setInitialEventsEndBookmarkIfRequested sets initialEventsEndBookmark field in watchCacheInterval for watchlist request
-func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCacheInterval, opts storage.ListOptions, currentResourceVersion uint64) {
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks {
-		// We don't need to set the InitialEventsAnnotation for this bookmark event,
-		// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
-		initialEventsEndBookmark := &watchCacheEvent{
-			Type:            watch.Bookmark,
-			Object:          c.newFunc(),
-			ResourceVersion: currentResourceVersion,
-		}
-
-		if err := c.versioner.UpdateObject(initialEventsEndBookmark.Object, initialEventsEndBookmark.ResourceVersion); err != nil {
-			klog.Errorf("failure to set resourceVersion to %d on initialEventsEndBookmark event %+v for watchlist request and wait for bookmark trigger to send", initialEventsEndBookmark.ResourceVersion, initialEventsEndBookmark.Object)
-			initialEventsEndBookmark = nil
-		}
-
-		cacheInterval.initialEventsEndBookmark = initialEventsEndBookmark
+// setInitialEventsEndBookmark sets initialEventsEndBookmark field in watchCacheInterval for watchlist request
+func (c *Cacher) setInitialEventsEndBookmark(cacheInterval *watchCacheInterval, currentResourceVersion uint64) {
+	// We don't need to set the InitialEventsAnnotation for this bookmark event,
+	// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
+	initialEventsEndBookmark := &watchCacheEvent{
+		Type:            watch.Bookmark,
+		Object:          c.newFunc(),
+		ResourceVersion: currentResourceVersion,
 	}
+
+	if err := c.versioner.UpdateObject(initialEventsEndBookmark.Object, initialEventsEndBookmark.ResourceVersion); err != nil {
+		klog.Errorf("failure to set resourceVersion to %d on initialEventsEndBookmark event %+v for watchlist request and wait for bookmark trigger to send", initialEventsEndBookmark.ResourceVersion, initialEventsEndBookmark.Object)
+		initialEventsEndBookmark = nil
+	}
+
+	cacheInterval.initialEventsEndBookmark = initialEventsEndBookmark
 }
 
 func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {

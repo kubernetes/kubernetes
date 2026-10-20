@@ -2884,26 +2884,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 	}
 }
 
-// TestGetBookmarkAfterResourceVersionLockedFunc test the following cases:
-//
-// +-----------------+---------------------+-----------------------+
-// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-// +=================+=====================+=======================+
-// | Unset           | true/false          | nil/true/false        |
-// | 0               | true/false          | nil/true/false        |
-// | 95             | true/false          | nil/true/false         |
-// +-----------------+---------------------+-----------------------+
-// where:
-// - false indicates the value of the param was set to "false" by a test case
-// - true  indicates the value of the param was set to "true" by a test case
-func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
-	listOptions := func(allowBookmarks bool, sendInitialEvents *bool, rv string) storage.ListOptions {
+func TestGetBookmarkAfterResourceVersionLocked(t *testing.T) {
+	listOptions := func(rv string) storage.ListOptions {
 		p := storage.Everything
-		p.AllowWatchBookmarks = allowBookmarks
 
 		opts := storage.ListOptions{}
 		opts.Predicate = p
-		opts.SendInitialEvents = sendInitialEvents
 		opts.ResourceVersion = rv
 		return opts
 	}
@@ -2916,146 +2902,26 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 
 		expectedBookmarkResourceVersion int
 	}{
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | Unset           | true/false          | nil/true/false        |
-		// +-----------------+---------------------+-----------------------+
 		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), ""),
+			name:                            "RV=unset",
+			opts:                            listOptions(""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 100,
 		},
 		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | 0               | true/false          | nil/true/false        |
-		// +-----------------+---------------------+-----------------------+
-		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), "0"),
+			name:                            "RV=0",
+			opts:                            listOptions("0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 99,
 		},
 		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | 95             | true/false          | nil/true/false         |
-		// +-----------------+---------------------+-----------------------+
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), "95"),
+			name:                            "RV=95",
+			opts:                            listOptions("95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 95,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, "95"),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
 		},
 	}
 	for _, scenario := range scenarios {
