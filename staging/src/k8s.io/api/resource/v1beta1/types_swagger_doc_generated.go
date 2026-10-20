@@ -548,15 +548,28 @@ var map_ResourceSliceSpec = map[string]string{
 	"nodeName":               "nodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 	"nodeSelector":           "nodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"allNodes":               "allNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"devices":                "devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+	"devices":                "devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
 	"perDeviceNodeSelection": "perDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"sharedCounters":         "sharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+	"sharedCounters":         "sharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
 	"partitionTypeAttribute": "partitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
 	"skipNodeOperations":     "skipNodeOperations lists node-local resource operations (gRPC calls) that will be skipped for the devices in this slice when determining whether operations are necessary on the node. If all allocated devices for a driver in a claim skip an operation, that gRPC call will be skipped. Valid values are:\n\n- \"NodePrepareResources\": NodePrepareResources gRPC calls are skipped. This\n  value cannot be specified unless \"NodeUnprepareResources\" is also listed\n  (or \"*\" is specified).\n- \"NodeUnprepareResources\": NodeUnprepareResources gRPC calls are skipped. - \"*\": All node-local resource operations are skipped.\n\nOther values may be added in the future. The kubelet must ignore unknown values.",
+	"sharingAffinity":        "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {
 	return map_ResourceSliceSpec
+}
+
+var map_SharingAffinityExtractor = map[string]string{
+	"":           "SharingAffinityExtractor declares one sharing-affinity key and its extraction logic. Every extractor applies to every device in the pool, and a request must obtain a non-empty value for every declared key. Multiple configurations contributing to the same key must produce the same value.",
+	"name":       "Name identifies the sharing-affinity key. It must be lowercase, conform to the DNS label (RFC 1123) requirements, and be unique within the pool.",
+	"apiGroup":   "APIGroup matches the group portion of the configuration's apiVersion, ignoring its version. It must be \"*\" or a lowercase value that conforms to the DNS subdomain (RFC 1123) requirements. The wildcard also matches configurations with absent or group-less apiVersion.",
+	"kind":       "Kind matches the configuration's kind exactly, including case. It must be a valid kind name of at most 63 characters or \"*\". The wildcard also matches an absent kind.",
+	"expression": "Expression is evaluated with the matched opaque configuration bound as parameters. It must return a string; an empty string contributes no value. Its length is limited to SharingAffinityCELExpressionMaxLength bytes. The combined estimated cost of the slice's expressions and the combined runtime cost of a pool/request extraction are limited to SharingAffinityCELMaxCost.",
+}
+
+func (SharingAffinityExtractor) SwaggerDoc() map[string]string {
+	return map_SharingAffinityExtractor
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

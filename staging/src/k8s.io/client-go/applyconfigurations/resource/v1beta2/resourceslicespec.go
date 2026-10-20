@@ -65,7 +65,7 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	Devices []DeviceApplyConfiguration `json:"devices,omitempty"`
 	// perDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
@@ -79,7 +79,7 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	//
 	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
@@ -105,6 +105,17 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// Other values may be added in the future. The kubelet must ignore unknown
 	// values.
 	SkipNodeOperations []resourcev1beta2.SkipNodeOperation `json:"skipNodeOperations,omitempty"`
+	// SharingAffinity carries CEL extractors for a metadata-only
+	// ResourceSlice. Each extractor evaluates against an in-scope request
+	// configuration object from the claim to derive an affinity value the
+	// scheduler uses to keep allocations on the same device compatible.
+	//
+	// A metadata-only ResourceSlice carries SharingAffinity instead of
+	// Devices or SharedCounters. At most one of Devices, SharedCounters, and
+	// SharingAffinity may be set in a ResourceSlice.
+	//
+	// The maximum number of extractors is 8.
+	SharingAffinity []SharingAffinityExtractorApplyConfiguration `json:"sharingAffinity,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -201,6 +212,19 @@ func (b *ResourceSliceSpecApplyConfiguration) WithPartitionTypeAttribute(value r
 func (b *ResourceSliceSpecApplyConfiguration) WithSkipNodeOperations(values ...resourcev1beta2.SkipNodeOperation) *ResourceSliceSpecApplyConfiguration {
 	for i := range values {
 		b.SkipNodeOperations = append(b.SkipNodeOperations, values[i])
+	}
+	return b
+}
+
+// WithSharingAffinity adds the given value to the SharingAffinity field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SharingAffinity field.
+func (b *ResourceSliceSpecApplyConfiguration) WithSharingAffinity(values ...*SharingAffinityExtractorApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSharingAffinity")
+		}
+		b.SharingAffinity = append(b.SharingAffinity, *values[i])
 	}
 	return b
 }

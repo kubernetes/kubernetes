@@ -125,6 +125,11 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 		*out = make([]resourcev1.SkipNodeOperation, len(*in))
 		copy(*out, *in)
 	}
+	if in.SharingAffinity != nil {
+		in, out := &in.SharingAffinity, &out.SharingAffinity
+		*out = make([]resourcev1.SharingAffinityExtractor, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
