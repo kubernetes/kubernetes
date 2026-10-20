@@ -140,7 +140,7 @@ func TestReactors(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if diff := cmp.Diff(getJob(name, namespace), obj); diff != "" {
+				if diff := cmp.Diff(getJob(namespace, name), obj); diff != "" {
 					return errors.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
