@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/ktesting"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -46,17 +49,19 @@ import (
 )
 
 func TestResourcePoolStatusRequest(t *testing.T) {
+	enabled := map[featuregate.Feature]bool{
+		features.DRAResourcePoolStatus:       true,
+		features.DRAPartitionableDevices:     true,
+		features.DRAPartitionableDevicesType: true,
+		features.DRAConsumableCapacity:       true,
+	}
 	for name, tc := range map[string]struct {
 		features map[featuregate.Feature]bool
+		flags    []string
 		f        func(tCtx ktesting.TContext)
 	}{
 		"feature-enabled": {
-			features: map[featuregate.Feature]bool{
-				features.DRAResourcePoolStatus:       true,
-				features.DRAPartitionableDevices:     true,
-				features.DRAPartitionableDevicesType: true,
-				features.DRAConsumableCapacity:       true,
-			},
+			features: enabled,
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("ProcessRequest", testProcessResourcePoolStatusRequest)
 				tCtx.Run("OneTimeProcessing", testOneTimeProcessing)
@@ -66,8 +71,34 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				tCtx.Run("IncompletePoolTerminalStatus", testIncompletePoolTerminalStatus)
 				tCtx.Run("PartitionSummary", testPartitionSummary)
 				tCtx.Run("ShareableSummary", testShareableSummary)
-				// Note: RBAC enforcement is standard Kubernetes behavior tested in
-				// test/integration/auth/. The test API server uses AlwaysAllow authorizer.
+				tCtx.Run("AdminAccessNotCounted", testAdminAccessNotCounted)
+			},
+		},
+		// DRAPartitionableDevicesType depends on DRAResourcePoolStatus, so both are off.
+		"feature-disabled": {
+			features: map[featuregate.Feature]bool{
+				features.DRAResourcePoolStatus:       false,
+				features.DRAPartitionableDevicesType: false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("APIServedForCleanup", testFeatureDisabled)
+			},
+		},
+		"partition-type-disabled": {
+			features: map[featuregate.Feature]bool{
+				features.DRAResourcePoolStatus:       true,
+				features.DRAPartitionableDevices:     true,
+				features.DRAPartitionableDevicesType: false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("PartitionTypeFieldsDropped", testPartitionTypeFieldsDropped)
+			},
+		},
+		"rbac": {
+			features: enabled,
+			flags:    []string{"--authorization-mode=RBAC"},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("StatusRequiresControllerPermissions", testStatusRBAC)
 			},
 		},
 	} {
@@ -82,6 +113,7 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 			apiServerFlags := framework.DefaultTestServerFlags()
 			// Enable the v1alpha3 API for ResourcePoolStatusRequest
 			apiServerFlags = append(apiServerFlags, "--runtime-config=resource.k8s.io/v1alpha3=true")
+			apiServerFlags = append(apiServerFlags, tc.flags...)
 			server := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, apiServerFlags, etcdOptions)
 			tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 				tCtx.Log("Stopping the apiserver...")
@@ -417,6 +449,95 @@ func testShareableSummary(tCtx ktesting.TContext) {
 	}
 	if len(sh.Capacity) != 1 || sh.Capacity[0].Total.Cmp(resource.MustParse("80Gi")) != 0 {
 		tCtx.Errorf("capacity = %+v, want a single memory key totaling 80Gi", sh.Capacity)
+	}
+}
+
+// testAdminAccessNotCounted checks that AdminAccess allocations are invisible
+// in every part of the pool status, while a regular allocation in the same
+// pool is counted.
+func testAdminAccessNotCounted(tCtx ktesting.TContext) {
+	startResourcePoolStatusRequestController(tCtx)
+
+	driverName := "adminaccess.example.com"
+	poolName := "adminaccess-pool"
+	nodeName := "adminaccess-node"
+
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "adminaccess-slice"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driverName,
+			Pool:     resourceapi.ResourcePool{Name: poolName, ResourceSliceCount: 1, Generation: 1},
+			NodeName: &nodeName,
+			Devices: []resourceapi.Device{
+				{
+					Name:                     "shared-0",
+					AllowMultipleAllocations: new(true),
+					Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("40Gi")}},
+				},
+				{Name: "plain-0"},
+				{Name: "plain-1"},
+			},
+		},
+	}
+	slice = must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, slice, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Delete, tCtx.Client().ResourceV1().ResourceSlices().Get, slice.Name)
+	})
+
+	allocate := func(namespace, name string, adminAccess bool, devices ...string) {
+		c := claim.DeepCopy()
+		c.Name = name
+		c.Namespace = namespace
+		if adminAccess {
+			c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+		}
+		c = must(tCtx, tCtx.Client().ResourceV1().ResourceClaims(namespace).Create, c, metav1.CreateOptions{})
+		c.Status.Allocation = &resourceapi.AllocationResult{}
+		for _, device := range devices {
+			result := resourceapi.DeviceRequestAllocationResult{
+				Request: c.Spec.Devices.Requests[0].Name,
+				Driver:  driverName,
+				Pool:    poolName,
+				Device:  device,
+			}
+			if adminAccess {
+				result.AdminAccess = new(true)
+			}
+			c.Status.Allocation.Devices.Results = append(c.Status.Allocation.Devices.Results, result)
+		}
+		must(tCtx, tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus, c, metav1.UpdateOptions{})
+	}
+	adminNS := createTestNamespace(tCtx, map[string]string{"resource.kubernetes.io/admin-access": "true"})
+	allocate(adminNS, "admin-claim", true, "shared-0", "plain-0")
+	allocate(createTestNamespace(tCtx, nil), "user-claim", false, "plain-1")
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-adminaccess"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: driverName},
+	}
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Create, request, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Delete, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
+	})
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourcev1alpha3.ResourcePoolStatusRequest, error) {
+		return tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
+	}).WithTimeout(30*time.Second).Should(
+		gomega.HaveField("Status.Pools", gomega.HaveLen(1)),
+		"pool with AdminAccess allocations should be processed",
+	)
+
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name, metav1.GetOptions{})
+	pool := request.Status.Pools[0]
+	if got := []int32{ptr.Deref(pool.TotalDevices, -1), ptr.Deref(pool.AllocatedDevices, -1), ptr.Deref(pool.AvailableDevices, -1)}; got[0] != 3 || got[1] != 1 || got[2] != 2 {
+		tCtx.Errorf("total/allocated/available = %v, want [3 1 2]: only user-claim allocates", got)
+	}
+	sh := pool.ShareableSummary
+	if sh == nil {
+		tCtx.Fatalf("expected a shareableSummary, got nil (pool %+v)", pool)
+	}
+	if ptr.Deref(sh.FullyAvailableDevices, 0) != 1 || ptr.Deref(sh.PartiallyAvailableDevices, 0) != 0 {
+		tCtx.Errorf("full/partial shareable devices = %d/%d, want 1/0", ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0))
 	}
 }
 
@@ -793,4 +914,151 @@ func testValidationErrors(tCtx ktesting.TContext) {
 	if !apierrors.IsInvalid(err) {
 		tCtx.Errorf("expected Invalid error for invalid driver name, got: %v", err)
 	}
+}
+
+const rpsrControllerRole = "system:controller:resourcepoolstatusrequest-controller"
+
+// testFeatureDisabled pins the apiserver behavior with DRAResourcePoolStatus
+// off. The storage stays registered while resource.k8s.io/v1alpha3 is enabled,
+// so leftover requests can still be listed and deleted, but the gated field is
+// dropped and the controller's ClusterRole is not installed.
+func testFeatureDisabled(tCtx ktesting.TContext) {
+	requests := tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests()
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-gate-off"},
+		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
+			Driver:                        "gate-off.example.com",
+			DefaultPartitionTypeAttribute: new("gpu.example.com/profile"),
+		},
+	}
+	request = must(tCtx, requests.Create, request, metav1.CreateOptions{})
+	if request.Spec.DefaultPartitionTypeAttribute != nil {
+		tCtx.Errorf("expected defaultPartitionTypeAttribute to be dropped, got %q", *request.Spec.DefaultPartitionTypeAttribute)
+	}
+
+	list, err := requests.List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "list requests with the gate off")
+	if len(list.Items) != 1 {
+		tCtx.Errorf("expected 1 request in the list, got %d", len(list.Items))
+	}
+	deleteAndWait(tCtx, requests.Delete, requests.Get, request.Name)
+
+	_, err = tCtx.Client().RbacV1().ClusterRoles().Get(tCtx, rpsrControllerRole, metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		tCtx.Errorf("expected ClusterRole %s to be absent with the gate off, got err=%v", rpsrControllerRole, err)
+	}
+}
+
+// testPartitionTypeFieldsDropped covers DRAResourcePoolStatus on with
+// DRAPartitionableDevicesType off: both partition type fields are dropped on
+// create.
+func testPartitionTypeFieldsDropped(tCtx ktesting.TContext) {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "partition-type-off-slice"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:                 "partition-type-off.example.com",
+			Pool:                   resourceapi.ResourcePool{Name: "pool-1", ResourceSliceCount: 1, Generation: 1},
+			NodeName:               new("node-1"),
+			PartitionTypeAttribute: ptr.To[resourceapi.FullyQualifiedName]("gpu.example.com/profile"),
+			Devices:                []resourceapi.Device{{Name: "device-1"}},
+		},
+	}
+	slice = must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, slice, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Delete, tCtx.Client().ResourceV1().ResourceSlices().Get, slice.Name)
+	})
+	if slice.Spec.PartitionTypeAttribute != nil {
+		tCtx.Errorf("expected ResourceSlice partitionTypeAttribute to be dropped, got %q", *slice.Spec.PartitionTypeAttribute)
+	}
+
+	requests := tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests()
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-partition-type-off"},
+		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
+			Driver:                        "partition-type-off.example.com",
+			DefaultPartitionTypeAttribute: new("gpu.example.com/profile"),
+		},
+	}
+	request = must(tCtx, requests.Create, request, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, requests.Delete, requests.Get, request.Name)
+	})
+	if request.Spec.DefaultPartitionTypeAttribute != nil {
+		tCtx.Errorf("expected defaultPartitionTypeAttribute to be dropped, got %q", *request.Spec.DefaultPartitionTypeAttribute)
+	}
+}
+
+// testStatusRBAC checks that only the controller's bootstrap role can write
+// the status: a user allowed to create and update requests cannot use the
+// status subresource.
+func testStatusRBAC(tCtx ktesting.TContext) {
+	admin := tCtx.Client()
+	must(tCtx, admin.RbacV1().ClusterRoles().Get, rpsrControllerRole, metav1.GetOptions{})
+
+	const user = "rpsr-user"
+	role := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "rpsr-user"},
+		Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{resourcev1alpha3.GroupName},
+			Resources: []string{"resourcepoolstatusrequests"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}},
+	}
+	must(tCtx, admin.RbacV1().ClusterRoles().Create, role, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(admin.RbacV1().ClusterRoles().Delete(tCtx, role.Name, metav1.DeleteOptions{}))
+	})
+	binding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "rpsr-user"},
+		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: role.Name},
+		Subjects:   []rbacv1.Subject{{APIGroup: rbacv1.GroupName, Kind: rbacv1.UserKind, Name: user}},
+	}
+	must(tCtx, admin.RbacV1().ClusterRoleBindings().Create, binding, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(admin.RbacV1().ClusterRoleBindings().Delete(tCtx, binding.Name, metav1.DeleteOptions{}))
+	})
+
+	userClient := impersonatingClient(tCtx, user)
+	controllerClient := impersonatingClient(tCtx, "system:serviceaccount:kube-system:resourcepoolstatusrequest-controller")
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-rbac"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: "rbac.example.com"},
+	}
+	// RBAC changes take effect asynchronously.
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
+		var err error
+		request, err = userClient.ResourceV1alpha3().ResourcePoolStatusRequests().Create(tCtx, request, metav1.CreateOptions{})
+		return err
+	}).WithTimeout(30 * time.Second).Should(gomega.Succeed())
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, admin.ResourceV1alpha3().ResourcePoolStatusRequests().Delete, admin.ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
+	})
+
+	withStatus := request.DeepCopy()
+	withStatus.Status = &resourcev1alpha3.ResourcePoolStatusRequestStatus{
+		PoolCount: ptr.To[int32](0),
+		Conditions: []metav1.Condition{{
+			Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionComplete,
+			Status:             metav1.ConditionTrue,
+			Reason:             "CalculationComplete",
+			Message:            "Calculated status for 0 pools",
+			LastTransitionTime: metav1.Now(),
+		}},
+	}
+	_, err := userClient.ResourceV1alpha3().ResourcePoolStatusRequests().UpdateStatus(tCtx, withStatus, metav1.UpdateOptions{})
+	if !apierrors.IsForbidden(err) {
+		tCtx.Errorf("expected user UpdateStatus to be forbidden, got %v", err)
+	}
+
+	// The controller's bootstrap role grants the status subresource.
+	if _, err := controllerClient.ResourceV1alpha3().ResourcePoolStatusRequests().UpdateStatus(tCtx, withStatus, metav1.UpdateOptions{}); err != nil {
+		tCtx.Errorf("expected controller UpdateStatus to succeed, got %v", err)
+	}
+}
+
+func impersonatingClient(tCtx ktesting.TContext, user string) kubernetes.Interface {
+	config := rest.CopyConfig(tCtx.RESTConfig())
+	config.Impersonate = rest.ImpersonationConfig{UserName: user}
+	return kubernetes.NewForConfigOrDie(config)
 }
