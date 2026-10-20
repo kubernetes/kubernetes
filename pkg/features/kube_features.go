@@ -743,6 +743,14 @@ const (
 	// rather than executing the nft command-line binary.
 	NFTablesNetlink featuregate.Feature = "NFTablesNetlink"
 
+	// owner: @aojea
+	// kep: https://kep.k8s.io/6313
+	//
+	// Enables the defaultNetwork field in the Pod spec, which allows pods to opt
+	// out of the default pod network and run with a loopback-only network
+	// namespace.
+	NetworkIsolatedPods featuregate.Feature = "NetworkIsolatedPods"
+
 	// owner: @michaelasp
 	//
 	// Gate for Node Lifecycle Controller to ensure that the Lease object actually is stale before marking a node unhealthy.
@@ -1786,6 +1794,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	NetworkIsolatedPods: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	NodeControllerLeaseCircuitBreaker: {
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2627,6 +2639,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MutableSchedulingDirectivesForSuspendedJobs: {},
 
 	NFTablesNetlink: {},
+
+	NetworkIsolatedPods: {NodeDeclaredFeatures},
 
 	NodeControllerLeaseCircuitBreaker: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 

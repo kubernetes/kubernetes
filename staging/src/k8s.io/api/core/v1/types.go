@@ -4112,6 +4112,34 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodDefaultNetwork describes the pod's default network.
+// +enum
+// +k8s:alpha(since: "1.38")=+k8s:enum
+type PodDefaultNetwork string
+
+const (
+	// PodDefaultNetworkPod gives the pod its own network namespace and
+	// attaches it to the default pod network (the network that Kubernetes
+	// connects every pod to unless the pod opts out). The container runtime
+	// performs its configured network plumbing and the pod is assigned pod
+	// IPs. This is the default and matches the historical behavior of
+	// Kubernetes.
+	PodDefaultNetworkPod PodDefaultNetwork = "Pod"
+
+	// PodDefaultNetworkHost runs the pod in the host's network namespace.
+	// It is equivalent to setting hostNetwork: true; the two fields are
+	// kept in sync by the API server.
+	PodDefaultNetworkHost PodDefaultNetwork = "Host"
+
+	// PodDefaultNetworkNone gives the pod an isolated network namespace
+	// (on Linux, one containing only the loopback interface) and does not
+	// attach it to the default pod network. The pod's podIPs are left
+	// unset. The pod is never selected into Services and, by default,
+	// receives no cluster DNS configuration or service environment
+	// variables.
+	PodDefaultNetworkNone PodDefaultNetwork = "None"
+)
+
 const (
 	// DefaultTerminationGracePeriodSeconds indicates the default duration in
 	// seconds a pod needs to terminate gracefully.
@@ -4564,11 +4592,14 @@ type PodSpec struct {
 	// +k8s:alpha(since: "1.38")=+k8s:maximum=2147483647
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// dnsPolicy sets the DNS policy for the pod.
-	// Defaults to "ClusterFirst".
+	// Defaults to "ClusterFirst", or to "None" when defaultNetwork is "None".
 	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
+	// 'None' requires dnsConfig with at least one nameserver, except when
+	// defaultNetwork is "None", where it may be left out to get an empty
+	// resolver configuration.
 	// +optional
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// nodeSelector is a selector which must be true for the pod to fit on a node.
@@ -4603,6 +4634,8 @@ type PodSpec struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// Equivalent to defaultNetwork: "Host"; the two fields are kept in sync
+	// by the API server.
 	// +optional
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// hostPID uses the host's pid namespace.
@@ -4698,7 +4731,9 @@ type PodSpec struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// enableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
-	// Optional: Defaults to true.
+	// Optional: Defaults to true, or to false when defaultNetwork is "None".
+	// For pods with defaultNetwork "None", false also leaves out the
+	// KUBERNETES_* variables of the kubernetes service.
 	// +optional
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty" protobuf:"varint,30,opt,name=enableServiceLinks"`
 	// preemptionPolicy is the Policy for preempting pods with lower priority.
@@ -4880,6 +4915,27 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// defaultNetwork selects the pod's default network.
+	// "Pod" gives the pod its own network namespace attached to the default
+	// pod network, "Host" runs the pod in the host network namespace
+	// (equivalent to hostNetwork: true), and "None" gives the pod an
+	// isolated network namespace with only a loopback interface, not
+	// attached to the default pod network and with no automatic network
+	// plumbing.
+	// When unset, hostNetwork selects between "Pod" and "Host". Setting
+	// "Host" sets hostNetwork to true; when one of the two fields changes on
+	// a workload template the other is updated to match. "None" may not be
+	// combined with hostNetwork: true.
+	// When "None" is selected, dnsPolicy defaults to "None" and
+	// enableServiceLinks defaults to false (both may be overridden), and
+	// features that require a pod IP (hostPort, and httpGet, tcpSocket and
+	// grpc probes and lifecycle handlers) are forbidden.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	// +k8s:optional
+	DefaultNetwork *PodDefaultNetwork `json:"defaultNetwork,omitempty" protobuf:"bytes,45,opt,name=defaultNetwork,casttype=PodDefaultNetwork"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
