@@ -278,6 +278,11 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
+		notFoundOnDeleteVictim = st.MakePod().Name("not-found-on-delete-victim").UID("victim1").
+					Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
+					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+					Obj()
+
 		failVictim = st.MakePod().Name("fail-victim").UID("victim1").
 				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -457,7 +462,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedStatus: nil,
 		},
 		{
-			name: "one victim, but victim is already deleted",
+			name: "one victim, but victim is already deleted when patching status",
 
 			candidate: newCandidate(&extenderv1.Victims{
 				Pods: []*v1.Pod{
@@ -467,6 +472,22 @@ func TestPrepareCandidate(t *testing.T) {
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
 			nodeNames:             []string{node1Name},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
+		},
+		{
+			name: "one victim, but victim is already deleted when deleting pod",
+
+			candidate: newCandidate(&extenderv1.Victims{
+				Pods: []*v1.Pod{
+					notFoundOnDeleteVictim,
+				},
+			}, node1Name, nil, node1Name),
+			preemptor:             preemptor,
+			testPods:              []*v1.Pod{},
+			nodeNames:             []string{node1Name},
+			expectedDeletedPod:    []string{},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
@@ -755,7 +776,7 @@ func TestPrepareCandidate(t *testing.T) {
 							return true, nil, errDeletePodFailed
 						}
 						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if name == "not-found-victim" {
+						if name == "not-found-victim" || name == "not-found-on-delete-victim" {
 							// Simulate a not-found error.
 							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), name)
 						}
