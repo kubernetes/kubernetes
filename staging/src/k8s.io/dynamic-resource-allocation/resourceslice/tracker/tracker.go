@@ -405,7 +405,8 @@ func (t *Tracker) resourceSliceAdd(ctx context.Context) func(*resourceapi.Resour
 	logger := klog.FromContext(ctx)
 	return func(slice *resourceapi.ResourceSlice) {
 		if loggerV := logger.V(6); loggerV.Enabled() {
-			loggerV.Info("ResourceSlice added", "slice", klog.Format(slice))
+			// Slices may contain CEL expressions and opaque config; log identity only.
+			loggerV.Info("ResourceSlice added", "slice", klog.KObj(slice), "resourceVersion", slice.ResourceVersion)
 		} else {
 			logger.V(5).Info("ResourceSlice added", "slice", klog.KObj(slice))
 		}
@@ -419,7 +420,8 @@ func (t *Tracker) resourceSliceUpdate(ctx context.Context) func(_, _ *resourceap
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			// While debugging, one needs a full dump of the objects for context *and*
 			// a diff because otherwise small changes would be hard to spot.
-			loggerV.Info("ResourceSlice updated", "diff", diff.Diff(oldSlice, newSlice), "slice", klog.Format(newSlice))
+			// Identity only: slices may contain CEL expressions and opaque config.
+			loggerV.Info("ResourceSlice updated", "slice", klog.KObj(newSlice), "oldResourceVersion", oldSlice.ResourceVersion, "resourceVersion", newSlice.ResourceVersion)
 		} else {
 			logger.V(5).Info("ResourceSlice updated", "slice", klog.KObj(newSlice))
 		}
@@ -565,7 +567,8 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 
 	if loggerV := logger.V(6); loggerV.Enabled() {
-		loggerV.Info("ResourceSlice synced", "diff", diff.Diff(oldPatchedObj, patchedSlice))
+		// A full diff would disclose CEL expressions and opaque config.
+		loggerV.Info("ResourceSlice synced", "slice", klog.KObj(patchedSlice), "resourceVersion", patchedSlice.ResourceVersion)
 	} else {
 		logger.V(5).Info("ResourceSlice synced")
 	}

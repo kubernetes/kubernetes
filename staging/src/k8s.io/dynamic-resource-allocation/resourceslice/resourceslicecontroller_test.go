@@ -2580,6 +2580,560 @@ func deepCopyDevices(devices []resourceapi.Device) []resourceapi.Device {
 	return out
 }
 
+// Use synchronous syncPool calls so negative assertions have an
+// exact completion barrier, rather than a quiet-period timeout.
+func TestSharingAffinityPublisher(t *testing.T) {
+	t.Run("deepcopy-isolation", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			entries []resourceapi.SharingAffinityExtractor
+		}{
+			{"nil", nil},
+			{"empty", []resourceapi.SharingAffinityExtractor{}},
+			{"populated", []resourceapi.SharingAffinityExtractor{sharingAffinityEntry("subnet", `"blue"`)}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				source := Slice{SharingAffinity: tc.entries}
+				copied := source.DeepCopy()
+				if (copied.SharingAffinity == nil) != (tc.entries == nil) {
+					t.Fatal("deepcopy changed nil/empty representation")
+				}
+				want := append([]resourceapi.SharingAffinityExtractor(nil), tc.entries...)
+				if len(source.SharingAffinity) > 0 {
+					source.SharingAffinity[0].Name = "changed"
+					source.SharingAffinity[0].Expression = `"changed"`
+				}
+				source.SharingAffinity = append(source.SharingAffinity, sharingAffinityEntry("extra", `"x"`))
+				if len(copied.SharingAffinity) != len(want) {
+					t.Fatalf("copy length changed: %d, want %d", len(copied.SharingAffinity), len(want))
+				}
+				for i := range want {
+					if copied.SharingAffinity[i] != want[i] {
+						t.Errorf("copy aliases input: got %#v, want %#v", copied.SharingAffinity[i], want[i])
+					}
+				}
+			})
+		}
+	})
+	for _, useUpdate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("caller-mutation-after-update=%t", useUpdate), func(t *testing.T) {
+			pool := sharingAffinityPublisherPool()
+			resources := &DriverResources{Pools: map[string]Pool{"pool": pool}}
+			h := newSharingAffinityHarness(t, resources, nil, "", false)
+			if useUpdate {
+				h.ctrl.Update(resources)
+			}
+			pool.Slices[0].SharingAffinity[0].Name = "changed"
+			pool.Slices[0].SharingAffinity[0].Expression = `"changed"`
+			pool.Slices[0].SharingAffinity = append(pool.Slices[0].SharingAffinity, sharingAffinityEntry("extra", `"x"`))
+			delete(resources.Pools, "pool")
+			h.sync(t)
+			h.noErrors(t)
+			h.expectPool(t, sharingAffinityPublisherPool(), 1)
+		})
+	}
+	for _, tc := range []struct {
+		name       string
+		changes    int
+		wantStats  Stats
+		generation int64
+	}{
+		{"equal-input-no-churn", 0, Stats{}, 7},
+		{"update-preserves-fields", 1, Stats{NumUpdates: 1}, 7},
+		{"declaration-change-two-slices-bumps-generation", 2, Stats{NumUpdates: 4}, 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pool := sharingAffinityPublisherPool()
+			old := sharingAffinityStoredSlices(pool, 7)
+			for i := 0; i < tc.changes; i++ {
+				pool.Slices[i].SharingAffinity[0].Expression = `"red"`
+			}
+			h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, "", false)
+			h.sync(t)
+			h.noErrors(t)
+			if got := h.ctrl.GetStats(); got != tc.wantStats {
+				t.Errorf("stats = %+v, want %+v", got, tc.wantStats)
+			}
+			h.expectPool(t, pool, tc.generation)
+			for i, stored := range h.list(t) {
+				if stored.UID != old[i].UID || stored.Labels["preserved"] != "yes" {
+					t.Errorf("update replaced object or lost unrelated metadata: %s", stored.Name)
+				}
+				if tc.changes == 1 && i != 0 && stored.ResourceVersion != old[i].ResourceVersion {
+					t.Errorf("unchanged sibling %s was updated", stored.Name)
+				}
+			}
+			h.client.ClearActions()
+			stats := h.ctrl.GetStats()
+			h.sync(t)
+			if got := h.ctrl.GetStats(); got != stats {
+				t.Errorf("equal-input resync churned: %+v -> %+v", stats, got)
+			}
+			h.noWrites(t)
+		})
+	}
+	t.Run("create-multi-slice", func(t *testing.T) {
+		pool := sharingAffinityPublisherPool()
+		h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, nil, "", false)
+		h.sync(t)
+		h.noErrors(t)
+		h.expectPool(t, pool, 1)
+		if got := h.ctrl.GetStats(); got != (Stats{NumCreates: 4}) {
+			t.Errorf("stats = %+v, want four creates", got)
+		}
+	})
+	t.Run("no-affinity-compat", func(t *testing.T) {
+		pool := sharingAffinityPublisherPool()
+		pool.Slices = pool.Slices[2:]
+		h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, nil, "", false)
+		h.sync(t)
+		h.noErrors(t)
+		h.expectPool(t, pool, 1)
+		h.client.ClearActions()
+		h.sync(t)
+		h.noWrites(t)
+	})
+	t.Run("nil-empty-no-churn", func(t *testing.T) {
+		for _, emptyDesired := range []bool{false, true} {
+			pool := sharingAffinityPool(sharingAffinityEntry("subnet", `"blue"`))
+			pool.Slices[0].SharingAffinity = nil
+			old := sharingAffinityStoredSlices(pool, 1)
+			if emptyDesired {
+				pool.Slices[0].SharingAffinity = []resourceapi.SharingAffinityExtractor{}
+			} else {
+				old[0].Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{}
+			}
+			h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, "", false)
+			h.sync(t)
+			h.noErrors(t)
+			h.noWrites(t)
+		}
+	})
+	for _, verb := range []string{"create", "update", "preserved"} {
+		t.Run("dropped-on-"+verb, func(t *testing.T) {
+			pool := sharingAffinityPool(sharingAffinityEntry("subnet", `"blue"`))
+			var old []*resourceapi.ResourceSlice
+			if verb != "create" {
+				old = sharingAffinityStoredSlices(pool, 1)
+				pool.Generation = 2
+				if verb == "update" {
+					old[0].Spec.SharingAffinity = nil
+				}
+			}
+			h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, "", false)
+			if verb != "preserved" {
+				// Modify only the server result, never the desired object used
+				// by sliceStored's comparison.
+				h.client.PrependReactor(verb, "resourceslices", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					var actual *resourceapi.ResourceSlice
+					// CreateAction and UpdateAction have the same methods, so
+					// a type switch would also treat updates as creates.
+					switch action.GetVerb() {
+					case "create":
+						actual = action.(k8stesting.CreateAction).GetObject().(*resourceapi.ResourceSlice).DeepCopy()
+						actual.Name = actual.GenerateName + "0"
+						actual.ResourceVersion = "1"
+					case "update":
+						actual = action.(k8stesting.UpdateAction).GetObject().(*resourceapi.ResourceSlice).DeepCopy()
+						actual.ResourceVersion = "11"
+					default:
+						t.Fatalf("unexpected action %T", action)
+					}
+					actual.Spec.SharingAffinity = nil
+					gvr := resourceapi.SchemeGroupVersion.WithResource("resourceslices")
+					var err error
+					if verb == "create" {
+						err = h.client.Tracker().Create(gvr, actual, "")
+					} else {
+						err = h.client.Tracker().Update(gvr, actual, "")
+					}
+					return true, actual, err
+				})
+			}
+			h.sync(t)
+			if verb == "preserved" {
+				h.noErrors(t)
+				h.expectPool(t, pool, 2)
+				if got := h.ctrl.GetStats(); got != (Stats{NumUpdates: 1}) {
+					t.Errorf("preservation was not exercised by an update: %+v", got)
+				}
+			} else {
+				if len(h.errs) != 1 {
+					t.Fatalf("reported errors = %v, want one dropped-field error", h.errs)
+				}
+				var dropped *DroppedFieldsError
+				if !errors.As(h.errs[0], &dropped) {
+					t.Fatalf("error = %v, want DroppedFieldsError", h.errs[0])
+				}
+				if diff := cmp.Diff([]string{"DRASharingAffinity"}, dropped.DisabledFeatures()); diff != "" {
+					t.Errorf("disabled features (-want,+got): %s", diff)
+				}
+				if len(dropped.DesiredSlice.Spec.SharingAffinity) != 1 || len(dropped.ActualSlice.Spec.SharingAffinity) != 0 {
+					t.Error("dropped error lost desired/actual declarations")
+				}
+				if dropped.PoolName != "pool" || dropped.SliceIndex != 0 {
+					t.Errorf("incorrect drop attribution: pool %q slice %d", dropped.PoolName, dropped.SliceIndex)
+				}
+				if got := h.list(t); len(got) != 1 || len(got[0].Spec.SharingAffinity) != 0 {
+					t.Fatalf("fake server did not store dropped result: %#v", got)
+				}
+			}
+			h.client.ClearActions()
+			count := len(h.errs)
+			h.sync(t)
+			h.noWrites(t)
+			if len(h.errs) != count {
+				t.Errorf("drop was reported again on unchanged resync: %v", h.errs)
+			}
+		})
+	}
+	t.Run("disabled-features-unit", func(t *testing.T) {
+		for _, tc := range []struct {
+			name             string
+			affinity, taints bool
+			want             []string
+		}{
+			{"affinity-only", true, false, []string{"DRASharingAffinity"}},
+			{"affinity-and-taints", true, true, []string{"DRADeviceTaints", "DRASharingAffinity"}},
+			{"taints-only", false, true, []string{"DRADeviceTaints"}},
+			{"empty-desired", false, false, nil},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				desired := &resourceapi.ResourceSlice{}
+				if tc.affinity {
+					desired.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{sharingAffinityEntry("subnet", `"blue"`)}
+				}
+				if tc.taints {
+					desired.Spec.Devices = []resourceapi.Device{{Name: "device", Taints: []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoSchedule}}}}
+				}
+				actual := desired.DeepCopy()
+				actual.Spec.SharingAffinity = nil
+				for i := range actual.Spec.Devices {
+					actual.Spec.Devices[i].Taints = nil
+				}
+				err := &DroppedFieldsError{DesiredSlice: desired, ActualSlice: actual}
+				if diff := cmp.Diff(tc.want, err.DisabledFeatures()); diff != "" {
+					t.Errorf("disabled features (-want,+got): %s", diff)
+				}
+			})
+		}
+	})
+	// Run every preflight failure both before first publication and
+	// over a valid pool. Prefix/suffix slices catch partial writes in either order.
+	for _, tc := range sharingAffinityValidationCases(t) {
+		if tc.wantText == "" && tc.wantExact == "" && tc.wantKind == nil {
+			continue
+		}
+		t.Run("invalid-pool-no-writes/"+tc.name, func(t *testing.T) {
+			for _, existing := range []bool{false, true} {
+				for _, scoped := range []bool{false, true} {
+					t.Run(fmt.Sprintf("existing=%t/scoped=%t", existing, scoped), func(t *testing.T) {
+						pool := *tc.pool.DeepCopy()
+						pool.AllNodes = true
+						pool.Slices = append(pool.Slices, Slice{Devices: []resourceapi.Device{{Name: "unrelated"}}})
+						var old []*resourceapi.ResourceSlice
+						if existing {
+							valid := *pool.DeepCopy()
+							for i := range valid.Slices {
+								valid.Slices[i] = Slice{Devices: []resourceapi.Device{{Name: fmt.Sprintf("old-%d", i)}}}
+							}
+							old = sharingAffinityStoredSlices(valid, 1)
+							// This would be deleted before creates without preflight.
+							obsolete := old[0].DeepCopy()
+							obsolete.Name = "obsolete-with-invalid-prefix"
+							old = append(old, obsolete)
+						}
+						scope := ""
+						if scoped {
+							scope = "pool"
+						}
+						h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, scope, true)
+						before := h.list(t)
+						h.sync(t)
+						h.noWrites(t)
+						if len(h.errs) != 1 || h.messages[0] != "pool validation failed" {
+							t.Fatalf("validation error not reported: messages %v, errors %v", h.messages, h.errs)
+						}
+						checkSharingAffinityValidationError(t, h.errs[0], tc)
+						if diff := cmp.Diff(before, h.list(t)); diff != "" {
+							t.Errorf("invalid pool changed stored objects (-before,+after): %s", diff)
+						}
+					})
+				}
+			}
+		})
+	}
+	for _, tc := range sharingAffinityRatchetCases(t) {
+		t.Run("ratchet-"+tc.name, func(t *testing.T) {
+			for _, scope := range []string{"", "pool"} {
+				t.Run("scope="+scope, func(t *testing.T) {
+					h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": tc.pool}}, tc.old, scope, false)
+					before := h.list(t)
+					h.sync(t)
+					if tc.wantText != "" || tc.wantKind != nil {
+						h.noWrites(t)
+						if len(h.errs) != 1 || h.messages[0] != "pool validation failed" {
+							t.Fatalf("expected validation failure, got %v (%v)", h.errs, h.messages)
+						}
+						checkSharingAffinityValidationError(t, h.errs[0], tc)
+						if diff := cmp.Diff(before, h.list(t)); diff != "" {
+							t.Errorf("invalid ratcheted pool changed stored state: %s", diff)
+						}
+						return
+					}
+					h.noErrors(t)
+					got := h.list(t)
+					if len(got) != len(tc.pool.Slices) {
+						t.Fatalf("stored %d slices, want %d", len(got), len(tc.pool.Slices))
+					}
+					for i := range got {
+						if diff := cmp.Diff(tc.pool.Slices[i].SharingAffinity, got[i].Spec.SharingAffinity); diff != "" {
+							t.Errorf("slice %d declarations (-want,+got): %s", i, diff)
+						}
+						if i < len(tc.old) && tc.old[i] != nil && got[i].UID != tc.old[i].UID {
+							t.Errorf("ratcheted declaration replaced instead of updated: %s", got[i].Name)
+						}
+					}
+					if h.ctrl.GetStats() == (Stats{}) {
+						t.Error("fixture did not exercise a write")
+					}
+				})
+			}
+		})
+	}
+	for _, obsoleteReason := range []string{"lower-generation", "invalid-name", "out-of-range-index"} {
+		t.Run("obsolete-generation-declaration/"+obsoleteReason, func(t *testing.T) {
+			pool := sharingAffinityPool(sharingAffinityEntry("subnet", `"`+strings.Repeat("a", 10239)+`"`), sharingAffinityEntry("zone", `"west"`))
+			old := sharingAffinityStoredSlices(pool, 2)
+			switch obsoleteReason {
+			case "lower-generation":
+				old[0].Spec.Pool.Generation = 1
+			case "invalid-name":
+				old[0].Name = "not-an-index"
+			case "out-of-range-index":
+				old[0].Name = encodeIndex(2, getIndexLength(2)) + "-driver-old"
+			}
+			h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, "", false)
+			before := h.list(t)
+			h.sync(t)
+			h.noWrites(t)
+			if len(h.errs) != 1 || !strings.Contains(h.errs[0].Error(), "expression length 10241") {
+				t.Fatalf("obsolete declaration incorrectly granted ratchet: %v", h.errs)
+			}
+			if diff := cmp.Diff(before, h.list(t)); diff != "" {
+				t.Errorf("stored objects changed: %s", diff)
+			}
+		})
+	}
+	t.Run("remove-last-declaration", func(t *testing.T) {
+		for _, removeSlice := range []bool{false, true} {
+			t.Run(fmt.Sprintf("remove-slice=%t", removeSlice), func(t *testing.T) {
+				pool := Pool{AllNodes: true, Slices: []Slice{
+					{Devices: []resourceapi.Device{{Name: "device"}}},
+					{SharingAffinity: []resourceapi.SharingAffinityExtractor{sharingAffinityEntry("subnet", `"blue"`)}},
+				}}
+				old := sharingAffinityStoredSlices(pool, 1)
+				if removeSlice {
+					pool.Slices = pool.Slices[:1]
+				} else {
+					pool.Slices[1].SharingAffinity = nil
+				}
+				h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{"pool": pool}}, old, "", false)
+				h.sync(t)
+				h.noErrors(t)
+				h.expectPool(t, pool, 1)
+				want := Stats{NumUpdates: 1}
+				if removeSlice {
+					want.NumDeletes = 1
+				}
+				if got := h.ctrl.GetStats(); got != want {
+					t.Errorf("stats = %+v, want %+v", got, want)
+				}
+			})
+		}
+	})
+	t.Run("invalid-pool-blocks-other-pools", func(t *testing.T) {
+		entry := sharingAffinityEntry("subnet", `"blue"`)
+		h := newSharingAffinityHarness(t, &DriverResources{Pools: map[string]Pool{
+			"pool": sharingAffinityPool(entry), "invalid": sharingAffinityPool(entry, entry),
+		}}, nil, "", false)
+		h.sync(t)
+		h.noWrites(t)
+		if len(h.errs) != 1 || !strings.Contains(h.errs[0].Error(), `pool "invalid"`) {
+			t.Errorf("invalid sibling pool did not block publication: %v", h.errs)
+		}
+	})
+}
+
+func TestMatchExistingSlices(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	old := sharingAffinityStoredSlices(sharingAffinityPool(sharingAffinityEntry("a", `"a"`), sharingAffinityEntry("b", `"b"`)), 3)
+	duplicate := old[0].DeepCopy()
+	duplicate.Name += "-duplicate"
+	invalid := old[0].DeepCopy()
+	invalid.Name = "invalid"
+	lower := old[0].DeepCopy()
+	lower.Spec.Pool.Generation = 2
+	for _, tc := range []struct {
+		name       string
+		slices     []*resourceapi.ResourceSlice
+		desired    int
+		generation int64
+		current    map[int]*resourceapi.ResourceSlice
+		obsolete   []*resourceapi.ResourceSlice
+	}{
+		{"empty", nil, 2, 0, map[int]*resourceapi.ResourceSlice{}, nil},
+		{"index-match", old, 2, 3, map[int]*resourceapi.ResourceSlice{0: old[0], 1: old[1]}, nil},
+		{"duplicate-index", []*resourceapi.ResourceSlice{old[0], duplicate}, 2, 3, map[int]*resourceapi.ResourceSlice{0: old[0]}, []*resourceapi.ResourceSlice{duplicate}},
+		{"invalid-name", []*resourceapi.ResourceSlice{invalid}, 2, 3, map[int]*resourceapi.ResourceSlice{}, []*resourceapi.ResourceSlice{invalid}},
+		{"lower-generation", []*resourceapi.ResourceSlice{lower, old[1]}, 2, 3, map[int]*resourceapi.ResourceSlice{1: old[1]}, []*resourceapi.ResourceSlice{lower}},
+		{"out-of-range", old, 1, 3, map[int]*resourceapi.ResourceSlice{0: old[0]}, []*resourceapi.ResourceSlice{old[1]}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := matchExistingSlices(logger, tc.slices, tc.desired)
+			if got.generation != tc.generation {
+				t.Errorf("generation = %d, want %d", got.generation, tc.generation)
+			}
+			if diff := cmp.Diff(tc.current, got.current); diff != "" {
+				t.Errorf("matches (-want,+got): %s", diff)
+			}
+			if len(got.obsolete) != len(tc.obsolete) {
+				t.Fatalf("obsolete count = %d, want %d", len(got.obsolete), len(tc.obsolete))
+			}
+			for i := range tc.obsolete {
+				if got.obsolete[i] != tc.obsolete[i] {
+					t.Errorf("obsolete[%d] = %s, want %s", i, got.obsolete[i].Name, tc.obsolete[i].Name)
+				}
+			}
+		})
+	}
+}
+
+func sharingAffinityPublisherPool() Pool {
+	pool := sharingAffinityPool(sharingAffinityEntry("subnet", `"blue"`), sharingAffinityEntry("zone", `"west"`))
+	pool.AllNodes = false
+	pool.NodeSelector = &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+		MatchExpressions: []v1.NodeSelectorRequirement{{Key: "example.com/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"west"}}},
+	}}}
+	pool.Slices = append(pool.Slices,
+		Slice{
+			Devices: []resourceapi.Device{{
+				Name:                     "device",
+				Attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"model": {StringValue: ptr.To("nic")}},
+				Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Gi")}},
+				AllowMultipleAllocations: ptr.To(true),
+			}},
+			PartitionTypeAttribute: ptr.To(resourceapi.FullyQualifiedName("example.com/model")),
+			SkipNodeOperations:     []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+		},
+		Slice{SharedCounters: []resourceapi.CounterSet{{
+			Name: "counter", Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("1Gi")}},
+		}}},
+	)
+	return pool
+}
+
+func sharingAffinityStoredSlices(pool Pool, generation int64) []*resourceapi.ResourceSlice {
+	var result []*resourceapi.ResourceSlice
+	for i, slice := range pool.Slices {
+		name := encodeIndex(i, getIndexLength(len(pool.Slices))) + "-driver.example.com-stored"
+		result = append(result, &resourceapi.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name), ResourceVersion: "10", Labels: map[string]string{"preserved": "yes"}},
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver:   "driver.example.com",
+				Pool:     resourceapi.ResourcePool{Name: "pool", Generation: generation, ResourceSliceCount: int64(len(pool.Slices))},
+				AllNodes: refIfNotZero(pool.AllNodes), NodeSelector: pool.NodeSelector,
+				Devices: slice.Devices, SharedCounters: slice.SharedCounters, SharingAffinity: slice.SharingAffinity,
+				PerDeviceNodeSelection: slice.PerDeviceNodeSelection, PartitionTypeAttribute: slice.PartitionTypeAttribute, SkipNodeOperations: slice.SkipNodeOperations,
+			},
+		})
+		result[i] = result[i].DeepCopy()
+	}
+	return result
+}
+
+type sharingAffinityHarness struct {
+	ctrl     *Controller
+	client   *fake.Clientset
+	ctx      context.Context
+	errs     []error
+	messages []string
+}
+
+func newSharingAffinityHarness(t *testing.T, resources *DriverResources, old []*resourceapi.ResourceSlice, scope string, disableQualifiedNames bool) *sharingAffinityHarness {
+	t.Helper()
+	_, ctx := ktesting.NewTestContext(t)
+	var objects []runtime.Object
+	for _, slice := range old {
+		if slice != nil {
+			objects = append(objects, slice.DeepCopy())
+		}
+	}
+	h := &sharingAffinityHarness{ctx: ctx, client: createTestClient(features{}, metav1.Time{}, objects...)}
+	var queue workqueue.Mock[string]
+	ctrl, err := newController(ctx, Options{
+		DriverName: "driver.example.com", KubeClient: h.client, Resources: resources, Queue: &queue,
+		ReconcilePoolWithName: scope, ValidateQualifiedNames: ptr.To(!disableQualifiedNames),
+		ErrorHandler: func(_ context.Context, err error, msg string) {
+			h.errs = append(h.errs, err)
+			h.messages = append(h.messages, msg)
+		},
+	})
+	if err != nil {
+		t.Fatalf("newController: %v", err)
+	}
+	h.ctrl = ctrl
+	t.Cleanup(ctrl.Stop)
+	h.client.ClearActions()
+	return h
+}
+
+func (h *sharingAffinityHarness) sync(t *testing.T) {
+	t.Helper()
+	if err := h.ctrl.syncPool(h.ctx, "pool"); err != nil {
+		t.Fatalf("syncPool: %v", err)
+	}
+}
+
+func (h *sharingAffinityHarness) noErrors(t *testing.T) {
+	t.Helper()
+	if len(h.errs) != 0 {
+		t.Fatalf("unexpected controller errors: %v (%v)", h.errs, h.messages)
+	}
+}
+
+func (h *sharingAffinityHarness) noWrites(t *testing.T) {
+	t.Helper()
+	for _, action := range h.client.Actions() {
+		if action.Matches("create", "resourceslices") || action.Matches("update", "resourceslices") || action.Matches("delete", "resourceslices") {
+			t.Errorf("unexpected %s on ResourceSlices", action.GetVerb())
+		}
+	}
+}
+
+func (h *sharingAffinityHarness) list(t *testing.T) []resourceapi.ResourceSlice {
+	t.Helper()
+	list, err := h.client.ResourceV1().ResourceSlices().List(h.ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("list ResourceSlices: %v", err)
+	}
+	sortResourceSlices(list.Items)
+	return list.Items
+}
+
+func (h *sharingAffinityHarness) expectPool(t *testing.T, pool Pool, generation int64) {
+	t.Helper()
+	got := h.list(t)
+	want := sharingAffinityStoredSlices(pool, generation)
+	if len(got) != len(want) {
+		t.Fatalf("stored %d slices, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if diff := cmp.Diff(want[i].Spec, got[i].Spec); diff != "" {
+			t.Errorf("slice %d spec (-want,+got): %s", i, diff)
+		}
+	}
+}
 func TestCopyTaintTimeAdded(t *testing.T) {
 	t1 := metav1.Time{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
 	t2 := metav1.Time{Time: time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)}

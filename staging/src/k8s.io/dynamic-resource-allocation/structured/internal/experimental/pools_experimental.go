@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -510,9 +511,52 @@ func (p *poolsLogger) MarshalLog() any {
 	}
 	if p.verbosity >= 7 {
 		info["devices"] = p.listDevices(-1)
-		info["content"] = p.pools
+		info["content"] = redactedPoolsForLog(p.pools)
 	}
 	return info
+}
+
+// redactedPoolsForLog copies only the parts that can carry affinity expressions.
+// Allocation and informer state must never observe these logging-only copies.
+func redactedPoolsForLog(pools []*Pool) []*Pool {
+	result := make([]*Pool, len(pools))
+	for i, pool := range pools {
+		c := *pool
+		c.DeviceSlicesTargetingNode = redactSlicesForLog(pool.DeviceSlicesTargetingNode)
+		c.DeviceSlicesNotTargetingNode = redactSlicesForLog(pool.DeviceSlicesNotTargetingNode)
+		result[i] = &c
+	}
+	return result
+}
+
+func redactSlicesForLog(resourceSlices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	if resourceSlices == nil {
+		return nil
+	}
+	result := make([]*draapi.ResourceSlice, len(resourceSlices))
+	for i, slice := range resourceSlices {
+		c := *slice
+		// Annotations and managed fields can retain CEL even after the field
+		// itself was removed. Keep only safe metadata for troubleshooting.
+		c.ObjectMeta = metav1.ObjectMeta{
+			Name: slice.Name, UID: slice.UID, ResourceVersion: slice.ResourceVersion,
+			Generation: slice.Generation, CreationTimestamp: slice.CreationTimestamp,
+			OwnerReferences: slice.OwnerReferences, Labels: slice.Labels,
+		}
+		if slice.Annotations != nil {
+			c.Annotations = make(map[string]string, len(slice.Annotations))
+			// Keys are kept deliberately: they identify the annotation, values may hold CEL.
+			for key := range slice.Annotations {
+				c.Annotations[key] = "<redacted>"
+			}
+		}
+		c.Spec.SharingAffinity = slices.Clone(slice.Spec.SharingAffinity)
+		for j := range c.Spec.SharingAffinity {
+			c.Spec.SharingAffinity[j].Expression = "<redacted>"
+		}
+		result[i] = &c
+	}
+	return result
 }
 
 func (p *poolsLogger) listDevices(maxDevices int) []string {

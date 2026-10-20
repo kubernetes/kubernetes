@@ -58,11 +58,12 @@ var SupportedFeatures = internal.Features{
 }
 
 type Allocator struct {
-	features         Features
-	allocatedDevices sets.Set[DeviceID]
-	classLister      DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
-	celCache         *cel.Cache
+	features              Features
+	allocatedDevices      sets.Set[DeviceID]
+	classLister           DeviceClassLister
+	slices                []*resourceapi.ResourceSlice
+	blockedAffinitySlices []*resourceapi.ResourceSlice
+	celCache              *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
 	// the available counters are needed for each pool. The information
@@ -94,13 +95,18 @@ func NewAllocator(ctx context.Context,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
+	var blockedAffinitySlices []*resourceapi.ResourceSlice
+	if !features.SharingAffinity {
+		slices, blockedAffinitySlices = filterAffinityDeclaringPools(slices)
+	}
 	return &Allocator{
-		features:          features,
-		allocatedDevices:  allocatedDevices,
-		classLister:       classLister,
-		slices:            slices,
-		celCache:          celCache,
-		availableCounters: make(map[PoolID]counterSets),
+		features:              features,
+		allocatedDevices:      allocatedDevices,
+		classLister:           classLister,
+		slices:                slices,
+		blockedAffinitySlices: blockedAffinitySlices,
+		celCache:              celCache,
+		availableCounters:     make(map[PoolID]counterSets),
 	}, nil
 }
 
@@ -109,6 +115,13 @@ func (a *Allocator) Channel() internal.AllocatorChannel {
 }
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
+	if len(a.blockedAffinitySlices) > 0 {
+		filtered, feasible, err := a.filterAffinityClaims(ctx, node, claims)
+		if err != nil || !feasible {
+			return nil, err
+		}
+		claims = filtered
+	}
 	alloc := &allocator{
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
@@ -1630,4 +1643,128 @@ func containsNodeSelectorRequirement(requirements []v1.NodeSelectorRequirement, 
 		return true
 	}
 	return false
+}
+
+// Filter before node selection or unsupported features can hide affinity metadata.
+// Keep this compatibility policy local to each allocator implementation.
+func filterAffinityDeclaringPools(slices []*resourceapi.ResourceSlice) ([]*resourceapi.ResourceSlice, []*resourceapi.ResourceSlice) {
+	metadata := make(map[[2]string]internal.PoolMetadataView)
+	// Only the highest generation describes current node placement;
+	// obsolete slices must not block unrelated pools on their old nodes.
+	maxGeneration := make(map[[2]string]int64)
+	for _, slice := range slices {
+		key := [2]string{slice.Spec.Driver, slice.Spec.Pool.Name}
+		if gen, ok := maxGeneration[key]; !ok || slice.Spec.Pool.Generation > gen {
+			maxGeneration[key] = slice.Spec.Pool.Generation
+		}
+	}
+	for _, slice := range slices {
+		if len(slice.Spec.SharingAffinity) == 0 {
+			continue
+		}
+		key := [2]string{slice.Spec.Driver, slice.Spec.Pool.Name}
+		if _, checked := metadata[key]; !checked {
+			metadata[key] = internal.ComputePoolMetadataView(slices, key[0], key[1])
+		}
+	}
+	filtered := make([]*resourceapi.ResourceSlice, 0, len(slices))
+	var blocked []*resourceapi.ResourceSlice
+	for _, slice := range slices {
+		key := [2]string{slice.Spec.Driver, slice.Spec.Pool.Name}
+		view, declares := metadata[key]
+		if declares && (!view.Complete || len(view.Extractors) > 0) {
+			if slice.Spec.Pool.Generation == maxGeneration[key] {
+				blocked = append(blocked, slice)
+			}
+			continue
+		}
+		if declares && slice.Spec.Pool.Generation != view.Generation {
+			continue
+		}
+		filtered = append(filtered, slice)
+	}
+	return filtered, blocked
+}
+
+// Removing declaring pools must not turn an All request into a partial allocation.
+func (a *Allocator) filterAffinityClaims(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) ([]*resourceapi.ResourceClaim, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	hasAll := false
+	for _, claim := range claims {
+		for _, request := range claim.Spec.Devices.Requests {
+			hasAll = hasAll || request.Exactly != nil && request.Exactly.AllocationMode == resourceapi.DeviceAllocationModeAll
+			if !a.features.PrioritizedList {
+				continue
+			}
+			for _, subrequest := range request.FirstAvailable {
+				hasAll = hasAll || subrequest.AllocationMode == resourceapi.DeviceAllocationModeAll
+			}
+		}
+	}
+	if !hasAll {
+		return claims, true, nil
+	}
+	relevant := false
+	for _, slice := range a.blockedAffinitySlices {
+		match, err := NodeMatches(node, ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false), slice.Spec.NodeSelector)
+		if err != nil {
+			return nil, false, err
+		}
+		if match {
+			relevant = true
+			break
+		}
+		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
+			for _, device := range slice.Spec.Devices {
+				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+				if err != nil {
+					return nil, false, err
+				}
+				if match {
+					relevant = true
+					break
+				}
+			}
+		}
+		if relevant {
+			break
+		}
+	}
+	if !relevant {
+		return claims, true, nil
+	}
+	// An unavailable All alternative must not suppress later ExactCount
+	// alternatives. Copy only affected claims; names and relative priority stay
+	// unchanged, including for request-scoped configurations and constraints.
+	filtered := make([]*resourceapi.ResourceClaim, len(claims))
+	for i, claim := range claims {
+		filtered[i] = claim
+		for requestIndex, request := range claim.Spec.Devices.Requests {
+			if request.Exactly != nil && request.Exactly.AllocationMode == resourceapi.DeviceAllocationModeAll {
+				return nil, false, nil
+			}
+			for _, subrequest := range request.FirstAvailable {
+				if subrequest.AllocationMode != resourceapi.DeviceAllocationModeAll {
+					continue
+				}
+				if filtered[i] == claim {
+					filtered[i] = claim.DeepCopy()
+				}
+				alternatives := make([]resourceapi.DeviceSubRequest, 0, len(request.FirstAvailable))
+				for _, alternative := range request.FirstAvailable {
+					if alternative.AllocationMode != resourceapi.DeviceAllocationModeAll {
+						alternatives = append(alternatives, alternative)
+					}
+				}
+				if len(alternatives) == 0 {
+					return nil, false, nil
+				}
+				filtered[i].Spec.Devices.Requests[requestIndex].FirstAvailable = alternatives
+				break
+			}
+		}
+	}
+	return filtered, true, nil
 }

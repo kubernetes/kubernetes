@@ -24,7 +24,31 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/allocatortesting"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 )
+
+var (
+	_ *internal.ClaimAffinity               = (*ClaimAffinity)(nil)
+	_ *internal.DeviceAffinity              = (*DeviceAffinity)(nil)
+	_ *internal.PoolMetadataView            = (*PoolMetadataView)(nil)
+	_ *schedulerapi.AffinityStatus          = (*internal.AffinityStatus)(nil)
+	_ *schedulerapi.DeviceAffinityState     = (*internal.DeviceAffinityState)(nil)
+	_ *schedulerapi.AffinityStateCollection = (*internal.AffinityStateCollection)(nil)
+	_ *schedulerapi.SharingAffinityState    = (*internal.SharingAffinityState)(nil)
+	_ *schedulerapi.AllocatedState          = (*internal.AllocatedState)(nil)
+)
+
+func TestSharingAffinityStatusAliases(t *testing.T) {
+	for _, statuses := range [][2]schedulerapi.AffinityStatus{
+		{internal.AffinityStatusClean, schedulerapi.AffinityStatusClean},
+		{internal.AffinityStatusLocked, schedulerapi.AffinityStatusLocked},
+		{internal.AffinityStatusUnreconstructable, schedulerapi.AffinityStatusUnreconstructable},
+	} {
+		if statuses[0] != statuses[1] {
+			t.Errorf("status alias = %d, want %d", statuses[0], statuses[1])
+		}
+	}
+}
 
 func TestAllocator(t *testing.T) {
 	newAllocator := func(

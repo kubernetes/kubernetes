@@ -558,7 +558,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"both-shared-counters-and-devices": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), "", "only one of `sharedCounters` or `devices` is allowed"),
+				field.Invalid(field.NewPath("spec"), "{`devices`, `sharedCounters`}", "only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)

@@ -37,7 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
@@ -45,10 +47,12 @@ import (
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -96,6 +100,11 @@ type stateData struct {
 	// Allocator handles claims with structured parameters, which is all of them nowadays.
 	allocator structured.Allocator
 
+	// Computed once in PreFilter, shared read-only by parallel Filter calls.
+	affinityExcluded        sets.Set[poolName]
+	affinityExcludedReasons map[poolName]string
+	affinitySlices          []*resourceapi.ResourceSlice
+
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -112,6 +121,10 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
+
+	affinityReservations map[types.UID]reservationToken
+	affinityMetadata     map[poolName]uint64
+	persistedClaims      sets.Set[types.UID]
 
 	// claimHasNodeAllocatableMappedDevice stores whether a claim's allocation is mapped.
 	// A claim is mapped if it is allocated a device that models a node-allocatable
@@ -156,7 +169,8 @@ type informationForClaim struct {
 	// Set by Reserve, published by PreBind, empty if nothing had to be allocated.
 	// May be set by PreFilter if this allocation was made by a previous Pod's
 	// Reserve but not yet published in PreBind.
-	allocation *resourceapi.AllocationResult
+	allocation      *resourceapi.AllocationResult
+	pendingAffinity *pendingAffinity
 }
 
 // nodeAllocation holds the allocation results and extended resource claim per node.
@@ -164,6 +178,7 @@ type nodeAllocation struct {
 	// allocationResults has the allocation results, matching the order of
 	// claims which had to be allocated.
 	allocationResults []resourceapi.AllocationResult
+	affinityByClaim   map[int]claimAffinityPlan
 	// extendedResourceClaim has the special claim for extended resource backed by DRA
 	// created during Filter for the nodes.
 	extendedResourceClaim *resourceapi.ResourceClaim
@@ -173,6 +188,18 @@ type nodeAllocation struct {
 	// nodeAllocatableResourceClaimStatuses stores the calculated node allocatable resource allocations through DRA.
 	// This is populated during Filter stage and passed to PreBind.
 	nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
+}
+
+type claimAffinityPlan struct {
+	source     planSource
+	allocation *resourceapi.AllocationResult
+	devices    []structured.DeviceAffinity
+}
+
+func (pl *DynamicResources) sharingAffinityEnabled() bool {
+	return pl.fts.EnableDRASharingAffinity && pl.fts.EnableDRAConsumableCapacity &&
+		utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -186,6 +213,8 @@ type DynamicResources struct {
 	draManager            fwk.SharedDRAManager
 	podIndexer            cache.Indexer
 	podResourceClaimIndex string
+	affinityWaiters       *affinityWaiters
+	affinityTracker       *claimTracker
 }
 
 const (
@@ -237,6 +266,11 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	pl.podIndexer = podInformer.Informer().GetIndexer()
 	pl.podResourceClaimIndex = podResourceClaimIndex
 
+	if pl.sharingAffinityEnabled() {
+		if err := pl.initAffinityWaiters(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return pl, nil
 }
 
@@ -279,8 +313,8 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
-		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
+		// Deletion can also expose an older, complete pool generation.
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.All}},
 	}
 
 	return events, nil
@@ -558,6 +592,9 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
 func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.affinityWaiters != nil {
+		pl.affinityWaiters.remove(pod.UID)
+	}
 	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
@@ -582,6 +619,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			podGroupState.podsStateData = make(map[types.NamespacedName]*stateData)
 		}
 		podGroupState.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}] = s
+		// Composite roots run PodGroupPostFilter on their own cycle state,
+		// while leaves get fresh child states. Publish the Pod state to every
+		// ancestor so the root sees this cycle's exclusions.
+		pl.publishPodStateToAncestors(state.GetPodGroupCycleState(), pod, s)
 	}
 
 	userClaims, err := pl.podResourceClaims(pod)
@@ -647,12 +688,23 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			if podGroupState != nil && podGroupState.pendingAllocations[claim.UID] != nil {
 				if pendingAllocation := pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID); pendingAllocation != nil {
 					s.informationsForClaim[index].allocation = pendingAllocation
+					if pl.sharingAffinityEnabled() {
+						reader, ok := pl.draManager.ResourceClaims().(affinityPendingReader)
+						if !ok {
+							return nil, statusError(logger, errors.New("claim tracker does not support pending sharing affinity"))
+						}
+						pending, ok := reader.GetPendingAffinity(claim.UID)
+						if !ok {
+							return nil, statusError(logger, errors.New("pending allocation has no sharing affinity provenance"))
+						}
+						s.informationsForClaim[index].pendingAffinity = &pending
+					}
 					nodeSelector, err := nodeSelectorFromAllocation(pendingAllocation)
 					if err != nil {
 						return nil, statusError(logger, err)
 					}
 					s.informationsForClaim[index].availableOnNodes = nodeSelector
-					logger.V(5).Info("reusing pending allocation", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim), "uid", claim.UID, "allocation", klog.Format(pendingAllocation))
+					logger.V(5).Info("reusing pending allocation", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim), "uid", claim.UID, "allocation", redactedAllocation{pendingAllocation})
 					continue
 				}
 			}
@@ -763,7 +815,36 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		// This might have to be retried in the unlikely case that some concurrent modification made
 		// the result invalid.
 		var allocatedState *structured.AllocatedState
+		var resourceSlices []*resourceapi.ResourceSlice
 		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
+			if pl.sharingAffinityEnabled() {
+				tracker, ok := pl.draManager.ResourceClaims().(interface {
+					gatherAllocatedStateForSlices([]*resourceapi.ResourceSlice) (affinityCycleSnapshot, error)
+				})
+				if !ok {
+					return false, errors.New("claim tracker does not support sharing affinity metadata")
+				}
+				resourceSlices, err = pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
+				if err != nil {
+					return false, err
+				}
+				snapshot, err := tracker.gatherAllocatedStateForSlices(resourceSlices)
+				if errors.Is(err, errClaimTrackerConcurrentModification) || errors.Is(err, errAffinityMetadataNotCoherent) {
+					return false, nil
+				}
+				if err != nil {
+					return false, err
+				}
+				allocatedState = snapshot.state
+				s.affinityExcluded = snapshot.excluded
+				s.affinityExcludedReasons = snapshot.reasons
+				s.affinitySlices = resourceSlices
+				s.affinityMetadata = make(map[poolName]uint64, len(snapshot.captured))
+				for pool, meta := range snapshot.captured {
+					s.affinityMetadata[pool] = meta.epoch
+				}
+				return true, nil
+			}
 			if pl.fts.EnableDRAConsumableCapacity {
 				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
 				if err != nil {
@@ -797,14 +878,21 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			}
 		})
 		if err != nil {
+			if pl.sharingAffinityEnabled() && errors.Is(err, context.DeadlineExceeded) {
+				err = fmt.Errorf("sharing affinity startup reconstruction not ready: %w", errAffinityMetadataNotCoherent)
+				pl.registerAffinityWaiters(logger, pod, sets.New(poolName{}))
+			}
 			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
-		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
-		if err != nil {
-			return nil, statusError(logger, err)
+		if !pl.sharingAffinityEnabled() {
+			resourceSlices, err = pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
+			if err != nil {
+				return nil, statusError(logger, err)
+			}
 		}
 		features := AllocatorFeatures(pl.fts)
-		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		features.SharingAffinity = pl.sharingAffinityEnabled()
+		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), resourceSlices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
@@ -822,6 +910,7 @@ func AllocatorFeatures(fts feature.Features) structured.Features {
 		DeviceTaints:            fts.EnableDRADeviceTaints,
 		DeviceBindingAndStatus:  fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
 		ConsumableCapacity:      fts.EnableDRAConsumableCapacity,
+		SharingAffinity:         fts.EnableDRASharingAffinity && fts.EnableDRAConsumableCapacity,
 		FractionalCapacityRange: fts.EnableDRAFractionalCapacityRange,
 		ListTypeAttributes:      fts.EnableDRAListTypeAttributes,
 		OptionalNodeOperations:  fts.EnableDRAOptionalNodeOperations,
@@ -1000,12 +1089,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
+	var affinityByClaim map[int]claimAffinityPlan
+	if pl.sharingAffinityEnabled() {
+		affinityByClaim = make(map[int]claimAffinityPlan)
+	}
 	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
-			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
+			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.KObj(node)))
 		}
 
 		// Apply timeout to the operation?
@@ -1020,6 +1113,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// This replaces the special ResourceClaim for extended resources with one
 		// matching the node.
 		claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, state.claims.len())
+		var claimIndices []int
 		// pendingResult holds pending allocations that were made for a previous
 		// Pod in Reserve, but before that allocation is recorded in the status
 		// by PreBind.
@@ -1030,6 +1124,15 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 				claim = nodeExtendedResourceClaim
 			}
 			if pendingAlloc := state.informationsForClaim[index].allocation; pendingAlloc != nil {
+				if pl.sharingAffinityEnabled() {
+					pending := state.informationsForClaim[index].pendingAffinity
+					if pending == nil {
+						return statusError(logger, errors.New("pending allocation has no sharing affinity provenance"))
+					}
+					affinityByClaim[index] = claimAffinityPlan{
+						source: planPending, allocation: pendingAlloc.DeepCopy(), devices: cloneAffinityProvenance(pending.provenance),
+					}
+				}
 				if allocationResultRequiresDRAOptionalNodeOperations(pendingAlloc) && !slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
 					logger.V(5).Info("allocation's device requires DRAOptionalNodeOperations feature, but node lacks it", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 					return statusUnschedulable(logger, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(claim)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
@@ -1039,8 +1142,20 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 				continue
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
+			claimIndices = append(claimIndices, index)
 		}
-		allocationResult, err := state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		var allocationResult []resourceapi.AllocationResult
+		var affinityResult []structured.ClaimAffinity
+		var err error
+		if pl.sharingAffinityEnabled() {
+			allocator, ok := state.allocator.(structured.AffinityAllocator)
+			if !ok {
+				return statusError(logger, errors.New("allocator does not support sharing affinity results"))
+			}
+			allocationResult, affinityResult, err = allocator.AllocateWithAffinity(allocCtx, node, claimsToAllocate)
+		} else {
+			allocationResult, err = state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		}
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1053,9 +1168,17 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		case errors.Is(err, structured.ErrFailedAllocationOnNode):
 			// Not a fatal error, allocation on other nodes may proceed.
 			// The error is only surfaced if allocation fails on all nodes.
+			if pl.sharingAffinityEnabled() {
+				if pool, found := state.excludedAffinityPoolForNode(node); found {
+					return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("sharing affinity state for pool %s/%s not yet reconciled", pool.driver, pool.pool))
+				}
+				return fwk.NewStatus(fwk.Unschedulable, err.Error())
+			}
 			return statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
 		case ctx.Err() != nil:
 			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+		case err != nil && sharingaffinity.Classify(err) == sharingaffinity.OutcomeClaimInconsistent:
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -1071,7 +1194,33 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
+			if pl.sharingAffinityEnabled() {
+				if pool, found := state.excludedAffinityPoolForNode(node); found {
+					return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("sharing affinity state for pool %s/%s not yet reconciled", pool.driver, pool.pool))
+				}
+				return fwk.NewStatus(fwk.Unschedulable, "cannot allocate all claims")
+			}
 			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+		}
+		if pl.sharingAffinityEnabled() {
+			if len(affinityResult) != len(allocationResult) {
+				return statusError(logger, errors.New("internal error: affinity results do not match allocation results"))
+			}
+			for i := range affinityResult {
+				if len(affinityResult[i].Devices) != len(allocationResult[i].Devices.Results) {
+					return statusError(logger, errors.New("internal error: affinity results do not match allocation results"))
+				}
+				seen := sets.New[int]()
+				for _, device := range affinityResult[i].Devices {
+					if device.ResultIndex < 0 || device.ResultIndex >= len(allocationResult[i].Devices.Results) || seen.Has(device.ResultIndex) {
+						return statusError(logger, errors.New("internal error: affinity results do not match allocation results"))
+					}
+					seen.Insert(device.ResultIndex)
+				}
+				affinityByClaim[claimIndices[i]] = claimAffinityPlan{
+					source: planNew, allocation: allocationResult[i].DeepCopy(), devices: cloneAffinityProvenance(affinityResult[i].Devices),
+				}
+			}
 		}
 
 		// Reserve uses this information.
@@ -1116,6 +1265,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	if state.allocator != nil || len(nodeAllocatableClaimStatus) > 0 {
 		state.nodeAllocations[node.Name] = nodeAllocation{
 			allocationResults:                    allocations,
+			affinityByClaim:                      affinityByClaim,
 			extendedResourceClaim:                nodeExtendedResourceClaim,
 			containerResourceRequestMappings:     containerResourceRequestMappings,
 			nodeAllocatableResourceClaimStatuses: nodeAllocatableClaimStatus,
@@ -1123,6 +1273,25 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 
 	return nil
+}
+
+func (s *stateData) excludedAffinityPoolForNode(node *v1.Node) (poolName, bool) {
+	for _, slice := range s.affinitySlices {
+		pool := poolName{driver: slice.Spec.Driver, pool: slice.Spec.Pool.Name}
+		if !s.affinityExcluded.Has(pool) {
+			continue
+		}
+		if ptr.Deref(slice.Spec.AllNodes, false) || slice.Spec.NodeName != nil && *slice.Spec.NodeName == node.Name || ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
+			return pool, true
+		}
+		if slice.Spec.NodeSelector != nil {
+			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
+			if err == nil && selector.Match(node) {
+				return pool, true
+			}
+		}
+	}
+	return poolName{}, false
 }
 
 // PostFilter checks whether there are allocated claims that could get
@@ -1139,6 +1308,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	if err != nil {
 		return nil, statusError(logger, err)
 	}
+	pl.registerAffinityWaiters(logger, pod, state.affinityExcluded)
 	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
 	// Thus we provide a fast path for this case to avoid unnecessary computations.
 	if state.claims.empty() {
@@ -1203,6 +1373,22 @@ func (pl *DynamicResources) PodGroupPostFilter(
 ) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
+	if pl.affinityWaiters != nil {
+		podGroupState, err := getPodGroupStateDataFromPodGroupCycleState(state)
+		switch {
+		case errors.Is(err, fwk.ErrNotFound):
+			// No DRA PreFilter ran in this cycle, so nothing was excluded.
+		case err != nil:
+			return nil, statusError(logger, err)
+		case podGroupState != nil:
+			for _, pod := range pgInfo.GetAllUnscheduledPods() {
+				if podState := podGroupState.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}]; podState != nil {
+					pl.registerAffinityWaiters(logger, pod, podState.affinityExcluded)
+				}
+			}
+		}
+	}
+
 	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
 		logger.V(5).Info("DRA PodGroupPostFilter is not supporting CompositePodGroups", "podGroup", pgInfo.GetName())
 		return nil, fwk.NewStatus(fwk.Unschedulable)
@@ -1253,6 +1439,33 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	}
 
 	return nil, fwk.NewStatus(fwk.Unschedulable, "deallocation and deletion of ResourceClaims completed")
+}
+
+// publishPodStateToAncestors links a Pod's state into the PodGroup state of
+// every composite ancestor cycle.
+func (pl *DynamicResources) publishPodStateToAncestors(pgState fwk.PodGroupCycleState, pod *v1.Pod, s *stateData) {
+	if pl.affinityWaiters == nil || pgState == nil {
+		return
+	}
+	for parent := pgState.GetParentPlacementCycleState(); parent != nil; {
+		ancestor := parent.GetPodGroupCycleState()
+		if ancestor == nil || ancestor == pgState {
+			return
+		}
+		data, err := getPodGroupStateDataFromPodGroupCycleState(ancestor)
+		if errors.Is(err, fwk.ErrNotFound) {
+			data = &podGroupStateData{
+				pendingAllocations: make(map[types.UID]sets.Set[types.UID]),
+				podsStateData:      make(map[types.NamespacedName]*stateData),
+			}
+			ancestor.Write(stateKey, data)
+		} else if err != nil || data == nil {
+			return
+		}
+		data.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}] = s
+		pgState = ancestor
+		parent = ancestor.GetParentPlacementCycleState()
+	}
 }
 
 func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state *podGroupStateData, pod *v1.Pod) *fwk.Status {
@@ -1473,6 +1686,35 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 		// Nothing left to do.
 		return nil
 	}
+	var affinityTracker affinityPendingAllocator
+	if pl.sharingAffinityEnabled() {
+		var ok bool
+		affinityTracker, ok = pl.draManager.ResourceClaims().(affinityPendingAllocator)
+		if !ok {
+			return statusError(logger, errors.New("claim tracker does not support sharing affinity reservations"))
+		}
+	}
+	state.mutex.Lock()
+	if state.affinityReservations == nil {
+		state.affinityReservations = make(map[types.UID]reservationToken)
+	}
+	state.mutex.Unlock()
+	var acquired []types.UID
+	defer func() {
+		if status.IsSuccess() {
+			return
+		}
+		for i := len(acquired) - 1; i >= 0; i-- {
+			uid := acquired[i]
+			pl.releasePendingAllocation(state, uid)
+			if podGroupState != nil {
+				podGroupState.pendingAllocations[uid].Delete(pod.UID)
+				if len(podGroupState.pendingAllocations[uid]) == 0 {
+					delete(podGroupState.pendingAllocations, uid)
+				}
+			}
+		}
+	}()
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 	numClaimsToAllocate := 0
 	needToAllocateUserClaims := false
@@ -1510,6 +1752,15 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 			// The index returned is the original index in the underlying claim store, it
 			// may not be sequentially numbered (e.g. 0, 1, 2 ...).
 			allocation := &allocations.allocationResults[allocIndex]
+			var plan claimAffinityPlan
+			if affinityTracker != nil {
+				var ok bool
+				plan, ok = allocations.affinityByClaim[index]
+				if !ok {
+					return statusError(logger, errors.New("internal error: claim sharing affinity plan not found"))
+				}
+				allocation = plan.allocation
+			}
 			state.informationsForClaim[index].allocation = allocation
 
 			if claim == extendedResourceClaim {
@@ -1526,11 +1777,43 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
 			}
 			claim.Status.Allocation = allocation
-			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
+			state.mutex.Lock()
+			_, alreadyReserved := state.affinityReservations[claim.UID]
+			state.mutex.Unlock()
+			if alreadyReserved {
+				// The same claim referenced under another name was already
+				// acquired; a second acquire would overwrite and leak the token.
+				allocIndex++
+				continue
+			}
+			token := reservationToken(uuid.NewUUID())
+			var err error
+			if affinityTracker != nil {
+				err = affinityTracker.ReserveClaimWithAffinity(ctx, affinityReservation{
+					claimUID: claim.UID, claimRV: claim.ResourceVersion, claim: claim,
+					source: plan.source, provenance: plan.devices, token: token,
+					fenceEpochs: state.affinityMetadata,
+				})
+			} else {
+				err = pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
+			}
 			if err != nil {
+				if errors.Is(err, errAffinityClaimVersionChanged) || errors.Is(err, errAffinityNotReady) {
+					// Error status goes through backoff and retries without
+					// needing another cluster event.
+					return statusError(logger, fmt.Errorf("claim %s: %w", claim.Name, err))
+				}
+				if errors.Is(err, errAffinityStale) || errors.Is(err, errAffinityConflict) {
+					// Keep the cause so callers can distinguish stale provenance from conflicts.
+					return fwk.NewStatus(fwk.Unschedulable, err.Error()).WithError(err)
+				}
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s: %w", claim.Name, err))
 			}
-			logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(allocation))
+			state.mutex.Lock()
+			state.affinityReservations[claim.UID] = token
+			state.mutex.Unlock()
+			acquired = append(acquired, claim.UID)
+			logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", redactedAllocation{allocation})
 			allocIndex++
 
 			if podGroupState != nil {
@@ -1543,6 +1826,24 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 	}
 
 	return nil
+}
+
+// A failed attempt must not release a pending allocation owned by another pod.
+func (pl *DynamicResources) releasePendingAllocation(state *stateData, uid types.UID) bool {
+	state.mutex.Lock()
+	token, ok := state.affinityReservations[uid]
+	delete(state.affinityReservations, uid)
+	state.mutex.Unlock()
+	if !ok {
+		return false
+	}
+	if pl.sharingAffinityEnabled() {
+		if tracker, ok := pl.draManager.ResourceClaims().(affinityPendingAllocator); ok {
+			return tracker.ReleaseClaimPendingAllocation(uid, token)
+		}
+		return false
+	}
+	return pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(uid, false)
 }
 
 // Unreserve clears the ReservedFor field for all claims.
@@ -1569,8 +1870,20 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		// in-flight, we need to revert the claim object in the assume cache to
 		// what it was before. The allocation is not removed until the last Pod
 		// sharing it is Bound or Unreserved.
-		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
-			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
+		state.mutex.Lock()
+		persisted := state.persistedClaims.Has(claim.UID)
+		if persisted {
+			delete(state.affinityReservations, claim.UID)
+		}
+		state.mutex.Unlock()
+		deleted := false
+		if persisted {
+			pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, true)
+		} else {
+			deleted = pl.releasePendingAllocation(state, claim.UID)
+		}
+		if deleted {
+			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", redactedAllocation{claim.Status.Allocation})
 			pl.draManager.ResourceClaims().AssumedClaimRestore(claim.Namespace, claim.Name)
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,
@@ -1603,6 +1916,11 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 				// We will get here again when pod scheduling is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
+		}
+	}
+	if claim := state.claims.extendedResourceClaim(); claim != nil {
+		if pl.sharingAffinityEnabled() {
+			pl.releasePendingAllocation(state, state.claims.getInitialExtendedResourceClaimUID())
 		}
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)
@@ -1784,6 +2102,15 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// completed, either successfully or with a failure.
 
 		if resourceClaimModified {
+			// A successful API write is real ownership even while the informer
+			// still has the unallocated object. Unreserve must hand it off.
+			state.mutex.Lock()
+			if state.persistedClaims == nil {
+				state.persistedClaims = sets.New[types.UID]()
+			}
+			state.persistedClaims.Insert(claimUIDs...)
+			state.persistedClaims.Insert(claimUID)
+			state.mutex.Unlock()
 			if isExtendedResourceClaim {
 				pl.waitForExtendedClaimInAssumeCache(ctx, claim)
 			} else {
@@ -1812,7 +2139,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 					// started in *this* cycle until Unreserve completes for all
 					// the Pods sharing that pending allocation and they can be
 					// Reserved again in another cycle.
-					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
+					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", redactedAllocation{allocation})
 				}
 			}
 		}
@@ -1834,7 +2161,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		}
 	}
 
-	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims.get(index)), "allocation", klog.Format(allocation))
+	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims.get(index)), "allocation", redactedAllocation{allocation})
 
 	// We may run into a ResourceVersion conflict because there may be some
 	// benign concurrent changes. In that case we get the latest claim and
@@ -1909,7 +2236,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		return nil, nil, retryErr
 	}
 
-	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
+	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", redactedAllocation{claim.Status.Allocation})
 
 	// Patch the pod status with the new information about the generated
 	// special resource claim.
@@ -2217,4 +2544,24 @@ func nodeSelectorFromAllocation(allocation *resourceapi.AllocationResult) (*node
 		return nil, nil
 	}
 	return nodeaffinity.NewNodeSelector(allocation.NodeSelector)
+}
+
+// redactedAllocation lazily renders an allocation for logging without
+// opaque driver configuration, which may hold sensitive values. Device
+// results (allocation identity) are kept; the original object is not mutated.
+type redactedAllocation struct {
+	allocation *resourceapi.AllocationResult
+}
+
+func (r redactedAllocation) MarshalLog() any {
+	if r.allocation == nil {
+		return nil
+	}
+	a := r.allocation.DeepCopy()
+	for i := range a.Devices.Config {
+		if a.Devices.Config[i].Opaque != nil {
+			a.Devices.Config[i].Opaque.Parameters = runtime.RawExtension{Raw: []byte(`"<redacted>"`)}
+		}
+	}
+	return a
 }

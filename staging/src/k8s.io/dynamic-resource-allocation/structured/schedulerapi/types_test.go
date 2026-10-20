@@ -23,8 +23,180 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 )
+
+func TestSharingAffinityStateZeroValueIsClean(t *testing.T) {
+	if AffinityStatusClean != 0 {
+		t.Errorf("AffinityStatusClean = %d, want 0", AffinityStatusClean)
+	}
+	for name, state := range map[string]AllocatedState{
+		"zero state": {},
+		"empty affinity map": {
+			DeviceSharingAffinity: SharingAffinityState{DeviceStates: AffinityStateCollection{}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := state.DeviceSharingAffinity.DeviceStates[MakeDeviceID("driver", "pool", "device")]
+			if got.Status != AffinityStatusClean || got.LockedAffinity != nil {
+				t.Errorf("absent device state = %#v, want Clean with nil lock", got)
+			}
+		})
+	}
+}
+
+// TestSharingAffinityStateCloneIsolation checks that DeviceAffinityState,
+// AffinityStateCollection, and SharingAffinityState clones preserve values and
+// nil/empty distinctions. Mutations must not leak between source and clone
+// or between different devices' lock maps.
+func TestSharingAffinityStateCloneIsolation(t *testing.T) {
+	t.Run("state", func(t *testing.T) {
+		for _, status := range []AffinityStatus{AffinityStatusClean, AffinityStatusUnreconstructable} {
+			source := DeviceAffinityState{Status: status}
+			got := source.Clone()
+			require.Equal(t, source, got)
+		}
+		source := DeviceAffinityState{Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "x", "tenant": "a"}}
+		got := source.Clone()
+		require.Equal(t, source, got)
+
+		got.LockedAffinity["subnet"] = "y"
+		delete(got.LockedAffinity, "tenant")
+		require.Equal(t, DeviceAffinityState{
+			Status:         AffinityStatusLocked,
+			LockedAffinity: map[string]string{"subnet": "x", "tenant": "a"},
+		}, source, "mutating clone changed source")
+
+		source.LockedAffinity["new"] = "source-only"
+		require.NotContains(t, got.LockedAffinity, "new", "mutating source changed clone")
+	})
+	t.Run("device states", func(t *testing.T) {
+		var nilStates AffinityStateCollection
+		require.Nil(t, nilStates.Clone())
+
+		emptySource := AffinityStateCollection{}
+		empty := emptySource.Clone()
+		require.Equal(t, AffinityStateCollection{}, empty)
+		device := MakeDeviceID("driver", "pool", "device")
+		empty[device] = DeviceAffinityState{Status: AffinityStatusUnreconstructable}
+		require.Empty(t, emptySource, "empty device states clone aliases source")
+
+		otherDevice := MakeDeviceID("driver", "pool", "other-device")
+		unknown := MakeDeviceID("driver", "pool", "unknown")
+		source := AffinityStateCollection{
+			device:      {Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "x"}},
+			otherDevice: {Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "z"}},
+			unknown:     {Status: AffinityStatusUnreconstructable},
+		}
+		got := source.Clone()
+		require.Equal(t, source, got)
+
+		got[device].LockedAffinity["subnet"] = "y"
+		require.Equal(t, map[string]string{"subnet": "z"}, got[otherDevice].LockedAffinity, "cloned devices share a lock map")
+		got[otherDevice].LockedAffinity["subnet"] = "w"
+		require.Equal(t, map[string]string{"subnet": "y"}, got[device].LockedAffinity, "cloned devices share a lock map")
+		delete(got, unknown)
+		require.Equal(t, AffinityStateCollection{
+			device:      {Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "x"}},
+			otherDevice: {Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "z"}},
+			unknown:     {Status: AffinityStatusUnreconstructable},
+		}, source, "device states clone aliases source")
+
+		delete(source, device)
+		require.Contains(t, got, device, "source deletion affected device states clone")
+	})
+	t.Run("snapshot", func(t *testing.T) {
+		device := MakeDeviceID("driver", "pool", "device")
+		unknown := MakeDeviceID("driver", "pool", "unknown")
+		pool := PoolID{Driver: "driver", Pool: "pool"}
+		for name, source := range map[string]SharingAffinityState{
+			"nil":               {},
+			"empty":             {DeviceStates: AffinityStateCollection{}, StalePools: sets.New[PoolID]()},
+			"nil device states": {StalePools: sets.New[PoolID]()},
+			"nil stale pools":   {DeviceStates: AffinityStateCollection{}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				got := source.Clone()
+				require.Equal(t, source, got)
+				if got.DeviceStates != nil {
+					got.DeviceStates[device] = DeviceAffinityState{Status: AffinityStatusUnreconstructable}
+					require.Empty(t, source.DeviceStates)
+				}
+				if got.StalePools != nil {
+					got.StalePools.Insert(pool)
+					require.Empty(t, source.StalePools)
+				}
+			})
+		}
+		t.Run("populated", func(t *testing.T) {
+			fixture := func() SharingAffinityState {
+				return SharingAffinityState{
+					DeviceStates: AffinityStateCollection{
+						device:  {Status: AffinityStatusLocked, LockedAffinity: map[string]string{"subnet": "x"}},
+						unknown: {Status: AffinityStatusUnreconstructable},
+					},
+					StalePools: sets.New(pool),
+				}
+			}
+			source, want := fixture(), fixture()
+			got := source.Clone()
+			require.Equal(t, want, got)
+
+			clonePool := PoolID{Driver: "driver", Pool: "clone-only"}
+			got.DeviceStates[device].LockedAffinity["subnet"] = "y"
+			delete(got.DeviceStates, unknown)
+			got.StalePools.Delete(pool)
+			got.StalePools.Insert(clonePool)
+			require.Equal(t, want, source)
+
+			source.DeviceStates[device].LockedAffinity["source"] = "only"
+			delete(source.DeviceStates, device)
+			source.StalePools.Insert(PoolID{Driver: "driver", Pool: "source-only"})
+			require.Equal(t, "y", got.DeviceStates[device].LockedAffinity["subnet"])
+			require.NotContains(t, got.DeviceStates[device].LockedAffinity, "source")
+			require.Equal(t, sets.New(clonePool), got.StalePools)
+		})
+	})
+}
+
+func TestSharingAffinityStatusString(t *testing.T) {
+	for _, tc := range []struct {
+		status AffinityStatus
+		want   string
+	}{
+		{AffinityStatusClean, "Clean"},
+		{AffinityStatusLocked, "Locked"},
+		{AffinityStatusUnreconstructable, "Unreconstructable"},
+		{AffinityStatus(-1), "AffinityStatus(-1)"},
+		{AffinityStatus(42), "AffinityStatus(42)"},
+	} {
+		t.Run(tc.want, func(t *testing.T) {
+			if got := tc.status.String(); got != tc.want {
+				t.Errorf("status %d String() = %q, want %q", tc.status, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPoolIDString(t *testing.T) {
+	for name, tc := range map[string]struct {
+		pool PoolID
+		want string
+	}{
+		"populated": {
+			pool: PoolID{Driver: "driver", Pool: "pool"},
+			want: "driver/pool",
+		},
+		"zero value": {
+			want: "/",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.pool.String())
+		})
+	}
+}
 
 func TestNewDeviceConsumedCapacity(t *testing.T) {
 	deviceID := DeviceID{Driver: draapi.MakeUniqueString("driver-a"), Pool: draapi.MakeUniqueString("pool-1"), Device: draapi.MakeUniqueString("device-1")}

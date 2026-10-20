@@ -5167,6 +5167,10 @@ func TestAllocatorSelection(t *testing.T) {
 			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
 			expectImplementation: "stable",
 		},
+		"SharingAffinity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRASharingAffinity=true",
+			expectImplementation: "experimental",
+		},
 		"DerivedAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
 			expectImplementation: "experimental",
@@ -5202,6 +5206,44 @@ func TestAllocatorSelection(t *testing.T) {
 	if len(notCovered) > 0 {
 		t.Errorf("Some feature fields in %T were never set by any of the dedicated sub-tests: %s\nA test case for a new feature is missing and/or AllocatorFeatures was not updated to set the field.", structured.Features{}, strings.Join(sets.List(notCovered), ", "))
 	}
+}
+
+// Exercise gate construction as well as hand-built feature prerequisites.
+func TestSharingAffinityAllocatorFeatures(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		sharing, capacity bool
+	}{
+		{"enabled", true, true},
+		{"disabled", false, true},
+		{"prerequisite disabled", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gate := utilfeature.DefaultFeatureGate.DeepCopy()
+			featuregatetesting.SetFeatureGatesDuringTest(t, gate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: tc.capacity,
+				features.DRASharingAffinity:    tc.sharing,
+			})
+			fts := feature.NewSchedulerFeaturesFromGates(gate)
+			if fts.EnableDRASharingAffinity != tc.sharing {
+				t.Errorf("scheduler sharing flag = %t, want %t", fts.EnableDRASharingAffinity, tc.sharing)
+			}
+			if fts.EnableDRAConsumableCapacity != tc.capacity {
+				t.Errorf("scheduler capacity flag = %t, want %t", fts.EnableDRAConsumableCapacity, tc.capacity)
+			}
+			got := AllocatorFeatures(fts)
+			want := tc.sharing && tc.capacity
+			if got.SharingAffinity != want || got.Set().Has("DRASharingAffinity") != want {
+				t.Errorf("allocator sharing flag/set = %t/%t, want %t", got.SharingAffinity, got.Set().Has("DRASharingAffinity"), want)
+			}
+		})
+	}
+	t.Run("hand-built flags still require consumable capacity", func(t *testing.T) {
+		got := AllocatorFeatures(feature.Features{EnableDRASharingAffinity: true})
+		if got.SharingAffinity || got.Set().Has("DRASharingAffinity") {
+			t.Error("allocator enables sharing affinity without consumable capacity")
+		}
+	})
 }
 
 func Test_allocationResultRequiresDRAOptionalNodeOperations(t *testing.T) {
@@ -5871,7 +5913,7 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 				resourceClaimTracker: &claimTracker{
 					cache:               assumeCache,
 					inFlightAllocations: make(map[types.UID]inFlightAllocation),
-					allocatedDevices:    newAllocatedDevices(logger),
+					allocatedDevices:    newAllocatedDevices(logger, nil),
 				},
 			}
 			for _, obj := range tc.allocatedResourceClaims {

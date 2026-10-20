@@ -22,7 +22,10 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,10 +45,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -58,6 +65,16 @@ type DeviceID = internal.DeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
 type AllocatedState = internal.AllocatedState
+type DeviceAffinityState = internal.DeviceAffinityState
+type AffinityStateCollection = internal.AffinityStateCollection
+type SharingAffinityState = internal.SharingAffinityState
+type PoolID = schedulerapi.PoolID
+
+type allocatorFactory func(context.Context, Features, AllocatedState, DeviceClassLister, []*resourceapi.ResourceSlice, *cel.Cache) (Allocator, error)
+
+type affinityAllocator interface {
+	AllocateWithAffinity(context.Context, *v1.Node, []*resourceapi.ResourceClaim) ([]resourceapi.AllocationResult, []internal.ClaimAffinity, error)
+}
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
@@ -975,13 +992,20 @@ type AllocatorTestCase struct {
 	allocatedDevices         []DeviceID
 	allocatedSharedDeviceIDs sets.Set[DeviceID]
 	allocatedCapacityDevices ConsumedCapacityCollection
+	affinityStates           AffinityStateCollection
+	stalePools               sets.Set[PoolID]
 	classes                  []*resourceapi.DeviceClass
 	slices                   []*resourceapi.ResourceSlice
 	node                     *v1.Node
 
-	expectResults []any
-	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
-	expectErrorIs error               // optional error to check with errors.Is
+	expectResults          []any
+	expectResultsByChannel map[internal.AllocatorChannel][]any
+	expectError            types.GomegaMatcher // can be used to check for no error or match specific error
+	expectErrorIs          error               // optional error to check with errors.Is
+
+	// Isolation tests may mutate the received state only after all allocator
+	// assertions, so their deliberate writes cannot hide allocator mutations.
+	inspectAllocatedState func(t *testing.T, received AllocatedState)
 
 	// Expected allocateOne invocations, asserted for every variant. A variant
 	// that searches differently overrides this through the map below.
@@ -1001,6 +1025,1532 @@ func requestWithDerivedAttributes(name, class string, count int64, derivedAttrs 
 	req := request(name, class, count, selectors...)
 	req.Exactly.DerivedAttributes = derivedAttrs
 	return req
+}
+
+const sharingAffinityDriver = "sharing.example.com"
+
+func sharingAffinityExtractor(name, expression string) resourceapi.SharingAffinityExtractor {
+	return resourceapi.SharingAffinityExtractor{Name: name, APIGroup: "*", Kind: "*", Expression: expression}
+}
+
+func sharingAffinityConfig(raw string, requests ...string) resourceapi.DeviceClaimConfiguration {
+	return deviceClaimConfig(requests, resourceapi.DeviceConfiguration{Opaque: &resourceapi.OpaqueDeviceConfiguration{
+		Driver: sharingAffinityDriver, Parameters: runtime.RawExtension{Raw: []byte(raw)},
+	}})
+}
+
+func sharingAffinityAllocConfig(raw string, source resourceapi.AllocationConfigSource, requests ...string) resourceapi.DeviceAllocationConfiguration {
+	return resourceapi.DeviceAllocationConfiguration{
+		Source: source, Requests: requests, DeviceConfiguration: sharingAffinityConfig(raw).DeviceConfiguration,
+	}
+}
+
+func sharingAffinityResult(request, device string) resourceapi.DeviceRequestAllocationResult {
+	return resourceapi.DeviceRequestAllocationResult{
+		Request: request, Driver: sharingAffinityDriver, Pool: "pool", Device: device, ShareID: &fixedShareID,
+	}
+}
+
+// Each case owns its fixtures and its expected result, including opaque config
+// bytes. The common runner checks both full results and input immutability.
+func sharingAffinityCase(mutate func(*AllocatorTestCase)) AllocatorTestCase {
+	claim := claimWithRequests("claim", nil, request("req", "network", 1)).
+		withConfigs([]resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{"tenant":"blue"}`)})
+	claim.Namespace = "default"
+	claim.UID = "claim-uid"
+	pool := resourceapi.ResourcePool{Name: "pool", Generation: 1, ResourceSliceCount: 2}
+	metadata := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "metadata"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: sharingAffinityDriver, Pool: pool,
+			SharingAffinity: []resourceapi.SharingAffinityExtractor{sharingAffinityExtractor("tenant", `parameters.?tenant.orValue("")`)},
+		},
+	}
+	tc := AllocatorTestCase{
+		features:                 Features{SharingAffinity: true, ConsumableCapacity: true, AdminAccess: true, PrioritizedList: true},
+		claimsToAllocate:         objects(claim),
+		classes:                  objects(class("network", sharingAffinityDriver)),
+		slices:                   []*resourceapi.ResourceSlice{metadata, sliceWithDevices("devices", nodeSelectionAll, pool, sharingAffinityDriver, device("device-a").withAllowMultipleAllocations()).obj()},
+		allocatedSharedDeviceIDs: sets.New[DeviceID](),
+		allocatedCapacityDevices: internal.NewConsumedCapacityCollection(),
+		affinityStates:           AffinityStateCollection{},
+		expectResults: []any{allocationResultWithConfigs(nil,
+			[]resourceapi.DeviceRequestAllocationResult{sharingAffinityResult("req", "device-a")},
+			[]resourceapi.DeviceAllocationConfiguration{sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim)})},
+	}
+	if mutate != nil {
+		mutate(&tc)
+	}
+	return tc
+}
+
+func sharingAffinityUnconstrained(tc *AllocatorTestCase) {
+	tc.slices = tc.slices[1:2]
+	tc.slices[0].Spec.Pool.ResourceSliceCount = 1
+}
+
+func sharingAffinityLockDevice(tc *AllocatorTestCase, device string, values map[string]string) {
+	id := MakeDeviceID(sharingAffinityDriver, "pool", device)
+	tc.allocatedSharedDeviceIDs.Insert(id)
+	tc.affinityStates[id] = DeviceAffinityState{Status: internal.AffinityStatusLocked, LockedAffinity: values}
+}
+
+func sharingAffinityExpect(tc *AllocatorTestCase, result resourceapi.DeviceRequestAllocationResult, configs ...resourceapi.DeviceAllocationConfiguration) {
+	tc.expectResults = []any{allocationResultWithConfigs(nil, []resourceapi.DeviceRequestAllocationResult{result}, configs)}
+}
+
+func sharingAffinityCandidates(testcases map[string]AllocatorTestCase) {
+	for _, candidate := range []struct {
+		name   string
+		mutate func(*AllocatorTestCase)
+		reject bool
+	}{
+		{name: "viable-clean"},
+		{name: "viable-equal-lock", mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+		}},
+		{name: "reject-mismatch-lock", reject: true, mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "red"})
+		}},
+		{name: "reject-lock-superset", reject: true, mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue", "extra": "value"})
+		}},
+		{name: "reject-lock-subset", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.slices[0].Spec.SharingAffinity = append(tc.slices[0].Spec.SharingAffinity, sharingAffinityExtractor("zone", `"west"`))
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+		}},
+		{name: "reject-partial-satisfaction", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.slices[0].Spec.SharingAffinity = append(tc.slices[0].Spec.SharingAffinity, sharingAffinityExtractor("zone", `""`))
+		}},
+		{name: "reject-no-config", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Config = nil
+		}},
+		{name: "reject-empty-values", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{"tenant":""}`)}
+		}},
+		{name: "reject-unreconstructable", reject: true, mutate: func(tc *AllocatorTestCase) {
+			id := MakeDeviceID(sharingAffinityDriver, "pool", "device-a")
+			tc.affinityStates[id] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+			tc.allocatedSharedDeviceIDs.Insert(id)
+		}},
+		{name: "reject-unreconstructable-unconstrained", reject: true, mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityUnconstrained(tc)
+			id := MakeDeviceID(sharingAffinityDriver, "pool", "device-a")
+			tc.affinityStates[id] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+			tc.allocatedSharedDeviceIDs.Insert(id)
+		}},
+		{name: "permissive-pool-no-config", mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityUnconstrained(tc)
+			tc.claimsToAllocate[0].Spec.Devices.Config = nil
+			sharingAffinityExpect(tc, sharingAffinityResult("req", "device-a"))
+		}},
+		{name: "permissive-pool-no-decoding", mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityUnconstrained(tc)
+			tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{`)}
+			sharingAffinityExpect(tc, sharingAffinityResult("req", "device-a"), sharingAffinityAllocConfig(`{`, resourceapi.AllocationConfigSourceClaim))
+		}},
+		{name: "first-fit-clean-before-locked", mutate: func(tc *AllocatorTestCase) {
+			tc.slices[1].Spec.Devices = append(tc.slices[1].Spec.Devices, device("device-b").withAllowMultipleAllocations().obj())
+			sharingAffinityLockDevice(tc, "device-b", map[string]string{"tenant": "blue"})
+		}},
+		{name: "first-fit-mismatch-then-clean", mutate: func(tc *AllocatorTestCase) {
+			tc.slices[1].Spec.Devices = append(tc.slices[1].Spec.Devices, device("device-b").withAllowMultipleAllocations().obj())
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "red"})
+			sharingAffinityExpect(tc, sharingAffinityResult("req", "device-b"), sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+		}},
+		{name: "dedicated-unsatisfied", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+			tc.claimsToAllocate[0].Spec.Devices.Config = nil
+		}},
+		{name: "dedicated-satisfied", mutate: func(tc *AllocatorTestCase) {
+			tc.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+			result := sharingAffinityResult("req", "device-a")
+			result.ShareID = nil
+			sharingAffinityExpect(tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+		}},
+		{name: "admin-unsatisfied", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+			tc.claimsToAllocate[0].Spec.Devices.Config = nil
+		}},
+		{name: "admin-mismatch", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "red"})
+		}},
+		{name: "admin-unreconstructable", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+			tc.affinityStates[MakeDeviceID(sharingAffinityDriver, "pool", "device-a")] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+		}},
+		{name: "admin-unconstrained-fenced", reject: true, mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityUnconstrained(tc)
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+			tc.affinityStates[MakeDeviceID(sharingAffinityDriver, "pool", "device-a")] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+		}},
+		{name: "dedicated-unconstrained-fenced", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+			sharingAffinityUnconstrained(tc)
+			tc.affinityStates[MakeDeviceID(sharingAffinityDriver, "pool", "device-a")] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+		}},
+		{name: "admin-satisfied", mutate: func(tc *AllocatorTestCase) {
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+			result := sharingAffinityResult("req", "device-a")
+			result.AdminAccess = ptr.To(true)
+			sharingAffinityExpect(tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+		}},
+	} {
+		tc := sharingAffinityCase(candidate.mutate)
+		if candidate.reject {
+			tc.expectResults = nil
+		}
+		testcases["sharing-affinity-candidates-"+candidate.name] = tc
+	}
+	for name, consumed := range map[string]string{"insufficient": "3", "sufficient": "2"} {
+		tc := sharingAffinityCase(func(tc *AllocatorTestCase) {
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+			tc.slices[1].Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"slots": {Value: resource.MustParse("4")}}
+			tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{Requests: map[resourceapi.QualifiedName]resource.Quantity{"slots": resource.MustParse("2")}}
+			tc.allocatedCapacityDevices.Insert(schedulerapi.NewDeviceConsumedCapacity(MakeDeviceID(sharingAffinityDriver, "pool", "device-a"), map[resourceapi.QualifiedName]resource.Quantity{"slots": resource.MustParse(consumed)}))
+		})
+		tc.expectResults = nil
+		if name == "sufficient" {
+			result := sharingAffinityResult("req", "device-a")
+			result.ConsumedCapacity = map[resourceapi.QualifiedName]resource.Quantity{"slots": resource.MustParse("2")}
+			sharingAffinityExpect(&tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+		}
+		testcases["sharing-affinity-candidates-capacity-"+name] = tc
+	}
+}
+
+func sharingAffinityAddMetadata(tc *AllocatorTestCase, entries ...resourceapi.SharingAffinityExtractor) {
+	metadata := tc.slices[0].DeepCopy()
+	metadata.Name = fmt.Sprintf("metadata-%d", len(tc.slices))
+	metadata.Spec.SharingAffinity = entries
+	tc.slices = append(tc.slices, metadata)
+	for _, s := range tc.slices {
+		s.Spec.Pool.ResourceSliceCount = int64(len(tc.slices))
+	}
+}
+
+func sharingAffinityPools(testcases map[string]AllocatorTestCase) {
+	for _, pool := range []struct {
+		name   string
+		mutate func(*AllocatorTestCase)
+		reject bool
+	}{
+		{name: "multiple-metadata-slices-union-partial", reject: true, mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityAddMetadata(tc, sharingAffinityExtractor("zone", `parameters.?zone.orValue("")`))
+		}},
+		{name: "multiple-metadata-slices-union-complete", mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityAddMetadata(tc, sharingAffinityExtractor("zone", `parameters.?zone.orValue("")`))
+			tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{"tenant":"blue","zone":"west"}`)}
+			sharingAffinityExpect(tc, sharingAffinityResult("req", "device-a"), sharingAffinityAllocConfig(`{"tenant":"blue","zone":"west"}`, resourceapi.AllocationConfigSourceClaim))
+		}},
+		{name: "generation-isolation-new-complete", mutate: func(tc *AllocatorTestCase) {
+			old := tc.slices[0].DeepCopy()
+			old.Name = "old"
+			old.Spec.SharingAffinity[0].Expression = `parameters.missing`
+			for _, s := range tc.slices {
+				s.Spec.Pool.Generation = 2
+			}
+			tc.slices = append(tc.slices, old)
+		}},
+		{name: "generation-isolation-new-incomplete", reject: true, mutate: func(tc *AllocatorTestCase) {
+			newer := tc.slices[0].DeepCopy()
+			newer.Name, newer.Spec.Pool.Generation = "new", 2
+			tc.slices = append(tc.slices, newer)
+		}},
+		{name: "driver-isolation", mutate: func(tc *AllocatorTestCase) {
+			other := tc.slices[0].DeepCopy()
+			other.Name, other.Spec.Driver, other.Spec.Pool.ResourceSliceCount = "other-driver", "other.example.com", 1
+			other.Spec.SharingAffinity[0].Expression = `parameters.missing`
+			tc.slices = append(tc.slices, other)
+		}},
+		{name: "incomplete-metadata", reject: true, mutate: func(tc *AllocatorTestCase) { tc.slices = tc.slices[1:] }},
+		{name: "inconsistent-slice-count", reject: true, mutate: func(tc *AllocatorTestCase) { tc.slices[0].Spec.Pool.ResourceSliceCount = 3 }},
+		{name: "duplicate-slice-name", reject: true, mutate: func(tc *AllocatorTestCase) { tc.slices[0].Name = tc.slices[1].Name }},
+		{name: "duplicate-names-across-slices", reject: true, mutate: func(tc *AllocatorTestCase) {
+			tc.slices[0].Spec.SharingAffinity[0].Expression = `string(1 / parameters.zero)`
+			sharingAffinityAddMetadata(tc, sharingAffinityExtractor("tenant", `parameters.missing`))
+			tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{"zero":0}`)}
+			// Duplicate keys invalidate the pool before either runtime error
+			// can occur, even though both expressions compile.
+			tc.expectErrorIs = internal.ErrFailedAllocationOnNode
+			tc.expectError = gomega.And(gomega.HaveOccurred(),
+				gomega.Not(gomega.MatchError(sharingaffinity.ErrCELEval)),
+				gomega.Not(gomega.MatchError(sharingaffinity.ErrMissingField)))
+		}},
+		{name: "sixteen-entries-across-two-slices", mutate: func(tc *AllocatorTestCase) {
+			tc.slices[0].Spec.SharingAffinity = nil
+			var second []resourceapi.SharingAffinityExtractor
+			for i := 0; i < 8; i++ {
+				tc.slices[0].Spec.SharingAffinity = append(tc.slices[0].Spec.SharingAffinity, sharingAffinityExtractor(fmt.Sprintf("first-%d", i), `"blue"`))
+				second = append(second, sharingAffinityExtractor(fmt.Sprintf("second-%d", i), `"west"`))
+			}
+			sharingAffinityAddMetadata(tc, second...)
+		}},
+		{name: "invalid-pool-does-not-poison-other-pools", mutate: func(tc *AllocatorTestCase) {
+			sharingAffinityAddMetadata(tc, sharingAffinityExtractor("tenant", `parameters.missing`))
+			alternative := tc.slices[1].DeepCopy()
+			alternative.Name = "alternative-devices"
+			alternative.Spec.Pool = resourceapi.ResourcePool{Name: "zz-alternative", Generation: 1, ResourceSliceCount: 1}
+			tc.slices = append(tc.slices, alternative)
+			result := sharingAffinityResult("req", "device-a")
+			result.Pool = "zz-alternative"
+			sharingAffinityExpect(tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+		}},
+	} {
+		tc := sharingAffinityCase(pool.mutate)
+		if pool.reject {
+			tc.expectResults = nil
+		}
+		testcases["sharing-affinity-pool-"+pool.name] = tc
+	}
+}
+
+func sharingAffinityGateAndState(testcases map[string]AllocatorTestCase) {
+	for _, state := range []struct {
+		name   string
+		status internal.AffinityStatus
+	}{
+		{"clean", internal.AffinityStatusClean},
+		{"conflicting-lock", internal.AffinityStatusLocked},
+		{"unreconstructable", internal.AffinityStatusUnreconstructable},
+	} {
+		for _, enabled := range []bool{false, true} {
+			tc := sharingAffinityCase(func(tc *AllocatorTestCase) {
+				tc.features = Features{ConsumableCapacity: true, SharingAffinity: enabled}
+				tc.slices[0].Spec.AllNodes = ptr.To(true)
+				tc.affinityStates = nil
+				tc.allocatedSharedDeviceIDs = nil
+				if state.status != internal.AffinityStatusClean {
+					device := MakeDeviceID(sharingAffinityDriver, "pool", "device-a")
+					lock := DeviceAffinityState{Status: state.status}
+					if state.status == internal.AffinityStatusLocked {
+						lock.LockedAffinity = map[string]string{"tenant": "red"}
+					}
+					tc.affinityStates = AffinityStateCollection{device: lock}
+					tc.allocatedSharedDeviceIDs = sets.New(device)
+				}
+			})
+			if !enabled || state.status != internal.AffinityStatusClean {
+				tc.expectResults = nil
+			}
+			testcases[fmt.Sprintf("sharing-affinity-gate-and-state-%s-enabled=%t", state.name, enabled)] = tc
+		}
+	}
+}
+
+func sharingAffinityGateOff(testcases map[string]AllocatorTestCase) {
+	for name, mode := range map[string]resourceapi.DeviceAllocationMode{
+		"exactcount": resourceapi.DeviceAllocationModeExactCount,
+		"all":        resourceapi.DeviceAllocationModeAll,
+	} {
+		for _, scope := range []string{"all-nodes", "no-node", "other-node", "per-device-node", "unconstrained", "newest-declares", "old-declares"} {
+			tc := sharingAffinityCase(func(tc *AllocatorTestCase) {
+				tc.features = Features{}
+				tc.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+				req := tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly
+				req.AllocationMode = mode
+				if mode == resourceapi.DeviceAllocationModeAll {
+					req.Count = 0
+				}
+				// Disabled affinity must never evaluate even invalid CEL.
+				tc.slices[0].Spec.SharingAffinity[0].Expression = `parameters.[`
+				switch scope {
+				case "all-nodes":
+					tc.slices[0].Spec.AllNodes = ptr.To(true)
+				case "other-node":
+					tc.slices[0].Spec.NodeName = ptr.To("elsewhere")
+				case "per-device-node":
+					tc.slices[0].Spec.PerDeviceNodeSelection = ptr.To(true)
+				case "unconstrained":
+					sharingAffinityUnconstrained(tc)
+				case "newest-declares":
+					old := tc.slices[1].DeepCopy()
+					old.Name, old.Spec.Pool.ResourceSliceCount = "old-devices", 1
+					for _, s := range tc.slices {
+						s.Spec.Pool.Generation = 2
+					}
+					tc.slices = append(tc.slices, old)
+				case "old-declares":
+					tc.slices[1].Spec.Pool.Generation = 2
+					tc.slices[1].Spec.Pool.ResourceSliceCount = 1
+				}
+			})
+			tc.expectResults = nil
+			if scope == "unconstrained" || scope == "old-declares" {
+				result := sharingAffinityResult("req", "device-a")
+				result.ShareID = nil
+				sharingAffinityExpect(&tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+			}
+			testcases["sharing-affinity-gate-off-"+name+"-"+scope] = tc
+		}
+	}
+	testcases["sharing-affinity-gate-off-consumable-capacity-enabled"] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+		tc.features = Features{ConsumableCapacity: true}
+		tc.expectResults = nil
+	})
+	all := resourceapi.DeviceSubRequest{Name: "all", DeviceClassName: "network", AllocationMode: resourceapi.DeviceAllocationModeAll}
+	exact := resourceapi.DeviceSubRequest{Name: "exact", DeviceClassName: "network", AllocationMode: resourceapi.DeviceAllocationModeExactCount, Count: 1}
+	for _, scenario := range []struct {
+		name        string
+		requests    []resourceapi.DeviceSubRequest
+		otherNode   bool
+		wantRequest string
+	}{
+		{name: "fallback", requests: []resourceapi.DeviceSubRequest{all, exact}, wantRequest: "req/exact"},
+		{name: "all-only", requests: []resourceapi.DeviceSubRequest{all}},
+		{name: "exact-first", requests: []resourceapi.DeviceSubRequest{exact, all}, wantRequest: "req/exact"},
+		{name: "unrelated-node", requests: []resourceapi.DeviceSubRequest{all, exact}, otherNode: true, wantRequest: "req/all"},
+	} {
+		testcases["sharing-affinity-gate-off-first-available-"+scenario.name] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+			tc.features = Features{PrioritizedList: true}
+			tc.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+			available := tc.slices[1].DeepCopy()
+			available.Name = "available"
+			available.Spec.Pool = resourceapi.ResourcePool{Name: "unconstrained", Generation: 1, ResourceSliceCount: 1}
+			tc.slices[0].Spec.SharingAffinity[0].Expression = `parameters.[`
+			if scenario.otherNode {
+				for _, slice := range tc.slices {
+					slice.Spec.AllNodes = nil
+					slice.Spec.NodeName = ptr.To("elsewhere")
+				}
+			}
+			tc.slices = append(tc.slices, available)
+			tc.claimsToAllocate[0].Spec.Devices.Requests = []resourceapi.DeviceRequest{{
+				Name: "req", FirstAvailable: scenario.requests,
+			}}
+			tc.expectResults = nil
+			if scenario.wantRequest != "" {
+				result := sharingAffinityResult(scenario.wantRequest, "device-a")
+				result.Pool, result.ShareID = "unconstrained", nil
+				sharingAffinityExpect(tc, result, sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+			}
+		})
+	}
+	testcases["sharing-affinity-gate-off-all-invalid-node-selector"] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+		tc.features = Features{}
+		tc.slices[0].Spec.NodeSelector = &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+			MatchExpressions: []v1.NodeSelectorRequirement{{Key: "zone", Operator: "invalid"}},
+		}}}
+		request := tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly
+		request.AllocationMode, request.Count = resourceapi.DeviceAllocationModeAll, 0
+		tc.expectResults = nil
+		tc.expectError = gomega.MatchError(gomega.ContainSubstring("failed to parse node selector"))
+	})
+	for _, obsolete := range []bool{true, false} {
+		testcases[fmt.Sprintf("sharing-affinity-gate-off-obsolete-placement-obsolete-%t", obsolete)] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+			tc.features = Features{}
+			sharingAffinityUnconstrained(tc)
+			tc.slices[0].Spec.AllNodes = nil
+			tc.slices[0].Spec.NodeName = ptr.To(node1)
+			tc.slices[0].Spec.Devices[0].AllowMultipleAllocations = nil
+			req := tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly
+			req.AllocationMode, req.Count = resourceapi.DeviceAllocationModeAll, 0
+			tc.slices = append(tc.slices, sliceWithDevices("blocked-new", "elsewhere",
+				resourceapi.ResourcePool{Name: "blocked", Generation: 2, ResourceSliceCount: 2},
+				sharingAffinityDriver, device("device-new")).obj())
+			if obsolete {
+				old := sliceWithNoDevices("blocked-old", node1,
+					resourceapi.ResourcePool{Name: "blocked", Generation: 1, ResourceSliceCount: 1}, sharingAffinityDriver).obj()
+				old.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{sharingAffinityExtractor("tenant", `"x"`)}
+				tc.slices = append(tc.slices, old)
+			}
+			result := sharingAffinityResult("req", "device-a")
+			result.ShareID = nil
+			tc.expectResults = []any{allocationResultWithConfigs(localNodeSelector(node1),
+				[]resourceapi.DeviceRequestAllocationResult{result},
+				[]resourceapi.DeviceAllocationConfiguration{sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim)})}
+		})
+	}
+}
+
+func sharingAffinityObsoleteGeneration(testcases map[string]AllocatorTestCase) {
+	// Only the newest generation's node placement determines whether another
+	// pool must be complete before an All request can be allocated.
+	for _, newest := range []string{"none", "complete", "incomplete"} {
+		testcases["sharing-affinity-obsolete-generation-"+newest] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+			sharingAffinityUnconstrained(tc)
+			req := tc.claimsToAllocate[0].Spec.Devices.Requests[0].Exactly
+			req.AllocationMode, req.Count = resourceapi.DeviceAllocationModeAll, 0
+			other := func(name, node string, generation, count int64) *resourceapi.ResourceSlice {
+				return sliceWithDevices(name, node,
+					resourceapi.ResourcePool{Name: "other", Generation: generation, ResourceSliceCount: count},
+					"other.example.com", device(name+"-device")).obj()
+			}
+			if newest != "none" {
+				tc.slices = append(tc.slices, other("old", node1, 1, 1))
+			}
+			switch newest {
+			case "complete":
+				tc.slices = append(tc.slices, other("new", "elsewhere", 2, 1))
+			case "incomplete":
+				tc.slices = append(tc.slices, other("new", "elsewhere", 2, 2))
+			}
+		})
+	}
+}
+
+func sharingAffinityMetadata(testcases map[string]AllocatorTestCase) {
+	for _, metadata := range []struct {
+		name, group, kind, raw string
+		want                   bool
+	}{
+		{"exact", "example.com", "Config", `{"apiVersion":"example.com/v1","kind":"Config","tenant":"blue"}`, true},
+		{"version-independent", "example.com", "Config", `{"apiVersion":"example.com/v99alpha1","kind":"Config","tenant":"blue"}`, true},
+		{"group-mismatch", "example.com", "Config", `{"apiVersion":"other.example.com/v1","kind":"Config","tenant":"blue"}`, false},
+		{"kind-mismatch", "example.com", "Config", `{"apiVersion":"example.com/v1","kind":"Other","tenant":"blue"}`, false},
+		{"kind-case-sensitive", "example.com", "Config", `{"apiVersion":"example.com/v1","kind":"config","tenant":"blue"}`, false},
+		{"wildcard", "*", "*", `{"tenant":"blue"}`, true},
+		{"wildcard-group", "*", "Config", `{"kind":"Config","tenant":"blue"}`, true},
+		{"wildcard-kind", "example.com", "*", `{"apiVersion":"example.com/v1","tenant":"blue"}`, true},
+		{"core-group", "*", "Config", `{"apiVersion":"v1","kind":"Config","tenant":"blue"}`, true},
+		{"core-group-exact-filter", "example.com", "Config", `{"apiVersion":"v1","kind":"Config","tenant":"blue"}`, false},
+		{"missing-api-version", "example.com", "Config", `{"kind":"Config","tenant":"blue"}`, false},
+		{"missing-kind", "*", "Config", `{"tenant":"blue"}`, false},
+		{"extra-fields-ignored", "*", "*", `{"tenant":"blue","private":{"password":"different"},"zone":"ignored"}`, true},
+	} {
+		tc := sharingAffinityCase(func(tc *AllocatorTestCase) {
+			tc.slices[0].Spec.SharingAffinity[0].APIGroup = metadata.group
+			tc.slices[0].Spec.SharingAffinity[0].Kind = metadata.kind
+			tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(metadata.raw)}
+			sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+		})
+		tc.expectResults = nil
+		if metadata.want {
+			sharingAffinityExpect(&tc, sharingAffinityResult("req", "device-a"), sharingAffinityAllocConfig(metadata.raw, resourceapi.AllocationConfigSourceClaim))
+		}
+		testcases["sharing-affinity-metadata-"+metadata.name] = tc
+	}
+}
+
+func sharingAffinityScope(testcases map[string]AllocatorTestCase) {
+	for _, scope := range []string{"other-driver-before-decode", "other-request-before-decode", "device-class-config-excluded", "device-class-cannot-satisfy", "other-claim-cannot-satisfy", "subrequest-scope", "parent-scope"} {
+		testcases["sharing-affinity-scope-"+scope] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+			switch scope {
+			case "other-driver-before-decode":
+				config := sharingAffinityConfig(`{`)
+				config.Opaque.Driver = "other.example.com"
+				tc.claimsToAllocate[0].Spec.Devices.Config = append(tc.claimsToAllocate[0].Spec.Devices.Config, config)
+				expected := sharingAffinityAllocConfig(`{`, resourceapi.AllocationConfigSourceClaim)
+				expected.Opaque.Driver = "other.example.com"
+				sharingAffinityExpect(tc, sharingAffinityResult("req", "device-a"),
+					sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim), expected)
+			case "other-request-before-decode":
+				tc.claimsToAllocate[0].Spec.Devices.Config = append(tc.claimsToAllocate[0].Spec.Devices.Config, sharingAffinityConfig(`{`, "unselected"))
+			case "device-class-config-excluded":
+				tc.classes[0].Spec.Config = []resourceapi.DeviceClassConfiguration{{DeviceConfiguration: sharingAffinityConfig(`{"tenant":"red"}`).DeviceConfiguration}}
+				sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+				sharingAffinityExpect(tc, sharingAffinityResult("req", "device-a"),
+					sharingAffinityAllocConfig(`{"tenant":"red"}`, resourceapi.AllocationConfigSourceClass),
+					sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+			case "device-class-cannot-satisfy":
+				tc.classes[0].Spec.Config = []resourceapi.DeviceClassConfiguration{{DeviceConfiguration: sharingAffinityConfig(`{"tenant":"blue"}`).DeviceConfiguration}}
+				tc.claimsToAllocate[0].Spec.Devices.Config = nil
+				tc.expectResults = nil
+			case "other-claim-cannot-satisfy":
+				second := wrapResourceClaim{tc.claimsToAllocate[0].DeepCopy()}
+				second.Name, second.UID, second.Spec.Devices.Config = "second", "second-uid", nil
+				tc.claimsToAllocate = append(tc.claimsToAllocate, second)
+				tc.expectResults = nil
+			case "subrequest-scope", "parent-scope":
+				tc.claimsToAllocate[0] = tc.claimsToAllocate[0].withRequests(requestWithPrioritizedList("req",
+					subRequest("first", "network", 1), subRequest("second", "network", 1)))
+				sharingAffinityLockDevice(tc, "device-a", map[string]string{"tenant": "blue"})
+				selected := "req/first"
+				if scope == "subrequest-scope" {
+					tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
+						sharingAffinityConfig(`{"tenant":"red"}`, "req/first"),
+						sharingAffinityConfig(`{"tenant":"blue"}`, "req/second"),
+					}
+					selected = "req/second"
+				} else {
+					tc.claimsToAllocate[0].Spec.Devices.Config[0].Requests = []string{"req"}
+				}
+				sharingAffinityExpect(tc, sharingAffinityResult(selected, "device-a"), sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim))
+			}
+		})
+	}
+	testcases["sharing-affinity-backtracking-rollback-local-lock"] = sharingAffinityCase(func(tc *AllocatorTestCase) {
+		tc.slices[1].Spec.Devices = []resourceapi.Device{
+			device("device-a").withAllowMultipleAllocations().withAttribute("ordinal", int64(0)).obj(),
+			device("device-b").withAllowMultipleAllocations().withAttribute("ordinal", int64(1)).obj(),
+		}
+		second := request("second", "network", 1, resourceapi.DeviceSelector{
+			CEL: &resourceapi.CELDeviceSelector{Expression: `device.attributes["sharing.example.com"].ordinal == 0`},
+		})
+		tc.claimsToAllocate[0].Spec.Devices.Requests = append(tc.claimsToAllocate[0].Spec.Devices.Requests, second)
+		tc.claimsToAllocate[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
+			sharingAffinityConfig(`{"tenant":"blue"}`, "req"), sharingAffinityConfig(`{"tenant":"red"}`, "second"),
+		}
+		tc.expectResults = []any{allocationResultWithConfigs(nil,
+			[]resourceapi.DeviceRequestAllocationResult{sharingAffinityResult("req", "device-b"), sharingAffinityResult("second", "device-a")},
+			[]resourceapi.DeviceAllocationConfiguration{
+				sharingAffinityAllocConfig(`{"tenant":"blue"}`, resourceapi.AllocationConfigSourceClaim, "req"),
+				sharingAffinityAllocConfig(`{"tenant":"red"}`, resourceapi.AllocationConfigSourceClaim, "second"),
+			})}
+	})
+}
+
+type allocationAffinityFixture struct {
+	newAllocator allocatorFactory
+	features     Features
+	state        AllocatedState
+	class        *resourceapi.DeviceClass
+	slices       []*resourceapi.ResourceSlice
+	claims       []*resourceapi.ResourceClaim
+	node         *v1.Node
+	cache        *cel.Cache
+}
+
+func newAllocationAffinityFixture(newAllocator allocatorFactory) *allocationAffinityFixture {
+	tc := sharingAffinityCase(nil)
+	return &allocationAffinityFixture{
+		newAllocator: newAllocator,
+		features:     tc.features,
+		state: AllocatedState{
+			AllocatedDevices: sets.New[DeviceID](), AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
+			AggregatedCapacity:    tc.allocatedCapacityDevices,
+			DeviceSharingAffinity: SharingAffinityState{DeviceStates: tc.affinityStates},
+		},
+		class:  tc.classes[0],
+		slices: tc.slices,
+		claims: unwrap(tc.claimsToAllocate...),
+		node:   &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node"}},
+		cache:  cel.NewCache(32, cel.Features{}),
+	}
+}
+
+func allocationAffinitySelector(expression string) resourceapi.DeviceSelector {
+	return resourceapi.DeviceSelector{CEL: &resourceapi.CELDeviceSelector{Expression: expression}}
+}
+
+func allocationAffinityRequest(name string) resourceapi.DeviceRequest {
+	return request(name, "network", 1)
+}
+
+func (f *allocationAffinityFixture) addMetadata(entries ...resourceapi.SharingAffinityExtractor) {
+	slice := f.slices[0].DeepCopy()
+	slice.Name = fmt.Sprintf("metadata-%d", len(f.slices))
+	slice.Spec.SharingAffinity = entries
+	f.slices = append(f.slices, slice)
+	for _, s := range f.slices {
+		s.Spec.Pool.ResourceSliceCount = int64(len(f.slices))
+	}
+}
+
+func (f *allocationAffinityFixture) unconstrained() {
+	f.slices = f.slices[1:2]
+	f.slices[0].Spec.Pool.ResourceSliceCount = 1
+}
+
+func (f *allocationAffinityFixture) lock(device string, values map[string]string) {
+	id := MakeDeviceID(sharingAffinityDriver, "pool", device)
+	f.state.AllocatedSharedDeviceIDs.Insert(id)
+	f.state.DeviceSharingAffinity.DeviceStates[id] = DeviceAffinityState{Status: internal.AffinityStatusLocked, LockedAffinity: values}
+}
+
+func (f *allocationAffinityFixture) allocator(t *testing.T, ctx context.Context) Allocator {
+	t.Helper()
+	a, err := f.newAllocator(ctx, f.features, f.state, informerLister[resourceapi.DeviceClass]{objs: []*resourceapi.DeviceClass{f.class}}, f.slices, f.cache)
+	if err != nil {
+		t.Fatalf("NewAllocator: %v", err)
+	}
+	return a
+}
+
+func assertAffinityAllocation(t *testing.T, got []resourceapi.AllocationResult, err error, devices ...string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("Allocate: %v", err)
+	}
+	var actual []string
+	for _, claim := range got {
+		for _, device := range claim.Devices.Results {
+			if device.Driver != sharingAffinityDriver || device.Pool != "pool" {
+				t.Errorf("allocated unexpected driver/pool: %s/%s", device.Driver, device.Pool)
+			}
+			actual = append(actual, device.Device)
+		}
+	}
+	if !reflect.DeepEqual(actual, devices) {
+		t.Fatalf("allocated devices = %v, want %v", actual, devices)
+	}
+	if len(devices) == 0 && len(got) != 0 {
+		t.Errorf("failed allocation returned %d partial claim results", len(got))
+	}
+}
+
+func testSharingAffinityAllocation(t *testing.T, newAllocator allocatorFactory) {
+	// Ordinary allocation cases run through the common TestAllocator matrix.
+	// These cases need provenance, multi-call state, or detailed errors.
+	for _, tc := range []struct {
+		name string
+		run  func(*testing.T, allocatorFactory)
+	}{
+		{"pool", testSharingAffinityPools},
+		{"fatal", testSharingAffinityFatal},
+		{"provenance", testSharingAffinityProvenance},
+		{"isolation", testSharingAffinityIsolation},
+		{"backtracking", testSharingAffinityBacktracking},
+		{"concurrent", testSharingAffinityConcurrent},
+		{"budget", testSharingAffinityBudget},
+		{"freshness", testSharingAffinityFreshness},
+	} {
+		t.Run(tc.name, func(t *testing.T) { tc.run(t, newAllocator) })
+	}
+	t.Run("cancellation", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		_, ctx := ktesting.NewTestContext(t)
+		a := f.allocator(t, ctx)
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+		got, err := a.Allocate(ctx, f.node, f.claims)
+		if !errors.Is(err, context.Canceled) || len(got) != 0 {
+			t.Fatalf("cancelled allocation = %v, %v; want no results and context.Canceled", got, err)
+		}
+	})
+}
+
+func testSharingAffinityGateOffEntryPoints(t *testing.T, newAllocator allocatorFactory) {
+	for _, entry := range []struct {
+		name       string
+		provenance bool
+	}{
+		{name: "allocate"},
+		{name: "provenance", provenance: true},
+	} {
+		for _, mode := range []resourceapi.DeviceAllocationMode{resourceapi.DeviceAllocationModeExactCount, resourceapi.DeviceAllocationModeAll} {
+			for _, canceled := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/canceled-%t", entry.name, mode, canceled), func(t *testing.T) {
+					f := newAllocationAffinityFixture(newAllocator)
+					f.features = Features{}
+					f.slices[1].Spec.Devices[0].AllowMultipleAllocations = nil
+					request := f.claims[0].Spec.Devices.Requests[0].Exactly
+					request.AllocationMode = mode
+					if mode == resourceapi.DeviceAllocationModeAll {
+						request.Count = 0
+					}
+					_, ctx := ktesting.NewTestContext(t)
+					allocator := f.allocator(t, ctx)
+					withAffinity, hasProvenance := allocator.(affinityAllocator)
+					if entry.provenance && !hasProvenance {
+						t.Skipf("%s does not expose the provenance entry point", allocator.Channel())
+					}
+					var wantErr error
+					if canceled {
+						var cancel context.CancelFunc
+						ctx, cancel = context.WithCancel(ctx)
+						cancel()
+						wantErr = context.Canceled
+					}
+					var results []resourceapi.AllocationResult
+					var provenance []internal.ClaimAffinity
+					var err error
+					if entry.provenance {
+						results, provenance, err = withAffinity.AllocateWithAffinity(ctx, f.node, f.claims)
+					} else {
+						results, err = allocator.Allocate(ctx, f.node, f.claims)
+					}
+					if !errors.Is(err, wantErr) || len(results) != 0 || len(provenance) != 0 {
+						t.Fatalf("allocation = %v, provenance = %v, error = %v; want no results or provenance and error %v", results, provenance, err, wantErr)
+					}
+				})
+			}
+		}
+	}
+}
+
+func testSharingAffinityProvenance(t *testing.T, newAllocator allocatorFactory) {
+	t.Run("result-index-and-ownership", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: "device-b"})
+		f.slices[1].Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"dedicated": {BoolValue: ptr.To(false)}}
+		f.slices[1].Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"dedicated": {BoolValue: ptr.To(true)}}
+		f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("admin"), allocationAffinityRequest("dedicated"))
+		f.claims[0].Spec.Devices.Requests[1].Exactly.AdminAccess = ptr.To(true)
+		f.claims[0].Spec.Devices.Requests[2].Exactly.Selectors = []resourceapi.DeviceSelector{allocationAffinitySelector(`device.attributes["sharing.example.com"].dedicated`)}
+		f.claims[0].Spec.Devices.Config = append(f.claims[0].Spec.Devices.Config,
+			sharingAffinityConfig(`{"tenant":"blue"}`, "admin"),
+			sharingAffinityConfig(`{"tenant":"blue"}`, "dedicated"),
+		)
+		_, ctx := ktesting.NewTestContext(t)
+		allocator := f.allocator(t, ctx).(affinityAllocator)
+		results, affinityResults, err := allocator.AllocateWithAffinity(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, results, err, "device-a", "device-a", "device-b")
+		if len(affinityResults) != 1 || len(affinityResults[0].Devices) != len(results[0].Devices.Results) {
+			t.Fatalf("affinity results = %#v, allocation results = %#v; want one provenance entry per result", affinityResults, results)
+		}
+		digest := internal.ExtractorDigest(f.slices[0].Spec.SharingAffinity)
+		for i, prov := range affinityResults[0].Devices {
+			result := results[0].Devices.Results[i]
+			if prov.ResultIndex != i {
+				t.Errorf("ResultIndex[%d] = %d, want %d", i, prov.ResultIndex, i)
+			}
+			if prov.Request != result.Request || prov.Device != MakeDeviceID(result.Driver, result.Pool, result.Device) {
+				t.Errorf("provenance[%d] = request %q device %q, want %q/%s", i, prov.Request, prov.Device, result.Request, result.Device)
+			}
+			if prov.Pool.Driver != result.Driver || prov.Pool.Name != result.Pool || prov.Pool.Generation != f.slices[0].Spec.Pool.Generation || prov.Digest != digest {
+				t.Errorf("pool provenance[%d] = %#v digest %q, want %s/%s gen %d digest %q", i, prov.Pool, prov.Digest, result.Driver, result.Pool, f.slices[0].Spec.Pool.Generation, digest)
+			}
+			if !prov.Constrained || prov.Values["tenant"] != "blue" {
+				t.Errorf("constrained values[%d] = %t/%v, want tenant=blue", i, prov.Constrained, prov.Values)
+			}
+			wantContributes := result.ShareID != nil && !ptr.Deref(result.AdminAccess, false)
+			if prov.Contributes != wantContributes {
+				t.Errorf("Contributes[%d] = %t, want %t for result %#v", i, prov.Contributes, wantContributes, result)
+			}
+		}
+	})
+	t.Run("unconstrained-and-admin", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.unconstrained()
+		f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("admin"))
+		f.claims[0].Spec.Devices.Requests[1].Exactly.AdminAccess = ptr.To(true)
+		_, ctx := ktesting.NewTestContext(t)
+		allocator := f.allocator(t, ctx).(affinityAllocator)
+		results, affinityResults, err := allocator.AllocateWithAffinity(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, results, err, "device-a", "device-a")
+		if len(affinityResults) != 1 || len(affinityResults[0].Devices) != len(results[0].Devices.Results) || len(results[0].Devices.Results) != 2 {
+			t.Fatalf("affinity results = %#v, allocation results = %#v; want two provenance entries, one per result", affinityResults, results)
+		}
+		for i, prov := range affinityResults[0].Devices {
+			result := results[0].Devices.Results[i]
+			if prov.Request != result.Request || prov.Device != MakeDeviceID(result.Driver, result.Pool, result.Device) ||
+				prov.Pool.Driver != result.Driver || prov.Pool.Name != result.Pool {
+				t.Errorf("unconstrained provenance[%d] = %#v, want request %q device %s/%s/%s", i, prov, result.Request, result.Driver, result.Pool, result.Device)
+			}
+			if prov.ResultIndex != i || prov.Pool.Generation != f.slices[0].Spec.Pool.Generation || prov.Digest != internal.EmptyExtractorDigest {
+				t.Errorf("unconstrained provenance[%d] = %#v, want matching index/generation empty digest", i, prov)
+			}
+			if prov.Constrained || prov.Values != nil || prov.Contributes {
+				t.Errorf("unconstrained provenance[%d] constrained/values/contributes = %t/%v/%t, want false/nil/false", i, prov.Constrained, prov.Values, prov.Contributes)
+			}
+		}
+	})
+}
+
+func testSharingAffinityPools(t *testing.T, newAllocator allocatorFactory) {
+	t.Run("aggregate-cost-overflow", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		// A constant-input regex has bounded cost and stays within the CEL
+		// expression length limit; two individually legal slices exceed the pool budget.
+		var expression string
+		for size := 1000; size <= 5000; size += 500 {
+			candidate := fmt.Sprintf("'%s'.matches('%s') ? 'blue' : 'blue'", strings.Repeat("a", size), strings.Repeat("a", size))
+			result := sharingaffinity.ValidateExpression(candidate, environment.StoredExpressions)
+			if result.Error != nil {
+				t.Fatalf("compile aggregate-cost fixture: %v", result.Error)
+			}
+			if result.MaxCost > resourceapi.SharingAffinityCELMaxCost/2 && result.MaxCost <= resourceapi.SharingAffinityCELMaxCost {
+				expression = candidate
+				break
+			}
+		}
+		if expression == "" {
+			t.Fatal("could not construct an individually valid expression exceeding half the aggregate budget")
+		}
+		entry := sharingAffinityExtractor("tenant", expression)
+		if err := sharingaffinity.ValidateExtractorSet([]resourceapi.SharingAffinityExtractor{entry}); err != nil {
+			t.Fatalf("individual metadata slice must be valid: %v", err)
+		}
+		second := entry
+		second.Name = "zone"
+		if err := sharingaffinity.ValidateExtractorSet([]resourceapi.SharingAffinityExtractor{entry, second}); !errors.Is(err, sharingaffinity.ErrCostExceeded) {
+			t.Fatalf("combined fixture must exceed estimated cost: %v", err)
+		}
+		f.slices[0].Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{entry}
+		f.addMetadata(second)
+		_, ctx := ktesting.NewTestContext(t)
+		got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		if !errors.Is(err, internal.ErrFailedAllocationOnNode) || len(got) != 0 {
+			t.Fatalf("over-budget pool allocation = %v, %v; want invalid-pool error", got, err)
+		}
+	})
+}
+
+func testSharingAffinityFatal(t *testing.T, newAllocator allocatorFactory) {
+	const secret = "s3cr3t-affinity-payload"
+	for _, tc := range []struct {
+		name, expression, raw string
+		wantErr               error
+	}{
+		{"cel-error", `string(int(parameters.secret))`, `{"secret":"s3cr3t-affinity-payload"}`, sharingaffinity.ErrCELEval},
+		{"missing-field", `parameters[parameters.secret]`, `{"secret":"s3cr3t-affinity-payload"}`, sharingaffinity.ErrMissingField},
+		{"non-string", `parameters.tenant`, `{"tenant":42,"secret":"s3cr3t-affinity-payload"}`, sharingaffinity.ErrNonStringReturn},
+		{"parameters", `parameters.tenant`, `{"tenant":"s3cr3t-affinity-payload"`, sharingaffinity.ErrParameters},
+		{"claim-inconsistent", `parameters.tenant`, `{"tenant":"s3cr3t-affinity-payload"}`, sharingaffinity.ErrClaimSelfInconsistent},
+		{"sibling-unsatisfied-before-error", `parameters.missing`, `{"tenant":"s3cr3t-affinity-payload"}`, sharingaffinity.ErrMissingField},
+		{"cost-exhausted-admissible", "", "", sharingaffinity.ErrCostExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, provenance := range []bool{false, true} {
+				t.Run(fmt.Sprintf("provenance-%t", provenance), func(t *testing.T) {
+					f := newAllocationAffinityFixture(newAllocator)
+					f.slices[0].Spec.SharingAffinity[0].Expression = tc.expression
+					f.claims[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(tc.raw)}
+					if tc.wantErr == sharingaffinity.ErrClaimSelfInconsistent {
+						f.claims[0].Spec.Devices.Config = append(f.claims[0].Spec.Devices.Config, sharingAffinityConfig(`{"tenant":"other-value"}`))
+					}
+					if tc.name == "sibling-unsatisfied-before-error" {
+						f.slices[0].Spec.SharingAffinity = append([]resourceapi.SharingAffinityExtractor{sharingAffinityExtractor("absent", `parameters.?absent.orValue("")`)}, f.slices[0].Spec.SharingAffinity...)
+					}
+					if tc.wantErr == sharingaffinity.ErrCostExceeded {
+						f.slices[0].Spec.SharingAffinity, f.claims[0].Spec.Devices.Config = admissibleBudgetFixture(t)
+					}
+					// A second candidate must not turn a runtime failure into success.
+					f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: "device-b", AllowMultipleAllocations: ptr.To(true)})
+					logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(10)))
+					ctx := klog.NewContext(context.Background(), logger)
+					if tc.wantErr == sharingaffinity.ErrCostExceeded {
+						pool := sharingaffinity.PoolExtractors{
+							Key:        sharingaffinity.PoolKey{Driver: sharingAffinityDriver, Name: "pool", Generation: 1},
+							Extractors: f.slices[0].Spec.SharingAffinity,
+						}
+						result, err := sharingaffinity.NewExtractor(1).Extract(ctx, pool, sharingaffinity.Request{Name: "req"}, f.claims[0].Spec.Devices.Config[:1])
+						if err != nil || !result.Satisfied {
+							t.Fatalf("one admissible evaluation must fit the runtime budget: %+v, %v", result, err)
+						}
+					}
+					a := f.allocator(t, ctx)
+					var got []resourceapi.AllocationResult
+					var affinity []internal.ClaimAffinity
+					var err error
+					if provenance {
+						got, affinity, err = a.(affinityAllocator).AllocateWithAffinity(ctx, f.node, f.claims)
+					} else {
+						got, err = a.Allocate(ctx, f.node, f.claims)
+					}
+					if len(got) != 0 || len(affinity) != 0 {
+						t.Errorf("fatal extraction returned results=%v, provenance=%v", got, affinity)
+					}
+					if !errors.Is(err, tc.wantErr) {
+						t.Fatalf("Allocate error = %v, want wrapped %v", err, tc.wantErr)
+					}
+					wantOutcome := sharingaffinity.OutcomeRuntime
+					if tc.wantErr == sharingaffinity.ErrClaimSelfInconsistent {
+						wantOutcome = sharingaffinity.OutcomeClaimInconsistent
+					}
+					if sharingaffinity.Classify(err) != wantOutcome || errors.Is(err, internal.ErrFailedAllocationOnNode) {
+						t.Errorf("fatal extraction has wrong scheduler classification: %v", err)
+					}
+					var attributed *sharingaffinity.Error
+					if !errors.As(err, &attributed) || attributed.Pool.Driver != sharingAffinityDriver || attributed.Pool.Name != "pool" || attributed.Request != "req" {
+						t.Fatalf("missing typed pool/request error attribution: %v", err)
+					}
+					if tc.wantErr == sharingaffinity.ErrCostExceeded && (attributed.ConfigIndex <= 0 || attributed.ConfigIndex >= len(f.claims[0].Spec.Devices.Config)) {
+						t.Errorf("budget failed at config %d, want shared budget exhausted after at least one evaluation", attributed.ConfigIndex)
+					}
+					secrets := []string{secret, strings.Repeat("a", 64)}
+					for _, extractor := range f.slices[0].Spec.SharingAffinity {
+						secrets = append(secrets, extractor.Expression)
+					}
+					for _, config := range f.claims[0].Spec.Devices.Config {
+						secrets = append(secrets, string(config.Opaque.Parameters.Raw))
+					}
+					logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+					for _, secret := range secrets {
+						if secret == "" {
+							t.Fatal("redaction check requires non-empty expression and payload")
+						}
+						if strings.Contains(err.Error(), secret) || strings.Contains(logs, secret) {
+							t.Errorf("error or logs disclosed input %.40q", secret)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func testSharingAffinityIsolation(t *testing.T, newAllocator allocatorFactory) {
+	for _, tc := range []struct {
+		name, second string
+		separate     bool
+		want         []string
+	}{
+		{"two-requests-same-device-equal", "blue", false, []string{"device-a", "device-a"}},
+		{"two-requests-same-device-mismatch", "red", false, []string{"device-a", "device-b"}},
+		{"two-claims-same-device-equal", "blue", true, []string{"device-a", "device-a"}},
+		{"two-claims-same-device-mismatch", "red", true, []string{"device-a", "device-b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newAllocationAffinityFixture(newAllocator)
+			f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: "device-b", AllowMultipleAllocations: ptr.To(true)})
+			if tc.separate {
+				second := f.claims[0].DeepCopy()
+				second.Name, second.UID = "second", "second-uid"
+				second.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(fmt.Sprintf(`{"tenant":%q}`, tc.second))}
+				f.claims = append(f.claims, second)
+			} else {
+				f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("second"))
+				f.claims[0].Spec.Devices.Config[0].Requests = []string{"req"}
+				f.claims[0].Spec.Devices.Config = append(f.claims[0].Spec.Devices.Config, sharingAffinityConfig(fmt.Sprintf(`{"tenant":%q}`, tc.second), "second"))
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			a := f.allocator(t, ctx)
+			got, err := a.Allocate(ctx, f.node, f.claims)
+			assertAffinityAllocation(t, got, err, tc.want...)
+			if len(got) != len(f.claims) {
+				t.Fatalf("results = %d, want one per claim (%d)", len(got), len(f.claims))
+			}
+			for i, result := range got {
+				for j, device := range result.Devices.Results {
+					if device.Request != f.claims[i].Spec.Devices.Requests[j].Name || device.ShareID == nil || *device.ShareID == "" {
+						t.Errorf("lost request or sharing identity: %#v", device)
+					}
+				}
+			}
+			// A later call may choose an incompatible value on the same clean
+			// device: Filter has not acquired a durable owner.
+			next := f.claims[0].DeepCopy()
+			next.Spec.Devices.Requests = []resourceapi.DeviceRequest{allocationAffinityRequest("req")}
+			next.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(`{"tenant":"green"}`)}
+			again, err := a.Allocate(ctx, f.node, []*resourceapi.ResourceClaim{next})
+			assertAffinityAllocation(t, again, err, "device-a")
+		})
+	}
+}
+
+func testSharingAffinityBacktracking(t *testing.T, newAllocator allocatorFactory) {
+	t.Run("failed-attempt-does-not-poison-next-call", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("second"))
+		f.claims[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
+			sharingAffinityConfig(`{"tenant":"blue"}`, "req"), sharingAffinityConfig(`{"tenant":"red"}`, "second"),
+		}
+		_, ctx := ktesting.NewTestContext(t)
+		a := f.allocator(t, ctx)
+		got, err := a.Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err)
+		next := f.claims[0].DeepCopy()
+		next.Spec.Devices.Requests = next.Spec.Devices.Requests[1:]
+		got, err = a.Allocate(ctx, f.node, []*resourceapi.ResourceClaim{next})
+		assertAffinityAllocation(t, got, err, "device-a")
+	})
+}
+
+func testSharingAffinityConcurrent(t *testing.T, newAllocator allocatorFactory) {
+	t.Run("nodes", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.lock("unrelated-device", map[string]string{"tenant": "unchanged"})
+		before := f.state.DeviceSharingAffinity.DeviceStates.Clone()
+		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		a := f.allocator(t, ctx)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		results := make([][]resourceapi.AllocationResult, 8)
+		provenance := make([][]internal.ClaimAffinity, 8)
+		errs := make([]error, 8)
+		for i := range results {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("node-%d", i)}}
+				claim := f.claims[0].DeepCopy()
+				claim.UID = apitypes.UID(fmt.Sprintf("claim-%d", i))
+				claim.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{sharingAffinityConfig(fmt.Sprintf(`{"tenant":"value-%d"}`, i))}
+				results[i], provenance[i], errs[i] = a.(affinityAllocator).AllocateWithAffinity(ctx, node, []*resourceapi.ResourceClaim{claim})
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if err := ctx.Err(); err != nil {
+			t.Fatalf("concurrent allocations exceeded their bounded context: %v", err)
+		}
+		shares := sets.New[apitypes.UID]()
+		for i := range results {
+			assertAffinityAllocation(t, results[i], errs[i], "device-a")
+			share := results[i][0].Devices.Results[0].ShareID
+			if share == nil || *share == "" || shares.Has(*share) {
+				t.Errorf("node %d has missing or reused share identity: %v", i, share)
+			} else {
+				shares.Insert(*share)
+			}
+			if len(provenance[i]) != 1 || len(provenance[i][0].Devices) != 1 || provenance[i][0].Devices[0].Values["tenant"] != fmt.Sprintf("value-%d", i) {
+				t.Fatalf("node %d provenance = %#v, want own tenant value", i, provenance[i])
+			}
+		}
+		provenance[0][0].Devices[0].Values["tenant"] = "mutated"
+		if provenance[1][0].Devices[0].Values["tenant"] == "mutated" {
+			t.Error("mutating one returned affinity map changed another concurrent call")
+		}
+		if f.state.DeviceSharingAffinity.DeviceStates[MakeDeviceID(sharingAffinityDriver, "pool", "unrelated-device")].LockedAffinity["tenant"] != "unchanged" {
+			t.Error("mutating returned affinity map changed the allocation snapshot")
+		}
+		if !reflect.DeepEqual(before, f.state.DeviceSharingAffinity.DeviceStates) {
+			t.Error("concurrent node allocation mutated snapshot lock maps")
+		}
+	})
+}
+
+func testSharingAffinityBudget(t *testing.T, newAllocator allocatorFactory) {
+	// Measure an admission-valid expression's real runtime budget through the
+	// existing extractor before using it to test allocator budget ownership.
+	entries, configs := admissibleBudgetFixture(t)
+	entry, config := entries[0], configs[0]
+	_, ctx := ktesting.NewTestContext(t)
+	pool := sharingaffinity.PoolExtractors{Key: sharingaffinity.PoolKey{Driver: sharingAffinityDriver, Name: "pool", Generation: 1}, Extractors: []resourceapi.SharingAffinityExtractor{entry}}
+	extractor := sharingaffinity.NewExtractor(1)
+	// Discover the boundary instead of depending on a particular CEL version's
+	// exact cost formula. Each extraction consumes a fresh request budget.
+	var below []resourceapi.DeviceClaimConfiguration
+	for n := 1; n <= resourceapi.DeviceConfigMaxSize; n++ {
+		configs := append(append([]resourceapi.DeviceClaimConfiguration(nil), below...), config)
+		_, err := extractor.Extract(ctx, pool, sharingaffinity.Request{Name: "req"}, configs)
+		if errors.Is(err, sharingaffinity.ErrCostExceeded) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("measure runtime budget: %v", err)
+		}
+		below = configs
+	}
+	if len(below) == 0 || len(below) == resourceapi.DeviceConfigMaxSize {
+		t.Fatalf("could not bracket runtime budget within the config admission limit, successful configs = %d", len(below))
+	}
+	for _, tc := range []struct {
+		name string
+		over bool
+	}{
+		{"per-request", false}, {"cost-exhausted", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newAllocationAffinityFixture(newAllocator)
+			f.slices[0].Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{entry}
+			f.claims[0].Spec.Devices.Config = append([]resourceapi.DeviceClaimConfiguration(nil), below...)
+			f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("second"))
+			if tc.over {
+				f.claims[0].Spec.Devices.Config = append(f.claims[0].Spec.Devices.Config, config)
+			}
+			a := f.allocator(t, ctx)
+			got, err := a.Allocate(ctx, f.node, f.claims)
+			if tc.over {
+				if !errors.Is(err, sharingaffinity.ErrCostExceeded) || sharingaffinity.Classify(err) != sharingaffinity.OutcomeRuntime || len(got) != 0 {
+					t.Errorf("over-budget allocation = %d results, %v; want runtime ErrCostExceeded", len(got), err)
+				}
+			} else {
+				assertAffinityAllocation(t, got, err, "device-a", "device-a")
+			}
+			next := f.claims[0].DeepCopy()
+			next.Spec.Devices.Config = append([]resourceapi.DeviceClaimConfiguration(nil), below...)
+			got, err = a.Allocate(ctx, f.node, []*resourceapi.ResourceClaim{next})
+			assertAffinityAllocation(t, got, err, "device-a", "device-a")
+		})
+	}
+	t.Run("across-candidate-rejection", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.slices[0].Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{entry}
+		f.claims[0].Spec.Devices.Config = append([]resourceapi.DeviceClaimConfiguration(nil), below...)
+		f.slices[1].Spec.Devices = nil
+		for i := 0; i < 8; i++ {
+			name := fmt.Sprintf("device-%d", i)
+			f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: name, AllowMultipleAllocations: ptr.To(true)})
+			if i < 7 {
+				f.lock(name, map[string]string{entry.Name: "red"})
+			}
+		}
+		got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err, "device-7")
+	})
+	t.Run("memo-once-per-pool-request", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.slices[1].Spec.Devices = nil
+		for i := 0; i < 8; i++ {
+			name := fmt.Sprintf("device-%d", i)
+			f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: name, AllowMultipleAllocations: ptr.To(true)})
+			if i < 7 {
+				f.lock(name, map[string]string{"tenant": "red"})
+			}
+		}
+		logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(6)))
+		ctx := klog.NewContext(context.Background(), logger)
+		buffer := logger.GetSink().(ktesting.Underlier).GetBuffer()
+		extractions := func() int {
+			count := 0
+			for _, entry := range buffer.Data() {
+				if entry.Message == "Extracting sharing affinity" {
+					count++
+				}
+			}
+			return count
+		}
+		a := f.allocator(t, ctx)
+		for _, requests := range []int{1, 2} {
+			t.Run(fmt.Sprintf("requests-%d", requests), func(t *testing.T) {
+				claim := f.claims[0].DeepCopy()
+				want := []string{"device-7"}
+				if requests == 2 {
+					claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, allocationAffinityRequest("second"))
+					want = append(want, "device-7")
+				}
+				before := extractions()
+				got, err := a.Allocate(ctx, f.node, []*resourceapi.ResourceClaim{claim})
+				// This existing extractor entry log observes real calls without
+				// changing the production extractor or introducing a fake.
+				if calls := extractions() - before; calls != requests {
+					t.Errorf("extraction calls = %d across eight candidates, want %d (once per pool/request per Allocate call)", calls, requests)
+				}
+				assertAffinityAllocation(t, got, err, want...)
+			})
+		}
+	})
+}
+
+func testSharingAffinityFreshness(t *testing.T, newAllocator allocatorFactory) {
+	for _, change := range []string{"expression", "name", "group", "kind", "generation", "deletion", "metadata-added", "fenced-after-removal"} {
+		t.Run(change, func(t *testing.T) {
+			f := newAllocationAffinityFixture(newAllocator)
+			f.lock("device-a", map[string]string{"tenant": "blue"})
+			_, ctx := ktesting.NewTestContext(t)
+			if change == "metadata-added" {
+				f.slices[0].Spec.SharingAffinity = nil
+			}
+			first, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+			assertAffinityAllocation(t, first, err, "device-a")
+			// A fresh cycle reuses the program cache, not metadata predicates,
+			// extracted values, or the previous cycle's successful decision.
+			for i := range f.slices {
+				f.slices[i] = f.slices[i].DeepCopy()
+			}
+			switch change {
+			case "expression":
+				f.slices[0].Spec.SharingAffinity[0].Expression = `"red"`
+			case "name":
+				f.slices[0].Spec.SharingAffinity[0].Name = "renamed"
+			case "group":
+				f.slices[0].Spec.SharingAffinity[0].APIGroup = "new.example.com"
+			case "kind":
+				f.slices[0].Spec.SharingAffinity[0].Kind = "NewConfig"
+			case "generation":
+				for _, s := range f.slices {
+					s.Spec.Pool.Generation++
+				}
+				f.slices[0].Spec.SharingAffinity[0].Expression = `"red"`
+			case "deletion":
+				f.slices = f.slices[1:]
+			case "metadata-added":
+				f.slices[0].Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{sharingAffinityExtractor("zone", `parameters.?zone.orValue("")`)}
+			case "fenced-after-removal":
+				f.unconstrained()
+				f.state.DeviceSharingAffinity.DeviceStates[MakeDeviceID(sharingAffinityDriver, "pool", "device-a")] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+			}
+			got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+			assertAffinityAllocation(t, got, err)
+		})
+	}
+	t.Run("delete-newer-incomplete-generation", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		newer := f.slices[0].DeepCopy()
+		newer.Name, newer.Spec.Pool.Generation = "newer-metadata", 2
+		newer.Spec.SharingAffinity[0].Expression = `""`
+		f.slices = append(f.slices, newer)
+		_, ctx := ktesting.NewTestContext(t)
+		got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err)
+		f.slices = f.slices[:2]
+		got, err = f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err, "device-a")
+	})
+	t.Run("same-generation-correction", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.slices[0].Spec.SharingAffinity[0].Expression = `""`
+		_, ctx := ktesting.NewTestContext(t)
+		got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err)
+		f.slices[0] = f.slices[0].DeepCopy()
+		f.slices[0].Spec.SharingAffinity[0].Expression = `parameters.tenant`
+		got, err = f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err, "device-a")
+	})
+}
+
+const (
+	diagnosticMismatch    = "incompatible with the device's sharing affinity lock"
+	diagnosticUnsatisfied = "claim configuration does not produce a value for every sharing affinity extractor of the pool"
+	diagnosticUnknown     = "device sharing affinity is unknown because of legacy or inconsistent allocations; it can only be re-evaluated after all active allocations on the device are removed"
+)
+
+// admissibleBudgetFixture exhausts the request-wide budget, not admission limits.
+// Keeping the work in a constant literal bounds the admission cost estimate.
+func admissibleBudgetFixture(t *testing.T) ([]resourceapi.SharingAffinityExtractor, []resourceapi.DeviceClaimConfiguration) {
+	t.Helper()
+	const list = "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]"
+	expr := `has(parameters.kind) && ` + list + `.all(i, ` + list + `.all(j, "` + strings.Repeat("a", 4000) + `".matches("a{1,3}"))) ? "x" : "x"`
+	entries := []resourceapi.SharingAffinityExtractor{{Name: "b0", APIGroup: "example.com", Kind: "Config", Expression: expr}}
+	if len(expr) > resourceapi.SharingAffinityCELExpressionMaxLength {
+		t.Fatalf("expression length %d exceeds admission limit", len(expr))
+	}
+	if err := sharingaffinity.ValidateExtractorSet(entries); err != nil {
+		t.Fatalf("runtime fixture must pass estimated-cost admission: %v", err)
+	}
+	configs := make([]resourceapi.DeviceClaimConfiguration, 8)
+	for i := range configs {
+		configs[i] = sharingAffinityConfig(`{"apiVersion":"example.com/v1","kind":"Config"}`)
+		if len(configs[i].Opaque.Parameters.Raw) > resourceapi.OpaqueParametersMaxLength {
+			t.Fatal("runtime fixture exceeds opaque parameter admission limit")
+		}
+	}
+	if len(configs) > resourceapi.DeviceConfigMaxSize {
+		t.Fatal("runtime fixture exceeds claim config admission limit")
+	}
+	return entries, configs
+}
+
+func assertAffinityRejection(t *testing.T, err error, message string) {
+	t.Helper()
+	if !errors.Is(err, internal.ErrFailedAllocationOnNode) {
+		t.Fatalf("error %v must preserve node-local retry semantics", err)
+	}
+	if err.Error() != message {
+		t.Errorf("message = %q, want %q", err.Error(), message)
+	}
+}
+
+func testSharingAffinityDiagnostics(t *testing.T, newAllocator allocatorFactory) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*allocationAffinityFixture)
+		message string
+	}{
+		{"mismatch/locked", func(f *allocationAffinityFixture) {
+			f.lock("device-a", map[string]string{"tenant": "private-lock-value"})
+		}, diagnosticMismatch},
+		{"mismatch/local-in-call", func(f *allocationAffinityFixture) {
+			f.claims[0].Spec.Devices.Requests = append(f.claims[0].Spec.Devices.Requests, allocationAffinityRequest("second"))
+			f.claims[0].Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
+				sharingAffinityConfig(`{"tenant":"private-first-value"}`, "req"),
+				sharingAffinityConfig(`{"tenant":"private-second-value"}`, "second"),
+			}
+		}, diagnosticMismatch},
+		{"unsatisfied/no-keys", func(f *allocationAffinityFixture) {
+			f.claims[0].Spec.Devices.Config = nil
+		}, diagnosticUnsatisfied},
+		{"unsatisfied/sibling-masked", func(f *allocationAffinityFixture) {
+			f.slices[0].Spec.SharingAffinity = append(f.slices[0].Spec.SharingAffinity, sharingAffinityExtractor("zone", `""`))
+		}, diagnosticUnsatisfied},
+		{"unknown/unreconstructable", func(f *allocationAffinityFixture) {
+			id := MakeDeviceID(sharingAffinityDriver, "pool", "device-a")
+			f.state.DeviceSharingAffinity.DeviceStates[id] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+			f.state.AllocatedSharedDeviceIDs.Insert(id)
+		}, diagnosticUnknown},
+		{"invalid-pool-plus-rejection", func(f *allocationAffinityFixture) {
+			f.lock("device-a", map[string]string{"tenant": "private-lock-value"})
+			invalid := f.slices[0].DeepCopy()
+			invalid.Name, invalid.Spec.Pool.Name = "invalid", "invalid"
+			invalid.Spec.Pool.ResourceSliceCount = 1
+			invalid.Spec.SharingAffinity = append(invalid.Spec.SharingAffinity, invalid.Spec.SharingAffinity[0])
+			invalid.Spec.AllNodes = ptr.To(true)
+			invalid.Spec.Devices = f.slices[1].Spec.Devices
+			f.slices = append(f.slices, invalid)
+		}, diagnosticMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newAllocationAffinityFixture(newAllocator)
+			tc.mutate(f)
+			before := f.state.DeviceSharingAffinity.DeviceStates.Clone()
+			_, ctx := ktesting.NewTestContext(t)
+			got, provenance, err := f.allocator(t, ctx).(affinityAllocator).AllocateWithAffinity(ctx, f.node, f.claims)
+			if len(got) != 0 || len(provenance) != 0 {
+				t.Errorf("failed allocation returned results=%v, provenance=%v", got, provenance)
+			}
+			if !reflect.DeepEqual(before, f.state.DeviceSharingAffinity.DeviceStates) {
+				t.Error("diagnostics changed snapshot locks")
+			}
+			message := "sharing affinity: " + tc.message
+			if tc.name == "invalid-pool-plus-rejection" {
+				message = "invalid resource pools were encountered; " + message
+			}
+			assertAffinityRejection(t, err, message)
+			for _, secret := range []string{"private-lock-value", "private-first-value", "private-second-value", "blue", f.slices[0].Spec.SharingAffinity[0].Expression} {
+				if strings.Contains(err.Error(), secret) {
+					t.Errorf("message discloses %q", secret)
+				}
+			}
+		})
+	}
+
+	t.Run("combined/real-allocation", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.lock("device-a", map[string]string{"tenant": "private-lock-value"})
+		for _, name := range []string{"unsatisfied", "unknown"} {
+			slice := f.slices[1].DeepCopy()
+			slice.Name, slice.Spec.Pool.Name = name, name
+			slice.Spec.Pool.ResourceSliceCount = 1
+			slice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{sharingAffinityExtractor("tenant", `""`)}
+			if name == "unknown" {
+				id := MakeDeviceID(sharingAffinityDriver, name, "device-a")
+				f.state.DeviceSharingAffinity.DeviceStates[id] = DeviceAffinityState{Status: internal.AffinityStatusUnreconstructable}
+				f.state.AllocatedSharedDeviceIDs.Insert(id)
+			}
+			f.slices = append(f.slices, slice)
+		}
+		_, ctx := ktesting.NewTestContext(t)
+		got, provenance, err := f.allocator(t, ctx).(affinityAllocator).AllocateWithAffinity(ctx, f.node, f.claims)
+		if len(got) != 0 || len(provenance) != 0 {
+			t.Error("combined failure returned partial allocation")
+		}
+		assertAffinityRejection(t, err,
+			"sharing affinity: "+strings.Join([]string{diagnosticMismatch, diagnosticUnsatisfied, diagnosticUnknown}, "; "))
+	})
+
+	t.Run("success-with-rejected-alternative", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.lock("device-a", map[string]string{"tenant": "red"})
+		f.slices[1].Spec.Devices = append(f.slices[1].Spec.Devices, resourceapi.Device{Name: "device-b", AllowMultipleAllocations: ptr.To(true)})
+		_, ctx := ktesting.NewTestContext(t)
+		a := f.allocator(t, ctx).(affinityAllocator)
+		for range 2 {
+			got, provenance, err := a.AllocateWithAffinity(ctx, f.node, f.claims)
+			assertAffinityAllocation(t, got, err, "device-b")
+			if len(provenance) != 1 {
+				t.Errorf("provenance count = %d, want 1", len(provenance))
+			}
+		}
+	})
+	for _, name := range []string{"allocate-without-provenance", "no-affinity-pool"} {
+		t.Run(name, func(t *testing.T) {
+			f := newAllocationAffinityFixture(newAllocator)
+			_, ctx := ktesting.NewTestContext(t)
+			switch name {
+			case "allocate-without-provenance":
+				f.lock("device-a", map[string]string{"tenant": "red"})
+				got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+				assertAffinityAllocation(t, got, err)
+			case "no-affinity-pool":
+				f.unconstrained()
+				got, _, err := f.allocator(t, ctx).(affinityAllocator).AllocateWithAffinity(ctx, f.node, f.claims)
+				assertAffinityAllocation(t, got, err, "device-a")
+			}
+		})
+	}
+	t.Run("pool-dump-redaction", func(t *testing.T) { testAffinityDiagnosticPoolDump(t, newAllocator) })
+	t.Run("unsatisfied/log-extractor-names", func(t *testing.T) {
+		f := newAllocationAffinityFixture(newAllocator)
+		f.slices[0].Spec.SharingAffinity = append(f.slices[0].Spec.SharingAffinity, sharingAffinityExtractor("missing-zone", `""`))
+		logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(7), ktesting.BufferLogs(true)))
+		ctx := klog.NewContext(t.Context(), logger)
+		_, _, err := f.allocator(t, ctx).(affinityAllocator).AllocateWithAffinity(ctx, f.node, f.claims)
+		found := false
+		for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+			fields := map[string]any{}
+			for _, kv := range [][]any{entry.WithKVList, entry.ParameterKVList} {
+				for i := 0; i+1 < len(kv); i += 2 {
+					if key, ok := kv[i].(string); ok {
+						fields[key] = kv[i+1]
+					}
+				}
+			}
+			if fields["reason"] == "unsatisfied" {
+				found = true
+				if !reflect.DeepEqual(fields["unsatisfied"], []string{"missing-zone"}) {
+					t.Errorf("unsatisfied rejection log names = %v, want [missing-zone]", fields["unsatisfied"])
+				}
+				for _, key := range []string{"device", "request"} {
+					if _, ok := fields[key]; !ok {
+						t.Errorf("rejection log omits %s", key)
+					}
+				}
+			}
+		}
+		if !found {
+			t.Error("missing V(7) device rejection log")
+		}
+		assertAffinityRejection(t, err, "sharing affinity: "+diagnosticUnsatisfied)
+	})
+}
+
+func testAffinityDiagnosticPoolDump(t *testing.T, newAllocator allocatorFactory) {
+	const canary = "kep5981-cel-canary-7f3a"
+	const annotation = "kubectl.kubernetes.io/last-applied-configuration"
+	f := newAllocationAffinityFixture(newAllocator)
+	f.slices[0].Spec.AllNodes = ptr.To(true)
+	f.slices[0].Spec.SharingAffinity[0].Expression = `"` + canary + `" == "x" ? "a" : "b"`
+	for _, slice := range f.slices {
+		slice.Annotations = map[string]string{annotation: canary}
+		slice.ManagedFields = []metav1.ManagedFieldsEntry{{Manager: "driver", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{"f:` + canary + `":{}}}}`)}}}
+	}
+	before := make([]*resourceapi.ResourceSlice, len(f.slices))
+	for i, slice := range f.slices {
+		before[i] = slice.DeepCopy()
+	}
+	for _, verbosity := range []int{0, 7} {
+		logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(verbosity), ktesting.BufferLogs(true)))
+		ctx := klog.NewContext(t.Context(), logger)
+		got, err := f.allocator(t, ctx).Allocate(ctx, f.node, f.claims)
+		assertAffinityAllocation(t, got, err, "device-a")
+		logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+		if strings.Contains(logs, canary) {
+			t.Errorf("V(%d) pool log discloses CEL or metadata payload", verbosity)
+		}
+		if verbosity == 7 {
+			for _, token := range []string{"content", "tenant", "apiGroup", "kind", annotation} {
+				if !strings.Contains(logs, token) {
+					t.Errorf("V(7) pool dump missing %q", token)
+				}
+			}
+		}
+		if !reflect.DeepEqual(f.slices, before) {
+			t.Error("logging mutated informer slices, expressions, annotations or managed fields")
+		}
+	}
+}
+
+// TestAllocatorSelection takes the public constructor without converting its result,
+// so a non-nil allocator returned with an error is not hidden by an adapter.
+func TestAllocatorSelection[A any](
+	t *testing.T,
+	enableAllocators func(...string),
+	newAllocator func(context.Context, Features, AllocatedState, DeviceClassLister, []*resourceapi.ResourceSlice, *cel.Cache) (A, error),
+) {
+	t.Cleanup(func() { enableAllocators() })
+	t.Run("sharing-affinity", func(t *testing.T) {
+		t.Run("feature sets", func(t *testing.T) {
+			if !internal.FeaturesAll.SharingAffinity || !internal.FeaturesAll.Set().Has("DRASharingAffinity") {
+				t.Error("FeaturesAll must enable and advertise DRASharingAffinity")
+			}
+			for _, enabled := range []bool{false, true} {
+				if got := (Features{SharingAffinity: enabled}).Set().Has("DRASharingAffinity"); got != enabled {
+					t.Errorf("Features{SharingAffinity:%t}.Set contains gate = %t", enabled, got)
+				}
+			}
+		})
+		for _, tc := range []struct {
+			name     string
+			channels []string
+			wantErr  bool
+		}{
+			{"stable", []string{"stable"}, true},
+			{"incubating", []string{"incubating"}, true},
+			{"older implementations", []string{"stable", "incubating"}, true},
+			{"experimental", []string{"experimental"}, false},
+			{"default selection", nil, false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				enableAllocators(tc.channels...)
+				allocator, err := newAllocator(ctx, Features{ConsumableCapacity: true, SharingAffinity: true}, AllocatedState{}, nil, nil, nil)
+				if tc.wantErr {
+					if err == nil || any(allocator) != nil {
+						t.Errorf("unsupported constructor = (%T, %v), want nil allocator and error", allocator, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("constructor: %v", err)
+				}
+				actual, ok := any(allocator).(Allocator)
+				if !ok {
+					t.Fatalf("allocator %T does not expose its implementation channel", allocator)
+				}
+				if got := actual.Channel(); got != internal.Experimental {
+					t.Errorf("channel = %q, want experimental", got)
+				}
+			})
+		}
+	})
 }
 
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
@@ -9371,7 +10921,96 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	sharingAffinityCandidates(testcases)
+	sharingAffinityPools(testcases)
+	sharingAffinityGateAndState(testcases)
+	sharingAffinityGateOff(testcases)
+	sharingAffinityObsoleteGeneration(testcases)
+	sharingAffinityMetadata(testcases)
+	sharingAffinityScope(testcases)
+
+	// Backends that receive the full allocated state must reject stale pools,
+	// even when sharing affinity and consumable capacity are disabled.
+	for variant, features := range map[string]Features{
+		"gate-off":   {},
+		"consumable": {AdminAccess: true, ConsumableCapacity: true, PrioritizedList: true},
+		"enforced":   {AdminAccess: true, ConsumableCapacity: true, PrioritizedList: true, SharingAffinity: true},
+	} {
+		const driver = "sharing.example.com"
+		for name, stalePools := range map[string]sets.Set[PoolID]{
+			"nil":          nil,
+			"other-pool":   sets.New(PoolID{Driver: driver, Pool: "other"}),
+			"other-driver": sets.New(PoolID{Driver: "other.example.com", Pool: "pool"}),
+			"stale-pool":   sets.New(PoolID{Driver: driver, Pool: "pool"}),
+		} {
+			claim := claimWithRequests("claim", nil, request("req", "network", 1))
+			claim.Namespace = "default"
+			claim.UID = "claim-uid"
+			slice := sliceWithDevices("devices", nodeSelectionAll, resourceapi.ResourcePool{
+				Name: "pool", Generation: 1, ResourceSliceCount: 1,
+			}, driver, device("device-a"))
+			result := resourceapi.DeviceRequestAllocationResult{
+				Request: "req", Driver: driver, Pool: "pool", Device: "device-a",
+			}
+			var configs []resourceapi.DeviceAllocationConfiguration
+			if features.ConsumableCapacity {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				config := resourceapi.DeviceConfiguration{Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					Driver: driver, Parameters: runtime.RawExtension{Raw: []byte(`{"tenant":"blue"}`)},
+				}}
+				claim.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{{DeviceConfiguration: config}}
+				configs = []resourceapi.DeviceAllocationConfiguration{{
+					Source: resourceapi.AllocationConfigSourceClaim, DeviceConfiguration: *config.DeepCopy(),
+				}}
+				result.ShareID = &fixedShareID
+			}
+			tc := AllocatorTestCase{
+				features:                 features,
+				claimsToAllocate:         objects(claim),
+				classes:                  objects(class("network", driver)),
+				slices:                   unwrapResourceSlices(slice),
+				allocatedSharedDeviceIDs: sets.New[DeviceID](),
+				allocatedCapacityDevices: internal.NewConsumedCapacityCollection(),
+				affinityStates:           AffinityStateCollection{},
+				stalePools:               stalePools,
+			}
+			expectResults := []any{allocationResultWithConfigs(nil,
+				[]resourceapi.DeviceRequestAllocationResult{result}, configs)}
+			if name != "stale-pool" {
+				tc.expectResults = expectResults
+			} else {
+				// Stable's constructor does not receive sharing-affinity state.
+				tc.expectResultsByChannel = map[internal.AllocatorChannel][]any{
+					internal.Stable: expectResults,
+				}
+			}
+			testcases["sharing-affinity-stale-pools-"+variant+"-"+name] = tc
+		}
+	}
+
 	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
+
+	t.Run("sharing-affinity-gate-off-entry-points", func(t *testing.T) {
+		testSharingAffinityGateOffEntryPoints(t, newAllocator)
+	})
+	for _, tc := range []struct {
+		name string
+		run  func(*testing.T, allocatorFactory)
+	}{
+		{"sharing-affinity-allocation", testSharingAffinityAllocation},
+		{"sharing-affinity-diagnostics", testSharingAffinityDiagnostics},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !supportedFeatures.SharingAffinity {
+				t.Skip("sharing affinity is not supported")
+			}
+			tc.run(t, newAllocator)
+		})
+	}
+
+	t.Run("sharing-affinity-state-transport", func(t *testing.T) {
+		testAllocatedStateTransport(t, supportedFeatures, newAllocator)
+	})
 
 	t.Run("interrupt", func(t *testing.T) {
 		for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
@@ -9476,7 +11115,6 @@ func RunTestAllocator(t *testing.T,
 				claimsToAllocate[i] = wrapResourceClaim{claim.DeepCopy()}
 			}
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
-			allocatedShare := tc.allocatedCapacityDevices.Clone()
 			var slices []*resourceapi.ResourceSlice
 			if tc.slices != nil {
 				slices = make([]*resourceapi.ResourceSlice, len(tc.slices))
@@ -9484,17 +11122,23 @@ func RunTestAllocator(t *testing.T,
 					slices[i] = slice.DeepCopy()
 				}
 			}
-			t.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClasses:\n%s\nallocated capacity:\n%s",
+			allocatedState := snapshotAllocatedState(AllocatedState{
+				AllocatedDevices:         sets.New(allocatedDevices...),
+				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
+				AggregatedCapacity:       tc.allocatedCapacityDevices,
+				DeviceSharingAffinity: SharingAffinityState{
+					DeviceStates: tc.affinityStates,
+					StalePools:   tc.stalePools,
+				},
+			})
+			before := snapshotAllocatedState(allocatedState)
+			t.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClasses:\n%s\nallocated capacity:\n%s\nDeviceSharingAffinity:\n%s",
 				format.Object(slices, 1),
 				format.Object(claimsToAllocate, 1),
 				format.Object(classLister.objs, 1),
-				format.Object(allocatedShare, 1),
+				format.Object(allocatedState.AggregatedCapacity, 1),
+				format.Object(allocatedState.DeviceSharingAffinity, 1),
 			)
-			allocatedState := AllocatedState{
-				AllocatedDevices:         sets.New(allocatedDevices...),
-				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
-				AggregatedCapacity:       allocatedShare,
-			}
 			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
 				EnableConsumableCapacity: tc.features.ConsumableCapacity,
 				EnableListTypeAttributes: tc.features.ListTypeAttributes,
@@ -9522,18 +11166,26 @@ func RunTestAllocator(t *testing.T,
 			for ri, result := range results {
 				for ai, allocation := range result.Devices.Results {
 					if allocation.ShareID != nil {
+						g.Expect(*allocation.ShareID).ToNot(gomega.BeEmpty())
 						results[ri].Devices.Results[ai].ShareID = &fixedShareID
 					}
 					t.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
 				}
 			}
-			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
+			expectResults := tc.expectResults
+			if override, ok := tc.expectResultsByChannel[allocator.Channel()]; ok {
+				expectResults = override
+			}
+			g.Expect(results).To(gomega.ConsistOf(expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
 			g.Expect(claimsToAllocate).To(gomega.Equal(tc.claimsToAllocate))
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
 			g.Expect(slices).To(gomega.Equal(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
+			if !equalAllocatedStateTransport(t, allocatedState, before) {
+				t.Fatal("allocator modified its input allocated state")
+			}
 
 			if expectNumAllocateOneInvocations := tc.expectNumAllocateOneInvocations; expectNumAllocateOneInvocations > 0 {
 				stats := allocator.(internal.AllocatorExtended).GetStats()
@@ -9542,8 +11194,198 @@ func RunTestAllocator(t *testing.T,
 				}
 				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(expectNumAllocateOneInvocations))
 			}
+			if tc.inspectAllocatedState != nil {
+				tc.inspectAllocatedState(t, allocatedState)
+			}
 		})
 	}
+}
+
+// Each constructor call and its immutability oracle need independent nested
+// maps. Capacity retains the runner's existing nil-to-empty normalization.
+func snapshotAllocatedState(state AllocatedState) AllocatedState {
+	return AllocatedState{
+		AllocatedDevices:         cloneSet(state.AllocatedDevices),
+		AllocatedSharedDeviceIDs: cloneSet(state.AllocatedSharedDeviceIDs),
+		AggregatedCapacity:       state.AggregatedCapacity.Clone(),
+		DeviceSharingAffinity:    state.DeviceSharingAffinity.Clone(),
+	}
+}
+
+func cloneSet[T comparable](s sets.Set[T]) sets.Set[T] {
+	if s == nil {
+		return nil
+	}
+	return s.Clone()
+}
+
+func testAllocatedStateTransport(t *testing.T, supportedFeatures Features,
+	newAllocator func(context.Context, Features, AllocatedState, DeviceClassLister, []*resourceapi.ResourceSlice, *cel.Cache) (Allocator, error)) {
+	const driver = "sharing.example.com"
+	deviceID := func(name string) DeviceID { return MakeDeviceID(driver, "pool", name) }
+	lockedDevice := deviceID("device-9")
+	extraDevice := deviceID("device-x")
+	slotsKey := draapi.FullyQualifiedName{Domain: driver, Identifier: "slots"}
+	insertCapacity := func(capacity ConsumedCapacityCollection, id DeviceID, amount string) {
+		capacity.Insert(schedulerapi.NewDeviceConsumedCapacity(id, map[resourceapi.QualifiedName]resource.Quantity{
+			"slots": resource.MustParse(amount),
+		}))
+	}
+	for _, shape := range []string{"nil", "empty", "populated"} {
+		t.Run(shape, func(t *testing.T) {
+			// Build the oracle independently: cloning the fixture here could
+			// mask the same shallow-copy defect that this test must detect.
+			fixture := func() AllocatorTestCase {
+				tc := AllocatorTestCase{
+					classes:          objects(class("network", driver)),
+					slices:           unwrapResourceSlices(sliceWithDevices("devices", nodeSelectionAll, "pool", driver, device("device-1"))),
+					claimsToAllocate: []wrapResourceClaim{claimWithRequests("claim", nil, request("req", "network", 1))},
+					expectResults: []any{allocationResult(nil, resourceapi.DeviceRequestAllocationResult{
+						Request: "req", Driver: driver, Pool: "pool", Device: "device-1",
+					})},
+				}
+				if shape == "nil" {
+					return tc
+				}
+				tc.affinityStates = AffinityStateCollection{}
+				tc.stalePools = sets.New[PoolID]()
+				tc.allocatedSharedDeviceIDs = sets.New[DeviceID]()
+				tc.allocatedCapacityDevices = internal.NewConsumedCapacityCollection()
+				if shape == "populated" {
+					tc.allocatedDevices = []DeviceID{deviceID("device-8")}
+					tc.allocatedSharedDeviceIDs.Insert(lockedDevice)
+					tc.affinityStates[lockedDevice] = DeviceAffinityState{
+						Status: internal.AffinityStatusLocked, LockedAffinity: map[string]string{"tenant": "blue"},
+					}
+					tc.stalePools.Insert(PoolID{Driver: "other.example.com", Pool: "x"})
+					insertCapacity(tc.allocatedCapacityDevices, lockedDevice, "3")
+				}
+				return tc
+			}
+			tc, pristine := fixture(), fixture()
+			stateOf := func(tc AllocatorTestCase) AllocatedState {
+				return AllocatedState{
+					AllocatedDevices:         sets.New(tc.allocatedDevices...),
+					AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
+					AggregatedCapacity:       tc.allocatedCapacityDevices,
+					DeviceSharingAffinity: SharingAffinityState{
+						DeviceStates: tc.affinityStates,
+						StalePools:   tc.stalePools,
+					},
+				}
+			}
+			want := stateOf(pristine)
+			// The existing runner always constructs an empty capacity collection.
+			if want.AggregatedCapacity == nil {
+				want.AggregatedCapacity = internal.NewConsumedCapacityCollection()
+			}
+			var received [2]AllocatedState
+			inspections := 0
+			for i, name := range []string{"first", "second"} {
+				tc.inspectAllocatedState = func(t *testing.T, state AllocatedState) {
+					inspections++
+					// Validate shape before any map writes or pointer access.
+					if !equalAllocatedStateTransport(t, state, want) {
+						t.Fatal("runner did not transport the fixture unchanged; cannot check isolation")
+					}
+					if i != 0 {
+						return
+					}
+					if state.AllocatedDevices == nil || state.AggregatedCapacity == nil {
+						t.Fatal("runner must construct non-nil allocated-device and capacity collections")
+					}
+					if shape == "populated" {
+						lock, ok := state.DeviceSharingAffinity.DeviceStates[lockedDevice]
+						if !ok || lock.LockedAffinity == nil {
+							t.Fatal("populated fixture lost device-9's nested affinity lock")
+						}
+						capacity, ok := state.AggregatedCapacity[lockedDevice]
+						if !ok {
+							t.Fatal("populated fixture lost device-9's consumed capacity")
+						}
+						q, ok := capacity[slotsKey]
+						if !ok || q == nil {
+							t.Fatal("populated fixture lost device-9's sharing.example.com/slots quantity")
+						}
+						if q.Cmp(resource.MustParse("3")) != 0 {
+							t.Fatalf("device-9 consumed slots = %s, want 3", q.String())
+						}
+						lock.LockedAffinity["tenant"] = "mutated"
+						q.Add(resource.MustParse("1"))
+					}
+					state.AllocatedDevices.Insert(extraDevice)
+					insertCapacity(state.AggregatedCapacity, extraDevice, "1")
+					if shape != "nil" {
+						if state.DeviceSharingAffinity.DeviceStates == nil || state.DeviceSharingAffinity.StalePools == nil || state.AllocatedSharedDeviceIDs == nil {
+							t.Fatal("non-nil fixture collections became nil")
+						}
+						state.DeviceSharingAffinity.DeviceStates[extraDevice] = DeviceAffinityState{
+							Status: internal.AffinityStatusLocked, LockedAffinity: map[string]string{"tenant": "mutated"},
+						}
+						state.DeviceSharingAffinity.StalePools.Insert(PoolID{Driver: driver, Pool: "extra"})
+						state.AllocatedSharedDeviceIDs.Insert(extraDevice)
+					}
+				}
+				recordingAllocator := func(ctx context.Context, features Features, state AllocatedState, classes DeviceClassLister, slices []*resourceapi.ResourceSlice, cache *cel.Cache) (Allocator, error) {
+					received[i] = state
+					return newAllocator(ctx, features, state, classes, slices, cache)
+				}
+				RunTestAllocator(t, supportedFeatures, recordingAllocator, map[string]AllocatorTestCase{name: tc})
+			}
+			if inspections != 2 {
+				t.Errorf("post-assertion inspections = %d, want 2; both runner calls must invoke the inspection hook", inspections)
+			}
+			if !equalAllocatedStateTransport(t, stateOf(tc), stateOf(pristine)) {
+				t.Error("mutating a received snapshot changed the original fixture")
+			}
+			if !equalAllocatedStateTransport(t, received[1], want) {
+				t.Error("second constructor did not receive an independent pristine snapshot")
+			}
+		})
+	}
+}
+
+func equalAllocatedStateTransport(t *testing.T, got, want AllocatedState) bool {
+	t.Helper()
+	equal := true
+	for _, field := range []struct {
+		name      string
+		got, want any
+	}{
+		{"AllocatedDevices", got.AllocatedDevices, want.AllocatedDevices},
+		{"AllocatedSharedDeviceIDs", got.AllocatedSharedDeviceIDs, want.AllocatedSharedDeviceIDs},
+		{"DeviceSharingAffinity", got.DeviceSharingAffinity, want.DeviceSharingAffinity},
+	} {
+		if !reflect.DeepEqual(field.got, field.want) {
+			t.Errorf("%s = %#v, want %#v (including nil/empty shape)", field.name, field.got, field.want)
+			equal = false
+		}
+	}
+	if (got.AggregatedCapacity == nil) != (want.AggregatedCapacity == nil) || len(got.AggregatedCapacity) != len(want.AggregatedCapacity) {
+		t.Errorf("AggregatedCapacity shape = %#v, want %#v", got.AggregatedCapacity, want.AggregatedCapacity)
+		equal = false
+	}
+	for id, wantCapacity := range want.AggregatedCapacity {
+		gotCapacity, ok := got.AggregatedCapacity[id]
+		if !ok || (gotCapacity == nil) != (wantCapacity == nil) || len(gotCapacity) != len(wantCapacity) {
+			t.Errorf("AggregatedCapacity[%s] = %#v, want %#v", id, gotCapacity, wantCapacity)
+			equal = false
+		}
+		for key, wantQuantity := range wantCapacity {
+			gotQuantity, ok := gotCapacity[key]
+			if !ok || gotQuantity == nil || wantQuantity == nil {
+				t.Errorf("AggregatedCapacity[%s][%s] = %v, want non-nil quantity %v", id, key, gotQuantity, wantQuantity)
+				equal = false
+				continue
+			}
+			// Quantity's cached string is not part of capacity equality.
+			if gotQuantity.Cmp(*wantQuantity) != 0 {
+				t.Errorf("AggregatedCapacity[%s][%s] = %s, want %s", id, key, gotQuantity.String(), wantQuantity.String())
+				equal = false
+			}
+		}
+	}
+	return equal
 }
 
 type informerLister[T any] struct {

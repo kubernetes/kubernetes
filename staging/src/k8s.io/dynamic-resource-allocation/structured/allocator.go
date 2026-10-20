@@ -55,6 +55,9 @@ var ErrFailedAllocationOnNode = internal.ErrFailedAllocationOnNode
 
 type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
+type ClaimAffinity = internal.ClaimAffinity
+type DeviceAffinity = internal.DeviceAffinity
+type PoolMetadataView = internal.PoolMetadataView
 
 // Type aliases to schedulerapi package for types that are part of the
 // scheduler and autoscaler contract. This ensures that changes to these
@@ -65,6 +68,31 @@ type SharedDeviceID = schedulerapi.SharedDeviceID
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
+type AffinityStatus = schedulerapi.AffinityStatus
+type DeviceAffinityState = schedulerapi.DeviceAffinityState
+type AffinityStateCollection = schedulerapi.AffinityStateCollection
+type SharingAffinityState = schedulerapi.SharingAffinityState
+
+// AffinityAllocator returns per-call provenance for Reserve without re-extraction.
+type AffinityAllocator interface {
+	AllocateWithAffinity(context.Context, *v1.Node, []*resourceapi.ResourceClaim) ([]resourceapi.AllocationResult, []ClaimAffinity, error)
+}
+
+var EmptyExtractorDigest = internal.EmptyExtractorDigest
+
+func ExtractorDigest(extractors []resourceapi.SharingAffinityExtractor) string {
+	return internal.ExtractorDigest(extractors)
+}
+
+func ComputePoolMetadataView(slices []*resourceapi.ResourceSlice, driver, pool string) PoolMetadataView {
+	return internal.ComputePoolMetadataView(slices, driver, pool)
+}
+
+const (
+	AffinityStatusClean             = schedulerapi.AffinityStatusClean
+	AffinityStatusLocked            = schedulerapi.AffinityStatusLocked
+	AffinityStatusUnreconstructable = schedulerapi.AffinityStatusUnreconstructable
+)
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
@@ -131,7 +159,7 @@ func NewAllocator(ctx context.Context,
 	celCache *cel.Cache,
 ) (Allocator, error) {
 	// The actual implementation may vary depending on which features are enabled.
-	// At the moment there is only one. The goal is to have three:
+	// There are three implementations:
 	// - stable: the oldest, most stable code
 	// - incubating: code which is aiming to become stable next
 	// - experimental: brand-new code

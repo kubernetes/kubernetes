@@ -20,9 +20,11 @@ import (
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -101,16 +103,116 @@ type allocatedDevices struct {
 	shareIDs                  sets.Set[structured.SharedDeviceID]
 	capacities                structured.ConsumedCapacityCollection
 	enabledConsumableCapacity bool
+
+	// Affinity ownership shares the legacy accounting lock and revision.
+	enabledSharingAffinity   bool
+	affinityAcct             *affinityAccounting
+	claimAffinity            map[types.UID]claimAffinity
+	affinityDevices          map[structured.DeviceID]*deviceAffinity
+	metadata                 *affinityMetadata
+	fenced                   sets.Set[structured.DeviceID]
+	inFlightOwners           map[structured.DeviceID]int
+	observedAfterComputeHook func()
+	owners                   map[ownerPoolKey]*ownerPoolRecord
+	ownerPools               map[ownerID]sets.Set[poolName]
+	holds                    map[types.NamespacedName]ownerID
+	nextToken                uint64
+	claimsSynced             bool
+	startupReady             bool
+	tracker                  *claimTracker
+	reconcile                workqueue.TypedRateLimitingInterface[poolName]
 }
 
-func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
-	return &allocatedDevices{
+type observedPoolProvenance struct {
+	pool    poolName
+	meta    poolMeta
+	devices []structured.DeviceID
+}
+
+type observedProvenance []observedPoolProvenance
+
+type metadataSliceList struct {
+	slices []*resourceapi.ResourceSlice
+	err    error
+}
+
+func (s metadataSliceList) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, error) {
+	return s.slices, s.err
+}
+
+func (a *allocatedDevices) hasOwnerLocked(device structured.DeviceID) bool {
+	if a.ids.Has(device) || a.inFlightOwners[device] > 0 {
+		return true
+	}
+	for id := range a.shareIDs {
+		if id.GetDeviceID() == device {
+			return true
+		}
+	}
+	return len(a.capacities[device]) != 0
+}
+
+func (a *allocatedDevices) clearDrainedFencesLocked() {
+	a.clearDrainedLocked()
+}
+
+func (a *allocatedDevices) checkProvenanceLocked(provenance observedProvenance) {
+	// Provenance alone cannot establish a semantic conflict. Owner records
+	// enforce readiness until reconciliation compares the extracted maps.
+}
+
+func (a *allocatedDevices) changeInFlightOwnersLocked(claim *resourceapi.ResourceClaim, delta int) {
+	if !a.enabledSharingAffinity || claim == nil || claim.Status.Allocation == nil {
+		return
+	}
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		if ptr.Deref(result.AdminAccess, false) {
+			continue
+		}
+		device := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		a.inFlightOwners[device] += delta
+		if a.inFlightOwners[device] == 0 {
+			delete(a.inFlightOwners, device)
+		}
+	}
+	a.clearDrainedFencesLocked()
+	a.revision++
+}
+
+func newAllocatedDevices(logger klog.Logger, acct *affinityAccounting) *allocatedDevices {
+	a := &allocatedDevices{
 		logger:                    logger,
 		ids:                       sets.New[structured.DeviceID](),
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
 		capacities:                structured.NewConsumedCapacityCollection(),
 		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		enabledSharingAffinity:    acct != nil,
+		affinityAcct:              acct,
 	}
+	if acct != nil {
+		a.claimAffinity = make(map[types.UID]claimAffinity)
+		a.affinityDevices = make(map[structured.DeviceID]*deviceAffinity)
+		a.fenced = sets.New[structured.DeviceID]()
+		a.inFlightOwners = make(map[structured.DeviceID]int)
+		a.owners = make(map[ownerPoolKey]*ownerPoolRecord)
+		a.ownerPools = make(map[ownerID]sets.Set[poolName])
+		a.holds = make(map[types.NamespacedName]ownerID)
+		a.startupReady = true
+	}
+	return a
+}
+
+func (a *allocatedDevices) affinitySnapshot() (map[structured.DeviceID]*deviceAffinity, int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+	if !a.enabledSharingAffinity {
+		return nil, a.revision
+	}
+	snapshot := make(map[structured.DeviceID]*deviceAffinity, len(a.affinityDevices))
+	for device, record := range a.affinityDevices {
+		snapshot[device] = record.clone()
+	}
+	return snapshot, a.revision
 }
 
 func (a *allocatedDevices) Get() (sets.Set[structured.DeviceID], int64) {
@@ -161,7 +263,9 @@ func (a *allocatedDevices) onAdd(obj any) {
 		return
 	}
 
-	if claim.Status.Allocation != nil {
+	// An unallocated replacement must still release a delete hold kept
+	// for its name.
+	if claim.Status.Allocation != nil || a.enabledSharingAffinity {
 		a.addDevices(claim)
 	}
 }
@@ -171,6 +275,10 @@ func (a *allocatedDevices) onUpdate(oldObj, newObj any) {
 	if err != nil {
 		// Shouldn't happen.
 		a.logger.Error(err, "unexpected object in allocatedDevices.onUpdate")
+		return
+	}
+	if a.enabledSharingAffinity {
+		a.replaceObserved(originalClaim, modifiedClaim)
 		return
 	}
 
@@ -197,6 +305,10 @@ func (a *allocatedDevices) onDelete(obj any) {
 }
 
 func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
+	if a.enabledSharingAffinity {
+		a.replaceObserved(nil, claim)
+		return
+	}
 	if claim.Status.Allocation == nil {
 		return
 	}
@@ -225,12 +337,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		},
 	)
 
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
 		return
 	}
-
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Insert(deviceID)
@@ -244,7 +355,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 }
 
 func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
-	if claim.Status.Allocation == nil {
+	if a.enabledSharingAffinity {
+		a.replaceObserved(claim, nil)
+		return
+	}
+	if claim.Status.Allocation == nil && !a.enabledSharingAffinity {
 		return
 	}
 
@@ -272,12 +387,11 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 			deviceCapacities = append(deviceCapacities, capacity)
 		})
 
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
 		return
 	}
-
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Delete(deviceID)
@@ -288,4 +402,5 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	for _, capacity := range deviceCapacities {
 		a.capacities.Remove(capacity)
 	}
+	a.clearDrainedFencesLocked()
 }

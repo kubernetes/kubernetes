@@ -429,6 +429,10 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		disabled = append(disabled, "DRAOptionalNodeOperations")
 	}
 
+	if len(err.DesiredSlice.Spec.SharingAffinity) > len(err.ActualSlice.Spec.SharingAffinity) {
+		disabled = append(disabled, "DRASharingAffinity")
+	}
+
 	// NodeAllocatableResources is dropped when DRANodeAllocatableResources is disabled.
 	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
 		if len(err.DesiredSlice.Spec.Devices[i].NodeAllocatableResources) > 0 && len(err.ActualSlice.Spec.Devices[i].NodeAllocatableResources) == 0 {
@@ -756,6 +760,54 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
+// sliceMatch fixes the update/create mapping before validation so that a
+// declaration can only inherit compatibility from the object being updated.
+type sliceMatch struct {
+	generation int64
+	current    map[int]*resourceapi.ResourceSlice
+	obsolete   []*resourceapi.ResourceSlice
+}
+
+func (m sliceMatch) oldSlices(numDesired int) []*resourceapi.ResourceSlice {
+	old := make([]*resourceapi.ResourceSlice, numDesired)
+	for i, slice := range m.current {
+		old[i] = slice
+	}
+	return old
+}
+
+func matchExistingSlices(logger klog.Logger, slices []*resourceapi.ResourceSlice, numDesired int) sliceMatch {
+	match := sliceMatch{current: make(map[int]*resourceapi.ResourceSlice, numDesired)}
+	for _, slice := range slices {
+		if slice.Spec.Pool.Generation > match.generation {
+			match.generation = slice.Spec.Pool.Generation
+		}
+	}
+	expectedPrefixLength := getIndexLength(numDesired)
+	for _, slice := range slices {
+		if slice.Spec.Pool.Generation < match.generation {
+			match.obsolete = append(match.obsolete, slice)
+			continue
+		}
+		index, err := decodeIndex(slice.Name, expectedPrefixLength)
+		if err != nil {
+			logger.V(5).Info("Unmatched existing slice (invalid name)", "slice", klog.KObj(slice), "err", err)
+			match.obsolete = append(match.obsolete, slice)
+			continue
+		}
+		if index >= 0 && index < numDesired {
+			if _, ok := match.current[index]; !ok {
+				match.current[index] = slice
+				logger.V(5).Info("Matched existing slice by index", "slice", klog.KObj(slice), "matchIndex", index)
+				continue
+			}
+		}
+		match.obsolete = append(match.obsolete, slice)
+		logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
+	}
+	return match
+}
+
 // syncPool processes one pool. Only runs inside a single worker, so there
 // is no need for locking except when accessing c.resources, which may
 // be updated at any time by the user of the controller.
@@ -789,6 +841,27 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		return nil
 	}
 
+	// Validate against the same per-object mapping that the write phase uses.
+	// In particular, obsolete slices must not grant stored-value ratcheting.
+	match := matchExistingSlices(logger, slices, len(pool.Slices))
+	var lookupErr error
+	oldSlicesFor := func(name string, desired Pool) []*resourceapi.ResourceSlice {
+		if name == poolName {
+			return match.oldSlices(len(desired.Slices))
+		}
+		objs, err := c.sliceStore.ByIndex(poolNameIndex, name)
+		if err != nil {
+			lookupErr = fmt.Errorf("retrieve ResourceSlice objects for pool %q: %w", name, err)
+			return nil
+		}
+		var existing []*resourceapi.ResourceSlice
+		for _, obj := range objs {
+			if slice, ok := obj.(*resourceapi.ResourceSlice); ok {
+				existing = append(existing, slice)
+			}
+		}
+		return matchExistingSlices(klog.LoggerWithValues(logger, "pool", name), existing, len(desired.Slices)).oldSlices(len(desired.Slices))
+	}
 	validateDriverName := c.driverName
 	if !c.validateQualifiedNames {
 		validateDriverName = ""
@@ -797,10 +870,13 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	if c.reconcilePoolWithName == "" {
 		// An invalid pool blocks all pools. Otherwise a device that moves
 		// out of it could get published twice.
-		validationErr = validateDriverResources(validateDriverName, resources)
+		validationErr = validateDriverResources(validateDriverName, resources, oldSlicesFor)
 	} else if ok {
 		// Other pools never get published, so they don't need to be valid.
-		validationErr = validatePool(validateDriverName, poolName, pool)
+		validationErr = validatePool(validateDriverName, poolName, pool, match.oldSlices(len(pool.Slices)))
+	}
+	if lookupErr != nil {
+		return lookupErr
 	}
 	if validationErr != nil {
 		c.errorHandler(ctx, validationErr, "pool validation failed")
@@ -839,43 +915,10 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Determine highest generation.
-	var generation int64
-	for _, slice := range slices {
-		if slice.Spec.Pool.Generation > generation {
-			generation = slice.Spec.Pool.Generation
-		}
-	}
-
-	// Classify existing slices. If an existing slice has wrong generation
-	// or doesn't match a desired index, it's obsolete.
-	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
+	generation := match.generation
+	currentSliceForDesiredSlice := match.current
+	obsoleteSlices := match.obsolete
 	expectedPrefixLength := getIndexLength(len(pool.Slices))
-
-	for _, slice := range slices {
-		// Wrong generation is always obsolete.
-		if slice.Spec.Pool.Generation < generation {
-			obsoleteSlices = append(obsoleteSlices, slice)
-			continue
-		}
-
-		index, err := decodeIndex(slice.Name, expectedPrefixLength)
-		if err != nil {
-			logger.V(5).Info("Unmatched existing slice (invalid name)", "slice", klog.KObj(slice), "err", err)
-			obsoleteSlices = append(obsoleteSlices, slice)
-			continue
-		}
-		if index >= 0 && index < len(pool.Slices) {
-			if _, ok := currentSliceForDesiredSlice[index]; !ok {
-				currentSliceForDesiredSlice[index] = slice
-				logger.V(5).Info("Matched existing slice by index", "slice", klog.KObj(slice), "matchIndex", index)
-				continue
-			}
-		}
-		obsoleteSlices = append(obsoleteSlices, slice)
-		logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
-	}
 
 	// Desired metadata which must be set in each slice.
 	resourceSliceCount := len(pool.Slices)
@@ -899,7 +942,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PartitionTypeAttribute, pool.Slices[i].PartitionTypeAttribute) ||
-			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SkipNodeOperations, pool.Slices[i].SkipNodeOperations) {
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SkipNodeOperations, pool.Slices[i].SkipNodeOperations) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharingAffinity, pool.Slices[i].SharingAffinity) {
 			changedDesiredSlices.Insert(i)
 			logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 		}
@@ -951,6 +995,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 		slice.Spec.PartitionTypeAttribute = pool.Slices[i].PartitionTypeAttribute
 		slice.Spec.SkipNodeOperations = pool.Slices[i].SkipNodeOperations
+		slice.Spec.SharingAffinity = pool.Slices[i].SharingAffinity
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
@@ -1006,6 +1051,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
 				PartitionTypeAttribute: pool.Slices[i].PartitionTypeAttribute,
 				SkipNodeOperations:     pool.Slices[i].SkipNodeOperations,
+				SharingAffinity:        pool.Slices[i].SharingAffinity,
 			},
 		}
 
@@ -1111,11 +1157,13 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.PartitionTypeAttribute, actualSlice.Spec.PartitionTypeAttribute) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SkipNodeOperations, actualSlice.Spec.SkipNodeOperations) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharingAffinity, actualSlice.Spec.SharingAffinity) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
 		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
 		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
 		pool.Slices[sliceIndex].PartitionTypeAttribute = actualSlice.Spec.PartitionTypeAttribute
 		pool.Slices[sliceIndex].SkipNodeOperations = actualSlice.Spec.SkipNodeOperations
+		pool.Slices[sliceIndex].SharingAffinity = actualSlice.Spec.SharingAffinity
 		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
 
 		err := &DroppedFieldsError{

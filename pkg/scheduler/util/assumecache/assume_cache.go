@@ -462,10 +462,9 @@ func (c *AssumeCache) Assume(obj interface{}) error {
 	c.pushEvent(objInfo.latestObj, obj)
 
 	// Only update the cached object
-	oldObj := objInfo.latestObj
 	objInfo.latestObj = obj
 	if loggerV := c.logger.V(6); loggerV.Enabled() {
-		loggerV.Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion, "oldObj", klog.Format(oldObj), "newObj", klog.Format(obj))
+		loggerV.Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion, "oldVersion", storedVersion, "newVersion", newVersion) // full objects may carry opaque driver config; never dump them
 	} else {
 		c.logger.V(5).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
 	}
