@@ -10,6 +10,7 @@ reviewers:
   - dims
   - justaugustus
   - liggitt
+  - upodroid
   - wojtek-t
 approvers:
   - aojea
@@ -17,6 +18,7 @@ approvers:
   - cheftako
   - dims
   - liggitt
+  - upodroid
   - wojtek-t
 emeritus_approvers:
   - mikedanese
@@ -25,3 +27,5 @@ emeritus_approvers:
   - roberthbailey # 2019-03-08
   - jbeda
   - zmerlynn
+labels:
+  - sig/testing

@@ -299,7 +299,7 @@ func processNextWorkItem(
 	defer queue.Done(key)
 
 	err := processFunc(ctx, key)
-	if err != nil {
+	if err == nil {
 		queue.Forget(key)
 		return true
 	}

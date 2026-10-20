@@ -28,11 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type mockAffinityStore struct {
@@ -1078,12 +1078,13 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
 			},
 		}
+		markAllDevicesHealthy(&m)
 
 		hints := m.generateDeviceTopologyHints(logger, resource, sets.New[string]("a"), nil, 1)
 
 		maskNode0, _ := bitmask.NewBitMask(0)
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: maskNode0, Preferred: true},
+			{NUMANodeAffinity: maskNode0, Preferred: true, Score: 1},
 		}
 
 		if !reflect.DeepEqual(hints, expected) {
@@ -1111,6 +1112,7 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
 			},
 		}
+		markAllDevicesHealthy(&m)
 
 		hints := m.generateDeviceTopologyHints(logger, resource, sets.New[string]("gpu0", "gpu1"), nil, 1)
 		sort.SliceStable(hints, func(i, j int) bool { return hints[i].LessThan(hints[j]) })
@@ -1119,9 +1121,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 		maskNode1, _ := bitmask.NewBitMask(1)
 		maskBoth, _ := bitmask.NewBitMask(0, 1)
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: maskNode0, Preferred: true},
-			{NUMANodeAffinity: maskNode1, Preferred: true},
-			{NUMANodeAffinity: maskBoth, Preferred: false},
+			{NUMANodeAffinity: maskNode0, Preferred: true, Score: 1},
+			{NUMANodeAffinity: maskNode1, Preferred: true, Score: 1},
+			{NUMANodeAffinity: maskBoth, Preferred: false, Score: 1},
 		}
 		sort.SliceStable(expected, func(i, j int) bool { return expected[i].LessThan(expected[j]) })
 
@@ -1145,6 +1147,7 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
 			},
 		}
+		markAllDevicesHealthy(&m)
 
 		hints := m.generateDeviceTopologyHints(logger, resource, sets.New[string]("a", "b"), nil, 1)
 
@@ -1171,11 +1174,12 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
 			},
 		}
+		markAllDevicesHealthy(&m)
 
 		hints := m.generateDeviceTopologyHints(logger, resource, nil, sets.New[string]("a"), 1)
 
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+			{NUMANodeAffinity: makeSocketMask(0), Preferred: true, Score: 1},
 		}
 		if !reflect.DeepEqual(hints, expected) {
 			t.Fatalf("expected hints %v, got %v", expected, hints)
@@ -1197,11 +1201,12 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
 			},
 		}
+		markAllDevicesHealthy(&m)
 
 		hints := m.generateDeviceTopologyHints(logger, resource, sets.New[string]("b"), sets.New[string]("a"), 2)
 
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: true},
+			{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: true, Score: 1},
 		}
 		if !reflect.DeepEqual(hints, expected) {
 			t.Fatalf("expected hints %v, got %v", expected, hints)
@@ -1421,6 +1426,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1455,14 +1461,17 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1497,6 +1506,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1533,14 +1543,17 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1584,6 +1597,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},
@@ -1624,20 +1638,24 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1710,6 +1728,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            100, // 2 out of 2 devices allocated = 100%
 					},
 				},
 			},
@@ -1849,28 +1868,34 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1949,28 +1974,34 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -2039,12 +2070,14 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},

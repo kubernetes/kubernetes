@@ -924,7 +924,7 @@ func TestLintRequiredness(t *testing.T) {
 					testAlias("MyString", testType("string"), "+k8s:minimum=0"),
 				)),
 			}),
-			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer types (pkg.MyString -> string)",
+			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer and resource.Quantity types (pkg.MyString -> string)",
 		},
 		{
 			name: "pointer field with transitive malformed tag on struct type definition - reports error as lint warning instead of crashing",
@@ -935,7 +935,7 @@ func TestLintRequiredness(t *testing.T) {
 					}, "+k8s:minimum=0"),
 				)),
 			}),
-			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer types (pkg.MyStruct)",
+			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer and resource.Quantity types (pkg.MyStruct)",
 		},
 		{
 			name: "same alias used with different opacity contexts caches correctly",
@@ -944,6 +944,29 @@ func TestLintRequiredness(t *testing.T) {
 				testField("Bar", sharedAlias),
 			}),
 			wantError: "field Bar: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "transitive struct member with only +k8s:optional - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:optional"),
+					}),
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "transitive struct member with a validated sibling - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:optional", "+default=1"),
+						testField("Baz", testType("int"), "+k8s:minimum=0"),
+					}),
+				)),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 	}
 

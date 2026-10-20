@@ -127,7 +127,7 @@ type Controller struct {
 	// Optional pool name to reconcile.
 	reconcilePoolWithName string
 
-	// validateQualifiedNames controls whether validateDriverResources checks
+	// validateQualifiedNames controls whether validatePool checks
 	// attribute and capacity names for redundant driver domain qualification.
 	// See [Options.ValidateQualifiedNames].
 	validateQualifiedNames bool
@@ -296,6 +296,10 @@ type Options struct {
 	// replace the slices if they cannot be published (see below),
 	// or force the program running the controller to fail by exiting.
 	//
+	// The handler runs on the controller's worker without holding any
+	// locks, so it may call Update to replace the resources. It must not
+	// call Stop because Stop waits for the worker.
+	//
 	// If some fields were dropped because the cluster does not support
 	// the feature they depend on, then the error is or wraps an
 	// [DroppedFieldsError] instance. Use [errors.As] to convert to that
@@ -326,6 +330,10 @@ type Options struct {
 	// Spec.Pool.Name and does not set Spec.NodeName (even for Node owners).
 	// This enables node-owned slices that remain cluster-visible via
 	// NodeSelector or AllNodes.
+	//
+	// Other pools in the desired resources are reported through ErrorHandler
+	// and are not published. If the desired resources do not have the pool
+	// with this name, its ResourceSlices get deleted.
 	//
 	// Beware that this has a performance impact on the cluster
 	// because all nodes have to receive all ResourceSlices of
@@ -473,20 +481,6 @@ func (c *Controller) Update(resources *DriverResources) {
 	if resources == nil {
 		c.resources = &DriverResources{}
 	} else {
-		// If reconcilePoolWithName is set, we expect to reconcile only a single pool.
-		// Having additional pools is considered an error. However, an empty pool list
-		// is intentionally allowed and treated as "no slices to publish", which matches
-		// the default controller behavior.
-		if c.reconcilePoolWithName != "" {
-			_, ok := resources.Pools[c.reconcilePoolWithName]
-			if (ok && len(resources.Pools) > 1) || !ok && len(resources.Pools) > 0 {
-				c.errorHandler(context.Background(),
-					fmt.Errorf("ReconcilePoolWithName=%q, but found %d pools; expected exactly one pool with this name", c.reconcilePoolWithName, len(resources.Pools)),
-					"processing update DriverResources")
-				return
-			}
-		}
-
 		c.resources = resources.DeepCopy()
 		roundTaintTimeAdded(c.resources)
 	}
@@ -780,18 +774,37 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
+	pool, ok := resources.Pools[poolName]
+
+	// The informer only sees slices of the ReconcilePoolWithName pool, so
+	// slices of other pools can neither be synced nor removed here.
+	if c.reconcilePoolWithName != "" && poolName != c.reconcilePoolWithName {
+		if ok {
+			c.errorHandler(ctx, fmt.Errorf("found pool %q, but ReconcilePoolWithName only allows pool %q", poolName, c.reconcilePoolWithName), "pool validation failed")
+		}
+		return nil
+	}
+
 	validateDriverName := c.driverName
 	if !c.validateQualifiedNames {
 		validateDriverName = ""
 	}
-	if err := validateDriverResources(validateDriverName, resources); err != nil {
-		c.errorHandler(ctx, err, "pool validation failed")
+	var validationErr error
+	if c.reconcilePoolWithName == "" {
+		// An invalid pool blocks all pools. Otherwise a device that moves
+		// out of it could get published twice.
+		validationErr = validateDriverResources(validateDriverName, resources)
+	} else if ok {
+		// Other pools never get published, so they don't need to be valid.
+		validationErr = validatePool(validateDriverName, poolName, pool)
+	}
+	if validationErr != nil {
+		c.errorHandler(ctx, validationErr, "pool validation failed")
 		// We only report the error through the error handler to prevent
 		// the controller from retrying.
 		return nil
 	}
 
-	pool, ok := resources.Pools[poolName]
 	if !ok {
 		if len(slices) > 0 {
 			// All are obsolete, pool does not exist anymore.

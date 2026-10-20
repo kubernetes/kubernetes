@@ -79,10 +79,12 @@ func TestFormatResourceName(t *testing.T) {
 
 type TestPrintHandler struct {
 	numCalls int
+	columns  [][]metav1.TableColumnDefinition
 }
 
 func (t *TestPrintHandler) TableHandler(columnDefinitions []metav1.TableColumnDefinition, printFunc interface{}) error {
 	t.numCalls++
+	t.columns = append(t.columns, columnDefinitions)
 	return nil
 }
 
@@ -96,6 +98,42 @@ func TestAllHandlers(t *testing.T) {
 	if h.getNumCalls() == 0 {
 		t.Error("TableHandler not called in AddHandlers")
 	}
+
+	second := &TestPrintHandler{numCalls: 0}
+	AddHandlers(second)
+	if len(second.columns) != len(h.columns) {
+		t.Fatalf("AddHandlers call count mismatch: got %d, want %d", len(second.columns), len(h.columns))
+	}
+	for i := range h.columns {
+		if len(h.columns[i]) == 0 {
+			t.Fatalf("handler %d registered empty column definitions", i)
+		}
+		if &second.columns[i][0] != &h.columns[i][0] {
+			t.Errorf("handler %d allocated a new TableColumnDefinition backing array on repeated AddHandlers call", i)
+		}
+	}
+}
+
+type noopPrintHandler struct{}
+
+func (noopPrintHandler) TableHandler(columnDefinitions []metav1.TableColumnDefinition, printFunc interface{}) error {
+	return nil
+}
+
+func BenchmarkAddHandlers(b *testing.B) {
+	b.Run("NoopHandler", func(b *testing.B) {
+		b.ReportAllocs()
+		var h noopPrintHandler
+		for i := 0; i < b.N; i++ {
+			AddHandlers(h)
+		}
+	})
+	b.Run("TableGenerator", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			printers.NewTableGenerator().With(AddHandlers)
+		}
+	})
 }
 
 func TestPrintEvent(t *testing.T) {

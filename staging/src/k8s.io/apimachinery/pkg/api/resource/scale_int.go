@@ -40,10 +40,10 @@ func init() {
 // negativeScaleInt64. ok is false when the true value overflows int64, and then
 // the result saturates to mostNegative or mostPositive.
 //
-// scale, newScale represent the scale of the unscaled decimal.
-// The mathematical value of the decimal is unscaled * 10**(-scale).
-func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
-	dif := scale - newScale
+// The mathematical value of the decimal is unscaled * 10**scale.
+func scaledValue(unscaled *big.Int, scale, newScale widenedScale) (int64, bool) {
+	// The number of digits to drop.
+	dif := newScale - scale
 	if dif == 0 {
 		return bigToInt64Saturated(unscaled)
 	}
@@ -53,8 +53,8 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 		if unscaled.Sign() == 0 {
 			return 0, true
 		}
-		// Bound dif before Scale(-dif) narrows it: 2^32 would come back as 0.
-		if dif <= -log10MaxInt64 {
+		up, fits := narrowScale(-dif)
+		if !fits || up >= log10MaxInt64 {
 			if unscaled.Sign() < 0 {
 				return mostNegative, false
 			}
@@ -67,7 +67,7 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 			}
 			return mostPositive, false
 		}
-		return positiveScaleInt64(unscaled.Int64(), Scale(-dif))
+		return positiveScaleInt64(unscaled.Int64(), up)
 	}
 
 	// Scale down: divide by 10^dif, rounding the quotient away from zero.
@@ -90,7 +90,7 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 
 	// Only the rounding sign survives, and no divisor has to be built:
 	// dif >= BitLen implies 10^dif > 2^dif >= 2^BitLen > |unscaled|.
-	if dif >= int64(unscaled.BitLen()) {
+	if int64(dif) >= int64(unscaled.BitLen()) {
 		switch unscaled.Sign() {
 		case 0:
 			return 0, true
@@ -113,7 +113,7 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 	}()
 
 	// divisor = 10^(dif)
-	divisor.Exp(bigTen, exp.SetInt64(dif), nil)
+	divisor.Exp(bigTen, exp.SetInt64(int64(dif)), nil)
 	// QuoRem truncates toward zero, so the step below rounds away from it.
 	quotient.QuoRem(unscaled, divisor, remainder)
 	if remainder.Sign() != 0 {

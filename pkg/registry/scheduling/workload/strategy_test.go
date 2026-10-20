@@ -216,6 +216,18 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: subdomainNameError,
 		},
+		"system-node-critical priority": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+		},
 		"drop preemptionPolicy with PodGroupPreemptionPolicy disabled": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()

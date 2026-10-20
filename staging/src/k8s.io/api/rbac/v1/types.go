@@ -50,7 +50,7 @@ type PolicyRule struct {
 	// verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
 	// +listType=atomic
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
@@ -127,7 +127,7 @@ type Role struct {
 	// rules holds all the PolicyRules for this Role
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
@@ -201,7 +201,7 @@ type ClusterRole struct {
 	// rules holds all the PolicyRules for this ClusterRole
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 
 	// aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.

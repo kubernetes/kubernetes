@@ -41,12 +41,12 @@ import (
 var (
 	// Explaining the Regex below:
 	// ^(?P<host>[\w\*\-\.]*) -> Indicates the host - 0-N characters of letters, number, underscore, '-', '.' and '*'
-	// (?P<path>/.*) -> Indicates the path and MUST start with '/' - / + 0-N characters
+	// (?P<path>/[^,=\n]*) -> Indicates the path and MUST start with '/' - / + 0-N characters other than ',', '=' and newline
 	// Separator from host/path to svcname:svcport -> "="
 	// (?P<svcname>[\w\-]+) -> Service Name (letters, numbers, '-') -> 1-N characters
 	// Separator from svcname to svcport -> ":"
 	// (?P<svcport>[\w\-]+) -> Service Port (letters, numbers, '-') -> 1-N characters
-	regexHostPathSvc = `^(?P<host>[\w\*\-\.]*)(?P<path>/.*)=(?P<svcname>[\w\-]+):(?P<svcport>[\w\-]+)`
+	regexHostPathSvc = `^(?P<host>[\w\*\-\.]*)(?P<path>/[^,=\n]*)=(?P<svcname>[\w\-]+):(?P<svcport>[\w\-]+)`
 
 	// This Regex is optional -> (....)?
 	// (?P<istls>tls) -> Verify if the argument after "," is 'tls'
@@ -226,13 +226,17 @@ func (o *CreateIngressOptions) Validate() error {
 	}
 
 	for _, annotation := range o.Annotations {
-		if an := strings.SplitN(annotation, "=", 2); len(an) != 2 {
+		an := strings.SplitN(annotation, "=", 2)
+		if len(an) != 2 || an[0] == "" || an[1] == "" {
 			return fmt.Errorf("annotation %s is invalid and should be in format key=[value]", annotation)
 		}
 	}
 
-	if len(o.DefaultBackend) > 0 && len(strings.Split(o.DefaultBackend, ":")) != 2 {
-		return fmt.Errorf("default-backend should be in format servicename:serviceport")
+	if len(o.DefaultBackend) > 0 {
+		backend := strings.Split(o.DefaultBackend, ":")
+		if len(backend) != 2 || backend[0] == "" || backend[1] == "" {
+			return fmt.Errorf("default-backend should be in format servicename:serviceport")
+		}
 	}
 
 	return nil

@@ -14,7 +14,7 @@ package types
 //   Unadvised, unless one controls the
 //   serving site.
 //
-//go:generate stringer -type=PluginRestrictions
+//go:generate go tool stringer -type=PluginRestrictions
 type PluginRestrictions int
 
 const (
@@ -28,7 +28,7 @@ const (
 )
 
 // BuiltinPluginLoadingOptions distinguish ways in which builtin plugins are used.
-//go:generate stringer -type=BuiltinPluginLoadingOptions
+//go:generate go tool stringer -type=BuiltinPluginLoadingOptions
 type BuiltinPluginLoadingOptions int
 
 const (

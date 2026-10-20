@@ -57,6 +57,7 @@ var (
 	k8sPath = flag.String("source", "", "location of the current source on the current machine")
 	confDoc = flag.Bool("docs", false, "write a conformance document")
 	version = flag.String("version", "v1.9", "version of this conformance document")
+	label   = flag.String("label", "Conformance", "test label to match")
 
 	// If a test name contains any of these tags, it is ineligible for promotion to conformance
 	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Feature:[^\]]+|Flaky)\]`)
@@ -101,7 +102,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if isConformance(spec) {
+		if shouldOutput(spec) {
 			testInfo := getTestInfo(spec)
 			if testInfo != nil {
 				testInfos = append(testInfos, testInfo)
@@ -116,8 +117,8 @@ func main() {
 	saveAllTestInfo(testInfos)
 }
 
-func isConformance(spec *types.SpecReport) bool {
-	return strings.Contains(getTestName(spec), "[Conformance]")
+func shouldOutput(spec *types.SpecReport) bool {
+	return strings.Contains(getTestName(spec), "["+*label+"]")
 }
 
 func getTestInfo(spec *types.SpecReport) *ConformanceData {

@@ -220,6 +220,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: ConditionalAuthorization
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ConsistentListFromCacheSkipTimeoutFallback
   versionedSpecs:
   - default: false
@@ -1115,6 +1121,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
@@ -1369,6 +1379,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OpenAPIV2LazyBuild
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: OpportunisticBatching
   versionedSpecs:
   - default: true
@@ -2182,6 +2198,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: WindowsGracefulNodeShutdown
   versionedSpecs:
   - default: false

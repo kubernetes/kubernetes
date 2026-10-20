@@ -41,7 +41,7 @@ type options struct {
 
 func defaultOptions() *options {
 	return &options{
-		getExemplarFn:          func(req *http.Request) prometheus.Labels { return nil },
+		getExemplarFn:          func(_ *http.Request) prometheus.Labels { return nil },
 		extraLabelsFromRequest: map[string]LabelValueFromRequest{},
 	}
 }

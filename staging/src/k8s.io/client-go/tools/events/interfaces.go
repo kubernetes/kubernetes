@@ -33,6 +33,7 @@ type AnnotatedEventRecorder = internalevents.AnnotatedEventRecorder
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
 type EventBroadcaster interface {
 	// StartRecordingToSink starts sending events received from the specified eventBroadcaster.
+	//
 	// Deprecated: use StartRecordingToSinkWithContext instead.
 	StartRecordingToSink(stopCh <-chan struct{})
 
@@ -51,6 +52,7 @@ type EventBroadcaster interface {
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
 	// logging function. The return value can be ignored or used to stop recording, if desired.
+	//
 	// Deprecated: use StartLogging instead.
 	StartStructuredLogging(verbosity klog.Level) func()
 

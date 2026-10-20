@@ -164,18 +164,12 @@ func TestDryRunPreemption(t *testing.T) {
 			},
 			expected: [][]fwk.PreemptionCandidate{
 				{
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
-						},
-						name: "node1",
-					},
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods: []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
-						},
-						name: "node2",
-					},
+					newCandidate(&extenderv1.Victims{
+						Pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
+					}, "node1", 0, "node1"),
+					newCandidate(&extenderv1.Victims{
+						Pods: []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
+					}, "node2", 0, "node2"),
 				},
 			},
 		},
@@ -195,20 +189,14 @@ func TestDryRunPreemption(t *testing.T) {
 			numViolatingVictim: 1,
 			expected: [][]fwk.PreemptionCandidate{
 				{
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods:             []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
-							NumPDBViolations: 1,
-						},
-						name: "node1",
-					},
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods:             []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
-							NumPDBViolations: 1,
-						},
-						name: "node2",
-					},
+					newCandidate(&extenderv1.Victims{
+						Pods:             []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
+						NumPDBViolations: 1,
+					}, "node1", 0, "node1"),
+					newCandidate(&extenderv1.Victims{
+						Pods:             []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
+						NumPDBViolations: 1,
+					}, "node2", 0, "node2"),
 				},
 			},
 		},
@@ -374,7 +362,7 @@ func TestSelectCandidate(t *testing.T) {
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
-				if s == nil || len(s.Name()) == 0 {
+				if s == nil || len(s.Name()) == 0 || len(s.Nodes()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
 					return
 				}
@@ -850,9 +838,9 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(midPriority).DisruptionModeSingle().Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p3").UID("p3").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p3").UID("p3").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p4").UID("p4").Namespace("default").Node("node1").Priority(lowPriority).Obj(),
 			},
 			targetNode: "node1",
@@ -861,7 +849,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 					Victim: &victim{
 						priority: midPriority,
 						pods: []fwk.PodInfo{
-							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj()),
 						},
 						keyType: fwk.PodGroupKeyType,
 					},
@@ -870,7 +858,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 					Victim: &victim{
 						priority: midPriority,
 						pods: []fwk.PodInfo{
-							newPodInfo(st.MakePod().Name("p3").UID("p3").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p3").UID("p3").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj()),
 						},
 						keyType: fwk.PodGroupKeyType,
 					},
@@ -900,8 +888,8 @@ func TestGetVictimsOnNode(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p-all-1").UID("p-all-1").Namespace("default").Node("node1").PodGroupName("pg-all").Priority(highPriority).Obj(),
 				st.MakePod().Name("p-all-2").UID("p-all-2").Namespace("default").Node("node2").PodGroupName("pg-all").Priority(highPriority).Obj(),
-				st.MakePod().Name("p-single-1").UID("p-single-1").Namespace("default").Node("node1").PodGroupName("pg-single").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p-single-2").UID("p-single-2").Namespace("default").Node("node2").PodGroupName("pg-single").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p-single-1").UID("p-single-1").Namespace("default").Node("node1").PodGroupName("pg-single").Priority(midPriority).Obj(),
+				st.MakePod().Name("p-single-2").UID("p-single-2").Namespace("default").Node("node2").PodGroupName("pg-single").Priority(midPriority).Obj(),
 				st.MakePod().Name("p-ind").UID("p-ind").Namespace("default").Node("node1").Priority(lowPriority).Obj(),
 			},
 			targetNode: "node1",
@@ -920,7 +908,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 					Victim: &victim{
 						priority: midPriority,
 						pods: []fwk.PodInfo{
-							newPodInfo(st.MakePod().Name("p-single-1").UID("p-single-1").Namespace("default").Node("node1").PodGroupName("pg-single").Priority(lowPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p-single-1").UID("p-single-1").Namespace("default").Node("node1").PodGroupName("pg-single").Priority(midPriority).Obj()),
 						},
 						keyType: fwk.PodGroupKeyType,
 					},
@@ -948,12 +936,12 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(midPriority).DisruptionModeAll().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").Priority(midPriority).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").Priority(midPriority).Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(midPriority).Obj(),
 			},
 			targetNode: "node1",
 			expectedVictims: []*DomainVictim{
@@ -961,8 +949,8 @@ func TestGetVictimsOnNode(t *testing.T) {
 					Victim: &victim{
 						priority: midPriority,
 						pods: []fwk.PodInfo{
-							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj()),
-							newPodInfo(st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(lowPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(midPriority).Obj()),
 						},
 						keyType: fwk.CompositePodGroupKeyType,
 					},
@@ -981,12 +969,12 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(midPriority).DisruptionModeSingle().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").Priority(midPriority).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").Priority(midPriority).Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace("default").Node("node2").PodGroupName("pg2").Priority(midPriority).Obj(),
 			},
 			targetNode: "node1",
 			expectedVictims: []*DomainVictim{
@@ -994,7 +982,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 					Victim: &victim{
 						priority: midPriority,
 						pods: []fwk.PodInfo{
-							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(lowPriority).Obj()),
+							newPodInfo(st.MakePod().Name("p1").UID("p1").Namespace("default").Node("node1").PodGroupName("pg1").Priority(midPriority).Obj()),
 						},
 						keyType: fwk.PodGroupKeyType,
 					},
@@ -1010,7 +998,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(midPriority).DisruptionModeAll().Obj(),
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").Priority(lowPriority).DisruptionModeSingle().Obj(),
@@ -1086,18 +1074,12 @@ func TestGetVictimsOnNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var cpgSnapshot fwk.CompositePodGroupLister
-			if tt.enableCompositePodGroup {
-				cpgSnapshot = fw.MutableSnapshotSharedLister().CompositePodGroups()
-			}
 			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			pe := Evaluator{
-				PluginName:                "TestPlugin",
-				Handler:                   fw,
-				executor:                  nil,
-				fts:                       fts,
-				podGroupSnapshot:          fw.MutableSnapshotSharedLister().PodGroups(),
-				compositePodGroupSnapshot: cpgSnapshot,
+				PluginName: "TestPlugin",
+				Handler:    fw,
+				executor:   nil,
+				fts:        fts,
 			}
 
 			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
@@ -1245,11 +1227,11 @@ func TestPreemptionEvaluationDurationMetric(t *testing.T) {
 				fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			)
 
-			stateBefore := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, metrics.Pod, tt.expectedStatus)
 
 			pe.evaluate(ctx, state, preemptor, m)
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, metrics.Pod, tt.expectedStatus)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {

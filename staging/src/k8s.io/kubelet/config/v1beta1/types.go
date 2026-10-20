@@ -372,6 +372,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: "4h"
 	// +optional
@@ -697,11 +698,13 @@ type KubeletConfiguration struct {
 	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains,omitempty"`
 	// iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ
 	// chain.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: 14
 	// +optional
 	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit,omitempty"`
 	// iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: 15
 	// +optional

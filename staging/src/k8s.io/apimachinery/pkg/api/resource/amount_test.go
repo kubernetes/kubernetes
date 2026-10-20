@@ -60,6 +60,10 @@ func TestInt64AmountAdd(t *testing.T) {
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 1, scale: -1}, int64Amount{value: 0, scale: -1}, false},
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 0, scale: -1}, int64Amount{value: mostPositive, scale: -1}, true},
 		{int64Amount{value: mostPositive / 10, scale: 1}, int64Amount{value: 10, scale: 0}, int64Amount{value: mostPositive, scale: -1}, false},
+
+		// Scale deltas exceeding math.MaxInt32 do not fit in Scale and must fail.
+		{int64Amount{value: 1, scale: math.MaxInt32}, int64Amount{value: 1, scale: -1}, int64Amount{}, false},
+		{int64Amount{value: 5, scale: math.MinInt32}, int64Amount{value: 1, scale: 0}, int64Amount{}, false},
 	} {
 		c := test.a
 		ok := c.Add(test.b)
@@ -167,6 +171,14 @@ func TestInt64AsCanonicalString(t *testing.T) {
 		{100, 1, "1", 3},
 		{100, -1, "10", 0},
 		{10800, -10, "1080", -9},
+		{10, math.MaxInt32, "100", math.MaxInt32 - 1},
+		{1000, math.MaxInt32, "10000", math.MaxInt32 - 1},
+		{math.MaxInt64, math.MaxInt32, "92233720368547758070", math.MaxInt32 - 1},
+		{1000, math.MinInt32, "10", math.MinInt32 + 2},
+		// No multiple of 3 fits at or below these exponents.
+		{1, math.MinInt32 + 1, "1", math.MinInt32 + 1},
+		{10, math.MinInt32, "1", math.MinInt32 + 1},
+		{1, math.MinInt32, "1", math.MinInt32},
 	} {
 		r, exp := int64Amount{value: test.value, scale: test.scale}.AsCanonicalBytes(nil)
 		if string(r) != test.result {
@@ -229,55 +241,69 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 	}
 }
 
-// TestScaleCanAlignInfScale locks the boundaries of the guard that gates the
-// decimal fallback in Sub: both operands must be representable, and their
-// alignment delta must fit int32. Directly pinning it here guards against the
-// range check being narrowed to one side, the bound flipping to a strict
-// comparison, or the delta regressing to int32 arithmetic.
-func TestScaleCanAlignInfScale(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		a    Scale
-		b    Scale
-		want bool
-	}{
-		{"same-scale", 0, 0, true},
-		{"positive-max-delta", Scale(math.MaxInt32), 0, true},
-		{"negative-max-delta", 0, Scale(math.MaxInt32), true},
-		{"positive-delta-overflow", Scale(math.MaxInt32), -1, false},
-		{"negative-delta-overflow", -1, Scale(math.MaxInt32), false},
-		{"receiver-min-int32", Scale(math.MinInt32), 0, false},
-		{"other-min-int32", 0, Scale(math.MinInt32), false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.a.canAlignInfScale(tc.b); got != tc.want {
-				t.Fatalf("Scale(%d).canAlignInfScale(%d) = %t, want %t", tc.a, tc.b, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestScaleInfScale(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		scale  Scale
-		result inf.Scale
+		name     string
+		scale    Scale
+		result   inf.Scale
+		resultOK bool
 	}{
-		{"positive scale flips sign", 3, -3},
-		{"negative scale flips sign", -3, 3},
-		{"zero", 0, 0},
-		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32},
+		{"positive scale flips sign", 3, -3, true},
+		{"negative scale flips sign", -3, 3, true},
+		{"zero", 0, 0, true},
+		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32, true},
 		// Scale is an int32 and infScale returns inf.Scale(-s). Negating
 		// math.MinInt32 does not fit in an int32, so the sign is not flipped
 		// and the value stays math.MinInt32 - the same int-negation edge as
 		// -mostNegative for int64. This asserts that behavior of infScale
 		// directly (it is exercised on the inf.Dec path, e.g. ScaledValue on
 		// a Dec-backed Quantity; the int64 backend does not call it).
-		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32},
+		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if got := test.scale.infScale(); got != test.result {
-				t.Errorf("%s: Scale(%d).infScale() = %d, want %d", test.name, test.scale, got, test.result)
+			if got, gotOK := test.scale.infScale(); got != test.result || gotOK != test.resultOK {
+				t.Errorf("%s: Scale(%d).infScale() = %d,%v, want %d,%v", test.name, test.scale, got, gotOK, test.result, test.resultOK)
+			}
+		})
+	}
+}
+
+func TestWidenInfScale(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   inf.Scale
+		want widenedScale
+	}{
+		{"positive flips sign", 3, -3},
+		{"negative flips sign", -3, 3},
+		{"zero", 0, 0},
+		{"MinInt32 flips sign", math.MinInt32, -math.MinInt32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := widenInfScale(tc.in); got != tc.want {
+				t.Errorf("widenInfScale(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNarrowScale(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		in       widenedScale
+		want     Scale
+		wantFits bool
+	}{
+		{"zero", 0, 0, true},
+		{"MaxInt32", math.MaxInt32, math.MaxInt32, true},
+		{"MinInt32", math.MinInt32, math.MinInt32, true},
+		{"MaxInt32+1 saturates", math.MaxInt32 + 1, math.MaxInt32, false},
+		{"MinInt32-1 saturates", math.MinInt32 - 1, math.MinInt32, false},
+		{"2^32 saturates", 1 << 32, math.MaxInt32, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, fits := narrowScale(tc.in); got != tc.want || fits != tc.wantFits {
+				t.Errorf("narrowScale(%d) = (%d, %t), want (%d, %t)", tc.in, got, fits, tc.want, tc.wantFits)
 			}
 		})
 	}

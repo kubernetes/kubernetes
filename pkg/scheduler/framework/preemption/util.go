@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -109,8 +108,8 @@ func victimRank(vi Victim) int {
 
 // traverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
 // If the next parent is missing, or cannot be listed, the traversal stops.
-// This method assumes that GenericWorkload feature gate is enabled.
-// The cpgLister should be non-nil only if the CompositePodGroup feature gate is enabled.
+// Feature gating is left to the listers: when GenericWorkload or CompositePodGroup is disabled,
+// the corresponding lister rejects lookups, so the traversal ends there.
 // TODO: log/return an error if there is a gap in the hierarchy.
 func traverseHierarchyUp(
 	namespace string,
@@ -151,9 +150,6 @@ func traverseHierarchyUp(
 				return
 			}
 
-			if cpgLister == nil {
-				return
-			}
 			parentKey, hasParent := gpg.GetParentKey()
 			if !hasParent {
 				return
@@ -161,29 +157,6 @@ func traverseHierarchyUp(
 			currentKey = parentKey
 		}
 	}
-}
-
-// getPodPriority returns the effective preemption priority of a pod. If the pod belongs to
-// a pod group or composite pod group hierarchy, it returns the priority of the root group of the hierarchy.
-// If podGroupLister is nil or the pod does not belong to a pod group, it returns the pod's own priority.
-// If compositePodGroupLister is nil or a parent composite pod group in the hierarchy is not found,
-// it falls back to the priority of the last successfully resolved group (or the pod's own priority).
-// TODO: log/return an error if there is a gap in the hierarchy.
-func getPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGroupLister fwk.CompositePodGroupLister) int32 {
-	if p.Spec.SchedulingGroup == nil || podGroupLister == nil {
-		return corev1helpers.PodPriority(p)
-	}
-	startKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-	var lastGPG *fwk.GenericPodGroup
-
-	for gpg := range traverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister) {
-		lastGPG = gpg
-	}
-
-	if lastGPG != nil {
-		return lastGPG.GetPriority()
-	}
-	return corev1helpers.PodPriority(p)
 }
 
 // FilterVictimsWithPDBViolation groups "victims" into "violatingVictims"

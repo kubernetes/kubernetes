@@ -1,4 +1,4 @@
-//go:build fieldsv1string
+//go:build !fieldsv1byte
 
 /*
 Copyright The Kubernetes Authors.

@@ -30,12 +30,12 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func mkPodTemplate(tolerations ...api.Toleration) *api.PodTemplate {
+func mkPodTemplate(podTweaks ...podtest.Tweak) *api.PodTemplate {
 	return &api.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"a": "b"}},
-			Spec:       podtest.MakePodSpec(podtest.SetTolerations(tolerations...)),
+			Spec:       podtest.MakePodSpec(podTweaks...),
 		},
 	}
 }
@@ -49,21 +49,22 @@ func TestDeclarativeValidate(t *testing.T) {
 			IsResourceRequest: true,
 			Verb:              "create",
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *api.PodTemplate
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkPodTemplate(),
 			},
 			"valid toleration key": {
-				input: mkPodTemplate(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}),
+				input: mkPodTemplate(podtest.SetTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
 			},
 			"valid toleration key without prefix": {
-				input: mkPodTemplate(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}),
+				input: mkPodTemplate(podtest.SetTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
 			},
 			"invalid toleration key format": {
-				input: mkPodTemplate(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}),
+				input: mkPodTemplate(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 				expectedErrs: field.ErrorList{
 					field.Invalid(field.NewPath("template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
@@ -91,6 +92,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkPodTemplate(tc.Tweaks...),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)

@@ -49,7 +49,7 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "select a ready schedulable node")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")
@@ -88,7 +88,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 	defer func() {
 		framework.Logf("Deleting %q pod", cgroupv2Testpod.Name)
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	}()
 
 	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
@@ -431,15 +431,15 @@ func podLevelResourcesTests(f *framework.Framework) {
 
 			ginkgo.By("verifying pod cgroup values")
 			err := cgroups.VerifyPodCgroups(ctx, f, pod, tc.expected.totalPodResources)
-			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+			framework.ExpectNoError(err, "verify pod's cgroup values: %v", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
 			err = verifyContainersCgroupLimits(ctx, f, pod)
-			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+			framework.ExpectNoError(err, "verify containers cgroup values: %v", err)
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "delete pod %s", delErr)
 		})
 	}
 }
@@ -447,27 +447,17 @@ func podLevelResourcesTests(f *framework.Framework) {
 func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
-		if pod.Spec.Resources != nil && !pod.Spec.Resources.Limits.Memory().IsZero() {
-			expectedResources := &v1.ResourceRequirements{Limits: make(v1.ResourceList)}
-			if container.Resources.Limits.Memory().IsZero() {
-				expectedResources.Limits[v1.ResourceMemory] = pod.Spec.Resources.Limits.Memory().DeepCopy()
-			} else {
-				expectedResources.Limits[v1.ResourceMemory] = container.Resources.Limits.Memory().DeepCopy()
-			}
-			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, expectedResources, true)
+		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
+			container.Resources.Limits.Memory() == nil {
+			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
 			}
 		}
 
-		if pod.Spec.Resources != nil && !pod.Spec.Resources.Limits.Cpu().IsZero() {
-			expectedResources := &v1.ResourceRequirements{Limits: make(v1.ResourceList)}
-			if container.Resources.Limits.Cpu().IsZero() {
-				expectedResources.Limits[v1.ResourceCPU] = pod.Spec.Resources.Limits.Cpu().DeepCopy()
-			} else {
-				expectedResources.Limits[v1.ResourceCPU] = container.Resources.Limits.Cpu().DeepCopy()
-			}
-			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, expectedResources, true)
+		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
+			container.Resources.Limits.Cpu() == nil {
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}
@@ -505,15 +495,15 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 
 		ginkgo.By("verifying pod cgroup values")
 		err := cgroups.VerifyPodCgroups(ctx, f, pod, expectedResources)
-		framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+		framework.ExpectNoError(err, "verify pod's cgroup values: %v", err)
 
 		ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
 		err = verifyContainersCgroupLimits(ctx, f, pod)
-		framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+		framework.ExpectNoError(err, "verify containers cgroup values: %v", err)
 
 		ginkgo.By("deleting pod")
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	})
 
 	// When only a CPU request is set at pod level (no memory request or limits), defaulting
@@ -543,14 +533,14 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		patch := []byte(`{"metadata":{"annotations":{"test-annotation":"trigger-defaulting"}}}`)
 		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(
 			ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch pod annotation")
+		framework.ExpectNoError(err, "patch pod annotation")
 
 		ginkgo.By("verifying pod resources after annotation update: defaulted memory request and limits remain unchanged")
 		verifyPodResources(*updatedPod, podResources, expectedResources)
 
 		ginkgo.By("deleting pod")
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	})
 }
 
@@ -560,7 +550,7 @@ var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial()
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "select a ready schedulable node")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")

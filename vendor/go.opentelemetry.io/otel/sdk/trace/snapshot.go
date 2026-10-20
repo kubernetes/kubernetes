@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// snapshot is an record of a spans state at a particular checkpointed time.
+// snapshot is a record of a span's state at a particular checkpointed time.
 // It is used as a read-only representation of that state.
 type snapshot struct {
 	name                  string

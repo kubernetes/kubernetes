@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -38,6 +39,7 @@ import (
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -274,6 +276,90 @@ func TestManagedFieldsOptOutFeatureGateDisabled(t *testing.T) {
 		t.Fatalf("failed to create configmap: %v", err)
 	}
 	expectManagedFields(t, "create", cm, true)
+}
+
+func TestManagedFieldsOptOutClient(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+
+	for _, tc := range []struct {
+		name          string
+		serverEnabled bool
+		clientEnabled bool
+		// wantSent is whether the server sends managedFields, and wantReturned whether the
+		// clients return them.
+		wantSent     bool
+		wantReturned bool
+	}{
+		{
+			name:          "server drops",
+			serverEnabled: true,
+			clientEnabled: true,
+		},
+		{
+			name:          "client strips",
+			serverEnabled: false,
+			clientEnabled: true,
+			wantSent:      true,
+		},
+		{
+			name:          "client gate disabled",
+			serverEnabled: true,
+			clientEnabled: false,
+			wantSent:      true,
+			wantReturned:  true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManagedFieldsOptOut, tc.serverEnabled)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, tc.clientEnabled)
+
+			ctx, client, config, tearDownFn := setup(t)
+			defer tearDownFn()
+
+			ns := framework.CreateNamespaceOrDie(client, "managedfields-opt-out-client", t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+			if _, err := client.CoreV1().ConfigMaps(ns.Name).Create(ctx, &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+				Data:       map[string]string{"key": "value"},
+			}, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("failed to create configmap: %v", err)
+			}
+			optOutConfig := restclient.CopyConfig(config)
+			optOutConfig.DropManagedFields = true
+			typedClient := clientset.NewForConfigOrDie(optOutConfig)
+
+			// Raw, since the clients strip managedFields from decoded objects.
+			raw, err := typedClient.CoreV1().RESTClient().Get().Namespace(ns.Name).Resource("configmaps").Name("test").
+				SetHeader("Accept", "application/json").DoRaw(ctx)
+			if err != nil {
+				t.Fatalf("raw get failed: %v", err)
+			}
+			if got := bytes.Contains(raw, []byte(`"managedFields"`)); got != tc.wantSent {
+				t.Errorf("managedFields sent = %t, want %t", got, tc.wantSent)
+			}
+
+			// The typed client requests protobuf, the metadata client replaces the Accept
+			// header with SetHeader, and the dynamic client requests CBOR.
+			gvr := v1.SchemeGroupVersion.WithResource("configmaps")
+			cm, err := typedClient.CoreV1().ConfigMaps(ns.Name).Get(ctx, "test", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("typed get failed: %v", err)
+			}
+			expectManagedFields(t, "typed get", cm, tc.wantReturned)
+			partial, err := metadata.NewForConfigOrDie(optOutConfig).Resource(gvr).Namespace(ns.Name).Get(ctx, "test", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("metadata get failed: %v", err)
+			}
+			expectManagedFields(t, "metadata get", partial, tc.wantReturned)
+			u, err := dynamic.NewForConfigOrDie(optOutConfig).Resource(gvr).Namespace(ns.Name).Get(ctx, "test", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("dynamic get failed: %v", err)
+			}
+			expectManagedFields(t, "dynamic get", u, tc.wantReturned)
+		})
+	}
 }
 
 // newDynamicClient returns a dynamic client that accepts the given media

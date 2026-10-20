@@ -641,7 +641,6 @@ const (
 	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
 
 	// owner: @ffromani
-	// Deprecated: v1.34
 	//
 	// issue: https://github.com/kubernetes/kubernetes/issues/119423
 	// Disables restricted output for the podresources API list endpoint.
@@ -1663,6 +1662,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeProxyNFTablesLocalhostNodePorts: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletAllocatedPodsEndpoint: {
@@ -2175,6 +2175,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WindowsCPUAndMemoryAffinity: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WindowsGracefulNodeShutdown: {
@@ -2225,6 +2226,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	genericfeatures.ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.ConditionalAuthorization: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	genericfeatures.ConsistentListFromCacheSkipTimeoutFallback: {
@@ -2297,6 +2302,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	genericfeatures.OpenAPIEnums: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.OpenAPIV2LazyBuild: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	genericfeatures.RemoteRequestHeaderUID: {
@@ -2786,6 +2795,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	genericfeatures.ConcurrentWatchObjectDecode: {},
 
+	genericfeatures.ConditionalAuthorization: {},
+
 	genericfeatures.ConsistentListFromCacheSkipTimeoutFallback: {},
 
 	genericfeatures.ConstrainedImpersonation: {},
@@ -2812,6 +2823,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.MutatingAdmissionPolicy: {},
 
 	genericfeatures.OpenAPIEnums: {},
+
+	genericfeatures.OpenAPIV2LazyBuild: {},
 
 	genericfeatures.RemoteRequestHeaderUID: {},
 

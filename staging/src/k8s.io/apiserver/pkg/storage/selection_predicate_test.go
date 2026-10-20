@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -303,74 +302,6 @@ func TestSelectionPredicateMatcherIndex(t *testing.T) {
 			indexFields:   []string{"uid"},
 			ctx:           context.Background(),
 			expected:      []MatchValue{{IndexName: FieldIndex("uid"), Value: "12345"}},
-		},
-		"Match field for listing namespace pods without metadata.namespace field selector": {
-			labelSelector: "",
-			fieldSelector: "",
-			indexLabels:   []string{},
-			indexFields:   []string{"metadata.namespace"},
-			ctx: request.WithRequestInfo(context.Background(), &request.RequestInfo{
-				IsResourceRequest: true,
-				Path:              "/api/v1/namespaces/default/pods",
-				Verb:              "list",
-				APIPrefix:         "api",
-				APIGroup:          "",
-				APIVersion:        "v1",
-				Namespace:         "default",
-				Resource:          "pods",
-			}),
-			expected: []MatchValue{{IndexName: FieldIndex("metadata.namespace"), Value: "default"}},
-		},
-		"Match field for listing namespace pods with metadata.namespace field selector": {
-			labelSelector: "",
-			fieldSelector: "metadata.namespace=kube-system",
-			indexLabels:   []string{},
-			indexFields:   []string{"metadata.namespace"},
-			ctx: request.WithRequestInfo(context.Background(), &request.RequestInfo{
-				IsResourceRequest: true,
-				Path:              "/api/v1/namespaces/default/pods",
-				Verb:              "list",
-				APIPrefix:         "api",
-				APIGroup:          "",
-				APIVersion:        "v1",
-				Namespace:         "default",
-				Resource:          "pods",
-			}),
-			expected: []MatchValue{{IndexName: FieldIndex("metadata.namespace"), Value: "kube-system"}},
-		},
-		"Match field for listing all pods without metadata.namespace field selector": {
-			labelSelector: "",
-			fieldSelector: "",
-			indexLabels:   []string{},
-			indexFields:   []string{"metadata.namespace"},
-			ctx: request.WithRequestInfo(context.Background(), &request.RequestInfo{
-				IsResourceRequest: true,
-				Path:              "/api/v1/pods",
-				Verb:              "list",
-				APIPrefix:         "api",
-				APIGroup:          "",
-				APIVersion:        "v1",
-				Namespace:         "",
-				Resource:          "pods",
-			}),
-			expected: nil,
-		},
-		"Match field for listing all pods with metadata.namespace field selector": {
-			labelSelector: "",
-			fieldSelector: "metadata.namespace=default",
-			indexLabels:   []string{},
-			indexFields:   []string{"metadata.namespace"},
-			ctx: request.WithRequestInfo(context.Background(), &request.RequestInfo{
-				IsResourceRequest: true,
-				Path:              "/api/v1/pods",
-				Verb:              "list",
-				APIPrefix:         "api",
-				APIGroup:          "",
-				APIVersion:        "v1",
-				Namespace:         "default",
-				Resource:          "pods",
-			}),
-			expected: []MatchValue{{IndexName: FieldIndex("metadata.namespace"), Value: "default"}},
 		},
 		"Match label": {
 			labelSelector: "name=foo",

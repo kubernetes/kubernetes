@@ -93,6 +93,9 @@ func sovGenerated(x uint64) (n int) {
 
 // Unmarshal is a customized version of the generated Protobuf unmarshaler for a struct
 // with a single string field.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (m *Quantity) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0

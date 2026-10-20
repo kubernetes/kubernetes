@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -186,16 +185,7 @@ func getClient(file string, dryRun bool, printer output.Printer) (clientset.Inte
 			return nil, errors.Wrapf(err, "could not create a client from %q", file)
 		}
 
-		// Obtain the FakeDiscovery object for this fake client.
-		fakeClient := dryRun.FakeClient()
-		fakeClientDiscovery, ok := fakeClient.Discovery().(*fakediscovery.FakeDiscovery)
-		if !ok {
-			return nil, errors.New("could not set fake discovery's server version")
-		}
-		// Set the right server version for it.
-		fakeClientDiscovery.FakedServerVersion = serverVersion
-
-		return fakeClient, nil
+		return dryRun.WithServerVersion(serverVersion).FakeClient(), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
 }

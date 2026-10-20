@@ -24,6 +24,7 @@ package minimum
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
@@ -62,6 +63,11 @@ type BasicStruct struct {
 	DurationField time.Duration `json:"durationField"`
 	// +k8s:minimum="100ms"
 	DurationPtrField *time.Duration `json:"durationPtrField"`
+
+	// +k8s:minimum=1
+	QuantityField resource.Quantity `json:"quantityField"`
+	// +k8s:minimum="1Gi"
+	QuantityPtrField *resource.Quantity `json:"quantityPtrField"`
 
 	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`

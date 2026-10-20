@@ -670,8 +670,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{
-						"watchCache locked acquired",
-						"watchCache fresh enough",
 						"GetByKey success",
 					},
 				},

@@ -76,6 +76,7 @@ import (
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -83,7 +84,6 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -626,6 +626,106 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	if count != 10 {
 		t.Errorf("Expected list size to be 10 but got %d", count)
+	}
+}
+
+func TestGetOptions(t *testing.T) {
+	for _, watchCacheEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = watchCacheEnabled
+				},
+			})
+			defer tearDownFn()
+
+			rsClient := clientSet.AppsV1().ReplicaSets("default")
+			rs := newRS("default")
+			rs.Name = "test-rs"
+			created, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating replicaset: %v", err)
+			}
+
+			tcs := []struct {
+				name           string
+				objectName     string
+				rv             string
+				wantStatusCode int32
+			}{
+				{
+					name:           "existing rv=empty",
+					objectName:     created.Name,
+					rv:             "",
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=0",
+					objectName:     created.Name,
+					rv:             "0",
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=valid",
+					objectName:     created.Name,
+					rv:             created.ResourceVersion,
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=invalid",
+					objectName:     created.Name,
+					rv:             invalidResourceVersion,
+					wantStatusCode: http.StatusUnprocessableEntity,
+				},
+				{
+					name:           "non-existing rv=empty",
+					objectName:     "non-existing",
+					rv:             "",
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=0",
+					objectName:     "non-existing",
+					rv:             "0",
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=valid",
+					objectName:     "non-existing",
+					rv:             created.ResourceVersion,
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=invalid",
+					objectName:     "non-existing",
+					rv:             invalidResourceVersion,
+					wantStatusCode: http.StatusUnprocessableEntity,
+				},
+			}
+
+			for _, tc := range tcs {
+				t.Run(tc.name, func(t *testing.T) {
+					got, err := rsClient.Get(tCtx, tc.objectName, metav1.GetOptions{ResourceVersion: tc.rv})
+					if tc.wantStatusCode == http.StatusOK {
+						if err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+						if got.UID != created.UID {
+							t.Errorf("expected UID %v, got %v", created.UID, got.UID)
+						}
+						return
+					}
+					if err == nil {
+						t.Fatalf("expected status code %d, got nil error", tc.wantStatusCode)
+					}
+					status, ok := err.(apierrors.APIStatus)
+					if !ok || status.Status().Code != tc.wantStatusCode {
+						t.Fatalf("expected status code %d, got: %#v", tc.wantStatusCode, err)
+					}
+				})
+			}
+		})
 	}
 }
 

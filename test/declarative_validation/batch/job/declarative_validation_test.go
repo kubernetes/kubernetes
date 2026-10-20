@@ -53,11 +53,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	})
 
-	testCases := map[string]struct {
+	type testCase struct {
 		input                 batch.Job
 		enableWorkloadWithJob bool
 		expectedErrs          field.ErrorList
-	}{
+	}
+
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkJob(),
 		},
@@ -298,6 +300,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkJob(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -668,6 +678,18 @@ func tweakBackoffLimitPerIndex(v *int32) func(*batch.Job) {
 func tweakTolerations(tolerations ...api.Toleration) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*batch.Job) {
+	return func(j *batch.Job) {
+		pod := &api.Pod{
+			Spec: j.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		j.Spec.Template.Spec = pod.Spec
 	}
 }
 

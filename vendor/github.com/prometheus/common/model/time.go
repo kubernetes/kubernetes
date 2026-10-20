@@ -164,6 +164,34 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
+// Common durations. Day and Week are included because ParseDuration supports
+// those units (unlike the standard time package).
+//
+// To count the number of units in a Duration, divide:
+//
+//	second := model.Second
+//	fmt.Print(int64(second/model.Millisecond)) // prints 1000
+//
+// To convert an integer number of units to a Duration, multiply:
+//
+//	seconds := 10
+//	fmt.Print(model.Duration(seconds)*model.Second) // prints 10s
+const (
+	Nanosecond  Duration = 1
+	Microsecond          = 1000 * Nanosecond
+	Millisecond          = 1000 * Microsecond
+	Second               = 1000 * Millisecond
+	Minute               = 60 * Second
+	Hour                 = 60 * Minute
+	Day                  = 24 * Hour
+	Week                 = 7 * Day
+)
+
+// Milliseconds returns the duration as an integer millisecond count.
+// Prometheus stores timestamps in milliseconds; time.Duration already
+// covers the other units.
+func (d Duration) Milliseconds() int64 { return time.Duration(d).Milliseconds() }
+
 // Set implements pflag/flag.Value.
 func (d *Duration) Set(s string) error {
 	var err error

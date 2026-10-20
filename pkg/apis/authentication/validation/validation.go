@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/utils/ptr"
 )
 
 const MinTokenAgeSec = 10 * 60 // 10 minutes
@@ -32,11 +33,12 @@ func ValidateTokenRequest(tr *authentication.TokenRequest) field.ErrorList {
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	if tr.Spec.ExpirationSeconds < MinTokenAgeSec {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
+	exp := ptr.Deref(tr.Spec.ExpirationSeconds, 0)
+	if exp < MinTokenAgeSec {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), exp, "may not specify a duration less than 10 minutes"))
 	}
-	if tr.Spec.ExpirationSeconds > 1<<32 {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds"))
+	if exp > 1<<32 {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), exp, "may not specify a duration larger than 2^32 seconds"))
 	}
 
 	switch {

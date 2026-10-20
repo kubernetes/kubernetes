@@ -162,6 +162,47 @@ func TestIsPodTerminated(t *testing.T) {
 	}
 }
 
+func TestProcessNextWorkItem(t *testing.T) {
+	tests := map[string]struct {
+		processErr      error
+		wantNumRequeues int
+	}{
+		"success forgets the key": {
+			processErr:      nil,
+			wantNumRequeues: 0,
+		},
+		"error requeues the key": {
+			processErr:      fmt.Errorf("conflict"),
+			wantNumRequeues: 1,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+			defer queue.ShutDown()
+
+			key := namespacedKey(defaultNS, defaultPGName)
+			queue.Add(key)
+
+			var processed []string
+			if !processNextWorkItem(ctx, "PodGroup", queue, func(_ context.Context, k string) error {
+				processed = append(processed, k)
+				return tc.processErr
+			}) {
+				t.Fatal("processNextWorkItem returned false, want true")
+			}
+
+			if !slices.Equal(processed, []string{key}) {
+				t.Errorf("processed keys = %v, want [%s]", processed, key)
+			}
+			if got := queue.NumRequeues(key); got != tc.wantNumRequeues {
+				t.Errorf("NumRequeues(%q) = %d, want %d", key, got, tc.wantNumRequeues)
+			}
+		})
+	}
+}
+
 func TestObjectOf(t *testing.T) {
 	tests := map[string]struct {
 		obj  interface{}

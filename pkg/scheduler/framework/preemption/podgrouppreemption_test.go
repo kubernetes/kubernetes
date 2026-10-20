@@ -18,6 +18,7 @@ package preemption
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"testing"
 
@@ -118,15 +119,48 @@ type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor
 
-	candidate fwk.PreemptionCandidate
+	reprieveFilter          fwk.ReprieveFilter
+	returnNilReprieveFilter bool
+	candidate               fwk.PreemptionCandidate
 }
 
 func (m *mockPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m
 }
 
+func (m *mockPreemptionManager) NewReprieveFilter(ctx context.Context, allVictims []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	if m.returnNilReprieveFilter {
+		return nil
+	}
+	if m.reprieveFilter != nil {
+		return m.reprieveFilter
+	}
+	return m.PreemptionManager.NewReprieveFilter(ctx, allVictims)
+}
+
 func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
 	m.candidate = candidate
+	return nil
+}
+
+type maxReprievesFilter struct {
+	remainingReprieves        int
+	shouldAttemptReprievalErr error
+	onReprievedErr            error
+}
+
+func (f *maxReprievesFilter) ShouldAttemptReprieval(_ context.Context, _ fwk.PreemptionVictim) (bool, error) {
+	if f.shouldAttemptReprievalErr != nil {
+		return false, f.shouldAttemptReprievalErr
+	}
+	return f.remainingReprieves > 0, nil
+}
+
+func (f *maxReprievesFilter) OnVictimReprieved(_ context.Context, _ fwk.PreemptionVictim) error {
+	if f.onReprievedErr != nil {
+		return f.onReprievedErr
+	}
+	f.remainingReprieves--
 	return nil
 }
 
@@ -139,6 +173,8 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		preemptor                      fwk.PodGroupInfo
 		pdbs                           []*policy.PodDisruptionBudget
 		nodeCapacities                 []nodeCapacity
+		reprieveFilter                 fwk.ReprieveFilter
+		returnNilReprieveFilter        bool
 		expectedVictims                []string
 		expectedStatus                 *fwk.Status
 		expectedNumPodGroupDisruptions int
@@ -400,7 +436,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(highPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
 				st.MakePod().Name("other-victim").UID("v2").Node("node1").Priority(lowPriority).Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
@@ -433,7 +469,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(highPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
 				st.MakePod().Name("other-victim").UID("v2").Node("node1").Priority(lowPriority).Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
@@ -852,67 +888,6 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
 		},
 		{
-			name: "Priority divergence: candidate victim PodGroup has lower priority than the Pods from that group",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Obj(),
-				st.MakeNode().Name("node2").Obj(),
-			},
-			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(highPriority).PodGroupName("pg1").Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(highPriority).PodGroupName("pg1").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(midPriority).Obj(),
-			},
-			preemptor: makePodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
-				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
-			),
-			nodeCapacities: []nodeCapacity{
-				{
-					nodeName: "node1",
-					capacity: 1,
-				},
-				{
-					nodeName: "node2",
-					capacity: 1,
-				},
-			},
-			expectedVictims:                []string{"p1", "p2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
-		},
-		{
-			name: "Priority divergence: candidate victim PodGroup has higher priority than the Pods from that group",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Obj(),
-				st.MakeNode().Name("node2").Obj(),
-			},
-			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("pg1").Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(midPriority).Obj(),
-			},
-			preemptor: makePodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(midPriority).Obj(),
-				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(midPriority).Obj()},
-			),
-			nodeCapacities: []nodeCapacity{
-				{
-					nodeName: "node1",
-					capacity: 1,
-				},
-				{
-					nodeName: "node2",
-					capacity: 1,
-				},
-			},
-			expectedVictims: []string{},
-			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
-		},
-		{
 			name: "Gang scheduling: schedule as many pods as possible without preempting higher priority pods, but still more than minCount",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
@@ -1179,6 +1154,116 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			expectedStatus:                 fwk.NewStatus(fwk.Success),
 			expectedNumPodGroupDisruptions: 1,
 		},
+		{
+			name: "ReprieveFilter: OnVictimReprieved is not called when a victim allowed by ShouldAttemptReprieval fails Filter",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(10).Labels(map[string]string{"size": "1"}).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(20).Labels(map[string]string{"size": "1"}).Obj(),
+				// v3 is evaluated after v4 during reprieve and passes both the reprieveFilter and the filter for all preemptor pods.
+				// Remaining victims v1 and v2 will not be reprieved because reprieveFilter only allows for a single reprieved victim,
+				// even though the preemptor would fit with those pods restored.
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(30).Labels(map[string]string{"size": "1"}).Obj(),
+				// v4 has highest victim priority so it is evaluated first during reprieve.
+				// It fits with p1 (6+3 <= 10) but fails Filter when p2 is also placed (6+3+3 > 10),
+				// so it does not consume the reprieve allowance enforced by the reprieveFilter.
+				st.MakePod().Name("v4").UID("v4").Node("node1").Priority(40).Labels(map[string]string{"size": "6"}).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).MinCount(2).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Labels(map[string]string{"size": "3"}).Obj(),
+					st.MakePod().Name("p2").UID("p2").Priority(highPriority).Labels(map[string]string{"size": "3"}).Obj(),
+				},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 10,
+				},
+			},
+			reprieveFilter:  &maxReprievesFilter{remainingReprieves: 1},
+			expectedVictims: []string{"v4", "v2", "v1"},
+			expectedStatus:  fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "ReprieveFilter: error from OnVictimReprieved results in error status",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(10).Labels(map[string]string{"size": "6"}).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(20).Labels(map[string]string{"size": "1"}).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).MinCount(1).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Labels(map[string]string{"size": "6"}).Obj(),
+				},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 10,
+				},
+			},
+			reprieveFilter: &maxReprievesFilter{
+				remainingReprieves: 1,
+				onReprievedErr:     errors.New("reprieve error"),
+			},
+			expectedStatus: fwk.AsStatus(errors.New("reprieve error")),
+		},
+		{
+			name: "ReprieveFilter: error from ShouldAttemptReprieval results in error status",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(10).Labels(map[string]string{"size": "6"}).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(20).Labels(map[string]string{"size": "1"}).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).MinCount(1).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Labels(map[string]string{"size": "6"}).Obj(),
+				},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 10,
+				},
+			},
+			reprieveFilter: &maxReprievesFilter{
+				shouldAttemptReprievalErr: errors.New("should attempt reprieval error"),
+			},
+			expectedStatus: fwk.AsStatus(errors.New("should attempt reprieval error")),
+		},
+		{
+			name: "ReprieveFilter: nil filter from NewReprieveFilter results in error status",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(10).Labels(map[string]string{"size": "6"}).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).MinCount(1).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Labels(map[string]string{"size": "6"}).Obj(),
+				},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 10,
+				},
+			},
+			returnNilReprieveFilter: true,
+			expectedStatus:          fwk.NewStatus(fwk.Error, "got nil reprieve filter"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1215,7 +1300,10 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
-			mockPreemptionManager := &mockPreemptionManager{}
+			mockPreemptionManager := &mockPreemptionManager{
+				reprieveFilter:          tt.reprieveFilter,
+				returnNilReprieveFilter: tt.returnNilReprieveFilter,
+			}
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
@@ -1339,6 +1427,14 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			if mockPreemptionManager.candidate.Victims().NumPDBViolations != int64(tt.expectedNumPDBViolations) {
 				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, mockPreemptionManager.candidate.Victims().NumPDBViolations)
 			}
+			wantCandidateNodes := sets.New[string]()
+			for _, ni := range res.NominatingInfos {
+				wantCandidateNodes.Insert(ni.NominatedNodeName)
+			}
+			gotCandidateNodes := sets.New(mockPreemptionManager.candidate.Nodes()...)
+			if diff := cmp.Diff(wantCandidateNodes, gotCandidateNodes); diff != "" {
+				t.Errorf("Candidate nodes mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -1456,7 +1552,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(highPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").UID("victim-pg").Priority(lowPriority).DisruptionModeAll().Obj(),
@@ -1478,7 +1574,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(highPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("victim-pg").Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").UID("victim-pg").Priority(lowPriority).DisruptionModeSingle().Obj(),
@@ -1641,18 +1737,35 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
-	preemptorPGInfo := newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
 
 	tests := []struct {
 		name             string
+		isCPG            bool
+		wantPreemptor    string
 		evaluationStatus *fwk.Status
 	}{
 		{
-			name:             "scheduling success",
+			name:             "podgroup scheduling success",
+			isCPG:            false,
+			wantPreemptor:    metrics.PodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name:             "scheduling error",
+			name:             "compositepodgroup scheduling success",
+			isCPG:            true,
+			wantPreemptor:    metrics.CompositePodGroup,
+			evaluationStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:             "podgroup scheduling error",
+			isCPG:            false,
+			wantPreemptor:    metrics.PodGroup,
+			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
+		},
+		{
+			name:             "compositepodgroup scheduling error",
+			isCPG:            true,
+			wantPreemptor:    metrics.CompositePodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
 		},
 	}
@@ -1665,6 +1778,13 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+
+			var preemptorPGInfo fwk.PodGroupInfo
+			if tt.isCPG {
+				preemptorPGInfo = newTestPodGroupInfo(nil, st.MakeCompositePodGroup().Name("preemptor-cpg").Priority(highPriority).Obj(), []*v1.Pod{preemptorPod})
+			} else {
+				preemptorPGInfo = newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
+			}
 
 			node := st.MakeNode().Name(nodeName).Obj()
 			victimPod := st.MakePod().Name("p2").UID("p2").Node(nodeName).Priority(lowPriority).Obj()
@@ -1711,7 +1831,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				return nil, tt.evaluationStatus
 			}
 			expectedStatus := tt.evaluationStatus.Code().String()
-			stateBefore := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -1721,11 +1841,11 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {
-				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+				t.Errorf("Expected %s count delta for %s to be 1, got %d", expectedStatus, tt.wantPreemptor, diff)
 			}
 		})
 	}

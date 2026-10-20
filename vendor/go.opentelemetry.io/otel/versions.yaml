@@ -3,7 +3,7 @@
 
 module-sets:
   stable-v1:
-    version: v1.46.0
+    version: v1.47.0
     modules:
       - go.opentelemetry.io/otel
       - go.opentelemetry.io/otel/bridge/opencensus
@@ -17,25 +17,29 @@ module-sets:
       - go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
       - go.opentelemetry.io/otel/exporters/stdout/stdouttrace
       - go.opentelemetry.io/otel/exporters/zipkin
+      - go.opentelemetry.io/otel/log
       - go.opentelemetry.io/otel/metric
       - go.opentelemetry.io/otel/sdk
+      - go.opentelemetry.io/otel/sdk/log
       - go.opentelemetry.io/otel/sdk/metric
       - go.opentelemetry.io/otel/trace
   experimental-metrics:
-    version: v0.68.0
+    version: v0.69.0
     modules:
       - go.opentelemetry.io/otel/exporters/prometheus
       - go.opentelemetry.io/otel/metric/x
   experimental-logs:
-    version: v0.22.0
+    version: v0.23.0
     modules:
-      - go.opentelemetry.io/otel/log
       - go.opentelemetry.io/otel/log/logtest
-      - go.opentelemetry.io/otel/sdk/log
       - go.opentelemetry.io/otel/sdk/log/logtest
       - go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc
       - go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp
       - go.opentelemetry.io/otel/exporters/stdout/stdoutlog
+  experimental-traces:
+    version: v0.1.0
+    modules:
+      - go.opentelemetry.io/otel/sdk/trace/x
   experimental-schema:
     version: v0.0.19
     modules:

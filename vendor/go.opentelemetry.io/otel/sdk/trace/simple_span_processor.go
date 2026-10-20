@@ -104,10 +104,15 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 		// span would need to be exported. Meaning, OnEnd would be called and
 		// try acquiring the lock that is held here.
 		ssp.exporterMu.Lock()
-		done, shutdown := stopFunc(ssp.exporter)
+		exp := ssp.exporter
 		ssp.exporter = nil
 		ssp.exporterMu.Unlock()
 
+		if exp == nil {
+			return
+		}
+
+		done, shutdown := stopFunc(exp)
 		go shutdown()
 
 		// Wait for the exporter to shut down or the deadline to expire.

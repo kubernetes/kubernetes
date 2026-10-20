@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Proc provides information about a running process.
@@ -128,7 +128,7 @@ func (fs FS) AllProcs() (Procs, error) {
 
 // CmdLine returns the command line of a process.
 func (p Proc) CmdLine() ([]string, error) {
-	data, err := util.ReadFileNoStat(p.path("cmdline"))
+	data, err := parsers.ReadFileNoStat(p.path("cmdline"))
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (p Proc) Wchan() (string, error) {
 
 // Comm returns the command name of a process.
 func (p Proc) Comm() (string, error) {
-	data, err := util.ReadFileNoStat(p.path("comm"))
+	data, err := parsers.ReadFileNoStat(p.path("comm"))
 	if err != nil {
 		return "", err
 	}
@@ -281,7 +281,7 @@ func (p Proc) MountStats() ([]*Mount, error) {
 // It supplies information missing in `/proc/self/mounts` and
 // fixes various other problems with that file too.
 func (p Proc) MountInfo() ([]*MountInfo, error) {
-	data, err := util.ReadFileNoStat(p.path("mountinfo"))
+	data, err := parsers.ReadFileNoStat(p.path("mountinfo"))
 	if err != nil {
 		return nil, err
 	}

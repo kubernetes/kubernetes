@@ -265,7 +265,10 @@ func Validate_Struct(
 			func() { // cohort = "ptrField"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
-					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+						return validate.RequiredPointer(ctx, op, fldPath, obj, oldObj)
+					}).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}

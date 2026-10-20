@@ -107,7 +107,7 @@ type SchedulingQueue interface {
 	// AddUnschedulablePodIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
 	// returned by calling SchedulingCycle().
-	AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error
+	AddUnschedulablePodIfNotPresent(ctx context.Context, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error
 	// AddAttemptedPodGroupIfNeeded adds an attempted pod group back to scheduling queue.
 	// If there are no pending pods, it will not add the pod group back to the queue.
 	// Should be called synchronously to the pod group scheduling cycle.
@@ -1081,10 +1081,10 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 
 // AddUnschedulablePodIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue.
-func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-
+	logger := klog.FromContext(ctx)
 	// In any case, this Pod will be moved back to the queue and we should call Done.
 	calledDone := false
 	defer func() {
@@ -1122,6 +1122,7 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
 	pInfo.FlushTimestamp = time.Time{}
+	pInfo.PodSignature = p.signPod(ctx, pod)
 
 	if p.isPodGroupMember(pod) {
 		// Done has to be called before adding the unschedulable pod group member.

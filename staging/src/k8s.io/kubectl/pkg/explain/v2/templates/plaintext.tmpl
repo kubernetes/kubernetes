@@ -42,7 +42,7 @@
         {{- throw "error: GVK %v not found in OpenAPI schema" $gvk -}}
     {{- end -}}
 {{- else -}}
-    {{- throw "error: GVR (%v) not found in OpenAPI schema" $.GVR.String -}}
+    {{- throw "error: GVR (%v) not found in OpenAPI schema" $.GVR -}}
 {{- end -}}
 {{- "\n" -}}
 

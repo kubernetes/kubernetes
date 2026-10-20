@@ -46,10 +46,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			IsResourceRequest: true,
 			Verb:              "create",
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *api.Pod
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: podtest.MakePod("foo"),
 			},
@@ -107,6 +108,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 			},
 		}
+
+		for _, tc := range InvalidPodSpecTestcases(field.NewPath("spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        podtest.MakePod("foo", tc.Tweaks...),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)

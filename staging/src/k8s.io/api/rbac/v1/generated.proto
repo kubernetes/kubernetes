@@ -46,7 +46,7 @@ message ClusterRole {
   // rules holds all the PolicyRules for this ClusterRole
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   repeated PolicyRule rules = 2;
 
   // aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
@@ -103,7 +103,7 @@ message PolicyRule {
   // verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
   // +listType=atomic
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:required
   repeated string verbs = 1;
 
   // apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
@@ -139,7 +139,7 @@ message Role {
   // rules holds all the PolicyRules for this Role
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   repeated PolicyRule rules = 2;
 }
 

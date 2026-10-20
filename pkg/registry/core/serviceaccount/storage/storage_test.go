@@ -133,7 +133,7 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 			Name:      serviceAccount.Name,
 			Namespace: serviceAccount.Namespace,
 		},
-		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: 3600},
+		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: new(int64(3600))},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed calling /token endpoint for service account: %v", err)

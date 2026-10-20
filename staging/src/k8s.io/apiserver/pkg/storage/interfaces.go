@@ -269,6 +269,7 @@ type Interface interface {
 	// https://github.com/kubernetes/kubernetes/blob/9325a57125e8502941d1b0c7379c4bb80a678d5c/vendor/go.etcd.io/etcd/client/v3/watch.go#L1037-L1042
 	//
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
+	//
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
 
@@ -445,3 +446,16 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	}
 	return key, nil
 }
+
+// ReverseKeyFunc recovers object identity from a resource-relative key
+// produced by the corresponding registry KeyFunc. Backend-specific prefixes
+// are removed before the key is passed to this function.
+// The key identifies a single object, not a collection or root.
+// It starts with "/" and does not end with "/".
+//
+// For namespaced resources, namespace and name are both non-empty. For
+// cluster-scoped resources, namespace is empty and name is non-empty. An error
+// is returned if the key cannot be parsed into a valid object identity.
+// A nil ReverseKeyFunc indicates that identity cannot be derived from the
+// key and callers must fall back to decoding the stored object.
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)

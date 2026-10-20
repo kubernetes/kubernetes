@@ -38,6 +38,7 @@ type defaultPreemptionManager struct {
 }
 
 var _ fwk.PreemptionManager = &defaultPreemptionManager{}
+var _ fwk.ReprieveFilter = &defaultPreemptionManager{}
 
 // NewPreemptionManager creates a PreemptionManager using the provided handle
 // and features for victim discovery and actuation.
@@ -60,12 +61,7 @@ func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo f
 		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
 	}
 
-	podGroupSnapshot := m.snapshot.PodGroups()
-	var compositePodGroupSnapshot fwk.CompositePodGroupLister
-	if m.fts.EnableCompositePodGroup {
-		compositePodGroupSnapshot = m.snapshot.CompositePodGroups()
-	}
-	victims, err := getWorkloadPreemptionVictims(logger, m.snapshot, podGroupSnapshot, compositePodGroupSnapshot)
+	victims, err := getWorkloadPreemptionVictims(logger, m.snapshot)
 	if err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("failed to get victims: %w", err))
 	}
@@ -80,6 +76,18 @@ func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo f
 
 func (m *defaultPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m.executor
+}
+
+func (m *defaultPreemptionManager) NewReprieveFilter(_ context.Context, _ []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	return m
+}
+
+func (m *defaultPreemptionManager) ShouldAttemptReprieval(_ context.Context, _ fwk.PreemptionVictim) (bool, error) {
+	return true, nil
+}
+
+func (m *defaultPreemptionManager) OnVictimReprieved(_ context.Context, _ fwk.PreemptionVictim) error {
+	return nil
 }
 
 func getPreemptionPolicy(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {

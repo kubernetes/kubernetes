@@ -37,9 +37,9 @@ import (
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestStorageVersionMigration is an integration test that verifies storage version migration works.

@@ -91,6 +91,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		codec,
 		newPod,
 		newPodList,
+		nil,
 		prefix,
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},
@@ -122,6 +123,7 @@ func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		config.Codec,
 		config.NewFunc,
 		config.NewListFunc,
+		nil,
 		etcd3testing.PathPrefix(),
 		config.ResourcePrefix,
 		config.GroupResource,
@@ -145,7 +147,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		}
 
 		c.cacher.watchCache.RLock()
-		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), false, rv)
+		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), rv)
 		c.cacher.watchCache.RUnlock()
 		if err != nil {
 			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
@@ -159,7 +161,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
 		}
 
-		if len(c.cacher.watchers.allWatchers) > 0 || len(c.cacher.watchers.valueWatchers) > 0 {
+		if len(c.cacher.watchers.scopeWatchers) > 0 || len(c.cacher.watchers.indexWatchers) > 0 {
 			// We could consider terminating those watchers, but given
 			// watchcache doesn't really support compaction and we don't
 			// exercise it in tests, we just throw an error here.
@@ -174,7 +176,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 
 			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.storage.UpdateListResourceVersion(rv)
+		c.cacher.watchCache.history.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}

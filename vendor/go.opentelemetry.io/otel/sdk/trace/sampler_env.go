@@ -46,14 +46,13 @@ func (e samplerArgParseError) Unwrap() error {
 }
 
 func samplerFromEnv() (Sampler, error) {
-	sampler, ok := os.LookupEnv(tracesSamplerKey)
-	if !ok {
+	sampler := strings.ToLower(strings.TrimSpace(os.Getenv(tracesSamplerKey)))
+	if sampler == "" {
 		return nil, nil
 	}
 
-	sampler = strings.ToLower(strings.TrimSpace(sampler))
-	samplerArg, hasSamplerArg := os.LookupEnv(tracesSamplerArgKey)
-	samplerArg = strings.TrimSpace(samplerArg)
+	samplerArg := strings.TrimSpace(os.Getenv(tracesSamplerArgKey))
+	hasSamplerArg := samplerArg != ""
 
 	switch sampler {
 	case samplerAlwaysOn:

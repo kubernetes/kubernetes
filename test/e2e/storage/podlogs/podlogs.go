@@ -327,9 +327,15 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		check()
+		resultChan := watcher.ResultChan()
 		for {
 			select {
-			case <-watcher.ResultChan():
+			case _, ok := <-resultChan:
+				if !ok {
+					// A terminal error closed the RetryWatcher for good; drop the channel.
+					resultChan = nil
+					continue
+				}
 				check()
 			case <-ticker.C:
 				check()

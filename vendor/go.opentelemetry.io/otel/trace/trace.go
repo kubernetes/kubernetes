@@ -134,13 +134,49 @@ func TraceIDFromHex(h string) (TraceID, error) {
 	if len(h) != 32 {
 		return [16]byte{}, errInvalidTraceIDLength
 	}
-	var b [16]byte
-	invalidMark := byte(0)
-	for i := 0; i < len(h); i += 4 {
-		b[i/2] = (hexRev[h[i]] << 4) | hexRev[h[i+1]]
-		b[i/2+1] = (hexRev[h[i+2]] << 4) | hexRev[h[i+3]]
-		invalidMark |= hexRev[h[i]] | hexRev[h[i+1]] | hexRev[h[i+2]] | hexRev[h[i+3]]
+	// Decoding every character at a constant index allows the compiler to
+	// eliminate the bounds checks a loop over h would retain.
+	n0, n1 := hexRev[h[0]], hexRev[h[1]]
+	n2, n3 := hexRev[h[2]], hexRev[h[3]]
+	n4, n5 := hexRev[h[4]], hexRev[h[5]]
+	n6, n7 := hexRev[h[6]], hexRev[h[7]]
+	n8, n9 := hexRev[h[8]], hexRev[h[9]]
+	n10, n11 := hexRev[h[10]], hexRev[h[11]]
+	n12, n13 := hexRev[h[12]], hexRev[h[13]]
+	n14, n15 := hexRev[h[14]], hexRev[h[15]]
+	n16, n17 := hexRev[h[16]], hexRev[h[17]]
+	n18, n19 := hexRev[h[18]], hexRev[h[19]]
+	n20, n21 := hexRev[h[20]], hexRev[h[21]]
+	n22, n23 := hexRev[h[22]], hexRev[h[23]]
+	n24, n25 := hexRev[h[24]], hexRev[h[25]]
+	n26, n27 := hexRev[h[26]], hexRev[h[27]]
+	n28, n29 := hexRev[h[28]], hexRev[h[29]]
+	n30, n31 := hexRev[h[30]], hexRev[h[31]]
+
+	b := [16]byte{
+		(n0 << 4) | n1,
+		(n2 << 4) | n3,
+		(n4 << 4) | n5,
+		(n6 << 4) | n7,
+		(n8 << 4) | n9,
+		(n10 << 4) | n11,
+		(n12 << 4) | n13,
+		(n14 << 4) | n15,
+		(n16 << 4) | n17,
+		(n18 << 4) | n19,
+		(n20 << 4) | n21,
+		(n22 << 4) | n23,
+		(n24 << 4) | n25,
+		(n26 << 4) | n27,
+		(n28 << 4) | n29,
+		(n30 << 4) | n31,
 	}
+
+	invalidMark := n0 | n1 | n2 | n3 | n4 | n5 | n6 | n7 |
+		n8 | n9 | n10 | n11 | n12 | n13 | n14 | n15 |
+		n16 | n17 | n18 | n19 | n20 | n21 | n22 | n23 |
+		n24 | n25 | n26 | n27 | n28 | n29 | n30 | n31
+
 	// If the upper 4 bits of any byte are not zero, there was an invalid hex
 	// character since invalid hex characters are 0xff in hexRev.
 	if invalidMark&0xf0 != 0 {
@@ -160,13 +196,31 @@ func SpanIDFromHex(h string) (SpanID, error) {
 	if len(h) != 16 {
 		return [8]byte{}, errInvalidSpanIDLength
 	}
-	var b [8]byte
-	invalidMark := byte(0)
-	for i := 0; i < len(h); i += 4 {
-		b[i/2] = (hexRev[h[i]] << 4) | hexRev[h[i+1]]
-		b[i/2+1] = (hexRev[h[i+2]] << 4) | hexRev[h[i+3]]
-		invalidMark |= hexRev[h[i]] | hexRev[h[i+1]] | hexRev[h[i+2]] | hexRev[h[i+3]]
+	// Decoding every character at a constant index allows the compiler to
+	// eliminate the bounds checks a loop over h would retain.
+	n0, n1 := hexRev[h[0]], hexRev[h[1]]
+	n2, n3 := hexRev[h[2]], hexRev[h[3]]
+	n4, n5 := hexRev[h[4]], hexRev[h[5]]
+	n6, n7 := hexRev[h[6]], hexRev[h[7]]
+	n8, n9 := hexRev[h[8]], hexRev[h[9]]
+	n10, n11 := hexRev[h[10]], hexRev[h[11]]
+	n12, n13 := hexRev[h[12]], hexRev[h[13]]
+	n14, n15 := hexRev[h[14]], hexRev[h[15]]
+
+	b := [8]byte{
+		(n0 << 4) | n1,
+		(n2 << 4) | n3,
+		(n4 << 4) | n5,
+		(n6 << 4) | n7,
+		(n8 << 4) | n9,
+		(n10 << 4) | n11,
+		(n12 << 4) | n13,
+		(n14 << 4) | n15,
 	}
+
+	invalidMark := n0 | n1 | n2 | n3 | n4 | n5 | n6 | n7 |
+		n8 | n9 | n10 | n11 | n12 | n13 | n14 | n15
+
 	// If the upper 4 bits of any byte are not zero, there was an invalid hex
 	// character since invalid hex characters are 0xff in hexRev.
 	if invalidMark&0xf0 != 0 {

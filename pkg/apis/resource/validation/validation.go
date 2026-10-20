@@ -1110,6 +1110,10 @@ func validateDeviceNodeSelection(device resource.Device, perDeviceNodeSelection 
 		if device.NodeSelector != nil {
 			setFields = append(setFields, "`nodeSelector`")
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(device.NodeSelector, false, fldPath.Child("nodeSelector"))...)
+			// As with spec.nodeSelector, the allocator can only merge single-term selectors.
+			if len(device.NodeSelector.NodeSelectorTerms) != 1 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), device.NodeSelector.NodeSelectorTerms, "must have exactly one node selector term"))
+			}
 		}
 		if device.AllNodes != nil {
 			if *device.AllNodes {

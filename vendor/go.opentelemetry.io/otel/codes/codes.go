@@ -32,7 +32,7 @@ const (
 	maxCode = 3
 )
 
-// Code is an 32-bit representation of a status state.
+// Code is a 32-bit representation of a status state.
 type Code uint32
 
 var codeToStr = map[Code]string{

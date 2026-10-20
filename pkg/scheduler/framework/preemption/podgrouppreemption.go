@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 
@@ -48,10 +49,10 @@ func NewPodGroupEvaluator(fh fwk.Handle) *PodGroupEvaluator {
 }
 
 // evaluate determines the victims for preemption, without actuation.
-func (ev *PodGroupEvaluator) evaluate(ctx context.Context, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
+func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptorType fwk.EntityKeyType, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptorType), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	return ev.selectVictimsOnDomain(ctx, potentialVictims, podGroupSchedulingFunc)
@@ -85,15 +86,15 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 		return nil, fwk.NewStatus(fwk.Unschedulable, "No preemption victims found for incoming preemptor")
 	}
 
-	res, status := ev.evaluate(ctx, victims, podGroupSchedulingFunc)
+	res, status := ev.evaluate(ctx, pgInfo.GetType(), victims, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}
-	candidate := &candidate{
-		victims:                res.victims,
-		numPodGroupDisruptions: res.numPodGroupDisruptions,
-		name:                   "cluster",
+	preemptorNodes := sets.New[string]()
+	for _, ni := range res.nominatedNodeNames {
+		preemptorNodes.Insert(ni.NominatedNodeName)
 	}
+	candidate := newCandidate(res.victims, "cluster", res.numPodGroupDisruptions, preemptorNodes.UnsortedList()...)
 	status = preemptionManager.Executor().ActuatePodGroupPreemption(ctx, candidate, pgInfo, names.DefaultPreemption)
 	if status.IsSuccess() {
 		status = fwk.NewStatus(fwk.Success, fmt.Sprintf("found a placement for podgroup, preempting %d victims", len(res.victims.Pods)))
@@ -202,11 +203,16 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		}
 	}
 
+	reprieveFilter := ev.Handle.PreemptionManager().NewReprieveFilter(ctx, potentialVictims)
+	if reprieveFilter == nil {
+		return nil, fwk.NewStatus(fwk.Error, "got nil reprieve filter")
+	}
 	// reprieveVictim tries to reprieve a victim as a single unit.
-	// It adds all victim's pods back to snapshot and to CycleStates of preemptor pods
+	// If reprieveFilter allows reprieving the victim, it adds all victim's pods back to snapshot
+	// and to CycleStates of preemptor pods.
 	// It then goes through preemptor's proposed assignments and runs FilterPlugins for a given preemptor
 	// pod on proposed node.
-	// If all FilterPlugins succeed, it returns true.
+	// If all FilterPlugins succeed, it notifies reprieveFilter and returns true.
 	// Preemptor pods are evaluated in the same order as in the scheduling cycle.
 	// This logic uses the CycleState returned for each of the preemptor pods from the
 	// scheduling algorithm called on a cluster without victims.
@@ -214,6 +220,13 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// - all previous preemptor pods assumed and reserved
 	// - no knowledge of upcoming preemptor pods
 	reprieveVictim := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) (fits bool, err error) {
+		ok, err := reprieveFilter.ShouldAttemptReprieval(ctx, v)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
+		}
 		if err = addVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
 			return false, err
 		}
@@ -225,7 +238,6 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				}
 			}
 		}()
-		fits = true
 		for _, assignment := range preemptorAssignments {
 			nodeInfo, err := mutableLister.NodeInfos().Get(assignment.GetNodeName())
 			if err != nil {
@@ -255,7 +267,10 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				return mutableLister.RemovePod(logger, assignment.GetPod(), assignment.GetNodeName())
 			})
 		}
-		return fits, nil
+		if err = reprieveFilter.OnVictimReprieved(ctx, v); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 
 	// Try to reprieve as many pods as possible. The provided victims are ordered

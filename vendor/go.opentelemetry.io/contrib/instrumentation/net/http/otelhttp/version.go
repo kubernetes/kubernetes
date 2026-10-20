@@ -4,4 +4,4 @@
 package otelhttp
 
 // Version is the current release version of the otelhttp instrumentation.
-const Version = "0.71.0"
+const Version = "0.72.0"

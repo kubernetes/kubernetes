@@ -20,8 +20,6 @@ import (
 	jsonv2 "encoding/json/v2"
 	"net/url"
 
-	"github.com/go-openapi/jsonpointer/jsonname"
-
 	"k8s.io/kube-openapi/pkg/internal"
 )
 
@@ -495,20 +493,22 @@ func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
 		Schema             string                     `json:"$schema,omitempty"`
 		Ref                string                     `json:"$ref,omitempty"`
 	}
-	x.ArbitraryKeys = make(map[string]any, len(s.Extensions)+len(s.ExtraProps))
-	for k, v := range s.Extensions {
-		if internal.IsExtensionKey(k) {
+	if len(s.Extensions) > 0 || len(s.ExtraProps) > 0 {
+		x.ArbitraryKeys = make(map[string]any, len(s.Extensions)+len(s.ExtraProps))
+		for k, v := range s.Extensions {
+			if internal.IsExtensionKey(k) {
+				x.ArbitraryKeys[k] = v
+			}
+		}
+		for k, v := range s.ExtraProps {
 			x.ArbitraryKeys[k] = v
 		}
-	}
-	for k, v := range s.ExtraProps {
-		x.ArbitraryKeys[k] = v
 	}
 	x.SchemaProps = schemaPropsOmitZero(s.SchemaProps)
 	x.SwaggerSchemaProps = swaggerSchemaPropsOmitZero(s.SwaggerSchemaProps)
 	x.Ref = s.Ref.String()
 	x.Schema = string(s.Schema)
-	return jsonv2.MarshalEncode(enc, x)
+	return jsonv2.MarshalEncode(enc, &x)
 }
 
 // UnmarshalJSON marshal this from JSON
@@ -537,9 +537,6 @@ func (s *Schema) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	delete(x.Extensions, "$ref")
 	delete(x.Extensions, "$schema")
 
-	for _, pn := range jsonname.DefaultJSONNameProvider.GetJSONNames(s) {
-		delete(x.Extensions, pn)
-	}
 	if len(x.Extensions) == 0 {
 		x.Extensions = nil
 	}

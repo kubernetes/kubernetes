@@ -25,6 +25,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	testclocks "k8s.io/utils/clock/testing"
 )
 
@@ -207,25 +209,12 @@ func TestEventSeriesWithEventSinkImplRace(t *testing.T) {
 	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
 	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
 
-	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		events, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if len(events.Items) != 1 {
-			return false, nil
-		}
-
-		if events.Items[0].Series == nil {
-			return false, nil
-		}
-
-		return true, nil
-	})
-	if err != nil {
-		t.Fatal("expected that 2 identical Eventf calls would result in the creation of an Event with a Serie")
-	}
+	ktesting.Init(t).Eventually(func(tCtx ktesting.TContext) {
+		events, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{})
+		tCtx.ExpectNoError(err, "list events")
+		tCtx.Expect(events.Items).To(gomega.HaveLen(1), "number of events")
+		tCtx.Expect(events.Items[0].Series).ToNot(gomega.BeNil(), "event series")
+	}).WithTimeout(5*time.Second).WithPolling(100*time.Millisecond).Should(gomega.Succeed(), "expected that 2 identical Eventf calls would result in the creation of an Event with a Series")
 }
 
 func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *eventsv1.Event, expectedEvent *eventsv1.Event, t *testing.T) {

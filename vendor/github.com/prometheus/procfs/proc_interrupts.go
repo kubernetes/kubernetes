@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Interrupt represents a single interrupt line.
@@ -42,7 +42,7 @@ type Interrupts map[string]Interrupt
 
 // Interrupts creates a new instance from a given Proc instance.
 func (p Proc) Interrupts() (Interrupts, error) {
-	data, err := util.ReadFileNoStat(p.fs.proc.Path("interrupts"))
+	data, err := parsers.ReadFileNoStat(p.fs.proc.Path("interrupts"))
 	if err != nil {
 		return nil, err
 	}

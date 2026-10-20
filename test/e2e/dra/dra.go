@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
@@ -67,7 +68,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	dratest "k8s.io/kubernetes/test/integration/dra"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
