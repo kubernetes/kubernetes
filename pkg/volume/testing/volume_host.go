@@ -207,6 +207,8 @@ func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
 }
 
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+	// Return a fresh map. Sharing one lazily filled map raced when mounts
+	// called this concurrently (TestWaitForAllPodsUnmount).
 	return map[string]string{"test-label": "test-value"}, nil
 }
 
