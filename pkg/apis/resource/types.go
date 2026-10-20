@@ -2573,13 +2573,15 @@ type PartitionTypeStatus struct {
 // ShareableSummaryStatus reports aggregate capacity for a pool that contains
 // devices with AllowMultipleAllocations.
 type ShareableSummaryStatus struct {
-	// FullyAvailableDevices is the number of shareable devices with no
-	// capacity consumed.
+	// FullyAvailableDevices is the number of shareable devices that are not
+	// in use, i.e. not allocated to any claim other than for admin access.
 	// +required
 	FullyAvailableDevices *int32
 
-	// PartiallyAvailableDevices is the number of shareable devices with some
-	// but not all capacity consumed.
+	// PartiallyAvailableDevices is the number of shareable devices that are
+	// in use, i.e. allocated to at least one claim other than for admin
+	// access. A device counts here regardless of how much of its capacity
+	// remains, including none; see capacity for the remaining amounts.
 	// +required
 	PartiallyAvailableDevices *int32
 
