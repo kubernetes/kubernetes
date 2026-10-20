@@ -43,6 +43,7 @@ type testEnv struct {
 
 func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	if !enabled {
+		tCtx.Run("Disabled", testNodeAllocatableResourcesDisabled)
 		return
 	}
 	tCtx.Run("ConsumablePool", testNodeAllocatableResourcesConsumablePool)
@@ -58,6 +59,9 @@ func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Run("OverheadMappingsInsufficient", testNodeAllocatableResourcesWithOverheadInsufficient)
 	tCtx.Run("ClaimSharingOverhead", testNodeAllocatableResourceClaimSharingOverhead)
 	tCtx.Run("ExtendedResource", testNodeAllocatableExtendedResource)
+	tCtx.Run("FilterOrder", testNodeAllocatableResourcesFilterOrder)
+	tCtx.Run("Quota", testNodeAllocatableResourcesQuota)
+	tCtx.Run("Scoring", testNodeAllocatableResourcesScoring)
 }
 
 func setupTestEnv(tCtx ktesting.TContext, nodeNum int) *testEnv {
@@ -249,6 +253,34 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 	}
 	anotherPod = createPod(tCtx, env.namespace, "", anotherPod)
 	expectPodUnschedulable(tCtx, anotherPod, "Insufficient cpu")
+}
+
+func testNodeAllocatableResourcesDisabled(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 0)
+
+	devices := []resourceapi.Device{
+		{
+			Name: "gpu0",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("1")),
+					},
+				},
+			},
+		},
+	}
+	slice := createSlice(tCtx, makeSlice(env, devices))
+	tCtx.Expect(slice.Spec.Devices).To(gomega.HaveLen(1))
+	tCtx.Expect(slice.Spec.Devices[0].NodeAllocatableResources).To(
+		gomega.BeEmpty(), "nodeAllocatableResources must be dropped when the feature is disabled")
+
+	startScheduler(tCtx)
+	pod, _ := createPodWithNodeAllocatableClaim(tCtx, env, "claim1", "pod1", 1)
+	scheduled := waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	tCtx.Expect(scheduled.Status.ExtraNodeAllocatableResources).To(
+		gomega.BeEmpty(), "extraNodeAllocatableResources must not be populated when the feature is disabled")
 }
 
 func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
@@ -1012,4 +1044,173 @@ func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
 	pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
 	pod2 = createPod(tCtx, env.namespace, "", pod2, claim) // Pass the existing claim
 	waitForPodScheduled(tCtx, env.namespace, pod2.Name)
+}
+
+func testNodeAllocatableResourcesQuota(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 3)
+
+	quota := &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "cpu"},
+		Spec:       v1.ResourceQuotaSpec{Hard: v1.ResourceList{v1.ResourceRequestsCPU: resource.MustParse("1")}},
+	}
+	quota = must(tCtx, tCtx.Client().CoreV1().ResourceQuotas(env.namespace).Create, quota, metav1.CreateOptions{})
+	// Create drops the status and no quota controller runs here, so set the status that quota admission checks.
+	quota.Status = v1.ResourceQuotaStatus{Hard: quota.Spec.Hard, Used: v1.ResourceList{v1.ResourceRequestsCPU: resource.MustParse("0")}}
+	must(tCtx, tCtx.Client().CoreV1().ResourceQuotas(env.namespace).UpdateStatus, quota, metav1.UpdateOptions{})
+
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	devices := []resourceapi.Device{
+		{
+			Name:                     "quota-cpus",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}
+	createSliceAndStartScheduler(tCtx, makeSlice(env, devices))
+
+	claim := st.MakeResourceClaim().
+		Name("quota-claim").
+		Namespace(env.namespace).
+		Request(env.class.Name).
+		Obj()
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: resource.MustParse("2")},
+	}
+	claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+
+	pod := st.MakePod().Name("quota-pod").Namespace(env.namespace).Obj()
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:  "c1",
+			Image: "test-image",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+				Claims: []v1.ResourceClaim{
+					{Name: claim.Name},
+				},
+			},
+		},
+	}
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPod(tCtx, env.namespace, "", pod, claim)
+
+	// The status patch is charged only the DRA footprint and gets rejected before DynamicResources writes the claim.
+	expectPodSchedulerError(tCtx, pod, "exceeded quota: cpu, requested: requests.cpu=2,")
+	gomega.NewWithT(tCtx).Expect(must(tCtx, tCtx.Client().ResourceV1().ResourceClaims(env.namespace).Get, claim.Name, metav1.GetOptions{})).
+		To(gomega.HaveField("ResourceVersion", claim.ResourceVersion), "claim should not have been modified")
+}
+
+func testNodeAllocatableResourcesScoring(tCtx ktesting.TContext) {
+	// Not parallel: pods of the parallel subtests would change the scores.
+	testEnv := setupTestEnv(tCtx, 0)
+	other := *testEnv
+	other.nodeName = "worker-1"
+	other.poolName = testEnv.namespace + "-pool-other"
+
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	cpuPool := []resourceapi.Device{
+		{
+			Name:                     "cpu-pool",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}
+	createSlice(tCtx, makeSlice(testEnv, cpuPool))
+	createSliceAndStartScheduler(tCtx, makeSlice(&other, cpuPool))
+
+	// createPodWithCPU creates a pod that requests specCPU and, if set, claims claimCPU from the pool.
+	createPodWithCPU := func(name, specCPU, claimCPU string, nodeNames ...string) *v1.Pod {
+		pod := st.MakePod().Name(name).Namespace(testEnv.namespace).
+			NodeAffinityIn("kubernetes.io/hostname", nodeNames, st.NodeSelectorTypeMatchExpressions).
+			Obj()
+		container := v1.Container{Name: "c1", Image: "test-image"}
+		if specCPU != "" {
+			container.Resources.Requests = v1.ResourceList{v1.ResourceCPU: resource.MustParse(specCPU)}
+		}
+		var claims []*resourceapi.ResourceClaim
+		if claimCPU != "" {
+			claim := st.MakeResourceClaim().Name(name).Namespace(testEnv.namespace).Request(testEnv.class.Name).Obj()
+			claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: resource.MustParse(claimCPU)},
+			}
+			claims = append(claims, createClaim(tCtx, testEnv.namespace, "", testEnv.class, claim))
+			container.Resources.Claims = []v1.ResourceClaim{{Name: name}}
+		}
+		pod.Spec.Containers = []v1.Container{container}
+		return createPod(tCtx, testEnv.namespace, "", pod, claims...)
+	}
+
+	waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("dra-load", "", "80", testEnv.nodeName).Name)
+	waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("spec-load", "40", "", other.nodeName).Name)
+
+	// Counting the DRA load, node 1 is 80% used and the other one 40%. Without it the node with dra would look empty.
+	pod := waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("scoring-pod", "", "10", testEnv.nodeName, other.nodeName).Name)
+	gomega.NewWithT(tCtx).Expect(pod.Spec.NodeName).To(gomega.Equal(other.nodeName), "node chosen by scoring")
+}
+
+func testNodeAllocatableResourcesFilterOrder(tCtx ktesting.TContext) {
+	env := setupTestEnv(tCtx, 1)
+	nodeCPUs := resource.MustParse(nodeCPUCapacity)
+	const claimCPUs = 10
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	createSlice(tCtx, makeSlice(env, []resourceapi.Device{
+		{
+			Name:                     "dev-filter-order",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}))
+	// Run DynamicResources before NodeResourcesFit in Filter, so NodeResourcesFit checks the footprint DynamicResources records.
+	startSchedulerWithConfig(tCtx, `
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    filter:
+      enabled:
+      - name: DynamicResources
+      - name: NodeResourcesFit
+`)
+
+	createPodWithCPU := func(name string, cpu int64) *v1.Pod {
+		claim := st.MakeResourceClaim().Name(name).Namespace(env.namespace).Request(env.class.Name).Obj()
+		claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+			Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: *resource.NewQuantity(claimCPUs, resource.DecimalSI)},
+		}
+		claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+		pod := st.MakePod().Name(name).Namespace(env.namespace).Obj()
+		pod.Spec.Containers = []v1.Container{
+			{
+				Name:  "c1",
+				Image: "test-image",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(cpu, resource.DecimalSI)},
+					Claims:   []v1.ResourceClaim{{Name: claim.Name}},
+				},
+			},
+		}
+		pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+		return createPod(tCtx, env.namespace, "", pod, claim)
+	}
+
+	expectPodUnschedulable(tCtx, createPodWithCPU("pod-over", nodeCPUs.Value()-claimCPUs+1), "Insufficient cpu")
+	// Spec and claim fill the node exactly, so this fails if NodeResourcesFit counts the claim's cpus twice.
+	waitForPodScheduled(tCtx, env.namespace, createPodWithCPU("pod-exact", nodeCPUs.Value()-claimCPUs).Name)
 }
