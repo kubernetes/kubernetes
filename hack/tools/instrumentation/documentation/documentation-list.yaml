@@ -5796,9 +5796,21 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: incomplete_requests_total
+  subsystem: resourcepoolstatusrequest_controller
+  help: Total number of ResourcePoolStatusRequests completed with at least one incomplete
+    pool after retries were exhausted
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: request_processing_duration_seconds
   subsystem: resourcepoolstatusrequest_controller
-  help: Time taken to process a ResourcePoolStatusRequest
+  help: Time from the first processing attempt of a ResourcePoolStatusRequest until
+    its status is written, including retries
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -5819,6 +5831,8 @@
   - 4.096
   - 8.192
   - 16.384
+  - 30
+  - 60
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
