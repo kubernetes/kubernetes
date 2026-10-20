@@ -870,6 +870,7 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 		nodeDeclaredFeatures []string
 		version              *version.Version
 		registeredFeatures   []ndf.Feature
+		podPhase             v1.PodPhase
 		expectedAdmit        bool
 		expectedReason       string
 		expectedMessage      string
@@ -912,6 +913,28 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			},
 			expectedAdmit: true,
 		},
+		{
+			name:                 "Reject: requirements not met, pending pod",
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, ""),
+			},
+			podPhase:        v1.PodPending,
+			expectedAdmit:   false,
+			expectedReason:  PodFeatureUnsupported,
+			expectedMessage: "Pod requires node features that are not available: FeatureA",
+		},
+		{
+			name:                 "Admit: requirements not met, but the pod is already running",
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", true, ""),
+			},
+			podPhase:      v1.PodRunning,
+			expectedAdmit: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -919,6 +942,8 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			framework := ndf.New(tc.registeredFeatures)
 			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
 			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
+			pod := pod.DeepCopy()
+			pod.Status.Phase = tc.podPhase
 			attrs := &PodAdmitAttributes{Pod: pod}
 
 			result := handler.Admit(tCtx, attrs)

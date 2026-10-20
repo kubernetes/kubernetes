@@ -256,6 +256,16 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
 
+	// A pod that already left the Pending phase on this node was admitted
+	// before. Re-evaluating it, which happens on every kubelet restart, would
+	// kill it when the node stopped declaring a feature in the meantime
+	// (feature gate turned off, container runtime downgraded). Like the
+	// AppArmor handler, keep running pods running; the declared features
+	// only gate new pods.
+	if pod.Status.Phase != "" && pod.Status.Phase != v1.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
 	reqs, err := c.ndfFramework.InferForPodScheduling(podInfo, c.version)
 	if err != nil {
