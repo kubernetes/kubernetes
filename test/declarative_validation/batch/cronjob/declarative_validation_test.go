@@ -309,6 +309,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	obj := mkCronJob()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	poddeclarativevalidation.RunDeclarativeValidateDefaultNetworkTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), new(mkCronJob()), func(baseObj *batch.CronJob, defaultNetwork *api.PodDefaultNetwork, hostNetwork bool) {
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.DefaultNetwork = defaultNetwork
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.HostNetwork = hostNetwork
+	})
 
 }
 

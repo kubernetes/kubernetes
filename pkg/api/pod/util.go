@@ -442,6 +442,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
+	opts.AllowPodDefaultNetwork = useAllowPodDefaultNetwork(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
@@ -842,6 +843,14 @@ func dropDisabledFields(
 		podSpec.HostnameOverride = nil
 	}
 
+	// spec.defaultNetwork is not dropped when the NetworkIsolatedPods gate is
+	// disabled; validation rejects new uses instead (see
+	// useAllowPodDefaultNetwork). Dropping "None" would silently attach a pod
+	// that asked for isolation to the pod network. "Pod" and "Host" could be
+	// dropped when they agree with hostNetwork, but that would give the gate
+	// value-dependent semantics for no practical gain, so all values follow
+	// the same rule: rejected on new objects, kept on objects that have them.
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -856,6 +865,16 @@ func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return true
+}
+
+// useAllowPodDefaultNetwork returns true when spec.defaultNetwork may be set:
+// the NetworkIsolatedPods gate is enabled, or the existing object already sets
+// the field so that it stays valid after the gate is disabled.
+func useAllowPodDefaultNetwork(oldPodSpec *api.PodSpec) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) {
+		return true
+	}
+	return oldPodSpec != nil && oldPodSpec.DefaultNetwork != nil
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {

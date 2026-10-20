@@ -4646,6 +4646,32 @@ func TestDropHostnameOverride(t *testing.T) {
 	}
 }
 
+func TestUseAllowPodDefaultNetwork(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		enabled    bool
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{name: "gate enabled, no old spec", enabled: true, want: true},
+		{name: "gate enabled, old spec without field", enabled: true, oldPodSpec: &api.PodSpec{}, want: true},
+		{name: "gate disabled, no old spec", enabled: false, want: false},
+		{name: "gate disabled, old spec without field", enabled: false, oldPodSpec: &api.PodSpec{}, want: false},
+		{name: "gate disabled, old spec with field", enabled: false, oldPodSpec: &api.PodSpec{DefaultNetwork: new(api.PodDefaultNetworkNone)}, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, tc.enabled)
+			if got := useAllowPodDefaultNetwork(tc.oldPodSpec); got != tc.want {
+				t.Errorf("useAllowPodDefaultNetwork() = %v, want %v", got, tc.want)
+			}
+			opts := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if opts.AllowPodDefaultNetwork != tc.want {
+				t.Errorf("AllowPodDefaultNetwork = %v, want %v", opts.AllowPodDefaultNetwork, tc.want)
+			}
+		})
+	}
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 
