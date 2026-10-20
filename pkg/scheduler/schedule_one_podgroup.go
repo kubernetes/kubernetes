@@ -1012,7 +1012,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			status:       status,
 		}, nil
 	}
-	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), len(placements))
+	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), len(placements))
 
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
@@ -1155,6 +1155,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			status:       status,
 		}, nil
 	}
+	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), len(placements))
 
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
@@ -1173,6 +1174,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
+		evaluationStart := time.Now()
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
 			return &podGroupAlgorithmResult{
@@ -1198,9 +1200,12 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			anyResultSubtree = subtreeResult
 		}
 
+		evaluationResult := metrics.InfeasibleResult
 		if result.status.IsSuccess() {
+			evaluationResult = metrics.FeasibleResult
 			successfulResults[placement] = subtreeResult
 		}
+		metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), metrics.SinceInSeconds(evaluationStart))
 
 		if len(successfulResults) >= numPlacementsToFind {
 			break
@@ -1349,7 +1354,7 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 	if result.status.IsSuccess() {
 		evaluationResult = metrics.FeasibleResult
 	}
-	metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
+	metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), metrics.SinceInSeconds(evaluationStart))
 	return result
 }
 
