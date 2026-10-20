@@ -44,14 +44,23 @@ type ContainerCPUs struct {
 	Baseline string `json:"baseline"`
 }
 
+// PendingResizeEntry struct is used in a checkpoint in v4 format to store a
+// resize that is staged but not committed yet.
+type PendingResizeEntry struct {
+	Containers map[string]string `json:"containers,omitempty"`
+	Pod        string            `json:"pod,omitempty"`
+}
+
 // CPUManagerCheckpointData struct is used to store CPU/pod assignments, which is part of a checkpoint in v4 format
 // CPU assignments at admission time is required for in-place vertical scaling, and stored in Baselines.
+// PendingResizes are the resizes staged but not committed yet, by pod UID.
 type CPUManagerCheckpointData struct {
-	PolicyName    string                              `json:"policyName"`
-	DefaultCPUSet string                              `json:"defaultCpuSet"`
-	Entries       map[string]map[string]string        `json:"entries,omitempty"`
-	PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
-	Baselines     map[string]map[string]ContainerCPUs `json:"baselines,omitempty"`
+	PolicyName     string                              `json:"policyName"`
+	DefaultCPUSet  string                              `json:"defaultCpuSet"`
+	Entries        map[string]map[string]string        `json:"entries,omitempty"`
+	PodEntries     PodCPUAssignments                   `json:"podEntries,omitempty"`
+	Baselines      map[string]map[string]ContainerCPUs `json:"baselines,omitempty"`
+	PendingResizes map[string]PendingResizeEntry       `json:"pendingResizes,omitempty"`
 }
 
 // CPUManagerCheckpoint represents a structure to store CPU manager checkpoint data.
@@ -116,9 +125,10 @@ func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
 			Entries: make(map[string]map[string]string),
 		},
 		CheckpointData: CPUManagerCheckpointData{
-			Entries:    make(map[string]map[string]string),
-			PodEntries: make(PodCPUAssignments),
-			Baselines:  make(map[string]map[string]ContainerCPUs),
+			Entries:        make(map[string]map[string]string),
+			PodEntries:     make(PodCPUAssignments),
+			Baselines:      make(map[string]map[string]ContainerCPUs),
+			PendingResizes: make(map[string]PendingResizeEntry),
 		},
 	}
 }

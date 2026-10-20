@@ -136,6 +136,65 @@ func (as ContainerCPUBaselines) Clone() ContainerCPUBaselines {
 	return ret
 }
 
+// PendingResize is a resize of a pod that is staged but not committed yet.
+type PendingResize struct {
+	// Containers are the target assignments of the changed containers, by container name.
+	Containers map[string]cpuset.CPUSet
+	// Pod is the target pod-level assignment, or nil if it does not change.
+	Pod *cpuset.CPUSet
+}
+
+// Clone returns a deep copy of PendingResize
+func (p PendingResize) Clone() PendingResize {
+	ret := PendingResize{Containers: maps.Clone(p.Containers)}
+	if p.Pod != nil {
+		ret.Pod = new(p.Pod.Clone())
+	}
+	return ret
+}
+
+// PendingResizes contains the pending resizes, by pod UID.
+type PendingResizes map[string]PendingResize
+
+// Clone returns a deep copy of PendingResizes
+func (p PendingResizes) Clone() PendingResizes {
+	ret := make(PendingResizes, len(p))
+	for podUID, pending := range p {
+		ret[podUID] = pending.Clone()
+	}
+	return ret
+}
+
+func podCPUs(assignments ContainerCPUAssignments, podAssignments PodCPUAssignments, podUID string) cpuset.CPUSet {
+	cpus := podAssignments[podUID].CPUSet
+	for _, cset := range assignments[podUID] {
+		cpus = cpus.Union(cset)
+	}
+	return cpus
+}
+
+// PendingResizeDelta compares current container and pod level assignments with
+// pending resize for the pod and calculates which CPUs should be taken from the
+// default CPU set and which should be returned to it. It takes the assignments
+// instead of a Reader, so that the state can use it while holding its lock.
+func PendingResizeDelta(assignments ContainerCPUAssignments, podAssignments PodCPUAssignments, podUID string, pending PendingResize) (taken, released cpuset.CPUSet) {
+	before := podCPUs(assignments, podAssignments, podUID)
+	after := podAssignments[podUID].CPUSet
+	if pending.Pod != nil {
+		after = *pending.Pod
+	}
+	for containerName, cset := range assignments[podUID] {
+		if target, ok := pending.Containers[containerName]; ok {
+			cset = target
+		}
+		after = after.Union(cset)
+	}
+	for _, target := range pending.Containers {
+		after = after.Union(target)
+	}
+	return after.Difference(before), before.Difference(after)
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
@@ -150,6 +209,10 @@ type Reader interface {
 	GetCPUBaselines() ContainerCPUBaselines
 	// GetBaselineCPUSet returns container-level CPU assignments recorded at admission time, prior to any resize
 	GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
+	// GetPendingResize returns the pending resize of a pod
+	GetPendingResize(podUID string) (PendingResize, bool)
+	// GetPendingResizes returns all pending resizes
+	GetPendingResizes() PendingResizes
 }
 
 type writer interface {
@@ -166,6 +229,14 @@ type writer interface {
 	DeletePod(podUID string)
 	// SetCPUBaselines stores all container-level CPU assignments recorded at admission time, prior to any resize
 	SetCPUBaselines(ContainerCPUBaselines)
+	// SetPendingResize stores the pending resize of a pod, without applying it
+	SetPendingResize(podUID string, pending PendingResize)
+	// SetPendingResizes stores all pending resizes
+	SetPendingResizes(PendingResizes)
+	// CommitPendingResize applies the pending resize of a pod and deletes it, at once
+	CommitPendingResize(podUID string)
+	// DeletePendingResize deletes the pending resize of a pod, without applying it
+	DeletePendingResize(podUID string)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

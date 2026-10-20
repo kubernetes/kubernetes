@@ -111,6 +111,29 @@ func (sc *stateCheckpoint) migrateV3CheckpointToV4Checkpoint(src *CPUManagerChec
 	}
 }
 
+func (e PendingResizeEntry) toPendingResize() (PendingResize, error) {
+	var pending PendingResize
+	if len(e.Containers) > 0 {
+		pending.Containers = make(map[string]cpuset.CPUSet, len(e.Containers))
+		for containerName, cpuString := range e.Containers {
+			target, err := cpuset.Parse(cpuString)
+			if err != nil {
+				return pending, fmt.Errorf("could not parse cpuset %q for container %q: %w", cpuString, containerName, err)
+			}
+			pending.Containers[containerName] = target
+		}
+	}
+	// An empty target is not a valid pod-level assignment, so it means unchanged.
+	if e.Pod != "" {
+		target, err := cpuset.Parse(e.Pod)
+		if err != nil {
+			return pending, fmt.Errorf("could not parse pod-level cpuset %q: %w", e.Pod, err)
+		}
+		pending.Pod = &target
+	}
+	return pending, nil
+}
+
 // restores state from a checkpoint and creates it if it doesn't exist
 func (sc *stateCheckpoint) restoreState() error {
 	sc.mux.Lock()
@@ -129,6 +152,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	var tmpContainerBaselineCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
 	tmpBaselines := ContainerCPUBaselines{}
+	tmpPendingResizes := PendingResizes{}
 
 	if sc.policyName != cp.CheckpointData.PolicyName {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.CheckpointData.PolicyName)
@@ -169,12 +193,19 @@ func (sc *stateCheckpoint) restoreState() error {
 				}
 			}
 		}
+
+		for pod, entry := range cp.CheckpointData.PendingResizes {
+			if tmpPendingResizes[pod], err = entry.toPendingResize(); err != nil {
+				return fmt.Errorf("could not parse pending resize of pod %q: %w", pod, err)
+			}
+		}
 	}
 
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		sc.cache.SetCPUBaselines(tmpBaselines)
+		sc.cache.SetPendingResizes(tmpPendingResizes)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		sc.cache.SetPodCPUAssignments(cp.CheckpointData.PodEntries)
@@ -269,6 +300,20 @@ func (sc *stateCheckpoint) loadCheckpointV2() (*CPUManagerCheckpointV2, error) {
 	return nil, err
 }
 
+func newPendingResizeEntry(pending PendingResize) PendingResizeEntry {
+	var entry PendingResizeEntry
+	if len(pending.Containers) > 0 {
+		entry.Containers = make(map[string]string, len(pending.Containers))
+		for containerName, target := range pending.Containers {
+			entry.Containers[containerName] = target.String()
+		}
+	}
+	if pending.Pod != nil {
+		entry.Pod = pending.Pod.String()
+	}
+	return entry
+}
+
 // saves state to a checkpoint, caller is responsible for locking
 func (sc *stateCheckpoint) storeState() error {
 	checkpoint := newCPUManagerCheckpoint()
@@ -288,6 +333,11 @@ func (sc *stateCheckpoint) storeState() error {
 			for container, cpuAllocation := range baselines[pod] {
 				checkpoint.CheckpointData.Baselines[pod][container] = ContainerCPUs{Baseline: cpuAllocation.Baseline.String()}
 			}
+		}
+
+		pendingResizes := sc.cache.GetPendingResizes()
+		for pod, pending := range pendingResizes {
+			checkpoint.CheckpointData.PendingResizes[pod] = newPendingResizeEntry(pending)
 		}
 	}
 
@@ -465,5 +515,67 @@ func (sc *stateCheckpoint) SetCPUBaselines(a ContainerCPUBaselines) {
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// GetPendingResize returns the pending resize of a pod
+func (sc *stateCheckpoint) GetPendingResize(podUID string) (PendingResize, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetPendingResize(podUID)
+}
+
+// GetPendingResizes returns all pending resizes
+func (sc *stateCheckpoint) GetPendingResizes() PendingResizes {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetPendingResizes()
+}
+
+// SetPendingResize stores the pending resize of a pod, without applying it
+func (sc *stateCheckpoint) SetPendingResize(podUID string, pending PendingResize) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetPendingResize(podUID, pending)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
+	}
+}
+
+// SetPendingResizes stores all pending resizes
+func (sc *stateCheckpoint) SetPendingResizes(p PendingResizes) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetPendingResizes(p)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// CommitPendingResize applies the pending resize of a pod and deletes it with
+// a single write of the checkpoint, so that a kubelet restart never sees the
+// resize half applied.
+func (sc *stateCheckpoint) CommitPendingResize(podUID string) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.CommitPendingResize(podUID)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
+	}
+}
+
+// DeletePendingResize deletes the pending resize of a pod, without applying it
+func (sc *stateCheckpoint) DeletePendingResize(podUID string) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.DeletePendingResize(podUID)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
 	}
 }
