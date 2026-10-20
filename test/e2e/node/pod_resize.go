@@ -1421,8 +1421,50 @@ func getBestNodeForResizeTest(ctx context.Context, f *framework.Framework) (v1.N
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
-		return helpers.IsPodResizeDeferred(pod), nil
+		if helpers.IsPodResizeDeferred(pod) {
+			return true, nil
+		}
+		if helpers.IsPodResizeInfeasible(pod) {
+			// Infeasible is a terminal resize state: the resize can never become deferred.
+			return false, gomega.StopTrying(fmt.Sprintf("resize of pod %s/%s was marked infeasible instead of deferred", pod.Namespace, pod.Name))
+		}
+		if resizeActuated(pod) {
+			// The kubelet accepted the resize, so it can never become deferred. This
+			// usually means node capacity changed after the test pods were created,
+			// invalidating the premise that the resized pod cannot fit on the node.
+			return false, gomega.StopTrying(fmt.Sprintf("resize of pod %s/%s was actuated instead of remaining deferred (%s). If the resources reported as available there exceed what this test measured at startup, the test premise was invalidated by capacity churn from outside the test; otherwise the kubelet actuated a resize that did not fit", pod.Namespace, pod.Name, nodeAvailabilitySummary(ctx, f, pod.Spec.NodeName)))
+		}
+		return false, nil
 	}))
+}
+
+// resizeActuated reports whether the kubelet has accepted the pod's desired
+// resource requests. status.allocatedResources is only updated to the desired
+// values once a resize is actuated; while a resize is pending, deferred or
+// infeasible it continues to reflect the previously accepted values.
+func resizeActuated(pod *v1.Pod) bool {
+	if pod.Status.AllocatedResources == nil {
+		return false
+	}
+	return apiequality.Semantic.DeepEqual(pod.Status.AllocatedResources, helpers.PodRequests(pod, helpers.PodResourcesOptions{}))
+}
+
+// nodeAvailabilitySummary describes the resources currently available for
+// allocation on the given node, for inclusion in failure messages.
+func nodeAvailabilitySummary(ctx context.Context, f *framework.Framework, nodeName string) string {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Sprintf("failed to get node %s: %v", nodeName, err)
+	}
+	_, availableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceCPU)
+	if err != nil {
+		return fmt.Sprintf("failed to get CPU available for allocation on node %s: %v", nodeName, err)
+	}
+	_, availableMemory, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceMemory)
+	if err != nil {
+		return fmt.Sprintf("failed to get memory available for allocation on node %s: %v", nodeName, err)
+	}
+	return fmt.Sprintf("node %s currently has %dm CPU and %d bytes of memory available for allocation", nodeName, availableCPU.MilliValue(), availableMemory.Value())
 }
 
 func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
