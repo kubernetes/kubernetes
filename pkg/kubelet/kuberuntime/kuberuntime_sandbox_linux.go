@@ -20,12 +20,14 @@ package kuberuntime
 
 import (
 	"context"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -43,6 +45,29 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 	}
 
 	return resources
+}
+
+func hugepageLimitsFromResourceList(resources v1.ResourceList) []*runtimeapi.HugepageLimit {
+	var limits []*runtimeapi.HugepageLimit
+	for name, quantity := range resources {
+		if !v1helper.IsHugePageResourceName(name) {
+			continue
+		}
+		pageSize, err := v1helper.HugePageSizeFromResourceName(name)
+		if err != nil {
+			continue
+		}
+		size, err := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
+		if err != nil {
+			continue
+		}
+		limits = append(limits, &runtimeapi.HugepageLimit{
+			PageSize: size,
+			Limit:    uint64(quantity.Value()),
+		})
+	}
+	sort.Slice(limits, func(i, j int) bool { return limits[i].PageSize < limits[j].PageSize })
+	return limits
 }
 
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Context, pod *v1.Pod) *runtimeapi.LinuxContainerResources {
@@ -63,7 +88,9 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Contex
 	hasExclusiveCPUs := m.containerManager.PodHasExclusiveCPUs(logger, pod)
 
 	logger.V(5).Info("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", hasExclusiveCPUs)
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), hasExclusiveCPUs)
+	resources := m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), hasExclusiveCPUs)
+	resources.HugepageLimits = hugepageLimitsFromResourceList(lim)
+	return resources
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(ctx context.Context, pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
