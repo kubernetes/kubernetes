@@ -172,7 +172,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	return err
 }
 
-func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod, claimsReconciled bool) error {
 	attemptedUpdate := false
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
@@ -187,22 +187,26 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 		if !storageMatches(set, pod) {
 			updateStorage(set, pod)
 			consistent = false
-			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
-				spc.recordPodEvent("update", set, pod, err)
-				return err
+			if !claimsReconciled {
+				if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
+					spc.recordPodEvent("update", set, pod, err)
+					return err
+				}
 			}
 		}
 		// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
 		// and dirty the pod.
-		if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		} else if !match {
-			if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		if !claimsReconciled {
+			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
+			} else if !match {
+				if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+					spc.recordPodEvent("update", set, pod, err)
+					return err
+				}
+				consistent = false
 			}
-			consistent = false
 		}
 
 		// if the Pod is not dirty, do nothing

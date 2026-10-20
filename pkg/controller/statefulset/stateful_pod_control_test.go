@@ -444,7 +444,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 		t.Error("no-op update should not make any client invocation")
 		return true, nil, apierrors.NewInternalError(errors.New("if we are here we have a problem"))
 	})
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Error returned on no-op update error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -469,7 +469,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 		return true, update.GetObject(), nil
 	})
 	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -502,7 +502,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
 	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(ctx, set, pod); err == nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err == nil {
 		t.Error("Failed update does not generate an error")
 	}
 	events := collectEvents(recorder.Events)
@@ -608,7 +608,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 				updated = update.GetObject().(*v1.Pod)
 				return true, update.GetObject(), nil
 			})
-			if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+			if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 				t.Fatalf("Successful update returned an error: %s", err)
 			}
 			assert.Equal(t, len(pvcs), createdClaims)
@@ -653,7 +653,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.UpdateStatefulPod(ctx, set, pod); err == nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err == nil {
 		t.Error("Failed Pod storage update did not return an error")
 	}
 	events := collectEvents(recorder.Events)
@@ -697,7 +697,7 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 
 	})
 	pod.Labels[apps.StatefulSetPodNameLabel] = "goo-0"
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -998,7 +998,7 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 		}
 	}
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistency.NewNoopConsistencyStore())
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	for k := range claims {
@@ -1044,7 +1044,7 @@ func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 	podLister := corelisters.NewPodLister(podIndexer)
 	claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistency.NewNoopConsistencyStore())
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	updatedClaim, err := claimLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
@@ -1082,7 +1082,7 @@ func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 		return true, update.GetObject(), nil
 	})
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistency.NewNoopConsistencyStore())
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Error("Unexpected error on pod update when PVCs are missing")
 	}
 	claims := getPersistentVolumeClaims(set, pod)
@@ -1095,7 +1095,7 @@ func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 		claimIndexer.Add(&claim)
 	}
 
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod, false); err != nil {
 		t.Errorf("Expected update to succeed, saw error %v", err)
 	}
 	updatedClaim, err := claimLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
@@ -1171,7 +1171,7 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			name: "UpdatePod",
 			action: func(ctx context.Context, control *StatefulPodControl, set *apps.StatefulSet, pod *v1.Pod) error {
 				pod.Name = "goo-0" // mismatch identity to trigger update
-				return control.UpdateStatefulPod(ctx, set, pod)
+				return control.UpdateStatefulPod(ctx, set, pod, false)
 			},
 			resource: podGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
