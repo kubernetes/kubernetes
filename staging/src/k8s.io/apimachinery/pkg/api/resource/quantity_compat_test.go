@@ -36,12 +36,14 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 		{in: "1e8589934592", wantValue: 1, wantFitsI64: true, wantString: "1e8589934592"},
 
 		// Fraction digits move the scale off the exponent, so these are the
-		// spellings at 2147483648 that a <=1.37 apiserver could write. None
-		// of them fits an int64, so only the spelling has to survive.
-		{in: "1.25e2147483648", wantString: "1.25e2147483648"},
-		{in: "1.5e2147483648", wantString: "150e2147483646"},
-		{in: "1.25e-2147483648", wantString: "1.25e-2147483648"},
-		{in: "0.5e2147483648", wantString: "50e2147483646"},
+		// spellings at 2147483648 that a <=1.37 apiserver could write. That
+		// apiserver wrapped the scale around int32 to a large positive one, which
+		// made each value larger than the decimal cap. These spellings now decode
+		// as the cap and are rewritten.
+		{in: "1.25e2147483648", wantString: "179769313486231570e291"},
+		{in: "1.5e2147483648", wantString: "179769313486231570e291"},
+		{in: "1.25e-2147483648", wantString: "179769313486231570e291"},
+		{in: "0.5e2147483648", wantString: "179769313486231570e291"},
 	}
 
 	for _, tc := range testCases {
@@ -69,7 +71,7 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 				t.Errorf("after json decode: AsInt64() = (%d, %v), want (%d, %v)", got, ok, tc.wantValue, tc.wantFitsI64)
 			}
 
-			// Re-encoding must not rewrite what is already stored.
+			// Re-encoding writes wantString.
 			data, err := json.Marshal(&fromJSON)
 			if err != nil {
 				t.Fatalf("json.Marshal failed: %v", err)

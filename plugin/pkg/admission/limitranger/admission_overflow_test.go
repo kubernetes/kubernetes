@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"math"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,9 +48,11 @@ func TestConstraintsAreOverflowSafe(t *testing.T) {
 
 	// The ratio path forms request*ratio, whose summed scale can fall past
 	// inf.Scale; a 3:1 ratio at an extreme exponent must still be rejected.
+	// These operands are capped when parsed, so we load them directly to keep
+	// testing this.
 	if err := limitRequestRatioConstraint("Container", "memory", resource.MustParse("2"),
-		api.ResourceList{api.ResourceMemory: resource.MustParse("1e2147483647")},
-		api.ResourceList{api.ResourceMemory: resource.MustParse("3e2147483647")}); err == nil {
+		api.ResourceList{api.ResourceMemory: *resource.NewScaledQuantity(1, math.MaxInt32)},
+		api.ResourceList{api.ResourceMemory: *resource.NewScaledQuantity(3, math.MaxInt32)}); err == nil {
 		t.Error("limitRequestRatioConstraint admitted a 3:1 ratio above the 2:1 max at an extreme scale")
 	}
 
@@ -65,39 +68,50 @@ func TestLimitRangerRatioIsExact(t *testing.T) {
 	// small negative, so a ratio of 9.2e18 looked like it was under the maximum
 	// and was admitted. Two operands that both collapse to zero went the other
 	// way, and a ratio of exactly 1 was rejected as "limit is 0".
-	ratioOf := func(reqStr, limStr, maxRatioStr string) error {
+	ratioOf := func(reqQuantity, limQuantity resource.Quantity, maxRatioStr string) error {
 		enforced := resource.MustParse(maxRatioStr)
-		req := api.ResourceList{api.ResourceMemory: resource.MustParse(reqStr)}
-		lim := api.ResourceList{api.ResourceMemory: resource.MustParse(limStr)}
+		req := api.ResourceList{api.ResourceMemory: reqQuantity}
+		lim := api.ResourceList{api.ResourceMemory: limQuantity}
 		return limitRequestRatioConstraint("Container", "memory", enforced, req, lim)
 	}
 	testCases := []struct {
 		desc      string
 		req       string
+		reqVal    *resource.Quantity // if set, use this value instead of parsing the req string
 		lim       string
+		limVal    *resource.Quantity // if set, use this value instead of parsing the lim string
 		maxRatio  string
 		wantError bool
 	}{
-		{"ratio at the maximum", "100", "200", "2", false},
-		{"ratio above the maximum", "100", "300", "2", true},
-		{"limit whose projection wraps negative", "1", "9223372036854775809", "2", true},
-		{"equal request and limit at 2^63", "9223372036854775808", "9223372036854775808", "1", false},
-		{"equal request and limit at 2^64", "18446744073709551616", "18446744073709551616", "1", false},
-		{"ratio at the maximum past 2^63", "9223372036854775808", "18446744073709551616", "2", false},
-		{"ratio above the maximum past 2^63", "9223372036854775808", "27670116110564327424", "2", true},
+		{desc: "ratio at the maximum", req: "100", lim: "200", maxRatio: "2"},
+		{desc: "ratio above the maximum", req: "100", lim: "300", maxRatio: "2", wantError: true},
+		{desc: "limit whose projection wraps negative", req: "1", lim: "9223372036854775809", maxRatio: "2", wantError: true},
+		{desc: "equal request and limit at 2^63", req: "9223372036854775808", lim: "9223372036854775808", maxRatio: "1"},
+		{desc: "equal request and limit at 2^64", req: "18446744073709551616", lim: "18446744073709551616", maxRatio: "1"},
+		{desc: "ratio at the maximum past 2^63", req: "9223372036854775808", lim: "18446744073709551616", maxRatio: "2"},
+		{desc: "ratio above the maximum past 2^63", req: "9223372036854775808", lim: "27670116110564327424", maxRatio: "2", wantError: true},
 		// float64 cannot separate 2^54 from 2^54+1, so a ratio computed that way
 		// reads as exactly 2 on the row below the last one.
-		{"ratio one unit below the maximum", "9007199254740992", "18014398509481983", "2", false},
-		{"ratio exactly at the maximum", "9007199254740992", "18014398509481984", "2", false},
-		{"ratio one unit above the maximum", "9007199254740992", "18014398509481985", "2", true},
-		{"ratio at a suffixed maximum at the largest exponent", "1e2147483647", "1000e2147483647", "1k", false},
+		{desc: "ratio one unit below the maximum", req: "9007199254740992", lim: "18014398509481983", maxRatio: "2"},
+		{desc: "ratio exactly at the maximum", req: "9007199254740992", lim: "18014398509481984", maxRatio: "2"},
+		{desc: "ratio one unit above the maximum", req: "9007199254740992", lim: "18014398509481985", maxRatio: "2", wantError: true},
+		// Operands at the largest exponent are capped when parsed, so we load them directly to test how the ratio check handles them.
+		{desc: "ratio at a suffixed maximum at the largest exponent", reqVal: resource.NewScaledQuantity(1, math.MaxInt32), limVal: resource.NewScaledQuantity(1000, math.MaxInt32), maxRatio: "1k"},
 		// TODO(#141166): A 10000:1 ratio exceeds max 1000, so wantError must be true.
-		{"ratio above a suffixed maximum at the largest exponent", "1e2147483647", "10000e2147483647", "1k", false},
+		{desc: "ratio above a suffixed maximum at the largest exponent", reqVal: resource.NewScaledQuantity(1, math.MaxInt32), limVal: resource.NewScaledQuantity(10000, math.MaxInt32), maxRatio: "1k"},
 		// TODO(#141166): Ratio 3 exceeds max 2, so wantError must be true.
-		{"ratio above the maximum with both operands negative", "-1", "-3", "2", false},
+		{desc: "ratio above the maximum with both operands negative", req: "-1", lim: "-3", maxRatio: "2"},
+	}
+	// quantity returns val if it is set, and otherwise parses s.
+	quantity := func(s string, val *resource.Quantity) resource.Quantity {
+		if val != nil {
+			return *val
+		}
+		return resource.MustParse(s)
 	}
 	for _, testCase := range testCases {
-		if err := ratioOf(testCase.req, testCase.lim, testCase.maxRatio); (err != nil) != testCase.wantError {
+		req, lim := quantity(testCase.req, testCase.reqVal), quantity(testCase.lim, testCase.limVal)
+		if err := ratioOf(req, lim, testCase.maxRatio); (err != nil) != testCase.wantError {
 			t.Errorf("%s: got error %v, wantError %v", testCase.desc, err, testCase.wantError)
 		}
 	}
@@ -107,25 +121,35 @@ func TestLimitRequestRatioConstraint(t *testing.T) {
 	testCases := []struct {
 		desc     string
 		req      string
+		reqVal   *resource.Quantity // if set, use this value instead of parsing the req string
 		lim      string
+		limVal   *resource.Quantity // if set, use this value instead of parsing the lim string
 		maxRatio string
 		wantErr  string
 	}{
-		{"ratio under the maximum", "1", "1", "2", ""},
-		{"ratio at the maximum", "1", "2", "2", ""},
-		{"ratio above the maximum", "1", "3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
-		{"ratio at the maximum past float64", "1e400", "2e400", "2", ""},
+		{desc: "ratio under the maximum", req: "1", lim: "1", maxRatio: "2"},
+		{desc: "ratio at the maximum", req: "1", lim: "2", maxRatio: "2"},
+		{desc: "ratio above the maximum", req: "1", lim: "3", maxRatio: "2", wantErr: "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		// Operands past float64 are capped when parsed, so we load them directly to test how the ratio check handles them.
+		{desc: "ratio at the maximum past float64", reqVal: resource.NewScaledQuantity(1, 400), limVal: resource.NewScaledQuantity(2, 400), maxRatio: "2"},
 		// TODO(#141166): The message must show the exact ratio 3.
-		{"ratio above the maximum with the limit past float64", "1e308", "3e308", "2", "memory max limit to request ratio per Container is 2, but provided ratio is +Inf"},
+		{desc: "ratio above the maximum with the limit past float64", req: "1e308", limVal: resource.NewScaledQuantity(3, 308), maxRatio: "2", wantErr: "memory max limit to request ratio per Container is 2, but provided ratio is +Inf"},
 		// TODO(#141166): The message must show the exact ratio 3.
-		{"ratio above the maximum with both operands past float64", "1e400", "3e400", "2", "memory max limit to request ratio per Container is 2, but provided ratio is NaN"},
+		{desc: "ratio above the maximum with both operands past float64", reqVal: resource.NewScaledQuantity(1, 400), limVal: resource.NewScaledQuantity(3, 400), maxRatio: "2", wantErr: "memory max limit to request ratio per Container is 2, but provided ratio is NaN"},
 		// TODO(#141166): A negative pair with ratio 1 must not fail the ratio check. Expect no error, or an error about negative values.
-		{"ratio under the maximum with both operands negative", "-1", "-1", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000"},
+		{desc: "ratio under the maximum with both operands negative", req: "-1", lim: "-1", maxRatio: "2", wantErr: "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000"},
+	}
+	// quantity returns val if it is set, and otherwise parses s.
+	quantity := func(s string, val *resource.Quantity) resource.Quantity {
+		if val != nil {
+			return *val
+		}
+		return resource.MustParse(s)
 	}
 	for _, testCase := range testCases {
 		err := limitRequestRatioConstraint("Container", "memory", resource.MustParse(testCase.maxRatio),
-			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.req)},
-			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.lim)})
+			api.ResourceList{api.ResourceMemory: quantity(testCase.req, testCase.reqVal)},
+			api.ResourceList{api.ResourceMemory: quantity(testCase.lim, testCase.limVal)})
 		gotErr := ""
 		if err != nil {
 			gotErr = err.Error()
@@ -167,8 +191,15 @@ func TestConstraintAllocationsDoNotGrowWithTheExponent(t *testing.T) {
 	// while reading the exponent adds thirty or more between these two values.
 	const slack = 8
 	for desc, check := range checks {
-		small := testing.AllocsPerRun(10, func() { _ = check(memory("1e100")) })
-		large := testing.AllocsPerRun(10, func() { _ = check(memory("1e10000000")) })
+		// 1e10000000 is capped when parsed, so we load it directly to keep testing
+		// the checks at a large exponent. 1e100 is loaded the same way, so any
+		// difference between the two counts comes from the check.
+		small := testing.AllocsPerRun(10, func() {
+			_ = check(api.ResourceList{api.ResourceMemory: *resource.NewScaledQuantity(1, 100)})
+		})
+		large := testing.AllocsPerRun(10, func() {
+			_ = check(api.ResourceList{api.ResourceMemory: *resource.NewScaledQuantity(1, 10000000)})
+		})
 		if large > small+slack {
 			t.Errorf("%s: %v allocations at 1e100 and %v at 1e10000000, so the comparison is reading the exponent", desc, small, large)
 		}
