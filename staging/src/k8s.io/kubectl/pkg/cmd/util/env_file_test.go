@@ -17,6 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -32,41 +35,20 @@ func Test_processEnvFileLine(t *testing.T) {
 		expectedValue string
 		expectedErr   string
 	}{
-		{
-			"the utf8bom is trimmed on the first line",
-			append(utf8bom, 'a', '=', 'c'), 0, "a", "c", "",
-		},
+		{"the utf8bom is trimmed on the first line",
+			append(utf8bom, 'a', '=', 'c'), 0, "a", "c", ""},
 
-		{
-			"the utf8bom is NOT trimmed on the second line",
-			append(utf8bom, 'a', '=', 'c'), 1, "", "", "not a valid key name",
-		},
+		{"the utf8bom is NOT trimmed on the second line",
+			append(utf8bom, 'a', '=', 'c'), 1, "", "", "not a valid key name"},
 
-		{
-			"no key is returned on a comment line",
-			[]byte{' ', '#', 'c'},
-			0, "", "", "",
-		},
+		{"no key is returned on a comment line",
+			[]byte{' ', '#', 'c'}, 0, "", "", ""},
 
-		{
-			"no key is returned on a blank line",
-			[]byte{' ', ' ', '\t'},
-			0, "", "", "",
-		},
+		{"no key is returned on a blank line",
+			[]byte{' ', ' ', '\t'}, 0, "", "", ""},
 
-		{
-			"key is returned even with no value",
-			[]byte{' ', 'x', '='},
-			0, "x", "", "",
-		},
-		{
-			"one line value is surrounded to quotes",
-			[]byte("prefixed_key=\"prefixed value\""), 0, "prefixed_key", "\"prefixed value\"", "",
-		},
-		{
-			"multiline value surrounded to quotes",
-			[]byte("multiline_key=\"line1\n... (rest of the value) ...\nlast line\""), 0, "multiline_key", "\"line1\n... (rest of the value) ...\nlast line\"", "",
-		},
+		{"key is returned even with no value",
+			[]byte{' ', 'x', '='}, 0, "x", "", ""},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -116,5 +98,70 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 	}
 	if value != realValue {
 		t.Errorf(`expected value %q, received %q`, realValue, value)
+	}
+}
+
+func TestAddFromEnvFile(t *testing.T) {
+	testCases := []struct {
+		name        string
+		content     string
+		expected    map[string]string
+		expectedErr string
+	}{
+		{
+			name:     "single line values",
+			content:  "A=1\nB=2\n",
+			expected: map[string]string{"A": "1", "B": "2"},
+		},
+		{
+			name:    "multi-line value between single line values",
+			content: "A=1\nCERT=\"\"\"\nline 1\nline 2\n\"\"\"\nB=2\n",
+			expected: map[string]string{
+				"A":    "1",
+				"CERT": "line 1\nline 2",
+				"B":    "2",
+			},
+		},
+		{
+			name:     "lines inside a multi-line value are not parsed",
+			content:  "KEY=\"\"\"\n# not a comment\n\nNOT_A_KEY=value\n\"\"\"\n",
+			expected: map[string]string{"KEY": "# not a comment\n\nNOT_A_KEY=value"},
+		},
+		{
+			name:     "a lone double quote is part of the value",
+			content:  "PASSWORD=\"*2KHjkdf!@kdlq\nOTHER=value\n",
+			expected: map[string]string{"PASSWORD": "\"*2KHjkdf!@kdlq", "OTHER": "value"},
+		},
+		{
+			name:        "unterminated multi-line value",
+			content:     "A=1\nKEY=\"\"\"\nline 1\n",
+			expectedErr: `unterminated multi-line value for key "KEY" starting at line 2`,
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := filepath.Join(t.TempDir(), "env")
+			if err := os.WriteFile(filePath, []byte(tt.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			got := map[string]string{}
+			err := AddFromEnvFile(filePath, func(key, value string) error {
+				got[key] = value
+				return nil
+			})
+			if len(tt.expectedErr) > 0 {
+				if err == nil || !strings.Contains(err.Error(), tt.expectedErr) {
+					t.Fatalf("err %v doesn't match expected %q", err, tt.expectedErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected err %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, got) {
+				t.Errorf("expected %q, received %q", tt.expected, got)
+			}
+		})
 	}
 }
