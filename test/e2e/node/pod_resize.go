@@ -1416,7 +1416,42 @@ func getBestNodeForResizeTest(ctx context.Context, f *framework.Framework) (v1.N
 		}
 	}
 	gomega.Expect(found).To(gomega.BeTrueBecause("failed to find any schedulable node with available resources"))
+
+	// Wait for the namespaces of earlier tests of this run to be deleted
+	// before using node availability to size the test pods: the framework
+	// deletes each test's namespace without waiting for the deletion to
+	// complete, so pods of a previously run test can still hold their
+	// resource requests on the chosen node for several seconds into this
+	// test. When such a straggler is deleted mid-test, the freed capacity
+	// allows the kubelet to actuate a resize that the test expected to
+	// remain deferred.
+	if err := waitForPriorTestsCleanedUp(ctx, f.ClientSet, f.Namespace.Name); err != nil {
+		e2eskipper.Skipf("namespaces of earlier tests of this run were not cleaned up: %v", err)
+	}
+
 	return bestNode, bestAllocatable, bestAvailable
+}
+
+// waitForPriorTestsCleanedUp waits until the namespaces of earlier tests of
+// the current run have been deleted, and returns an error on timeout.
+// Namespaces are matched through the e2e-run label, which the framework sets
+// on every namespace it creates, so namespaces belonging to other test
+// binaries running concurrently (for example other shards or monitoring
+// extensions) are not waited for.
+func waitForPriorTestsCleanedUp(ctx context.Context, c clientset.Interface, ownNamespace string) error {
+	nsList, err := c.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: "e2e-run=" + string(framework.RunID),
+	})
+	if err != nil {
+		return err
+	}
+	var priorTestNamespaces []string
+	for _, ns := range nsList.Items {
+		if ns.Name != ownNamespace {
+			priorTestNamespaces = append(priorTestNamespaces, ns.Name)
+		}
+	}
+	return framework.WaitForNamespacesDeleted(ctx, c, priorTestNamespaces, 2*time.Minute)
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
