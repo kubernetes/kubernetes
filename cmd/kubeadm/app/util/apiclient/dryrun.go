@@ -426,7 +426,7 @@ func (d *DryRun) HealthCheckJobReactor() *testing.SimpleReactor {
 			if !strings.HasPrefix(a.GetName(), "upgrade-health-check") || a.GetNamespace() != metav1.NamespaceSystem {
 				return false, nil, nil
 			}
-			obj := getJob(a.GetName(), a.GetNamespace())
+			obj := getJob(a.GetNamespace(), a.GetName())
 			d.LogObject(obj, action.GetResource().GroupVersion())
 			return true, obj, nil
 		},
