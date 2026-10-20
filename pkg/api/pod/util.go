@@ -842,6 +842,10 @@ func dropDisabledFields(
 		podSpec.HostnameOverride = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodDefaultNetwork) && !defaultNetworkInUse(oldPodSpec) {
+		podSpec.DefaultNetwork = nil
+	}
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -856,6 +860,11 @@ func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return true
+}
+
+// defaultNetworkInUse returns true if the pod spec sets the DefaultNetwork field.
+func defaultNetworkInUse(podSpec *api.PodSpec) bool {
+	return podSpec != nil && podSpec.DefaultNetwork != nil
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {

@@ -60,6 +60,7 @@ var featureGatedPodDefaults = map[string]string{
 	".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Protocol":                                `"HTTP1"`,
 	".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Protocol":                               `"HTTP1"`,
 	".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Protocol":                                 `"HTTP1"`,
+	".Spec.DefaultNetwork": `"Pod"`,
 }
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
@@ -3360,6 +3361,163 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
 		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
+	}
+}
+
+func TestSetDefaultPodDefaultNetwork(t *testing.T) {
+	testCases := []struct {
+		name               string
+		gateEnabled        bool
+		spec               v1.PodSpec
+		wantDefaultNetwork *v1.PodDefaultNetwork
+		wantHostNetwork    bool
+		wantDNSPolicy      v1.DNSPolicy
+		wantServiceLinks   bool
+	}{
+		{
+			name:               "gate disabled, unset",
+			spec:               v1.PodSpec{},
+			wantDefaultNetwork: nil,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "gate disabled, hostNetwork",
+			spec:               v1.PodSpec{HostNetwork: true},
+			wantDefaultNetwork: nil,
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "gate disabled, Host is not mirrored",
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkHost)},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    false,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "gate disabled, None keeps ClusterFirst and service links",
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkNone)},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "unset defaults to Pod",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkPod),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "old client hostNetwork defaults to Host",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{HostNetwork: true},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "new client Host mirrors to hostNetwork",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkHost)},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "Pod with hostNetwork becomes Host",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkPod), HostNetwork: true},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "Pod stays Pod",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkPod)},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkPod),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "None defaults dnsPolicy and enableServiceLinks",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkNone)},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+			wantDNSPolicy:      v1.DNSNone,
+			wantServiceLinks:   false,
+		},
+		{
+			name:        "None keeps explicit dnsPolicy and enableServiceLinks",
+			gateEnabled: true,
+			spec: v1.PodSpec{
+				DefaultNetwork:     ptr.To(v1.PodDefaultNetworkNone),
+				DNSPolicy:          v1.DNSClusterFirst,
+				EnableServiceLinks: ptr.To(true),
+			},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			// Validation rejects this; defaulting must not paper over it.
+			name:               "None with hostNetwork is left for validation",
+			gateEnabled:        true,
+			spec:               v1.PodSpec{DefaultNetwork: ptr.To(v1.PodDefaultNetworkNone), HostNetwork: true},
+			wantDefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSNone,
+			wantServiceLinks:   false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDefaultNetwork, tc.gateEnabled)
+
+			pod := &v1.Pod{Spec: *tc.spec.DeepCopy()}
+			got := roundTrip(t, runtime.Object(pod)).(*v1.Pod).Spec
+			if !reflect.DeepEqual(got.DefaultNetwork, tc.wantDefaultNetwork) {
+				t.Errorf("pod: defaultNetwork = %v, want %v", ptr.Deref(got.DefaultNetwork, "<nil>"), ptr.Deref(tc.wantDefaultNetwork, "<nil>"))
+			}
+			if got.HostNetwork != tc.wantHostNetwork {
+				t.Errorf("pod: hostNetwork = %v, want %v", got.HostNetwork, tc.wantHostNetwork)
+			}
+			if got.DNSPolicy != tc.wantDNSPolicy {
+				t.Errorf("pod: dnsPolicy = %q, want %q", got.DNSPolicy, tc.wantDNSPolicy)
+			}
+			if got.EnableServiceLinks == nil || *got.EnableServiceLinks != tc.wantServiceLinks {
+				t.Errorf("pod: enableServiceLinks = %v, want %v", ptr.Deref(got.EnableServiceLinks, false), tc.wantServiceLinks)
+			}
+
+			// Templates get the mirroring and the dnsPolicy default, but the
+			// field itself and enableServiceLinks are only defaulted on Pods.
+			template := &v1.PodTemplate{Template: v1.PodTemplateSpec{Spec: *tc.spec.DeepCopy()}}
+			gotTemplate := roundTrip(t, runtime.Object(template)).(*v1.PodTemplate).Template.Spec
+			wantTemplateDefaultNetwork := tc.wantDefaultNetwork
+			if tc.spec.DefaultNetwork == nil {
+				wantTemplateDefaultNetwork = nil
+			}
+			if !reflect.DeepEqual(gotTemplate.DefaultNetwork, wantTemplateDefaultNetwork) {
+				t.Errorf("template: defaultNetwork = %v, want %v", ptr.Deref(gotTemplate.DefaultNetwork, "<nil>"), ptr.Deref(wantTemplateDefaultNetwork, "<nil>"))
+			}
+			if gotTemplate.HostNetwork != tc.wantHostNetwork {
+				t.Errorf("template: hostNetwork = %v, want %v", gotTemplate.HostNetwork, tc.wantHostNetwork)
+			}
+			if gotTemplate.DNSPolicy != tc.wantDNSPolicy {
+				t.Errorf("template: dnsPolicy = %q, want %q", gotTemplate.DNSPolicy, tc.wantDNSPolicy)
+			}
+			if !reflect.DeepEqual(gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks) {
+				t.Errorf("template: enableServiceLinks = %v, want %v", gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks)
+			}
+		})
 	}
 }
 

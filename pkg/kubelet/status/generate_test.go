@@ -703,6 +703,27 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		"Network isolated pod sandbox status ready without IP": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					DefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+				},
+			},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			test.expected.Type = v1.PodReadyToStartContainers
