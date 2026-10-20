@@ -327,7 +327,7 @@ func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
 			"PriorityClassName", "Priority", "DNSConfig", "ReadinessGates", "RuntimeClassName",
 			"EnableServiceLinks", "PreemptionPolicy", "Overhead", "TopologySpreadConstraints",
 			"SetHostnameAsFQDN", "OS", "HostUsers", "SchedulingGates", "ResourceClaims", "Resources",
-			"HostnameOverride", "SchedulingGroup", "EvictionResponders",
+			"HostnameOverride", "SchedulingGroup", "EvictionResponders", "DefaultNetwork",
 		},
 	}
 	containerFields := map[category][]string{

@@ -76,6 +76,10 @@ type FakeRuntimeService struct {
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
 
 	ErrorOnSandboxCreate bool
+	// IgnoreDefaultNetwork simulates a runtime that attaches every sandbox to
+	// the pod network, including sandboxes created with
+	// PodSandboxConfig.DefaultNetwork DEFAULT_NETWORK_NONE.
+	IgnoreDefaultNetwork bool
 
 	// CheckpointedPods records the CheckpointPod requests received, in order, so
 	// tests can assert on the request passed to a checkpoint.
@@ -232,6 +236,12 @@ func (r *FakeRuntimeService) RunPodSandbox(_ context.Context, config *runtimeapi
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
 	podSandboxID := BuildSandboxName(config.Metadata)
 	createdAt := time.Now().UnixNano()
+	// A sandbox without the default pod network has no IPs. The network
+	// status is still reported, with an empty IP, as the CRI requires.
+	podIPs := FakePodSandboxIPs
+	if config.GetDefaultNetwork() == runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE && !r.IgnoreDefaultNetwork {
+		podIPs = []string{""}
+	}
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
 			Id:        podSandboxID,
@@ -239,7 +249,7 @@ func (r *FakeRuntimeService) RunPodSandbox(_ context.Context, config *runtimeapi
 			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
 			CreatedAt: createdAt,
 			Network: &runtimeapi.PodSandboxNetworkStatus{
-				Ip: FakePodSandboxIPs[0],
+				Ip: podIPs[0],
 			},
 			// Without setting sandboxStatus's Linux.Namespaces.Options, kubeGenericRuntimeManager's podSandboxChanged will consider it as network
 			// namespace changed and always recreate sandbox which causes pod creation failed.
@@ -256,7 +266,7 @@ func (r *FakeRuntimeService) RunPodSandbox(_ context.Context, config *runtimeapi
 		RuntimeHandler: runtimeHandler,
 	}
 	// assign additional IPs
-	additionalIPs := FakePodSandboxIPs[1:]
+	additionalIPs := podIPs[1:]
 	additionalPodIPs := make([]*runtimeapi.PodIP, 0, len(additionalIPs))
 	for _, ip := range additionalIPs {
 		additionalPodIPs = append(additionalPodIPs, &runtimeapi.PodIP{
