@@ -122,12 +122,13 @@ func newCacheIntervalFromStore(resourceVersion uint64, s store.Snapshot, key str
 
 // newCacheIntervalFromLazySnapshot captures a snapshot under the watch cache
 // lock and traverses it incrementally after the lock is released.
-func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, prefix string) *watchCacheInterval {
+func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, key string, recursive bool) *watchCacheInterval {
 	return &watchCacheInterval{
 		source: &lazySnapshotCacheIntervalSource{
 			snapshot:        snap,
 			resourceVersion: resourceVersion,
-			prefix:          prefix,
+			key:             key,
+			recursive:       recursive,
 		},
 		resourceVersion: resourceVersion,
 	}
@@ -287,19 +288,41 @@ type lazySnapshotCacheIntervalSource struct {
 	snapshot store.Snapshot
 	// resourceVersion is assigned to every watchCacheEvent produced by this source.
 	resourceVersion uint64
-	prefix          string
+	key             string
+	recursive       bool
 }
 
 func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
 	return func(yield func(*watchCacheEvent, error) bool) {
-		for elem, err := range s.snapshot.RangePrefix(s.prefix, "").All() {
-			if err != nil {
-				yield(nil, err)
-				return
+		// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix.
+		// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
+		if s.recursive {
+			for elem, err := range s.snapshot.RangePrefix(s.key, "").All() {
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+					return
+				}
 			}
-			if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
-				return
-			}
+			return
+		}
+		// Non-recursive expects key to be an exact match.
+		obj, exists, err := s.snapshot.GetByKey(s.key)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		if !exists {
+			return
+		}
+		elem, ok := obj.(*store.Element)
+		if !ok {
+			return
+		}
+		if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+			return
 		}
 	}
 }
