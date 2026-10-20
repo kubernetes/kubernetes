@@ -162,7 +162,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "disruption mode all",
 			root: &WorkloadItem{
 				Name:          "disruption-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
 				Input:         WorkloadInput{DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}}},
 			},
 			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
@@ -311,7 +311,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "composite root compiles into a composite template with leaf children",
 			root: &WorkloadItem{
 				Name:          "cpg-root",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				Children: []*WorkloadItem{
 					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}}}},
 					{Name: "ps", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
@@ -328,8 +328,8 @@ func TestBuildWorkload(t *testing.T) {
 				if cpg.Name != "cpg-root" {
 					t.Errorf("expected composite template name 'cpg-root', got %q", cpg.Name)
 				}
-				if cpg.SchedulingPolicy.Gang == nil || cpg.SchedulingPolicy.Gang.MinGroupCount != 2 {
-					t.Errorf("expected composite Gang policy with MinGroupCount=2, got %+v", cpg.SchedulingPolicy)
+				if cpg.SchedulingPolicy.Basic == nil {
+					t.Errorf("expected composite Basic policy, got %+v", cpg.SchedulingPolicy)
 				}
 				if len(cpg.PodGroupTemplates) != 2 {
 					t.Fatalf("expected 2 child PodGroupTemplates, got %d", len(cpg.PodGroupTemplates))
@@ -348,7 +348,7 @@ func TestBuildWorkload(t *testing.T) {
 				Name:  "cpg-root",
 				Input: WorkloadInput{Policy: PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](3)}}}},
 				Children: []*WorkloadItem{
-					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
@@ -362,7 +362,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "composite constraints and disruption mode compile onto the composite template",
 			root: &WorkloadItem{
 				Name:          "cpg-root",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](1)}}},
 				Input: WorkloadInput{
 					Constraints: ConstraintsInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
 						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
@@ -370,7 +370,13 @@ func TestBuildWorkload(t *testing.T) {
 					DisruptionMode: DisruptionModeInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}}},
 				},
 				Children: []*WorkloadItem{
-					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+					{
+						Name: "workers",
+						DefaultConfig: &SchedulingConfig{
+							Policy:         &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}},
+							DisruptionMode: &DisruptionMode{All: &AllDisruptionMode{}},
+						},
+					},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
@@ -409,7 +415,7 @@ func TestBuildWorkload(t *testing.T) {
 						Name:          "inner",
 						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
 						Children: []*WorkloadItem{
-							{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+							{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
 						},
 					},
 				},
@@ -481,6 +487,95 @@ func TestBuildWorkload(t *testing.T) {
 				Children: []*WorkloadItem{
 					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
 					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "tree at maximum depth succeeds",
+			root: &WorkloadItem{
+				Name:          "cpg-1",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{
+						Name:          "cpg-2",
+						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+						Children: []*WorkloadItem{
+							{
+								Name:          "cpg-3",
+								DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+								Children: []*WorkloadItem{
+									{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "tree exceeding maximum depth fails",
+			root: &WorkloadItem{
+				Name:          "cpg-1",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{
+						Name:          "cpg-2",
+						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+						Children: []*WorkloadItem{
+							{
+								Name:          "cpg-3",
+								DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+								Children: []*WorkloadItem{
+									{
+										Name:          "cpg-4",
+										DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+										Children: []*WorkloadItem{
+											{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "composite item exceeding maximum leaf children fails",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{Name: "leaf-1"},
+					{Name: "leaf-2"},
+					{Name: "leaf-3"},
+					{Name: "leaf-4"},
+					{Name: "leaf-5"},
+					{Name: "leaf-6"},
+					{Name: "leaf-7"},
+					{Name: "leaf-8"},
+					{Name: "leaf-9"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "composite item exceeding maximum composite children fails",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{Name: "cpg-1", Children: []*WorkloadItem{{Name: "leaf-1"}}},
+					{Name: "cpg-2", Children: []*WorkloadItem{{Name: "leaf-2"}}},
+					{Name: "cpg-3", Children: []*WorkloadItem{{Name: "leaf-3"}}},
+					{Name: "cpg-4", Children: []*WorkloadItem{{Name: "leaf-4"}}},
+					{Name: "cpg-5", Children: []*WorkloadItem{{Name: "leaf-5"}}},
+					{Name: "cpg-6", Children: []*WorkloadItem{{Name: "leaf-6"}}},
+					{Name: "cpg-7", Children: []*WorkloadItem{{Name: "leaf-7"}}},
+					{Name: "cpg-8", Children: []*WorkloadItem{{Name: "leaf-8"}}},
+					{Name: "cpg-9", Children: []*WorkloadItem{{Name: "leaf-9"}}},
 				},
 			},
 			wantErr: true,
@@ -923,12 +1018,12 @@ func createCompositeWorkloadItem() *WorkloadItem {
 		Name:          "cpgt-0",
 		DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
 		Children: []*WorkloadItem{
-			{Name: "pgt-0", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+			{Name: "pgt-0", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
 			{
 				Name:          "cpgt-1",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
 				Children: []*WorkloadItem{
-					{Name: "pgt-1", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+					{Name: "pgt-1", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
 				},
 			},
 		},
