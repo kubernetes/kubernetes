@@ -113,7 +113,9 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 				afterQuote := rest[closingIdx+1:]
 				trimmedAfterQuote := strings.TrimLeft(afterQuote, " \t")
 				// Without separating whitespace, '#' is part of the shell value, not a comment.
-				if trimmedAfterQuote != "" && (afterQuote == trimmedAfterQuote || !strings.HasPrefix(trimmedAfterQuote, "#")) {
+				blankAfterQuote := trimmedAfterQuote != afterQuote
+				isComment := blankAfterQuote && strings.HasPrefix(trimmedAfterQuote, "#")
+				if trimmedAfterQuote != "" && !isComment {
 					return "", false, fmt.Errorf("invalid environment variable format at line %d: unexpected content after closing quote", lineNum)
 				}
 
