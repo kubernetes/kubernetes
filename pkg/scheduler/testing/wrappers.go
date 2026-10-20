@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1992,7 +1993,7 @@ func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName 
 // TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *CompositePodGroupWrapper {
 	wrapper.CompositePodGroup.Spec.SchedulingConstraints = &schedulingv1alpha3.CompositePodGroupSchedulingConstraints{
-		Topology: []schedulingv1alpha3.TopologyConstraint{
+		Topology: []schedulingv1.TopologyConstraint{
 			{
 				Key: topologyKey,
 			},
