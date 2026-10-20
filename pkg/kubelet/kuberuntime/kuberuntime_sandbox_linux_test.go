@@ -34,6 +34,57 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func TestApplySandboxResourcesHugepageOverhead(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name     string
+		overhead v1.ResourceList
+		expected []*runtimeapi.HugepageLimit
+	}{
+		{
+			name: "no overhead",
+		},
+		{
+			name: "CPU and memory only",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "multiple hugepage sizes",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+				"hugepages-1Gi":   resource.MustParse("192Gi"),
+				"hugepages-2Mi":   resource.MustParse("4Mi"),
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{PageSize: "1GB", Limit: 192 * 1024 * 1024 * 1024},
+				{PageSize: "2MB", Limit: 4 * 1024 * 1024},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{
+				Overhead: tc.overhead,
+				Containers: []v1.Container{{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{"hugepages-1Gi": resource.MustParse("1Gi")},
+					},
+				}},
+			}}
+			config := &runtimeapi.PodSandboxConfig{Linux: &runtimeapi.LinuxPodSandboxConfig{}}
+			require.NoError(t, m.applySandboxResources(tCtx, pod, config))
+			assert.ElementsMatch(t, tc.expected, config.Linux.Overhead.HugepageLimits)
+			assert.Equal(t, []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 1024 * 1024 * 1024}}, config.Linux.Resources.HugepageLimits)
+		})
+	}
+}
+
 func TestApplySandboxResourcesHugepages(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)

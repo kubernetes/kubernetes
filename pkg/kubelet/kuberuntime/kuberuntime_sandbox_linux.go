@@ -42,6 +42,7 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
 		resources = m.calculateLinuxResources(cpu, cpu, memory, false)
+		resources.HugepageLimits = hugepageLimitsFromResourceList(pod.Spec.Overhead)
 	}
 
 	return resources
