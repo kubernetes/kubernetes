@@ -2253,7 +2253,17 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	}
 
-	resources := allocatedPod.Spec.Resources.DeepCopy()
+	// Start from the pod's effective allocated resources: the container requests
+	// and limits aggregated with the pod overhead, or the pod-level resources
+	// when they are set. The pod cgroup is sized from these values, so they are
+	// also what the cgroup readback below has to be compared against. Seeding
+	// from the pod-level spec alone compares against an empty value for pods
+	// that only set container resources, which makes every readback look like a
+	// real change, and drops resources that only the containers request. This
+	// mirrors convertContainerStatusResources, which also starts from the
+	// allocated resources and only overrides cpu and memory with the actuated
+	// values.
+	resources := getEffectiveAllocatedResources(allocatedPod)
 
 	if oldPodStatus.Resources == nil {
 		oldPodStatus.Resources = &v1.ResourceRequirements{}
