@@ -61,6 +61,18 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.deviceSelector.all": {
+				{ErrorType: "FieldValueInvalid", Origin: "neq"},
+			},
+			"spec.deviceSelector.device": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
+			"spec.deviceSelector.driver": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
+			"spec.deviceSelector.pool": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
 			"spec.taint.effect": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},

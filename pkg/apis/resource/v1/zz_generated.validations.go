@@ -2446,7 +2446,35 @@ func Validate_DeviceTaintRuleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1.DeviceTaintRuleSpec) (errs field.ErrorList) {
 
-	// field resourcev1.DeviceTaintRuleSpec.DeviceSelector has no validation
+	{ // field resourcev1.DeviceTaintRuleSpec.DeviceSelector
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.DeviceTaintSelector,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaintSelector(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceTaintRuleSpec) *resourcev1.DeviceTaintSelector {
+				return oldObj.DeviceSelector
+			})
+		errs = append(errs, fn(fldPath.Child("deviceSelector"), obj.DeviceSelector, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1.DeviceTaintRuleSpec.Taint
 		fn := func(
@@ -2515,6 +2543,96 @@ func Validate_DeviceTaintRuleStatus(
 				return oldObj.Conditions
 			})
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_DeviceTaintSelector validates an instance of DeviceTaintSelector according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaintSelector(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.DeviceTaintSelector) (errs field.ErrorList) {
+
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "all",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.All != nil
+		}, "driver",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Driver != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "all",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.All != nil
+		}, "pool",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Pool != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "all",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.All != nil
+		}, "device",
+		func(obj *resourcev1.DeviceTaintSelector) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Device != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	// field resourcev1.DeviceTaintSelector.Driver has no validation
+	// field resourcev1.DeviceTaintSelector.Pool has no validation
+	// field resourcev1.DeviceTaintSelector.Device has no validation
+
+	{ // field resourcev1.DeviceTaintSelector.All
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *bool,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, false).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceTaintSelector) *bool {
+				return oldObj.All
+			})
+		errs = append(errs, fn(fldPath.Child("all"), obj.All, oldVal, oldObj != nil)...)
 	}
 
 	return errs
