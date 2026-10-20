@@ -195,7 +195,7 @@ func (c *csiAttacher) waitForVolumeAttachmentWithLister(spec *volume.Spec, volum
 	return c.waitForVolumeAttachDetachStatusWithLister(spec, volumeHandle, attachID, timeout, verifyStatus, "Attach")
 }
 
-func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (c *csiAttacher) VolumesAreAttached(logger klog.Logger, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	klog.V(4).Info(log("probing attachment status for %d volume(s) ", len(specs)))
 
 	attached := make(map[*volume.Spec]bool)
@@ -214,7 +214,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 		driverName := pvSrc.Driver
 		volumeHandle := pvSrc.VolumeHandle
 
-		skip, err := c.plugin.skipAttach(driverName)
+		skip, err := c.plugin.skipAttach(logger, driverName)
 		if err != nil {
 			klog.Error(log("Failed to check CSIDriver for %s: %s", driverName, err))
 		} else {
@@ -261,7 +261,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) error {
+func (c *csiAttacher) MountDevice(logger klog.Logger, spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) error {
 	klog.V(4).Info(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	if deviceMountPath == "" {
@@ -298,7 +298,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
-	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+	publishContext, err := c.plugin.getPublishContext(ctx, c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(err.Error())
@@ -323,7 +323,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	var seLinuxSupported bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		support, err := c.plugin.SupportsSELinuxContextMount(spec)
+		support, err := c.plugin.SupportsSELinuxContextMount(logger, spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}

@@ -38,7 +38,7 @@ import (
 // Manager interface provides methods for Kubelet to manage ConfigMap.
 type Manager interface {
 	// Get configmap by configmap namespace and name.
-	GetConfigMap(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -62,8 +62,8 @@ func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 	return &simpleConfigMapManager{kubeClient: kubeClient}
 }
 
-func (s *simpleConfigMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
-	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (s *simpleConfigMapManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 func (s *simpleConfigMapManager) RegisterPod(pod *v1.Pod) {
@@ -80,7 +80,7 @@ type configMapManager struct {
 	manager manager.Manager
 }
 
-func (c *configMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
+func (c *configMapManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	object, err := c.manager.GetObject(namespace, name)
 	if err != nil {
 		return nil, err

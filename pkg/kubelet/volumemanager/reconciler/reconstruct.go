@@ -62,7 +62,7 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 			// There is nothing to reconstruct
 			continue
 		}
-		reconstructedVolume, err := rc.reconstructVolume(volume)
+		reconstructedVolume, err := rc.reconstructVolume(logger, volume)
 		if err != nil {
 			logger.Info("Could not construct volume information", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			// We can't reconstruct the volume. Remember to check DSW after it's fully populated and force unmount the volume when it's orphaned.

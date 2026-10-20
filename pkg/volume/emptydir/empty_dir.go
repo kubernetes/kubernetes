@@ -17,15 +17,15 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
-
-	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
@@ -107,7 +107,7 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.EmptyDir != nil
 }
 
-func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *emptyDirPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	// The kuberuntime_manager is responsible for resizing memory-backed emptyDir volumes,
 	// so we never remount them from within the volume plugin.
 	return false
@@ -117,7 +117,7 @@ func (plugin *emptyDirPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -160,7 +160,9 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
-			nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+			// Use context.TODO() because we currently do not have a proper context to pass in.
+			// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+			nodeAllocatable, err := plugin.host.GetNodeAllocatable(context.TODO())
 			if err != nil {
 				return nil, err
 			}
@@ -246,12 +248,12 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
-	return ed.SetUpAt(ed.GetPath(), mounterArgs)
+func (ed *emptyDir) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ctx, ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (ed *emptyDir) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
