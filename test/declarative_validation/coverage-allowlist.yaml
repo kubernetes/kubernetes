@@ -1,10 +1,9 @@
 # Suppressions for declarative-validation coverage.
 #
-# Every field is required. apiVersion matches exactly (use the standard
-# "<group>/<version>" form, or "<version>" for core). kind, path,
-# errorType, and origin match exactly OR wildcard with '*' (no implicit
-# wildcarding, so an entry can never silently overexclude). reason is
-# required.
+# Every field is required, empty is rejected at load time so an entry can never silently overexclude.
+#   - apiVersion matches by literal equality (in the "<group>/<version>" form, or just "<version>" for core or wildcard equality with "*/*")
+#   - path matches by literal equality or wildcard with "*" or glob prefix with "*..."
+#   - kind/errorType/origin match literally or wildcard with "*" or glob prefix with "*..."
 #
 # Example:
 #   - apiVersion: autoscaling/v1   # one specific rule

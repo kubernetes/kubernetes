@@ -53,11 +53,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	})
 	schedulingPath := field.NewPath("spec", "jobTemplate", "spec", "scheduling")
-	testCases := map[string]struct {
+	type testCase struct {
 		input                 batch.CronJob
 		enableWorkloadWithJob bool
 		expectedErrs          field.ErrorList
-	}{
+	}
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkCronJob(),
 		},
@@ -289,6 +290,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "jobTemplate", "spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkCronJob(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -668,6 +677,18 @@ func tweakJobTemplateBackoffLimitPerIndex(v *int32) func(*batch.CronJob) {
 func tweakTolerations(tolerations ...api.Toleration) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.JobTemplate.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*batch.CronJob) {
+	return func(cj *batch.CronJob) {
+		pod := &api.Pod{
+			Spec: cj.Spec.JobTemplate.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		cj.Spec.JobTemplate.Spec.Template.Spec = pod.Spec
 	}
 }
 
