@@ -558,7 +558,21 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
 	hasPending := entity.HasPodsWithPendingPlugins()
+	// For a gated entity, PreEnqueue stops at the first gated pod and subsequent members
+	// added to the group are not evaluated by PreEnqueue, leaving them without rejector plugins.
+	// Skip such pods so they don't trigger a requeue via the "no failed plugins" fallback,
+	// unless no pod in the group is gated (e.g. the gated pod was deleted).
+	var sawGatedPod, sawPodWithoutRejectors bool
 	for pInfo := range entity.ForEachPodInfo() {
+		if pInfo.Gated() {
+			sawGatedPod = true
+		}
+		if len(pInfo.UnschedulablePlugins) == 0 && len(pInfo.PendingPlugins) == 0 {
+			sawPodWithoutRejectors = true
+			if entity.Gated() {
+				continue
+			}
+		}
 		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
@@ -570,6 +584,11 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 		if !hasPending && bestStrategy == queueAfterBackoff {
 			return bestStrategy
 		}
+	}
+	// If the gated pod was deleted from the group, no pod is actually gating the entity anymore,
+	// so any skipped pod without rejector plugins should still trigger a requeue.
+	if entity.Gated() && !sawGatedPod && sawPodWithoutRejectors {
+		return queueAfterBackoff
 	}
 	return bestStrategy
 }

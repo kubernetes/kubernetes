@@ -2215,6 +2215,17 @@ func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Stat
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod label not in allowlists")
 }
 
+// countingPreEnqueuePlugin is a preEnqueuePlugin that counts PreEnqueue calls.
+type countingPreEnqueuePlugin struct {
+	preEnqueuePlugin
+	calls int
+}
+
+func (pl *countingPreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
+	pl.calls++
+	return pl.preEnqueuePlugin.PreEnqueue(ctx, p)
+}
+
 type denyingPreEnqueuePlugin struct {
 	denylists []string
 }
@@ -6373,9 +6384,11 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                  string
-		queueingHintMap       QueueingHintMapPerProfile
-		entity                framework.QueuedEntityInfo
+		name            string
+		queueingHintMap QueueingHintMapPerProfile
+		entity          framework.QueuedEntityInfo
+		// gatingPlugin, if set, marks the entity as gated by that plugin.
+		gatingPlugin          string
 		event                 fwk.ClusterEvent
 		newObj                any
 		expectedStrategy      queueingStrategy
@@ -6628,6 +6641,185 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 			expectedStrategy:      queueSkip,
 			expectedEvaluatedPods: []string{"p1", "p2"},
 		},
+		{
+			// p1 sorts before p2 and has no rejector plugins. Without skipping pods that have
+			// no rejector plugins in a gated entity, p1 would be worth requeuing without consulting any hint.
+			name: "gated pod group: pod without rejector plugins is skipped, returns queueSkip when gated pod hint returns Skip",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginGate", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+				},
+				setQueuedPodInfoGated(&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				}, "pluginGate", []fwk.ClusterEvent{nodeAdd}),
+			),
+			gatingPlugin:          "pluginGate",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p2"},
+		},
+		{
+			name: "gated pod group: pod without rejector plugins is skipped, returns queueAfterBackoff when gated pod hint returns Queue",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginGate", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+				},
+				setQueuedPodInfoGated(&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				}, "pluginGate", []fwk.ClusterEvent{nodeAdd}),
+			),
+			gatingPlugin:          "pluginGate",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p2"},
+		},
+		{
+			// When DefaultPreemption gates a pod group, its own QueueingHint returns QueueSkip and
+			// it relies on the in-cycle UnschedulablePlugins of the member pod that failed Filter.
+			name: "gated pod group: non-gated pod with UnschedulablePlugins is evaluated while pod without rejector plugins is skipped",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginGate", QueueingHintFn: queueHintReturnSkip},
+						{PluginName: "pluginFilter", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				setQueuedPodInfoGated(&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+				}, "pluginGate", []fwk.ClusterEvent{nodeAdd}),
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				},
+				&framework.QueuedPodInfo{
+					PodInfo:              mustNewPodInfo(st.MakePod().Name("p3").Namespace("ns1").PodGroupName("pg1").Obj()),
+					UnschedulablePlugins: sets.New("pluginFilter"),
+				},
+			),
+			gatingPlugin:          "pluginGate",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1", "p3"},
+		},
+		{
+			name: "gated pod group: pending plugin of a non-gated pod upgrades strategy to queueImmediately",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginGate", QueueingHintFn: queueHintReturnQueue},
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo:        mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					PendingPlugins: sets.New("pluginPending"),
+				},
+				setQueuedPodInfoGated(&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				}, "pluginGate", []fwk.ClusterEvent{nodeAdd}),
+			),
+			gatingPlugin:          "pluginGate",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueImmediately,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "gated pod group: wildcard event returns queueAfterBackoff without consulting hints",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginGate", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+				},
+				setQueuedPodInfoGated(&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				}, "pluginGate", []fwk.ClusterEvent{nodeAdd}),
+			),
+			gatingPlugin:          "pluginGate",
+			event:                 framework.EventUnschedulableTimeout,
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: nil,
+		},
+		{
+			// The gated pod can be deleted from the group without re-running PreEnqueue,
+			// leaving the entity gated while none of its pods is. If all remaining pods have
+			// rejector plugins, their verdict is respected.
+			name: "gated pod group without gated pods: verdict is respected when all remaining pods have rejector plugins",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginSkip", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					UnschedulablePlugins: sets.New("pluginSkip"),
+				},
+				&framework.QueuedPodInfo{
+					PodInfo:              mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					UnschedulablePlugins: sets.New("pluginSkip"),
+				},
+			),
+			gatingPlugin:          "pluginSkip",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+		{
+			// When the gated pod is deleted and any remaining pod has no rejector plugins,
+			// the group falls back to queueAfterBackoff even if other pods return QueueSkip.
+			name: "gated pod group without gated pods: pod without rejector plugins triggers queueAfterBackoff",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginSkip", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					UnschedulablePlugins: sets.New("pluginSkip"),
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+				},
+			),
+			gatingPlugin:          "pluginSkip",
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6635,6 +6827,9 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 			evaluatedPods = nil // reset evaluated pods every time
 			logger, ctx := ktesting.NewTestContext(t)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(tt.queueingHintMap))
+			if tt.gatingPlugin != "" {
+				tt.entity.SetGatingPlugin(tt.gatingPlugin, []fwk.ClusterEvent{nodeAdd})
+			}
 
 			gotStrategy := q.isEntityWorthRequeuing(logger, tt.entity, tt.event, nil, tt.newObj, nil)
 			if gotStrategy != tt.expectedStrategy {
@@ -8355,6 +8550,117 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 					t.Errorf("Expected in-flight event %s to be tracked, but it wasn't", tt.event.Label())
 				}
 				return
+			}
+		})
+	}
+}
+
+// TestMoveAllToActiveOrBackoffQueueGatedPodGroup verifies that a gated pod group isn't
+// pointlessly re-evaluated by PreEnqueue on events of its gating plugin when the plugin's
+// QueueingHint returns QueueSkip. Members joining a gated group aren't evaluated by PreEnqueue
+// and have no rejector plugins, which must not be taken as a reason to requeue the group.
+func TestMoveAllToActiveOrBackoffQueueGatedPodGroup(t *testing.T) {
+	pgName := "pg-test"
+	// Both pods lack the "allow" label, so they're gated by preEnqueuePlugin.
+	p1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName(pgName).Obj()
+	p2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").PodGroupName(pgName).Obj()
+	unrelatedPod := st.MakePod().Name("unrelated").Namespace("ns1").UID("unrelated").Obj()
+
+	tests := []struct {
+		name   string
+		event  fwk.ClusterEvent
+		newObj any
+		hint   fwk.QueueingHint
+		// expectedPreEnqueueCalls is the number of PreEnqueue calls caused by the event.
+		expectedPreEnqueueCalls int
+		// expectedHintedPods are the pods for which the QueueingHint was called, in order.
+		expectedHintedPods []string
+	}{
+		{
+			name:                    "gating plugin event with QueueSkip hint doesn't re-run PreEnqueue",
+			event:                   framework.EventUnscheduledPodAdd,
+			newObj:                  unrelatedPod,
+			hint:                    fwk.QueueSkip,
+			expectedPreEnqueueCalls: 0,
+			expectedHintedPods:      []string{"pod1"},
+		},
+		{
+			name:                    "gating plugin event with Queue hint re-runs PreEnqueue",
+			event:                   framework.EventUnscheduledPodAdd,
+			newObj:                  unrelatedPod,
+			hint:                    fwk.Queue,
+			expectedPreEnqueueCalls: 1,
+			expectedHintedPods:      []string{"pod1"},
+		},
+		{
+			name:                    "wildcard event re-runs PreEnqueue without consulting the hint",
+			event:                   framework.EventUnschedulableTimeout,
+			hint:                    fwk.QueueSkip,
+			expectedPreEnqueueCalls: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			plugin := &countingPreEnqueuePlugin{preEnqueuePlugin: preEnqueuePlugin{allowlists: []string{"allow"}}}
+			preEnqueueMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {plugin.Name(): plugin},
+			}
+			var hintedPods []string
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""] = map[fwk.ClusterEvent][]*QueueingHintFunction{
+				{Resource: fwk.Pod, ActionType: fwk.Add}: {
+					{
+						PluginName: plugin.Name(),
+						QueueingHintFn: func(_ klog.Logger, pod *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+							hintedPods = append(hintedPods, pod.Name)
+							return tt.hint, nil
+						},
+					},
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithQueueingHintMapPerProfile(m))
+			q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()))
+
+			// p1 creates the group and gets gated by PreEnqueue.
+			// p2 joins the gated group without PreEnqueue being run.
+			q.Add(ctx, p1)
+			q.Add(ctx, p2)
+
+			pgLookup := newQueuedPodGroupInfoForLookup("ns1", pgName, fwk.PodGroupKeyType)
+			entity := q.unschedulableEntities.get(pgLookup)
+			if entity == nil || !entity.Gated() {
+				t.Fatalf("Expected pod group to be gated in unschedulableEntities, got: %v", entity)
+			}
+			for pInfo := range entity.ForEachPodInfo() {
+				if pInfo.Pod.Name == p2.Name && (pInfo.Gated() || pInfo.UnschedulablePlugins.Len() > 0 || pInfo.PendingPlugins.Len() > 0) {
+					t.Fatalf("Expected %s to have no gating or rejector plugins, got gated: %v, unschedulable: %v, pending: %v", p2.Name, pInfo.Gated(), pInfo.UnschedulablePlugins, pInfo.PendingPlugins)
+				}
+			}
+			preEnqueueCallsBefore := plugin.calls
+
+			q.MoveAllToActiveOrBackoffQueue(logger, tt.event, nil, tt.newObj, nil)
+
+			if got := plugin.calls - preEnqueueCallsBefore; got != tt.expectedPreEnqueueCalls {
+				t.Errorf("Expected %d PreEnqueue calls caused by the event, got %d", tt.expectedPreEnqueueCalls, got)
+			}
+			if diff := cmp.Diff(tt.expectedHintedPods, hintedPods); diff != "" {
+				t.Errorf("Unexpected pods evaluated by QueueingHint (-want,+got):\n%s", diff)
+			}
+			// PreEnqueue keeps gating the group, so it must end up gated in unschedulableEntities in all cases.
+			if entity = q.unschedulableEntities.get(pgLookup); entity == nil || !entity.Gated() {
+				t.Errorf("Expected pod group to stay gated in unschedulableEntities, got: %v", entity)
+			}
+			if q.activeQ.has(pgLookup) || q.backoffQ.has(pgLookup) {
+				t.Errorf("Expected pod group not to be in activeQ or backoffQ")
 			}
 		})
 	}
