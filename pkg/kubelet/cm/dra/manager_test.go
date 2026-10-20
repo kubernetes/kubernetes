@@ -2737,6 +2737,101 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	}
 }
 
+func TestUpdateAllocatedResourcesStatus_ExtendedResources(t *testing.T) {
+	testCases := []struct {
+		name         string
+		resourceName v1.ResourceName
+		quantity     string
+		wantHealth   bool
+	}{
+		{
+			name:         "Extended resource",
+			resourceName: "example.com/gpu",
+			quantity:     "1",
+			wantHealth:   true,
+		},
+		{
+			name:         "Implicit DeviceClass resource",
+			resourceName: "deviceclass.resource.kubernetes.io/gpu.example.com",
+			quantity:     "1",
+			wantHealth:   true,
+		},
+		{
+			name:         "Zero resource request",
+			resourceName: "example.com/gpu",
+			quantity:     "0",
+		},
+		{
+			name:         "Non-DRA resource",
+			resourceName: v1.ResourceCPU,
+			quantity:     "1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+			manager, err := NewManager(logger, nil, t.TempDir())
+			require.NoError(t, err)
+			defer manager.Stop()
+
+			pod := genTestPodWithExtendedResource()
+			pod.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+				tc.resourceName: resource.MustParse(tc.quantity),
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+				Name: "other-container",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				},
+			})
+			extendedClaim := pod.Status.ExtendedResourceClaimStatus
+			extendedClaim.RequestMappings[0].ResourceName = string(tc.resourceName)
+			extendedClaim.RequestMappings = append(extendedClaim.RequestMappings, v1.ContainerExtendedResourceRequest{
+				ContainerName: "other-container",
+				ResourceName:  "example.com/gpu",
+				RequestName:   "other-request",
+			})
+
+			manager.cache.add(&ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimName: extendedClaim.ResourceClaimName,
+					Namespace: pod.Namespace,
+					DriverState: map[string]state.DriverState{
+						"test-driver": {Devices: []state.Device{
+							{PoolName: "pool", DeviceName: "dev-app", RequestNames: []string{"container-0-request-0"}},
+							{PoolName: "pool", DeviceName: "dev-other", RequestNames: []string{"other-request"}},
+						}},
+					},
+				},
+			})
+			_, err = manager.healthInfoCache.updateHealthInfo(logger, "test-driver", []state.DeviceHealth{
+				{PoolName: "pool", DeviceName: "dev-app", Health: state.DeviceHealthStatusUnhealthy},
+				{PoolName: "pool", DeviceName: "dev-other", Health: state.DeviceHealthStatusHealthy},
+			})
+			require.NoError(t, err)
+
+			status := &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: containerName}}}
+			manager.UpdateAllocatedResourcesStatus(logger, pod, status)
+
+			if !tc.wantHealth {
+				assert.Empty(t, status.ContainerStatuses[0].AllocatedResourcesStatus)
+				return
+			}
+			assert.Equal(t, []v1.ResourceStatus{
+				{
+					Name: v1.ResourceName("claim:" + claimName + "/container-0-request-0"),
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-app", Health: v1.ResourceHealthStatusUnhealthy},
+					},
+				},
+			}, status.ContainerStatuses[0].AllocatedResourcesStatus)
+		})
+	}
+}
+
 func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
