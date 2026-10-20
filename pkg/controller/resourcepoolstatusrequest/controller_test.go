@@ -1374,6 +1374,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		requestAttr     *string
 		// mixedClass adds a second device slice grouped by a different attribute.
 		mixedClass bool
+		claims     []*resourcev1.ResourceClaim
 		want       map[string][2]int32
 	}{
 		"pool declares the attribute": {
@@ -1391,6 +1392,19 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		"request default applies when the pool declares none": {
 			requestAttr: ptr.To(profileAttr),
 			want:        map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
+		},
+		// Allocating the Full partition uses up the shared counter, so nothing
+		// else fits.
+		"allocated partition consumes the shared counter": {
+			declarePoolAttr: true,
+			claims:          []*resourcev1.ResourceClaim{makeAllocatedClaim("c0", "ns", driver, "pool-0", "full-0")},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 0}, key(profileAttr, "Half"): {2, 0}},
+		},
+		// AdminAccess is not an allocation: it must not consume counters.
+		"adminAccess claim does not consume the shared counter": {
+			declarePoolAttr: true,
+			claims:          []*resourcev1.ResourceClaim{makeAdminAccessClaim("admin-0", "ns", driver, "pool-0", "full-0")},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
 		// Slices declaring different attributes are not a conflict: each group
 		// is reported independently under its own attribute.
@@ -1424,7 +1438,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 			request := makeRequest(driver)
 			request.Spec.DefaultPartitionTypeAttribute = tc.requestAttr
 
-			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, nil))
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, tc.claims))
 			if pool.ValidationError != nil {
 				t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
 			}
@@ -1447,6 +1461,7 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 	testCases := map[string]struct {
 		capacity      map[resourcev1.QualifiedName]resourcev1.DeviceCapacity
 		consumed      map[resourcev1.QualifiedName]resource.Quantity
+		adminAccess   bool
 		wantFully     int32
 		wantPartially int32
 		// want maps each capacity name to {total, consumed, available}.
@@ -1457,6 +1472,15 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			consumed:      map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
 			wantPartially: 1,
 			want:          map[string][3]string{"memory": {"40Gi", "10Gi", "30Gi"}},
+		},
+		// AdminAccess is not an allocation: the device stays fully available
+		// and its consumed capacity is not counted.
+		"adminAccess claim is not counted": {
+			capacity:    map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{"memory": {Value: qty("40Gi")}},
+			consumed:    map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
+			adminAccess: true,
+			wantFully:   1,
+			want:        map[string][3]string{"memory": {"40Gi", "0", "40Gi"}},
 		},
 		"multiple capacities": {
 			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
@@ -1481,6 +1505,9 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
 			slice.Spec.Devices[0].Capacity = tc.capacity
 			claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+			if tc.adminAccess {
+				claim = makeAdminAccessClaim("c0", "ns", driver, "pool-0", "device-0")
+			}
 			claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = tc.consumed
 
 			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim}))
