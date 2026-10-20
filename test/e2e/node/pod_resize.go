@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -1040,8 +1041,12 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), initNodeAvailableCPU.MilliValue())
 
-		nodeAllocatableMem, initNodeAvailableMem, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
+		nodeAllocatableMem, _, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
 		framework.ExpectNoError(err, "failed to get Memory resources available for allocation")
+		initNodeAvailableMem, err := waitForStableNodeAvailability(ctx, f, &node, v1.ResourceMemory)
+		if err != nil {
+			e2eskipper.Skipf("available memory on node %s did not stabilize: %v", node.Name, err)
+		}
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
 			node.Name, nodeAllocatableMem.Value(), initNodeAvailableMem.Value())
 
@@ -1429,7 +1434,11 @@ func getBestNodeForResizeTest(ctx context.Context, f *framework.Framework) (v1.N
 		e2eskipper.Skipf("namespaces of earlier tests of this run were not cleaned up: %v", err)
 	}
 
-	return bestNode, bestAllocatable, bestAvailable
+	stableAvailableCPU, err := waitForStableNodeAvailability(ctx, f, &bestNode, v1.ResourceCPU)
+	if err != nil {
+		e2eskipper.Skipf("available CPU on node %s did not stabilize: %v", bestNode.Name, err)
+	}
+	return bestNode, bestAllocatable, stableAvailableCPU
 }
 
 // waitForPriorTestsCleanedUp waits until the namespaces of earlier tests of
@@ -1452,6 +1461,36 @@ func waitForPriorTestsCleanedUp(ctx context.Context, c clientset.Interface, ownN
 		}
 	}
 	return framework.WaitForNamespacesDeleted(ctx, c, priorTestNamespaces, 2*time.Minute)
+}
+
+// availabilitySampleInterval is the delay between consecutive samples of a
+// node's available resources when waiting for the reading to stabilize.
+const availabilitySampleInterval = 5 * time.Second
+
+// waitForStableNodeAvailability returns the quantity of resourceName
+// available for allocation on the node, once the same value has been observed
+// on two consecutive samples taken availabilitySampleInterval apart, and an
+// error if the reading does not stabilize before the timeout. A transient
+// reading (for example, while workloads evicted or deleted by an earlier test
+// are being rescheduled onto the node) must not be used to size the deferred
+// resize tests' pods: the tests rely on the node remaining exactly full for
+// their duration.
+func waitForStableNodeAvailability(ctx context.Context, f *framework.Framework, node *v1.Node, resourceName v1.ResourceName) (resource.Quantity, error) {
+	var available resource.Quantity
+	stable := false
+	err := wait.PollUntilContextTimeout(ctx, availabilitySampleInterval, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		_, current, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, resourceName)
+		if err != nil {
+			return false, err
+		}
+		if stable && current.Equal(available) {
+			available = current
+			return true, nil
+		}
+		available, stable = current, true
+		return false, nil
+	})
+	return available, err
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
