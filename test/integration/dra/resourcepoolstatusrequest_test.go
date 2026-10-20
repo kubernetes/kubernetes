@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/gomega"
 
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -470,6 +471,21 @@ func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 	if !apimeta.IsStatusConditionTrue(request.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete) {
 		tCtx.Errorf("expected Complete=True condition, got %+v", request.Status.Conditions)
 	}
+
+	// The status alone is easy to miss, so a Warning event is emitted as well.
+	// Events for cluster-scoped objects are recorded in the default namespace.
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Event, error) {
+		events, err := tCtx.Client().CoreV1().Events(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{
+			FieldSelector: "involvedObject.name=" + request.Name + ",reason=PoolIncomplete",
+		})
+		if err != nil {
+			return nil, err
+		}
+		return events.Items, nil
+	}).WithTimeout(30*time.Second).Should(
+		gomega.ContainElement(gomega.HaveField("Type", v1.EventTypeWarning)),
+		"expected a Warning PoolIncomplete event for the request",
+	)
 }
 
 func testOneTimeProcessing(tCtx ktesting.TContext) {

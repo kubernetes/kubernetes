@@ -29,14 +29,16 @@ func TestRequestsProcessed(t *testing.T) {
 	defer registry.Reset()
 	registry.MustRegister(RequestsProcessed)
 
-	RequestsProcessed.WithLabelValues("driver-a.example.com").Inc()
-	RequestsProcessed.WithLabelValues("driver-a.example.com").Inc()
-	RequestsProcessed.WithLabelValues("driver-b.example.com").Inc()
+	RequestsProcessed.WithLabelValues("driver-a.example.com", ResultComplete).Inc()
+	RequestsProcessed.WithLabelValues("driver-a.example.com", ResultComplete).Inc()
+	RequestsProcessed.WithLabelValues("driver-a.example.com", ResultIncomplete).Inc()
+	RequestsProcessed.WithLabelValues(UnknownDriver, ResultFailed).Inc()
 
-	want := `# HELP resourcepoolstatusrequest_controller_requests_processed_total [ALPHA] Total number of ResourcePoolStatusRequests processed
+	want := `# HELP resourcepoolstatusrequest_controller_requests_processed_total [ALPHA] Total number of ResourcePoolStatusRequests processed, by result: complete, incomplete (some pools still incomplete), failed (Failed condition) or error (status write failed)
 # TYPE resourcepoolstatusrequest_controller_requests_processed_total counter
-resourcepoolstatusrequest_controller_requests_processed_total{driver_name="driver-a.example.com"} 2
-resourcepoolstatusrequest_controller_requests_processed_total{driver_name="driver-b.example.com"} 1
+resourcepoolstatusrequest_controller_requests_processed_total{driver_name="driver-a.example.com",result="complete"} 2
+resourcepoolstatusrequest_controller_requests_processed_total{driver_name="driver-a.example.com",result="incomplete"} 1
+resourcepoolstatusrequest_controller_requests_processed_total{driver_name="unknown",result="failed"} 1
 `
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(want), "resourcepoolstatusrequest_controller_requests_processed_total"); err != nil {
 		t.Errorf("unexpected metric output: %v", err)
