@@ -5847,6 +5847,7 @@
   subsystem: resourcepoolstatusrequest_controller
   help: Total number of errors encountered while processing ResourcePoolStatusRequests
   type: Counter
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   labels:
   - driver_name
@@ -5855,11 +5856,14 @@
     endpoint: /metrics
 - name: requests_processed_total
   subsystem: resourcepoolstatusrequest_controller
-  help: Total number of ResourcePoolStatusRequests processed
+  help: 'Total number of ResourcePoolStatusRequests processed, by result: complete,
+    incomplete (some pools still incomplete), failed (Failed condition) or error (status
+    write failed)'
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - driver_name
+  - result
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics

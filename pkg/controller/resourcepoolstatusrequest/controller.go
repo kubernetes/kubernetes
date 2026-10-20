@@ -18,6 +18,7 @@ package resourcepoolstatusrequest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -26,9 +27,11 @@ import (
 
 	"golang.org/x/time/rate"
 
+	v1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,9 +41,12 @@ import (
 	resourcev1informers "k8s.io/client-go/informers/resource/v1"
 	resourcev1alpha3informers "k8s.io/client-go/informers/resource/v1alpha3"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	resourcev1alpha3listers "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
@@ -61,6 +67,14 @@ const (
 	retryBaseDelay = 500 * time.Millisecond
 	retryMaxDelay  = 8 * time.Second
 
+	// conflictRetryDelay gives the informer time to catch up with the object
+	// that caused a status update conflict.
+	conflictRetryDelay = 100 * time.Millisecond
+
+	// Event reasons for requests that end in a degraded state.
+	eventReasonPoolIncomplete    = "PoolIncomplete"
+	eventReasonCalculationFailed = "CalculationFailed"
+
 	// cleanupPollingInterval is how often the controller checks for expired requests.
 	cleanupPollingInterval = 10 * time.Minute
 
@@ -72,6 +86,16 @@ const (
 	// is retained before being automatically deleted. This handles stuck requests.
 	pendingRequestTTL = 24 * time.Hour
 )
+
+// errIncompletePool is returned by syncRequest to requeue a request whose
+// pools are still being published. It is expected, so it is not logged as an
+// error.
+var errIncompletePool = errors.New("incomplete pools detected, requeueing")
+
+// errStatusConflict wraps a conflict on the status update, which happens when
+// the request was modified concurrently, for example a label change. It
+// resolves on its own once the informer has the new version.
+var errStatusConflict = errors.New("status update conflict")
 
 // Controller manages ResourcePoolStatusRequest processing.
 type Controller struct {
@@ -104,6 +128,10 @@ type Controller struct {
 
 	// workqueue is a rate limited work queue for processing ResourcePoolStatusRequests
 	workqueue workqueue.TypedRateLimitingInterface[string]
+
+	// recorder is set by Run. It stays nil in unit tests that call syncRequest
+	// directly, in which case no events are emitted.
+	recorder record.EventRecorder
 }
 
 // newRateLimiter is DefaultTypedControllerRateLimiter with a longer per-item
@@ -178,6 +206,13 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ResourcePoolStatusRequest controller")
 
+	// Constructed here rather than in NewController because it spawns goroutines.
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	c.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName}).WithLogger(logger)
+	eventBroadcaster.StartStructuredLogging(3)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
+	defer eventBroadcaster.Shutdown()
+
 	var wg sync.WaitGroup
 	defer func() {
 		logger.Info("Shutting down ResourcePoolStatusRequest controller")
@@ -235,8 +270,20 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
+	// Retried without counting against maxRetries: on the last attempt for an
+	// incomplete pool, dropping the request would leave it without status.
+	if errors.Is(err, errStatusConflict) {
+		logger.V(4).Info("Status update conflicted, retrying", "request", key, "err", err)
+		c.workqueue.AddAfter(key, conflictRetryDelay)
+		return true
+	}
+
 	if c.workqueue.NumRequeues(key) < maxRetries {
-		logger.Error(err, "Error syncing request, requeuing", "request", key)
+		if errors.Is(err, errIncompletePool) {
+			logger.V(4).Info("Pools still incomplete, requeuing", "request", key)
+		} else {
+			logger.Error(err, "Error syncing request, requeuing", "request", key)
+		}
 		c.workqueue.AddRateLimited(key)
 		return true
 	}
@@ -251,15 +298,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // syncRequest processes a single ResourcePoolStatusRequest.
 func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
-	startTime := time.Now()
-	var driverName string
-	var recordDuration bool
-
-	defer func() {
-		if driverName != "" && recordDuration {
-			metrics.RequestProcessingDuration.WithLabelValues(driverName).Observe(time.Since(startTime).Seconds())
-		}
-	}()
 
 	// Get the request
 	request, err := c.requestLister.Get(key)
@@ -268,13 +306,12 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		return nil
 	}
 
-	driverName = request.Spec.Driver
-
 	// Skip if already processed (status is set)
 	if request.Status != nil {
 		logger.V(4).Info("Request already processed, skipping", "request", key)
 		return nil
 	}
+	startTime := time.Now()
 
 	logger.V(2).Info("Processing ResourcePoolStatusRequest", "request", key, "driver", request.Spec.Driver)
 
@@ -293,29 +330,60 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 			break
 		}
 	}
-	if hasIncomplete {
-		if c.workqueue.NumRequeues(key) < maxRetries {
-			return fmt.Errorf("incomplete pools detected, requeueing")
-		}
-		logger.V(2).Info("Pools still incomplete after max retries, writing partial status", "request", key, "retries", maxRetries)
+	if hasIncomplete && c.workqueue.NumRequeues(key) < maxRetries {
+		return errIncompletePool
 	}
+
+	driverName := c.metricDriver(request.Spec.Driver)
 
 	// Update the request status
 	requestCopy := request.DeepCopy()
 	requestCopy.Status = &status
 
 	_, err = c.client.ResourceV1alpha3().ResourcePoolStatusRequests().UpdateStatus(ctx, requestCopy, metav1.UpdateOptions{})
+	if apierrors.IsConflict(err) {
+		return fmt.Errorf("%w for request %s: %w", errStatusConflict, key, err)
+	}
+	metrics.RequestProcessingDuration.WithLabelValues(driverName).Observe(time.Since(startTime).Seconds())
 	if err != nil {
-		recordDuration = true
 		metrics.RequestProcessingErrors.WithLabelValues(driverName).Inc()
-		metrics.RequestsProcessed.WithLabelValues(driverName).Inc()
+		metrics.RequestsProcessed.WithLabelValues(driverName, metrics.ResultError).Inc()
 		return fmt.Errorf("failed to update status for request %s: %w", key, err)
 	}
 
-	recordDuration = true
-	metrics.RequestsProcessed.WithLabelValues(driverName).Inc()
+	result := metrics.ResultComplete
+	if failed := apimeta.FindStatusCondition(status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionFailed); failed != nil {
+		result = metrics.ResultFailed
+		c.warn(request, eventReasonCalculationFailed, failed.Message)
+	} else if hasIncomplete {
+		result = metrics.ResultIncomplete
+		logger.V(2).Info("Wrote partial status, pools still incomplete after max retries", "request", key, "retries", maxRetries)
+		c.warn(request, eventReasonPoolIncomplete, fmt.Sprintf("Some pools were still incomplete after %d retries; see status.pools[].validationError", maxRetries))
+	}
+	metrics.RequestsProcessed.WithLabelValues(driverName, result).Inc()
 	logger.V(2).Info("Successfully processed ResourcePoolStatusRequest", "request", key, "poolCount", len(status.Pools))
 	return nil
+}
+
+// metricDriver returns driver if it publishes ResourceSlices, otherwise
+// metrics.UnknownDriver, so arbitrary spec.driver values can't create series.
+func (c *Controller) metricDriver(driver string) string {
+	slices, err := c.sliceLister.List(labels.Everything())
+	if err != nil {
+		return metrics.UnknownDriver
+	}
+	for _, slice := range slices {
+		if slice.Spec.Driver == driver {
+			return driver
+		}
+	}
+	return metrics.UnknownDriver
+}
+
+func (c *Controller) warn(request *resourcev1alpha3.ResourcePoolStatusRequest, reason, message string) {
+	if c.recorder != nil {
+		c.recorder.Event(request, v1.EventTypeWarning, reason, message)
+	}
 }
 
 // deviceUnavailable reports whether a device should count as unavailable,
