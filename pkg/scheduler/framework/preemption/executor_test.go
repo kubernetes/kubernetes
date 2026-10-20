@@ -650,16 +650,12 @@ func TestPrepareCandidate(t *testing.T) {
 		},
 		{
 			name: "metrics: compositepodgroup preemptor with PDB violations and disruptions",
-			candidate: &candidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1,
-					},
-					NumPDBViolations: 1,
+			candidate: newCandidate(&extenderv1.Victims{
+				Pods: []*v1.Pod{
+					victim1,
 				},
-				disruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1},
-			},
+				NumPDBViolations: 1,
+			}, node1Name, map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1}, node1Name),
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
 			testPods: []*v1.Pod{
