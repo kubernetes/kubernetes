@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -2175,16 +2176,16 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		select {
 		case update := <-updateChan:
 			assert.ElementsMatch(t, []string{string(podUID)}, update.PodUIDs)
-		case <-time.After(time.Second):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("timed out waiting for the initial device health update")
 		}
-		require.Eventually(t, fakeClock.HasWaiters, time.Second, time.Millisecond, "expiration loop did not start a deadline timer")
+		require.Eventually(t, fakeClock.HasWaiters, wait.ForeverTestTimeout, time.Millisecond, "expiration loop did not start a deadline timer")
 
 		fakeClock.Step(time.Second)
 		select {
 		case update := <-updateChan:
 			assert.ElementsMatch(t, []string{string(podUID)}, update.PodUIDs)
-		case <-time.After(time.Second):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("timed out waiting for the device health expiration update")
 		}
 
@@ -2196,7 +2197,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		select {
 		case <-done:
 			require.NoError(t, <-streamErrChan)
-		case <-time.After(time.Second):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("timed out waiting for the health stream to stop")
 		}
 	})

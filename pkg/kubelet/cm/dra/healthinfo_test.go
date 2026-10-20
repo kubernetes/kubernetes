@@ -435,6 +435,59 @@ func TestExpireHealthInfo(t *testing.T) {
 	assert.NotContains(t, *cache.HealthInfo, testDriver)
 }
 
+// An "Unknown" device which still carries a message must be reported on
+// expiry so that the stale message gets cleared from the Pod status.
+func TestExpireHealthInfoUnknownWithMessage(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	now := time.Date(2026, time.July, 24, 0, 0, 0, 0, time.UTC)
+
+	t.Run("expiration loop", func(t *testing.T) {
+		fakeClock := clocktesting.NewFakeClock(now)
+		cache, err := newHealthInfoCache(logger, "")
+		require.NoError(t, err)
+		cache.clock = fakeClock
+
+		_, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{
+			{PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusUnknown, Message: "probe failed", HealthCheckTimeout: time.Second},
+		})
+		require.NoError(t, err)
+
+		fakeClock.Step(time.Second)
+		expired, _ := cache.expireHealthInfo(logger)
+		require.Len(t, expired[testDriver], 1)
+		assert.Equal(t, testDevice, expired[testDriver][0].DeviceName)
+		assert.Equal(t, state.DeviceHealthStatusUnknown, expired[testDriver][0].Health)
+		assert.Empty(t, expired[testDriver][0].Message)
+	})
+
+	t.Run("not reported in update", func(t *testing.T) {
+		fakeClock := clocktesting.NewFakeClock(now)
+		cache, err := newHealthInfoCache(logger, "")
+		require.NoError(t, err)
+		cache.clock = fakeClock
+
+		_, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{
+			{PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusUnknown, Message: "probe failed", HealthCheckTimeout: time.Second},
+		})
+		require.NoError(t, err)
+
+		fakeClock.Step(2 * time.Second)
+		changed, err := cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{
+			{PoolName: testPool, DeviceName: "other", Health: state.DeviceHealthStatusHealthy},
+		})
+		require.NoError(t, err)
+		var expired []state.DeviceHealth
+		for _, d := range changed {
+			if d.DeviceName == testDevice {
+				expired = append(expired, d)
+			}
+		}
+		require.Len(t, expired, 1)
+		assert.Equal(t, state.DeviceHealthStatusUnknown, expired[0].Health)
+		assert.Empty(t, expired[0].Message)
+	})
+}
+
 // TestUpdateHealthInfo tests adding, updating, and reconciling device health.
 func TestUpdateHealthInfo(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)

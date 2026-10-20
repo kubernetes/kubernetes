@@ -248,9 +248,9 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 				}
 
 				if now.Sub(existingDevice.LastUpdated) > timeout {
-					// Entries which were already "Unknown" are removed
-					// without a notification, nothing changes for readers.
-					if existingDevice.Health != state.DeviceHealthStatusUnknown {
+					// Entries which were already "Unknown" without a message
+					// are removed without a notification, nothing changes for readers.
+					if existingDevice.Health != state.DeviceHealthStatusUnknown || existingDevice.Message != "" {
 						existingDevice.Health = state.DeviceHealthStatusUnknown
 						existingDevice.Message = ""
 						existingDevice.LastUpdated = now
@@ -301,7 +301,7 @@ func (cache *healthInfoCache) expireHealthInfo(logger klog.Logger) (map[string][
 					continue
 				}
 
-				if device.Health != state.DeviceHealthStatusUnknown {
+				if device.Health != state.DeviceHealthStatusUnknown || device.Message != "" {
 					device.Health = state.DeviceHealthStatusUnknown
 					device.Message = ""
 					expiredDevices[driverName] = append(expiredDevices[driverName], device)

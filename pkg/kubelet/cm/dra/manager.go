@@ -1166,7 +1166,7 @@ func (m *Manager) notifyPodsForDevices(logger klog.Logger, driverName string, ch
 	}
 
 	podUIDs := podsToUpdate.UnsortedList()
-	logger.Info("Sending health update notification for pods", "driverName", driverName, "pods", podUIDs)
+	logger.V(4).Info("Sending health update notification for pods", "driverName", driverName, "pods", podUIDs)
 	select {
 	case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
 	default:
