@@ -153,7 +153,7 @@ type ResourceSliceSpec struct {
 	//
 	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	//
 	// +optional
 	// +listType=atomic
@@ -177,7 +177,7 @@ type ResourceSliceSpec struct {
 	//
 	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	//
 	// The maximum number of counter sets is 8.
 	//
@@ -217,7 +217,73 @@ type ResourceSliceSpec struct {
 	// +listType=set
 	// +featureGate=DRAOptionalNodeOperations
 	SkipNodeOperations []SkipNodeOperation
+
+	// SharingAffinity carries CEL extractors for a metadata-only
+	// ResourceSlice. Each extractor evaluates against an in-scope request
+	// configuration object from the claim to derive an affinity value the
+	// scheduler uses to keep allocations on the same device compatible.
+	//
+	// At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.
+	//
+	// The maximum number of extractors is 8.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRASharingAffinity
+	// +zeroOrOneOf=ResourceSliceType
+	SharingAffinity []SharingAffinityExtractor
 }
+
+// SharingAffinityExtractor declares one sharing-affinity key and its extraction
+// logic. Every extractor applies to every device in the pool, and a request
+// must obtain a non-empty value for every declared key. Multiple configurations
+// contributing to the same key must produce the same value.
+type SharingAffinityExtractor struct {
+	// Name identifies the sharing-affinity key. It must be lowercase,
+	// conform to the DNS label (RFC 1123) requirements, and be unique
+	// within the pool.
+	//
+	// +required
+	Name string
+
+	// APIGroup matches the group portion of the configuration's apiVersion,
+	// ignoring its version. It must be "*" or a lowercase value that conforms
+	// to the DNS subdomain (RFC 1123) requirements. The wildcard also matches
+	// configurations with absent or group-less apiVersion.
+	//
+	// +required
+	APIGroup string
+
+	// Kind matches the configuration's kind exactly, including case. It must
+	// be a valid kind name of at most 63 characters or "*". The wildcard
+	// also matches an absent kind.
+	//
+	// +required
+	Kind string
+
+	// Expression is evaluated with the matched opaque configuration bound as
+	// parameters. It must return a string; an empty string contributes no value.
+	// Its length is limited to SharingAffinityCELExpressionMaxLength bytes.
+	// The combined estimated cost of the slice's expressions and the combined
+	// runtime cost of a pool/request extraction are limited to SharingAffinityCELMaxCost.
+	//
+	// +required
+	Expression string
+}
+
+const (
+	// SharingAffinityMaxEntries is the maximum number of SharingAffinity extractors per ResourceSlice.
+	SharingAffinityMaxEntries = 8
+
+	// SharingAffinityCELExpressionMaxLength is the maximum length,
+	// in bytes, of a sharing-affinity CEL expression.
+	SharingAffinityCELExpressionMaxLength = 10 * 1024
+
+	// SharingAffinityCELMaxCost bounds combined sharing-affinity expression cost,
+	// in CEL cost units. Admission checks estimated cost per slice; runtime meters
+	// actual cost per pool and request.
+	SharingAffinityCELMaxCost = 1000000
+)
 
 // +enum
 type SkipNodeOperation string

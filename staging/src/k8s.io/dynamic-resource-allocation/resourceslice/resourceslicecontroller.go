@@ -214,6 +214,10 @@ type Slice struct {
 	// feature is enabled; dropped by the apiserver otherwise.
 	PartitionTypeAttribute *resourceapi.FullyQualifiedName
 	SkipNodeOperations     []resourceapi.SkipNodeOperation
+	// SharingAffinity belongs in metadata-only slices. Names and estimated CEL
+	// cost are validated across the pool before publication. Only effective when
+	// the DRASharingAffinity feature is enabled; dropped by the apiserver otherwise.
+	SharingAffinity []resourceapi.SharingAffinityExtractor
 }
 
 // +k8s:deepcopy-gen=true
