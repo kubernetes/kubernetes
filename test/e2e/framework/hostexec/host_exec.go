@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package hostexec
 
 import (
 	"context"
@@ -59,8 +59,8 @@ type hostExecutor struct {
 	nodeExecPods map[string]*v1.Pod
 }
 
-// NewHostExec returns a HostExec
-func NewHostExec(framework *framework.Framework) HostExec {
+// New returns a HostExec
+func New(framework *framework.Framework) HostExec {
 	return &hostExecutor{
 		Framework:    framework,
 		nodeExecPods: make(map[string]*v1.Pod),
@@ -111,6 +111,8 @@ func (h *hostExecutor) launchNodeExecPod(ctx context.Context, node string) *v1.P
 			return &privileged
 		}(true),
 	}
+	// Already pinned to one node; this just allows tainted (e.g. control-plane) nodes.
+	hostExecPod.Spec.Tolerations = []v1.Toleration{{Operator: v1.TolerationOpExists}}
 	pod, err := cs.CoreV1().Pods(ns.Name).Create(ctx, hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
