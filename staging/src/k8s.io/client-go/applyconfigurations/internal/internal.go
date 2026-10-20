@@ -13677,12 +13677,37 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.SharingAffinityExtractor
+          elementRelationship: atomic
     - name: skipNodeOperations
       type:
         list:
           elementType:
             scalar: string
           elementRelationship: associative
+- name: io.k8s.api.resource.v1.SharingAffinityExtractor
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+      default: ""
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:
@@ -14673,12 +14698,37 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.SharingAffinityExtractor
+          elementRelationship: atomic
     - name: skipNodeOperations
       type:
         list:
           elementType:
             scalar: string
           elementRelationship: associative
+- name: io.k8s.api.resource.v1beta1.SharingAffinityExtractor
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+      default: ""
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta2.AllocatedDeviceStatus
   map:
     fields:
@@ -15507,12 +15557,37 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.SharingAffinityExtractor
+          elementRelationship: atomic
     - name: skipNodeOperations
       type:
         list:
           elementType:
             scalar: string
           elementRelationship: associative
+- name: io.k8s.api.resource.v1beta2.SharingAffinityExtractor
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+      default: ""
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:
