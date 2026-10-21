@@ -2915,6 +2915,55 @@ func TestPodInfoCalculateResources(t *testing.T) {
 	}
 }
 
+func TestCalculateResourceRuntimeClassOverheadCountedOnce(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
+	mem32Mi := resource.MustParse("32Mi")
+	mem96Mi := resource.MustParse("96Mi")
+	podInfo := PodInfo{
+		Pod: &v1.Pod{
+			Spec: v1.PodSpec{
+				Overhead: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("250m"),
+					v1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Containers: []v1.Container{{
+					Name: "c",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("10m"),
+							v1.ResourceMemory: mem32Mi,
+						},
+					},
+				}},
+			},
+			Status: v1.PodStatus{
+				AllocatedResources: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("260m"),
+					v1.ResourceMemory: mem96Mi,
+				},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("260m"),
+						v1.ResourceMemory: mem96Mi,
+					},
+				},
+			},
+		},
+	}
+	got := podInfo.CalculateResource()
+	want := fwk.PodResource{
+		Resource: &Resource{MilliCPU: 260, Memory: mem96Mi.Value()},
+		Non0CPU:  260,
+		Non0Mem:  mem96Mi.Value(),
+	}
+	if diff := cmp.Diff(want, got, nodeInfoCmpOpts...); diff != "" {
+		t.Errorf("Unexpected resource (-want,+got):\n%s", diff)
+	}
+}
+
 func TestCalculatePodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
