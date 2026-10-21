@@ -3577,20 +3577,39 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.
 
 func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	registry := k8smetrics.NewKubeRegistry()
+	metrics.WatchFilteredEventsTotal.Reset()
+	require.NoError(t, registry.Register(metrics.WatchFilteredEventsTotal))
+
 	uid := "test-uid-3"
 	pod := makeExamplePod("pod3", "default", uid, map[string]string{"app": "web"})
 	gr := schema.GroupResource{Resource: "pods"}
 
 	pred := storage.SelectionPredicate{
-		Label:         labels.Everything(),
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
 		Field:         fields.Everything(),
 		ShardSelector: selectorExcludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
 	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
+	if filter("/pods/default/pod3", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: neither labels nor shard match")
+	}
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(""), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("expected no shard-filtered metric when label selector rejects first: %v", err)
+	}
+
 	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard does not match")
+	}
+	expectedMetric := `
+# HELP apiserver_watch_filtered_events_total [ALPHA] Counter of events filtered out by shard selector during watch dispatch, broken by resource type.
+# TYPE apiserver_watch_filtered_events_total counter
+apiserver_watch_filtered_events_total{group="",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetric), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("unexpected metric error: %v", err)
 	}
 }
 
