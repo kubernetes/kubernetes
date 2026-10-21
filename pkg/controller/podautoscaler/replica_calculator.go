@@ -307,7 +307,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s on %s %s/%s: %w", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = calcPerPodReplicas(usage, targetAverageUsage, statusReplicas, tolerances)
+	replicaCount = getPerPodReplicas(usage, targetAverageUsage, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
@@ -386,21 +386,21 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		}
 	}
 
-	replicaCount = calcPerPodReplicas(usage, targetUsagePerPod, statusReplicas, tolerances)
+	replicaCount = getPerPodReplicas(usage, targetUsagePerPod, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
 
-func calcPerPodReplicas(totalUsage int64, targetPerPod int64, statusReplicas int32, tolerances Tolerances) int32 {
+// getPerPodReplicas returns the current replica count if usage is within tolerance,
+// else the desired count (total usage / per-pod target, rounded up).
+// With zero running pods the ratio is undefined, so skip the tolerance check and use the desired count.
+func getPerPodReplicas(totalUsage int64, targetPerPod int64, statusReplicas int32, tolerances Tolerances) int32 {
 	if statusReplicas != 0 {
-		// change replicas when usageRatio falls outside the tolerance band.
 		usageRatio := float64(totalUsage) / (float64(targetPerPod) * float64(statusReplicas))
 		if tolerances.isWithin(usageRatio) {
 			return statusReplicas
 		}
 	}
-	// Ratio is undefined when no pods are running; skip the tolerance check
-	// and go straight to the desired count.
 	return ceilToInt32(float64(totalUsage) / float64(targetPerPod))
 }
 
