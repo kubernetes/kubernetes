@@ -756,6 +756,11 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		if q.CmpInt64(-1024) > 0 && q.CmpInt64(1024) < 0 {
 			// This avoids rounding and hopefully confusion, too.
 			format = DecimalSI
+		} else if q.widenedScale() >= 70 {
+			// Short-circuit the base-1024 computation, since q is guaranteed to
+			// print in exponent notation. A Scale of 70 or more is at least
+			// 1024^7, more than the largest BinarySI suffix (1024^6).
+			format = DecimalExponent
 		} else {
 			var exact bool
 			if rounded, exact = q.AsScale(0); !exact {
