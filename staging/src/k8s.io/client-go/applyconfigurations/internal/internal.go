@@ -1819,6 +1819,26 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.apps.v1.DeploymentSchedulingConfiguration
+  map:
+    fields:
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
+    - name: schedulingConstraints
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints
+    - name: schedulingPolicy
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy
 - name: io.k8s.api.apps.v1.DeploymentSpec
   map:
     fields:
@@ -1837,6 +1857,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: revisionHistoryLimit
       type:
         scalar: numeric
+    - name: scheduling
+      type:
+        namedType: io.k8s.api.apps.v1.DeploymentSchedulingConfiguration
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector

@@ -158,6 +158,18 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 	return map_DeploymentList
 }
 
+var map_DeploymentSchedulingConfiguration = map[string]string{
+	"":                      "DeploymentSchedulingConfiguration composes the reusable scheduling building blocks from scheduling.k8s.io for use on a Deployment.",
+	"schedulingPolicy":      "schedulingPolicy defines the scheduling policy for this Deployment. If spec.scheduling.schedulingPolicy is omitted, the Basic policy is used. Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may be omitted to derive it from replicas.",
+	"schedulingConstraints": "schedulingConstraints defines optional scheduling constraints (e.g. topology) for the Deployment's pods.",
+	"disruptionMode":        "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used.",
+	"resourceClaims":        "resourceClaims defines which ResourceClaims may be shared among Pods in the Deployment. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup.",
+}
+
+func (DeploymentSchedulingConfiguration) SwaggerDoc() map[string]string {
+	return map_DeploymentSchedulingConfiguration
+}
+
 var map_DeploymentSpec = map[string]string{
 	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "replicas is the desired number of pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -168,6 +180,7 @@ var map_DeploymentSpec = map[string]string{
 	"revisionHistoryLimit":    "revisionHistoryLimit is the maximum number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
 	"paused":                  "paused indicates that the deployment is paused.",
 	"progressDeadlineSeconds": "progressDeadlineSeconds is the maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
+	"scheduling":              "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for policy.gang.minCount.",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {

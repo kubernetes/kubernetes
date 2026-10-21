@@ -316,6 +316,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.DeploymentApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsappsv1.DeploymentConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsappsv1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsappsv1.DeploymentSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentStatus"):

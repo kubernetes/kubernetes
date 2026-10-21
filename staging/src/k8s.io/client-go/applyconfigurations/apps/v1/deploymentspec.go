@@ -57,6 +57,14 @@ type DeploymentSpecApplyConfiguration struct {
 	// Note that progress will not be estimated during the time a deployment is paused.
 	// Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
+	// scheduling defines the Workload-aware Scheduling configuration for this Deployment.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
+	// Deployment uses standard pod-by-pod scheduling.
+	// This field is alpha-level and requires the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for policy.gang.minCount.
+	Scheduling *DeploymentSchedulingConfigurationApplyConfiguration `json:"scheduling,omitempty"`
 }
 
 // DeploymentSpecApplyConfiguration constructs a declarative configuration of the DeploymentSpec type for use with
@@ -126,5 +134,13 @@ func (b *DeploymentSpecApplyConfiguration) WithPaused(value bool) *DeploymentSpe
 // If called multiple times, the ProgressDeadlineSeconds field is set to the value of the last call.
 func (b *DeploymentSpecApplyConfiguration) WithProgressDeadlineSeconds(value int32) *DeploymentSpecApplyConfiguration {
 	b.ProgressDeadlineSeconds = &value
+	return b
+}
+
+// WithScheduling sets the Scheduling field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Scheduling field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithScheduling(value *DeploymentSchedulingConfigurationApplyConfiguration) *DeploymentSpecApplyConfiguration {
+	b.Scheduling = value
 	return b
 }
