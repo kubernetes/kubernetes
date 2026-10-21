@@ -57,7 +57,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: persistentvolumeclaim.GetAttrs}
+
+	rest := &REST{store}
+
+	options := &generic.StoreOptions{
+		RESTOptions:     optsGetter,
+		AttrFunc:        persistentvolumeclaim.GetAttrs,
+		DecodeDecorator: rest.defaultOnRead, // plumb the decorator down into storage
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}
@@ -65,9 +72,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	statusStore := *store
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy
 	statusStore.ResetFieldsStrategy = persistentvolumeclaim.StatusStrategy
-
-	rest := &REST{store}
-	store.Decorator = rest.defaultOnRead
 
 	return rest, &StatusREST{store: &statusStore}, nil
 }
