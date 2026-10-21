@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -83,6 +84,11 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 		})
 		ginkgo.It("should handle introducing hugepage reservation on a running node", func(ctx context.Context) {
 			framework.ExpectNoError(runHugepagesUpgradeTest(ctx, f))
+		})
+	})
+	f.Describe("Validate 1Gi Hugepage Reservation", feature.HugePages, func() {
+		ginkgo.It("sets correct cgroup limits and allocatable for 1Gi hugepages", func(ctx context.Context) {
+			framework.ExpectNoError(run1GiHugepagesTest(ctx, f))
 		})
 	})
 	f.Describe("Validate CGroup management", func() {
@@ -283,32 +289,14 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 	newCfg := oldCfg.DeepCopy()
 
-	// Provision hugepages before configuring kubelet so setDesiredConfiguration
-	// can include them in system-reserved and kube-reserved.
-	// 2Mi is required - setHugepages skips the test if not supported.
+	// Provision 2Mi hugepages before configuring kubelet.
+	// setHugepages skips the test if 2Mi hugepages are not supported.
 	hugepages := map[string]int{hugepagesResourceName2Mi: 4} // 4 × 2Mi = 8Mi capacity
 	setHugepages(ctx, hugepages)
-
-	// 1Gi is best-effort - runtime allocation may fail if the host lacks
-	// contiguous memory. Try directly and only include if successful.
-	has1GiHugepages := false
-	if isHugePageAvailable(hugepagesSize1G) {
-		// A partial allocation for example (1 of 2 pages) still pins memory, so always release.
-		hugepages[hugepagesResourceName1Gi] = 0
-		if err := configureHugePages(hugepagesSize1G, 2, nil); err == nil {
-			has1GiHugepages = true
-			hugepages[hugepagesResourceName1Gi] = 2 // 2 × 1Gi = 2Gi capacity
-		} else {
-			framework.Logf("Failed to allocate 1Gi hugepage at runtime, 1Gi validation will not be exercised: %v", err)
-		}
-	}
-	ginkgo.DeferCleanup(releaseHugepages, ctx, hugepages)
+	ginkgo.DeferCleanup(releaseHugepages, hugepages)
 
 	// setDesiredConfiguration reserves: 2Mi sys + 2Mi kube = 4Mi for 2Mi pages.
 	setDesiredConfiguration(newCfg, cgroupManager, map[string]string{hugepagesResourceName2Mi: "4Mi"}, nil)
-	if has1GiHugepages {
-		newCfg.SystemReserved["hugepages-1Gi"] = "1Gi"
-	}
 
 	// Set the new kubelet configuration.
 	// Update the Kubelet configuration.
@@ -351,14 +339,10 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	hpReserved := hugepageReserved{
 		v1.ResourceName(hugepagesResourceName2Mi): "4Mi", // 2Mi sys + 2Mi kube
 	}
-	if has1GiHugepages {
-		hpReserved[v1.ResourceName(hugepagesResourceName1Gi)] = "1Gi" // 1Gi sys only
-	}
 
 	// Map hugepage resource names to cgroup controller names.
 	hpCgroupCtrl := map[v1.ResourceName]string{
 		v1.ResourceName(hugepagesResourceName2Mi): "hugetlb.2MB",
-		v1.ResourceName(hugepagesResourceName1Gi): "hugetlb.1GB",
 	}
 
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
@@ -552,6 +536,156 @@ func hugetlbLimitFile(subsystems *cm.CgroupSubsystems, cgroupPath, hpCgroupCtrl 
 		return filepath.Join(subsystems.MountPoints["hugetlb"], cgroupPath, hpCgroupCtrl+".max")
 	}
 	return filepath.Join(subsystems.MountPoints["hugetlb"], cgroupPath, hpCgroupCtrl+".limit_in_bytes")
+}
+
+// run1GiHugepagesTest verifies 1Gi hugepage reservation in kubelet cgroups.
+// It pre-allocates a single 1Gi page, configures system-reserved for it, and
+// checks kubepods cgroup limits, scheduler allocatable, reserved cgroup limits,
+// and QoS reconciliation stability.
+func run1GiHugepagesTest(ctx context.Context, f *framework.Framework) error {
+	if !isHugePageAvailable(hugepagesSize1G) {
+		e2eskipper.Skipf("1Gi hugepages not available on this host")
+	}
+
+	subsystems, err := cm.GetCgroupSubsystems()
+	if err != nil {
+		return err
+	}
+
+	oldCfg, err := getCurrentKubeletConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, oldCfg.CgroupDriver)
+
+	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		if oldCfg != nil {
+			ginkgo.By("Stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			gomega.Eventually(ctx, func() bool {
+				return e2enode.HealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet(ctx)
+		}
+	})
+	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
+		return err
+	}
+
+	hugepages := map[string]int{hugepagesResourceName1Gi: 1} // 1 × 1Gi
+	gomega.Eventually(ctx, func() error {
+		return configureHugePages(hugepagesSize1G, 1, nil)
+	}, 30*time.Second, framework.Poll).Should(gomega.Succeed(), "failed to allocate 1Gi hugepage")
+	ginkgo.DeferCleanup(releaseHugepages, hugepages)
+
+	newCfg := oldCfg.DeepCopy()
+	// Reserve the single 1Gi page in system-reserved.
+	setDesiredConfiguration(newCfg, cgroupManager,
+		map[string]string{hugepagesResourceName1Gi: "1Gi"}, nil)
+
+	ginkgo.By("Stopping the kubelet")
+	restartKubelet := mustStopKubelet(ctx, f)
+
+	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
+	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
+		Name: cm.NewCgroupName(expectedNAPodCgroup),
+	}); err != nil {
+		return err
+	}
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+	ginkgo.By("Starting the kubelet")
+	restartKubelet(ctx)
+
+	currentConfig := newCfg
+
+	hpReserved := hugepageReserved{
+		v1.ResourceName(hugepagesResourceName1Gi): "1Gi",
+	}
+	hpCgroupCtrl := map[v1.ResourceName]string{
+		v1.ResourceName(hugepagesResourceName1Gi): "hugetlb.1GB",
+	}
+
+	var capacity v1.ResourceList
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(nodeList.Items) != 1 {
+			return fmt.Errorf("expected 1 node, got %d", len(nodeList.Items))
+		}
+		cgroupName := nodeAllocatableCgroup
+		if currentConfig.CgroupDriver == "systemd" {
+			cgroupName = nodeAllocatableCgroup + ".slice"
+		}
+
+		node := nodeList.Items[0]
+		capacity = node.Status.Capacity
+		alloc := getAllocatableLimits("200m", "200Mi", "1738", hpReserved, capacity)
+
+		// Verify kubepods cgroup hugepage limit.
+		for hpName, hpAlloc := range alloc.hugepages {
+			ctrl := hpCgroupCtrl[hpName]
+			if err := expectFileValToEqual(hugetlbLimitFile(subsystems, cgroupName, ctrl), hpAlloc.Value(), 0); err != nil {
+				return fmt.Errorf("kubepods %s check: %w", ctrl, err)
+			}
+		}
+
+		// Verify scheduler allocatable for hugepages.
+		schedulerAllocatable := node.Status.Allocatable
+		allocSched := getAllocatableLimits("200m", "300Mi", "1738", hpReserved, capacity)
+		for hpName, hpAlloc := range allocSched.hugepages {
+			allocHP, ok := schedulerAllocatable[hpName]
+			if !ok {
+				return fmt.Errorf("%s not found in node allocatable", hpName)
+			}
+			if allocHP.Cmp(*hpAlloc) != 0 {
+				return fmt.Errorf("expected allocatable %s %s, got %s", hpName, hpAlloc.String(), allocHP.String())
+			}
+		}
+		return nil
+	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+	// Verify system-reserved cgroup hugepage limits.
+	var cgroupPath string
+	if currentConfig.CgroupDriver == "systemd" {
+		cgroupPath = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup).ToSystemd()
+	} else {
+		cgroupPath = cgroupManager.Name(cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup))
+	}
+	for hpName, ctrl := range hpCgroupCtrl {
+		if valStr, ok := currentConfig.SystemReserved[string(hpName)]; ok {
+			systemReservedHP := resource.MustParse(valStr)
+			if err := expectFileValToEqual(hugetlbLimitFile(subsystems, cgroupPath, ctrl), systemReservedHP.Value(), 0); err != nil {
+				return fmt.Errorf("system-reserved %s check: %w", ctrl, err)
+			}
+		}
+	}
+
+	// Verify QoS cgroup reconciliation does not overwrite hugepage limits.
+	cgroupName := nodeAllocatableCgroup
+	if currentConfig.CgroupDriver == "systemd" {
+		cgroupName = nodeAllocatableCgroup + ".slice"
+	}
+	alloc := getAllocatableLimits("200m", "200Mi", "1738", hpReserved, capacity)
+
+	ginkgo.By("Waiting for QoS cgroup reconciliation cycle")
+	gomega.Consistently(ctx, func() error {
+		for hpName, hpAlloc := range alloc.hugepages {
+			ctrl := hpCgroupCtrl[hpName]
+			if err := expectFileValToEqual(hugetlbLimitFile(subsystems, cgroupName, ctrl), hpAlloc.Value(), 0); err != nil {
+				return fmt.Errorf("QoS reconciliation %s check: %w", ctrl, err)
+			}
+		}
+		return nil
+	}).WithTimeout(90 * time.Second).WithPolling(10 * time.Second).Should(gomega.Succeed())
+
+	return nil
 }
 
 // runHugepagesUpgradeTest verifies the upgrade behavior when hugepage
