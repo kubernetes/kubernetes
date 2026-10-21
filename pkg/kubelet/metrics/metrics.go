@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -1682,11 +1683,30 @@ func GetImageNameForMetrics(image string) string {
 func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
 	observer := ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize))
 	if eo, ok := observer.(prometheus.ExemplarObserver); ok {
-		eo.ObserveWithExemplar(duration, prometheus.Labels{
-			"image":       GetImageNameForMetrics(image),
-			"pull_policy": pullPolicy,
-		})
+		eo.ObserveWithExemplar(duration, imagePullExemplarLabels(image, pullPolicy))
 		return
 	}
 	observer.Observe(duration)
+}
+
+// imagePullExemplarLabels builds the exemplar labels for an image pull observation.
+//
+// client_golang panics if the exemplar label names and values together exceed
+// prometheus.ExemplarMaxRunes or contain invalid UTF-8. The image reference comes from the pod
+// spec and is not bounded, so it is truncated to the remaining rune budget (keeping the registry
+// and the start of the repository path) instead of crashing the pull path. The full reference
+// is still available in the pull event and log.
+func imagePullExemplarLabels(image, pullPolicy string) prometheus.Labels {
+	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
+	budget := prometheus.ExemplarMaxRunes - utf8.RuneCountInString("image"+"pull_policy"+pullPolicy)
+	if budget < 0 {
+		budget = 0
+	}
+	if utf8.RuneCountInString(image) > budget {
+		image = string([]rune(image)[:budget])
+	}
+	return prometheus.Labels{
+		"image":       image,
+		"pull_policy": pullPolicy,
+	}
 }

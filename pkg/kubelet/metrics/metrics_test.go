@@ -19,8 +19,11 @@ package metrics
 import (
 	"os"
 	"sort"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -185,5 +188,68 @@ func TestObserveImagePullDurationExemplars(t *testing.T) {
 		} else if l.GetValue() != want {
 			t.Errorf("exemplar label %q = %q, want %q", l.GetName(), l.GetValue(), want)
 		}
+	}
+}
+
+func TestObserveImagePullDurationExemplarLabelLimits(t *testing.T) {
+	Register()
+	defer clearMetrics()
+
+	tests := []struct {
+		name      string
+		image     string
+		wantImage string
+	}{
+		{
+			name:      "short image is kept as is",
+			image:     "gcr.io/project/app:v1",
+			wantImage: "gcr.io/project/app",
+		},
+		{
+			name:  "image longer than the exemplar rune budget is truncated, not a panic",
+			image: "registry.example.com/" + strings.Repeat("a", 300) + ":v1",
+			// budget = ExemplarMaxRunes - len("image") - len("pull_policy") - len("Always")
+			wantImage: ("registry.example.com/" + strings.Repeat("a", 300))[:prometheus.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")],
+		},
+		{
+			name:      "truncation does not split multi-byte runes",
+			image:     "registry.example.com/" + strings.Repeat("é", 300),
+			wantImage: "registry.example.com/" + strings.Repeat("é", prometheus.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")-len("registry.example.com/")),
+		},
+		{
+			name:      "invalid UTF-8 is replaced, not a panic",
+			image:     "gcr.io/project/\xffapp:v1",
+			wantImage: "gcr.io/project/�app",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearMetrics()
+			ObserveImagePullDuration(10.0, tt.image, "Always", 5*1024*1024)
+
+			mfs, err := GetGather().Gather()
+			if err != nil {
+				t.Fatalf("Gather failed: %v", err)
+			}
+			var gotImage string
+			for _, mf := range mfs {
+				if mf.GetName() != imagePullDurationKey {
+					continue
+				}
+				for _, b := range mf.GetMetric()[0].GetHistogram().GetBucket() {
+					for _, l := range b.GetExemplar().GetLabel() {
+						if l.GetName() == "image" {
+							gotImage = l.GetValue()
+						}
+					}
+				}
+			}
+			if gotImage != tt.wantImage {
+				t.Errorf("exemplar image = %q, want %q", gotImage, tt.wantImage)
+			}
+			if n := utf8.RuneCountInString("image" + gotImage + "pull_policy" + "Always"); n > prometheus.ExemplarMaxRunes {
+				t.Errorf("exemplar labels use %d runes, limit is %d", n, prometheus.ExemplarMaxRunes)
+			}
+		})
 	}
 }
