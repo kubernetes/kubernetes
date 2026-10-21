@@ -604,19 +604,7 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 			}
 		}
 	}
-	for _, vol := range desired.Spec.Volumes {
-		for _, allocVol := range allocated.Spec.Volumes {
-			if allocVol.Name != vol.Name {
-				continue
-			}
-			hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(&allocVol)
-			if hasLimit != hasAllocLimit || (hasLimit && vol.EmptyDir.SizeLimit.Cmp(*allocVol.EmptyDir.SizeLimit) != 0) {
-				return true
-			}
-			break
-		}
-	}
-	return false
+	return IsMemoryBackedVolumeResizeRequested(desired, allocated)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it

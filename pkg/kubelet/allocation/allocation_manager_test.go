@@ -659,6 +659,11 @@ func TestUpdatePodFromAllocationPending(t *testing.T) {
 		{"emptyDir limit added", func(pod, allocated *v1.Pod) {
 			pod.Spec.Volumes[2].EmptyDir.SizeLimit = new(resource.MustParse("64Mi"))
 		}, never, true, true},
+		{"volume missing from the allocated pod", func(pod, allocated *v1.Pod) { allocated.Spec.Volumes = nil }, never, true, false},
+		{"memory-backed emptyDir limit with added volume", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[0].EmptyDir.SizeLimit = new(resource.MustParse("128Mi"))
+			pod.Spec.Volumes = append([]v1.Volume{{Name: "added-vol", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}}, pod.Spec.Volumes...)
+		}, withMemoryBackedGate, true, true},
 		{"pod field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.HostUsers = new(false) }, never, true, false},
 		{"container field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.Containers[0].Command = []string{"new"} }, never, true, false},
 		{"passthrough fields", func(pod, allocated *v1.Pod) {

@@ -53,21 +53,14 @@ func (f *memoryBackedVolumesResizeFeature) InferForScheduling(podInfo *types.Pod
 }
 
 func (f *memoryBackedVolumesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
-	if len(oldPodInfo.Spec.Volumes) != len(newPodInfo.Spec.Volumes) {
-		// Volumes can only be resized in-place, not added or removed; let standard validation reject the patch.
-		return false
-	}
-
 	for i := range newPodInfo.Spec.Volumes {
 		newVol := &newPodInfo.Spec.Volumes[i]
-		oldVol := &oldPodInfo.Spec.Volumes[i]
-
-		if newVol.Name != oldVol.Name {
-			// Volume name changed, let standard validation catch this.
-			continue
-		}
 		if newVol.EmptyDir == nil || newVol.EmptyDir.Medium != v1.StorageMediumMemory {
 			// The volume is not memory backed. Standard validation will catch attempts to change volume type.
+			continue
+		}
+		oldVol := findVolume(oldPodInfo.Spec.Volumes, newVol.Name, i)
+		if oldVol == nil {
 			continue
 		}
 		if oldVol.EmptyDir == nil || oldVol.EmptyDir.Medium != v1.StorageMediumMemory {
@@ -79,12 +72,24 @@ func (f *memoryBackedVolumesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo
 		if hasOldLimit != hasNewLimit {
 			return true
 		}
-		if hasOldLimit && hasNewLimit && newVol.EmptyDir.SizeLimit.Cmp(*oldVol.EmptyDir.SizeLimit) != 0 {
+		if hasOldLimit && hasNewLimit && !newVol.EmptyDir.SizeLimit.Equal(*oldVol.EmptyDir.SizeLimit) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func findVolume(volumes []v1.Volume, name string, idxHint int) *v1.Volume {
+	if len(volumes) > idxHint && volumes[idxHint].Name == name {
+		return &volumes[idxHint]
+	}
+	for i := range volumes {
+		if volumes[i].Name == name {
+			return &volumes[i]
+		}
+	}
+	return nil
 }
 
 func (f *memoryBackedVolumesResizeFeature) MaxVersion() *version.Version {
