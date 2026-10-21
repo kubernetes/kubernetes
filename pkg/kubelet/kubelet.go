@@ -745,9 +745,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,
-		klet.syncPodNow,
-		klet.GetActivePods,
-		klet.podManager.GetPodByUID,
+		klet,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
 		logger,
@@ -3624,7 +3622,10 @@ func (kl *Kubelet) RequestPodRelist(logger klog.Logger, podUID types.UID) {
 	kl.pleg.RequestRelist(logger, podUID)
 }
 
-func (kl *Kubelet) syncPodNow(ctx context.Context, pod *v1.Pod) {
+var _ allocation.PodProvider = &Kubelet{}
+
+// SyncPodNow triggers an immediate pod sync and on-demand PLEG relist.
+func (kl *Kubelet) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 	kl.HandlePodSyncs(ctx, []*v1.Pod{pod})
 	kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)
 }
