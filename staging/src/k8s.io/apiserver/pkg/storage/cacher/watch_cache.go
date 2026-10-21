@@ -369,12 +369,12 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, resourceVersion u
 
 func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
 	if opts.Recursive {
-		return c.waitUntilFreshAndList(ctx, key, opts)
+		return c.waitUntilFreshAndListRecursive(ctx, key, opts)
 	}
-	return c.waitUntilFreshAndGetList(ctx, key, opts)
+	return c.waitUntilFreshAndListNonRecursive(ctx, key, opts)
 }
 
-func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
+func (c *watchCache) waitUntilFreshAndListNonRecursive(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
 	var resourceVersion string
 	if opts.ResourceVersionMatch == "" && opts.ResourceVersion == "" {
 		resourceVersion = ""
@@ -403,7 +403,7 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
 	span := tracing.SpanFromContext(ctx)
-	snap, _, _, err := w.waitAndGetLatestSnapshot(ctx, resourceVersion, nil)
+	snap, _, _, err := w.waitAndGetLatestSnapshot(ctx, false, resourceVersion, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +420,9 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 
 // NOTICE: Structure follows the shouldDelegateList function in
 // staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
+func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
+	// The RV semantic below is for Recursive List, non-recursive lists should use waitUntilFreshAndListNonRecursive.
+	recursive := true
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return listResp{}, "", err
@@ -440,7 +442,7 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 				return w.waitAndListExactRV(ctx, key, continueKey, uint64(continueRV))
 			} else {
 				// Don't pass matchValues as they don't support continueKey
-				return w.waitAndListConsistent(ctx, key, continueKey, nil)
+				return w.waitAndListConsistent(ctx, recursive, key, continueKey, nil)
 			}
 		}
 		// Legacy exact match
@@ -448,10 +450,10 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 			return w.waitAndListExactRV(ctx, key, "", listRV)
 		}
 		if opts.ResourceVersion == "" {
-			return w.waitAndListConsistent(ctx, key, "", opts.Predicate.MatcherIndex(ctx))
+			return w.waitAndListConsistent(ctx, recursive, key, "", opts.Predicate.MatcherIndex(ctx))
 		}
 	}
-	return w.waitAndListLatestRV(ctx, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
+	return w.waitAndListLatestRV(ctx, recursive, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
 }
 
 func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
@@ -483,25 +485,25 @@ func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersio
 	return store, nil
 }
 
-func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+func (w *watchCache) waitAndListConsistent(ctx context.Context, recursive bool, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	resourceVersion, err := w.config.getCurrentRV(ctx)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	span.AddEvent("getCurrentRV success")
-	return w.waitAndListLatestRV(ctx, resourceVersion, key, continueKey, matchValues)
+	return w.waitAndListLatestRV(ctx, recursive, resourceVersion, key, continueKey, matchValues)
 }
 
-func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, matchValues)
+func (w *watchCache) waitAndListLatestRV(ctx context.Context, recursive bool, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, recursive, minResourceVersion, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, index, nil
 }
 
-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
+func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive bool, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	w.RLock()
 	span.AddEvent("watchCache locked acquired")
@@ -511,24 +513,28 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		return nil, 0, "", err
 	}
 	span.AddEvent("watchCache fresh enough")
-	snap, index = w.getLatestSnapshotLocked(ctx, matchValues)
+	snap, index = w.getLatestSnapshotLocked(ctx, recursive, matchValues)
 	return snap, w.resourceVersion, index, nil
 }
 
-func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
+func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, recursive bool, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
+	// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix. Non-recursive expects key to be an exact match.
+	// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
 	span := tracing.SpanFromContext(ctx)
-	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
-	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
-	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
-	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
-	for _, matchValue := range matchValues {
-		snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
-		if err == nil {
-			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
-			w.checkSnapshotResourceVersion(snap, w.resourceVersion)
-			return snap, matchValue.IndexName
+	if recursive {
+		// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
+		// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
+		// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
+		// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+		for _, matchValue := range matchValues {
+			snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
+			if err == nil {
+				span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
+				w.checkSnapshotResourceVersion(snap, w.resourceVersion)
+				return snap, matchValue.IndexName
+			}
+			span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 		}
-		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap = w.storage.LatestSnapshot()
 	span.AddEvent("LatestSnapshot success")
@@ -573,7 +579,7 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion s
 		readResourceVersion = snap.ResourceVersion()
 	} else {
 		var err error
-		snap, readResourceVersion, _, err = w.waitAndGetLatestSnapshot(ctx, minResourceVersion, nil)
+		snap, readResourceVersion, _, err = w.waitAndGetLatestSnapshot(ctx, false, minResourceVersion, nil)
 		if err != nil {
 			return nil, false, 0, err
 		}
@@ -697,12 +703,6 @@ func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersio
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, opts storage.ListOptions) (*watchCacheInterval, string, error) {
-	matchValues := []storage.MatchValue{}
-	// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix. Non-recursive expects key to be an exact match.
-	// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
-	if opts.Recursive {
-		matchValues = opts.Predicate.MatcherIndex(ctx)
-	}
-	snapshot, index := w.getLatestSnapshotLocked(ctx, matchValues)
+	snapshot, index := w.getLatestSnapshotLocked(ctx, opts.Recursive, opts.Predicate.MatcherIndex(ctx))
 	return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key, opts.Recursive), index, nil
 }
