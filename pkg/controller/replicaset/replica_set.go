@@ -39,6 +39,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,11 +50,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	consistencyutil "k8s.io/client-go/util/consistency"
@@ -131,6 +134,13 @@ type ReplicaSetController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	workloadLister       schedulinglisters.WorkloadLister
+	workloadIndexer      cache.Indexer
+	workloadListerSynced cache.InformerSynced
+	podGroupLister       schedulinglisters.PodGroupLister
+	podGroupListerSynced cache.InformerSynced
+	schedulingEnabled    bool
+
 	clock clock.PassiveClock
 
 	consistencyStore consistencyutil.ConsistencyStore
@@ -152,7 +162,8 @@ func DefaultReplicaSetControllerFeatures() ReplicaSetControllerFeatures {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+// Workload and PodGroup informers are required when WorkloadWithDeployment is enabled.
+func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer, kubeClient clientset.Interface, burstReplicas int) (*ReplicaSetController, error) {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	if err := metrics.Register(legacyregistry.Register); err != nil {
@@ -184,7 +195,7 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
-	return NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
+	rsc := NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
@@ -197,6 +208,13 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		DefaultReplicaSetControllerFeatures(),
 		consistencyStore,
 	)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		return rsc, nil
+	}
+	if err := rsc.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
+		return nil, err
+	}
+	return rsc, nil
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
@@ -295,7 +313,9 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
+	syncs := []cache.InformerSynced{rsc.podListerSynced, rsc.rsListerSynced}
+	syncs = append(syncs, rsc.schedulingCachesSynced()...)
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncs...) {
 		return
 	}
 
@@ -650,7 +670,12 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <activePods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
+func (rsc *ReplicaSetController) manageReplicas(
+	ctx context.Context,
+	activePods []*v1.Pod,
+	rs *apps.ReplicaSet,
+	podGroup *schedulingv1beta1.PodGroup,
+) error {
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
@@ -678,8 +703,25 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
+		// If this ReplicaSet is scheduling-enabled, add scheduling metadata to
+		// created Pods without mutating the stored template.
+		podTemplate := &rs.Spec.Template
+		if podGroup != nil {
+			podGroupName := podGroup.Name
+			t := rs.Spec.Template.DeepCopy()
+			t.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &podGroupName}
+			// The PodGroup protection finalizer handles Pod cleanup ordering, so
+			// BlockOwnerDeletion is left unset.
+			t.OwnerReferences = append(t.OwnerReferences, metav1.OwnerReference{
+				APIVersion: schedulingv1beta1.SchemeGroupVersion.String(),
+				Kind:       "PodGroup",
+				Name:       podGroup.Name,
+				UID:        podGroup.UID,
+			})
+			podTemplate = t
+		}
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
-			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
+			err := rsc.podControl.CreatePods(ctx, rs.Namespace, podTemplate, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 					// if the namespace is being terminated, we don't have to do
@@ -790,6 +832,24 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return err
 	}
 
+	if rs.DeletionTimestamp != nil {
+		if err := rsc.cleanupDeletingReplicaSet(ctx, rs); err != nil {
+			return err
+		}
+		if hasReplicaSetPodGroupFinalizer(rs) {
+			// The cached ReplicaSet still has the finalizer. Return and let its
+			// update event requeue it if it remains.
+			return nil
+		}
+	}
+	if err := rsc.ensureReplicaSetPodGroupFinalizer(ctx, rs); err != nil {
+		return err
+	}
+	podGroup, err := rsc.ensurePodGroupForReplicaSet(ctx, rs)
+	if err != nil {
+		return err
+	}
+
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(logger, key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
@@ -820,7 +880,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	var manageReplicasErr error
 	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
+		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs, podGroup)
 	}
 	rs = rs.DeepCopy()
 	// Use the same time for calculating status and nextSyncDuration.
