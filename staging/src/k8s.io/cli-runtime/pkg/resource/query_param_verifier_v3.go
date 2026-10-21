@@ -141,5 +141,8 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 		}
 		return NewParamUnsupportedError(gvk, queryParam)
 	}
-	return fmt.Errorf("Path not found for GVK (%s) in OpenAPI V3 doc", gvk)
+	// If no PATCH endpoint exists for this GVK in the GroupVersion's OpenAPI V3
+	// document (for example, non-patchable list kinds such as ReplicationControllerList
+	// or ServiceList), the query parameter is not supported for this GVK.
+	return NewParamUnsupportedError(gvk, queryParam)
 }
