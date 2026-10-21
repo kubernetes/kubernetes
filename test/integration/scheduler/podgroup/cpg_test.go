@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 // _ to avoid unused import
@@ -1503,7 +1503,7 @@ func TestCPGScheduling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-sched",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-sched",
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(1))
 
@@ -1521,7 +1521,7 @@ func TestPodGroupDependentRequiredValidation(t *testing.T) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "pg-validation",
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-validation",
 		scheduler.WithPodMaxBackoffSeconds(1),
 		scheduler.WithPodInitialBackoffSeconds(1))
 	cs, ns := testCtx.ClientSet, testCtx.NS.Name

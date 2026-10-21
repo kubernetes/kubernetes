@@ -47,6 +47,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -54,9 +55,9 @@ import (
 // imported from testutils
 var (
 	initPausePod        = testutils.InitPausePod
-	createNode          = testutils.CreateNode
+	createNode          = schedulerutils.CreateNode
 	createPausePod      = testutils.CreatePausePod
-	runPausePod         = testutils.RunPausePod
+	runPausePod         = schedulerutils.RunPausePod
 	podIsGettingEvicted = testutils.PodIsGettingEvicted
 )
 
@@ -1225,7 +1226,7 @@ func TestPreemption(t *testing.T) {
 							}
 							// Also check that the preemptor pod gets the NominatedNodeName field set.
 							if len(test.preemptedPodIndexes) > 0 && !clearingNominatedNodeNameAfterBinding {
-								if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+								if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 									t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 								}
 							}
@@ -2778,7 +2779,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 									testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 									if scenario.schedulePod.expectSuccess {
-										if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
+										if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
 											t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
 										}
 									} else if scenario.schedulePod.expectUnschedulable {
@@ -2810,7 +2811,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 										if err != nil {
 											t.Fatalf("Failed to get preemptor pod: %v", err)
 										}
-										if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+										if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 											t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 										}
 									}

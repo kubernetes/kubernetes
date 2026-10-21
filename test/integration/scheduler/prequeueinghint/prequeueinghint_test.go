@@ -40,6 +40,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
@@ -171,7 +172,7 @@ func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 			}
 
 			// Wait for all 3 pods to be attempted and become unschedulable.
-			if err := testutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-3", Namespace: testCtx.NS.Name}}, 30*time.Second); err != nil {
+			if err := schedulerutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-3", Namespace: testCtx.NS.Name}}, 30*time.Second); err != nil {
 				t.Fatalf("pod-3 not unschedulable: %v", err)
 			}
 
