@@ -355,11 +355,18 @@ func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *Resou
 	}
 
 	// For each page size enumerated, set that value.
+	// Only include sizes the kernel actually supports; unsupported sizes
+	// (e.g. 1Gi without pdpe1gb) have no cgroup file and would cause ENOENT.
+	supportedSizes := sets.New[string](libcontainercgroups.HugePageSizes()...)
 	pageSizes := sets.New[string]()
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		if err != nil {
 			logger.Info("Invalid pageSize", "err", err)
+			continue
+		}
+		if !supportedSizes.Has(sizeString) {
+			logger.Info("ignoring unsupported hugepage size", "size", sizeString)
 			continue
 		}
 		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainercgroups.HugepageLimit{
