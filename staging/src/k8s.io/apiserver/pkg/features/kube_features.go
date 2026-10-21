@@ -239,6 +239,13 @@ const (
 	// headers when forwarding requests to the servers serving the aggregated API.
 	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
 
+	// owner: @serathius @siarkowicz
+	// kep: https://kep.k8s.io/6315
+	//
+	// Enables Open Request Cost Aggregation (ORCA) endpoint load metrics reporting
+	// via HTTP response headers when --enable-endpoint-load-metrics is set.
+	RequestCostAggregation featuregate.Feature = "RequestCostAggregation"
+
 	// owner: @cici37
 	//
 	// Allow watch cache to create a watch on a dedicated RPC.
@@ -472,6 +479,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RequestCostAggregation: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SeparateCacheWatchRPC: {

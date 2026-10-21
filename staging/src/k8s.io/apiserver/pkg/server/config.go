@@ -66,6 +66,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/loadmetrics"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/routine"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
@@ -280,6 +281,9 @@ type Config struct {
 	// StorageObjectCountTracker is used to keep track of the total number of objects
 	// in the storage per resource, so we can estimate width of incoming requests.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+
+	// LoadReporter samples process CPU utilization and request rate for ORCA endpoint load metrics.
+	LoadReporter *loadmetrics.Reporter
 
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
@@ -1006,6 +1010,18 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
+	if c.LoadReporter != nil {
+		const endpointLoadMetricsHookName = "endpoint-load-metrics-reporter"
+		if !s.isPostStartHookRegistered(endpointLoadMetricsHookName) {
+			if err := s.AddPostStartHook(endpointLoadMetricsHookName, func(hookContext PostStartHookContext) error {
+				go c.LoadReporter.Run(hookContext.Done())
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
 		skip := false
 		for _, existingCheck := range c.HealthzChecks {
@@ -1123,6 +1139,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
+	if c.LoadReporter != nil {
+		handler = loadmetrics.WithEndpointLoadMetrics(handler, c.LoadReporter)
+	}
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithAuditInit(handler)

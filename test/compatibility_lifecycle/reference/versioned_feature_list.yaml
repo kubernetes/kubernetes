@@ -1684,6 +1684,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: RequestCostAggregation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ResourceHealthStatus
   versionedSpecs:
   - default: false
