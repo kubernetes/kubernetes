@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestK8sCIDR(t *testing.T) {
@@ -28,7 +27,7 @@ func TestK8sCIDR(t *testing.T) {
 
 	st.Value(&MyType{
 		CIDRField:        "10.9.8.0/24",
-		CIDRPtrField:     ptr.To("2001:db8::/64"),
+		CIDRPtrField:     new("2001:db8::/64"),
 		CIDRTypedefField: "0.0.0.0/0",
 	}).ExpectValid()
 
@@ -41,7 +40,7 @@ func TestK8sCIDR(t *testing.T) {
 	} {
 		invalidStruct := &MyType{
 			CIDRField:        bad,
-			CIDRPtrField:     ptr.To(bad),
+			CIDRPtrField:     new(bad),
 			CIDRTypedefField: CIDRStringType(bad),
 		}
 		st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
