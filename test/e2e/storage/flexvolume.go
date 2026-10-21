@@ -157,7 +157,7 @@ func getHostFromHostPort(hostPort string) string {
 	return host
 }
 
-var _ = utils.SIGDescribe("Flexvolumes", func() {
+var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"), func() {
 	f := framework.NewDefaultFramework("flexvolume")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -170,7 +170,6 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 	var suffix string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()

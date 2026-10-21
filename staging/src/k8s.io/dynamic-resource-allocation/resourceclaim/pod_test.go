@@ -189,3 +189,57 @@ func TestPodExtendedStatusEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestPodClaims(t *testing.T) {
+	type claimEntry struct {
+		name           string
+		mustCheckOwner bool
+	}
+
+	collect := func(pod *corev1.Pod) []claimEntry {
+		var res []claimEntry
+		for name, mustCheckOwner := range PodClaims(pod) {
+			res = append(res, claimEntry{name: name, mustCheckOwner: mustCheckOwner})
+		}
+		return res
+	}
+
+	assert.Empty(t, collect(nil))
+	assert.Empty(t, collect(&corev1.Pod{}))
+
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			ResourceClaims: []corev1.PodResourceClaim{
+				{Name: "direct", ResourceClaimName: new("claim-direct")},
+				{Name: "template-created", ResourceClaimTemplateName: new("tpl-1")},
+				{Name: "template-uncreated", ResourceClaimTemplateName: new("tpl-2")},
+				{Name: "template-skipped", ResourceClaimTemplateName: new("tpl-3")},
+				{Name: "unsupported"},
+			},
+		},
+		Status: corev1.PodStatus{
+			ResourceClaimStatuses: []corev1.PodResourceClaimStatus{
+				{Name: "template-created", ResourceClaimName: new("claim-from-tpl")},
+				{Name: "template-skipped", ResourceClaimName: nil},
+			},
+			ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: "pod-extended-resources-abc",
+			},
+		},
+	}
+
+	expected := []claimEntry{
+		{name: "claim-direct", mustCheckOwner: false},
+		{name: "claim-from-tpl", mustCheckOwner: true},
+		{name: "pod-extended-resources-abc", mustCheckOwner: true},
+	}
+	assert.Equal(t, expected, collect(pod))
+
+	// Verify early break from iterator works properly.
+	var firstOnly []claimEntry
+	for name, mustCheckOwner := range PodClaims(pod) {
+		firstOnly = append(firstOnly, claimEntry{name: name, mustCheckOwner: mustCheckOwner})
+		break
+	}
+	assert.Equal(t, expected[:1], firstOnly)
+}

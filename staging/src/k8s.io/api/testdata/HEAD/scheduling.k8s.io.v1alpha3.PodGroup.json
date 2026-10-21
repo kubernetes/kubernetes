@@ -44,6 +44,7 @@
     ]
   },
   "spec": {
+    "parentCompositePodGroupName": "parentCompositePodGroupNameValue",
     "workloadRef": {
       "workloadName": "workloadNameValue",
       "templateName": "templateNameValue"
@@ -73,7 +74,7 @@
       "all": {}
     },
     "priorityClassName": "priorityClassNameValue",
-    "priority": 7,
+    "priority": 8,
     "preemptionPolicy": "preemptionPolicyValue"
   },
   "status": {

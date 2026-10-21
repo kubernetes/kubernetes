@@ -55,7 +55,7 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 					Kind:      "Pod",
 				},
 			},
-			false,
+			true,
 		}, {
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{

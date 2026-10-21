@@ -27,6 +27,7 @@ import (
 )
 
 // ContainerCPUAssignments type used in cpu manager state
+// without in-place vertical scaling.
 type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
 
 // Clone returns a copy of ContainerCPUAssignments
@@ -109,6 +110,32 @@ func (a PodCPUAssignments) Clone() PodCPUAssignments {
 	return clone
 }
 
+// ContainerCPUAllocation tracks the current allocation state
+// ContainerCPUBaselines tracks the allocation state at admission time.
+// If in-place vertical scaling is enabled, the allocation state at admission
+// time is required to proper resource accounting; otherwise the field is
+// unused and only the current state is relevant.
+
+type ContainerCPUBaseline struct {
+	Baseline cpuset.CPUSet
+}
+
+type ContainerCPUBaselines map[string]map[string]ContainerCPUBaseline
+
+// Clone returns a deep copy of ContainerCPUBaselines
+func (as ContainerCPUBaselines) Clone() ContainerCPUBaselines {
+	ret := make(ContainerCPUBaselines, len(as))
+	for pod := range as {
+		ret[pod] = make(map[string]ContainerCPUBaseline, len(as[pod]))
+		for container, orig := range as[pod] {
+			ret[pod][container] = ContainerCPUBaseline{
+				Baseline: orig.Baseline.Clone(),
+			}
+		}
+	}
+	return ret
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
@@ -119,6 +146,10 @@ type Reader interface {
 	GetPodCPUSet(podUID string) (cpuset.CPUSet, bool)
 	// GetPodCPUAssignments returns all pod-level CPU assignments
 	GetPodCPUAssignments() PodCPUAssignments
+	// GetCPUBaselines returns all container-level CPU assignments recorded at admission time, prior to any resize
+	GetCPUBaselines() ContainerCPUBaselines
+	// GetBaselineCPUSet returns container-level CPU assignments recorded at admission time, prior to any resize
+	GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 }
 
 type writer interface {
@@ -133,6 +164,8 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
+	// SetCPUBaselines stores all container-level CPU assignments recorded at admission time, prior to any resize
+	SetCPUBaselines(ContainerCPUBaselines)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

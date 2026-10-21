@@ -18,6 +18,8 @@ limitations under the License.
 
 package v1alpha3
 
+type CompositePodGroupExpansion interface{}
+
 type PodGroupExpansion interface{}
 
 type WorkloadExpansion interface{}

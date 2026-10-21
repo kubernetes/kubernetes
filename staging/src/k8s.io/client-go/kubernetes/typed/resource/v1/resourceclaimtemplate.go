@@ -41,6 +41,7 @@ type ResourceClaimTemplateInterface interface {
 	Create(ctx context.Context, resourceClaimTemplate *resourcev1.ResourceClaimTemplate, opts metav1.CreateOptions) (*resourcev1.ResourceClaimTemplate, error)
 	Update(ctx context.Context, resourceClaimTemplate *resourcev1.ResourceClaimTemplate, opts metav1.UpdateOptions) (*resourcev1.ResourceClaimTemplate, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*resourcev1.ResourceClaimTemplate, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*resourcev1.ResourceClaimTemplateList, error)

@@ -111,16 +111,16 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]TopologyHint
 	// GetPodTopologyHints returns a map of resource names to a list of possible
 	// concrete resource allocations per Pod in terms of NUMA locality hints.
-	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]TopologyHint
+	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]TopologyHint
 	// AllocatePod is called to trigger the allocation of resources to a pod.
-	AllocatePod(logger klog.Logger, pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
-	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -130,12 +130,34 @@ type Store interface {
 	Name() string
 }
 
+// AuthoritativeStore is an optional extension of Store that reports whether the
+// affinity hint for a container is authoritative. When IsHintAuthoritative
+// returns true, the consumer must use the hint as-is and must not extend it to
+// additional NUMA nodes.
+//
+// This is used on Windows, where memory placement has to follow the CPU
+// manager's NUMA decision (Windows has no cpuset.mems): the affinity Store is a
+// wrapper that owns the CPU-following knowledge, so the coupling between the CPU
+// and memory managers passes through the Store rather than being a peer-to-peer
+// dependency between the two managers.
+type AuthoritativeStore interface {
+	Store
+	IsHintAuthoritative(podUID, containerName string) bool
+}
+
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
 	NUMANodeAffinity bitmask.BitMask
 	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
+	// Score is an optional utilization signal in the range [0,100].
+	// 0 means no packing signal is provided. A non-zero value (1–100)
+	// represents the fraction of allocated resources on the NUMA node(s)
+	// covered by NUMANodeAffinity; higher values indicate more allocated.
+	// Score is populated by HintProviders and aggregated during merge,
+	// but does not influence hint selection in the current policy.
+	Score int64
 }
 
 // IsEqual checks if TopologyHint are equal
@@ -162,11 +184,7 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-
+func NewManager(logger klog.Logger, topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
 		logger.Info("Creating topology manager with none policy")
@@ -265,7 +283,7 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))

@@ -70,9 +70,7 @@ func (c *LeaseCandidateGCController) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, c.gc, c.gcCheckPeriod)
-
-	<-ctx.Done()
+	wait.UntilWithContext(ctx, c.gc, c.gcCheckPeriod)
 }
 
 func (c *LeaseCandidateGCController) gc(ctx context.Context) {

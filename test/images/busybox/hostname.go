@@ -34,14 +34,28 @@ func getOutboundIP() net.IP {
 	return localAddr.IP
 }
 
+func getHostname() (string, error) {
+	return os.Hostname()
+}
+
 func main() {
-	flagIP := flag.Bool("i", false, "a string")
+	flagIP := flag.Bool("i", false, "display the IP address of the host")
+	flagFQDN := flag.Bool("f", false, "display the fully qualified domain name")
+	flagFQDNLong := flag.Bool("fqdn", false, "display the fully qualified domain name")
+	flagLong := flag.Bool("long", false, "display the fully qualified domain name")
 	flag.Parse()
-	if *flagIP {
+	switch {
+	case *flagIP:
 		ip := getOutboundIP()
 		fmt.Print(ip.String())
-	} else {
-		hostname, err := os.Hostname()
+	case *flagFQDN || *flagFQDNLong || *flagLong:
+		fqdn, err := getFQDN()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Print(fqdn)
+	default:
+		hostname, err := getHostname()
 		if err != nil {
 			log.Fatal(err)
 		}

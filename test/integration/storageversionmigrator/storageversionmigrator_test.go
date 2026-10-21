@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -27,9 +28,15 @@ import (
 
 	"go.uber.org/goleak"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	svmv1 "k8s.io/api/storagemigration/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extensionfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
+	metaconditions "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
@@ -37,9 +44,10 @@ import (
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // TestStorageVersionMigration is an integration test that verifies storage version migration works.
@@ -357,4 +365,124 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	wg.Wait()
 
 	svmTest.validateRVAndGeneration(ctx, t, crVersions, "v1")
+}
+
+// TestStorageVersionMigrationFailureKeepsStoredVersions verifies that a failed
+// migration leaves the CRD's status.storedVersions alone. Some objects are
+// still stored in the old version, so dropping it from storedVersions would let
+// it be removed from the CRD and make those objects unreadable.
+func TestStorageVersionMigrationFailureKeepsStoredVersions(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+		extensionfeatures.CRDObservedGenerationTracking:                  true,
+	})
+
+	ctx := ktesting.Init(t)
+	// the admission policy below rejects the migration of cr2
+	svmTest := svmSetup(ctx, t, http.StatusUnprocessableEntity)
+
+	crd := svmTest.createCRD(t, crdName, crdGroup, nil, v1CRDVersion)
+	svmTest.createCR(ctx, t, "cr1", "v1")
+	svmTest.createCR(ctx, t, "cr2", "v1")
+
+	// Reject every update of cr2, which makes the migration fail with cr2
+	// still stored as v1.
+	policy := &admissionregistrationv1.ValidatingAdmissionPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "freeze-cr2"},
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+			FailurePolicy: ptr.To(admissionregistrationv1.Fail),
+			MatchConstraints: &admissionregistrationv1.MatchResources{
+				ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{{
+					RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Update},
+						Rule: admissionregistrationv1.Rule{
+							APIGroups:   []string{crdGroup},
+							APIVersions: []string{"*"},
+							Resources:   []string{crd.Spec.Names.Plural},
+						},
+					},
+				}},
+			},
+			Validations: []admissionregistrationv1.Validation{{
+				Expression: "object.metadata.name != 'cr2'",
+				Message:    "cr2 is frozen",
+			}},
+		},
+	}
+	if _, err := svmTest.client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create ValidatingAdmissionPolicy: %v", err)
+	}
+	binding := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "freeze-cr2"},
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName:        policy.Name,
+			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+		},
+	}
+	if _, err := svmTest.client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create ValidatingAdmissionPolicyBinding: %v", err)
+	}
+	v1Resource := schema.GroupVersionResource{Group: crdGroup, Version: "v1", Resource: crd.Spec.Names.Plural}
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		cr2, err := svmTest.dynamicClient.Resource(v1Resource).Namespace(defaultNamespace).Get(ctx, "cr2", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		_, err = svmTest.dynamicClient.Resource(v1Resource).Namespace(defaultNamespace).Update(ctx, cr2, metav1.UpdateOptions{})
+		return err != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the admission policy to reject updates of cr2: %v", err)
+	}
+
+	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion, []string{"v1", "v2"}, "v2")
+
+	if _, err := svmTest.createSVMResource(ctx, t, svmName, metav1.GroupResource{Group: crdGroup, Resource: crd.Spec.Names.Plural}); err != nil {
+		t.Fatalf("Failed to create SVM resource: %v", err)
+	}
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		svm, err := svmTest.getSVM(ctx, t, svmName)
+		if err != nil {
+			return false, err
+		}
+		return metaconditions.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1.MigrationFailed)), nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the migration to fail: %v", err)
+	}
+
+	var migratedCRD *apiextensionsv1.CustomResourceDefinition
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		migratedCRD, err = svmTest.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, cond := range migratedCRD.Status.Conditions {
+			if cond.Type == apiextensionsv1.StorageMigrating {
+				return cond.Status == apiextensionsv1.ConditionFalse && cond.Reason == "MigrationFailed", nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the CRD to report the failed migration: %v", err)
+	}
+
+	if !svmTest.isCRStoredAtVersion(t, "v1", "cr2") {
+		t.Fatalf("Expected cr2 to still be stored as v1")
+	}
+	if !slices.Contains(migratedCRD.Status.StoredVersions, "v1") {
+		t.Fatalf("Expected v1 to remain in status.storedVersions after a failed migration, got %v", migratedCRD.Status.StoredVersions)
+	}
+
+	// While v1 is a stored version, it must not be possible to remove it.
+	_, err = crdintegration.UpdateV1CustomResourceDefinitionWithRetry(svmTest.apiextensionsclient, crd.Name, func(c *apiextensionsv1.CustomResourceDefinition) {
+		c.Spec.Versions = slices.DeleteFunc(c.Spec.Versions, func(v apiextensionsv1.CustomResourceDefinitionVersion) bool {
+			return v.Name == "v1"
+		})
+	})
+	if err == nil {
+		t.Fatalf("Expected removing stored version v1 from the CRD to be rejected")
+	}
 }

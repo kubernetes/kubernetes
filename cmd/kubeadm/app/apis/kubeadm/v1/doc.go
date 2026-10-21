@@ -27,7 +27,9 @@ limitations under the License.
 //
 // A list of changes since v1beta4:
 // vx.yy:
-//   - TODO
+//   - Add a new field `MergeMethod` to an `Arg` with 3 possible values, `append`, `prepend`, or empty.
+//     This allows to control how an override argument is merged with the base argument of the same name.
+//     Empty is the default behavior and means replace.
 //
 // Migration from old kubeadm config versions
 //

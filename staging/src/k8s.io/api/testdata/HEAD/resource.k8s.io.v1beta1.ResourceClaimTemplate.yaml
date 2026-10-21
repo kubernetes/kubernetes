@@ -91,6 +91,9 @@ spec:
           requests:
             requestsKey: "0"
         count: 5
+        derivedAttributes:
+        - expression: expressionValue
+          name: nameValue
         deviceClassName: deviceClassNameValue
         firstAvailable:
         - allocationMode: allocationModeValue
@@ -98,6 +101,9 @@ spec:
             requests:
               requestsKey: "0"
           count: 5
+          derivedAttributes:
+          - expression: expressionValue
+            name: nameValue
           deviceClassName: deviceClassNameValue
           name: nameValue
           selectors:

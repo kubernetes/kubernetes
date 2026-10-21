@@ -24,9 +24,10 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
 // SchemalessTypedToVal wraps a Go value as a CEL ref.Val.
@@ -209,15 +210,16 @@ func (l *reflectSchemalessTypedList) Add(other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 	sz := l.value.Len()
-	elements := make([]interface{}, 0, sz)
+	otherSz, _ := otherList.Size().(types.Int)
+	elements := make([]ref.Val, 0, sz+int(otherSz))
 	for i := range sz {
-		elements = append(elements, l.value.Index(i).Interface())
+		elements = append(elements, l.Get(types.Int(i)))
 	}
 	it := otherList.Iterator()
 	for it.HasNext() == types.True {
-		elements = append(elements, it.Next().Value())
+		elements = append(elements, it.Next())
 	}
-	return &reflectSchemalessTypedList{value: reflect.ValueOf(elements)}
+	return types.NewRefValList(types.DefaultTypeAdapter, elements)
 }
 
 func (l *reflectSchemalessTypedList) Get(index ref.Val) ref.Val {

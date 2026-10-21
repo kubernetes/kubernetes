@@ -44,6 +44,7 @@ type ClusterTestTypeInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, clusterTestType *apiv1.ClusterTestType, opts metav1.UpdateOptions) (*apiv1.ClusterTestType, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiv1.ClusterTestType, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*apiv1.ClusterTestTypeList, error)

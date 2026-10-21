@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,11 +33,8 @@ import (
 const discoveryPath = "/apis"
 const jsonAccept = "application/json"
 const protobufAccept = "application/vnd.kubernetes.protobuf"
-const aggregatedV2Beta1AcceptSuffix = ";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 const aggregatedAcceptSuffix = ";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 
-const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
-const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
 const aggregatedNoPeerJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=nopeer"
@@ -64,7 +60,6 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 }
 
 func TestAggregationEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
 	aggregated := fakeHTTPHandler{data: "nopeer-aggregated"}
 	peerAggregated := fakeHTTPHandler{data: "peer-aggregated"}
@@ -83,12 +78,6 @@ func TestAggregationEnabled(t *testing.T) {
 			// Empty accept headers are valid and should be handled by the unaggregated handler
 			accept:   "",
 			expected: "unaggregated",
-		}, {
-			accept:   aggregatedV2Beta1JSONAccept,
-			expected: "nopeer-aggregated",
-		}, {
-			accept:   aggregatedV2Beta1ProtoAccept,
-			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedJSONAccept,
 			expected: "nopeer-aggregated",
@@ -140,12 +129,7 @@ func TestAggregationEnabled(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
-		}
-		if tc.enablePeerAggregated {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
-		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, tc.enablePeerAggregated)
 		body := fetchPath(wrapped, discoveryPath, tc.accept)
 		assert.Equal(t, tc.expected, body)
 	}

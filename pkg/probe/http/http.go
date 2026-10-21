@@ -58,24 +58,50 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 			DialContext: probe.ProbeDialer().DialContext,
 		})
 
-	return httpProber{transport, followNonLocalRedirects}
+	// HTTP version behavior:
+	// - HTTPS probes negotiate HTTP/2 automatically via ALPN during the TLS handshake.
+	// - HTTP probes use HTTP/1.1 exclusively (no upgrade mechanism in cleartext).
+	// - h2cTransport enables HTTP/2 over cleartext (h2c with prior knowledge), which
+	//   is not otherwise possible without TLS. This is what H2CContainerProbe provides.
+	h2cTransport := &http.Transport{
+		DisableKeepAlives:  true,
+		Proxy:              http.ProxyURL(nil),
+		DisableCompression: true,
+		DialContext:        probe.ProbeDialer().DialContext,
+	}
+	h2cTransport.Protocols = new(http.Protocols)
+	h2cTransport.Protocols.SetUnencryptedHTTP2(true)
+
+	return httpProber{transport, h2cTransport, followNonLocalRedirects}
 }
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
 type Prober interface {
 	Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error)
+	ProbeH2C(req *http.Request, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
 	transport               *http.Transport
+	h2cTransport            *http.Transport
 	followNonLocalRedirects bool
 }
 
-// Probe returns a ProbeRunner capable of running an HTTP check.
+// Probe returns a ProbeRunner capable of running an HTTP/1.1 check.
 func (pr httpProber) Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error) {
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
+		CheckRedirect: RedirectChecker(pr.followNonLocalRedirects),
+	}
+	return DoHTTPProbe(req, client)
+}
+
+// ProbeH2C runs an HTTP probe over HTTP/2 cleartext (h2c) with prior knowledge.
+func (pr httpProber) ProbeH2C(req *http.Request, timeout time.Duration) (probe.Result, string, error) {
+	client := &http.Client{
+		Timeout:       timeout,
+		Transport:     pr.h2cTransport,
 		CheckRedirect: RedirectChecker(pr.followNonLocalRedirects),
 	}
 	return DoHTTPProbe(req, client)

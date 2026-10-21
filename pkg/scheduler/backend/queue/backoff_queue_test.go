@@ -272,7 +272,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 				logger, _ := ktesting.NewTestContext(t)
 				bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, convertLessFn(newDefaultQueueSort()), popFromBackoffQEnabled)
 				for _, podName := range tt.podsInBackoff {
-					bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
+					bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label(), nil)
 				}
 				gotPodInfos := bq.popAllBackoffCompleted(logger)
 				var gotPods []string
@@ -383,7 +383,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, convertLessFn(newDefaultQueueSort()), tt.popFromBackoffQEnabled)
 			for _, podInfo := range podInfos {
-				bq.add(logger, podInfo, framework.EventUnscheduledPodAdd.Label())
+				bq.add(logger, podInfo, framework.EventUnscheduledPodAdd.Label(), nil)
 			}
 			gotPodInfos := bq.popAllBackoffCompleted(logger)
 			var gotPods []string

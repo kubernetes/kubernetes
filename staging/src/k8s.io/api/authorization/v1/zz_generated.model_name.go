@@ -22,6 +22,26 @@ limitations under the License.
 package v1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AuthorizationOptions) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.AuthorizationOptions"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in Condition) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.Condition"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ConditionsAwareDecision) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.ConditionsAwareDecision"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ConditionsMap) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.ConditionsMap"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in FieldSelectorAttributes) OpenAPIModelName() string {
 	return "io.k8s.api.authorization.v1.FieldSelectorAttributes"
 }
@@ -34,6 +54,11 @@ func (in LabelSelectorAttributes) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in LocalSubjectAccessReview) OpenAPIModelName() string {
 	return "io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NamedConditionsAwareDecision) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.NamedConditionsAwareDecision"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -94,4 +119,9 @@ func (in SubjectAccessReviewStatus) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in SubjectRulesReviewStatus) OpenAPIModelName() string {
 	return "io.k8s.api.authorization.v1.SubjectRulesReviewStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in UnconditionalDecision) OpenAPIModelName() string {
+	return "io.k8s.api.authorization.v1.UnconditionalDecision"
 }

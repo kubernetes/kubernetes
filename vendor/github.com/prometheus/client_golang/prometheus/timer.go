@@ -37,10 +37,10 @@ type Timer struct {
 // or
 //
 //	func TimeMeWithExemplar() {
-//		    timer := NewTimer(myHistogram)
-//		    defer timer.ObserveDurationWithExemplar(exemplar)
-//		    // Do actual work.
-//		}
+//	    timer := NewTimer(myHistogram)
+//	    defer timer.ObserveDurationWithExemplar(exemplar)
+//	    // Do actual work.
+//	}
 func NewTimer(o Observer) *Timer {
 	return &Timer{
 		begin:    time.Now(),
@@ -66,7 +66,7 @@ func (t *Timer) ObserveDuration() time.Duration {
 
 // ObserveDurationWithExemplar is like ObserveDuration, but it will also
 // observe exemplar with the duration unless exemplar is nil or provided Observer can't
-// be casted to ExemplarObserver.
+// be cast to ExemplarObserver.
 func (t *Timer) ObserveDurationWithExemplar(exemplar Labels) time.Duration {
 	d := time.Since(t.begin)
 	eo, ok := t.observer.(ExemplarObserver)

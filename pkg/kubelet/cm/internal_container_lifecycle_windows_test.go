@@ -132,7 +132,8 @@ func TestComputeFinalCpuSet(t *testing.T) {
 			allNumaNodeCPUs: []winstats.GroupAffinity{
 				{Mask: 0b1100, Group: 0}, // CPUs 2 and 3 in Group 0
 			},
-			expectedCPUSet: sets.New[int](0, 1, 2, 3),
+			// CPU Manager allocation is authoritative; NUMA CPUs are not merged in.
+			expectedCPUSet: sets.New[int](0, 1),
 		},
 		{
 			name:            "Only CPU manager enabled",

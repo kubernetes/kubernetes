@@ -17,14 +17,16 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -317,6 +319,37 @@ var (
 		nil, nil, metrics.ALPHA, "")
 	LocalhostNodePortAcceptedNFAcctCounter = "localhost_nps_accepted_pkts"
 
+	// LocalhostNodePortListeners is the number of active localhost NodePort
+	// userspace proxy listeners currently bound by kube-proxy.
+	LocalhostNodePortListeners = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "nftables_localhost_nodeport_listeners",
+			Help:           "Number of active localhost NodePort userspace proxy listeners.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// LocalhostNodePortListenerCreationFailuresTotal is the number of times
+	// kube-proxy failed to bind a localhost NodePort userspace proxy listener.
+	LocalhostNodePortListenerCreationFailuresTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "nftables_localhost_nodeport_listener_creation_failures_total",
+			Help:           "Number of localhost NodePort userspace proxy listener creation failures.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// localhostNodePortRejectedPacketsDescription describes the counter for packets
+	// rejected on localhost NodePorts.
+	localhostNodePortRejectedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_nftables_localhost_nodeport_rejected_packets_total",
+		"Number of packets rejected on localhost NodePorts. UDP and SCTP are always rejected; TCP is rejected when the localhost NodePort proxy is not running",
+		[]string{"ip_family", "protocol"}, nil, metrics.ALPHA, "")
+
 	// ReconcileConntrackFlowsLatency is the latency of one round of kube-proxy conntrack flows reconciliation.
 	ReconcileConntrackFlowsLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -340,6 +373,22 @@ var (
 		[]string{"ip_family"},
 	)
 )
+
+// LocalhostNodePortRejectedProtocols are the NodePort protocols the userspace
+// proxy cannot serve; localhost traffic for them is rejected and counted.
+var LocalhostNodePortRejectedProtocols = []v1.Protocol{v1.ProtocolUDP, v1.ProtocolSCTP}
+
+// LocalhostNodePortRejectableProtocols are all NodePort protocols whose localhost
+// traffic kube-proxy may reject and count. UDP / SCTP are always rejected, TCP
+// is rejected when the localhost NodePort proxy is not running.
+var LocalhostNodePortRejectableProtocols = []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP, v1.ProtocolSCTP}
+
+// LocalhostNodePortRejectedCounterName returns the name of the nftables named
+// counter that the kube-proxy table increments for localhost NodePort packets
+// rejected because their protocol is unsupported.
+func LocalhostNodePortRejectedCounterName(protocol v1.Protocol) string {
+	return "localhost-nodeport-rejected-" + strings.ToLower(string(protocol))
+}
 
 var registerMetricsOnce sync.Once
 
@@ -390,6 +439,17 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
+				legacyregistry.MustRegister(LocalhostNodePortListeners)
+				legacyregistry.MustRegister(LocalhostNodePortListenerCreationFailuresTotal)
+				rejectedCounters := make(map[string]string, len(LocalhostNodePortRejectableProtocols))
+				for _, protocol := range LocalhostNodePortRejectableProtocols {
+					rejectedCounters[LocalhostNodePortRejectedCounterName(protocol)] = string(protocol)
+				}
+				if c := newNFTablesCounterMetricCollector(rejectedCounters, localhostNodePortRejectedPacketsDescription); c != nil {
+					legacyregistry.CustomMustRegister(c)
+				}
+			}
 			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
 			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
@@ -408,48 +468,4 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-var _ metrics.StableCollector = &nfacctMetricCollector{}
-
-func newNFAcctMetricCollector(counter string, description *metrics.Desc) *nfacctMetricCollector {
-	client, err := nfacct.New()
-	if err != nil {
-		klog.ErrorS(err, "failed to initialize nfacct client")
-		return nil
-	}
-	return &nfacctMetricCollector{
-		client:      client,
-		counter:     counter,
-		description: description,
-	}
-}
-
-type nfacctMetricCollector struct {
-	metrics.BaseStableCollector
-	client      nfacct.Interface
-	counter     string
-	description *metrics.Desc
-}
-
-// DescribeWithStability implements the metrics.StableCollector interface.
-func (n *nfacctMetricCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
-	ch <- n.description
-}
-
-// CollectWithStability implements the metrics.StableCollector interface.
-func (n *nfacctMetricCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	if n.client != nil {
-		counter, err := n.client.Get(n.counter)
-		if err != nil {
-			klog.ErrorS(err, "failed to collect nfacct counter", "counter", n.counter)
-		} else {
-			metric, err := metrics.NewConstMetric(n.description, metrics.CounterValue, float64(counter.Packets))
-			if err != nil {
-				klog.ErrorS(err, "failed to create constant metric")
-			} else {
-				ch <- metric
-			}
-		}
-	}
 }

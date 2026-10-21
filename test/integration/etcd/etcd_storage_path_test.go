@@ -106,7 +106,6 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 		}
 	})
 
-	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)
 
 	client := &allClient{dynamicClient: apiServer.Dynamic}
@@ -121,7 +120,10 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 	} else {
 		// Drop alphas from etcd data fixtures when emulating previous versions
 		// as alphas are not supported with emulation.
+		original := logExpectedVersionChange
+		logExpectedVersionChange = t.Logf
 		etcdStorageData = GetEtcdStorageDataForNamespaceServedAt("etcdstoragepathtestnamespace", v, true)
+		logExpectedVersionChange = original
 	}
 
 	kindSeen := sets.NewString()

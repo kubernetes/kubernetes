@@ -23,10 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func checkExpectedEndpoints(expected sets.Set[string], actual []Endpoint) error {
@@ -48,12 +44,11 @@ func checkExpectedEndpoints(expected sets.Set[string], actual []Endpoint) error 
 
 func TestCategorizeEndpoints(t *testing.T) {
 	testCases := []struct {
-		name              string
-		preferSameEnabled bool
-		nodeName          string
-		nodeLabels        map[string]string
-		serviceInfo       ServicePort
-		endpoints         []Endpoint
+		name        string
+		nodeName    string
+		nodeLabels  map[string]string
+		serviceInfo ServicePort
+		endpoints   []Endpoint
 
 		// We distinguish `nil` ("service doesn't use this kind of endpoints") from
 		// `sets.Set[string]()` ("service uses this kind of endpoints but has no endpoints").
@@ -179,25 +174,10 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.4:80", "10.1.2.6:80"),
 		localEndpoints:   nil,
 	}, {
-		name:              "PreferSameNode falls back to same-zone when feature gate disabled",
-		preferSameEnabled: false,
-		nodeName:          "node-1",
-		nodeLabels:        map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:       &BaseServicePortInfo{},
-		endpoints: []Endpoint{
-			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), nodeHints: sets.New[string]("node-1"), ready: true},
-			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), nodeHints: sets.New[string]("node-2"), ready: true},
-			&BaseEndpointInfo{endpoint: "10.1.2.5:80", zoneHints: sets.New[string]("zone-c"), nodeHints: sets.New[string]("node-3"), ready: true},
-			&BaseEndpointInfo{endpoint: "10.1.2.6:80", zoneHints: sets.New[string]("zone-a"), nodeHints: sets.New[string]("node-4"), ready: true},
-		},
-		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.6:80"),
-		localEndpoints:   nil,
-	}, {
-		name:              "PreferSameNode available",
-		preferSameEnabled: true,
-		nodeName:          "node-1",
-		nodeLabels:        map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:       &BaseServicePortInfo{},
+		name:        "PreferSameNode",
+		nodeName:    "node-1",
+		nodeLabels:  map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo: &BaseServicePortInfo{},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), nodeHints: sets.New[string]("node-1"), ready: true},
 			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), nodeHints: sets.New[string]("node-2"), ready: true},
@@ -207,11 +187,10 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.New[string]("10.1.2.3:80"),
 		localEndpoints:   nil,
 	}, {
-		name:              "PreferSameNode ignored if some endpoints unhinted",
-		preferSameEnabled: true,
-		nodeName:          "node-1",
-		nodeLabels:        map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:       &BaseServicePortInfo{},
+		name:        "PreferSameNode ignored if some endpoints unhinted",
+		nodeName:    "node-1",
+		nodeLabels:  map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo: &BaseServicePortInfo{},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), nodeHints: sets.New[string]("node-1"), ready: true},
 			&BaseEndpointInfo{endpoint: "10.1.2.4:80", ready: true},
@@ -221,11 +200,10 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 		localEndpoints:   nil,
 	}, {
-		name:              "PreferSameNode falls back to PreferSameZone if no endpoint for node",
-		preferSameEnabled: true,
-		nodeName:          "node-0",
-		nodeLabels:        map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:       &BaseServicePortInfo{},
+		name:        "PreferSameNode falls back to PreferSameZone if no endpoint for node",
+		nodeName:    "node-0",
+		nodeLabels:  map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo: &BaseServicePortInfo{},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), nodeHints: sets.New[string]("node-1"), ready: true},
 			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), nodeHints: sets.New[string]("node-2"), ready: true},
@@ -411,11 +389,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.preferSameEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.preferSameEnabled)
-
 			clusterEndpoints, localEndpoints, allEndpoints, hasAnyEndpoints := CategorizeEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeName, tc.nodeLabels)
 
 			if len(tc.clusterEndpoints) == 0 && len(clusterEndpoints) != 0 {

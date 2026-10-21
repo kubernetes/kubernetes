@@ -113,6 +113,9 @@ func ValOrErr(val ref.Val, format string, args ...any) ref.Val {
 
 // WrapErr wraps an existing Go error value into a CEL Err value.
 func WrapErr(err error) ref.Val {
+	if err, ok := err.(*Err); ok {
+		return err
+	}
 	return &Err{error: err}
 }
 

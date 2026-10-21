@@ -26,6 +26,11 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
+// DeepEqualFunc stands in for the deep-equal function configured for the
+// package being generated (see +k8s:validation-gen-deep-equal-func).  The
+// generator substitutes the real name when it renders this argument.
+type DeepEqualFunc struct{}
+
 // TagValidator describes a single validation tag and how to use it. To be
 // findable by validation-gen, a TagValidator must be registered - see
 // RegisterTagValidator.
@@ -40,8 +45,9 @@ type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
 
-	// TagName returns the full tag name (without the "marker" prefix) for this
-	// tag.
+	// TagName returns the name of this tag without the tag prefix, e.g.
+	// "required" for "+k8s:required". The registry qualifies it with the
+	// prefix it was initialized with (see InitGlobalValidator).
 	TagName() string
 
 	// ValidScopes returns the set of scopes where this tag may be used.
@@ -71,12 +77,21 @@ type Config struct {
 	// be initialized yet.
 	TagValidator TagValidationExtractor
 
-	// InputToPkg maps each input (API types) package to the package into which
-	// validation code is generated for it.  This is the same mapping the
-	// generator uses to locate generated Validate_<Type> functions, and lets
-	// validators reference hand-written functions that live alongside the
-	// generated code (e.g. +k8s:customValidation).
-	InputToPkg map[string]string
+	// InputToOutputPkgs maps each input (API types) package to the packages its
+	// validation is generated into, canonical one first.  This is the same
+	// mapping the generator uses to locate generated Validate_<Type> functions,
+	// and lets validators reference hand-written functions that live alongside
+	// the generated code (e.g. +k8s:customValidation).
+	InputToOutputPkgs map[string][]string
+
+	// TagPrefix qualifies every registered tag name, e.g. "k8s:" for
+	// "+k8s:required". Validators that refer to other tags by name, in
+	// messages or when inspecting a tag's nested value, must prepend it.
+	TagPrefix string
+
+	// Extensions are the validations this project adds to the built-in
+	// ones, read from --validation-extensions-file. Nil when none were given.
+	Extensions *Extensions
 }
 
 // Scope describes where a validation (or potential validation) is located.
@@ -189,7 +204,11 @@ type ListSelectorTerm struct {
 	Value any
 }
 
-// TagStabilityLevel indicates the stability of a validation tag.
+// TagStabilityLevel indicates the stability of a validation tag. It describes
+// the tag itself and is surfaced in the generated tag documentation. It does
+// not constrain which APIs a tag may be used on: whether a change in validation
+// behavior is acceptable is a property of the API being validated, not of the
+// tag.
 type TagStabilityLevel string
 
 const (
@@ -203,12 +222,6 @@ const (
 	TagStabilityLevelStable TagStabilityLevel = "Stable"
 )
 
-var stabilityOrder = map[TagStabilityLevel]int{
-	TagStabilityLevelAlpha:  0,
-	TagStabilityLevelBeta:   1,
-	TagStabilityLevelStable: 2,
-}
-
 // Validation stability level denotes the stability of a validation.
 type ValidationStabilityLevel string
 
@@ -219,23 +232,10 @@ const (
 	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
 )
 
-// Compare returns an integer comparing two stability levels, or an error if either
-// stability level is unknown.
-func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
-	sOrder, okS := stabilityOrder[s]
-	if !okS {
-		return 0, fmt.Errorf("unknown stability level %q", s)
-	}
-	otherOrder, okOther := stabilityOrder[other]
-	if !okOther {
-		return 0, fmt.Errorf("unknown stability level %q", other)
-	}
-	return sOrder - otherOrder, nil
-}
-
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
-	// Tag is the tag name, without the leading '+'.
+	// Tag is the tag name, without the leading '+'. A TagValidator sets its
+	// unqualified TagName(); the registry qualifies it with the tag prefix.
 	Tag string
 	// StabilityLevel is the stability level of the tag.
 	StabilityLevel TagStabilityLevel
@@ -465,6 +465,11 @@ const (
 	// accumulated as an error, but should trigger other aspects of the failure
 	// path (e.g. early return when combined with ShortCircuit).
 	NonError
+
+	// VariadicArgs indicates that the validator function has variadic trailing
+	// arguments, so its signature does not match ValidateFunc even when Args is
+	// empty, and WrapperFunction must wrap it in a closure.
+	VariadicArgs
 )
 
 // Conditions defines what conditions must be true for a resource to be validated.
@@ -539,7 +544,8 @@ type Emission struct {
 
 // FunctionGen describes a function call that should be generated.
 type FunctionGen struct {
-	// TagName is the tag which triggered this function.
+	// TagName is the tag which triggered this function, without the tag
+	// prefix (as returned by TagValidator.TagName).
 	TagName string
 
 	// Cohort indicates a set of related functions which are processed
@@ -587,7 +593,7 @@ type FunctionGen struct {
 	// Emits, when non-empty, declares the field.Errors the runtime validator
 	// produces on failure. Set via WithEmits; empty for wrappers and
 	// non-emitting validators. A single function call may emit errors of
-	// different types and/or at different path fragments (e.g. UpdateSlice
+	// different types and/or at different path fragments (e.g. ValSliceUpdate
 	// with NoAddItem and NoRemoveItem), so this is a slice.
 	Emits []Emission
 }

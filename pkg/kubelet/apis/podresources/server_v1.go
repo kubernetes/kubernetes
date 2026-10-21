@@ -73,13 +73,17 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	}
 
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
-	p.devicesProvider.UpdateAllocatedDevices()
+	p.devicesProvider.UpdateAllocatedDevices(logger)
 
 	for i, pod := range pods {
 		pRes := podresourcesv1.PodResources{
 			Name:       pod.Name,
 			Namespace:  pod.Namespace,
 			Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+			pRes.CpuIds = p.cpusProvider.GetPodCPUs(string(pod.UID))
+			pRes.Memory = p.memoryProvider.GetPodMemory(logger, string(pod.UID))
 		}
 
 		pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
@@ -105,13 +109,14 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 
 // GetAllocatableResources returns information about all the resources known by the server - this more like the capacity, not like the current amount of free resources.
 func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req *podresourcesv1.AllocatableResourcesRequest) (*podresourcesv1.AllocatableResourcesResponse, error) {
+	logger := klog.FromContext(ctx)
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetAllocatableCount.WithLabelValues("v1").Inc()
 
 	response := &podresourcesv1.AllocatableResourcesResponse{
-		Devices: p.devicesProvider.GetAllocatableDevices(),
+		Devices: p.devicesProvider.GetAllocatableDevices(logger),
 		CpuIds:  p.cpusProvider.GetAllocatableCPUs(),
-		Memory:  p.memoryProvider.GetAllocatableMemory(),
+		Memory:  p.memoryProvider.GetAllocatableMemory(logger),
 	}
 
 	return response, nil
@@ -134,6 +139,10 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 		Name:       pod.Name,
 		Namespace:  pod.Namespace,
 		Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+		podResources.CpuIds = p.cpusProvider.GetPodCPUs(string(pod.UID))
+		podResources.Memory = p.memoryProvider.GetPodMemory(logger, string(pod.UID))
 	}
 
 	podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
@@ -159,8 +168,8 @@ func (p *v1PodResourcesServer) getContainerResources(logger klog.Logger, pod *v1
 	containerResources := &podresourcesv1.ContainerResources{
 		Name:             container.Name,
 		Devices:          p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-		CpuIds:           p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
-		Memory:           p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+		CpuIds:           p.cpusProvider.GetCPUs(pod, container),
+		Memory:           p.memoryProvider.GetMemory(logger, pod, container),
 		DynamicResources: p.dynamicResourcesProvider.GetDynamicResources(logger, pod, container),
 	}
 	return containerResources

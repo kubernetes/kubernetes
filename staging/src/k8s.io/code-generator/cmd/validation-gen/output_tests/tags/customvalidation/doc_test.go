@@ -66,10 +66,10 @@ func TestIfEnabled(t *testing.T) {
 	matcher := field.ErrorMatcher{}.ByType().ByField()
 
 	// Option disabled: the gated custom validation does not run.
-	st.Value(&OptionStruct{}).ExpectValid()
+	st.Value(&OptionStruct{}).Opts(map[string]bool{"FeatureX": false}).ExpectValid()
 
 	// Option enabled: the custom validation runs.
-	st.Value(&OptionStruct{}).Opts([]string{"FeatureX"}).ExpectMatches(matcher, field.ErrorList{
+	st.Value(&OptionStruct{}).Opts(map[string]bool{"FeatureX": true}).ExpectMatches(matcher, field.ErrorList{
 		field.Invalid(field.NewPath("stringField"), nil, ""),
 	})
 }

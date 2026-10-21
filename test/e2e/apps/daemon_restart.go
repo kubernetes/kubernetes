@@ -39,7 +39,6 @@ import (
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -144,7 +143,7 @@ func (r *RestartDaemonConfig) kill(ctx context.Context) {
 	}
 	framework.Logf("Killing %v", r)
 	_, err := e2essh.NodeExec(ctx, r.nodeName, killCmd, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "kill daemon on node %q using command %q", r.nodeName, killCmd)
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up
@@ -189,7 +188,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 	for i := range pods {
 		found = append(found, pods[i])
 	}
-	framework.ExpectNoError(store.Replace(found, "0"))
+	framework.ExpectNoError(store.Replace(found, "0"), "replace the cached pod list before restarting daemons")
 }
 
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
@@ -197,7 +196,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 func getContainerRestarts(ctx context.Context, c clientset.Interface, ns string, labelSelector labels.Selector) (int, []string) {
 	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
 	pods, err := c.CoreV1().Pods(ns).List(ctx, options)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "list Pods in namespace %q", ns)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
@@ -209,7 +208,7 @@ func getContainerRestarts(ctx context.Context, c clientset.Interface, ns string,
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
+var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithProvider(framework.ProvidersWithSSH...) /* These tests require SSH */, func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -223,8 +222,6 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 	var tracker *podTracker
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		// These tests require SSH
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -237,7 +234,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		framework.ExpectNoError(e2erc.RunRC(ctx, config))
+		framework.ExpectNoError(e2erc.RunRC(ctx, config), "create ReplicationController and wait for its pods to run")
 		replacePods(*config.CreatedPods, existingPods)
 
 		// The following code continues to run after the BeforeEach and thus
@@ -274,10 +271,8 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		go controller.Run(backgroundCtx.Done())
 	})
 
-	ginkgo.It("Controller Manager should not create/delete replicas across restart", func(ctx context.Context) {
+	f.It("Controller Manager should not create/delete replicas across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 
-		// Requires master ssh access.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
@@ -297,7 +292,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 			// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 			// to the same size achieves this, because the scale operation advances the RC's sequence number
 			// and awaits it to be observed and reported back in the RC's status.
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true), "scale ReplicationController %q in namespace %q to %d replicas", rcName, ns, numPods)
 
 			// Only check the keys, the pods can be different if the kubelet updated it.
 			// TODO: Can it really?
@@ -316,9 +311,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		}
 	})
 
-	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func(ctx context.Context) {
-		// Requires master ssh access.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
+	f.It("Scheduler should continue assigning pods to nodes across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
@@ -337,9 +330,9 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 			restarter.kill(ctx)
 			// This is best effort to try and create pods while the scheduler is down,
 			// since we don't know exactly when it is restarted after the kill signal.
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false), "scale ReplicationController %q in namespace %q to %d replicas", rcName, ns, numPods+5)
 			restarter.waitUp(ctx)
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true), "scale ReplicationController %q in namespace %q to %d replicas", rcName, ns, numPods+5)
 		}
 	})
 

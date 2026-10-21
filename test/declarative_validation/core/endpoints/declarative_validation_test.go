@@ -26,9 +26,6 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1"}
-
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {

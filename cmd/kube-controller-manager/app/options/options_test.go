@@ -57,6 +57,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	devicetaintevictionconfig "k8s.io/kubernetes/pkg/controller/devicetainteviction/config"
+	disruptionconfig "k8s.io/kubernetes/pkg/controller/disruption/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -100,6 +101,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-disruption-syncs=10",
 	"--concurrent-device-taint-eviction-syncs=10",
 	"--concurrent-resourceclaim-syncs=10",
 	"--concurrent-daemonset-syncs=10",
@@ -268,6 +270,11 @@ func TestAddFlags(t *testing.T) {
 		DeploymentController: &DeploymentControllerOptions{
 			&deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+		},
+		DisruptionController: &DisruptionControllerOptions{
+			&disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs: 10,
 			},
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
@@ -628,6 +635,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+			DisruptionController: disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs: 10,
 			},
 			DeviceTaintEvictionController: devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
 				ConcurrentSyncs: 10,
@@ -1271,6 +1281,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &DeploymentControllerOptions{
 				&deploymentconfig.DeploymentControllerConfiguration{
 					ConcurrentDeploymentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "DisruptionControllerOptions",
+			expectErrors: false,
+			options: &DisruptionControllerOptions{
+				&disruptionconfig.DisruptionControllerConfiguration{
+					ConcurrentDisruptionSyncs: 10,
 				},
 			},
 		},

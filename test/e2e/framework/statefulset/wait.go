@@ -190,3 +190,42 @@ func Saturate(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet
 		ResumeNextPod(ctx, c, ss)
 	}
 }
+
+// WaitForFailedWithImagePullErr waits for numPodsFailed in ss to be Failed with ImagePullBackError or ImagePullErr
+func WaitForFailedWithImagePullErr(ctx context.Context, c clientset.Interface, numPodsFailed int32, ss *appsv1.StatefulSet) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			podList, err := GetPodList(ctx, c, ss)
+			if err != nil {
+				return false, err
+			}
+
+			SortStatefulPods(podList)
+			if int32(len(podList.Items)) < numPodsFailed {
+				framework.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsFailed)
+				return false, nil
+			}
+			if int32(len(podList.Items)) > numPodsFailed {
+				return false, fmt.Errorf("too many pods scheduled, expected %d got %d", numPodsFailed, len(podList.Items))
+			}
+			for _, p := range podList.Items {
+				isFailingWithImagePullErr := false
+				shouldBeFailing := getStatefulPodOrdinal(&p) < int(numPodsFailed)
+				for _, containerStatus := range p.Status.ContainerStatuses {
+					w := containerStatus.State.Waiting
+					if w != nil && (w.Reason == "ImagePullBackOff" || w.Reason == "ErrImagePull") {
+						isFailingWithImagePullErr = true
+					}
+				}
+				desiredFailing := shouldBeFailing == isFailingWithImagePullErr
+				framework.Logf("Waiting for pod %v to be stuck with image pull error - shouldFail=%v, phase=%v, imagePullErr=%v", p.Name, shouldBeFailing, p.Status.Phase, isFailingWithImagePullErr)
+				if p.Status.Phase != v1.PodPending || !desiredFailing {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		framework.Failf("Failed waiting for %d pods to be stuck with image pull error: %v", numPodsFailed, pollErr)
+	}
+}

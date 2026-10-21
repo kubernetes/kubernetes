@@ -17,6 +17,7 @@ limitations under the License.
 package v2
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,7 @@ func PrintModelDescription(
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
+	maxDepth int,
 	outputFormat string,
 ) error {
 	generator := NewGenerator()
@@ -44,7 +46,7 @@ func PrintModelDescription(
 	}
 
 	return printModelDescriptionWithGenerator(
-		generator, fieldsPath, w, client, gvr, recursive, outputFormat)
+		generator, fieldsPath, w, client, gvr, recursive, maxDepth, outputFormat)
 }
 
 // Factored out for testability
@@ -55,6 +57,7 @@ func printModelDescriptionWithGenerator(
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
+	maxDepth int,
 	outputFormat string,
 ) error {
 	paths, err := client.Paths()
@@ -86,12 +89,15 @@ func printModelDescriptionWithGenerator(
 		return fmt.Errorf("failed to parse openapi schema for %s: %w", resourcePath, err)
 	}
 
-	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, w)
-
-	explainErr := explainError("")
-	if errors.As(err, &explainErr) {
+	var buf bytes.Buffer
+	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, maxDepth, &buf)
+	if explainErr, ok := errors.AsType[explainError](err); ok {
 		return explainErr
 	}
+	if err != nil {
+		return err
+	}
 
+	_, err = io.Copy(w, &buf)
 	return err
 }

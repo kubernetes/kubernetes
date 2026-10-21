@@ -547,6 +547,11 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 	for i := range pod.Spec.Volumes {
 		source := &pod.Spec.Volumes[i].VolumeSource
 		if source.EmptyDir != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && source.EmptyDir.Medium == v1.StorageMediumMemory {
+				// Memory-backed emptyDir volumes are backed by tmpfs, which has its size limit
+				// enforced by the kernel. Eviction manager enforcement is not needed.
+				continue
+			}
 			size := source.EmptyDir.SizeLimit
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
@@ -592,7 +597,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 	thresholdsMap := make(map[string]*resource.Quantity)
 	for _, container := range pod.Spec.Containers {
 		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
+		// Use IsZero rather than Value to test whether a limit is set. Value can
+		// overflow an int64 and returns 0 when it does, so a large but valid limit
+		// such as "100E" would otherwise be mistaken for an unset limit and never
+		// enforced. The comparison below uses Cmp, which is overflow-safe.
+		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}
@@ -601,7 +610,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 			continue
 		}
 		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
+		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}

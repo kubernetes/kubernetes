@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,7 +61,6 @@ func TestCleanerController(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -78,7 +77,7 @@ func TestCleanerController(t *testing.T) {
 	}
 	c := cleaner.NewPCRCleanerController(
 		cleanerClient,
-		informers.Certificates().V1beta1().PodCertificateRequests(),
+		informers.Certificates().V1().PodCertificateRequests(),
 		clock.RealClock{},
 		1*time.Second,
 		1*time.Second,
@@ -141,13 +140,13 @@ func TestCleanerController(t *testing.T) {
 	}
 
 	// Have node1 create a PodCertificateRequest for pod1
-	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-	pcr := &certsv1beta1.PodCertificateRequest{
+	stubReq := mustMakeStubPKCS10Request(t)
+	pcr := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pcr1",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   pod.ObjectMeta.Name,
 			PodUID:                    pod.ObjectMeta.UID,
@@ -155,17 +154,16 @@ func TestCleanerController(t *testing.T) {
 			ServiceAccountUID:         sa.ObjectMeta.UID,
 			NodeName:                  types.NodeName(node.ObjectMeta.Name),
 			NodeUID:                   node.ObjectMeta.UID,
-			PKIXPublicKey:             pubPKIX,
-			ProofOfPossession:         proof,
+			StubPKCS10Request:         stubReq,
 			UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 		},
 	}
-	pcr, err = node1Client.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Create(ctx, pcr, metav1.CreateOptions{})
+	pcr, err = node1Client.CertificatesV1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Create(ctx, pcr, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating PodCertificateRequest: %v", err)
 	}
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err := client.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Get(ctx, pcr.ObjectMeta.Name, metav1.GetOptions{})
+		_, err := client.CertificatesV1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Get(ctx, pcr.ObjectMeta.Name, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			return true, nil
 		} else if err != nil {
@@ -196,7 +194,6 @@ func TestNodeRestriction(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -273,13 +270,13 @@ func TestNodeRestriction(t *testing.T) {
 
 	t.Run("node1 can create PCR for pod on node1", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
-		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		stubReq := mustMakeStubPKCS10Request(t)
+		pcr := &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   pod.ObjectMeta.Name,
 				PodUID:                    pod.ObjectMeta.UID,
@@ -287,8 +284,7 @@ func TestNodeRestriction(t *testing.T) {
 				ServiceAccountUID:         sa.ObjectMeta.UID,
 				NodeName:                  types.NodeName(node1.ObjectMeta.Name),
 				NodeUID:                   node1.ObjectMeta.UID,
-				PKIXPublicKey:             pubPKIX,
-				ProofOfPossession:         proof,
+				StubPKCS10Request:         stubReq,
 				UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 			},
 		}
@@ -297,7 +293,7 @@ func TestNodeRestriction(t *testing.T) {
 		// errors.
 		var lastErr string
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
+			_, err = node1Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 			if err != nil {
 				if errStr := err.Error(); errStr != lastErr {
 					t.Logf("Create PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
@@ -314,13 +310,13 @@ func TestNodeRestriction(t *testing.T) {
 
 	t.Run("node2 cannot create PCR for pod on node1", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
-		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		stubReq := mustMakeStubPKCS10Request(t)
+		pcr := &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   pod.ObjectMeta.Name,
 				PodUID:                    pod.ObjectMeta.UID,
@@ -328,8 +324,7 @@ func TestNodeRestriction(t *testing.T) {
 				ServiceAccountUID:         sa.ObjectMeta.UID,
 				NodeName:                  types.NodeName(node1.ObjectMeta.Name),
 				NodeUID:                   node1.ObjectMeta.UID,
-				PKIXPublicKey:             pubPKIX,
-				ProofOfPossession:         proof,
+				StubPKCS10Request:         stubReq,
 				UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 			},
 		}
@@ -340,7 +335,7 @@ func TestNodeRestriction(t *testing.T) {
 		// durable error condition.
 		var lastErr string
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
+			_, err = node2Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 			if err == nil || k8serrors.IsForbidden(err) {
 				return true, err
 			}
@@ -359,13 +354,13 @@ func TestNodeRestriction(t *testing.T) {
 
 	t.Run("node2 cannot create PCR for pod that doesn't exist", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
-		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		stubReq := mustMakeStubPKCS10Request(t)
+		pcr := &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   "dnepod",
 				PodUID:                    "dnepoduid",
@@ -373,8 +368,7 @@ func TestNodeRestriction(t *testing.T) {
 				ServiceAccountUID:         sa.ObjectMeta.UID,
 				NodeName:                  types.NodeName(node2.ObjectMeta.Name),
 				NodeUID:                   node2.ObjectMeta.UID,
-				PKIXPublicKey:             pubPKIX,
-				ProofOfPossession:         proof,
+				StubPKCS10Request:         stubReq,
 				UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 			},
 		}
@@ -384,7 +378,7 @@ func TestNodeRestriction(t *testing.T) {
 		// hold here for 15 seconds and assume if we're still getting an error,
 		// then it can't be due to informer lag.
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
+			_, err = node2Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 			if err == nil {
 				return true, err
 			}
@@ -410,7 +404,6 @@ func TestNodeAuthorization(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -486,13 +479,13 @@ func TestNodeAuthorization(t *testing.T) {
 	}
 
 	// Have node1 create a PodCertificateRequest for pod1
-	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-	pcr := &certsv1beta1.PodCertificateRequest{
+	stubReq := mustMakeStubPKCS10Request(t)
+	pcr := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pcr1",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   pod.ObjectMeta.Name,
 			PodUID:                    pod.ObjectMeta.UID,
@@ -500,8 +493,7 @@ func TestNodeAuthorization(t *testing.T) {
 			ServiceAccountUID:         sa.ObjectMeta.UID,
 			NodeName:                  types.NodeName(node1.ObjectMeta.Name),
 			NodeUID:                   node1.ObjectMeta.UID,
-			PKIXPublicKey:             pubPKIX,
-			ProofOfPossession:         proof,
+			StubPKCS10Request:         stubReq,
 			UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 		},
 	}
@@ -509,7 +501,7 @@ func TestNodeAuthorization(t *testing.T) {
 	// Creating the PCR could fail if there is informer lag in the
 	// noderestriction logic.  Poll until it succeeds.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
+		_, err = node1Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 		if err != nil {
 			t.Logf("Create PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
 			return false, nil
@@ -524,7 +516,7 @@ func TestNodeAuthorization(t *testing.T) {
 		// Getting the PCR could fail if there is lag in the node authorizer graph population.
 		// Poll until it succeeds.
 		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
+			_, err := node1Client.CertificatesV1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
 			if err != nil {
 				t.Logf("Get PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
 				return false, nil
@@ -537,7 +529,7 @@ func TestNodeAuthorization(t *testing.T) {
 	})
 
 	t.Run("node1 can see pcr1 when listing", func(t *testing.T) {
-		pcrList, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
+		pcrList, err := node1Client.CertificatesV1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
 			FieldSelector: "spec.nodeName=node1",
 		})
 		if err != nil {
@@ -554,7 +546,7 @@ func TestNodeAuthorization(t *testing.T) {
 	})
 
 	t.Run("node2 cannot list with field selector for node1", func(t *testing.T) {
-		_, err := node2Client.CertificatesV1beta1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
+		_, err := node2Client.CertificatesV1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
 			FieldSelector: "spec.nodeName=node1",
 		})
 		if err == nil {
@@ -565,7 +557,7 @@ func TestNodeAuthorization(t *testing.T) {
 	})
 
 	t.Run("node2 cannot directly get pcr1", func(t *testing.T) {
-		_, err := node2Client.CertificatesV1beta1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
+		_, err := node2Client.CertificatesV1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
 		if err == nil {
 			t.Fatalf("Getting pcr1 unexpectedly succeeded")
 		} else if !k8serrors.IsForbidden(err) {
@@ -574,7 +566,7 @@ func TestNodeAuthorization(t *testing.T) {
 	})
 
 	t.Run("node2 cannot see pcr1 when listing", func(t *testing.T) {
-		pcrList, err := node2Client.CertificatesV1beta1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
+		pcrList, err := node2Client.CertificatesV1().PodCertificateRequests("default").List(ctx, metav1.ListOptions{
 			FieldSelector: "spec.nodeName=node2",
 		})
 		if err != nil {
@@ -603,7 +595,6 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -728,13 +719,13 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 
 	// Have node1 create a PodCertificateRequest for bar/foo
-	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(podBarFoo.ObjectMeta.UID))
-	pcrBarFoo := &certsv1beta1.PodCertificateRequest{
+	stubReq := mustMakeStubPKCS10Request(t)
+	pcrBarFoo := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "bar",
 			Name:      "foo",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   podBarFoo.ObjectMeta.Name,
 			PodUID:                    podBarFoo.ObjectMeta.UID,
@@ -742,8 +733,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 			ServiceAccountUID:         saBar.ObjectMeta.UID,
 			NodeName:                  types.NodeName(node1.ObjectMeta.Name),
 			NodeUID:                   node1.ObjectMeta.UID,
-			PKIXPublicKey:             pubPKIX,
-			ProofOfPossession:         proof,
+			StubPKCS10Request:         stubReq,
 			UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "foo"},
 		},
 	}
@@ -751,7 +741,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	// noderestriction logic.  Poll until it succeeds.
 	var lastErr string
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("bar").Create(ctx, pcrBarFoo, metav1.CreateOptions{})
+		_, err = node1Client.CertificatesV1().PodCertificateRequests("bar").Create(ctx, pcrBarFoo, metav1.CreateOptions{})
 		if err != nil {
 			if errStr := err.Error(); errStr != lastErr {
 				t.Logf("Create PodCertificateRequest bar/foo as node1 failed with error: %v, retrying...", err)
@@ -766,13 +756,13 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 
 	// Have node2 create a PodCertificateRequest for foo/bar
-	_, _, pubPKIXFooBar, proofFooBar := mustMakeEd25519KeyAndProof(t, []byte(podFooBar.ObjectMeta.UID))
-	pcrFooBar := &certsv1beta1.PodCertificateRequest{
+	stubReqFooBar := mustMakeStubPKCS10Request(t)
+	pcrFooBar := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "foo",
 			Name:      "bar",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   podFooBar.ObjectMeta.Name,
 			PodUID:                    podFooBar.ObjectMeta.UID,
@@ -780,8 +770,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 			ServiceAccountUID:         saFoo.ObjectMeta.UID,
 			NodeName:                  types.NodeName(node2.ObjectMeta.Name),
 			NodeUID:                   node2.ObjectMeta.UID,
-			PKIXPublicKey:             pubPKIXFooBar,
-			ProofOfPossession:         proofFooBar,
+			StubPKCS10Request:         stubReqFooBar,
 			UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "bar"},
 		},
 	}
@@ -789,7 +778,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	// noderestriction logic.  Poll until it succeeds.
 	lastErr = ""
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("foo").Create(ctx, pcrFooBar, metav1.CreateOptions{})
+		_, err = node2Client.CertificatesV1().PodCertificateRequests("foo").Create(ctx, pcrFooBar, metav1.CreateOptions{})
 		if err != nil {
 			if errStr := err.Error(); errStr != lastErr {
 				t.Logf("Create PodCertificateRequest foo/bar as node2 failed with error: %v, retrying...", err)
@@ -808,7 +797,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 		// Poll until it succeeds.
 		var lastErr string
 		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("bar").Get(ctx, "foo", metav1.GetOptions{})
+			_, err := node1Client.CertificatesV1().PodCertificateRequests("bar").Get(ctx, "foo", metav1.GetOptions{})
 			if err != nil {
 				if errStr := err.Error(); errStr != lastErr {
 					t.Logf("Get PodCertificateRequest bar/foo as node1 failed with error: %v, retrying...", err)
@@ -828,7 +817,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 		// Poll until it succeeds.
 		var lastErr string
 		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err := node2Client.CertificatesV1beta1().PodCertificateRequests("foo").Get(ctx, "bar", metav1.GetOptions{})
+			_, err := node2Client.CertificatesV1().PodCertificateRequests("foo").Get(ctx, "bar", metav1.GetOptions{})
 			if err != nil {
 				if errStr := err.Error(); errStr != lastErr {
 					t.Logf("Get PodCertificateRequest foo/bar as node2 failed with error: %v, retrying...", err)
@@ -844,13 +833,13 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	})
 
 	// Delete bar/foo
-	err = client.CertificatesV1beta1().PodCertificateRequests("bar").Delete(ctx, "foo", metav1.DeleteOptions{})
+	err = client.CertificatesV1().PodCertificateRequests("bar").Delete(ctx, "foo", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error deleting pcr bar/foo: %v", err)
 	}
 
 	t.Run("node2 can still directly get foo/bar after bar/foo was deleted", func(t *testing.T) {
-		_, err := node2Client.CertificatesV1beta1().PodCertificateRequests("foo").Get(ctx, "bar", metav1.GetOptions{})
+		_, err := node2Client.CertificatesV1().PodCertificateRequests("foo").Get(ctx, "bar", metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error getting foo/bar as node2: %v", err)
 		}
@@ -878,7 +867,6 @@ func TestSignerNameAuthorization(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -938,14 +926,14 @@ func TestSignerNameAuthorization(t *testing.T) {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 
-	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-	makePCR := func() *certsv1beta1.PodCertificateRequest {
-		return &certsv1beta1.PodCertificateRequest{
+	csrData := mustMakeStubPKCS10Request(t)
+	makePCR := func() *certsv1.PodCertificateRequest {
+		return &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   pod.ObjectMeta.Name,
 				PodUID:                    pod.ObjectMeta.UID,
@@ -953,8 +941,7 @@ func TestSignerNameAuthorization(t *testing.T) {
 				ServiceAccountUID:         sa.ObjectMeta.UID,
 				NodeName:                  types.NodeName(node1.ObjectMeta.Name),
 				NodeUID:                   node1.ObjectMeta.UID,
-				PKIXPublicKey:             pubPKIX,
-				ProofOfPossession:         proof,
+				StubPKCS10Request:         csrData,
 				UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
 			},
 		}
@@ -967,7 +954,7 @@ func TestSignerNameAuthorization(t *testing.T) {
 		// durable Forbidden condition.
 		var lastErr string
 		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
+			_, err := node1Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
 			if err == nil || k8serrors.IsForbidden(err) {
 				return true, err
 			}
@@ -986,14 +973,14 @@ func TestSignerNameAuthorization(t *testing.T) {
 
 	// Grant node1 the ability to request the kubernetes.io/foo signer for sa1.
 	authutil.GrantUserAuthorization(t, ctx, client, "system:node:node1", rbacv1.PolicyRule{
-		APIGroups:     []string{certsv1beta1.GroupName},
+		APIGroups:     []string{certsv1.GroupName},
 		Resources:     []string{"kubernetes.io:foo"},
 		Verbs:         []string{"request-serviceaccounts-podcertificate-signer"},
 		ResourceNames: []string{sa.ObjectMeta.Name},
 	})
 
 	t.Run("node1 can create PCR once the signer is authorized via RBAC", func(t *testing.T) {
-		_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
+		_, err := node1Client.CertificatesV1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("PCR creation unexpectedly failed after the signer was authorized: %v", err)
 		}
@@ -1039,15 +1026,15 @@ func podCertificateVolume(signerName string) []corev1.Volume {
 	}
 }
 
-func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+func mustMakeStubPKCS10Request(t *testing.T) []byte {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("Error while generating ed25519 key: %v", err)
 	}
-	pubPKIX, err := x509.MarshalPKIXPublicKey(pub)
+	tmpl := &x509.CertificateRequest{}
+	pkcs10Req, err := x509.CreateCertificateRequest(rand.Reader, tmpl, priv)
 	if err != nil {
-		t.Fatalf("Error while marshaling PKIX public key: %v", err)
+		t.Fatalf("while generating stub PKCS#10 request: %v", err)
 	}
-	sig := ed25519.Sign(priv, toBeSigned)
-	return priv, pub, pubPKIX, sig
+	return pkcs10Req
 }

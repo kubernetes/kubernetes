@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -184,7 +184,7 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 	if oldRc.Generation != newRc.Generation {
-		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), oldRc.Spec.Template, newRc.Spec.Template)
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), newRc.Spec.Template, oldRc.Spec.Template)
 	}
 	return warnings
 }

@@ -68,7 +68,6 @@ type applyData struct {
 	renewCerts                bool
 	allowExperimentalUpgrades bool
 	allowRCUpgrades           bool
-	printConfig               bool
 	cfg                       *kubeadmapi.UpgradeConfiguration
 	initCfg                   *kubeadmapi.InitConfiguration
 	client                    clientset.Interface
@@ -287,7 +286,6 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		renewCerts:                *renewCerts,
 		allowExperimentalUpgrades: *allowExperimentalUpgrades,
 		allowRCUpgrades:           *allowRCUpgrades,
-		printConfig:               *printConfig,
 		cfg:                       upgradeCfg,
 		initCfg:                   initCfg,
 		client:                    client,

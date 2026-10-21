@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 
 	yaml "go.yaml.in/yaml/v2"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	baseversion "k8s.io/component-base/version"
 )
@@ -50,10 +51,11 @@ const (
 )
 
 type featureSpec struct {
-	Default       bool   `yaml:"default" json:"default"`
-	LockToDefault bool   `yaml:"lockToDefault" json:"lockToDefault"`
-	PreRelease    string `yaml:"preRelease" json:"preRelease"`
-	Version       string `yaml:"version" json:"version"`
+	Default                 bool   `yaml:"default" json:"default"`
+	LockToDefault           bool   `yaml:"lockToDefault" json:"lockToDefault"`
+	PreRelease              string `yaml:"preRelease" json:"preRelease"`
+	Version                 string `yaml:"version" json:"version"`
+	MinCompatibilityVersion string `yaml:"minCompatibilityVersion,omitempty" json:"minCompatibilityVersion,omitempty"`
 }
 
 type featureInfo struct {
@@ -503,6 +505,13 @@ func parseFeatureSpec(variables map[string]ast.Expr, v ast.Expr) (featureSpec, e
 					return spec, err
 				}
 				spec.Version = ver
+
+			case "MinCompatibilityVersion":
+				ver, err := parseVersion(eltType.Value)
+				if err != nil {
+					return spec, err
+				}
+				spec.MinCompatibilityVersion = ver
 			}
 
 		default:

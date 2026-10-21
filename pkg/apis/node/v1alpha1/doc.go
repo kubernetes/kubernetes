@@ -22,7 +22,7 @@ limitations under the License.
 // will default RuntimeClass's overhead.podFixed field.
 // +k8s:defaulter-gen=false
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-input=k8s.io/api/node/v1alpha1
 
 // +groupName=node.k8s.io

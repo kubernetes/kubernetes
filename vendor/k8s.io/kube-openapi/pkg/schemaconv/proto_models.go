@@ -21,8 +21,9 @@ import (
 	"path"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v7/schema"
+
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/v6/schema"
 )
 
 // ToSchema converts openapi definitions into a schema suitable for structured

@@ -546,6 +546,8 @@ func (p *SourcePath) appendFieldOptions_FeatureSupport(b []byte) []byte {
 		b = p.appendSingularField(b, "deprecation_warning", nil)
 	case 4:
 		b = p.appendSingularField(b, "edition_removed", nil)
+	case 5:
+		b = p.appendSingularField(b, "removal_error", nil)
 	}
 	return b
 }

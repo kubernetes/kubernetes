@@ -23,12 +23,12 @@ import (
 
 	"github.com/onsi/gomega"
 
+	"k8s.io/client-go/ktesting"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 )
 
@@ -61,20 +61,38 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 	subTests := map[string]struct {
 		test                gateOnFunc
 		driverResourcesFunc getResources
-		// gates lists the feature gates to start ON in phase 0, toggle OFF in phase 1, and re-enable in phase 2.
-		gates []string
+		// enabledGates lists the feature gates that are enabled throughout the test.
+		enabledGates []string
+		// toggledGates lists the feature gates to start ON in phase 0, toggle OFF in phase 1, and re-enable in phase 2.
+		toggledGates []string
 		// emulatedVersion, if non-empty, is passed as EMULATED_VERSION to local-up-cluster.sh.
 		// Set this to the last version where the gates were still toggleable so the test
 		// keeps working once those gates become locked in a future release.
-		emulatedVersion string
+		emulatedVersion    string
+		extraRuntimeConfig string
 	}{
 		"extended-resource": {
 			test:                extendedResourceGateCycle,
 			driverResourcesFunc: extendedResourcesDriverResources,
-			gates:               []string{"DRAExtendedResource"},
+			toggledGates:        []string{"DRAExtendedResource"},
 			// Emulate 1.36 so that gates which are locked in the current binary
 			// remain toggleable. DRAExtendedResource is toggleable in 1.36.
 			emulatedVersion: "1.36",
+		},
+		"workload-resourceclaims": {
+			test:                workloadResourceClaimsGateCycle,
+			driverResourcesFunc: workloadResourceClaimsDriverResources,
+			enabledGates:        []string{"GenericWorkload"},
+			toggledGates:        []string{"DRAWorkloadResourceClaims"},
+			extraRuntimeConfig:  "scheduling.k8s.io/v1beta1",
+		},
+		"compatibility-groups": {
+			test:                compatibilityGroupsGateCycle,
+			driverResourcesFunc: compatibilityGroupsDriverResources,
+			toggledGates:        []string{"DRADeviceCompatibilityGroups"},
+			// DRADeviceCompatibilityGroups is alpha and toggleable starting in 1.37;
+			// emulate that version so the test keeps working once the gate locks.
+			emulatedVersion: "1.37",
 		},
 	}
 
@@ -88,11 +106,14 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			localUpClusterEnv := map[string]string{
 				"RUNTIME_CONFIG": localUpClusterRuntimeConfig,
 			}
+			if def.extraRuntimeConfig != "" {
+				localUpClusterEnv["RUNTIME_CONFIG"] += "," + def.extraRuntimeConfig
+			}
 			if def.emulatedVersion != "" {
 				localUpClusterEnv["EMULATED_VERSION"] = def.emulatedVersion
 			}
 			phase := "phase-0-gate-on"
-			cluster.Start(tCtx, phase, dir, localUpClusterEnv, turnFgOn(def.gates))
+			cluster.Start(tCtx, phase, dir, localUpClusterEnv, turnFgOn(def.enabledGates)+","+turnFgOn(def.toggledGates))
 
 			restConfig := cluster.LoadConfig(tCtx)
 			restConfig.UserAgent = restclient.DefaultKubernetesUserAgent() + " -- dra"
@@ -119,7 +140,13 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			// ---- Phase 1: gate(s) OFF ----
 			phase = "phase-1-gate-off"
-			cluster.ToggleFeatureGates(tCtx, phase, turnFgOff(def.gates))
+			// With the gate off, the apiserver is expected to drop the gated fields
+			// from any ResourceSlice the driver (re)publishes - the kubelet wipes the
+			// slices when it restarts, so the driver re-creates them and the create is
+			// stripped. Tolerate those expected drops until the gate is back on and the
+			// slices have been re-published.
+			driver.SetExpectDroppedFields(true)
+			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOff(def.toggledGates))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
 
 			var gateOnAgainFn gateOnAgainFunc
@@ -129,8 +156,19 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			// ---- Phase 2: gate(s) ON again ----
 			phase = "phase-2-gate-on-again"
-			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.gates))
+			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOn(def.toggledGates))
+			// While the gate was off, the apiserver dropped the gated fields, and the
+			// resourceslice controller latched its desired state to the stored
+			// (stripped) result to avoid a hot update loop. Without re-publishing, the
+			// driver keeps publishing slices without the gated fields even though the
+			// apiserver now accepts them. ToggleFeatureGates only returns once the
+			// gate-on apiserver is ready, so this re-publish is guaranteed to reach an
+			// apiserver that preserves the fields.
+			driver.PublishResources(tCtx, def.driverResourcesFunc(nodes))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
+			// The gate is back on and the slices have been re-published with the gated
+			// fields, so from here on any dropped-field error would be a real bug.
+			driver.SetExpectDroppedFields(false)
 
 			tCtx.Run(phase, func(tCtx ktesting.TContext) {
 				gateOnAgainFn(tCtx)

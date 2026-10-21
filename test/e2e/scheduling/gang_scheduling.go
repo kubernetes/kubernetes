@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,7 +40,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 		cs := f.ClientSet
 		ns := f.Namespace.Name
 		ginkgo.By("Deleting PodGroup")
-		err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(ctx, pgName, metav1.DeleteOptions{})
+		err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, pgName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete PodGroup")
 	}
 
@@ -50,20 +50,20 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 
 		ginkgo.By("Creating a PodGroup with MinCount=2")
 		pgName := "test-pg"
-		pg := &schedulingv1alpha3.PodGroup{
+		pg := &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pgName,
 				Namespace: ns,
 			},
-			Spec: schedulingv1alpha3.PodGroupSpec{
-				SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.GangSchedulingPolicy{
+			Spec: schedulingv1beta1.PodGroupSpec{
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Gang: &schedulingv1beta1.GangSchedulingPolicy{
 						MinCount: 2,
 					},
 				},
 			},
 		}
-		_, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
+		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create PodGroup")
 		defer removePodGroup(ctx, pgName)
 
@@ -103,18 +103,18 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 
 		ginkgo.By("Creating a PodGroup with Basic policy")
 		pgName := "test-pg"
-		pg := &schedulingv1alpha3.PodGroup{
+		pg := &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pgName,
 				Namespace: ns,
 			},
-			Spec: schedulingv1alpha3.PodGroupSpec{
-				SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-					Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+			Spec: schedulingv1beta1.PodGroupSpec{
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 				},
 			},
 		}
-		_, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
+		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create PodGroup")
 
 		ginkgo.By("Creating first pod in the group")

@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
 )
@@ -58,7 +57,7 @@ func TestPodAndContainer(t *testing.T) {
 	tests := []struct {
 		args              []string
 		argsLenAtDash     int
-		p                 *ExecOptions
+		flags             *ExecFlags
 		name              string
 		expectError       bool
 		expectedPod       string
@@ -67,27 +66,27 @@ func TestPodAndContainer(t *testing.T) {
 		obj               *corev1.Pod
 	}{
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "empty",
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd",
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			flags:         &ExecFlags{ContainerName: "bar"},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd, w/ container",
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: 0,
 			expectError:   true,
@@ -95,7 +94,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo"},
 			argsLenAtDash: -1,
 			expectError:   true,
@@ -103,7 +102,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: 1,
 			expectedPod:   "foo",
@@ -112,7 +111,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: -1,
 			expectError:   true,
@@ -120,7 +119,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			flags:         &ExecFlags{ContainerName: "bar"},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: -1,
 			expectError:   true,
@@ -128,7 +127,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo", "cmd", "bar"},
 			argsLenAtDash: 2,
 			expectError:   true,
@@ -136,7 +135,7 @@ func TestPodAndContainer(t *testing.T) {
 			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{},
+			flags:         &ExecFlags{},
 			args:          []string{"foo", "--any-flag", "any-value"},
 			argsLenAtDash: -1,
 			expectError:   true,
@@ -159,14 +158,16 @@ func TestPodAndContainer(t *testing.T) {
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
-			options := test.p
-			options.ErrOut = bytes.NewBuffer([]byte{})
-			options.Out = bytes.NewBuffer([]byte{})
-			err = options.Complete(tf, cmd, test.args, test.argsLenAtDash)
+			flags := test.flags
+			flags.ErrOut = bytes.NewBuffer([]byte{})
+			flags.Out = bytes.NewBuffer([]byte{})
+			options, err := flags.ToOptions(tf, cmd, test.args, test.argsLenAtDash)
 			if !test.expectError && err != nil {
 				t.Errorf("%s: unexpected error: %v", test.name, err)
 			}
-			err = options.Validate()
+			if err == nil {
+				err = options.Validate()
+			}
 
 			if test.expectError && err == nil {
 				t.Errorf("%s: unexpected non-error", test.name)
@@ -247,20 +248,19 @@ func TestExec(t *testing.T) {
 			if test.execErr {
 				ex.execErr = fmt.Errorf("exec error")
 			}
-			params := &ExecOptions{
-				StreamOptions: StreamOptions{
-					PodName:       "foo",
-					ContainerName: "bar",
-					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
-				},
-				Executor: ex,
+			flags := &ExecFlags{
+				ContainerName: "bar",
+				IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
 			args := []string{"pod/foo", "--", "command"}
-			if err := params.Complete(tf, cmd, args, 1); err != nil {
+			params, err := flags.ToOptions(tf, cmd, args, 1)
+			if err != nil {
 				t.Fatal(err)
 			}
-			err := params.Run()
+			params.PodName = "foo"
+			params.Executor = ex
+			err = params.Run()
 			if test.execErr && err != ex.execErr {
 				t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 				return
@@ -427,7 +427,7 @@ func TestCreateExecutor(t *testing.T) {
 		t.Fatalf("unable to parse test url: %v", err)
 	}
 	config := cmdtesting.DefaultClientConfig()
-	// First, ensure that no environment variable creates the fallback executor.
+	// WebSockets with SPDY fallback is always used.
 	executor, err := createExecutor(url, config)
 	if err != nil {
 		t.Fatalf("unable to create executor: %v", err)
@@ -435,22 +435,5 @@ func TestCreateExecutor(t *testing.T) {
 	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
-	// Next, check turning on feature flag explicitly also creates fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
-	executor, err = createExecutor(url, config)
-	if err != nil {
-		t.Fatalf("unable to create executor: %v", err)
-	}
-	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
-		t.Errorf("expected fallback executor, got %#v", executor)
-	}
-	// Finally, check explicit disabling does NOT create the fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
-	executor, err = createExecutor(url, config)
-	if err != nil {
-		t.Fatalf("unable to create executor: %v", err)
-	}
-	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
-		t.Errorf("expected fallback executor, got %#v", executor)
-	}
+
 }

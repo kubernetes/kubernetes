@@ -38,6 +38,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
@@ -49,7 +50,6 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -243,6 +243,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
+		false,
 		false,
 		fakeContainerStatsProvider{},
 	)
@@ -479,6 +480,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		true,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -657,6 +659,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -812,6 +815,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
+		false,
 		fakeContainerStatsProvider,
 	)
 
@@ -895,6 +899,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
+		false,
 		false,
 		fakeContainerStatsProvider{},
 	)

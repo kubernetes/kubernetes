@@ -35,6 +35,14 @@ message PodResources {
     string name = 1;
     string namespace = 2;
     repeated ContainerResources containers = 3;
+    // List of exclusive CPU ids allocated at the pod level. Populated only when
+    // the pod has a pod-level exclusive allocation. CPUs exclusively assigned
+    // to individual containers within the pod are also included here, so
+    // pod-level and container-level cpu_ids intentionally overlap.
+    repeated int64 cpu_ids = 4;
+    // List of memory blocks allocated at the pod level, following the same
+    // population and overlap semantics as cpu_ids.
+    repeated ContainerMemory memory = 5;
 }
 
 // ContainerResources contains information about the resources assigned to a container
@@ -46,7 +54,7 @@ message ContainerResources {
     repeated DynamicResource dynamic_resources = 5;
 }
 
-// ContainerMemory contains information about memory and hugepages assigned to a container
+// ContainerMemory contains information about memory and hugepages assigned to a pod / container
 message ContainerMemory {
     string memory_type = 1;
     uint64 size = 2;

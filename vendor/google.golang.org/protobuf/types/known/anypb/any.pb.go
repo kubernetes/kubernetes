@@ -128,120 +128,66 @@ import (
 // `Any` contains an arbitrary serialized protocol buffer message along with a
 // URL that describes the type of the serialized message.
 //
-// Protobuf library provides support to pack/unpack Any values in the form
-// of utility functions or additional generated methods of the Any type.
+// In its binary encoding, an `Any` is an ordinary message; but in other wire
+// forms like JSON, it has a special encoding. The format of the type URL is
+// described on the `type_url` field.
 //
-// Example 1: Pack and unpack a message in C++.
+// Protobuf APIs provide utilities to interact with `Any` values:
 //
-//	Foo foo = ...;
-//	Any any;
-//	any.PackFrom(foo);
-//	...
-//	if (any.UnpackTo(&foo)) {
-//	  ...
-//	}
+//   - A 'pack' operation accepts a message and constructs a generic `Any` wrapper
+//     around it.
+//   - An 'unpack' operation reads the content of an `Any` message, either into an
+//     existing message or a new one. Unpack operations must check the type of the
+//     value they unpack against the declared `type_url`.
+//   - An 'is' operation decides whether an `Any` contains a message of the given
+//     type, i.e. whether it can 'unpack' that type.
 //
-// Example 2: Pack and unpack a message in Java.
+// The JSON format representation of an `Any` follows one of these cases:
 //
-//	   Foo foo = ...;
-//	   Any any = Any.pack(foo);
-//	   ...
-//	   if (any.is(Foo.class)) {
-//	     foo = any.unpack(Foo.class);
-//	   }
-//	   // or ...
-//	   if (any.isSameTypeAs(Foo.getDefaultInstance())) {
-//	     foo = any.unpack(Foo.getDefaultInstance());
-//	   }
+//   - For types without special-cased JSON encodings, the JSON format
+//     representation of the `Any` is the same as that of the message, with an
+//     additional `@type` field which contains the type URL.
+//   - For types with special-cased JSON encodings (typically called 'well-known'
+//     types, listed in https://protobuf.dev/programming-guides/json/#any), the
+//     JSON format representation has a key `@type` which contains the type URL
+//     and a key `value` which contains the JSON-serialized value.
 //
-//	Example 3: Pack and unpack a message in Python.
-//
-//	   foo = Foo(...)
-//	   any = Any()
-//	   any.Pack(foo)
-//	   ...
-//	   if any.Is(Foo.DESCRIPTOR):
-//	     any.Unpack(foo)
-//	     ...
-//
-//	Example 4: Pack and unpack a message in Go
-//
-//	    foo := &pb.Foo{...}
-//	    any, err := anypb.New(foo)
-//	    if err != nil {
-//	      ...
-//	    }
-//	    ...
-//	    foo := &pb.Foo{}
-//	    if err := any.UnmarshalTo(foo); err != nil {
-//	      ...
-//	    }
-//
-// The pack methods provided by protobuf library will by default use
-// 'type.googleapis.com/full.type.name' as the type URL and the unpack
-// methods only use the fully qualified type name after the last '/'
-// in the type URL, for example "foo.bar.com/x/y.z" will yield type
-// name "y.z".
-//
-// JSON
-// ====
-// The JSON representation of an `Any` value uses the regular
-// representation of the deserialized, embedded message, with an
-// additional field `@type` which contains the type URL. Example:
-//
-//	package google.profile;
-//	message Person {
-//	  string first_name = 1;
-//	  string last_name = 2;
-//	}
-//
-//	{
-//	  "@type": "type.googleapis.com/google.profile.Person",
-//	  "firstName": <string>,
-//	  "lastName": <string>
-//	}
-//
-// If the embedded message type is well-known and has a custom JSON
-// representation, that representation will be embedded adding a field
-// `value` which holds the custom JSON in addition to the `@type`
-// field. Example (for message [google.protobuf.Duration][]):
-//
-//	{
-//	  "@type": "type.googleapis.com/google.protobuf.Duration",
-//	  "value": "1.212s"
-//	}
+// The text format representation of an `Any` is like a message with one field
+// whose name is the type URL in brackets. For example, an `Any` containing a
+// `foo.Bar` message may be written `[type.googleapis.com/foo.Bar] { a: 2 }`.
 type Any struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// A URL/resource name that uniquely identifies the type of the serialized
-	// protocol buffer message. This string must contain at least
-	// one "/" character. The last segment of the URL's path must represent
-	// the fully qualified name of the type (as in
-	// `path/google.protobuf.Duration`). The name should be in a canonical form
-	// (e.g., leading "." is not accepted).
+	// Identifies the type of the serialized Protobuf message with a URI reference
+	// consisting of a prefix ending in a slash and the fully-qualified type name.
 	//
-	// In practice, teams usually precompile into the binary all types that they
-	// expect it to use in the context of Any. However, for URLs which use the
-	// scheme `http`, `https`, or no scheme, one can optionally set up a type
-	// server that maps type URLs to message definitions as follows:
+	// Example: type.googleapis.com/google.protobuf.StringValue
 	//
-	//   - If no scheme is provided, `https` is assumed.
-	//   - An HTTP GET on the URL must yield a [google.protobuf.Type][]
-	//     value in binary format, or produce an error.
-	//   - Applications are allowed to cache lookup results based on the
-	//     URL, or have them precompiled into a binary to avoid any
-	//     lookup. Therefore, binary compatibility needs to be preserved
-	//     on changes to types. (Use versioned type names to manage
-	//     breaking changes.)
+	// This string must contain at least one `/` character, and the content after
+	// the last `/` must be the fully-qualified name of the type in canonical
+	// form, without a leading dot. Do not write a scheme on these URI references
+	// so that clients do not attempt to contact them.
 	//
-	// Note: this functionality is not currently available in the official
-	// protobuf release, and it is not used for type URLs beginning with
-	// type.googleapis.com. As of May 2023, there are no widely used type server
-	// implementations and no plans to implement one.
+	// The prefix is arbitrary and Protobuf implementations are expected to
+	// simply strip off everything up to and including the last `/` to identify
+	// the type. `type.googleapis.com/` is a common default prefix that some
+	// legacy implementations require. This prefix does not indicate the origin of
+	// the type, and URIs containing it are not expected to respond to any
+	// requests.
 	//
-	// Schemes other than `http`, `https` (or the empty scheme) might be
-	// used with implementation specific semantics.
+	// All type URL strings must be legal URI references with the additional
+	// restriction (for the text format) that the content of the reference
+	// must consist only of alphanumeric characters, percent-encoded escapes, and
+	// characters in the following set (not including the outer backticks):
+	// `/-.~_!$&()*+,;=`. Despite our allowing percent encodings, implementations
+	// should not unescape them to prevent confusion with existing parsers. For
+	// example, `type.googleapis.com%2FFoo` should be rejected.
+	//
+	// In the original design of `Any`, the possibility of launching a type
+	// resolution service at these type URLs was considered but Protobuf never
+	// implemented one and considers contacting these URLs to be problematic and
+	// a potential security issue. Do not attempt to contact type URLs.
 	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"`
-	// Must be a valid serialized protocol buffer of the above specified type.
+	// Holds a Protobuf serialization of the type described by type_url.
 	Value         []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

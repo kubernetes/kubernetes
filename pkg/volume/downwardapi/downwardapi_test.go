@@ -20,19 +20,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -193,6 +199,120 @@ func TestDownwardAPI(t *testing.T) {
 			step.run(test)
 		}
 		test.tearDown()
+	}
+}
+
+func TestCollectDataWithUser(t *testing.T) {
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
+
+	cases := []struct {
+		name     string
+		mappings []v1.DownwardAPIVolumeFile
+		mode     int32
+		user     *int64
+		payload  map[string]util.FileProjection
+
+		disableUserFieldsGate bool
+	}{
+		{
+			name: "mapping with defaultUser",
+			mappings: []v1.DownwardAPIVolumeFile{
+				{
+					Path: "namespace_file_name",
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+		},
+		{
+			name: "mapping with User",
+			mappings: []v1.DownwardAPIVolumeFile{
+				{
+					Path: "namespace_file_name",
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+					User: &caseMappingUser1,
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+		},
+		{
+			name: "mapping with defaultUser and User",
+			mappings: []v1.DownwardAPIVolumeFile{
+				{
+					Path: "namespace_file_name",
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+					User: &caseMappingUser2,
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+		},
+		{
+			name: "user fields with disabled feature gate",
+			mappings: []v1.DownwardAPIVolumeFile{
+				{
+					Path: "namespace_file_name",
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+					User: &caseMappingUser2,
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644},
+			},
+			disableUserFieldsGate: true,
+		},
+	}
+
+	for _, tc := range cases {
+		if tc.disableUserFieldsGate {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, !tc.disableUserFieldsGate)
+
+		pod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testName,
+				Namespace: testNamespace,
+				UID:       testPodUID,
+			},
+		}
+		clientset := fake.NewSimpleClientset(&pod)
+		tempDir, host := newTestHost(t, clientset)
+		defer func() {
+			if err := os.RemoveAll(tempDir); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		actualPayload, err := CollectData(tc.mappings, &pod, host, &tc.mode, tc.user)
+		if err != nil {
+			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
+			continue
+		}
+		if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: expected and actual payload do not match", tc.name)
+		}
 	}
 }
 

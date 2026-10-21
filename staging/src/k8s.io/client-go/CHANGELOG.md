@@ -4,6 +4,97 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### SharedInformer: add SetShardSelector
+
+Mock implementations of the SharedInformer or SharedIndexInformer interfaces
+have to add a SetShardSelector implementation.
+
+```
+- ./tools/cache.SharedInformer.SetShardSelector: added
+...
+```
+
+### More flexible util/testing.CloseAndRemove
+
+Callers are no longer restricted to passing exactly a testing.T instance.
+Existing calls still work, only usage of CloseAndRemove as a function pointer
+has to be adapted.
+
+Note that `CloseAndRemove(&testing.T{})` is broken, also without this change:
+the test crashes in case of a problem. The new `FatalToError(&err)` can be used to
+capture problems in an error. E2E tests can use `GinkgoTB()`.
+
+```
+- ./util/testing.CloseAndRemove: changed from func(*testing.T, ...*os.File) to func(TB, ...*os.File)
+```
+
+### Dynamic shared informer factory: add StartWithContext
+
+The same change was made earlier for the type informer factory:
+the new API supports contextual logging because a logger can
+be attached to the context.
+
+Mock implementations of the DynamicSharedInformerFactory have to add a
+StartWithContext implementation.
+
+```
+- ./dynamic/dynamicinformer.DynamicSharedInformerFactory.StartWithContext: added
+```
+
+### sigs.k8s.io/structured-merge-diff/v7 upgrade
+
+The signature of csaupgrade.FindFieldsOwners changed from sigs.k8s.io/structured-merge-diff/v6 to sigs.k8s.io/structured-merge-diff/v7 types.
+
+```
+- ./util/csaupgrade.FindFieldsOwners: changed from func([]k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry, k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsOperationType, *sigs.k8s.io/structured-merge-diff/v6/fieldpath.Set) []k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry to func([]k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry, k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsOperationType, *sigs.k8s.io/structured-merge-diff/v7/fieldpath.Set) []k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry
+```
+
+### Type-safe informers
+
+All code using the result of the generated client-go Informer() methods (a
+cache.SharedIndexInformer) constantly has to do type casts from "any" to the
+actual type of the objects managed by the informer.
+
+This is:
+- annoying at best
+- often done inconsistently (should failed type assertions be logged and if so, how?)
+- a source of bugs (not handling DeletedFinalStateUnknown, type in event handler not matching the type in the informer)
+
+In contrast, the Lister() result is typed. Now the new TypedInformer() methods
+return a variant of the traditional interfaces where event handlers are called
+with objects already cast to the correct type.
+
+Adding this method to each generated informer interface is a breaking
+change. Someone who mocks those interfaces may have to add the TypedInformer
+method to their mock.
+
+
+```
+...
+- ./informers/apps/v1.Interface.ControllerRevisions: changed from func() ControllerRevisionInformer to func() TypedControllerRevisionInformer
+- ./informers/apps/v1.Interface.DaemonSets: changed from func() DaemonSetInformer to func() TypedDaemonSetInformer
+- ./informers/apps/v1.Interface.Deployments: changed from func() DeploymentInformer to func() TypedDeploymentInformer
+- ./informers/apps/v1.ReplicaSetInformer: changed from ReplicaSetInformer to ReplicaSetInformer
+...
+```
+
+### mutation cache: support informer events
+
+Calling OnAddOrUpdate and OnDelete from event handlers is optional. Calling
+them has the advantage that the mutation cache is updated sooner. It also fixes
+incorrectly reporting a locally updated item when a) using "include adds" and
+b) the updated item got deleted in the apiserver and informer cache.
+
+Although formally a Go API break because the MutationCache interface gets
+extended, in practice that interface is expected to have only the single
+implementation in client-go itself, so no-one should be affected by this.
+
+```
+- ./tools/cache.MutationCache.OnAddOrUpdate: added
+- ./tools/cache.MutationCache.OnDelete: added
+- ./tools/cache.MutationCache.internal: added unexported method
+```
+
 ### restmapper + discovery: add context-aware APIs
 
 See [PR #129109](https://github.com/kubernetes/kubernetes/pull/129109).

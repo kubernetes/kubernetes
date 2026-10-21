@@ -9,7 +9,7 @@ metadata:
     label3: value3
     label4: value4
 spec:
-  priority: 9999999
+  priority: 10000
   terminationGracePeriodSeconds: 0
   containers:
   - image: registry.k8s.io/pause:3.10.1

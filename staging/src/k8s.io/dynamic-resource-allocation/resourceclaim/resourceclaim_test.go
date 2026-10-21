@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -173,6 +173,12 @@ func TestResourceClaimIsFor(t *testing.T) {
 				pod:           podOwner,
 				claim:         claimNoOwner,
 				expectedError: `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
+			},
+			"accept-podgroup-without-podgroup": {
+				pod:            podOwner,
+				claim:          claimNoOwner,
+				expectedError:  `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
+				acceptPodGroup: true,
 			},
 			"different-namespace": {
 				pod:           podOwner,

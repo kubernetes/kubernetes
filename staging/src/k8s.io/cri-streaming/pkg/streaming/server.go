@@ -59,6 +59,11 @@ type Server interface {
 
 // Runtime is the interface to execute the commands and provide the streams.
 type Runtime interface {
+	// Exec executes a command in a container.
+	//
+	// If the command terminates with a non-zero exit code, Exec should return
+	// a [remotecommandserver.ExitError]. In particular, [*os/exec.ExitError]
+	// satisfies this contract.
 	Exec(ctx context.Context, containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error
 	Attach(ctx context.Context, containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error
 	PortForward(ctx context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error
@@ -363,9 +368,11 @@ type criAdapter struct {
 	Runtime
 }
 
-var _ remotecommandserver.Executor = &criAdapter{}
-var _ remotecommandserver.Attacher = &criAdapter{}
-var _ portforward.PortForwarder = &criAdapter{}
+var (
+	_ remotecommandserver.Executor = &criAdapter{}
+	_ remotecommandserver.Attacher = &criAdapter{}
+	_ portforward.PortForwarder    = &criAdapter{}
+)
 
 func (a *criAdapter) ExecInContainer(ctx context.Context, podName string, podUID string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize, timeout time.Duration) error {
 	return a.Runtime.Exec(ctx, container, cmd, in, out, err, tty, resize)

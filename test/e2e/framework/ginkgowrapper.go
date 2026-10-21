@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -29,8 +30,10 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/version"
 )
 
 // Feature is the name of a certain feature that the cluster under test must have.
@@ -261,12 +264,12 @@ func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text
 // leafNodeLabels contains labels that
 // - might get added multiple times while constructing the spec tree and
 // - only need to be shown once and
-// - is very likely not considered part of the full test name string.
+// - are very likely not considered part of the full test name string.
 //
-// Injecting their tag multiple times directly into the text at the place which
-// triggers their addition, they get only added as label (not visible) and the
-// text then gets added at the end of the leaf node text (= ginkgo.It name)
-// based on the previously added labels.
+// Instead of injecting their tag multiple times directly into the text at the
+// place which triggers their addition, they get only added as label (not
+// visible) and the text then gets added at the end of the leaf node text (=
+// ginkgo.It name) based on the previously added labels.
 //
 // The initial set contains the labels defined in the E2E framework. Feature
 // gate stability texts (Alpha, Beta, etc.) and feature gate dependencies
@@ -275,6 +278,7 @@ func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text
 // they simply aren't known upfront.
 var leafNodeLabels = sets.New[string](
 	"Conformance",
+	"FutureConformance",
 	"Disruptive",
 	"Feature:OffByDefault",
 	"Flaky",
@@ -349,13 +353,49 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 		}
 	}
 
+	var providerChecks [][]string
+	skipUnlessProviderIs := func() {
+		for _, supportedProviders := range providerChecks {
+			if !ProviderIs(supportedProviders...) {
+				ginkgo.Skip(fmt.Sprintf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider))
+			}
+		}
+	}
+	injectSkipUnlessProviderIs := func() {
+		if leafNode {
+			// Check directly inside It.
+			skipUnlessProviderIs()
+		} else {
+			// Insert BeforeEach with the same check.
+			ginkgo.BeforeEach(skipUnlessProviderIs)
+		}
+	}
+
 	haveEmptyStrings := false
+	var conformanceArg *conformance
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case featureGate:
 			addFeatureGate(arg.name, arg.spec, true)
+		case conformance:
+			// Record the "best" WithConformance/WithConformanceVersion arg,
+			// where versioned conformance overrides unversioned.
+			if conformanceArg == nil || arg.version != "" {
+				conformanceArg = &arg
+			}
 		case label:
-			fullLabel := strings.Join(arg.parts, ":")
+			fullLabel := arg.String()
+			if arg.parts[0] == "Provider" {
+				providerChecks = append(providerChecks, strings.Split(arg.parts[1], ","))
+				// Only add text, not as label: Ginkgo labels must not contain commas.
+				// We could split up into separate labels, but then the semantic is not clear:
+				// [Provider:gce,aws] means "provider must be one of these two",
+				// but [Provider:gce] [Provider:aws] could be either that or "must be
+				// gce and aws", i.e. the test always needs to be skipped (for example,
+				// because there are different independent WithProvider calls in different places).
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+				continue
+			}
 			addLabel(fullLabel)
 			if !leafNodeLabels.Has(fullLabel) {
 				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
@@ -377,8 +417,62 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 				haveEmptyStrings = true
 			}
 			texts = append(texts, arg)
+		case func(context.Context):
+			// Wrapping shows up in stack backtraces. Avoid it if possible.
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx context.Context) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func(ginkgo.SpecContext):
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx ginkgo.SpecContext) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func():
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func() {
+					injectSkipUnlessProviderIs()
+					body()
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
+		}
+	}
+
+	if conformanceArg != nil {
+		if conformanceArg.version == "" {
+			// We have only an unversioned conformance tag.
+			addLabel("Conformance")
+		} else {
+			// Add either "Conformance" or "FutureConformance" depending on the
+			// version, and add a semver constraint either way.
+			k8sVersion := utilversion.MustParseMajorMinor(version.DefaultKubeBinaryVersion)
+			conformanceVersion := utilversion.MustParseMajorMinor(conformanceArg.version)
+			if k8sVersion.AtLeast(conformanceVersion) {
+				addLabel("Conformance")
+			} else {
+				addLabel("FutureConformance")
+			}
+			// While ginkgo lets us have multiple "Conformance" constraints,
+			// we can't actually use this to list "base release plus releases
+			// where the test changed" like the conformance Release comment
+			// does, because ginkgo uses only the *most-restrictive*
+			// constraint, so running with
+			// `-ginkgo.sem-ver-filter="Conformance=1.30"` would skip a test
+			// with `[Conformance: [>=1.21 >=1.35]]`, which is the opposite of
+			// what we want.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.ComponentSemVerConstraint("Conformance", ">="+conformanceArg.version))
 		}
 	}
 
@@ -639,6 +733,33 @@ func withEnvironment(name Environment) interface{} {
 	return newLabel("Environment", string(name))
 }
 
+// WithProvider specifies that a certain test or group of tests depend on
+// features that are only available with one of the listed cluster providers.
+// It inserts the [Provider: <provider1>,<provider2>, ...] tag into the test name
+// and injects a runtime skip check at the start of the function.
+//
+// Filtering by provider is a legacy mechanism with unclear semantics: which
+// provider supports which features is undefined. Prefer defining features and
+// calling WithFeature instead.
+//
+// Note that this must come before the function in the Describe/Context/It call!
+func WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+// WithProvider is a shorthand for the corresponding package function.
+func (f *Framework) WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+func withProvider(providers []string) interface{} {
+	return newLabel("Provider", strings.Join(providers, ","))
+}
+
+type conformance struct {
+	version string
+}
+
 // WithConformance specifies that a certain test or group of tests must pass in
 // all conformant Kubernetes clusters. The return value may be passed as additional
 // argument to the framework wrappers and the Ginkgo functions directly.
@@ -652,7 +773,22 @@ func (f *Framework) WithConformance() interface{} {
 }
 
 func withConformance() interface{} {
-	return newLabel("Conformance")
+	return conformance{}
+}
+
+// WithConformanceVersion specifies that a certain test or group of tests must pass in all
+// conformant Kubernetes clusters starting with the indicated version.
+func WithConformanceVersion(version string) interface{} {
+	return withConformanceVersion(version)
+}
+
+// WithConformanceVersion is a shorthand for the corresponding package function.
+func (f *Framework) WithConformanceVersion(version string) interface{} {
+	return withConformanceVersion(version)
+}
+
+func withConformanceVersion(version string) interface{} {
+	return conformance{version: version}
 }
 
 // WithNodeConformance specifies that a certain test or group of tests for node
@@ -783,37 +919,27 @@ func withKubeletMinVersion(version string) interface{} {
 	return newLabel("KubeletMinVersion", version)
 }
 
+// label must be comparable, some code uses that to detect feature.Windows.
 type label struct {
 	// parts get concatenated with ":" to build the full label.
-	parts []string
+	parts [2]string
+	len   int
+}
+
+func (l label) String() string {
+	if l.len == 2 {
+		return l.parts[0] + ":" + l.parts[1]
+	}
+	return l.parts[0]
 }
 
 func newLabel(parts ...string) label {
-	return label{
-		parts: parts,
-	}
-}
-
-// TagsEqual can be used to check whether two tags are the same.
-// It's safe to compare e.g. the result of WithSlow() against the result
-// of WithSerial(), the result will be false. False is also returned
-// when a parameter is some completely different value.
-func TagsEqual(a, b interface{}) bool {
-	switch a := a.(type) {
-	case label:
-		b, ok := b.(label)
-		if !ok {
-			return false
-		}
-		return slices.Equal(a.parts, b.parts)
-	case featureGate:
-		b, ok := b.(featureGate)
-		if !ok {
-			return false
-		}
-		return a == b
+	switch len(parts) {
+	case 1:
+		return label{parts: [2]string{parts[0], ""}, len: 1}
+	case 2:
+		return label{parts: [2]string{parts[0], parts[1]}, len: 2}
 	default:
-		// Unknown tag, cannot compare.
-		return false
+		panic(fmt.Sprintf("invalid number of part strings: %v", parts))
 	}
 }

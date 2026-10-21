@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -78,6 +78,32 @@ type Struct struct {
 
 	// +k8s:forbidden
 	MapTypedefField MapType `json:"mapTypedefField"`
+}
+
+type PayloadStruct struct {
+	TypeMeta int
+
+	// +k8s:forbidden="custom string msg"
+	StringField string `json:"stringField"`
+
+	// +k8s:forbidden="custom pointer msg"
+	StringPtrField *string `json:"stringPtrField"`
+
+	// +k8s:forbidden="custom slice msg"
+	SliceField []string `json:"sliceField"`
+
+	// +k8s:forbidden="custom map msg"
+	MapField map[string]string `json:"mapField"`
+}
+
+type OptionsStruct struct {
+	TypeMeta int
+
+	// +k8s:ifEnabled(Enabled)=+k8s:forbidden="custom enabled msg"
+	EnabledField string `json:"enabledField"`
+
+	// +k8s:ifDisabled(Disabled)=+k8s:forbidden="custom disabled msg"
+	DisabledField string `json:"disabledField"`
 }
 
 type StringType string

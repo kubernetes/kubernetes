@@ -24,8 +24,12 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CertificateSigningRequests returns a CertificateSigningRequestInformer.
-	CertificateSigningRequests() CertificateSigningRequestInformer
+	// CertificateSigningRequests returns a TypedCertificateSigningRequestInformer.
+	CertificateSigningRequests() TypedCertificateSigningRequestInformer
+	// ClusterTrustBundles returns a TypedClusterTrustBundleInformer.
+	ClusterTrustBundles() TypedClusterTrustBundleInformer
+	// PodCertificateRequests returns a TypedPodCertificateRequestInformer.
+	PodCertificateRequests() TypedPodCertificateRequestInformer
 }
 
 type version struct {
@@ -39,7 +43,17 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// CertificateSigningRequests returns a CertificateSigningRequestInformer.
-func (v *version) CertificateSigningRequests() CertificateSigningRequestInformer {
+// CertificateSigningRequests returns a TypedCertificateSigningRequestInformer.
+func (v *version) CertificateSigningRequests() TypedCertificateSigningRequestInformer {
 	return &certificateSigningRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterTrustBundles returns a TypedClusterTrustBundleInformer.
+func (v *version) ClusterTrustBundles() TypedClusterTrustBundleInformer {
+	return &clusterTrustBundleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// PodCertificateRequests returns a TypedPodCertificateRequestInformer.
+func (v *version) PodCertificateRequests() TypedPodCertificateRequestInformer {
+	return &podCertificateRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

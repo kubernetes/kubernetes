@@ -5,6 +5,7 @@ package json
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 
 	"github.com/go-openapi/swag/jsonutils/adapters/ifaces"
 	"github.com/go-openapi/swag/typeutils"
@@ -24,11 +25,16 @@ var ErrStdlib jsonError = "error from the JSON adapter stdlib"
 var _ ifaces.Adapter = &Adapter{}
 
 type Adapter struct {
+	options
 }
 
 // NewAdapter yields an [ifaces.Adapter] using the standard library.
-func NewAdapter() *Adapter {
-	return &Adapter{}
+func NewAdapter(opts ...Option) *Adapter {
+	var o options
+
+	return &Adapter{
+		options: buildOptions(o, opts),
+	}
 }
 
 func (a *Adapter) Marshal(value any) ([]byte, error) {
@@ -40,45 +46,18 @@ func (a *Adapter) Unmarshal(data []byte, value any) error {
 }
 
 func (a *Adapter) OrderedMarshal(value ifaces.Ordered) ([]byte, error) {
-	w := poolOfWriters.Borrow()
-	defer func() {
-		poolOfWriters.Redeem(w)
-	}()
+	w, redeem := poolOfWriters.BorrowWithRedeem()
+	defer redeem()
+	w.setBuf()
 
-	if typeutils.IsNil(value) {
-		w.RawString("null")
-
-		return w.BuildBytes()
-	}
-
-	w.RawByte('{')
-	first := true
-	for k, v := range value.OrderedItems() {
-		if first {
-			first = false
-		} else {
-			w.RawByte(',')
-		}
-
-		w.String(k)
-		w.RawByte(':')
-
-		switch val := v.(type) {
-		case ifaces.Ordered:
-			w.Raw(a.OrderedMarshal(val))
-		default:
-			w.Raw(stdjson.Marshal(v))
-		}
-	}
-
-	w.RawByte('}')
+	a.orderedMarshal(w, value, 1)
 
 	return w.BuildBytes()
 }
 
 func (a *Adapter) OrderedUnmarshal(data []byte, value ifaces.SetOrdered) error {
 	var m MapSlice
-	if err := m.OrderedUnmarshalJSON(data); err != nil {
+	if err := m.orderedUnmarshalJSON(data, a.maxDepth()); err != nil {
 		return err
 	}
 
@@ -112,4 +91,43 @@ func (a *Adapter) Redeem() {
 }
 
 func (a *Adapter) Reset() {
+	a.options = options{}
+}
+
+// orderedMarshal writes value to w, tracking the container nesting depth to guard
+// against stack overflow on deeply nested structures.
+func (a *Adapter) orderedMarshal(w *jwriter, value ifaces.Ordered, depth int) {
+	if typeutils.IsNil(value) {
+		w.RawString("null")
+
+		return
+	}
+
+	if maxDepth := a.maxDepth(); depth > maxDepth {
+		w.SetErr(fmt.Errorf("maximum nesting depth of %d exceeded: %w", maxDepth, ErrStdlib))
+
+		return
+	}
+
+	w.RawByte('{')
+	first := true
+	for k, v := range value.OrderedItems() {
+		if first {
+			first = false
+		} else {
+			w.RawByte(',')
+		}
+
+		w.String(k)
+		w.RawByte(':')
+
+		switch val := v.(type) {
+		case ifaces.Ordered:
+			a.orderedMarshal(w, val, depth+1)
+		default:
+			w.Raw(stdjson.Marshal(v))
+		}
+	}
+
+	w.RawByte('}')
 }

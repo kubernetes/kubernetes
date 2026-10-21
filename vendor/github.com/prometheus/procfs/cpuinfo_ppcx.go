@@ -12,8 +12,6 @@
 // limitations under the License.
 
 //go:build linux && (ppc64 || ppc64le)
-// +build linux
-// +build ppc64 ppc64le
 
 package procfs
 

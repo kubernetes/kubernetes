@@ -65,7 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -76,9 +76,11 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
+const resourceStatusClaimPrefix = "claim:"
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
+var emptyDirModeErrorMsg = "must be a number between 0 and 01777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
@@ -121,6 +123,11 @@ var allowedEphemeralContainerFields = map[string]bool{
 // In future, they can be expanded to values from
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
+
+// MaxPodEvictionResponders specifies the maximum number of EvictionResponders that can be present in a Pod's
+// .spec.evictionResponders field. Other consumers of responders might add to the number to make room for
+// additional responders.
+const MaxPodEvictionResponders = 10
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -550,6 +557,9 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
+		if source.EmptyDir.Mode != nil && (*source.EmptyDir.Mode > 01777 || *source.EmptyDir.Mode < 0) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("emptyDir").Child("mode"), *source.EmptyDir.Mode, emptyDirModeErrorMsg))
+		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {
@@ -972,6 +982,7 @@ func validateSecretVolumeSource(secretSource *core.SecretVolumeSource, fldPath *
 	if secretMode != nil && (*secretMode > 0777 || *secretMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *secretMode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(secretSource.DefaultUser, fldPath.Child("defaultUser"))...)
 
 	itemsPath := fldPath.Child("items")
 	for i, kp := range secretSource.Items {
@@ -991,6 +1002,7 @@ func validateConfigMapVolumeSource(configMapSource *core.ConfigMapVolumeSource, 
 	if configMapMode != nil && (*configMapMode > 0777 || *configMapMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *configMapMode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(configMapSource.DefaultUser, fldPath.Child("defaultUser"))...)
 
 	itemsPath := fldPath.Child("items")
 	for i, kp := range configMapSource.Items {
@@ -1012,6 +1024,7 @@ func validateKeyToPath(kp *core.KeyToPath, fldPath *field.Path) field.ErrorList 
 	if kp.Mode != nil && (*kp.Mode > 0777 || *kp.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(kp.User, fldPath.Child("user"))...)
 
 	return allErrs
 }
@@ -1131,6 +1144,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 	if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(file.User, fldPath.Child("user"))...)
 
 	return allErrs
 }
@@ -1142,6 +1156,7 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *core.DownwardAPIVolumeSo
 	if downwardAPIMode != nil && (*downwardAPIMode > 0777 || *downwardAPIMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *downwardAPIMode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(downwardAPIVolume.DefaultUser, fldPath.Child("defaultUser"))...)
 
 	for _, file := range downwardAPIVolume.Items {
 		allErrs = append(allErrs, validateDownwardAPIVolumeFile(&file, fldPath, opts)...)
@@ -1225,6 +1240,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			} else if !opts.AllowNonLocalProjectedTokenPath {
 				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ServiceAccountToken.Path, fldPath.Child("path"))...)
 			}
+			allErrs = append(allErrs, validateUserField(source.ServiceAccountToken.User, projPath.Child("user"))...)
 		}
 		if projPath := srcPath.Child("clusterTrustBundle"); source.ClusterTrustBundle != nil {
 			numSources++
@@ -1280,6 +1296,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, field.Required(projPath.Child("path"), ""))
 			}
 
+			allErrs = append(allErrs, validateUserField(source.ClusterTrustBundle.User, projPath.Child("user"))...)
 			allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ClusterTrustBundle.Path, projPath.Child("path"))...)
 
 			curPath := source.ClusterTrustBundle.Path
@@ -1298,12 +1315,22 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				userAnnotationsErrors := ValidateUserAnnotations(source.PodCertificate.UserAnnotations, projPath.Child("userAnnotations"))
 				allErrs = append(allErrs, userAnnotationsErrors...)
 			}
+			allErrs = append(allErrs, validateUserField(source.PodCertificate.User, projPath.Child("user"))...)
 
 			switch source.PodCertificate.KeyType {
 			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":
 				// ok
+			case "MLDSA44", "MLDSA65", "MLDSA87":
+				if !opts.AllowMLDSAPodCertificateKeyTypes {
+					allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				}
 			default:
-				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				supportedKeyTypes := []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}
+				if opts.AllowMLDSAPodCertificateKeyTypes {
+					supportedKeyTypes = append(supportedKeyTypes, "MLDSA44", "MLDSA65", "MLDSA87")
+				}
+
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, supportedKeyTypes))
 			}
 
 			if source.PodCertificate.MaxExpirationSeconds != nil {
@@ -1371,6 +1398,7 @@ func validateProjectedVolumeSource(projection *core.ProjectedVolumeSource, fldPa
 	if projectionMode != nil && (*projectionMode > 0777 || *projectionMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, fileModeErrorMsg))
 	}
+	allErrs = append(allErrs, validateUserField(projection.DefaultUser, fldPath.Child("defaultUser"))...)
 
 	allErrs = append(allErrs, validateProjectionSources(projection, projectionMode, fldPath, opts)...)
 	return allErrs
@@ -1775,6 +1803,17 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 		if len(storageos.SecretRef.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
 		}
+	}
+	return allErrs
+}
+
+func validateUserField(user *int64, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if user == nil {
+		return allErrs
+	}
+	for _, msg := range validation.IsValidUserID(*user) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *user, msg))
 	}
 	return allErrs
 }
@@ -2666,6 +2705,50 @@ var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgr
 	core.PersistentVolumeClaimNodeResizeInProgress,
 	core.PersistentVolumeClaimNodeResizeInfeasible)
 
+func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	volumeNames := sets.New[string]()
+	if spec != nil {
+		for _, v := range spec.Volumes {
+			volumeNames.Insert(v.Name)
+		}
+	}
+	for i, vh := range volumeHealth {
+		idxPath := fldPath.Index(i)
+		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
+			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
+		}
+		allErrs = append(allErrs, validateVolumeHealthConditions(vh.HealthConditions, idxPath.Child("healthConditions"))...)
+	}
+	return allErrs
+}
+
+func validateVolumeHealthStatus(status *core.VolumeHealthStatus, fldPath *field.Path) field.ErrorList {
+	if status == nil {
+		return nil
+	}
+	return validateVolumeHealthConditions(status.HealthConditions, fldPath.Child("healthConditions"))
+}
+
+func validateVolumeHealthConditions(conditions []core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, condition := range conditions {
+		allErrs = append(allErrs, validateVolumeHealthCondition(condition, fldPath.Index(i))...)
+	}
+	return allErrs
+}
+
+func validateVolumeHealthCondition(condition core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(condition.Reason) == 0 {
+		return allErrs
+	}
+	for _, msg := range unversionedvalidation.IsValidConditionReason(condition.Reason) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
@@ -2680,6 +2763,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	for r, qty := range newPvc.Status.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
+	allErrs = append(allErrs, validateVolumeHealthStatus(newPvc.Status.HealthStatus, field.NewPath("status", "healthStatus"))...)
 	if validationOpts.EnableRecoverFromExpansionFailure {
 		resizeStatusPath := field.NewPath("status", "allocatedResourceStatuses")
 		if newPvc.Status.AllocatedResourceStatuses != nil {
@@ -3143,6 +3227,36 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 		allErrs = append(allErrs, validateMountRecursiveReadOnly(mnt, fldPath.Child("recursiveReadOnly"))...)
+		allErrs = append(allErrs, validateBindMountOptions(mnt.BindMountOptions, idxPath.Child("bindMountOptions"))...)
+		if len(mnt.BindMountOptions) > 0 {
+			if vs, ok := volumes[mnt.Name]; ok && vs.Image != nil {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("bindMountOptions"), mnt.BindMountOptions, "bindMountOptions may not be used with image volumes"))
+			}
+		}
+	}
+	return allErrs
+}
+
+var supportedBindMountOptions = sets.New(
+	string(core.BindMountOptionNoExec),
+	string(core.BindMountOptionNoDev),
+	string(core.BindMountOptionNoSUID),
+)
+
+func validateBindMountOptions(bindMountOptions []string, fldPath *field.Path) field.ErrorList {
+	if len(bindMountOptions) == 0 {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+	seen := sets.New[string]()
+	for i, opt := range bindMountOptions {
+		if !supportedBindMountOptions.Has(opt) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i), opt, sets.List(supportedBindMountOptions)))
+		}
+		if seen.Has(opt) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), opt))
+		}
+		seen.Insert(opt)
 	}
 	return allErrs
 }
@@ -3450,6 +3564,9 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 }
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
+var supportedHTTPProtocols = sets.New(core.HTTPProtocolHTTP1, core.HTTPProtocolHTTP2)
+
+var supportedGRPCProbeModes = sets.New(core.GRPCProbeModePlaintext, core.GRPCProbeModeTLS)
 
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -3463,6 +3580,15 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 	for _, header := range http.HTTPHeaders {
 		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	if http.Protocol != nil {
+		if !supportedHTTPProtocols.Has(*http.Protocol) {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("protocol"), *http.Protocol, sets.List(supportedHTTPProtocols)))
+		} else if *http.Protocol == core.HTTPProtocolHTTP2 && http.Scheme != core.URISchemeHTTP {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("protocol"), *http.Protocol, "is only supported with HTTP (H2C)"))
+		} else if *http.Protocol == core.HTTPProtocolHTTP2 && len(http.Host) > 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("host"), http.Host, "must be empty when `protocol` is \"HTTP2\""))
 		}
 	}
 	return allErrors
@@ -3487,9 +3613,15 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
+
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+	allErrors := ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+	if grpc.Mode != nil && !supportedGRPCProbeModes.Has(*grpc.Mode) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("mode"), *grpc.Mode, sets.List(supportedGRPCProbeModes)))
+	}
+	return allErrors
 }
+
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
@@ -3911,7 +4043,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
-	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers)...)
+	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse)...)
 	return allErrs
 }
 
@@ -4024,7 +4156,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
-		return append(allErrs, field.Required(fldPath, ""))
+		return append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	}
 
 	allNames := sets.Set[string]{}
@@ -4474,6 +4606,9 @@ type PodValidationOptions struct {
 	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
 	// or disabled.
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
+	// Indicates whether InPlacePodVerticalScalingMemoryBackedVolumes feature is enabled
+	// or disabled.
+	InPlacePodVerticalScalingMemoryBackedVolumesEnabled bool
 	// Allow sidecar containers resize policy for backward compatibility
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
@@ -4504,6 +4639,10 @@ type PodValidationOptions struct {
 	AllowImageVolumeWithDigest bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
+	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
+	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
+	AllowMLDSAPodCertificateKeyTypes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4703,8 +4842,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.ActiveDeadlineSeconds != nil {
 		value := *spec.ActiveDeadlineSeconds
-		if value < 1 || value > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)))
+		if value < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)).WithOrigin("minimum").MarkCoveredByDeclarative())
+		} else if value > math.MaxInt32 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)).WithOrigin("maximum").MarkCoveredByDeclarative())
 		}
 	}
 
@@ -4756,6 +4897,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.SchedulingGroup != nil {
 		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
+		if len(spec.EvictionResponders) > 0 {
+			// covered by alpha DV dependentForbidden
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schedulingGroup"), "may not be set when evictionResponders is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative())
+		}
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -5720,6 +5865,9 @@ var updatablePodSpecFields = []string{
 	"`spec.activeDeadlineSeconds`",
 	"`spec.tolerations` (only additions to existing tolerations)",
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+	"`spec.schedulingGates` (only deletions of existing scheduling gates)",
+	"`spec.nodeSelector` (only additions, and only while the pod has scheduling gates)",
+	"`spec.affinity.nodeAffinity` (only while the pod has scheduling gates)",
 }
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
@@ -5735,8 +5883,12 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// 1.  spec.containers[*].image
 	// 2.  spec.initContainers[*].image
 	// 3.  spec.activeDeadlineSeconds
-	// 4.  spec.terminationGracePeriodSeconds
-	// 5.  spec.schedulingGates
+	// 4.  spec.tolerations (only additions)
+	// 5.  spec.terminationGracePeriodSeconds (only negative -> 1)
+	// 6.  spec.schedulingGates (only deletions)
+	// 7.  spec.nodeSelector (only additions, only while gated)
+	// 8.  spec.affinity.nodeAffinity (only while gated)
+	// Keep this list in sync with updatablePodSpecFields.
 
 	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
 	allErrs = append(allErrs, containerErrs...)
@@ -6079,6 +6231,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
 	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
 
+	if len(newPod.Status.VolumeHealth) > 0 {
+		allErrs = append(allErrs, validatePodVolumeHealth(newPod.Status.VolumeHealth, &newPod.Spec, fldPath.Child("volumeHealth"))...)
+	}
+
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
 	}
@@ -6091,8 +6247,8 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.OS)...)
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), newPod.Spec.OS)...)
 
-	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.Containers)...)
-	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers)...)
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.Containers, &newPod.Status)...)
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers, &newPod.Status)...)
 	// ephemeral containers are not allowed to have resources allocated
 	allErrs = append(allErrs, validateContainerStatusNoAllocatedResourcesStatus(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 
@@ -6178,7 +6334,7 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
 		statusFldPath := fldPath.Index(i)
 		if nodeAllocatableStatus.ResourceClaimName == "" {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+			continue
 		}
 
 		// First check the podSpec to see if the ResourceClaim is directly referenced.
@@ -6198,33 +6354,64 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 				}
 			}
 		}
+		// Extended resources backed by DRA are satisfied by a scheduler-created
+		// ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
+		// podStatus.ResourceClaimStatuses. Its name is recorded in
+		// podStatus.ExtendedResourceClaimStatus instead.
+		if !found && podStatus.ExtendedResourceClaimStatus != nil &&
+			podStatus.ExtendedResourceClaimStatus.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName {
+			found = true
+		}
 
 		if !found {
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
 		}
 
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(nodeAllocatableStatus.Containers) == 0 {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
+		if len(nodeAllocatableStatus.Mapping) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(nodeAllocatableStatus.Mapping, statusFldPath.Child("mapping"))...)
 		}
-
-		resourcesFldPath := statusFldPath.Child("resources")
-		if len(nodeAllocatableStatus.Resources) == 0 {
-			allErrs = append(allErrs, field.Required(resourcesFldPath, "must not be empty"))
-		}
-
-		for resourceName, quantity := range nodeAllocatableStatus.Resources {
-			keyPath := resourcesFldPath.Key(string(resourceName))
-			if !v1helper.IsNativeResource(v1.ResourceName(resourceName)) {
-				allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
-			}
-			if quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(keyPath, quantity.String(), "must be non-negative"))
-			}
+		if len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
+	return allErrs
+}
+
+// validateNodeAllocatableMappedResources validates a list of mapped node allocatable resources
+func validateNodeAllocatableMappedResources(mapping []core.NodeAllocatableMappedResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range mapping {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.Quantity != nil && item.Quantity.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), item.Quantity.String(), "must be non-negative"))
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadResources validates a list of overhead node allocatable resources
+func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOverheadResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range overhead {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.PerPod == nil && item.PerContainer == nil {
+			allErrs = append(allErrs, field.Invalid(itemPath, "", "at least one of perPod or perContainer must be set"))
+		} else {
+			if item.PerPod != nil && item.PerPod.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perPod"), item.PerPod.String(), "must be non-negative"))
+			}
+			if item.PerContainer != nil && item.PerContainer.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perContainer"), item.PerContainer.String(), "must be non-negative"))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -6378,15 +6565,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for node-allocatable resources.
-	// TODO(KEP-5517) - Handle in place resize with node-allocatable resource claims.
-	// Currently, the presence of any node-allocatable resource claim blocks resizing for all resources, irrespective of whether
-	// ResourceClaim is used for the same resource.
-	if len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		allErrs = append(allErrs, field.Forbidden(specPath, "pods with node allocatable resource claims cannot be resized"))
-	}
-
-	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 
@@ -6463,6 +6642,50 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		newInitContainers = append(newInitContainers, container)
 	}
 	newPodSpecCopy.InitContainers = newInitContainers
+
+	// Part 5: Validate that the changes between oldPod.Spec.Volumes and
+	// newPod.Spec.Volumes are allowed. Only sizeLimit of memory-backed emptyDir volumes is mutable on resize.
+	if opts.InPlacePodVerticalScalingMemoryBackedVolumesEnabled {
+		if len(newPod.Spec.Volumes) != len(oldPod.Spec.Volumes) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes may not be added or removed on resize"))
+		} else {
+			for i, newVol := range newPod.Spec.Volumes {
+				oldVol := oldPod.Spec.Volumes[i]
+				volPath := field.NewPath("spec").Child("volumes").Index(i)
+				if newVol.Name != oldVol.Name {
+					allErrs = append(allErrs, field.Forbidden(volPath.Child("name"), "volumes may not be renamed or reordered on resize"))
+					continue
+				}
+				newVolToCompare := &newVol
+				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
+					newVolCopy := newVol.DeepCopy()
+					newVolCopy.EmptyDir.SizeLimit = oldVol.EmptyDir.SizeLimit // +k8s:verify-mutation:reason=clone
+					newVolToCompare = newVolCopy
+				}
+				if !apiequality.Semantic.DeepEqual(newVolToCompare, &oldVol) {
+					allErrs = append(allErrs, field.Forbidden(volPath, "only sizeLimit of memory-backed emptyDir volumes is mutable on resize"))
+					continue
+				}
+				// If it is emptyDir, check mutable constraints
+				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
+					hasOldLimit := oldVol.EmptyDir.SizeLimit != nil && !oldVol.EmptyDir.SizeLimit.IsZero()
+					hasNewLimit := newVol.EmptyDir.SizeLimit != nil && !newVol.EmptyDir.SizeLimit.IsZero()
+					if hasOldLimit != hasNewLimit {
+						allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "adding or removing sizeLimit on an existing volume is not allowed"))
+					} else if oldVol.EmptyDir.SizeLimit != nil && newVol.EmptyDir.SizeLimit != nil {
+						if oldVol.EmptyDir.SizeLimit.Cmp(*newVol.EmptyDir.SizeLimit) != 0 {
+							if newVol.EmptyDir.Medium != core.StorageMediumMemory {
+								allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit is only mutable for memory-backed emptyDir volumes"))
+							}
+						}
+					}
+				}
+			}
+		}
+		newPodSpecCopy.Volumes = oldPod.Spec.Volumes // +k8s:verify-mutation:reason=clone
+	} else if !apiequality.Semantic.DeepEqual(newPod.Spec.Volumes, oldPod.Spec.Volumes) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes are immutable on resize when InPlacePodVerticalScalingMemoryBackedVolumes feature gate is disabled"))
+	}
 
 	if len(allErrs) > 0 {
 		return allErrs
@@ -6541,6 +6764,19 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		v1Pod := &v1.Pod{}
+		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
+		} else {
+			// TODO(pravk03): Explore optimization to avoid double aggregation of container resources
+			// in validatePodResourceConsistency and validatePodLevelResourcesCoverDRA.
+			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod); !ok {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("resources"), newPod.Spec.Resources, msg))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -6571,7 +6807,8 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
-	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+	// Resource claims are immutable during pod resize and the original configuration must be preserved.
+	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
 
 // dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
@@ -6606,6 +6843,88 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		}
 	}
 	return resources
+}
+
+func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
+	if pod.Spec.Resources == nil {
+		return true, ""
+	}
+
+	if pod.Spec.Resources.Requests != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
+
+		for resName, podLevelReq := range pod.Spec.Resources.Requests {
+			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+				continue
+			}
+			val, ok := requestWithoutPodLevel[resName]
+			if !ok {
+				continue
+			}
+			if val.Cmp(podLevelReq) > 0 {
+				return false, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName)
+			}
+		}
+	}
+
+	if pod.Spec.Resources.Limits != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
+
+		// Pod level hugepage limits must be always equal or greater than the aggregated
+		// container level hugepage limits + DRA limits
+		for resourceName, ctrLims := range limitsWithoutPodLevel {
+			if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+				continue
+			}
+
+			podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
+			if !hasLimit {
+				continue
+			}
+
+			if ctrLims.Cmp(podLevelResLimit) > 0 {
+				return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName)
+			}
+		}
+
+		// Individual Container limits + DRA overheads must be <= Pod-level limits.
+		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		for _, ctr := range pod.Spec.Containers {
+			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+		}
+
+		for _, ctr := range pod.Spec.Containers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+					continue
+				}
+
+				// Skip if the pod-level limit of the resource is not set.
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit.Add(draResAllocation)
+
+				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)
+				}
+			}
+		}
+	}
+
+	return true, ""
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
@@ -7029,6 +7348,12 @@ func validateServiceInternalTrafficFieldsValue(service *core.Service) field.Erro
 	return allErrs
 }
 
+var supportedTrafficDistribution = []string{
+	v1.ServiceTrafficDistributionPreferClose,
+	v1.ServiceTrafficDistributionPreferSameZone,
+	v1.ServiceTrafficDistributionPreferSameNode,
+}
+
 // validateServiceTrafficDistribution validates the values for the
 // trafficDistribution field.
 func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
@@ -7036,19 +7361,6 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 	if service.Spec.TrafficDistribution == nil {
 		return allErrs
-	}
-
-	var supportedTrafficDistribution []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
-		supportedTrafficDistribution = []string{
-			v1.ServiceTrafficDistributionPreferClose,
-		}
-	} else {
-		supportedTrafficDistribution = []string{
-			v1.ServiceTrafficDistributionPreferClose,
-			v1.ServiceTrafficDistributionPreferSameZone,
-			v1.ServiceTrafficDistributionPreferSameNode,
-		}
 	}
 
 	if !slices.Contains(supportedTrafficDistribution, *service.Spec.TrafficDistribution) {
@@ -7189,13 +7501,8 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
 func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationControllerSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds")).MarkCoveredByDeclarative()...)
+	// replicas and minReadySeconds are covered by declarative validation.
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	if spec.Replicas == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("replicas"), "").MarkCoveredByDeclarative())
-	} else {
-		allErrs = append(allErrs, ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas")).MarkCoveredByDeclarative()...)
-	}
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, fldPath.Child("template"), opts)...)
 	return allErrs
 }
@@ -7398,15 +7705,13 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
 	if len(oldNode.Spec.PodCIDRs) > 0 {
-		// compare the entire slice
-		if len(oldNode.Spec.PodCIDRs) != len(node.Spec.PodCIDRs) {
+		if len(node.Spec.PodCIDRs) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "podCIDRs"), nil, "field cannot be cleared once set").WithOrigin("update").MarkCoveredByDeclarative())
+		} else if !apiequality.Semantic.DeepEqual(oldNode.Spec.PodCIDRs, node.Spec.PodCIDRs) {
+			// Modification of an already-assigned podCIDRs is not expressible with
+			// +k8s:update yet: NoModify is rejected on list fields, and the
+			// per-item form does not correlate changed values in a listType=set.
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
-		} else {
-			for idx, value := range oldNode.Spec.PodCIDRs {
-				if value != node.Spec.PodCIDRs[idx] {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
-				}
-			}
 		}
 	}
 
@@ -7577,7 +7882,7 @@ func validateResourceName(value core.ResourceName, fldPath *field.Path) field.Er
 
 // Validate container resource name
 // Refer to docs/design/resources.md for more details.
-func validateContainerResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
+func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
 	if len(strings.Split(string(value), "/")) == 1 {
@@ -7645,7 +7950,7 @@ func validateLimitRangeTypeName(value core.LimitType, fldPath *field.Path) field
 func validateLimitRangeResourceName(limitType core.LimitType, value core.ResourceName, fldPath *field.Path) field.ErrorList {
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
-		return validateContainerResourceName(value, fldPath)
+		return ValidateContainerResourceName(value, fldPath)
 	default:
 		return validateResourceName(value, fldPath)
 	}
@@ -7949,8 +8254,16 @@ func ValidateConfigMapUpdate(newCfg, oldCfg *core.ConfigMap) field.ErrorList {
 }
 
 func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
-	if quantity.Value() < 0 {
-		return field.ErrorList{field.Invalid(fldPath, quantity.Value(), "must be a valid resource quantity")}
+	// Sign() rather than Value(): the check only cares about the sign, and Value()
+	// does not report it reliably. It overflows to a positive number for negative
+	// quantities such as -9.5Gi, and falls back to zero when its conversion fails,
+	// as for -1e30 -- both of which pass a "Value() < 0" test. Sign() is correct
+	// for every quantity, and does not depend on how overflow is handled.
+	//
+	// String() rather than Value() in the error for the same reason: the reported
+	// value would otherwise be the overflowed one rather than what was submitted.
+	if quantity.Sign() < 0 {
+		return field.ErrorList{field.Invalid(fldPath, quantity.String(), "must be a valid resource quantity")}
 	}
 	return field.ErrorList{}
 }
@@ -7960,7 +8273,7 @@ func validatePodResourceRequirements(requirements *core.ResourceRequirements, po
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
 }
 
 // Validates resource requirement spec.
@@ -8235,14 +8548,15 @@ func ValidateResourceQuotaStatus(status *core.ResourceQuotaStatus, fld *field.Pa
 }
 
 func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	return validateResourceQuotaSpec(resourceQuotaSpec, nil, fld)
+}
+
+// validateResourceQuotaSpec validates a spec against the hard limits the object
+// already stores, oldHard, which is nil on create. Nothing is mutated.
+func validateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, oldHard core.ResourceList, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	fldPath := fld.Child("hard")
-	for k, v := range resourceQuotaSpec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	allErrs = append(allErrs, validateResourceQuotaResourceList(resourceQuotaSpec.Hard, fld.Child("hard"), oldHard)...)
 
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
 	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
@@ -8250,12 +8564,50 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 	return allErrs
 }
 
+// validateResourceQuotaResourceList validates every name in values, and every
+// value that none of the stored lists holds under the same key. Nothing is mutated.
+func validateResourceQuotaResourceList(values core.ResourceList, fldPath *field.Path, stored ...core.ResourceList) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k, v := range values {
+		resPath := fldPath.Key(string(k))
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
+		// A value the object already holds was accepted when it was stored.
+		if isStoredQuantity(k, v, stored) {
+			continue
+		}
+		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
+	}
+	return allErrs
+}
+
+// isStoredQuantity reports whether one of the lists holds name with the same value.
+func isStoredQuantity(name core.ResourceName, value resource.Quantity, lists []core.ResourceList) bool {
+	for _, list := range lists {
+		if old, ok := list[name]; ok && old.Cmp(value) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// isIntegerResourceValue reports whether q may be used where whole units are
+// required. Wherever the milli projection fits in an int64 this is the check
+// that has always been applied, so values it accepted, such as 1.9999, still
+// pass. Past that range only an exact whole number passes.
+func isIntegerResourceValue(q resource.Quantity) bool {
+	if _, integer := q.AsScale(0); integer {
+		return true
+	}
+	milli, ok := q.AsMilliInt64()
+	return ok && milli%1000 == 0
+}
+
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if helper.IsIntegerResourceName(resource) {
-		if value.MilliValue()%int64(1000) != int64(0) {
+		if !isIntegerResourceValue(value) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}
@@ -8265,7 +8617,7 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 // ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceQuotaSpec(&newResourceQuota.Spec, oldResourceQuota.Spec.Hard, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
 	fldPath := field.NewPath("spec", "scopes")
@@ -8290,18 +8642,9 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 	if len(newResourceQuota.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
 	}
-	fldPath := field.NewPath("status", "hard")
-	for k, v := range newResourceQuota.Status.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
-	fldPath = field.NewPath("status", "used")
-	for k, v := range newResourceQuota.Status.Used {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	// The quota controller copies spec.hard into status.hard, so a stored spec value counts as stored here too.
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Hard, field.NewPath("status", "hard"), oldResourceQuota.Status.Hard, oldResourceQuota.Spec.Hard)...)
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Used, field.NewPath("status", "used"), oldResourceQuota.Status.Used)...)
 	return allErrs
 }
 
@@ -8496,7 +8839,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateSecurityContext ensures the security context contains valid settings
-func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers bool) field.ErrorList {
+func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers, allowSysAdminWhenPrivilegeEscalationFalse bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// this should only be true for testing since SecurityContext is defaulted by the core
 	if sc == nil {
@@ -8536,7 +8879,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 			allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))
 		}
 
-		if sc.Capabilities != nil {
+		if !allowSysAdminWhenPrivilegeEscalationFalse && sc.Capabilities != nil {
 			for _, cap := range sc.Capabilities.Add {
 				if string(cap) == "CAP_SYS_ADMIN" {
 					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
@@ -9544,7 +9887,26 @@ func validateContainerStatusUsers(containerStatuses []core.ContainerStatus, fldP
 				allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("user").Child("linux"), "cannot be set for a windows pod"))
 			}
 		case core.Linux:
-			allErrors = append(allErrors, validateLinuxContainerUser(containerUser.Linux, fldPath.Index(i).Child("user").Child("linux"))...)
+			// The linux container user validation is inlined here, rather than a
+			// shared helper, so the UID range below (which is wider than what we
+			// allow for a pod spec's runAsUser) can only ever be applied to
+			// container status validation.
+			if linuxUser := containerUser.Linux; linuxUser != nil {
+				userFldPath := fldPath.Index(i).Child("user").Child("linux")
+				// UID is reported by the container runtime and may be any valid
+				// Linux uid_t (0 to math.MaxUint32).
+				if linuxUser.UID < 0 || linuxUser.UID > math.MaxUint32 {
+					allErrors = append(allErrors, field.Invalid(userFldPath.Child("uid"), linuxUser.UID, fmt.Sprintf("must be between 0 and %d, inclusive", int64(math.MaxUint32))))
+				}
+				for _, msg := range validation.IsValidGroupID(linuxUser.GID) {
+					allErrors = append(allErrors, field.Invalid(userFldPath.Child("gid"), linuxUser.GID, msg))
+				}
+				for g, gid := range linuxUser.SupplementalGroups {
+					for _, msg := range validation.IsValidGroupID(gid) {
+						allErrors = append(allErrors, field.Invalid(userFldPath.Child("supplementalGroups").Index(g), gid, msg))
+					}
+				}
+			}
 		}
 	}
 	return allErrors
@@ -9566,7 +9928,7 @@ func validateContainerStatusNoAllocatedResourcesStatus(containerStatuses []core.
 // validateContainerStatusAllocatedResourcesStatus iterate the allocated resources health and validate:
 // - resourceName matches one of resources in container's resource requirements
 // - resourceID is not empty and unique
-func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path, containers []core.Container) field.ErrorList {
+func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path, containers []core.Container, podStatus *core.PodStatus) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	for i, containerStatus := range containerStatuses {
@@ -9595,20 +9957,18 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 				if strings.HasPrefix(string(allocatedResource.Name), "claim:") {
 					// assume it is a claim name
 
-					errorStr = "must match one of the container's resource claims in a format 'claim:<claimName>/<request>' or 'claim:<claimName>' if request is empty"
+					errorStr = "must match one of the container's resource claims as 'claim:<claimName>/<requestName>' when container.resources.claims[*].request is set or 'claim:<claimName>' when it is empty"
 
 					for _, c := range container.Resources.Claims {
-						name := "claim:" + c.Name
-						if c.Request != "" {
-							name += "/" + c.Request
-						}
-
-						if name == string(allocatedResource.Name) {
+						if resourceStatusName(c.Name, c.Request) == allocatedResource.Name {
 							found = true
 							break
 						}
 					}
 
+					if !found {
+						found = matchesExtendedResourceClaimStatus(allocatedResource.Name, container, podStatus.ExtendedResourceClaimStatus)
+					}
 				} else {
 					// assume it is a resource name
 
@@ -9659,24 +10019,52 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 	return allErrors
 }
 
-func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fldPath *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	if linuxContainerUser == nil {
-		return allErrors
-	}
-	for _, msg := range validation.IsValidUserID(linuxContainerUser.UID) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("uid"), linuxContainerUser.UID, msg))
+func matchesExtendedResourceClaimStatus(resourceStatusName core.ResourceName, container core.Container, extendedResourceClaimStatus *core.PodExtendedResourceClaimStatus) bool {
+	if extendedResourceClaimStatus == nil {
+		return false
 	}
 
-	for _, msg := range validation.IsValidGroupID(linuxContainerUser.GID) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("gid"), linuxContainerUser.GID, msg))
+	claimName, requestName, found := parseResourceStatusName(string(resourceStatusName))
+	if !found || requestName == "" || claimName != extendedResourceClaimStatus.ResourceClaimName {
+		return false
 	}
-	for g, gid := range linuxContainerUser.SupplementalGroups {
-		for _, msg := range validation.IsValidGroupID(gid) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
+
+	for _, mapping := range extendedResourceClaimStatus.RequestMappings {
+		if mapping.ContainerName != container.Name || mapping.RequestName != requestName {
+			continue
+		}
+		quantity, found := container.Resources.Requests[core.ResourceName(mapping.ResourceName)]
+		if found && !quantity.IsZero() {
+			return true
 		}
 	}
-	return allErrors
+
+	return false
+}
+
+// resourceStatusName returns the ResourceStatus.Name form accepted for pod resource claims.
+// ResourceClaim.Request is optional, so the encoded form is either
+// "claim:<claimName>" or "claim:<claimName>/<requestName>".
+func resourceStatusName(claimName, requestName string) core.ResourceName {
+	if requestName == "" {
+		return core.ResourceName(resourceStatusClaimPrefix + claimName)
+	}
+	return core.ResourceName(resourceStatusClaimPrefix + claimName + "/" + requestName)
+}
+
+func parseResourceStatusName(resourceStatusName string) (claimName, requestName string, ok bool) {
+	claimRef, ok := strings.CutPrefix(resourceStatusName, resourceStatusClaimPrefix)
+	if !ok {
+		return "", "", false
+	}
+	claimName, requestName, hasRequest := strings.Cut(claimRef, "/")
+	if claimName == "" {
+		return "", "", false
+	}
+	if hasRequest && requestName == "" {
+		return "", "", false
+	}
+	return claimName, requestName, true
 }
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {

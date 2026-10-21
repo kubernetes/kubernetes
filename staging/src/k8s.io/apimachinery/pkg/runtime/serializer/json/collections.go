@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
-	"slices"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -173,7 +171,10 @@ func (e *streamEncoder) encodeUnstructuredList(list *unstructured.UnstructuredLi
 	if err != nil {
 		return err
 	}
-	keys := slices.Collect(maps.Keys(list.Object))
+	keys := make([]string, 0, len(list.Object)+1)
+	for key := range list.Object {
+		keys = append(keys, key)
+	}
 	if _, exists := list.Object["items"]; !exists {
 		keys = append(keys, "items")
 	}

@@ -59,7 +59,8 @@ fi
 kube_master_image="${KUBE_GCE_MASTER_IMAGE:-}"
 if [[ -z "${kube_master_image}" ]]; then
   # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
+  # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
+  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
 fi
 
 echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
@@ -79,7 +80,8 @@ function set-linux-node-image() {
   kube_node_image="${KUBE_GCE_NODE_IMAGE:-}"
   if [[ -z "${kube_node_image}" ]]; then
     # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
+    # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
+    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
   fi
 
   echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
@@ -168,14 +170,12 @@ function verify-prereqs() {
     exit 1
   fi
 
-  # we use gcloud to create the cluster, gsutil to stage binaries and data
-  for cmd in gcloud gsutil; do
-    if ! which "${cmd}" >/dev/null; then
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
-      exit 1
-    fi
-  done
+  # we use gcloud both to create the cluster and to stage binaries and data
+  if ! which gcloud >/dev/null; then
+    echo "Can't find gcloud in PATH, please fix and retry. The Google Cloud " >&2
+    echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
+    exit 1
+  fi
   update-or-verify-gcloud
 }
 
@@ -206,15 +206,14 @@ function detect-project() {
   fi
 }
 
-# Use gsutil to get the md5 hash for a particular tar
-function gsutil_get_tar_md5() {
+# Use gcloud storage to get the md5 hash for a particular tar
+function get_tar_md5() {
   # location_tar could be local or in the cloud
   # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
   # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
   local -r tar_location=$1
-  #parse the output and return the md5 hash
-  #the sed command at the end removes whitespace
-  local -r tar_md5=$(gsutil hash -h -m "${tar_location}" 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
+  #print an empty string if the tar does not exist, so the caller uploads it
+  local -r tar_md5=$(gcloud storage hash --hex --skip-crc32c --format='value(md5_hash)' "${tar_location}" 2>/dev/null)
   echo "${tar_md5}"
 }
 
@@ -232,11 +231,11 @@ function copy-to-staging() {
   #remote_tar_md5 checks the remote location for the existing tarball and its md5
   #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
   #basename_tar example kubernetes-server-linux-amd64.tar.gz
-  local -r remote_tar_md5=$(gsutil_get_tar_md5 "${staging_path}/${basename_tar}")
+  local -r remote_tar_md5=$(get_tar_md5 "${staging_path}/${basename_tar}")
   if [[ -n ${remote_tar_md5} ]]; then
     #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
     #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-    local -r local_tar_md5=$(gsutil_get_tar_md5 "${tar}")
+    local -r local_tar_md5=$(get_tar_md5 "${tar}")
     if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
       echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
       return 0
@@ -244,8 +243,8 @@ function copy-to-staging() {
   fi
 
   echo "${hash}" > "${tar}.sha512"
-  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
+  gcloud storage cp --no-user-output-enabled --cache-control="private, max-age=0" "${tar}" "${tar}.sha512" "${staging_path}"
+  gcloud storage objects update --add-acl-grant=entity=allUsers,role=READER "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
   echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
@@ -336,9 +335,9 @@ function upload-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gsutil ls "${staging_bucket}" >/dev/null; then
+    if ! gcloud storage buckets describe "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
+      gcloud storage buckets create --location="${region}" --project="${PROJECT}" "${staging_bucket}"
     fi
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
@@ -3631,6 +3630,77 @@ function remove-replica-from-etcd() {
   return "${res}"
 }
 
+# Robustly try to delete a managed instance group.
+# Retry transient gcloud failures. A failed delete only counts as success once
+# list confirms the group is gone, which covers a group that never existed and
+# a delete that succeeded but whose response was lost.
+# $1: The name of the managed instance group.
+# $2: The zone of the managed instance group.
+function delete-managed-instance-group-with-retries() {
+  local -r group_name="${1}"
+  local -r zone="${2}"
+  local attempt=0
+  local found
+
+  while true; do
+    gcloud compute instance-groups managed delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --zone "${zone}" \
+      "${group_name}" && break
+
+    if found=$(gcloud compute instance-groups managed list \
+        --project "${PROJECT}" \
+        --filter="name=${group_name} AND zone:(${zone})" \
+        --format="value(name)") && [[ -z "${found}" ]]; then
+      return 0
+    fi
+
+    if (( attempt >= 3 )); then
+      echo -e "${color_red}Failed to delete managed instance group ${group_name}.${color_norm}" >&2
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete managed instance group ${group_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 15))
+  done
+}
+
+# Robustly try to delete an instance template.
+# Retry transient gcloud failures. A failed delete only counts as success once
+# list confirms the template is gone, which covers a template that never
+# existed and a delete that succeeded but whose response was lost.
+# $1: The name of the instance template.
+function delete-instance-template-with-retries() {
+  local -r template_name="${1}"
+  local attempt=0
+  local found
+
+  while true; do
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${template_name}" && break
+
+    if found=$(gcloud compute instance-templates list \
+        --project "${PROJECT}" \
+        --filter="name=${template_name}" \
+        --format="value(name)") && [[ -z "${found}" ]]; then
+      return 0
+    fi
+
+    if (( attempt >= 3 )); then
+      echo -e "${color_red}Failed to delete instance template ${template_name}.${color_norm}" >&2
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete instance template ${template_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 15))
+  done
+}
+
 # Delete a kubernetes cluster. This is called from test-teardown.
 #
 # Assumed vars:
@@ -3663,15 +3733,7 @@ function kube-down() {
     # Deliberately do not quote, do not change unless a bug is found
     # shellcheck disable=SC2068
     for group in ${all_instance_groups[@]:-}; do
-      {
-        if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-          gcloud compute instance-groups managed delete \
-            --project "${PROJECT}" \
-            --quiet \
-            --zone "${ZONE}" \
-            "${group}"
-        fi
-      } &
+      delete-managed-instance-group-with-retries "${group}" "${ZONE}" &
     done
 
 
@@ -3733,14 +3795,7 @@ function kube-down() {
     # Deliberately do not quote, do not change unless a bug is found
     # shellcheck disable=SC2068
     for template in ${templates[@]:-}; do
-      {
-        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-          gcloud compute instance-templates delete \
-            --project "${PROJECT}" \
-            --quiet \
-            "${template}" &
-        fi
-      } &
+      delete-instance-template-with-retries "${template}" &
     done
   fi
 

@@ -42,7 +42,7 @@ func Test(t *testing.T) {
 		MapFieldEachValDisabled: map[string]string{
 			"b": "2",
 		},
-	}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectValidateFalseByPath(map[string][]string{
 		"mapFieldDisabled":           {"field Struct.MapFieldDisabled"},
 		"mapFieldEachKeyDisabled":    {"field Struct.MapFieldEachKeyDisabled/key"},
 		"mapFieldEachValDisabled[b]": {"field Struct.MapFieldEachValDisabled/val"},
@@ -67,7 +67,7 @@ func Test(t *testing.T) {
 		MapFieldEachValDisabled: map[string]string{
 			"b": "2",
 		},
-	}).Opts([]string{"FeatureX"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectValidateFalseByPath(map[string][]string{
 		"mapField":           {"field Struct.MapField"},
 		"mapFieldEachKey":    {"field Struct.MapFieldEachKey/key"},
 		"mapFieldEachVal[a]": {"field Struct.MapFieldEachVal/val"},

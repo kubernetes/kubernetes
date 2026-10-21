@@ -19,6 +19,7 @@ package v1_test
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,6 +41,26 @@ import (
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
+
+// featureGatedPodDefaults contains defaults applied to Pods only when all feature gates are enabled.
+// These are set in SetDefaults_Pod (not SetDefaults_PodSpec) to avoid spurious workload rollouts.
+var featureGatedPodDefaults = map[string]string{
+	".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Protocol":                                           `"HTTP1"`,
+	".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Protocol":                                             `"HTTP1"`,
+	".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Protocol":                                    `"HTTP1"`,
+	".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Protocol":                                   `"HTTP1"`,
+	".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Protocol":                                     `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Protocol":         `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Protocol":           `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Protocol":  `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Protocol": `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Protocol":   `"HTTP1"`,
+	".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Protocol":                                       `"HTTP1"`,
+	".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Protocol":                                         `"HTTP1"`,
+	".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Protocol":                                `"HTTP1"`,
+	".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Protocol":                               `"HTTP1"`,
+	".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Protocol":                                 `"HTTP1"`,
+}
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
 // Defaulting changes within this type can cause spurious rollouts of workloads on API server update.
@@ -361,6 +382,9 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if featuresEnabled {
+		maps.Copy(expectedDefaults, featureGatedPodDefaults)
 	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
@@ -3243,6 +3267,60 @@ func TestSetDefaultProbe(t *testing.T) {
 	actualProbe := *output.Spec.Containers[0].LivenessProbe
 	if actualProbe != expectedProbe {
 		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
+	}
+}
+
+func TestSetDefaultProbeGRPCMode(t *testing.T) {
+	tlsMode := v1.GRPCProbeModeTLS
+	plaintextMode := v1.GRPCProbeModePlaintext
+	tests := []struct {
+		name         string
+		grpc         *v1.GRPCAction
+		expectedMode *v1.GRPCProbeMode
+	}{
+		{
+			name: "mode TLS is preserved",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				Mode: &tlsMode,
+			},
+			expectedMode: &tlsMode,
+		},
+		{
+			name: "mode Plaintext is preserved",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				Mode: &plaintextMode,
+			},
+			expectedMode: &plaintextMode,
+		},
+		{
+			name: "nil mode stays nil",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+			},
+			expectedMode: nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								GRPC: tc.grpc,
+							},
+						},
+					}},
+				},
+			}
+			output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+			actualMode := output.Spec.Containers[0].LivenessProbe.GRPC.Mode
+			if (actualMode == nil) != (tc.expectedMode == nil) || (actualMode != nil && *actualMode != *tc.expectedMode) {
+				t.Errorf("expected Mode %v, got %v", tc.expectedMode, actualMode)
+			}
+		})
 	}
 }
 

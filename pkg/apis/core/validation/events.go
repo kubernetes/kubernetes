@@ -26,7 +26,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -184,10 +183,6 @@ func legacyValidateEvent(event *core.Event, requestVersion schema.GroupVersion) 
 		if len(event.Message) > NoteLengthLimit {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("message"), "", fmt.Sprintf("can have at most %v characters", NoteLengthLimit)))
 		}
-	}
-
-	for _, msg := range validation.IsDNS1123Subdomain(event.Namespace) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("namespace"), event.Namespace, msg))
 	}
 	return allErrs
 }

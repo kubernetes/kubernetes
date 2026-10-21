@@ -44,24 +44,34 @@ const (
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 
+	// owner: @pmengelbert
+	// kep: https://kep.k8s.io/6060
+	//
+	// Controls whether the apiserver supports dispensing tokens for authenticating
+	// the Kubernetes API Server and Aggregated API Servers to webhooks.
+	APIServerWebhookAuthenticationToken featuregate.Feature = "APIServerWebhookAuthenticationToken"
+
 	// owner: @linxiulei
 	//
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
-	// owner: @jefftree
+	// owner: @seans3
 	//
-	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
-	// discovery implements its own handlers and follows a different lifecycle than
-	// traditional k8s resources.
-	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
+	// Bounds the capacity of the encode buffers that the apiserver retains in
+	// its protobuf serialization pool (runtime.AllocatorPool). Without the
+	// bound every pooled buffer grows to the largest response it ever
+	// encoded and is kept for the life of the process. While enabled, encode
+	// buffers also grow to max(n, 2*cap) instead of 2*cap+n, so a buffer is
+	// never more than twice the largest object it has encoded.
+	AllocatorPoolBufferCap featuregate.Feature = "AllocatorPoolBufferCap"
 
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
 	AllowParsingUserUIDFromCertAuth featuregate.Feature = "AllowParsingUserUIDFromCertAuth"
 
-	// owner: @stlaz @tkashem @dgrisonnet
+	// owner: @stlaz @tkashem @dgrisonnet @ibihim
 	// kep: https://kep.k8s.io/3926
 	//
 	// Enables the cluster admin to identify resources that fail to
@@ -80,6 +90,14 @@ const (
 	// owner: @serathius
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
+
+	// owner: @luxas
+	// kep: https://kep.k8s.io/5681
+	//
+	// Enables conditional authorization, where authorizers can return conditions
+	// (residual expressions) that depend on the request/stored object. These
+	// conditions are enforced during the validating admission phase.
+	ConditionalAuthorization featuregate.Feature = "ConditionalAuthorization"
 
 	// owner: @yedou37
 	//
@@ -151,9 +169,16 @@ const (
 	// Enables the RangeStream RPC for list operations in etcd.
 	EtcdRangeStream featuregate.Feature = "EtcdRangeStream"
 
+	// owner: @aramase @BenTheElder
+	// kep: https://kep.k8s.io/5793
+	//
+	// Enables excluding the same set of authentication and authorization virtual resources
+	// from ValidatingAdmissionWebhook and MutatingAdmissionWebhook that ValidatingAdmissionPolicy
+	// and MutatingAdmissionPolicy already exclude.
+	ExcludeAdmissionWebhookVirtualResources featuregate.Feature = "ExcludeAdmissionWebhookVirtualResources"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
-	// deprecated: v1.28
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
@@ -163,6 +188,14 @@ const (
 	//
 	// Enables generating snapshots of watch cache store and using them to serve LIST requests.
 	ListFromCacheSnapshot featuregate.Feature = "ListFromCacheSnapshot"
+
+	// owner: @yongruilin
+	// kep: https://kep.k8s.io/5958
+	//
+	// Enables the "drop=metadata.managedFields" Accept header parameter, which serves
+	// responses with metadata.managedFields omitted. When disabled the parameter is
+	// ignored rather than rejected, and responses are unchanged.
+	ManagedFieldsOptOut featuregate.Feature = "ManagedFieldsOptOut"
 
 	// owner: @aramase @BenTheElder
 	// kep: https://kep.k8s.io/5793
@@ -186,12 +219,32 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
+	// owner: @seans3
+	//
+	// Defers building the /openapi/v2 spec until the first request instead
+	// of building it eagerly at server startup, reducing apiserver memory on
+	// clusters where the endpoint is not exercised. Served content, ETags
+	// and update semantics are unchanged once built. A spec that fails to
+	// build no longer fails startup: the server's own /openapi/v2 serves 503,
+	// and the aggregated /openapi/v2 omits that server's APIs, as it does for
+	// any delegate whose spec is unavailable. With this feature enabled
+	// GenericAPIServer.StaticOpenAPISpec builds the spec on its first Get
+	// rather than during PrepareRun.
+	OpenAPIV2LazyBuild featuregate.Feature = "OpenAPIV2LazyBuild"
+
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
 	// This will also make the kube-apiserver's API aggregator add UIDs via standard
 	// headers when forwarding requests to the servers serving the aggregated API.
 	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
+
+	// owner: @serathius @siarkowicz
+	// kep: https://kep.k8s.io/6315
+	//
+	// Enables Open Request Cost Aggregation (ORCA) endpoint load metrics reporting
+	// via HTTP response headers when --enable-endpoint-load-metrics is set.
+	RequestCostAggregation featuregate.Feature = "RequestCostAggregation"
 
 	// owner: @cici37
 	//
@@ -313,14 +366,16 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	APIServerWebhookAuthenticationToken: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	AggregatedDiscoveryRemoveBetaType: {
-		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true},
+	AllocatorPoolBufferCap: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	AllowParsingUserUIDFromCertAuth: {
@@ -329,6 +384,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	CBORServingAndStorage: {
@@ -337,6 +393,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ConditionalAuthorization: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ConsistentListFromCacheSkipTimeoutFallback: {
@@ -373,7 +434,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	EtcdRangeStream: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ExcludeAdmissionWebhookVirtualResources: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
@@ -387,8 +452,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ManagedFieldsOptOut: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ManifestBasedAdmissionControlConfig: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	MutatingAdmissionPolicy: {
@@ -402,9 +472,17 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	OpenAPIV2LazyBuild: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RequestCostAggregation: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SeparateCacheWatchRPC: {
@@ -467,7 +545,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	WatchListCompression: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WebhookRoundTripLoadBalancing: {

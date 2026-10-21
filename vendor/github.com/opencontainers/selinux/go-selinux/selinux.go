@@ -26,11 +26,6 @@ var (
 	// ErrInvalidLabel is returned when an invalid label is specified.
 	ErrInvalidLabel = errors.New("invalid Label")
 
-	// InvalidLabel is returned when an invalid label is specified.
-	//
-	// Deprecated: use [ErrInvalidLabel].
-	InvalidLabel = ErrInvalidLabel
-
 	// ErrIncomparable is returned two levels are not comparable
 	ErrIncomparable = errors.New("incomparable levels")
 	// ErrLevelSyntax is returned when a sensitivity or category do not have correct syntax in a level
@@ -45,11 +40,28 @@ var (
 	// is not the thread group leader.
 	ErrNotTGLeader = errors.New("calling thread is not the thread group leader")
 
-	// CategoryRange allows the upper bound on the category range to be adjusted
+	// CategoryRange allows the upper bound on the category range to be adjusted.
+	//
+	// Deprecated: use [SetCategoryRange] instead.
 	CategoryRange = DefaultCategoryRange
 
 	privContainerMountLabel string
 )
+
+// ProcessKind selects which process domain [SetProcessKind] applies to a label.
+type ProcessKind int
+
+const (
+	ProcessKindRegular ProcessKind = 1
+	ProcessKindInit    ProcessKind = 2
+	ProcessKindKVM     ProcessKind = 3
+)
+
+// SetProcessKind returns label with its type component replaced by the one
+// corresponding to kind. Other label components are kept intact.
+func SetProcessKind(label string, kind ProcessKind) (string, error) {
+	return setProcessKind(label, kind)
+}
 
 // Context is a representation of the SELinux label broken into 4 parts
 type Context map[string]string
@@ -62,6 +74,16 @@ func SetDisabled() {
 // GetEnabled returns whether SELinux is currently enabled.
 func GetEnabled() bool {
 	return getEnabled()
+}
+
+// SetCategoryRange allows to adjust the upper bound of the category range.
+// It affects subsequent calls to [KVMContainerLabel] and [InitContainerLabel].
+func SetCategoryRange(upper uint32) error {
+	if upper > DefaultCategoryRange {
+		return errors.New("can't have more than DefaultCategoryRange categories")
+	}
+	CategoryRange = upper
+	return nil
 }
 
 // ClassIndex returns the int index for an object class in the loaded policy,
@@ -107,12 +129,12 @@ func SetFSCreateLabel(label string) error {
 // FSCreateLabel returns the default label the kernel which the kernel is using
 // for file system objects created by this task. "" indicates default.
 func FSCreateLabel() (string, error) {
-	return fsCreateLabel()
+	return readConThreadSelf("attr/fscreate")
 }
 
 // CurrentLabel returns the SELinux label of the current process thread, or an error.
 func CurrentLabel() (string, error) {
-	return currentLabel()
+	return readConThreadSelf("attr/current")
 }
 
 // PidLabel returns the SELinux label of the given pid, or an error.
@@ -123,7 +145,7 @@ func PidLabel(pid int) (string, error) {
 // ExecLabel returns the SELinux label that the kernel will use for any programs
 // that are executed by the current process thread, or an error.
 func ExecLabel() (string, error) {
-	return execLabel()
+	return readConThreadSelf("attr/exec")
 }
 
 // CanonicalizeContext takes a context string and writes it to the kernel
@@ -180,7 +202,7 @@ func SocketLabel() (string, error) {
 
 // PeerLabel retrieves the label of the client on the other side of a socket
 func PeerLabel(fd uintptr) (string, error) {
-	return peerLabel(fd)
+	return peerLabel(int(fd)) //#nosec G115 -- ignore "integer overflow conversion uintptr -> int".
 }
 
 // SetKeyLabel takes a process label and tells the kernel to assign the
@@ -216,9 +238,27 @@ func ClearLabels() {
 	clearLabels()
 }
 
-// ReserveLabel reserves the MLS/MCS level component of the specified label
+// ReserveLabel reserves the MLS/MCS level component of the specified label.
+//
+// Deprecated: use [ReserveLabelV2] instead.
 func ReserveLabel(label string) {
-	reserveLabel(label)
+	_ = reserveLabel(label)
+}
+
+// ReserveLabelV2 reserves the MLS/MCS level component of the specified label.
+// Labels without MLS/MCS category component (":c") are ignored.
+// Returns an error if the label can't be reserved.
+//
+// Callers that are intentionally reusing an existing level/MCS (e.g. multiple
+// container in a pod sharing a label) may safely ignore [ErrMCSAlreadyExists]
+// error.
+func ReserveLabelV2(label string) error {
+	return reserveLabel(label)
+}
+
+// CheckLabel check the MLS/MCS level component of the specified label
+func CheckLabel(label string) error {
+	return checkLabel(label)
 }
 
 // MLSEnabled checks if MLS is enabled.
@@ -250,25 +290,51 @@ func ReleaseLabel(label string) {
 	releaseLabel(label)
 }
 
-// ROFileLabel returns the specified SELinux readonly file label
+// ROFileLabel returns the specified SELinux readonly file label.
+//
+// Deprecated: this (apparently) has no users and will be removed from the
+// future version of this package. Open a bug report if you use it.
 func ROFileLabel() string {
 	return roFileLabel()
 }
 
 // KVMContainerLabels returns the default processLabel and mountLabel to be used
 // for kvm containers by the calling process.
+//
+// Deprecated: use [KVMContainerLabel] instead.
 func KVMContainerLabels() (string, string) {
 	return kvmContainerLabels()
 }
 
+// KVMContainerLabel returns the default process label to be used
+// for KVM containers by the calling process.
+//
+// If you only need to change a type of existing label, use [SetProcessKind] instead.
+func KVMContainerLabel() (string, error) {
+	return kvmContainerLabel()
+}
+
 // InitContainerLabels returns the default processLabel and file labels to be
 // used for containers running an init system like systemd by the calling process.
+//
+// Deprecated: use [InitContainerLabel] instead.
 func InitContainerLabels() (string, string) {
 	return initContainerLabels()
 }
 
+// InitContainerLabel returns the default process label to be used
+// for containers running an init system like systemd by the calling process.
+//
+// If you only need to change a type of existing label, use [SetProcessKind] instead.
+func InitContainerLabel() (string, error) {
+	return initContainerLabel()
+}
+
 // ContainerLabels returns an allocated processLabel and fileLabel to be used for
 // container labeling by the calling process.
+//
+// Deprecated: this (apparently) has no users and will be removed from the
+// future version of this package. Open a bug report if you use it.
 func ContainerLabels() (processLabel string, fileLabel string) {
 	return containerLabels()
 }
@@ -305,11 +371,19 @@ func DisableSecOpt() []string {
 	return []string{"disable"}
 }
 
+// SEUserByName retrieves the SELinux username and security level for a given
+// Linux username. The username and security level is based on the
+// /etc/selinux/{SELINUXTYPE}/seusers file.
+func SEUserByName(username string) (seUser string, level string, err error) {
+	return getSeUserByName(username)
+}
+
 // GetDefaultContextWithLevel gets a single context for the specified SELinux user
 // identity that is reachable from the specified scon context. The context is based
 // on the per-user /etc/selinux/{SELINUXTYPE}/contexts/users/<username> if it exists,
 // and falls back to the global /etc/selinux/{SELINUXTYPE}/contexts/default_contexts
-// file.
+// file and finally the global /etc/selinux/{SELINUXTYPE}/contexts/failsafe_context
+// file if no match can be found anywhere else.
 func GetDefaultContextWithLevel(user, level, scon string) (string, error) {
 	return getDefaultContextWithLevel(user, level, scon)
 }

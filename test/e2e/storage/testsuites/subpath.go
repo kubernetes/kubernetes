@@ -90,8 +90,8 @@ func (s *subPathTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
+func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	return checkVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
 		storageframework.PreprovisionedPV,
 		storageframework.InlineVolume))
 }
@@ -1114,19 +1114,12 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 	framework.ExpectNoError(err, "lazy-unmounting subPath bind mounts: %s", result)
 	framework.Logf("umount result: %s", result)
 
-	// stop the container via crictl so kubelet restarts it and calls
+	// stop the container so kubelet restarts it and calls
 	// prepareSubpathTarget on the stale bind mount.
-	ginkgo.By("Stopping app container via crictl to trigger restart through stale bind-mount path")
-	containerName := pod.Spec.Containers[0].Name
-	stopCmd := fmt.Sprintf(
-		`cid=$(crictl ps --label io.kubernetes.pod.uid=%s --name %s -q 2>/dev/null | head -1); `+
-			`[ -z "$cid" ] && { echo "container not found"; exit 1; }; `+
-			`crictl stop "$cid" && echo "stopped $cid"`,
-		pod.UID, containerName,
-	)
-	stopResult, stopErr := hostExec.IssueCommandWithResult(ctx, stopCmd, podNode)
-	framework.ExpectNoError(stopErr, "stopping container via crictl for pod %s: %s", pod.UID, stopResult)
-	framework.Logf("crictl stop result: %s", stopResult)
+	ginkgo.By("Stopping app container to trigger restart through stale bind-mount path")
+	// PID 1 is the sh that traps TERM and exits.
+	stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "kill", "1")
+	framework.ExpectNoError(err, "sending TERM to PID 1 in pod %s: stdout=%q stderr=%q", pod.Name, stdout, stderr)
 
 	// wait for the container to restart and reach Running with restarts >= 1.
 	ginkgo.By("Waiting for container to restart with a fresh bind mount")

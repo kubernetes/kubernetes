@@ -575,6 +575,29 @@ func TestRealFIFO_Resync(t *testing.T) {
 	}
 }
 
+func TestRealFIFO_ResyncPropagatesQueueError(t *testing.T) {
+	sentinel := errors.New("computing key failed")
+	f := NewRealFIFO(
+		func(obj interface{}) (string, error) {
+			if fifoObj, ok := obj.(testFifoObject); ok && fifoObj.name == "broken" {
+				return "", sentinel
+			}
+			return testFifoObjectKeyFunc(obj)
+		},
+		literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("broken", 5)}
+		}),
+		nil,
+	)
+	err := f.Resync()
+	if err == nil {
+		t.Fatal("expected Resync to return an error when the object cannot be queued")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("expected the underlying queueing error to be wrapped, got: %v", err)
+	}
+}
+
 func TestRealFIFO_DeleteExistingNonPropagated(t *testing.T) {
 	f := NewRealFIFO(
 		testFifoObjectKeyFunc,
@@ -1041,7 +1064,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			},
 		},
 		{
-			name: "split due to non-unique#1: update single item for multiple items should have separate batch",
+			name: "non-split due to non-unique#1: update single item for multiple items should be bundled after initial list",
 			initialItems: []testFifoObject{
 				obj1,
 			},
@@ -1052,8 +1075,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			batchSize: unlimitedBatchSize,
 			expectedBatches: [][]Delta{
 				{{Replaced, obj1}},
-				{{Updated, obj1}},
-				{{Updated, obj1}},
+				{{Updated, obj1}, {Updated, obj1}},
 			},
 		},
 		{
@@ -1245,8 +1267,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				sucessObj1, sucessObj2, failObj3, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
-				{{testDeltaType, failObj4}},
+				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}, {testDeltaType, failObj4}},
 			},
 		},
 		{
@@ -1255,8 +1276,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				failObj3, sucessObj1, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, failObj3}},
-				{{testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
+				{{testDeltaType, failObj3}, {testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
 			},
 		},
 	}

@@ -131,10 +131,15 @@ import (
 	unsafe "unsafe"
 )
 
-// `NullValue` is a singleton enumeration to represent the null value for the
-// `Value` type union.
+// Represents a JSON `null`.
 //
-// The JSON representation for `NullValue` is JSON `null`.
+// `NullValue` is a sentinel, using an enum with only one value to represent
+// the null value for the `Value` type union.
+//
+// A field of type `NullValue` with any value other than `0` is considered
+// invalid. Most ProtoJSON serializers will emit a Value with a `null_value` set
+// as a JSON `null` regardless of the integer value, and so will round trip to
+// a `0` value.
 type NullValue int32
 
 const (
@@ -179,14 +184,19 @@ func (NullValue) EnumDescriptor() ([]byte, []int) {
 	return file_google_protobuf_struct_proto_rawDescGZIP(), []int{0}
 }
 
-// `Struct` represents a structured data value, consisting of fields
-// which map to dynamically typed values. In some languages, `Struct`
-// might be supported by a native representation. For example, in
-// scripting languages like JS a struct is represented as an
-// object. The details of that representation are described together
-// with the proto support for the language.
+// Represents a JSON object.
 //
-// The JSON representation for `Struct` is JSON object.
+// An unordered key-value map, intending to perfectly capture the semantics of a
+// JSON object. This enables parsing any arbitrary JSON payload as a message
+// field in ProtoJSON format.
+//
+// This follows RFC 8259 guidelines for interoperable JSON: notably this type
+// cannot represent large Int64 values or `NaN`/`Infinity` numbers,
+// since the JSON format generally does not support those values in its number
+// type.
+//
+// If you do not intend to parse arbitrary JSON into your message, a custom
+// typed message should be preferred instead of using this type.
 type Struct struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unordered map of dynamically typed values.
@@ -269,12 +279,12 @@ func (x *Struct) GetFields() map[string]*Value {
 	return nil
 }
 
+// Represents a JSON value.
+//
 // `Value` represents a dynamically typed value which can be either
 // null, a number, a string, a boolean, a recursive struct value, or a
 // list of values. A producer of value is expected to set one of these
-// variants. Absence of any variant indicates an error.
-//
-// The JSON representation for `Value` is JSON value.
+// variants. Absence of any variant is an invalid state.
 type Value struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The kind of value.
@@ -548,32 +558,35 @@ type isValue_Kind interface {
 }
 
 type Value_NullValue struct {
-	// Represents a null value.
+	// Represents a JSON `null`.
 	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
 type Value_NumberValue struct {
-	// Represents a double value.
+	// Represents a JSON number. Must not be `NaN`, `Infinity` or
+	// `-Infinity`, since those are not supported in JSON. This also cannot
+	// represent large Int64 values, since JSON format generally does not
+	// support them in its number type.
 	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
 }
 
 type Value_StringValue struct {
-	// Represents a string value.
+	// Represents a JSON string.
 	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof"`
 }
 
 type Value_BoolValue struct {
-	// Represents a boolean value.
+	// Represents a JSON boolean (`true` or `false` literal in JSON).
 	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof"`
 }
 
 type Value_StructValue struct {
-	// Represents a structured value.
+	// Represents a JSON object.
 	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof"`
 }
 
 type Value_ListValue struct {
-	// Represents a repeated `Value`.
+	// Represents a JSON array.
 	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof"`
 }
 
@@ -589,9 +602,7 @@ func (*Value_StructValue) isValue_Kind() {}
 
 func (*Value_ListValue) isValue_Kind() {}
 
-// `ListValue` is a wrapper around a repeated field of values.
-//
-// The JSON representation for `ListValue` is JSON array.
+// Represents a JSON array.
 type ListValue struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Repeated field of dynamically typed values.

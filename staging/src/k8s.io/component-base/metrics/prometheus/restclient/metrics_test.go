@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -82,6 +83,32 @@ func TestClientGOMetrics(t *testing.T) {
 						# HELP rest_client_exec_plugin_call_total [ALPHA] Number of calls to an exec plugin, partitioned by the type of event encountered (no_error, plugin_execution_error, plugin_not_found_error, client_internal_error) and an optional exit code. The exit code will be set to 0 if and only if the plugin call was successful.
         				# TYPE rest_client_exec_plugin_call_total counter
         				rest_client_exec_plugin_call_total{call_status="no_error",code="0"} 1
+				`,
+		},
+		{
+			description: "DNS resolver latency in seconds",
+			name:        "rest_client_dns_resolution_duration_seconds",
+			metric:      resolverLatency,
+			update: func() {
+				metrics.ResolverLatency.Observe(context.TODO(), "www.foo.com", time.Second)
+			},
+			want: `
+			            # HELP rest_client_dns_resolution_duration_seconds [ALPHA] DNS resolver latency in seconds. Broken down by host.
+			            # TYPE rest_client_dns_resolution_duration_seconds histogram
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="0.005"} 0
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="0.025"} 0
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="0.1"} 0
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="0.25"} 0
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="0.5"} 0
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="1"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="2"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="4"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="8"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="15"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="30"} 1
+			            rest_client_dns_resolution_duration_seconds_bucket{host="www.foo.com",le="+Inf"} 1
+			            rest_client_dns_resolution_duration_seconds_sum{host="www.foo.com"} 1
+			            rest_client_dns_resolution_duration_seconds_count{host="www.foo.com"} 1
 				`,
 		},
 		{

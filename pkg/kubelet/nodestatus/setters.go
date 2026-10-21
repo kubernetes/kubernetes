@@ -200,6 +200,7 @@ func MachineInfo(nodeName string,
 	devicePluginResourceCapacityFunc func(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
+	runningInUserNSFunc func() *bool, // typically Kubelet.runningInUserNS
 	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
@@ -287,6 +288,10 @@ func MachineInfo(nodeName string,
 				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
 					Capacity: ptr.To(int64(info.SwapCapacity)),
 				}
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
+				node.Status.NodeInfo.RunningInUserNamespace = runningInUserNSFunc()
 			}
 		}
 
@@ -383,12 +388,12 @@ func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 // imageListFunc is expected to return a list of images sorted in descending order by image size.
 // nodeStatusMaxImages is ignored if set to -1.
 func Images(nodeStatusMaxImages int32,
-	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
+	imageListFunc func(context.Context) ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
 		// Update image list of this node
 		var imagesOnNode []v1.ContainerImage
-		containerImages, err := imageListFunc()
+		containerImages, err := imageListFunc(ctx)
 		if err != nil {
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)

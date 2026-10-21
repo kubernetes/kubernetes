@@ -291,7 +291,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		nodeName := nodes.Items[0].Name
 
 		metricName := "kubeproxy_iptables_localhost_nodeports_accepted_packets_total"
-		metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, fr.ClientSet, nil, fr.ClientConfig(), false, false, false, false, false, false)
+		metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, fr.ClientSet, fr.ClientConfig(), false, false, false, false, false, false)
 		framework.ExpectNoError(err)
 
 		// create a pod with host-network for execing

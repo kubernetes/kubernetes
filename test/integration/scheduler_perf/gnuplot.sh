@@ -37,7 +37,7 @@ set ytics autofreq nomirror tc lt 1
 set xlabel 'measurement runtime [seconds]'
 set ylabel 'scheduling rate [pods/second]' tc lt 1
 set y2tics autofreq nomirror tc lt 2
-set y2label 'scheduling attempts per pod' tc lt 2
+set y2label 'scheduling attempts per pod / pending pods' tc lt 2
 
 # Derivative from https://stackoverflow.com/questions/15751226/how-can-i-plot-the-derivative-of-a-graph-in-gnuplot.
 d2(x,y) = (\$0 == 0) ? (x1 = x, y1 = y, 1/0) : (x2 = x1, x1 = x, y2 = y1, y1 = y, (y1-y2)/(x1-x2))
@@ -49,6 +49,10 @@ EOF
         echo -n "'${file}' using (\$1 - dx):(d2(\$1, \$2)) with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') metric rate' axis x1y1, "
         echo -n "'${file}' using (\$1 - dx):(d2(\$1, \$4)) with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') observed rate' axis x1y1, "
         echo -n "'${file}' using 1:(\$3/\$2) with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') attempts' axis x1y2, "
+        echo -n "'${file}' using 1:6 with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') active' axis x1y2, "
+        echo -n "'${file}' using 1:7 with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') backoff' axis x1y2, "
+        echo -n "'${file}' using 1:8 with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') unschedulable' axis x1y2, "
+        echo -n "'${file}' using 1:9 with linespoints title '$(basename "$file" .dat | sed -e 's/_/ /g') gated' axis x1y2, "
     done
     echo
 ) | tee /dev/stderr | gnuplot "${args[@]}" -

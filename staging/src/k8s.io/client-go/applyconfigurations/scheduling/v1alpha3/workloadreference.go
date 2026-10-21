@@ -24,12 +24,12 @@ package v1alpha3
 // WorkloadReference references the Workload object together with the template
 // that was used to create a particular PodGroup.
 type WorkloadReferenceApplyConfiguration struct {
-	// WorkloadName is the name of the Workload object that contains a template
+	// workloadName is the name of the Workload object that contains a template
 	// that was used when creating a pod group. It must
 	// be a DNS name.
 	// This field is required.
 	WorkloadName *string `json:"workloadName,omitempty"`
-	// TemplateName is the name of a template within the Workload object that
+	// templateName is the name of a template within the Workload object that
 	// was used to create a pod group. It must be a DNS label.
 	// This field is required.
 	TemplateName *string `json:"templateName,omitempty"`

@@ -21,7 +21,6 @@
 # the same ResourceClaim. Exactly one ResourceClaim exists for each PodGroup.
 - name: SharedPodGroupResourceClaim
   featureGates:
-    DynamicResourceAllocation: true
     DRAWorkloadResourceClaims: true
     GenericWorkload: true
   workloadTemplate:
@@ -30,9 +29,6 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
   - opcode: createAny
     templatePath: ../templates/resourceslice-podgroup.yaml
     countParam: $podGroups
@@ -82,7 +78,6 @@
 # the same ResourceClaim generated from a ResourceClaimTemplate.
 - name: SharedPodGroupResourceClaimTemplate
   featureGates:
-    DynamicResourceAllocation: true
     DRAWorkloadResourceClaims: true
     GenericWorkload: true
   workloadTemplate:
@@ -91,9 +86,6 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
   - opcode: createAny
     templatePath: ../templates/resourceslice-podgroup.yaml
     countParam: $podGroups

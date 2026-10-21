@@ -31,4 +31,4 @@ limitations under the License.
 // the configuration, which in turn rely on members of the same package, which cannot be moved,
 // or imported (cyclic dependency) here.
 
-package v1 // import "k8s.io/component-base/metrics/api/v1"
+package v1

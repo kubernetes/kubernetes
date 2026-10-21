@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -75,7 +76,9 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
+	var wg sync.WaitGroup
 	defer utilruntime.HandleCrashWithContext(ctx)
+	defer wg.Wait()
 	defer c.queue.ShutDown()
 	defer func() {
 		err := c.leaseInformer.Informer().RemoveEventHandler(c.leaseRegistration)
@@ -105,7 +108,9 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	klog.Infof("Workers: %d", workers)
 	for range workers {
 		klog.Infof("Starting worker")
-		go wait.UntilWithContext(ctx, c.runElectionWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runElectionWorker, time.Second)
+		})
 	}
 	<-ctx.Done()
 }

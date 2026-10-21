@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/deployment"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
@@ -73,10 +74,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			APIGroup:   "apps",
 			APIVersion: apiVersion,
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *apps.Deployment
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkDeployment(),
 			},
@@ -92,7 +94,35 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkDeployment(func(d *apps.Deployment) {
+					deadline := int64(0)
+					d.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in Deployment is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkDeployment(func(d *apps.Deployment) {
+					deadline := int64(2147483648)
+					d.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in Deployment is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkDeployment(tweakPodSpec(tc.Tweaks...)),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
@@ -101,6 +131,10 @@ func TestDeclarativeValidate(t *testing.T) {
 		meta.RunObjectMetaTestCases(t, ctx, mkDeployment(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
+		poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), mkDeployment(), func(baseObj *apps.Deployment, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Spec.Template.Spec.EvictionResponders = responders
+			baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+		})
 	}
 }
 

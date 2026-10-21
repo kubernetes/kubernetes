@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,7 +36,6 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // REST is a RESTStorage for PodCertificateRequest.
@@ -56,9 +57,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Uncondi
 		DefaultQualifiedResource:  api.Resource("podcertificaterequests"),
 		SingularQualifiedResource: api.Resource("podcertificaterequest"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}

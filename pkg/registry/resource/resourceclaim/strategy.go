@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -270,6 +270,7 @@ func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim)
 	dropDeviceBindingConditionsFields(newClaim, oldClaim)
+	dropDisabledDRAOptionalNodeOperationsStatusFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -411,6 +412,9 @@ func draDeviceBindingConditionsInUse(claim *resource.ResourceClaim) bool {
 		return false
 	}
 	if allocation := claim.Status.Allocation; allocation != nil {
+		if allocation.AllocationTimestamp != nil {
+			return true
+		}
 		for _, result := range allocation.Devices.Results {
 			if result.BindingConditions != nil || result.BindingFailureConditions != nil {
 				return true
@@ -453,9 +457,37 @@ func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClai
 	}
 
 	if allocation := newClaim.Status.Allocation; allocation != nil {
+		newClaim.Status.Allocation.AllocationTimestamp = nil
 		for i := range allocation.Devices.Results {
 			newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
 			newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
 		}
 	}
+}
+
+func dropDisabledDRAOptionalNodeOperationsStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) ||
+		draOptionalNodeOperationsStatusFeatureInUse(oldClaim) {
+		return
+	}
+
+	if allocation := newClaim.Status.Allocation; allocation != nil {
+		for i := range allocation.Devices.Results {
+			newClaim.Status.Allocation.Devices.Results[i].SkipNodeOperations = nil
+		}
+	}
+}
+
+func draOptionalNodeOperationsStatusFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if len(result.SkipNodeOperations) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

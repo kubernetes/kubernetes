@@ -48,7 +48,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			old:    mkScale(),
 			update: mkScale(setReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 	}

@@ -59,9 +59,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	remotecommand "k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 	"k8s.io/streaming/pkg/httpstream/spdy"
 
@@ -95,15 +95,17 @@ const (
 )
 
 type fakeKubelet struct {
-	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
-	podsFunc            func() []*v1.Pod
-	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
-	logFunc             func(w http.ResponseWriter, req *http.Request)
-	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
-	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
-	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
+	podByNameFunc          func(namespace, name string) (*v1.Pod, bool)
+	machineInfoFunc        func() (*cadvisorapi.MachineInfo, error)
+	podsFunc               func() []*v1.Pod
+	runningPodsFunc        func(ctx context.Context) ([]*v1.Pod, error)
+	logFunc                func(w http.ResponseWriter, req *http.Request)
+	runFunc                func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	getExecCheck           func(string, types.UID, string, []string, remotecommandserver.Options)
+	getAttachCheck         func(string, types.UID, string, remotecommandserver.Options)
+	getPortForwardCheck    func(string, string, types.UID, portforward.V4Options)
+	allocatedPodsFunc      func() []*v1.Pod
+	allocatedPodByNameFunc func(namespace, name string) *v1.Pod
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	resyncInterval    time.Duration
@@ -138,6 +140,20 @@ func (fk *fakeKubelet) GetPods() []*v1.Pod {
 
 func (fk *fakeKubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
 	return fk.runningPodsFunc(ctx)
+}
+
+func (fk *fakeKubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	if fk.allocatedPodsFunc != nil {
+		return fk.allocatedPodsFunc(), nil
+	}
+	return nil, nil
+}
+
+func (fk *fakeKubelet) GetAllocatedPodByName(namespace, name string) (*v1.Pod, error) {
+	if fk.allocatedPodByNameFunc != nil {
+		return fk.allocatedPodByNameFunc(namespace, name), nil
+	}
+	return nil, nil
 }
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
@@ -2244,9 +2260,8 @@ func TestServeHTTPRequestDurationMetric(t *testing.T) {
 }
 
 // TestGetExecWebSocketHandlerSelection verifies that getExec selects the
-// translating handler (WebSocket v5 ↔ SPDY) when ExtendWebSocketsToKubelet
-// is enabled and a v5 request arrives, and the plain UpgradeAwareHandler
-// otherwise.
+// translating handler (WebSocket v5 ↔ SPDY) when a v5 request arrives, and the
+// plain UpgradeAwareHandler otherwise.
 //
 // Observable difference: the translating handler accepts v5 WebSocket directly
 // and echoes "v5.channel.k8s.io" back in the 101 response. Without it, the
@@ -2254,38 +2269,29 @@ func TestServeHTTPRequestDurationMetric(t *testing.T) {
 // only lists v4/legacy subprotocols and rejects the v5 upgrade entirely
 // (gorilla receives a non-101 response → "bad handshake").
 // When the client uses v4, the UpgradeAwareHandler proxies the upgrade to the
-// streaming server which accepts v4, so the connection succeeds even when the
-// gate is enabled.
+// streaming server which accepts v4, so the connection succeeds.
 func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		subprotocols           []string // defaults to v5 if nil
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		subprotocols        []string // defaults to v5 if nil
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses translating handler, v5 negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "v5.channel.k8s.io",
-			expectMetricInc:        true,
+			name:                "v5 request uses translating handler, v5 negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "v5.channel.k8s.io",
+			expectMetricInc:     true,
 		},
 		{
-			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
-		},
-		{
-			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// When the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
 			// returns false so getExec falls through to the plain UpgradeAwareHandler, which proxies the
 			// request to the streaming server. The streaming server understands v4 and accepts it.
-			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
-			enableExtendWebSockets: true,
-			subprotocols:           []string{"v4.channel.k8s.io"},
-			expectDialError:        false,
-			expectedSubprotocol:    "v4.channel.k8s.io",
+			name:                "v4 request uses UpgradeAwareHandler, v4 negotiated",
+			subprotocols:        []string{"v4.channel.k8s.io"},
+			expectDialError:     false,
+			expectedSubprotocol: "v4.channel.k8s.io",
 		},
 	}
 
@@ -2299,8 +2305,6 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			ss.fakeRuntime.execFunc = func(_ string, _ []string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
 				stdout.Close() //nolint:errcheck
@@ -2330,7 +2334,7 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="exec"} 1
 `
@@ -2344,38 +2348,30 @@ kubelet_websocket_streaming_requests_total{subresource="exec"} 1
 }
 
 // TestGetAttachWebSocketHandlerSelection verifies that getAttach selects the
-// translating handler when ExtendWebSocketsToKubelet is enabled and a v5
-// request arrives, analogous to TestGetExecWebSocketHandlerSelection.
+// translating handler when a v5 request arrives, analogous to
+// TestGetExecWebSocketHandlerSelection.
 func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		subprotocols           []string // defaults to v5 if nil
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		subprotocols        []string // defaults to v5 if nil
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses translating handler, v5 negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "v5.channel.k8s.io",
-			expectMetricInc:        true,
+			name:                "v5 request uses translating handler, v5 negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "v5.channel.k8s.io",
+			expectMetricInc:     true,
 		},
 		{
-			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
-		},
-		{
-			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// When the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
 			// returns false so getAttach falls through to the plain UpgradeAwareHandler, which proxies the
 			// request to the streaming server. The streaming server understands v4 and accepts it.
-			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
-			enableExtendWebSockets: true,
-			subprotocols:           []string{"v4.channel.k8s.io"},
-			expectDialError:        false,
-			expectedSubprotocol:    "v4.channel.k8s.io",
+			name:                "v4 request uses UpgradeAwareHandler, v4 negotiated",
+			subprotocols:        []string{"v4.channel.k8s.io"},
+			expectDialError:     false,
+			expectedSubprotocol: "v4.channel.k8s.io",
 		},
 	}
 
@@ -2389,8 +2385,6 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			ss.fakeRuntime.attachFunc = func(_ string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
 				stdout.Close() //nolint:errcheck
@@ -2420,7 +2414,7 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="attach"} 1
 `
@@ -2434,39 +2428,26 @@ kubelet_websocket_streaming_requests_total{subresource="attach"} 1
 }
 
 // TestGetPortForwardWebSocketHandlerSelection verifies that getPortForward
-// selects the tunneling handler when ExtendWebSocketsToKubelet is enabled and
-// the client sends the WebSocket tunneling subprotocol ("SPDY/3.1+portforward.k8s.io"),
-// and the plain UpgradeAwareHandler otherwise.
+// selects the tunneling handler when the client sends the WebSocket tunneling
+// subprotocol ("SPDY/3.1+portforward.k8s.io").
 //
-// When the gate is enabled, getPortForward skips portforward.NewV4Options (which
-// would reject a request with no port parameter) and wraps the proxy with a
-// TunnelingHandler that translates the WebSocket tunneling protocol to SPDY.
-// The streaming server speaks SPDY portforward and responds with 101; the
-// tunneling handler translates that back to a WebSocket 101 with the tunneling
-// subprotocol.
-//
-// When the gate is disabled, portforward.NewV4Options is called on the WebSocket
-// request, which has no port query parameter, causing a 400 Bad Request before
-// the WebSocket upgrade is attempted.
+// getPortForward skips portforward.NewV4Options (which would reject a request
+// with no port parameter) and wraps the proxy with a TunnelingHandler that
+// translates the WebSocket tunneling protocol to SPDY. The streaming server
+// speaks SPDY portforward and responds with 101; the tunneling handler
+// translates that back to a WebSocket 101 with the tunneling subprotocol.
 func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 	tests := []struct {
-		name                   string
-		enableExtendWebSockets bool
-		expectDialError        bool
-		expectedSubprotocol    string
-		expectMetricInc        bool
+		name                string
+		expectDialError     bool
+		expectedSubprotocol string
+		expectMetricInc     bool
 	}{
 		{
-			name:                   "feature gate enabled uses tunneling handler, tunneling subprotocol negotiated",
-			enableExtendWebSockets: true,
-			expectDialError:        false,
-			expectedSubprotocol:    "SPDY/3.1+portforward.k8s.io",
-			expectMetricInc:        true,
-		},
-		{
-			name:                   "feature gate disabled rejects tunneling request (no port parameter)",
-			enableExtendWebSockets: false,
-			expectDialError:        true,
+			name:                "tunneling request uses tunneling handler, tunneling subprotocol negotiated",
+			expectDialError:     false,
+			expectedSubprotocol: "SPDY/3.1+portforward.k8s.io",
+			expectMetricInc:     true,
 		},
 	}
 
@@ -2480,8 +2461,6 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 			defer ss.testHTTPServer.Close()
 			fw := newServerTestWithDebug(tCtx, true, ss)
 			defer fw.testHTTPServer.Close()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
 			portForwardURL := strings.Replace(fw.testHTTPServer.URL, "http://", "ws://", 1) +
 				"/portForward/default/foo"
@@ -2502,7 +2481,7 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
 `
@@ -2536,4 +2515,178 @@ func TestKubeletNativeHistogramMetrics(t *testing.T) {
 	}
 
 	testutil.AssertHasNativeHistogram(t, mf, nil)
+}
+
+func TestGetAllocatedPods(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+			UID:       "uid1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "img1"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod2",
+			Namespace: "ns1",
+			UID:       "uid2",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c2", Image: "img2"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		path           string
+		allocatedPods  []*v1.Pod
+		allocatedPod   *v1.Pod
+		expectedStatus int
+		expectedPods   []v1.Pod
+		expectedPod    *v1.Pod
+	}{
+		{
+			name:           "feature disabled - list",
+			featureEnabled: false,
+			path:           "/allocatedPods",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature disabled - get",
+			featureEnabled: false,
+			path:           "/allocatedPods/ns1/pod1",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature enabled - list empty",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{},
+			expectedStatus: http.StatusOK,
+			expectedPods:   []v1.Pod{},
+		},
+		{
+			name:           "feature enabled - list pods",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{pod1, pod2},
+			expectedStatus: http.StatusOK,
+			expectedPods: []v1.Pod{
+				{
+					ObjectMeta: pod1.ObjectMeta,
+					Spec:       pod1.Spec,
+				},
+				{
+					ObjectMeta: pod2.ObjectMeta,
+					Spec:       pod2.Spec,
+				},
+			},
+		},
+		{
+			name:           "feature enabled - get pod found",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusOK,
+			expectedPod: &v1.Pod{
+				ObjectMeta: pod1.ObjectMeta,
+				Spec:       pod1.Spec,
+			},
+		},
+		{
+			name:           "feature enabled - get pod not found",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod3",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature enabled - get pod with matching UID",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1/uid1",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusOK,
+			expectedPod: &v1.Pod{
+				ObjectMeta: pod1.ObjectMeta,
+				Spec:       pod1.Spec,
+			},
+		},
+		{
+			name:           "feature enabled - get pod with mismatch UID",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1/wrong-uid",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletAllocatedPodsEndpoint, tt.featureEnabled)
+
+			tCtx := ktesting.Init(t)
+			fw := newServerTest(tCtx)
+			defer fw.testHTTPServer.Close()
+
+			fw.fakeKubelet.allocatedPodsFunc = func() []*v1.Pod {
+				return tt.allocatedPods
+			}
+			fw.fakeKubelet.allocatedPodByNameFunc = func(namespace, name string) *v1.Pod {
+				if tt.allocatedPod != nil && namespace == tt.allocatedPod.Namespace && name == tt.allocatedPod.Name {
+					return tt.allocatedPod
+				}
+				return nil
+			}
+
+			req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus != http.StatusOK {
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			if tt.expectedPods != nil {
+				var podList v1.PodList
+				err = json.Unmarshal(body, &podList)
+				require.NoError(t, err)
+				assert.Len(t, podList.Items, len(tt.expectedPods))
+				for i, expectedPod := range tt.expectedPods {
+					assert.Equal(t, expectedPod.Name, podList.Items[i].Name)
+					assert.Equal(t, expectedPod.Spec, podList.Items[i].Spec)
+					assert.Empty(t, podList.Items[i].Status)
+				}
+			}
+
+			if tt.expectedPod != nil {
+				var pod v1.Pod
+				err = json.Unmarshal(body, &pod)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedPod.Name, pod.Name)
+				assert.Equal(t, tt.expectedPod.Spec, pod.Spec)
+				assert.Empty(t, pod.Status)
+			}
+		})
+	}
 }

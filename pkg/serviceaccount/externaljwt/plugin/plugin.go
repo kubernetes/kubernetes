@@ -25,10 +25,10 @@ import (
 	"net"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -174,9 +174,12 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 		return fmt.Errorf("key id longer than 1 kb")
 	}
 	switch header.Algorithm {
-	// IMPORTANT: If this function is updated to support additional algorithms,
-	// JWTTokenGenerator, signerFromRSAPrivateKey, signerFromECDSAPrivateKey in
-	// kubernetes/pkg/serviceaccount/jwt.go must also be updated to support the same Algorithms.
+	// IMPORTANT: The algorithms listed below must be kept in sync with:
+	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
+	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 	case "RS256", "ES256", "ES384", "ES512":
 		// OK
 	default:

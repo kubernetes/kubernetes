@@ -56,7 +56,7 @@ This test performs the following:
 - Removes the `out-of-service` taint from the node.
 */
 
-var _ = utils.SIGDescribe(framework.WithDisruptive(), "[LinuxOnly] NonGracefulNodeShutdown", func() {
+var _ = utils.SIGDescribe(framework.WithDisruptive(), framework.WithProvider("gce"), "[LinuxOnly] NonGracefulNodeShutdown", func() {
 	var (
 		c  clientset.Interface
 		ns string
@@ -67,7 +67,6 @@ var _ = utils.SIGDescribe(framework.WithDisruptive(), "[LinuxOnly] NonGracefulNo
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		e2eskipper.SkipUnlessProviderIs("gce")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to list node: %v", err)

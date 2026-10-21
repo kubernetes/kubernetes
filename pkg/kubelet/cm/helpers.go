@@ -33,6 +33,7 @@ import (
 // for typecheck across platforms
 var _ func(int64, int64) int64 = MilliCPUToQuota
 var _ func(int64) uint64 = MilliCPUToShares
+var _ func(uint64, uint64) bool = CPUSharesEqualAfterV2RoundTrip
 var _ func(*v1.Pod, bool, uint64, bool, kubeletconfig.MemoryReservationPolicy) *ResourceConfig = ResourceConfigForPod
 var _ func() (*CgroupSubsystems, error) = GetCgroupSubsystems
 var _ func(string) ([]int, error) = getCgroupProcs

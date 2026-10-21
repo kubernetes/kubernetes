@@ -31,9 +31,26 @@ Currently the test suite has the following:
 
 ### Benchmark tests
 
+To make benchmark results more comparable, the number of cores gets limited to
+six in the examples below via `numactl --physcpubind=0-5`.
+This is similar to how scheduler_perf is run periodically:
+https://github.com/kubernetes/test-infra/blob/45625f266a23ad16629cd64ed77ff6a65455377f/config/jobs/kubernetes/sig-scalability/sig-scalability-periodic-jobs.yaml#L721-L780
+
+Here some explanations for parameters used below:
+- `KUBE_CACHE_MUTATION_DETECTOR=false`: prevents enabling the client-go/tools/cache sanity checking,
+  which can be expensive (uses DeepEqual) and is off in production
+- `KUBE_TIMEOUT=-timeout=1h`: benchmarks may have to run longer than the default 10 minutes
+- `FULL_LOG=y`: ensures that benchmark results are shown
+- `ARTIFACTS=/tmp`: redirects non-test log output, which is lengthy and breaks parsing by `benchstat`
+- `SHORT=-short=false`: enables running benchmarks which run sufficiently long to be meaningful
+- `-run=^$`: disables running unit tests
+- `-perf-cpuprofile`, `-perf-memprofile`, ..., `-perf-trace`: enable per-test profile or execution trace dumps
+- `-data-items-dir`: write data files and profiles into that directory instead of the current directory of each test;
+  file names are unique, so it is possible to use the same directory for multiple runs
+
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling'
+numactl --physcpubind=0-5 make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling'
 ```
 
 The output can used for [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
@@ -51,7 +68,7 @@ a comma-separated list of label names. Each label may have a `+` or `-` as prefi
 be set. For example, this runs all performance benchmarks except those that are labeled
 as "integration-test":
 ```shell
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
+numactl --physcpubind=0-5 make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
 ```
 
 Once the benchmark is finished, JSON files with metrics are available in the subdirectories (`test/integration/scheduler_perf/config/<topic>`). 
@@ -65,26 +82,64 @@ Otherwise, the golang benchmark framework will try to run a test more than once 
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
+numactl --physcpubind=0-5 make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
 ```
 
-To run a test with profiler you need to target a specific package directory as `go test` does not support profiling across multiple packages.
+It is possible to collect CPU and memory profiles separately for each
+profiling step of a test case. This is more useful than `go test -cpuprofile`
+or `-mem-profile` because the setup and tear down phases are not included and
+because it is possible to investigate different cases individually or
+cumulatively. `go tool pprof` automatically merges different profiles of the
+same type when it is invoked for more than one file.
 
-To produce a cpu profile:
+The "-delta-mem.prof" file for each test capture the delta between the
+allocations from the end of the test and the start of the test, i.e. they only
+show allocations which occurred during the profiling step. "-start-mem.prof"
+and "-end-mem.prof" are snapshots which include allocations since the start of
+the test binary.
+
+Block and mutex profiles and execution traces (includes garbage collection)
+are also supported.
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/misc KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
+rm -rf /tmp/perf-data
+numactl --physcpubind=0-5 make test-integration WHAT=./test/integration/scheduler_perf/misc KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -perf-cpuprofile -perf-memprofile -perf-blockprofile -perf-mutexprofile -perf-trace -data-items-dir=/tmp/perf-data'
+go tool pprof -http=:8080 /tmp/perf-data/*-cpu.prof
+go tool pprof -http=:8081 /tmp/perf-data/*-delta-mem.prof
+go tool trace -http=:8081 /tmp/perf-data/<one file>-trace.out
 ```
 
-Here some explanations for those parameters:
-- `KUBE_CACHE_MUTATION_DETECTOR=false`: prevents enabling the client-go/tools/cache sanity checking,
-  which can be expensive (uses DeepEqual) and is off in production
-- `KUBE_TIMEOUT=-timeout=1h`: benchmarks may have to run longer than the default 10 minutes
-- `FULL_LOG=y`: ensures that benchmark results are shown
-- `ARTIFACTS=/tmp`: redirects non-test log output, which is lengthy and breaks parsing by `benchstat`
-- `SHORT=-short=false`: enables running benchmarks which run sufficiently long to be meaningful
-- `-run=^$`: disables running unit tests
+Enabling all profiles and tracing reduces average scheduling throughput by
+~8-10% (observed for test/integration/dra). Be careful to only compare results
+from runs with identical parameters.
+
+To debug garbage collection, run with `GODEBUG=gctrace=1 FULL_LOG=y`, capture
+stdout+stderr, then `grep -e "metrics collection" -e '^gc'`. The garbage
+collector output between "Started metrics collection" and "Stopped metrics
+collection" is the relevant one for performance.
+
+The `traceparse` tool in `hack/tools/traceparse` summarizes GC activity from
+execution trace files. It is useful for comparing two runs and spotting
+allocation-driven regressions:
+
+```shell
+go -C hack/tools build -o /tmp/traceparse ./traceparse
+/tmp/traceparse \
+  /tmp/perf-data/before-trace.out \
+  /tmp/perf-data/after-trace.out
+```
+
+The most diagnostic output is the **GC mark assist** row: it counts goroutine
+interruptions caused by allocations outpacing background GC marking. A large
+count (or high total duration) in the hot scheduling path directly caps
+throughput. See `hack/tools/traceparse/README.md` for details.
+
+For more information, see:
+- memory profiles: https://pkg.go.dev/runtime/pprof#Profile
+- pprof tool: https://github.com/google/pprof/blob/main/doc/README.md
+- traces: https://go.dev/blog/execution-traces-2024
+- garbage collector output: https://pkg.go.dev/runtime#hdr-Environment_Variables
 
 ### How to configure benchmark tests
 

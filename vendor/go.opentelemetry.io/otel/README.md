@@ -3,12 +3,11 @@
 [![ci](https://github.com/open-telemetry/opentelemetry-go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/open-telemetry/opentelemetry-go/actions/workflows/ci.yml)
 [![codecov.io](https://codecov.io/gh/open-telemetry/opentelemetry-go/coverage.svg?branch=main)](https://app.codecov.io/gh/open-telemetry/opentelemetry-go?branch=main)
 [![PkgGoDev](https://pkg.go.dev/badge/go.opentelemetry.io/otel)](https://pkg.go.dev/go.opentelemetry.io/otel)
-[![Go Report Card](https://goreportcard.com/badge/go.opentelemetry.io/otel)](https://goreportcard.com/report/go.opentelemetry.io/otel)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/open-telemetry/opentelemetry-go/badge)](https://scorecard.dev/viewer/?uri=github.com/open-telemetry/opentelemetry-go)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9996/badge)](https://www.bestpractices.dev/projects/9996)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/opentelemetry-go.svg)](https://issues.oss-fuzz.com/issues?q=project:opentelemetry-go)
 [![FOSSA Status](https://app.fossa.com/api/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-go.svg?type=shield&issueType=license)](https://app.fossa.com/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-go?ref=badge_shield&issueType=license)
-[![Slack](https://img.shields.io/badge/slack-@cncf/otel--go-brightgreen.svg?logo=slack)](https://cloud-native.slack.com/archives/C01NPAXACKT)
+[![Slack](https://img.shields.io/badge/slack-@cncf/otel--go-brightgreen.svg?logo=slack)](https://slack.cncf.io/)
 
 OpenTelemetry-Go is the [Go](https://golang.org/) implementation of [OpenTelemetry](https://opentelemetry.io/).
 It provides a set of APIs to directly measure performance and behavior of your software and send this data to observability platforms.
@@ -19,7 +18,7 @@ It provides a set of APIs to directly measure performance and behavior of your s
 |---------|--------------------|
 | Traces  | Stable             |
 | Metrics | Stable             |
-| Logs    | Beta[^1]           |
+| Logs    | Stable             |
 
 Progress and status specific to this repository is tracked in our
 [project boards](https://github.com/open-telemetry/opentelemetry-go/projects)
@@ -28,8 +27,6 @@ and
 
 Project versioning information and stability guarantees can be found in the
 [versioning documentation](VERSIONING.md).
-
-[^1]: https://github.com/orgs/open-telemetry/projects/43
 
 ### Compatibility
 
@@ -53,20 +50,20 @@ Currently, this project supports the following environments.
 
 | OS       | Go Version | Architecture |
 |----------|------------|--------------|
+| Ubuntu   | 1.27       | amd64        |
 | Ubuntu   | 1.26       | amd64        |
-| Ubuntu   | 1.25       | amd64        |
+| Ubuntu   | 1.27       | 386          |
 | Ubuntu   | 1.26       | 386          |
-| Ubuntu   | 1.25       | 386          |
+| Ubuntu   | 1.27       | arm64        |
 | Ubuntu   | 1.26       | arm64        |
-| Ubuntu   | 1.25       | arm64        |
+| macOS    | 1.27       | amd64        |
 | macOS    | 1.26       | amd64        |
-| macOS    | 1.25       | amd64        |
+| macOS    | 1.27       | arm64        |
 | macOS    | 1.26       | arm64        |
-| macOS    | 1.25       | arm64        |
+| Windows  | 1.27       | amd64        |
 | Windows  | 1.26       | amd64        |
-| Windows  | 1.25       | amd64        |
+| Windows  | 1.27       | 386          |
 | Windows  | 1.26       | 386          |
-| Windows  | 1.25       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.

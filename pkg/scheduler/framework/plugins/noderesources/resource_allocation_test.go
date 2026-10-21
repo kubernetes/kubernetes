@@ -36,6 +36,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -44,7 +45,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -595,8 +595,6 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	resourceSliceTrackerOpts := tracker.Options{
 		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
-		TaintInformer: informerFactory.Resource().V1beta2().DeviceTaintRules(),
-		ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:    client,
 	}
 	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
@@ -621,7 +619,6 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 
 	informerFactory.Start(tCtx.Done())
 	tCtx.Cleanup(func() {
-		tCtx.Cancel("test has completed")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})

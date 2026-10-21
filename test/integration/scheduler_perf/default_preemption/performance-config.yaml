@@ -1,0 +1,346 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+
+- name: PreemptionBasic
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/pod-high-priority.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 1000Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+  - name: 1000Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+# This test case always seems to fail.
+# https://github.com/kubernetes/kubernetes/issues/108308
+#
+#  - name: 5000Nodes
+#    params:
+#      initNodes: 5000
+#      initPods: 20000
+#      measurePods: 5000
+
+# Measure throughput of regular schedulable pods that are interleaved by high priority preemption pods scheduled at 5/s rate.
+# Implementation of asynchronous preemption feature https://github.com/kubernetes/kubernetes/issues/126858 is supposed to increase the throughput of the measured pods as all heavy operations (apiserver communication) will be performed asynchronously, without blocking the scheduler loop.
+# How is it achieved:
+# 1. There are X initial nodes with 4 low priority pods each, consuming 3.6 CPU out of the total 4 available.
+# 2. High priority preemption which need to preempt 3 of 4 low priority pods to fit (require 3 CPU).
+# 3. Measured pods are always schedulable, as they require 0.1 CPU only.
+- name: PreemptionAsync
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-low-priority.yaml
+  - opcode: churn
+    mode: create
+    templatePaths:
+    - templates/pod-high-priority.yaml
+    intervalMilliseconds: 200
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 500Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+  - name: 5000Nodes
+    labels: [performance]
+    threshold: 570
+    featureGates:
+      SchedulerAsyncPreemption: false
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_AsyncPreemptionEnabled
+    threshold: 570
+    labels: [performance]
+    featureGates:
+      SchedulerAsyncPreemption: true
+      SchedulerAsyncAPICalls: false
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    threshold: 570
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+
+# Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 5/s rate.
+# Note that the scheduling performance depends on the number of Pods, as preemption plugin needs to loop over all Pods in attempt to preempt them.
+- name: Unschedulable
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: churn
+    mode: create
+    templatePaths:
+    - ../templates/pod-high-priority-large-cpu.yaml
+    intervalMilliseconds: 200
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes/1Init/10Pods
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 10
+  - name: 5Nodes/1Init/10Pods_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 10
+  - name: 500Nodes/10Init/1kPods
+    labels: [performance]
+    params:
+      initNodes: 500
+      initPods: 10
+      measurePods: 1000
+  - name: 5kNodes/100Init/1kPods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 1000
+  - name: 5kNodes/100Init/10kPods
+    labels: [performance]
+    threshold: 590
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 10000
+  - name: 5kNodes/100Init/10kPods_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    threshold: 590
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods
+    labels: [performance]
+    threshold: 600
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    threshold: 600
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 10000
+
+# This test suite compares preemption latency across three victim disruption configurations:
+# 1. NoPodGroup: low-priority victim pods are regular pods (do not belong to any PodGroup).
+# 2. PodGroup_DisruptionSingle: low-priority victim pods belong to PodGroups configured with
+#    disruptionMode "single" (the scheduler preempts only the minimal required member pods).
+# 3. PodGroup_DisruptionAll: low-priority victim pods belong to PodGroups configured with
+#    disruptionMode "all" (preempting any member pod forces eviction of the entire gang).
+#
+# Scenario & Ratio Explanation:
+# - Node Capacity: Standard nodes with 4000m CPU.
+# - Initial State & Spreading: 10,000 low-priority victim pods are scheduled across 1000 nodes.
+#   For PodGroup workloads (DisruptionSingle / DisruptionAll), these are 1000 PodGroups (10 pods per group).
+#   For NoPodGroup, these are 10,000 individual standalone victim pods (not belonging to any PodGroup).
+#   Member pods of a gang are spread across nodes by default scheduler scoring.
+# - Preemption Request: High-priority preemptor pods request 3970m CPU each.
+# - Victim-to-Preemptor Ratio (10:1):
+#   To fit 1 high-priority preemptor (3970m CPU), the node needs 2970m additional CPU (3970m - 1000m free).
+#   Each low-priority victim pod frees up 300m CPU. Thus, the scheduler must preempt all 10 low-priority
+#   victim pods located on the target node (10 * 300m = 3000m freed).
+#   This yields a 10:1 victim-to-preemptor ratio (10 low-priority victim pods preempted per 1 preemptor pod).
+# - Disruption Mode Impact:
+#   * "single": Preempting the 10 victim pods on the target node only evicts those specific 10 pods.
+#   * "all": Preempting a victim pod on the target node triggers eviction of its entire PodGroup
+#     (including member pods located on other nodes).
+- name: PreemptionPodGroupDisruptionMode
+  featureGates:
+    GenericWorkload: true
+    SchedulerAsyncAPICalls: false
+
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+
+  - opcode: createPodGroups
+    countParam: $lowPriorityGroups
+    namespace: gang-preempt-1
+    templatePath: ../templates/podgroup.yaml
+    templateParams:
+      minCount: $podsPerGroup
+      priority: 1000
+      disruptionMode: $disruptionMode
+
+  - opcode: createPods
+    countParam: $lowPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $lowPriorityCpuRequest
+      priority: 1000
+      disruptionMode: $disruptionMode
+
+  - opcode: barrier
+    stageRequirement: Scheduled
+
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $measurePods
+    namespace: gang-preempt-0
+    podTemplatePath: templates/pod-high-priority.yaml
+
+  workloads:
+  # Fast CI test: regular low-priority pods without any PodGroup (disruptionMode: "").
+  # Note: lowPriorityGroups specifies the count multiplier to generate 4 low-priority pods (2 groups * 2 pods/group),
+  # but disruptionMode: "" ensures gang-pod.yaml creates regular pods without any PodGroup binding.
+  - name: FastTest_NoPodGroup
+    labels: [integration-test, short]
+    params:
+      initNodes: 2
+      lowPriorityGroups: 2
+      podsPerGroup: 2
+      measurePods: 1
+      disruptionMode: ""
+      lowPriorityCpuRequest: 1500m
+
+  # Fast CI test: disruptionMode "single" allows preempting minimal required member pods without evicting the whole PodGroup.
+  - name: FastTest_PodGroupDisruptionMode_Single
+    labels: [integration-test, short]
+    params:
+      initNodes: 2
+      lowPriorityGroups: 2
+      podsPerGroup: 2
+      measurePods: 1
+      disruptionMode: "single"
+      lowPriorityCpuRequest: 1500m
+
+  # Fast CI test: disruptionMode "all" forces evicting the entire candidate PodGroup if any pod is selected as a victim.
+  - name: FastTest_PodGroupDisruptionMode_All
+    labels: [integration-test, short]
+    params:
+      initNodes: 2
+      lowPriorityGroups: 2
+      podsPerGroup: 2
+      measurePods: 1
+      disruptionMode: "all"
+      lowPriorityCpuRequest: 1500m
+
+  # Performance test: 1000 nodes, 10000 regular low-priority pods without any PodGroup (disruptionMode: "").
+  # Note: lowPriorityGroups specifies the count multiplier to generate 10,000 low-priority pods (1000 groups * 10 pods/group),
+  # but disruptionMode: "" ensures gang-pod.yaml creates regular pods without any PodGroup binding.
+  - name: 1000Nodes_1000Candidates_NoPodGroup
+    labels: [performance]
+    params:
+      initNodes: 1000
+      lowPriorityGroups: 1000
+      podsPerGroup: 10
+      measurePods: 100
+      disruptionMode: ""
+      lowPriorityCpuRequest: 300m
+
+  # Performance test: 1000 nodes, 1000 PodGroups with disruptionMode "single". Preemptor displaces minimal member pods.
+  - name: 1000Nodes_1000Candidates_DisruptionSingle
+    labels: [performance]
+    params:
+      initNodes: 1000
+      lowPriorityGroups: 1000
+      podsPerGroup: 10
+      measurePods: 100
+      disruptionMode: "single"
+      lowPriorityCpuRequest: 300m
+
+  # Performance test: 1000 nodes, 1000 PodGroups with disruptionMode "all". Preemptor forces full gang eviction.
+  - name: 1000Nodes_1000Candidates_DisruptionAll
+    labels: [performance]
+    params:
+      initNodes: 1000
+      lowPriorityGroups: 1000
+      podsPerGroup: 10
+      measurePods: 100
+      disruptionMode: "all"
+      lowPriorityCpuRequest: 300m

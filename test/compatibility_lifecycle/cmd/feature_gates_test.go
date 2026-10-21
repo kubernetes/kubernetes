@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -484,6 +485,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CPUCFSQuotaPeriod: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 	},
+	DRAFractionalCapacityRange: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.37")},
+	},
 	genericfeatures.AggregatedDiscoveryEndpoint: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -502,6 +507,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 					FullName: "CPUCFSQuotaPeriod",
 					VersionedSpecs: []featureSpec{
 						{Default: false, PreRelease: "Alpha", Version: "1.29"},
+					},
+				},
+				{
+					Name:     "DRAFractionalCapacityRange",
+					FullName: "DRAFractionalCapacityRange",
+					VersionedSpecs: []featureSpec{
+						{Default: false, PreRelease: "Beta", Version: "1.37"},
+						{Default: true, PreRelease: "Beta", Version: "1.37", MinCompatibilityVersion: "1.37"},
 					},
 				},
 				{

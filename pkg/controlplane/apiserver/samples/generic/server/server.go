@@ -30,6 +30,7 @@ import (
 	_ "k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/signals"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/client-go/kubernetes"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	_ "k8s.io/kubernetes/pkg/features"
@@ -83,7 +85,7 @@ APIs.`,
 			}
 			cliflag.PrintFlags(fs)
 
-			ctx := genericapiserver.SetupSignalContext()
+			ctx := signals.SetupSignalContext()
 
 			completedOptions, err := s.Complete(ctx, []string{}, []net.IP{})
 			if err != nil {
@@ -95,7 +97,7 @@ APIs.`,
 			}
 
 			// add feature enablement metrics
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 
 			return Run(ctx, completedOptions)
 		},

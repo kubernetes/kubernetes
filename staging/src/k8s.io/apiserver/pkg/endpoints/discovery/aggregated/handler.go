@@ -25,15 +25,12 @@ import (
 	"sync/atomic"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -171,9 +168,6 @@ func (rdm *resourceDiscoveryManager) invalidateCacheLocked() {
 func NewResourceManager(path string) ResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	// Register conversion for apidiscovery
-	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
 
 	var opts []serializer.CodecFactoryOptionsMutator
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
@@ -563,26 +557,17 @@ func writeDiscoveryResponse(
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	var targetGV schema.GroupVersion
 	if mediaType.Convert == nil {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got unknown group and version"))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
-		mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion {
+	if mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	if mediaType.Convert.GroupVersion() == apidiscoveryv2beta1.SchemeGroupVersion &&
-		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryRemoveBetaType) {
-		klog.Errorf("aggregated discovery version v2beta1 is removed. Please update to use v2")
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	targetGV = mediaType.Convert.GroupVersion()
+	targetGV := mediaType.Convert.GroupVersion()
 
 	if len(etag) > 0 {
 		// Use proper e-tag headers if one is available

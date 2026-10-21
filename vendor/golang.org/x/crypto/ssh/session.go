@@ -423,6 +423,9 @@ func (s *Session) wait(reqs <-chan *Request) error {
 	for msg := range reqs {
 		switch msg.Type {
 		case "exit-status":
+			if len(msg.Payload) < 4 {
+				return errors.New("ssh: malformed exit-status request")
+			}
 			wm.status = int(binary.BigEndian.Uint32(msg.Payload))
 		case "exit-signal":
 			var sigval struct {

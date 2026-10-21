@@ -26,7 +26,6 @@ import (
 	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -34,6 +33,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -56,6 +56,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -76,6 +77,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -92,13 +94,13 @@ var groups = []runtime.SchemeBuilder{
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
 	apiserverinternalv1alpha1.SchemeBuilder,
-	apidiscoveryv2beta1.SchemeBuilder,
 	apidiscoveryv2.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
 	appsv1beta2.SchemeBuilder,
 	appsv1.SchemeBuilder,
 	authenticationv1beta1.SchemeBuilder,
 	authenticationv1.SchemeBuilder,
+	authorizationv1alpha1.SchemeBuilder,
 	authorizationv1beta1.SchemeBuilder,
 	authorizationv1.SchemeBuilder,
 	autoscalingv1.SchemeBuilder,
@@ -122,6 +124,7 @@ var groups = []runtime.SchemeBuilder{
 	flowcontrolv1beta3.SchemeBuilder,
 	flowcontrolv1.SchemeBuilder,
 	imagepolicyv1alpha1.SchemeBuilder,
+	lifecyclev1alpha1.SchemeBuilder,
 	networkingv1.SchemeBuilder,
 	networkingv1beta1.SchemeBuilder,
 	nodev1.SchemeBuilder,
@@ -143,6 +146,7 @@ var groups = []runtime.SchemeBuilder{
 	storagev1beta1.SchemeBuilder,
 	storagev1.SchemeBuilder,
 	svmv1beta1.SchemeBuilder,
+	svmv1.SchemeBuilder,
 }
 
 func TestRoundTripExternalTypes(t *testing.T) {

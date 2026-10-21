@@ -11,6 +11,7 @@ The schema used for the generated JUnit xml file was adapted from https://llg.cu
 package reporters
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"maps"
@@ -136,6 +137,8 @@ type JUnitTestCase struct {
 	SystemOut string `xml:"system-out,omitempty"`
 	//SystemOut maps onto any captured GinkgoWriter output - maps onto SpecReport.CapturedGinkgoWriterOutput
 	SystemErr string `xml:"system-err,omitempty"`
+	//Properties captures any ReportEntries attached to the spec via AddReportEntry, as key/value pairs with the JSON dump of the value as value.
+	Properties *JUnitProperties `xml:"properties,omitempty"`
 }
 
 type JUnitSkipped struct {
@@ -240,6 +243,20 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 		}
 		if !config.OmitCapturedStdOutErr {
 			test.SystemOut = systemOutForUnstructuredReporters(spec)
+		}
+		if len(spec.ReportEntries) > 0 {
+			properties := JUnitProperties{}
+			for _, entry := range spec.ReportEntries {
+				value, err := json.Marshal(entry.GetRawValue())
+				if err != nil {
+					value = []byte(fmt.Sprintf("%q", err.Error()))
+				}
+				properties.Properties = append(properties.Properties, JUnitProperty{
+					Name:  entry.Name,
+					Value: string(value),
+				})
+			}
+			test.Properties = &properties
 		}
 		suite.Tests += 1
 

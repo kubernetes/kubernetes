@@ -33,10 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/utils/ptr"
 )
 
 // rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
@@ -148,6 +150,10 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	var numSurge int
 	var numAvailable int
 
+	// The daemon pod tolerations and the parsed required node affinity are
+	// the same for every node; build them once instead of once per node.
+	tolerations := daemonPodTolerations(ds)
+	requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity)
 	for nodeName, pods := range nodeToDaemonPods {
 		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 		if !ok {
@@ -179,7 +185,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 				if err != nil {
 					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
 				}
-				if shouldRun, _ := NodeShouldRunDaemonPod(logger, node, ds); !shouldRun {
+				if shouldRun, _ := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity); !shouldRun {
 					logger.V(5).Info("DaemonSet pod on node is not available and does not match scheduling constraints, remove old pod", "daemonset", klog.KObj(ds), "node", nodeName, "oldPod", klog.KObj(oldPod))
 					oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 					continue
@@ -196,7 +202,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 				if err != nil {
 					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
 				}
-				if shouldRun, _ := NodeShouldRunDaemonPod(logger, node, ds); !shouldRun {
+				if shouldRun, _ := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity); !shouldRun {
 					shouldNotRunPodsToDelete = append(shouldNotRunPodsToDelete, oldPod.Name)
 					continue
 				}
@@ -563,7 +569,7 @@ func (dsc *DaemonSetsController) snapshot(ctx context.Context, ds *apps.DaemonSe
 		}
 		// If the collision count used to compute hash was in fact stale, there's no need to bump collision count; retry again
 		if !reflect.DeepEqual(currDS.Status.CollisionCount, ds.Status.CollisionCount) {
-			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ds.Status.CollisionCount, currDS.Status.CollisionCount, ds.Name)
+			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ptr.Deref(ds.Status.CollisionCount, 0), ptr.Deref(currDS.Status.CollisionCount, 0), ds.Name)
 		}
 		if currDS.Status.CollisionCount == nil {
 			currDS.Status.CollisionCount = new(int32)
@@ -584,9 +590,11 @@ func (dsc *DaemonSetsController) snapshot(ctx context.Context, ds *apps.DaemonSe
 func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) (int, int, int, error) {
 	var desiredNumberScheduled int
 	logger := klog.FromContext(ctx)
+	tolerations := daemonPodTolerations(ds)
+	requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity)
 	for i := range nodeList {
 		node := nodeList[i]
-		wantToRun, _ := NodeShouldRunDaemonPod(logger, node, ds)
+		wantToRun, _ := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity)
 		if !wantToRun {
 			continue
 		}

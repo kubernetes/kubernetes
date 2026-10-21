@@ -41,13 +41,13 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -938,9 +938,12 @@ func TestMachineInfo(t *testing.T) {
 					message:   message,
 				})
 			}
+			runningInUserNSFunc := func() *bool {
+				return nil
+			}
 			// construct setter
 			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
-				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, tc.disableLocalStorageCapacityIsolation)
+				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, runningInUserNSFunc, tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1154,7 +1157,7 @@ func TestImages(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			imageListFunc := func() ([]kubecontainer.Image, error) {
+			imageListFunc := func(_ context.Context) ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
 				// (e.g. if the image cache stopped sorting for us)

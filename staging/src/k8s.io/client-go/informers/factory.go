@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	sharding "k8s.io/apimachinery/pkg/sharding"
 	wait "k8s.io/apimachinery/pkg/util/wait"
 	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apiserverinternal "k8s.io/client-go/informers/apiserverinternal"
@@ -41,6 +42,7 @@ import (
 	extensions "k8s.io/client-go/informers/extensions"
 	flowcontrol "k8s.io/client-go/informers/flowcontrol"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	lifecycle "k8s.io/client-go/informers/lifecycle"
 	networking "k8s.io/client-go/informers/networking"
 	node "k8s.io/client-go/informers/node"
 	policy "k8s.io/client-go/informers/policy"
@@ -64,6 +66,7 @@ type sharedInformerFactory struct {
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
 	transform        cache.TransformFunc
+	shardSelector    sharding.Selector
 	informerName     *cache.InformerName
 
 	informers map[reflect.Type]cache.SharedIndexInformer
@@ -107,6 +110,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector sharding.Selector) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -259,6 +270,9 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	if f.transform != nil {
 		informer.SetTransform(f.transform)
 	}
+	if f.shardSelector != nil {
+		informer.SetShardSelector(f.shardSelector)
+	}
 	f.informers[informerType] = informer
 
 	return informer
@@ -275,17 +289,17 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 //	defer factory.Shutdown()    // Returns immediately if nothing was started.
 //	genericInformer := factory.ForResource(resource)
 //	typedInformer := factory.SomeAPIGroup().V1().SomeType()
-//	handle, err := typeInformer.Informer().AddEventHandler(...)
+//	handle, err := typedInformer.Informer().AddEventHandler(...)
 //	if err != nil {
 //	    return fmt.Errorf("register event handler: %v", err)
 //	}
-//	defer typeInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
+//	defer typedInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
 //	factory.StartWithContext(ctx)                            // Start processing these informers.
 //	synced := factory.WaitForCacheSyncWithContext(ctx)
 //	if err := synced.AsError(); err != nil {
 //	    return err
 //	}
-//	for v := range synced {
+//	for v := range synced.Synced {
 //	    // Only if desired log some information similar to this.
 //	    fmt.Fprintf(os.Stdout, "cache synced: %s", v)
 //	}
@@ -356,6 +370,7 @@ type SharedInformerFactory interface {
 	Events() events.Interface
 	Extensions() extensions.Interface
 	Flowcontrol() flowcontrol.Interface
+	Lifecycle() lifecycle.Interface
 	Networking() networking.Interface
 	Node() node.Interface
 	Policy() policy.Interface
@@ -412,6 +427,10 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 
 func (f *sharedInformerFactory) Flowcontrol() flowcontrol.Interface {
 	return flowcontrol.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Lifecycle() lifecycle.Interface {
+	return lifecycle.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Networking() networking.Interface {

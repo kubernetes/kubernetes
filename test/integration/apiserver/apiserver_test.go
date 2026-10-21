@@ -76,6 +76,7 @@ import (
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -83,7 +84,6 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -106,7 +106,6 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 	})
 
 	newTeardown := func() {
-		tCtx.Cancel("tearing down apiserver")
 		teardown()
 	}
 
@@ -627,6 +626,106 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	if count != 10 {
 		t.Errorf("Expected list size to be 10 but got %d", count)
+	}
+}
+
+func TestGetOptions(t *testing.T) {
+	for _, watchCacheEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = watchCacheEnabled
+				},
+			})
+			defer tearDownFn()
+
+			rsClient := clientSet.AppsV1().ReplicaSets("default")
+			rs := newRS("default")
+			rs.Name = "test-rs"
+			created, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating replicaset: %v", err)
+			}
+
+			tcs := []struct {
+				name           string
+				objectName     string
+				rv             string
+				wantStatusCode int32
+			}{
+				{
+					name:           "existing rv=empty",
+					objectName:     created.Name,
+					rv:             "",
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=0",
+					objectName:     created.Name,
+					rv:             "0",
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=valid",
+					objectName:     created.Name,
+					rv:             created.ResourceVersion,
+					wantStatusCode: http.StatusOK,
+				},
+				{
+					name:           "existing rv=invalid",
+					objectName:     created.Name,
+					rv:             invalidResourceVersion,
+					wantStatusCode: http.StatusUnprocessableEntity,
+				},
+				{
+					name:           "non-existing rv=empty",
+					objectName:     "non-existing",
+					rv:             "",
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=0",
+					objectName:     "non-existing",
+					rv:             "0",
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=valid",
+					objectName:     "non-existing",
+					rv:             created.ResourceVersion,
+					wantStatusCode: http.StatusNotFound,
+				},
+				{
+					name:           "non-existing rv=invalid",
+					objectName:     "non-existing",
+					rv:             invalidResourceVersion,
+					wantStatusCode: http.StatusUnprocessableEntity,
+				},
+			}
+
+			for _, tc := range tcs {
+				t.Run(tc.name, func(t *testing.T) {
+					got, err := rsClient.Get(tCtx, tc.objectName, metav1.GetOptions{ResourceVersion: tc.rv})
+					if tc.wantStatusCode == http.StatusOK {
+						if err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+						if got.UID != created.UID {
+							t.Errorf("expected UID %v, got %v", created.UID, got.UID)
+						}
+						return
+					}
+					if err == nil {
+						t.Fatalf("expected status code %d, got nil error", tc.wantStatusCode)
+					}
+					status, ok := err.(apierrors.APIStatus)
+					if !ok || status.Status().Code != tc.wantStatusCode {
+						t.Fatalf("expected status code %d, got: %#v", tc.wantStatusCode, err)
+					}
+				})
+			}
+		})
 	}
 }
 
@@ -3162,8 +3261,9 @@ func TestDedupOwnerReferences(t *testing.T) {
 }
 
 func TestEmulatedStorageVersion(t *testing.T) {
-	validVap := &admissionregistrationv1.ValidatingAdmissionPolicy{
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+	fail := admissionregistrationv1.Fail
+	validMap := &admissionregistrationv1.MutatingAdmissionPolicy{
+		Spec: admissionregistrationv1.MutatingAdmissionPolicySpec{
 			MatchConstraints: &admissionregistrationv1.MatchResources{
 				ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
 					{
@@ -3179,10 +3279,14 @@ func TestEmulatedStorageVersion(t *testing.T) {
 					},
 				},
 			},
-			Validations: []admissionregistrationv1.Validation{
+			FailurePolicy:      &fail,
+			ReinvocationPolicy: admissionregistrationv1.NeverReinvocationPolicy,
+			Mutations: []admissionregistrationv1.Mutation{
 				{
-					Expression: "true",
-					Message:    "always valid",
+					PatchType: admissionregistrationv1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &admissionregistrationv1.ApplyConfiguration{
+						Expression: `Object{metadata: Object.metadata{annotations: {"foo": "bar"}}}`,
+					},
 				},
 			},
 		},
@@ -3197,28 +3301,28 @@ func TestEmulatedStorageVersion(t *testing.T) {
 	}
 	cases := []testCase{
 		{
-			name:            "vap after ga release",
-			emulatedVersion: "1.31",
+			name:            "map after ga release",
+			emulatedVersion: "1.37",
 			gvr: schema.GroupVersionResource{
 				Group:    "admissionregistration.k8s.io",
 				Version:  "v1beta1",
-				Resource: "validatingadmissionpolicies",
+				Resource: "mutatingadmissionpolicies",
 			},
-			object: validVap,
+			object: validMap,
 			expectedStorageVersion: schema.GroupVersion{
 				Group:   "admissionregistration.k8s.io",
 				Version: "v1",
 			},
 		},
 		{
-			name:            "vap before ga release",
-			emulatedVersion: "1.30",
+			name:            "map before ga release",
+			emulatedVersion: "1.36",
 			gvr: schema.GroupVersionResource{
 				Group:    "admissionregistration.k8s.io",
 				Version:  "v1beta1",
-				Resource: "validatingadmissionpolicies",
+				Resource: "mutatingadmissionpolicies",
 			},
-			object: validVap,
+			object: validMap,
 			expectedStorageVersion: schema.GroupVersion{
 				Group:   "admissionregistration.k8s.io",
 				Version: "v1beta1",
@@ -3547,10 +3651,10 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.38"},
+		[]string{"--emulated-version=kube=1.35", "--runtime-config=api/beta=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3575,11 +3679,15 @@ func TestEnableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			path:               "/apis/admissionregistration.k8s.io/v1beta1/mutatingadmissionpolicies", // introduced at 1.34, removed at 1.40
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicies", // introduced at 1.36
+			expectedStatusCode: 404,
+		},
+		{
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings", // introduced at 1.36
 			expectedStatusCode: 404,
 		},
 	}
@@ -3605,10 +3713,10 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.38"},
+		[]string{"--emulated-version=kube=1.35", "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3633,11 +3741,15 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			path:               "/apis/admissionregistration.k8s.io/v1beta1/mutatingadmissionpolicies", // introduced at 1.34, removed at 1.40
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicies", // introduced at 1.36
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings", // introduced at 1.36
 			expectedStatusCode: 200,
 		},
 	}
@@ -3663,10 +3775,10 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 }
 
 func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,networking.k8s.io/v1=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.38"},
+		[]string{"--emulated-version=kube=1.35", "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,admissionregistration.k8s.io/v1/mutatingadmissionpolicies=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3691,12 +3803,16 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			path:               "/apis/admissionregistration.k8s.io/v1beta1/mutatingadmissionpolicies", // introduced at 1.34, removed at 1.40
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicies", // introduced at 1.36
 			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings", // introduced at 1.36, not in --runtime-config
+			expectedStatusCode: 404,
 		},
 	}
 
@@ -3721,10 +3837,10 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.40"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.34"},
-		[]string{}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.40"},
+		[]string{"--runtime-config=api/beta=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3745,12 +3861,20 @@ func TestDisableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1/servicecidrs",
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			path:               "/apis/admissionregistration.k8s.io/v1beta1/mutatingadmissionpolicies", // introduced at 1.34, removed at 1.40
 			expectedStatusCode: 404,
+		},
+		{
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicies", // introduced at 1.36
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings", // introduced at 1.36
+			expectedStatusCode: 200,
 		},
 	}
 

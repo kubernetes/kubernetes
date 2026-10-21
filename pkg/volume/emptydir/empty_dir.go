@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
@@ -50,6 +51,16 @@ import (
 // https://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
+// unixModeToFileMode converts a Unix-style permission value (0-01777) to
+// Go's os.FileMode. The sticky bit (01000) maps to os.ModeSticky.
+func unixModeToFileMode(mode int32) os.FileMode {
+	fm := os.FileMode(mode & 0777)
+	if mode&01000 != 0 {
+		fm |= os.ModeSticky
+	}
+	return fm
+}
+
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{
@@ -61,15 +72,15 @@ type emptyDirPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &emptyDirPlugin{}
+var _ volume.ResizableEphemeralVolumePlugin = &emptyDirPlugin{}
 
 const (
-	emptyDirPluginName           = "kubernetes.io/empty-dir"
+	EmptyDirPluginName           = "kubernetes.io/empty-dir"
 	hugePagesPageSizeMountOption = "pagesize"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(EmptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -79,7 +90,7 @@ func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (plugin *emptyDirPlugin) GetPluginName() string {
-	return emptyDirPluginName
+	return EmptyDirPluginName
 }
 
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
@@ -97,6 +108,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
+	// The kuberuntime_manager is responsible for resizing memory-backed emptyDir volumes,
+	// so we never remount them from within the volume plugin.
 	return false
 }
 
@@ -143,6 +156,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
+	var mode *int32
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
@@ -152,12 +166,16 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			}
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) {
+			mode = spec.Volume.EmptyDir.Mode
+		}
 	}
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
 		medium:          medium,
 		sizeLimit:       sizeLimit,
+		mode:            mode,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
@@ -212,6 +230,7 @@ type emptyDir struct {
 	volName       string
 	sizeLimit     *resource.Quantity
 	medium        v1.StorageMedium
+	mode          *int32
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
@@ -334,7 +353,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(emptyDirPluginName)))
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
@@ -445,11 +464,19 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
 }
 
-// setupDir creates the directory with the default permissions specified by the perm constant.
+// setupDir creates the directory with the requested mode, or defaults to 0777.
 func (ed *emptyDir) setupDir(dir string) error {
 	// Create the directory if it doesn't already exist.
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return err
+	}
+
+	if ed.mode != nil && runtime.GOOS != "windows" {
+		effectivePerm := unixModeToFileMode(*ed.mode)
+		if err := os.Chmod(dir, effectivePerm); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// stat the directory to read permission bits
@@ -556,7 +583,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
+	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(EmptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

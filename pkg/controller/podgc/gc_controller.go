@@ -74,6 +74,7 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 // This function is only intended for integration tests
 func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
+
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
@@ -81,9 +82,12 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 		podListerSynced:        podInformer.Informer().HasSynced,
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
-		nodeQueue:              workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Name: "orphaned_pods_nodes"}),
-		gcCheckPeriod:          gcCheckPeriod,
-		quarantineTime:         quarantineTime,
+		nodeQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "orphaned_pods_nodes",
+		}),
+		gcCheckPeriod:  gcCheckPeriod,
+		quarantineTime: quarantineTime,
 	}
 
 	// Register prometheus metrics

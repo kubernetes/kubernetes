@@ -79,7 +79,7 @@ func (s SamplePair) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte(fmt.Sprintf("[%s,%s]", t, v)), nil
+	return fmt.Appendf(nil, "[%s,%s]", t, v), nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

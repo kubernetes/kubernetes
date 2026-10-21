@@ -28,7 +28,6 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
-	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 func init() {
@@ -128,9 +127,7 @@ func Convert_authentication_SelfSubjectReview_To_v1beta1_SelfSubjectReview(in *a
 }
 
 func autoConvert_v1beta1_SelfSubjectReviewStatus_To_authentication_SelfSubjectReviewStatus(in *authenticationv1beta1.SelfSubjectReviewStatus, out *authentication.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := v1.Convert_v1_UserInfo_To_authentication_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authentication.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -140,9 +137,7 @@ func Convert_v1beta1_SelfSubjectReviewStatus_To_authentication_SelfSubjectReview
 }
 
 func autoConvert_authentication_SelfSubjectReviewStatus_To_v1beta1_SelfSubjectReviewStatus(in *authentication.SelfSubjectReviewStatus, out *authenticationv1beta1.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := v1.Convert_authentication_UserInfo_To_v1_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authenticationv1beta1.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 

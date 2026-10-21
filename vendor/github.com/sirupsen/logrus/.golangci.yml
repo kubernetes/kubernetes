@@ -1,12 +1,9 @@
 version: "2"
-run:
-  tests: false
 linters:
   enable:
     - asasalint
     - asciicheck
     - bidichk
-    - bodyclose
     - contextcheck
     - durationcheck
     - errchkjson
@@ -22,46 +19,21 @@ linters:
     - nilerr
     - nilnesserr
     - noctx
-    - protogetter
     - reassign
     - recvcheck
-    - rowserrcheck
-    - spancheck
-    - sqlclosecheck
     - testifylint
     - unparam
-    - zerologlint
-  disable:
-    - prealloc
-  settings:
-    errcheck:
-      check-type-assertions: false
-      check-blank: false
-    lll:
-      line-length: 100
-      tab-width: 4
-    prealloc:
-      simple: false
-      range-loops: false
-      for-loops: false
-    whitespace:
-      multi-if: false
-      multi-func: false
   exclusions:
-    generated: lax
     presets:
-      - comments
-      - common-false-positives
       - legacy
       - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
-formatters:
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test\.go
+        linters:
+          - gosec
+          - musttag
+          - noctx # TODO: enable once we switch to Go 1.24+.
+      - linters: # TODO: remove once golangci-lint is updated with https://github.com/golangci/golangci-lint/pull/6584
+          - gocheckcompilerdirectives
+        text: 'compiler directive unrecognized: //go:fix'

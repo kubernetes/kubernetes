@@ -28,8 +28,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestServiceAccountCreation(t *testing.T) {
@@ -166,14 +166,13 @@ func TestServiceAccountCreation(t *testing.T) {
 			nsInformer := informers.Core().V1().Namespaces()
 
 			var wg sync.WaitGroup
-			defer wg.Wait()
 
 			tCtx := ktesting.Init(t)
+			tCtx.Cleanup(wg.Wait)
 			logger := tCtx.Logger()
-			defer tCtx.Cancel("test case terminating")
 
 			controller, err := NewServiceAccountsController(
-				logger,
+				tCtx,
 				saInformer,
 				nsInformer,
 				client,

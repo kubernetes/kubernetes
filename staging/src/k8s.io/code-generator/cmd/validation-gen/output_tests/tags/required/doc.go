@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -72,7 +72,8 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.ByteField"
 	ByteField byte `json:"byteField"`
 
-	// non-pointer struct fields cannot be required or optional
+	// +k8s:required
+	OtherStructField OtherStruct `json:"otherStructField"`
 
 	// +k8s:required
 	// +k8s:validateFalse="field Struct.OtherStructPtrField"
@@ -97,6 +98,25 @@ type Struct struct {
 	// +k8s:required
 	// +k8s:validateFalse="field Struct.MapTypedefField"
 	MapTypedefField MapType `json:"mapTypedefField"`
+}
+
+type PayloadStruct struct {
+	TypeMeta int
+
+	// +k8s:required="custom string msg"
+	StringField string `json:"stringField"`
+
+	// +k8s:required="custom pointer msg"
+	StringPtrField *string `json:"stringPtrField"`
+
+	// +k8s:required="custom slice msg"
+	SliceField []string `json:"sliceField"`
+
+	// +k8s:required="custom map msg"
+	MapField map[string]string `json:"mapField"`
+
+	// +k8s:required="custom struct msg"
+	OtherStructField OtherStruct `json:"otherStructField"`
 }
 
 // +k8s:validateFalse="type StringType"

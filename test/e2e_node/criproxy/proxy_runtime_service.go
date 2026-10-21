@@ -60,6 +60,8 @@ const (
 	UpdateRuntimeConfig       = "UpdateRuntimeConfig"
 	Status                    = "Status"
 	CheckpointContainer       = "CheckpointContainer"
+	CheckpointPod             = "CheckpointPod"
+	RestorePod                = "RestorePod"
 	GetContainerEvents        = "GetContainerEvents"
 	ListMetricDescriptors     = "ListMetricDescriptors"
 	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
@@ -479,6 +481,32 @@ func (p *RemoteRuntime) CheckpointContainer(ctx context.Context, req *runtimeapi
 		return nil, err
 	}
 	return &runtimeapi.CheckpointContainerResponse{}, nil
+}
+
+// CheckpointPod checkpoints the given pod sandbox.
+func (p *RemoteRuntime) CheckpointPod(ctx context.Context, req *runtimeapi.CheckpointPodRequest) (*runtimeapi.CheckpointPodResponse, error) {
+	if err := p.runInjectors(CheckpointPod); err != nil {
+		return nil, err
+	}
+
+	err := p.runtimeService.CheckpointPod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.CheckpointPodResponse{}, nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint.
+func (p *RemoteRuntime) RestorePod(ctx context.Context, req *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	if err := p.runInjectors(RestorePod); err != nil {
+		return nil, err
+	}
+
+	response, err := p.runtimeService.RestorePod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func (p *RemoteRuntime) GetContainerEvents(req *runtimeapi.GetEventsRequest, ces runtimeapi.RuntimeService_GetContainerEventsServer) error {

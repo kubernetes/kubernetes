@@ -21,7 +21,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 func TestPodCalculateAffinity(t *testing.T) {
@@ -133,7 +134,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 			},
 		}
 
-		podScope.calculateAffinity(logger, &v1.Pod{})
+		podScope.calculateAffinity(logger, &v1.Pod{}, lifecycle.AddOperation)
 		actual := podScope.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -265,7 +266,7 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 				hintProviders: tc.hp,
 			},
 		}
-		actual := pScope.accumulateProvidersHints(logger, &v1.Pod{})
+		actual := pScope.accumulateProvidersHints(logger, &v1.Pod{}, lifecycle.AddOperation)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}

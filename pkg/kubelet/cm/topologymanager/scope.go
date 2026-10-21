@@ -42,7 +42,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
@@ -136,9 +136,9 @@ func (s *scope) RemoveContainer(logger klog.Logger, containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(ctx, pod, &container)
+		err := s.allocateAlignedResources(ctx, pod, &container, operation)
 		if err != nil {
 			return admission.GetPodAdmitResult(err)
 		}
@@ -148,9 +148,9 @@ func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod) lifecycle.PodA
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager does not track providers anymore
-func (s *scope) allocateAlignedResources(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
+func (s *scope) allocateAlignedResources(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
 	for _, provider := range s.hintProviders {
-		err := provider.Allocate(ctx, pod, container)
+		err := provider.Allocate(ctx, pod, container, operation)
 		if err != nil {
 			return err
 		}
@@ -158,9 +158,9 @@ func (s *scope) allocateAlignedResources(ctx context.Context, pod *v1.Pod, conta
 	return nil
 }
 
-func (s *scope) allocatePodAlignedResources(logger klog.Logger, pod *v1.Pod) error {
+func (s *scope) allocatePodAlignedResources(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
 	for _, provider := range s.hintProviders {
-		err := provider.AllocatePod(logger, pod)
+		err := provider.AllocatePod(logger, pod, operation)
 		if err != nil {
 			return err
 		}

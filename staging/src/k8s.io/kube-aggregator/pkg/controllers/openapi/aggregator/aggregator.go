@@ -26,7 +26,10 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/aggregator"
@@ -85,13 +88,12 @@ type specAggregator struct {
 	downloader *Downloader
 }
 
-func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggregatorSpec *spec.Swagger, delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
+func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, lazyAggregatorSpec cached.Value[*spec.Swagger], delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
 	s := &specAggregator{
 		downloader:            downloader,
 		specsByAPIServiceName: map[string]*openAPISpecInfo{},
 	}
-	cachedAggregatorSpec := cached.Static(aggregatorSpec, "never-changes")
-	s.addLocalSpec(fmt.Sprintf(localDelegateChainNamePattern, 0), cachedAggregatorSpec)
+	s.addLocalSpec(fmt.Sprintf(localDelegateChainNamePattern, 0), lazyAggregatorSpec)
 	for i, handler := range delegationHandlers {
 		name := fmt.Sprintf(localDelegateChainNamePattern, i+1)
 
@@ -100,19 +102,47 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 	}
 
 	s.openAPIVersionedService = handler.NewOpenAPIServiceLazy(s.buildMergeSpecLocked())
-	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
+	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", instrumentedPathHandler{delegate: pathHandler})
 	return s
+}
+
+type instrumentedPathHandler struct {
+	delegate common.PathHandler
+}
+
+// Handle is called once to register the handler, not per request.
+func (i instrumentedPathHandler) Handle(path string, h http.Handler) {
+	i.delegate.Handle(path, metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v2",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated = */ false,
+		/* removedRelease = */ "",
+		h.ServeHTTP))
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
 func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
 	config *common.Config, pathHandler common.PathHandler) (SpecAggregator, error) {
 
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
-	if err != nil {
-		return nil, err
+	cfg := *config
+	lazyAggregatorSpec := cached.Once(cached.Func(func() (*spec.Swagger, string, error) {
+		aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), &cfg)
+		if err != nil {
+			klog.Errorf("Failed to build OpenAPI v2 spec for aggregator: %v", err)
+			return nil, "", err
+		}
+		aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
+		return aggregatorOpenAPISpec, "never-changes", nil
+	}))
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV2LazyBuild) {
+		if _, _, err := lazyAggregatorSpec.Get(); err != nil {
+			return nil, err
+		}
 	}
-	aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
 
 	var delegationHandlers []http.Handler
 
@@ -129,7 +159,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 		}
 		delegationHandlers = append(delegationHandlers, handler)
 	}
-	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, aggregatorOpenAPISpec, delegationHandlers, pathHandler)
+	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, lazyAggregatorSpec, delegationHandlers, pathHandler)
 	return s, nil
 }
 

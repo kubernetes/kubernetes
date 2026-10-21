@@ -148,7 +148,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 			return nil, fmt.Errorf("unexpected options type: %T", options)
 		}
 	}
-	embeddedEncoder := newWatchEmbeddedEncoder(ctx, negotiatedEncoder, mediaTypeOptions.Convert, tableOptions, scope)
+	embeddedEncoder := newWatchEmbeddedEncoder(ctx, negotiatedEncoder, mediaTypeOptions.Convert, tableOptions, mediaTypeOptions.Drop, scope)
 
 	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		if memoryAllocator == nil {
@@ -371,7 +371,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	req = req.WithContext(ctx)
 	defer func() {
 		if s.MemoryAllocator != nil {
-			runtime.AllocatorPool.Put(s.MemoryAllocator)
+			runtime.PutAllocator(s.MemoryAllocator)
 		}
 	}()
 
@@ -487,7 +487,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 	defer func() {
 		if s.MemoryAllocator != nil {
-			runtime.AllocatorPool.Put(s.MemoryAllocator)
+			runtime.PutAllocator(s.MemoryAllocator)
 		}
 	}()
 

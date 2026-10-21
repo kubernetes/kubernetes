@@ -35,9 +35,9 @@ import (
 // created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// ObjectMeta describes the pod that is being evicted.
+	// metadata describes the pod that is being evicted.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// DeleteOptions may be provided
+	// deleteOptions may be provided
 	DeleteOptions *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 

@@ -26,7 +26,7 @@ package v1beta3
 // In the mandatory exempt configuration object the values in the fields
 // here can be modified by authorized users, unlike the rest of the `spec`.
 type ExemptPriorityLevelConfigurationApplyConfiguration struct {
-	// `nominalConcurrencyShares` (NCS) contributes to the computation of the
+	// nominalConcurrencyShares (NCS) contributes to the computation of the
 	// NominalConcurrencyLimit (NominalCL) of this level.
 	// This is the number of execution seats nominally reserved for this priority level.
 	// This DOES NOT limit the dispatching from this priority level
@@ -41,7 +41,7 @@ type ExemptPriorityLevelConfigurationApplyConfiguration struct {
 	// at the expense of every other priority level.
 	// This field has a default value of zero.
 	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty"`
-	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// lendablePercent prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels.  This value of this
 	// field must be between 0 and 100, inclusive, and it defaults to 0.
 	// The number of seats that other levels can borrow from this level, known

@@ -23,11 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/statefulset"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
@@ -78,11 +80,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		apitesting.VerifyValidationEquivalence(t, ctx, &objWithEmptyVCTName, registry.Strategy, expectedErrs)
 	})
 
-	testCases := map[string]struct {
+	type testCase struct {
 		input apps.StatefulSet
 
 		expectedErrs field.ErrorList
-	}{
+	}
+
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkValidStatefulSet(),
 		},
@@ -98,6 +102,26 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				deadline := int64(0)
+				ss.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				deadline := int64(2147483648)
+				ss.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+			},
+		},
 		"selector required": {
 			input: mkValidStatefulSet(tweakSelectorLabels(nil)),
 			expectedErrs: field.ErrorList{
@@ -106,11 +130,23 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkValidStatefulSet(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), new(mkValidStatefulSet()), func(baseObj *apps.StatefulSet, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+		baseObj.Spec.Template.Spec.EvictionResponders = responders
+		baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -327,5 +363,17 @@ func tweakVolumeClaimTemplate(name, storage string) func(obj *apps.StatefulSet) 
 				},
 			},
 		}}
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.StatefulSet) {
+	return func(ss *apps.StatefulSet) {
+		pod := &api.Pod{
+			Spec: ss.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		ss.Spec.Template.Spec = pod.Spec
 	}
 }

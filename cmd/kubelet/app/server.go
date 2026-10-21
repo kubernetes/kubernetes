@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
@@ -50,7 +49,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
@@ -65,9 +64,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/signals"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -86,6 +85,7 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -106,6 +106,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
+	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -302,9 +303,9 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			// set up signal context for kubelet shutdown
-			ctx := genericapiserver.SetupSignalContext()
+			ctx := signals.SetupSignalContext()
 
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 			// run the kubelet
 			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
 		},
@@ -632,7 +633,7 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	}
 }
 
-func getReservedCPUs(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
+func getReservedCPUs(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
 	emptyCPUSet := cpuset.New()
 
 	if cpus == "" {
@@ -800,6 +801,17 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) && !cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint) {
+		_, err := kubeDeps.RemoteRuntimeService.PodSandboxStats(ctx, "")
+		if err != nil {
+			s, ok := status.FromError(err)
+			if ok && s.Code() == codes.Unimplemented {
+				logger.Info("CRI implementation does not support PodSandboxStats, falling back to cadvisor stats")
+				kubeDeps.PodSandboxStatsUnimplemented = true
+			}
+		}
+	}
+
 	// Get cgroup driver setting from CRI
 	if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
 		return err
@@ -833,7 +845,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
+		disableContainerDiscovery := utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) && !kubeDeps.PodSandboxStatsUnimplemented
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation, disableContainerDiscovery)
 		if err != nil {
 			return err
 		}
@@ -940,6 +953,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				MemoryManagerPolicy:          s.MemoryManagerPolicy,
 				MemoryManagerReservedMemory:  s.ReservedMemory,
 				MemoryReservationPolicy:      s.MemoryReservationPolicy,
+				MemoryThrottlingFactor:       s.MemoryThrottlingFactor,
 				PodPidsLimit:                 s.PodPidsLimit,
 				EnforceCPULimits:             s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:            s.CPUCFSQuotaPeriod.Duration,
@@ -1032,7 +1046,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 
 		kubeClientConfigOverrides(s, clientConfig)
 
-		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
+		clientCertificateManager, err := buildClientCertificateManager(logger, certConfig, clientConfig, s.CertDirectory, nodeName, s.ClientCertificateKeyAlgorithm)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1134,7 +1148,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 // buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
 // if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
 // write out).
-func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
+func buildClientCertificateManager(logger klog.Logger, certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName, keyAlgorithm *kubeletconfiginternal.CertificateKeyAlgorithmType) (certificate.Manager, error) {
 	newClientsetFn := func(current *tls.Certificate) (clientset.Interface, error) {
 		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
@@ -1148,6 +1162,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 	}
 
 	return kubeletcertificate.NewKubeletClientCertificateManager(
+		logger,
 		certDir,
 		nodeName,
 
@@ -1160,6 +1175,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		clientConfig.CertFile,
 		clientConfig.KeyFile,
 		newClientsetFn,
+		keyAlgorithm,
 	)
 }
 
@@ -1187,7 +1203,10 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 			if err != nil {
 				return nil, err
 			}
-			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
+			cert, key, err := certutil.GenerateSelfSignedCertKeyWithOptions(certutil.SelfSignedCertKeyOptions{
+				Host:        hostName,
+				GenerateKey: keyalgorithm.KeyGeneratorFunc(kc.ServerCertificateKeyAlgorithm),
+			})
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %w", err)
 			}
@@ -1409,7 +1428,16 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
 			if v1.ResourceName(k) == v1.ResourceCPU {
-				q.SetMilli((q.ScaledValue(resource.Micro) + 500) / 1000)
+				// Round to the nearest milli while micro-cores fit an int64, where
+				// micro+500 used to wrap into a negative reservation. Past that the
+				// value is kept as parsed, so the cutoff is a step, not a no-op.
+				if micro, ok := q.AsScaledInt64(resource.Micro); ok {
+					milli := micro / 1000
+					if micro%1000 >= 500 {
+						milli++
+					}
+					q.SetMilli(milli)
+				}
 			}
 			rl[v1.ResourceName(k)] = q
 		default:

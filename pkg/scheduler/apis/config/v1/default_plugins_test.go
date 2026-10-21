@@ -38,48 +38,14 @@ func TestApplyFeatureGates(t *testing.T) {
 		wantConfig *v1.Plugins
 	}{
 		{
-			name: "Feature gate DynamicResourceAllocation disabled",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: false,
-			},
+			name: "Default feature gates",
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
-						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
-						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
-						{Name: names.VolumeRestrictions},
-						{Name: names.NodeVolumeLimits},
-						{Name: names.VolumeBinding},
-						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
-						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
-						{Name: names.DefaultPreemption},
-						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
-						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
-						{Name: names.DefaultBinder},
-						// NodeDeclaredFeatures not added as we set emmulation version in the test to 1.34 when DRA is disabled.
-					},
-				},
-			},
-		},
-		{
-			name: "Feature gate DynamicResourceAllocation enabled",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
-			wantConfig: &v1.Plugins{
-				MultiPoint: v1.PluginSet{
-					Enabled: []v1.Plugin{
-						{Name: names.SchedulingGates},
-						{Name: names.PrioritySort},
 						{Name: names.NodeUnschedulable},
-						{Name: names.NodeName},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -110,8 +76,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -142,8 +108,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -173,8 +139,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -207,8 +173,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -236,9 +202,7 @@ func TestApplyFeatureGates(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if draEnabled, draExists := test.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
-			} else if ndfEnabled, ndfExists := test.features[features.NodeDeclaredFeatures]; ndfExists && !ndfEnabled {
+			if ndfEnabled, ndfExists := test.features[features.NodeDeclaredFeatures]; ndfExists && !ndfEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)

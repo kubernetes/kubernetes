@@ -18,7 +18,6 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -123,6 +122,12 @@ type Cache interface {
 	// PodGroups returns a PodGroupLister used to access the cached PodGroup objects.
 	PodGroups() fwk.PodGroupLister
 
+	// CompositePodGroupStates returns a CompositePodGroupStateLister.
+	CompositePodGroupStates() fwk.CompositePodGroupStateLister
+
+	// CompositePodGroups returns a CompositePodGroupLister used to access the cached CompositePodGroup objects.
+	CompositePodGroups() fwk.CompositePodGroupLister
+
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)
 
@@ -132,14 +137,18 @@ type Cache interface {
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
 
-	// AddPodGroup adds a pod group object to the cache.
-	AddPodGroup(podGroup *schedulingv1alpha3.PodGroup)
+	// AddGenericPodGroup adds a generic pod group object to the cache.
+	AddGenericPodGroup(gpg *fwk.GenericPodGroup)
 
-	// UpdatePodGroup updates a pod group object in the cache.
-	UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.PodGroup)
+	// UpdateGenericPodGroup updates a generic pod group object in the cache.
+	UpdateGenericPodGroup(logger klog.Logger, gpg *fwk.GenericPodGroup)
 
-	// RemovePodGroup removes a pod group object from the cache.
-	RemovePodGroup(podGroup *schedulingv1alpha3.PodGroup)
+	// RemoveGenericPodGroup removes a generic pod group object from the cache.
+	RemoveGenericPodGroup(logger klog.Logger, gpg *fwk.GenericPodGroup)
+
+	// FindRootGroup returns the root *fwk.GenericPodGroup for the given EntityKey,
+	// or nil if the root group was not found.
+	FindRootGroup(key fwk.EntityKey) (*fwk.GenericPodGroup, error)
 }
 
 // Dump is a dump of the cache state.

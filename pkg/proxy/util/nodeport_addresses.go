@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -28,13 +28,17 @@ import (
 type NodePortAddresses struct {
 	cidrStrings []string
 
-	cidrs                []*net.IPNet
-	containsIPv4Loopback bool
-	matchAll             bool
+	cidrs                    []*net.IPNet
+	containsIPv4Loopback     bool
+	containsExplicitLoopback bool
+	matchAll                 bool
 }
 
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
-var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
+var (
+	ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
+	ipv4Localhost     = net.IPv4(127, 0, 0, 1)
+)
 
 // NewNodePortAddresses takes an IP family and the `--nodeport-addresses` value (which is
 // assumed to contain only valid CIDRs, potentially of both IP families) and returns a
@@ -58,7 +62,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 		}
 	}
 
-	// Now parse
+	// Calculate loopback properties.
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
@@ -67,6 +71,16 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 				npa.containsIPv4Loopback = true
 			}
 		}
+
+		if !IsZeroCIDR(cidr) &&
+			(cidr.Contains(ipv4Localhost) || cidr.Contains(net.IPv6loopback)) {
+			npa.containsExplicitLoopback = true
+		}
+	}
+
+	// Now parse
+	for _, str := range npa.cidrStrings {
+		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
 		if IsZeroCIDR(cidr) {
 			// Ignore everything else
@@ -131,4 +145,10 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 // ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
 func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
 	return npa.containsIPv4Loopback
+}
+
+// ContainsExplicitLoopback returns true if npa's CIDRs contain the localhost
+// address (127.0.0.1 or ::1).
+func (npa *NodePortAddresses) ContainsExplicitLoopback() bool {
+	return npa.containsExplicitLoopback
 }

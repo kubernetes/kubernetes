@@ -30,6 +30,7 @@ option go_package = "k8s.io/api/coordination/v1";
 
 // Lease defines a lease concept.
 message Lease {
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -79,14 +80,14 @@ message LeaseSpec {
   // +optional
   optional int32 leaseTransitions = 5;
 
-  // Strategy indicates the strategy for picking the leader for coordinated leader election.
+  // strategy indicates the strategy for picking the leader for coordinated leader election.
   // If the field is not specified, there is no active coordination for this lease.
   // (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
   // +featureGate=CoordinatedLeaderElection
   // +optional
   optional string strategy = 6;
 
-  // PreferredHolder signals to a lease holder that the lease has a
+  // preferredHolder signals to a lease holder that the lease has a
   // more optimal holder and should be given up.
   // This field can only be set if Strategy is also set.
   // +featureGate=CoordinatedLeaderElection

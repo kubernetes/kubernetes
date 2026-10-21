@@ -25,14 +25,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
-func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	// Loop through all device resources and generate TopologyHints for them.
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
@@ -82,9 +83,9 @@ func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, containe
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
-func (m *ManagerImpl) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *ManagerImpl) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getPodDeviceRequest(pod)
@@ -205,12 +206,19 @@ func (m *ManagerImpl) generateDeviceTopologyHints(logger klog.Logger, resource s
 			return
 		}
 
+		// Calculate a utilization score for this hint based on how many devices
+		// in this NUMA mask are already allocated.  This provides a packing signal
+		// for utilization-aware policies.  We use a simple count-based approach:
+		// all devices are treated equally regardless of capability differences.
+		score := m.calculateDeviceScore(resource, mask)
+
 		// Otherwise, create a new hint from the NUMA mask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
 			NUMANodeAffinity: mask,
 			Preferred:        false,
+			Score:            score,
 		})
 	})
 
@@ -225,6 +233,33 @@ func (m *ManagerImpl) generateDeviceTopologyHints(logger klog.Logger, resource s
 	}
 
 	return hints
+}
+
+// calculateDeviceScore computes a utilization score for devices within the given
+// NUMA mask. The score represents the percentage of devices that are already
+// allocated; the shared UtilizationScore() keeps it on the same footing as the
+// CPU and memory manager scores, which the hint merge averages together.
+// The caller must hold m.mutex.
+func (m *ManagerImpl) calculateDeviceScore(resource string, mask bitmask.BitMask) int64 {
+	var allocatableInMask int
+	var allocatedInMask int
+
+	for deviceID, device := range m.allDevices[resource] {
+		// Only healthy devices are allocatable: getAvailableDevices() hands out
+		// healthy minus allocated, so counting unhealthy ones here would make a
+		// node that has lost hardware look emptier than it is.
+		if !m.healthyDevices[resource].Has(deviceID) {
+			continue
+		}
+		if mask.AnySet(m.getNUMANodeIds(device.Topology)) {
+			allocatableInMask++
+			if m.allocatedDevices[resource].Has(deviceID) {
+				allocatedInMask++
+			}
+		}
+	}
+
+	return topologymanager.UtilizationScore(int64(allocatableInMask), int64(allocatedInMask))
 }
 
 // deviceNUMANodes returns the sorted list of NUMA node IDs that host at least

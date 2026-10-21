@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -261,9 +262,12 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		"volumeLimit(old)", oldLimit,
 	)
 
-	if newLimit != nil && (oldLimit == nil || newLimit.Value() > oldLimit.Value()) {
-		logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable")
-		return fwk.Queue, nil
+	if newLimit != nil {
+		newLimitCopy := *newLimit
+		if oldLimit == nil || newLimitCopy.Cmp(*oldLimit) > 0 {
+			logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable")
+			return fwk.Queue, nil
+		}
 	}
 
 	logger.V(5).Info("CSIStorageCapacity was updated, but it doesn't make this pod schedulable")
@@ -348,6 +352,9 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
 func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	logger := klog.FromContext(ctx)
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
@@ -412,6 +419,9 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 

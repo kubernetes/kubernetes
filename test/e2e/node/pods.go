@@ -504,7 +504,10 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 				{
 					name: "updates to pod metadata should not trigger generation bump",
 					updateFn: func(pod *v1.Pod) {
-						pod.SetAnnotations(map[string]string{"key": "value"})
+						if pod.Annotations == nil {
+							pod.Annotations = map[string]string{}
+						}
+						pod.Annotations["key"] = "value"
 					},
 					expectGenerationBump: false,
 				},
@@ -629,8 +632,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			})
 
 			expectedPodConditions := []v1.PodConditionType{
-				// add back once PodReadyToStartContainers feature GAs
-				// v1.PodReadyToStartContainers
+				v1.PodReadyToStartContainers,
 				v1.PodInitialized,
 				v1.PodReady,
 				v1.ContainersReady,

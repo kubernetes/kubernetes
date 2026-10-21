@@ -1,0 +1,2 @@
+Copied from [github.com/NYTimes/gziphandler](https://github.com/NYTimes/gziphandler) v1.1.1 (commit dd0439581c7657cb652dfe5c71d7d48baf39541d) to drop the module dependency.
+Copyright 2016-2017 The New York Times Company, Apache License 2.0 (see LICENSE). Changes: gofmt; the HTTP/2 Push method (`gzip_go18.go`) and its tests are dropped, the OpenAPI handler never pushes; the import comment is removed.

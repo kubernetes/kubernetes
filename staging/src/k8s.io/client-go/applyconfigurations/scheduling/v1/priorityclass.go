@@ -35,7 +35,7 @@ import (
 // integer value. The value can be any valid integer.
 type PriorityClassApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// value represents the integer value of this priority class. This is the actual priority that pods

@@ -224,12 +224,19 @@ type KubeProxyConfiguration struct {
 	// used.)
 	ClusterCIDR string `json:"clusterCIDR"`
 
-	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
-	// alternatively, the single string 'primary'. If set to a list of CIDRs,
-	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If set to 'primary', NodePort services will only be
-	// accepted on the node's primary IPv4 and/or IPv6 address according to the Node
-	// object. If unset, NodePort connections will be accepted on all local IPs.
+	// nodePortAddresses is a list of CIDR ranges and/or keywords that expand to CIDR
+	// ranges. NodePort services are only accessible on node IPs covered by the list.
+	// Supported keywords: 'primary' (the Node object's primary IPv4 and/or IPv6
+	// addresses), 'localhost' (127.0.0.0/8 and ::1/128), and 'all' (0.0.0.0/0 and ::/0).
+	// Any combination of valid keywords and CIDRs may be included in the list.
+	//
+	// Serving NodePorts on loopback IPs is only supported in iptables mode (IPv4
+	// only, see iptables.localhostNodePorts), and, only for TCP, in nftables mode when
+	// the KubeProxyNFTablesLocalhostNodePorts feature gate is enabled and the list
+	// explicitly includes loopback (e.g. 'localhost').
+	//
+	// If unset, this defaults to 'all' in iptables and ipvs mode, and to 'primary' in
+	// nftables mode.
 	NodePortAddresses []string `json:"nodePortAddresses"`
 
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within

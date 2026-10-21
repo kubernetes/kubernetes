@@ -28,10 +28,10 @@ import (
 // PodFailurePolicyOnPodConditionsPattern describes a pattern for matching
 // an actual pod condition type.
 type PodFailurePolicyOnPodConditionsPatternApplyConfiguration struct {
-	// Specifies the required Pod condition type. To match a pod condition
+	// type specifies the required Pod condition type. To match a pod condition
 	// it is required that specified type equals the pod condition type.
 	Type *corev1.PodConditionType `json:"type,omitempty"`
-	// Specifies the required Pod condition status. To match a pod condition
+	// status specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
 	Status *corev1.ConditionStatus `json:"status,omitempty"`

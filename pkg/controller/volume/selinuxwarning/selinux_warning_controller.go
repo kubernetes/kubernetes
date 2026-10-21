@@ -117,7 +117,8 @@ func NewController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig[cache.ObjectName](
 			workqueue.DefaultTypedControllerRateLimiter[cache.ObjectName](),
 			workqueue.TypedRateLimitingQueueConfig[cache.ObjectName]{
-				Name: "selinux_warning",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "selinux_warning",
 			},
 		),
 		labelCache: volumecache.NewVolumeLabelCache(seLinuxTranslator),
@@ -139,36 +140,36 @@ func NewController(
 	}
 
 	logger := klog.FromContext(ctx)
-	_, err = podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.enqueuePod(logger, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePod(logger, oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { c.enqueuePod(logger, obj) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.addPVC(logger, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePVC(logger, oldObj, newObj) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.addPV(logger, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePV(logger, oldObj, newObj) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = csiDriverInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = csiDriverInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.addCSIDriver(logger, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { c.updateCSIDriver(logger, oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { c.deleteCSIDriver(logger, obj) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +356,7 @@ func (c *Controller) enqueueAllPodsForCSIDriver(csiDriverName string) {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting SELinux warning controller")

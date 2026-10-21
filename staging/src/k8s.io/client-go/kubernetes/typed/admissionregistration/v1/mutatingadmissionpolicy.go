@@ -41,6 +41,7 @@ type MutatingAdmissionPolicyInterface interface {
 	Create(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1.MutatingAdmissionPolicy, opts metav1.CreateOptions) (*admissionregistrationv1.MutatingAdmissionPolicy, error)
 	Update(ctx context.Context, mutatingAdmissionPolicy *admissionregistrationv1.MutatingAdmissionPolicy, opts metav1.UpdateOptions) (*admissionregistrationv1.MutatingAdmissionPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*admissionregistrationv1.MutatingAdmissionPolicy, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*admissionregistrationv1.MutatingAdmissionPolicyList, error)

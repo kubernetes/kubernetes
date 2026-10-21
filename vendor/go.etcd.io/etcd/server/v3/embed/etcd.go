@@ -727,7 +727,7 @@ func configureClientListeners(cfg *Config) (sctxs map[string]*serveCtx, err erro
 			}
 			sctx.l.Close()
 			cfg.logger.Warn(
-				"closing peer listener",
+				"closing client listener",
 				zap.String("address", sctx.addr),
 				zap.Error(err),
 			)

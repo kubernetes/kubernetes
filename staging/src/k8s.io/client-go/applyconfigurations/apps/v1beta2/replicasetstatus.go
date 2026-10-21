@@ -23,23 +23,25 @@ package v1beta2
 //
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatusApplyConfiguration struct {
-	// Replicas is the most recently observed number of non-terminating pods.
+	// replicas is the most recently observed number of non-terminating pods.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	Replicas *int32 `json:"replicas,omitempty"`
-	// The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
+	// fullyLabeledReplicas is the number of non-terminating pods that have labels matching the labels of the pod
+	// template of the replicaset.
 	FullyLabeledReplicas *int32 `json:"fullyLabeledReplicas,omitempty"`
-	// The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
+	// readyReplicas is the number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
 	ReadyReplicas *int32 `json:"readyReplicas,omitempty"`
-	// The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.
+	// availableReplicas is the number of available non-terminating pods (ready for at least minReadySeconds) for this
+	// replica set.
 	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
-	// The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
-	// and have not yet reached the Failed or Succeeded .status.phase.
+	// terminatingReplicas is the number of terminating pods for this replica set. Terminating pods have a non-null
+	// .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
 	//
 	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty"`
-	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
+	// observedGeneration reflects the generation of the most recently observed ReplicaSet.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
-	// Represents the latest available observations of a replica set's current state.
+	// conditions lists the latest available observations of a replica set's current state.
 	Conditions []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

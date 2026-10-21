@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,6 +30,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,6 +43,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/ptr"
 )
 
 // Construct an instance of a plugin, by name.
@@ -1205,5 +1210,274 @@ func TestTmpfsMountOptions(t *testing.T) {
 				t.Errorf("size option is not expected when is zero. options: %v", options)
 			}
 		})
+	}
+}
+
+func TestResizeEphemeralVolume(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("only supported on linux")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "emptydir_resize_test")
+	require.NoError(t, err, "failed to create temp dir")
+	defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+	quantity200Mi := resource.MustParse("200Mi")
+	quantity0 := resource.MustParse("0")
+
+	tests := []struct {
+		name                 string
+		medium               v1.StorageMedium
+		isMountPoint         bool
+		currentMountSizeOpts []string
+		newSize              *resource.Quantity
+		expectError          bool
+		expectedMountAction  string
+		expectedMountOpts    []string
+	}{
+		{
+			name:                 "resize memory volume when mount point does not exist yet",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         false,
+			currentMountSizeOpts: nil,
+			newSize:              &quantity200Mi,
+			expectError:          true,
+			expectedMountAction:  "",
+			expectedMountOpts:    nil,
+		},
+		{
+			name:                 "resize memory volume when mount already exists (remount/resize)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"}, // 100Mi
+			newSize:              &quantity200Mi,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			expectedMountOpts:    []string{"remount", "size=209715200"},
+		},
+		{
+			name:                 "resize disk-backed volume should return error",
+			medium:               v1.StorageMediumDefault,
+			isMountPoint:         false,
+			currentMountSizeOpts: nil,
+			newSize:              &quantity200Mi,
+			expectError:          true,
+			expectedMountAction:  "",
+			expectedMountOpts:    nil,
+		},
+		{
+			name:                 "resize memory volume with nil newSize (error path)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"},
+			newSize:              nil,
+			expectError:          true,
+		},
+		{
+			name:                 "resize memory volume with zero newSize (error path)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"},
+			newSize:              &quantity0,
+			expectError:          true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    tt.medium,
+						SizeLimit: tt.newSize,
+					},
+				},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID("poduid"),
+				},
+			}
+
+			volumeSpec := volume.NewSpecFromVolume(spec)
+			mounterInstance, err := plug.NewMounter(volumeSpec, pod)
+			require.NoError(t, err)
+			volPath := mounterInstance.GetPath()
+
+			physicalMounter := plug.(*emptyDirPlugin).host.GetMounter().(*mount.FakeMounter)
+
+			if tt.isMountPoint {
+				physicalMounter.MountPoints = []mount.MountPoint{{Path: volPath, Opts: tt.currentMountSizeOpts}}
+				require.NoError(t, os.MkdirAll(volPath, 0750), "failed to create directory")
+			} else {
+				os.RemoveAll(volPath) //nolint:errcheck
+			}
+
+			resizablePlugin, ok := plug.(volume.ResizableEphemeralVolumePlugin)
+			require.True(t, ok, "plugin does not implement ResizableEphemeralVolumePlugin")
+
+			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, tt.newSize)
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			log := physicalMounter.GetLog()
+			if tt.expectedMountAction == "" {
+				require.Empty(t, log, "expected no mount actions")
+				return
+			}
+			require.Len(t, log, 1)
+			require.Equal(t, "mount", log[0].Action)
+
+			var targetMp *mount.MountPoint
+			for i := len(physicalMounter.MountPoints) - 1; i >= 0; i-- {
+				if physicalMounter.MountPoints[i].Path == volPath {
+					targetMp = &physicalMounter.MountPoints[i]
+					break
+				}
+			}
+			require.NotNil(t, targetMp, "expected a mount point at %s, but got none", volPath)
+			for _, expectedOpt := range tt.expectedMountOpts {
+				assert.Contains(t, targetMp.Opts, expectedOpt)
+			}
+		})
+	}
+}
+
+func TestEmptyDirVolumeMode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, true)
+
+	testCases := []struct {
+		name         string
+		mode         *int32
+		expectedPerm os.FileMode
+		expectSticky bool
+	}{
+		{
+			name:         "mode 0750",
+			mode:         ptr.To[int32](0o750),
+			expectedPerm: os.FileMode(0o750),
+		},
+		{
+			name:         "mode 01777 with sticky bit",
+			mode:         ptr.To[int32](0o1777),
+			expectedPerm: os.FileMode(0o777),
+			expectSticky: true,
+		},
+		{
+			name:         "nil mode defaults to 0777",
+			mode:         nil,
+			expectedPerm: os.FileMode(0o777),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			basePath, err := utiltesting.MkTmpdir("emptydir_mode_test")
+			if err != nil {
+				t.Fatalf("can't make a temp dir: %v", err)
+			}
+			t.Cleanup(func() { _ = os.RemoveAll(basePath) })
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Mode: tc.mode},
+				},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID("poduid"),
+				},
+			}
+
+			mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+				volume.NewSpecFromVolume(spec),
+				pod,
+				mount.NewFakeMounter(nil),
+				&fakeMountDetector{},
+			)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+
+			if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+				t.Fatalf("SetUp failed: %v", err)
+			}
+
+			volPath := mounter.GetPath()
+			fileinfo, err := os.Stat(volPath)
+			if err != nil {
+				t.Fatalf("Stat failed: %v", err)
+			}
+
+			if fileinfo.Mode().Perm() != tc.expectedPerm {
+				t.Errorf("expected permissions %v, got %v", tc.expectedPerm, fileinfo.Mode().Perm())
+			}
+
+			if tc.expectSticky {
+				if fileinfo.Mode()&os.ModeSticky == 0 {
+					t.Errorf("expected sticky bit to be set, got mode %v", fileinfo.Mode())
+				}
+			}
+		})
+	}
+}
+
+func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, false)
+
+	basePath, err := utiltesting.MkTmpdir("emptydir_mode_gate_test")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(basePath) })
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+
+	mode := int32(0o750)
+	spec := &v1.Volume{
+		Name: "test-volume",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{Mode: &mode},
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID("poduid"),
+		},
+	}
+
+	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+		volume.NewSpecFromVolume(spec),
+		pod,
+		mount.NewFakeMounter(nil),
+		&fakeMountDetector{},
+	)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+		t.Fatalf("SetUp failed: %v", err)
+	}
+
+	volPath := mounter.GetPath()
+	fileinfo, err := os.Stat(volPath)
+	if err != nil {
+		t.Fatalf("Stat failed: %v", err)
+	}
+
+	if fileinfo.Mode().Perm() != perm.Perm() {
+		t.Errorf("expected default permissions %v when feature gate is disabled, got %v", perm.Perm(), fileinfo.Mode().Perm())
 	}
 }

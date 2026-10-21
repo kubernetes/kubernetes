@@ -2,27 +2,40 @@ package logrus
 
 import "time"
 
-// Default key names for the default fields
 const (
+	// defaultTimestampFormat is the layout used to format entry timestamps
+	// when a formatter has not specified a custom TimestampFormat.
+	// It follows time.RFC3339 and is applied unless timestamps are disabled.
 	defaultTimestampFormat = time.RFC3339
-	FieldKeyMsg            = "msg"
-	FieldKeyLevel          = "level"
-	FieldKeyTime           = "time"
-	FieldKeyLogrusError    = "logrus_error"
-	FieldKeyFunc           = "func"
-	FieldKeyFile           = "file"
+
+	// defaultFields is the number of commonly included predefined log entry fields
+	// (msg, level, time). It is used as a capacity hint when constructing
+	// intermediate collections during formatting (for example, the fixed key list).
+	//
+	// It does not include the optional "logrus_error", "func", or "file" fields.
+	defaultFields = 3
 )
 
-// The Formatter interface is used to implement a custom Formatter. It takes an
-// `Entry`. It exposes all the fields, including the default ones:
+// Default key names for the default fields
+const (
+	FieldKeyMsg         = "msg"
+	FieldKeyLevel       = "level"
+	FieldKeyTime        = "time"
+	FieldKeyLogrusError = "logrus_error"
+	FieldKeyFunc        = "func"
+	FieldKeyFile        = "file"
+)
+
+// Formatter is implemented by types that format log entries. It receives an
+// [*Entry], which contains:
 //
-// * `entry.Data["msg"]`. The message passed from Info, Warn, Error ..
-// * `entry.Data["time"]`. The timestamp.
-// * `entry.Data["level"]. The level the entry was logged at.
+//   - entry.Message: the message passed to logging methods such as [Info], [Warn], [Error]
+//   - entry.Time: the timestamp
+//   - entry.Level: the log level
 //
-// Any additional fields added with `WithField` or `WithFields` are also in
-// `entry.Data`. Format is expected to return an array of bytes which are then
-// logged to `logger.Out`.
+// Additional fields added with [WithField] or [WithFields] are available in
+// [Entry.Data]. Format should return the formatted log entry as a byte slice,
+// which is written to [Logger.Out].
 type Formatter interface {
 	Format(*Entry) ([]byte, error)
 }
@@ -30,12 +43,12 @@ type Formatter interface {
 // This is to not silently overwrite `time`, `msg`, `func` and `level` fields when
 // dumping it. If this code wasn't there doing:
 //
-//  logrus.WithField("level", 1).Info("hello")
+//	logrus.WithField("level", 1).Info("hello")
 //
 // Would just silently drop the user provided level. Instead with this code
 // it'll logged as:
 //
-//  {"level": "info", "fields.level": 1, "msg": "hello", "time": "..."}
+//	{"level": "info", "fields.level": 1, "msg": "hello", "time": "..."}
 //
 // It's not exported because it's still using Data in an opinionated way. It's to
 // avoid code duplication between the two default formatters.

@@ -181,7 +181,7 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: content},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(scrubCBORContentConfigIfDisabled(content))},
 		Client:           client,
 	})
 }
@@ -462,6 +462,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
+	}
+	if r.contentConfig.DropManagedFields && strings.EqualFold(key, "Accept") && len(values) > 0 {
+		values = []string{acceptDroppingManagedFields(strings.Join(values, ","))}
 	}
 	r.headers.Del(key)
 	for _, value := range values {

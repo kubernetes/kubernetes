@@ -222,6 +222,22 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 		return nil
 	}
 
+	// Check that the claim really is unallocated. The Pod's CycleState may be
+	// stale and this claim may have been allocated since that was calculated.
+	//
+	// Extended resources claims cannot be shared, so skip checking the assume
+	// cache because we already know it's not allocated.
+	if !isSpecialClaimName(allocatedClaim.Name) {
+		assumedClaim, err := c.Get(allocatedClaim.Namespace, allocatedClaim.Name)
+		if err != nil {
+			return fmt.Errorf("look up assumed claim %s/%s, UID=%s: %w", allocatedClaim.Namespace, allocatedClaim.Name, claimUID, err)
+		}
+		if assumedClaim.UID == claimUID && assumedClaim.Status.Allocation != nil {
+			c.logger.V(6).Info("Claim is already allocated, not creating in-flight", "claim", klog.KObj(assumedClaim), "uid", claimUID, "version", assumedClaim.ResourceVersion)
+			return nil
+		}
+	}
+
 	c.inFlightAllocations[claimUID] = inFlightAllocation{
 		claim:   allocatedClaim,
 		sharers: 1,
@@ -332,7 +348,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 // GatherAllocatedState collects and returns the current allocation state of all devices
 // across the cluster. This includes:
 // - AllocatedDevices: Set of device IDs that are fully allocated (dedicated mode)
-// - AllocatedSharedDeviceIDs: Set of shared device IDs when consumable capacity is enabled
+// - AllocatedSharedDeviceIDs: Set of device IDs with shared allocations when consumable capacity is enabled
 // - AggregatedCapacity: Consumed capacity across all devices when consumable capacity is enabled
 //
 // The function handles two allocation models:
@@ -376,11 +392,11 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		// dedicated device allocation model.
 		// This ensures backward compatibility with the original DRA behavior where devices
 		// could only be allocated exclusively to a single claim.
-		for sharedDeviceID := range allocatedSharedDeviceIDs {
-			allocated.Insert(sharedDeviceID.GetDeviceID())
+		for deviceID := range allocatedSharedDeviceIDs {
+			allocated.Insert(deviceID)
 		}
 		// Reset allocatedSharedDeviceIDs and aggregatedCapacity
-		allocatedSharedDeviceIDs = sets.New[structured.SharedDeviceID]()
+		allocatedSharedDeviceIDs = sets.New[structured.DeviceID]()
 		aggregatedCapacity = make(schedulerapi.ConsumedCapacityCollection)
 	}
 
@@ -395,7 +411,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 			enabledConsumableCapacity,
 			func(sharedDeviceID structured.SharedDeviceID) { // sharedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
-				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				allocatedSharedDeviceIDs.Insert(sharedDeviceID.GetDeviceID())
 			},
 			func(capacity structured.DeviceConsumedCapacity) { // consumedCapacityCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "consumed capacity", capacity, "claim", klog.KObj(claim))

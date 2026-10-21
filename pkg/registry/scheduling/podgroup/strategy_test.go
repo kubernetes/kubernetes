@@ -97,7 +97,6 @@ var (
 	oneOfError             = "must specify one of: `basic`, `gang`"
 	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
 	tooManyItemsError      = "must have at most 1 item"
-	maximumError           = "must be less than or equal to 1000000000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
 	notAllowedToUnsetError = "field cannot be cleared once set"
@@ -117,7 +116,7 @@ func TestStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha3",
+		APIVersion:        "v1beta1",
 		Resource:          "podgroups",
 		IsResourceRequest: true,
 	})
@@ -239,13 +238,17 @@ func TestStrategyCreate(t *testing.T) {
 				return pg
 			}(),
 		},
-		"too high priority": {
+		"system-node-critical priority": {
 			obj: func() *scheduling.PodGroup {
 				pg := podGroup.DeepCopy()
-				pg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				pg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return pg
 			}(),
-			expectValidationError: maximumError,
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return pg
+			}(),
 		},
 		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
 			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptNever),
@@ -335,7 +338,7 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"updating pod group template ref not allowed": {
+		"updating pod group workload ref not allowed": {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
@@ -474,7 +477,7 @@ func TestStrategyUpdate(t *testing.T) {
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha3",
+		APIVersion:  "v1beta1",
 		Resource:    "podgroups",
 		Subresource: "status",
 	})
@@ -838,4 +841,104 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestDropPodGroupParentCompositePodGroupNameField(t *testing.T) {
+	var noPodGroup *scheduling.PodGroup
+	podGroupWithoutParent := podGroup
+
+	podGroupWithParent := func() *scheduling.PodGroup {
+		w := podGroupWithoutParent.DeepCopy()
+		w.Spec.ParentCompositePodGroupName = new("parent1")
+		return w
+	}()
+
+	podGroupWithParentDropped := func() *scheduling.PodGroup {
+		w := podGroupWithParent.DeepCopy()
+		w.Spec.ParentCompositePodGroupName = nil
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldPodGroup  *scheduling.PodGroup
+		newPodGroup  *scheduling.PodGroup
+		wantPodGroup *scheduling.PodGroup
+	}{
+		{
+			description:  "old with parent / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old with parent / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old without parent / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParentDropped,
+		},
+		{
+			description:  "old without parent / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old without parent / new without parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithoutParent,
+			wantPodGroup: podGroupWithoutParent,
+		},
+		{
+			description:  "old without parent / new without parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithoutParent,
+			wantPodGroup: podGroupWithoutParent,
+		},
+		{
+			description:  "nil old / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  noPodGroup,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParentDropped,
+		},
+		{
+			description:  "nil old / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  noPodGroup,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               tc.enabled,
+			})
+			var oldSpec *scheduling.PodGroupSpec
+			if tc.oldPodGroup != nil {
+				oldSpec = &tc.oldPodGroup.Spec
+			}
+			dropDisabledPodGroupSpecFields(&tc.newPodGroup.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantPodGroup, tc.newPodGroup); diff != "" {
+				t.Errorf("new PodGroup changed (- want, + got): %s", diff)
+			}
+		})
+	}
 }

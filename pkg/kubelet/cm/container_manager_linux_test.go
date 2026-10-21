@@ -183,7 +183,9 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	req := require.New(t)
 	tempDir, err := os.MkdirTemp("", "")
 	req.NoError(err)
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tempDir), "unable to remove dir %s", tempDir)
+	})
 	req.NoError(os.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
 	req.NoError(os.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
 	mountInt := mount.NewFakeMounter(

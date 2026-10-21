@@ -42,6 +42,9 @@ type Db struct {
 	files []*FileDescription
 	// extensions contains the mapping between a given type name, extension name and its FieldDescription
 	extensions map[string]map[string]*FieldDescription
+
+	// jsonFieldNames indicates whether json-style names are supported as proto field names.
+	jsonFieldNames bool
 }
 
 // extensionsMap is a type alias to a map[typeName]map[extensionName]*FieldDescription
@@ -81,12 +84,26 @@ func Merge(dstPB, srcPB proto.Message) error {
 	return nil
 }
 
+// DbOption modifies feature flags enabled on the proto database.
+type DbOption func(*Db) *Db
+
+// JSONFieldNames configures the Db to support proto field accesses by their JSON names.
+func JSONFieldNames(enabled bool) DbOption {
+	return func(db *Db) *Db {
+		db.jsonFieldNames = enabled
+		return db
+	}
+}
+
 // NewDb creates a new `pb.Db` with an empty type name to file description map.
-func NewDb() *Db {
+func NewDb(opts ...DbOption) *Db {
 	pbdb := &Db{
 		revFileDescriptorMap: make(map[string]*FileDescription),
 		files:                []*FileDescription{},
 		extensions:           make(extensionMap),
+	}
+	for _, o := range opts {
+		pbdb = o(pbdb)
 	}
 	// The FileDescription objects in the default db contain lazily initialized TypeDescription
 	// values which may point to the state contained in the DefaultDb irrespective of this shallow
@@ -100,9 +117,15 @@ func NewDb() *Db {
 	return pbdb
 }
 
+// JSONFieldNames indicates whether the database is configured for proto field accesses by JSON names.
+func (pbdb *Db) JSONFieldNames() bool {
+	return pbdb.jsonFieldNames
+}
+
 // Copy creates a copy of the current database with its own internal descriptor mapping.
 func (pbdb *Db) Copy() *Db {
 	copy := NewDb()
+	copy.jsonFieldNames = pbdb.jsonFieldNames
 	for _, fd := range pbdb.files {
 		hasFile := false
 		for _, fd2 := range copy.files {

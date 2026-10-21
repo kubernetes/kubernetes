@@ -46,6 +46,8 @@ func NewLegacyManager(cg *cgroups.Cgroup, paths map[string]string) (*LegacyManag
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
+	// ID returns the controller ID for filtering.
+	ID() cgroups.Controller
 	// GetStats returns the stats, as 'stats', corresponding to the cgroup under 'path'.
 	GetStats(path string, stats *cgroups.Stats) error
 	// Set sets cgroup resource limits.
@@ -69,7 +71,7 @@ var legacySubsystems = []subsystem{
 	&fs.NetClsGroup{},
 	&fs.NameGroup{GroupName: "name=systemd"},
 	&fs.RdmaGroup{},
-	&fs.NameGroup{GroupName: "misc"},
+	&fs.NameGroup{GroupName: "misc", GroupID: cgroups.Misc},
 }
 
 func genV1ResourcesProperties(r *cgroups.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
@@ -339,14 +341,32 @@ func (m *LegacyManager) GetAllPids() ([]int, error) {
 }
 
 func (m *LegacyManager) GetStats() (*cgroups.Stats, error) {
+	return m.Stats(nil)
+}
+
+// Stats returns cgroup statistics for the specified controllers.
+func (m *LegacyManager) Stats(opts *cgroups.StatsOptions) (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Default: query all controllers (same as original GetStats behavior)
+	controllers := cgroups.AllControllers
+	if opts != nil && opts.Controllers != 0 {
+		controllers = opts.Controllers
+	}
+
 	stats := cgroups.NewStats()
 	for _, sys := range legacySubsystems {
 		path := m.paths[sys.Name()]
 		if path == "" {
 			continue
 		}
+
+		// Filter based on controller type
+		if sys.ID()&controllers == 0 {
+			continue
+		}
+
 		if err := sys.GetStats(path, stats); err != nil {
 			return nil, err
 		}

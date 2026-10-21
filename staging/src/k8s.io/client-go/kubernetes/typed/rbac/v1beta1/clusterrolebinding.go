@@ -41,6 +41,7 @@ type ClusterRoleBindingInterface interface {
 	Create(ctx context.Context, clusterRoleBinding *rbacv1beta1.ClusterRoleBinding, opts v1.CreateOptions) (*rbacv1beta1.ClusterRoleBinding, error)
 	Update(ctx context.Context, clusterRoleBinding *rbacv1beta1.ClusterRoleBinding, opts v1.UpdateOptions) (*rbacv1beta1.ClusterRoleBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*rbacv1beta1.ClusterRoleBinding, error)
 	List(ctx context.Context, opts v1.ListOptions) (*rbacv1beta1.ClusterRoleBindingList, error)

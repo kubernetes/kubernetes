@@ -1059,15 +1059,20 @@ func TestEtcdCreateBinding(t *testing.T) {
 		if test.badNameInURL {
 			name += "badNameInURL"
 		}
-		if _, err := bindingStorage.Create(ctx, name, &test.binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); !test.errOK(err) {
+		if out, err := bindingStorage.Create(ctx, name, &test.binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
-			// If bind succeeded, verify Host field in pod's Spec.
+			// If bind succeeded, verify Host field in pod's Spec and ResourceVersion in Status.
 			pod, err := storage.Get(ctx, pod.ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
-			} else if pod.(*api.Pod).Spec.NodeName != test.binding.Target.Name {
-				t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
+			} else {
+				if pod.(*api.Pod).Spec.NodeName != test.binding.Target.Name {
+					t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
+				}
+				if out.(*metav1.Status).ResourceVersion != pod.(*api.Pod).ResourceVersion {
+					t.Errorf("%s: expected ResourceVersion: %v, got: %v", k, pod.(*api.Pod).ResourceVersion, out.(*metav1.Status).ResourceVersion)
+				}
 			}
 		}
 	}

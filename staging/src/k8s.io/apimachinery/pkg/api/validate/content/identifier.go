@@ -33,3 +33,16 @@ func IsCIdentifier(value string) []string {
 	}
 	return nil
 }
+
+const conditionReasonFmt string = "[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?"
+const conditionReasonErrMsg string = "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_'"
+
+var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
+
+func IsValidReason(value string) []string {
+	if !conditionReasonRegexp.MatchString(value) {
+		return []string{RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
+	}
+	return nil
+
+}

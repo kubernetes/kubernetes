@@ -409,8 +409,8 @@ function codegen::defaults() {
 # The <VALUE> depends on context:
 #     on packages:
 #       *: all exported types are candidates for having validation generated
-#       FIELDNAME: any type with a field of this name is a candidate for
-#                  having validation generated
+#       TypesWithField=NAME: any type with a field of this name is a
+#           candidate for having validation generated
 #     on types:
 #       true:  always generate validation for this type
 #       false: never generate validation for this type
@@ -439,8 +439,15 @@ function codegen::validation() {
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
     fi
 
+    # The extensions example uses "+k8s:" like everything else, so the
+    # search above finds it -- but this run knows nothing about its formats.
+    local extensions_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/extensions"
+
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
+        if [[ "${dir}" == "${extensions_example}"/* ]]; then
+            continue
+        fi
         tag_pkgs+=("./$dir")
     done
 
@@ -476,6 +483,30 @@ function codegen::validation() {
         --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
+        "$@"
+
+    # validation-gen's example of a generator with a custom tag prefix
+    # ("+xyz:") is not found by the tag search above, and its output shares
+    # the file prefix removed above, so regenerate it here to keep it in step
+    # with the generator.
+    local custom_prefix_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/custom-prefix"
+    kube::log::status "Generating validation code for the custom-prefix example"
+    GOPROXY=off go run "./${custom_prefix_example}" \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        "./${custom_prefix_example}/output_tests/..." \
+        "$@"
+
+    # The extensions example, excluded above. This is the stock
+    # generator: --validation-extensions-file is the whole difference.
+    kube::log::status "Generating validation code for the extensions example"
+    validation-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        --validation-extensions-file "./${extensions_example}/extensions.yaml" \
+        "./${extensions_example}/output_tests/..." \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then

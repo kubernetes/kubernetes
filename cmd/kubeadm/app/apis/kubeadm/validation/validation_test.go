@@ -1239,6 +1239,10 @@ func TestValidateEncryptionAlgorithm(t *testing.T) {
 		{name: "valid RSA-3072", algo: kubeadmapi.EncryptionAlgorithmRSA3072, expectedErrors: false},
 		{name: "valid RSA-4096", algo: kubeadmapi.EncryptionAlgorithmRSA4096, expectedErrors: false},
 		{name: "valid ECDSA-P256", algo: kubeadmapi.EncryptionAlgorithmECDSAP256, expectedErrors: false},
+		{name: "valid ECDSA-P384", algo: kubeadmapi.EncryptionAlgorithmECDSAP384, expectedErrors: false},
+		{name: "valid ML-DSA-44", algo: kubeadmapi.EncryptionAlgorithmMLDSA44, expectedErrors: false},
+		{name: "valid ML-DSA-65", algo: kubeadmapi.EncryptionAlgorithmMLDSA65, expectedErrors: false},
+		{name: "valid ML-DSA-87", algo: kubeadmapi.EncryptionAlgorithmMLDSA87, expectedErrors: false},
 		{name: "invalid algorithm", algo: "foo", expectedErrors: true},
 		{name: "empty algorithm returns an error", algo: "", expectedErrors: true},
 	}
@@ -1479,8 +1483,18 @@ func TestValidateExtraArgs(t *testing.T) {
 		expectedErrors int
 	}{
 		{
-			name:           "valid argument",
+			name:           "valid argument without merge method",
 			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar"}},
+			expectedErrors: 0,
+		},
+		{
+			name:           "valid argument with append merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: kubeadmapi.ArgMergeMethodAppend}},
+			expectedErrors: 0,
+		},
+		{
+			name:           "valid argument with prepend merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: kubeadmapi.ArgMergeMethodPrepend}},
 			expectedErrors: 0,
 		},
 		{
@@ -1492,6 +1506,11 @@ func TestValidateExtraArgs(t *testing.T) {
 			name:           "invalid two arguments",
 			args:           []kubeadmapi.Arg{{Name: "", Value: "foo"}, {Name: "", Value: "bar"}},
 			expectedErrors: 2,
+		},
+		{
+			name:           "invalid merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: "foo"}},
+			expectedErrors: 1,
 		},
 	}
 

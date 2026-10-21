@@ -89,6 +89,16 @@ message CreateTaskRequest {
   google.protobuf.Any options = 9;
 
   string runtime_path = 10;
+
+  // TaskApiAddress optionally specifies the address of an existing task API
+  // endpoint (e.g. an in-VM agent for sandbox runtimes such as Kata).
+  // When set, containerd connects to this address for task operations instead
+  // of bootstrapping a new shim.  The format is <protocol>+<scheme>://...,
+  // e.g. "ttrpc+unix:///path/to/uds" or "grpc+vsock://<cid>:<port>".
+  string task_api_address = 11;
+  // TaskApiVersion is the shim API version served at TaskApiAddress.
+  // Currently supported values are 2 and 3.
+  uint32 task_api_version = 12;
 }
 
 message CreateTaskResponse {

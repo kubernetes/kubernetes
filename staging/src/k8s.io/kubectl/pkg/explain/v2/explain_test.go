@@ -44,12 +44,12 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test0.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, "unknown-format")
+	}, false, 0, "unknown-format")
 	require.ErrorContains(t, err, "couldn't find resource for \"test0.example.com/v1, Resource=doesntmatter\"")
 
 	// Validate error when openapi client returns error.
 	fakeClient.ForcedErr = fmt.Errorf("Always fails")
-	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, "unknown-format")
+	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, 0, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch list of groupVersions")
 
 	// Validate error when GroupVersion "Schema()" call returns error.
@@ -60,7 +60,7 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test1.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, "unknown-format")
+	}, false, 0, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch openapi schema ")
 
 	// Validate error when returned bytes from GroupVersion "Schema" are invalid.
@@ -70,13 +70,28 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test2.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, "unknown-format")
+	}, false, 0, "unknown-format")
 	require.ErrorContains(t, err, "failed to parse openapi schema")
 
 	// Validate error when render template is not recognized.
 	client := openapitest.NewEmbeddedFileClient()
-	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, "unknown-format")
+	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, 0, "unknown-format")
 	require.ErrorContains(t, err, "unrecognized format: unknown-format")
+}
+
+// TestExplainInvalidFieldPathWritesNoOutput verifies that when explain fails on
+// an invalid field path, nothing (not even the KIND/VERSION header) is written
+// to the output writer. A failing command must not emit partial output to
+// stdout, which would otherwise pollute pipes and redirects.
+func TestExplainInvalidFieldPathWritesNoOutput(t *testing.T) {
+	var buf bytes.Buffer
+
+	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	client := openapitest.NewEmbeddedFileClient()
+
+	err := PrintModelDescription([]string{"spec", "nonexistentfield"}, &buf, client, podsGVR, false, 0, "plaintext")
+	require.ErrorContains(t, err, `field "nonexistentfield" does not exist`)
+	require.Empty(t, buf.String(), "no output should be written to w when explain fails")
 }
 
 // Shows that the correct GVR is fetched from the open api client when
@@ -107,7 +122,7 @@ func TestExplainOpenAPIClient(t *testing.T) {
 		FieldPath: nil,
 	}
 
-	err = printModelDescriptionWithGenerator(gen, nil, &buf, fileClient, apiGroupsGVR, false, "Context")
+	err = printModelDescriptionWithGenerator(gen, nil, &buf, fileClient, apiGroupsGVR, false, 0, "Context")
 	require.NoError(t, err)
 
 	var actualContext TemplateContext

@@ -26,7 +26,6 @@ import (
 	fmt "fmt"
 
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -41,6 +40,36 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type MutatingAdmissionPolicy
+	scheme.AddValidationFunc(
+		(*admissionregistrationv1alpha1.MutatingAdmissionPolicy)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_MutatingAdmissionPolicy(
+					ctx, op, nil, /* fldPath */
+					obj.(*admissionregistrationv1alpha1.MutatingAdmissionPolicy),
+					safe.Cast[*admissionregistrationv1alpha1.MutatingAdmissionPolicy](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type MutatingAdmissionPolicyBinding
+	scheme.AddValidationFunc(
+		(*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_MutatingAdmissionPolicyBinding(
+					ctx, op, nil, /* fldPath */
+					obj.(*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding),
+					safe.Cast[*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ValidatingAdmissionPolicy
 	scheme.AddValidationFunc(
 		(*admissionregistrationv1alpha1.ValidatingAdmissionPolicy)(nil),
@@ -74,6 +103,74 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_MutatingAdmissionPolicy validates an instance of MutatingAdmissionPolicy according
+// to declarative validation rules in the API schema.
+func Validate_MutatingAdmissionPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *admissionregistrationv1alpha1.MutatingAdmissionPolicy) (errs field.ErrorList) {
+
+	// field admissionregistrationv1alpha1.MutatingAdmissionPolicy.TypeMeta has no validation
+
+	{ // field admissionregistrationv1alpha1.MutatingAdmissionPolicy.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *admissionregistrationv1alpha1.MutatingAdmissionPolicy) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field admissionregistrationv1alpha1.MutatingAdmissionPolicy.Spec has no validation
+	return errs
+}
+
+// Validate_MutatingAdmissionPolicyBinding validates an instance of MutatingAdmissionPolicyBinding according
+// to declarative validation rules in the API schema.
+func Validate_MutatingAdmissionPolicyBinding(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding) (errs field.ErrorList) {
+
+	// field admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding.TypeMeta has no validation
+
+	{ // field admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding.Spec has no validation
+	return errs
+}
+
 // Validate_ValidatingAdmissionPolicy validates an instance of ValidatingAdmissionPolicy according
 // to declarative validation rules in the API schema.
 func Validate_ValidatingAdmissionPolicy(
@@ -81,7 +178,29 @@ func Validate_ValidatingAdmissionPolicy(
 	obj, oldObj *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) (errs field.ErrorList) {
 
 	// field admissionregistrationv1alpha1.ValidatingAdmissionPolicy.TypeMeta has no validation
-	// field admissionregistrationv1alpha1.ValidatingAdmissionPolicy.ObjectMeta has no validation
+
+	{ // field admissionregistrationv1alpha1.ValidatingAdmissionPolicy.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
 	// field admissionregistrationv1alpha1.ValidatingAdmissionPolicy.Spec has no validation
 
 	{ // field admissionregistrationv1alpha1.ValidatingAdmissionPolicy.Status
@@ -91,7 +210,7 @@ func Validate_ValidatingAdmissionPolicy(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -116,7 +235,28 @@ func Validate_ValidatingAdmissionPolicyBinding(
 	obj, oldObj *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding) (errs field.ErrorList) {
 
 	// field admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding.TypeMeta has no validation
-	// field admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding.ObjectMeta has no validation
+
+	{ // field admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding.Spec
 		fn := func(
@@ -125,7 +265,7 @@ func Validate_ValidatingAdmissionPolicyBinding(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -162,7 +302,7 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -188,13 +328,13 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -229,7 +369,7 @@ func Validate_ValidatingAdmissionPolicyStatus(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -242,13 +382,13 @@ func Validate_ValidatingAdmissionPolicyStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

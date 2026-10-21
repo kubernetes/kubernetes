@@ -387,6 +387,7 @@ func TooLongCharacters[T ~string](field *Path, _ T, maxLength int) *Error {
 }
 
 // TooLongMaxLength returns a *Error indicating "too long".
+//
 // Deprecated: Use TooLong instead.
 func TooLongMaxLength(field *Path, value interface{}, maxLength int) *Error {
 	return TooLong(field, "", maxLength)

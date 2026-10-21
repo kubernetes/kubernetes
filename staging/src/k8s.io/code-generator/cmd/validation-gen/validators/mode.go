@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	modeDiscriminatorTagName = "k8s:modeDiscriminator"
-	ifModeTagName            = "k8s:ifMode"
+	modeDiscriminatorTagName = "modeDiscriminator"
+	ifModeTagName            = "ifMode"
 )
 
 // validGroupNameRegex restricts discriminator group names to identifiers that
@@ -131,7 +131,7 @@ func (mdtv *modeDiscriminatorTagValidator) GetValidations(context Context, tag c
 func (mdtv *modeDiscriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mdtv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mdtv.ValidScopes()),
 		Description:    "Indicates that this field is a discriminator for state-based validation.",
 		Args: []TagArgDoc{{
@@ -222,7 +222,7 @@ func (imtv *ifModeTagValidator) GetValidations(context Context, tag codetags.Tag
 func (imtv *ifModeTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            imtv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(imtv.ValidScopes()),
 		Description:    "Indicates that this field's validation depends on a mode discriminator.",
 		Args: []TagArgDoc{{
@@ -367,6 +367,7 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	}
 
 	discriminatorType := group.discriminatorMember.Type
+	var result Validations
 	var discriminatedRules []any
 	for _, val := range values {
 		wrapper := MultiWrapperFunction{
@@ -374,6 +375,11 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 			ObjType:   nilableFieldType,
 			// Per-mode rules also run at structPath.Child(jsonName).
 			PathFragment: "." + jsonName,
+		}
+		// A variable is a package-level declaration and does not depend on the
+		// mode, so it is hoisted out rather than dropped.
+		for _, v := range rulesByValue[val].Variables {
+			result.AddVariable(v)
 		}
 
 		// Convert the string tag value to the appropriate typed Go literal
@@ -420,9 +426,9 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	// looking up and comparing correlated list elements for validation ratcheting.
 	var equivArg any
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(fieldType))) {
-		equivArg = Identifier(validateDirectEqualPtr)
+		equivArg = Identifier(validateDirectEqual)
 	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
+		equivArg = DeepEqualFunc{}
 	}
 
 	fn := Function(modeDiscriminatorTagName, DefaultFlags, discriminatedValidator,
@@ -437,7 +443,8 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	// skip the level wrapping in the upstream. Processing the stability level
 	// in the upstream will override the stability levels of the wrapped validators.
 	fn.StabilityLevelSelfManaged = true
-	return Validations{Functions: []FunctionGen{fn}}, nil
+	result.AddFunction(fn)
+	return result, nil
 }
 
 // uniformStabilityLevel returns the common stability level if all rules share

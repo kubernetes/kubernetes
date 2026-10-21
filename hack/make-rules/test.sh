@@ -253,6 +253,7 @@ runTests() {
   # Enable coverage data collection?
   local cover_msg
   local COMBINED_COVER_PROFILE
+  local cover_flags=()
 
   if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then
     cover_msg="with code coverage"
@@ -264,7 +265,7 @@ runTests() {
     kube::log::status "Saving coverage output in '${cover_report_dir}'"
     mkdir -p "${@+${@/#/${cover_report_dir}/}}"
     COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
-    goflags+=(-cover -covermode="${KUBE_COVERMODE}" -coverprofile="${COMBINED_COVER_PROFILE}")
+    cover_flags=(-cover -covermode="${KUBE_COVERMODE}" -coverprofile="${COMBINED_COVER_PROFILE}")
   else
     cover_msg="without code coverage"
   fi
@@ -300,6 +301,11 @@ runTests() {
     if ! (
            case "${prefix}" in
              "")
+               # Collect coverage only for the main workspace. Every "go test"
+               # invocation overwrites the shared profile file, and
+               # "go tool cover" below cannot resolve packages that are
+               # outside the workspace.
+               goflags+=("${cover_flags[@]:+${cover_flags[@]}}")
                ;;
              "vendor/")
                # Upstream tests are not vendored, so we have to download without modifying the vendor directory.

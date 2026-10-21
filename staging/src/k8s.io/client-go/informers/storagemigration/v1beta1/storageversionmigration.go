@@ -34,11 +34,39 @@ import (
 )
 
 // StorageVersionMigrationInformer provides access to a shared informer and lister for
-// StorageVersionMigrations.
+// StorageVersionMigrations. Prefer using the type-safe variant (see [TypedStorageVersionMigrationInformer]).
 type StorageVersionMigrationInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagemigrationv1beta1.StorageVersionMigrationLister
 }
+
+// TypedStorageVersionMigrationInformer provides access to a shared informer and lister for
+// StorageVersionMigrations, including the type-safe TypedInformer variant.
+// It is a superset of StorageVersionMigrationInformer.
+type TypedStorageVersionMigrationInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() StorageVersionMigrationIndexInformer
+	Lister() storagemigrationv1beta1.StorageVersionMigrationLister
+}
+
+// StorageVersionMigrationIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type StorageVersionMigrationIndexInformer cache.TypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration]
+
+// StorageVersionMigrationHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for StorageVersionMigration.
+type StorageVersionMigrationHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistoragemigrationv1beta1.StorageVersionMigration]
+
+// StorageVersionMigrationDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for StorageVersionMigration.
+type StorageVersionMigrationDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistoragemigrationv1beta1.StorageVersionMigration]
+
+// StorageVersionMigrationFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for StorageVersionMigration.
+type StorageVersionMigrationFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistoragemigrationv1beta1.StorageVersionMigration]
+
+// StorageVersionMigrationIndexers is a specialization of [cache.TypedIndexers] for StorageVersionMigration.
+type StorageVersionMigrationIndexers = cache.TypedIndexers[*apistoragemigrationv1beta1.StorageVersionMigration]
+
+// DeletedStorageVersionMigration is a specialization of [cache.DeletedObject] for StorageVersionMigration.
+type DeletedStorageVersionMigration = cache.DeletedObject[*apistoragemigrationv1beta1.StorageVersionMigration]
 
 type storageVersionMigrationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type storageVersionMigrationInformer struct {
 // NewStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageVersionMigrationInformer]).
 func NewStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers StorageVersionMigrationIndexers) StorageVersionMigrationIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredStorageVersionMigrationInformer]).
 func NewFilteredStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers StorageVersionMigrationIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) StorageVersionMigrationIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewStorageVersionMigrationInformerWithOptions constructs a new informer for StorageVersionMigration type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageVersionMigrationInformerWithOptions]).
 func NewStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, options)
+}
+
+// NewTypedStorageVersionMigrationInformerWithOptions constructs a new informer for StorageVersionMigration type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) StorageVersionMigrationIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storagemigration.k8s.io", Version: "v1beta1", Resource: "storageversionmigrations"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *storageVersionMigrationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *storageVersionMigrationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragemigrationv1beta1.StorageVersionMigration{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *storageVersionMigrationInformer) TypedInformer() StorageVersionMigrationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](f.factory.InformerFor(&apistoragemigrationv1beta1.StorageVersionMigration{}, f.defaultInformer))
 }
 
 func (f *storageVersionMigrationInformer) Lister() storagemigrationv1beta1.StorageVersionMigrationLister {
 	return storagemigrationv1beta1.NewStorageVersionMigrationLister(f.Informer().GetIndexer())
+}
+
+// ToTypedStorageVersionMigrationInformer converts an untyped informer into a TypedStorageVersionMigrationInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *StorageVersionMigration. If that is not the case, calling type-safe methods of the returned
+// TypedStorageVersionMigrationInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedStorageVersionMigrationInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedStorageVersionMigrationInformer(informer StorageVersionMigrationInformer) TypedStorageVersionMigrationInformer {
+	if informer, ok := informer.(TypedStorageVersionMigrationInformer); ok {
+		return informer
+	}
+	return &storageVersionMigrationTypedInformerAdapter{informer}
+}
+
+type storageVersionMigrationTypedInformerAdapter struct {
+	StorageVersionMigrationInformer
+}
+
+func (a *storageVersionMigrationTypedInformerAdapter) TypedInformer() StorageVersionMigrationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](a.Informer())
+}
+
+// ToStorageVersionMigrationIndexInformer converts an untyped informer into a StorageVersionMigrationIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *StorageVersionMigration. If that is not the case, calling type-safe methods of the returned
+// StorageVersionMigrationIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a StorageVersionMigrationIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToStorageVersionMigrationIndexInformer(informer cache.SharedIndexInformer) StorageVersionMigrationIndexInformer {
+	if informer, ok := informer.(StorageVersionMigrationIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](informer)
 }

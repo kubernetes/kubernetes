@@ -32,7 +32,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,12 +42,12 @@ import (
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/go-logr/logr"
@@ -115,10 +114,9 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	clientConfig                     *rest.Config
-	restMapper                       *restmapper.DeferredDiscoveryRESTMapper
-	ClientSet                        clientset.Interface
-	KubemarkExternalClusterClientSet clientset.Interface
+	clientConfig *rest.Config
+	restMapper   *restmapper.DeferredDiscoveryRESTMapper
+	ClientSet    clientset.Interface
 
 	DynamicClient dynamic.Interface
 
@@ -186,7 +184,7 @@ func (f *Framework) TContext(ctx context.Context) ktesting.TContext {
 		panic("TContext may only be used while a test runs.")
 	}
 	tCtx := ktesting.InitCtx(ctx, f /* intentionally using f here and not f.TB because f overrides some methods */)
-	tCtx = tCtx.WithClients(f.clientConfig, f.restMapper, f.ClientSet, f.DynamicClient, apiextensions.NewForConfigOrDie(f.clientConfig))
+	tCtx = tCtx.WithClients(f.clientConfig, f.restMapper, f.ClientSet, f.DynamicClient)
 	if f.Namespace != nil {
 		tCtx = tCtx.WithNamespace(f.Namespace.Name)
 	}
@@ -210,7 +208,7 @@ func ContextTODO(ctx context.Context, client clientset.Interface) ktesting.TCont
 	}
 	f := NewDefaultFramework("tcontext")
 	tCtx := ktesting.InitCtx(ctx, f)
-	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
 	tCtx = ensureLogger(tCtx)
 	return tCtx
 }

@@ -19,7 +19,7 @@ E2E Node test for DRA (Dynamic Resource Allocation)
 This test covers node-specific aspects of DRA
 The test can be run locally on Linux this way:
     make test-e2e-node FOCUS='\[Feature:DynamicResourceAllocation\]' SKIP='\[Flaky\]' PARALLELISM=1 \
-       TEST_ARGS='--feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --service-feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --runtime-config=api/all=true'
+       TEST_ARGS='--feature-gates="ResourceHealthStatus=true,DRAConsumableCapacity=true" --service-feature-gates="ResourceHealthStatus=true,DRAConsumableCapacity=true" --runtime-config=api/all=true'
 */
 
 package e2enode
@@ -35,6 +35,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -94,7 +95,7 @@ const (
 
 // Tests depend on container runtime support for CDI and the DRA feature gate.
 // The "DRA" label is used to select tests related to DRA in a Ginkgo label filter.
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, func() {
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -729,7 +730,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.It("must call NodeUnprepareResources again if it's in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
 			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unblockNodeUnprepareResources := kubeletPlugin2.BlockNodeUnprepareResources()
+			// Cleanup also unblocks, in case the test fails before the call below.
+			unblockNodeUnprepareResources := sync.OnceFunc(kubeletPlugin2.BlockNodeUnprepareResources())
+			ginkgo.DeferCleanup(unblockNodeUnprepareResources)
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for plugin1 NodePrepareResources call to succeed")
@@ -738,13 +741,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("wait for plugin2 NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
 
+			// Restart only while plugin2 is inside NodeUnprepareResources, which is what this test is about.
+			ginkgo.By("wait for plugin2 NodeUnprepareResources call to be in progress")
+			gomega.Eventually(ctx, kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesInProgress)
+			callsBeforeRestart := len(kubeletPlugin2.GetGRPCCalls())
+
 			ginkgo.By("restart Kubelet")
 			restartKubelet(ctx, true)
 
 			unblockNodeUnprepareResources()
 
-			ginkgo.By("wait for plugin2 NodeUnprepareResources call to succeed")
-			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+			ginkgo.By("wait for a plugin2 NodeUnprepareResources call made after the restart to succeed")
+			gomega.Eventually(ctx, kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceededAfter(callsBeforeRestart))
 
 			ginkgo.By("wait for pod to succeed")
 			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -896,41 +904,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	f.Context("Resource Health", framework.WithFeatureGate(features.ResourceHealthStatus), f.WithSerial(), func() {
 
-		// Verifies that device health transitions (Healthy -> Unhealthy -> Healthy)
-		// reported by a DRA plugin are correctly reflected in the Pod's status.
-		ginkgo.It("should reflect device health changes in the Pod's status", func(ctx context.Context) {
-			ginkgo.By("Starting the test driver with channel-based control")
-			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
-
-			pod, claimName, poolNameForTest, deviceNameForTest := setupAndVerifyHealthyPod(
-				ctx, f, kubeletPlugin, driverName,
-				"health-test-class", "health-test-claim", "health-test-pod", "pool-a", "dev-0",
-			)
-
-			ginkgo.By("Setting device health to Unhealthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Unhealthy",
-			}
-
-			ginkgo.By("Verifying device health is now Unhealthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"), "Device health should update to Unhealthy")
-
-			ginkgo.By("Setting device health back to Healthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Healthy",
-			}
-
-			ginkgo.By("Verifying device health has recovered to Healthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should recover and update to Healthy")
-		})
+		// The device health transition tests, including negotiation of the
+		// DRAResourceHealth API version, are in test/e2e/dra.
 
 		// This test verifies that the Kubelet establishes only a single gRPC connection
 		// with the DRA plugin throughout the plugin lifecycle.
@@ -1403,7 +1378,10 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 	ctx = klog.NewContext(ctx, logger)
 
 	allOpts := []any{
-		testdriver.Options{EnableHealthService: false},
+		// In split deployments the registrar's registration is what the
+		// kubelet negotiates the health service from, so it must advertise
+		// health even though a separate service instance serves it.
+		testdriver.Options{EnableHealthService: true},
 		kubeletplugin.DRAService(false),
 	}
 

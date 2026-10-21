@@ -69,7 +69,6 @@ var baseOpts = []VersionedOptions{
 
 			UnversionedLib(library.URLs),
 			UnversionedLib(library.Regex),
-			UnversionedLib(library.Lists),
 
 			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
 			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
@@ -82,6 +81,13 @@ var baseOpts = []VersionedOptions{
 			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
 			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
 			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.Lists(library.ListsVersion(0)),
 		},
 	},
 	{
@@ -131,11 +137,19 @@ var baseOpts = []VersionedOptions{
 			ext.Sets(),
 		},
 	},
+	// IP Library
 	{
 		IntroducedVersion: version.MajorMinor(1, 30),
 		EnvOptions: []cel.EnvOption{
 			UnversionedLib(library.IP),
-			UnversionedLib(library.CIDR),
+		},
+	},
+	// CIDR Library v0
+	{
+		IntroducedVersion: version.MajorMinor(1, 30),
+		RemovedVersion:    version.MajorMinor(1, 38),
+		EnvOptions: []cel.EnvOption{
+			library.CIDR(library.CIDRVersion(0)),
 		},
 	},
 	// Format Library
@@ -171,6 +185,19 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 34),
 		EnvOptions: []cel.EnvOption{
 			ext.Lists(ext.ListsVersion(3)),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.Lists(library.ListsVersion(1)),
+		},
+	},
+	// CIDR Library v1
+	{
+		IntroducedVersion: version.MajorMinor(1, 38),
+		EnvOptions: []cel.EnvOption{
+			library.CIDR(library.CIDRVersion(1)),
 		},
 	},
 	StrictCostOpt,

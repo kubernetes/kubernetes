@@ -88,10 +88,6 @@ const (
 	// affinity is enabled.
 	AffinityConfirmCount = 15
 
-	// SessionAffinityTimeout is the number of seconds to wait between requests for
-	// session affinity to timeout before trying a load-balancer request again
-	SessionAffinityTimeout = 125
-
 	// label define which is used to find kube-proxy and kube-apiserver pod
 	kubeProxyLabelName     = "kube-proxy"
 	clusterAddonLabelKey   = "k8s-app"
@@ -2481,7 +2477,8 @@ var _ = common.SIGDescribe("Services", func() {
 		// Create a pod in one node to get evicted
 		ginkgo.By("creating a client pod that is going to be evicted for the service " + serviceName)
 		evictedPod := e2epod.NewAgnhostPod(namespace, "evicted-pod", nil, nil, nil)
-		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000"}
+		// Use /dev/urandom rather than /dev/zero so the write isn't collapsed by filesystems with inline compression.
+		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/urandom of=file bs=1M count=10; sleep 10000"}
 		evictedPod.Spec.Containers[0].Name = "evicted-pod"
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
@@ -3952,8 +3949,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		checkOneHealthCheck := func(nodeIP string, expectResponse bool, expectStatus string, deadline time.Time) {
-			// "-i" means to return the HTTP headers in the response
-			cmd := fmt.Sprintf("curl -g -i -s --connect-timeout 3 http://%s/", net.JoinHostPort(nodeIP, hcNodePortStr))
+			// "-i" means to return the HTTP headers in the response. We request /healthz because that is the path
+			// the ESIPP design specifies for healthCheckNodePort, and the one the rest of the suite already uses.
+			cmd := fmt.Sprintf("curl -g -i -s --connect-timeout 3 http://%s/healthz", net.JoinHostPort(nodeIP, hcNodePortStr))
 			err := wait.PollUntilContextTimeout(ctx, framework.Poll, time.Until(deadline), true, func(ctx context.Context) (bool, error) {
 				out, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
 				if !expectResponse {
@@ -4119,7 +4117,17 @@ var _ = common.SIGDescribe("Services", func() {
 		checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
 	})
 
-	ginkgo.It("should support named targetPorts that resolve to different ports on different endpoints", func(ctx context.Context) {
+	/*
+		Release: v1.41
+		Testname: Service, named targetPorts that resolve to different ports
+		Description: Create a Service with a named port and 2 endpoint pods (which
+		map the named port to the same container port). Replace one of the pods
+		with a new pod that maps the named port to a different container port. The
+		Service must still send traffic to both endpoints. Replace the other pod
+		with a new pod that likewise maps to the same new container port. The
+		Service must still send traffic to both endpoints.
+	*/
+	framework.ConformanceIt("should support named targetPorts that resolve to different ports on different endpoints", framework.WithConformanceVersion("1.41"), func(ctx context.Context) {
 		serviceName := "mutable-named-port"
 		ns := f.Namespace.Name
 
@@ -4200,7 +4208,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	ginkgo.By("creating service in namespace " + ns)
 	serviceType := svc.Spec.Type
 	// set an affinity timeout equal to the number of connection requests
-	svcSessionAffinityTimeout := int32(SessionAffinityTimeout)
+	svcSessionAffinityTimeout := int32(AffinityConfirmCount)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 		ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -4236,37 +4244,34 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	err = jig.CheckServiceReachability(ctx, svc, execPod)
 	framework.ExpectNoError(err)
 
-	// the service should be sticky until the timeout expires
+	ginkgo.By("checking that affinity holds when making multiple connections separated by less than the affinity timeout")
 	if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
 		framework.Failf("the service %s (%s:%d) should be sticky until the timeout expires", svc.Name, svcIP, servicePort)
 	}
-	// but it should return different hostnames after the timeout expires
-	// try several times to avoid the probability that we hit the same pod twice
+
+	ginkgo.By("checking that affinity DOES NOT hold when making connections separated by more than the affinity timeout")
 	hosts := sets.NewString()
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
+	// Even if affinity times out correctly, there's no guarantee that we'll get a
+	// different endpoint the second time we connect, since the new random endpoint
+	// might happen to be the same as the old random endpoint. But if we retry enough
+	// times (and affinity actually is timing out) then we'll eventually get a
+	// different endpoint.
 	for range 10 {
 		hostname, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
-		if err == nil {
-			hosts.Insert(hostname)
-			if hosts.Len() > 1 {
-				return
-			}
-			// In some case, ipvs didn't deleted the persistent connection after timeout expired,
-			// use 'ipvsadm -lnc' command can found the expire time become '13171233:02' after '00:00'
-			//
-			// pro expire state       source             virtual            destination
-			// TCP 00:00  NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
-			//
-			// pro expire state       source             virtual            destination
-			// TCP 13171233:02 NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
-			//
-			// And 2 seconds later, the connection will be ensure deleted,
-			// so we sleep 'svcSessionAffinityTimeout+5' seconds to avoid this issue.
-			// TODO: figure out why the expired connection didn't be deleted and fix this issue in ipvs side.
-			time.Sleep(time.Duration(svcSessionAffinityTimeout+5) * time.Second)
+		framework.ExpectNoError(err)
+
+		hosts.Insert(hostname)
+		if hosts.Len() > 1 {
+			// Success: affinity was broken.
+			return
 		}
+
+		// The service is now pinned to hostname; wait for that to expire
+		// before trying again.
+		time.Sleep(time.Duration(svcSessionAffinityTimeout+5) * time.Second)
 	}
-	framework.Fail("Session is sticky after reaching the timeout")
+	framework.Failf("Session is still sticky after reaching the %ds timeout", svcSessionAffinityTimeout)
 }
 
 func execAffinityTestForNonLBServiceWithTransition(ctx context.Context, f *framework.Framework, cs clientset.Interface, svc *v1.Service) {

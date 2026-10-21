@@ -204,7 +204,6 @@ type CustomResourceDefinitionVersion struct {
 	// A maximum of 8 selectable fields are allowed.
 	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
 	//
-	// +featureGate=CustomResourceFieldSelectors
 	// +optional
 	// +listType=atomic
 	SelectableFields []SelectableField `json:"selectableFields,omitempty" protobuf:"bytes,9,rep,name=selectableFields"`

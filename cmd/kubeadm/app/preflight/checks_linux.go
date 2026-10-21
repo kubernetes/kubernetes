@@ -91,6 +91,13 @@ func addExecChecks(checks []Checker, execer utilsexec.Interface, k8sVersion stri
 	// kubelet requires mount to be present in PATH for in-tree volume plugins.
 	checks = append(checks, InPathCheck{executable: "mount", mandatory: true, exec: execer})
 
+	// kubelet uses getent to resolve the "kubelet" account before it consults getsubids
+	// for user namespace ID mappings. Without it the account looks absent and kubelet
+	// falls back to the default ID range without reporting anything.
+	// (ref: https://github.com/kubernetes/kubernetes/pull/135870)
+	checks = append(checks, InPathCheck{executable: "getent", mandatory: false, exec: execer,
+		suggestion: "install the package that provides getent, usually glibc or libc-bin"})
+
 	// kubeadm requires cp to be present in PATH for copying etcd directories.
 	checks = append(checks, InPathCheck{executable: "cp", mandatory: true, exec: execer})
 	return checks

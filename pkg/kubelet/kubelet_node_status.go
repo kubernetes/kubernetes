@@ -127,10 +127,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(ctx context.Context, node *v1.Node) 
 	// Edge case: the node was previously registered; reconcile
 	// the value of the controller-managed attach-detach
 	// annotation.
-	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(logger, node, existingNode)
-	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileExtendedResource(logger, node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileHugePageResource(logger, node, existingNode) || requiresUpdate
+	requiresUpdate := kl.reconcileInitialNodeWithExistingNode(logger, node, existingNode)
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			logger.Error(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
@@ -139,6 +136,16 @@ func (kl *Kubelet) tryRegisterWithAPIServer(ctx context.Context, node *v1.Node) 
 	}
 
 	return true
+}
+
+// reconcileInitialNodeWithExistingNode reconciles the initial node with the existing node,
+// returning a boolean indicating whether the existing node must be updated.
+func (kl *Kubelet) reconcileInitialNodeWithExistingNode(logger klog.Logger, initialNode, existingNode *v1.Node) bool {
+	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(logger, initialNode, existingNode)
+	requiresUpdate = kl.updateDefaultLabels(initialNode, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileExtendedResource(logger, initialNode, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileHugePageResource(logger, initialNode, existingNode) || requiresUpdate
+	return requiresUpdate
 }
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported
@@ -192,7 +199,7 @@ func (kl *Kubelet) reconcileHugePageResource(logger klog.Logger, initialNode, ex
 func (kl *Kubelet) reconcileExtendedResource(logger klog.Logger, initialNode, node *v1.Node) bool {
 	requiresUpdate := updateDefaultResources(initialNode, node)
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
-	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
+	if kl.containerManager != nil && kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
 			if v1helper.IsExtendedResourceName(k) {
 				logger.Info("Zero out resource capacity in existing node", "resourceName", k, "node", klog.KObj(node))
@@ -633,16 +640,64 @@ func (kl *Kubelet) markVolumesFromNode(node *v1.Node) {
 	kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 }
 
+// nodeRefWithUID returns a copy of the Kubelet's static node ObjectReference with
+// the Node's UID populated on a best-effort basis.
+//
+// kl.nodeRef is constructed once at Kubelet startup (see NewMainKubelet), before
+// the Node object is guaranteed to exist in the apiserver, so it intentionally
+// carries only kind+name and no UID (see https://github.com/kubernetes/kubernetes/issues/42701).
+// As a result every event the kubelet records against the node has
+// involvedObject.uid unset, which prevents consumers such as `kubectl describe
+// node` from correlating those events with the Node by UID
+// (see https://github.com/kubernetes/kubernetes/issues/138524).
+//
+// Once the Node is visible in the local cache we resolve the UID once and cache
+// the resulting reference in kl.cachedNodeRef. It is not refreshed: if the Node
+// were deleted and recreated with a new UID while this kubelet keeps running,
+// events would keep using the original UID.
+func (kl *Kubelet) nodeRefWithUID() *v1.ObjectReference {
+	// Fast path: a reference with the UID already resolved has been cached.
+	if ref := kl.cachedNodeRef.Load(); ref != nil {
+		return ref
+	}
+
+	// kl.nodeRef is written once at construction in NewMainKubelet and never
+	// reassigned, so there is no concurrent writer to guard against here. The nil
+	// check only matters for tests that do not set it.
+	if kl.nodeRef == nil {
+		return nil
+	}
+
+	ref := *kl.nodeRef
+	if ref.UID == "" {
+		// In standalone mode there is no apiserver, hence no Node UID to resolve.
+		if kl.kubeClient == nil {
+			return kl.nodeRef
+		}
+		node, err := kl.nodeLister.Get(string(kl.nodeName))
+		if err != nil || node.UID == "" {
+			// UID not known yet; return the name-only reference and retry next time.
+			return kl.nodeRef
+		}
+		ref.UID = node.UID
+	}
+
+	// Cache the resolved reference. CompareAndSwap keeps the first winner if two
+	// goroutines resolve concurrently; Load then returns whichever won.
+	kl.cachedNodeRef.CompareAndSwap(nil, &ref)
+	return kl.cachedNodeRef.Load()
+}
+
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(logger klog.Logger, eventType, event string) {
 	logger.V(2).Info("Recording event message for node", "node", klog.KRef("", string(kl.nodeName)), "event", event)
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRefWithUID(), eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // recordEvent records an event for this node, the Kubelet's nodeRef is passed to the recorder
 func (kl *Kubelet) recordEvent(eventType, event, message string) {
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "%s", message)
+	kl.recorder.Eventf(kl.nodeRefWithUID(), eventType, event, "%s", message)
 }
 
 // record if node schedulable change.
@@ -685,7 +740,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, utilnet.ResolveBindAddress),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
-			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.supportLocalStorageCapacityIsolation()),
+			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.runningInUserNS, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),

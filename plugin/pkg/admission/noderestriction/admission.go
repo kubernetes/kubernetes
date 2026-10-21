@@ -28,6 +28,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -90,10 +91,10 @@ type Plugin struct {
 
 	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
-	dynamicResourceAllocationEnabled               bool
 	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
 	podCertificateRequestsEnabled                  bool
+	csiVolumeHealthEnabled                         bool
 }
 
 var (
@@ -106,10 +107,10 @@ var (
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
-	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
+	p.csiVolumeHealthEnabled = featureGates.Enabled(features.CSIVolumeHealth)
 	p.inspectedFeatureGates = true
 }
 
@@ -430,20 +431,28 @@ func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAlloca
 		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
 			return false
 		}
-		if len(statusA[i].Resources) != len(statusB[i].Resources) {
+		if !nodeAllocatableMappedResourcesEqual(statusA[i].Mapping, statusB[i].Mapping) {
 			return false
 		}
-		for name, qtyA := range statusA[i].Resources {
-			qtyB, ok := statusB[i].Resources[name]
-			if !ok {
-				return false
-			}
-			if qtyA.Cmp(qtyB) != 0 {
-				return false
-			}
+		if !nodeAllocatableOverheadResourcesEqual(statusA[i].Overhead, statusB[i].Overhead) {
+			return false
 		}
 	}
 	return true
+}
+
+func nodeAllocatableMappedResourcesEqual(a, b []api.NodeAllocatableMappedResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableMappedResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.Quantity, y.Quantity)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
+}
+
+func nodeAllocatableOverheadResourcesEqual(a, b []api.NodeAllocatableOverheadResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableOverheadResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.PerPod, y.PerPod) && apiresource.QuantityPtrEqual(x.PerContainer, y.PerContainer)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
@@ -723,14 +732,17 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return fmt.Errorf("node may only request 0 or 1 audiences")
 	}
 
-	foundAudiencesInPodSpec, err := p.podReferencesAudience(ctx, pod, requestedAudience)
-	if err != nil {
-		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
-	}
-	if foundAudiencesInPodSpec {
+	foundAudiencesInPodSpec, podRefErr := p.podReferencesAudience(ctx, pod, requestedAudience)
+	if podRefErr == nil && foundAudiencesInPodSpec {
 		return nil
 	}
 
+	// The pod spec does not reference the requested audience, or we could not
+	// determine whether it does because resolving the pod's volume sources failed
+	// (for example a referenced PVC, PV, or CSIDriver was not found). Either way,
+	// fall back to the authorizer so that an explicit grant of the
+	// request-serviceaccounts-token-audience verb still acts as an escape hatch,
+	// including on the error path.
 	attrs := buildAuthorizerAttributes(
 		a,
 		"request-serviceaccounts-token-audience",
@@ -738,14 +750,21 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		a.GetName(), // This API operation is on the service account, so this is the SA name.
 	)
 
-	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	authorized, _, authzErr := p.authz.Authorize(ctx, attrs)
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
 	if authorized == authorizer.DecisionAllow {
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, err)
+
+	// The authorizer did not allow the request. Surface the most actionable error:
+	// a failure to resolve the pod's audiences points at a real misconfiguration,
+	// so prefer it over the generic authorization errors.
+	if podRefErr != nil {
+		return fmt.Errorf("error validating audience %q: %w", requestedAudience, podRefErr)
+	}
+	if authzErr != nil {
+		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, authzErr)
 	}
 
 	return fmt.Errorf("%s is not authorized to request tokens for audience %q", a.GetUserInfo().GetName(), requestedAudience)
@@ -1034,7 +1053,35 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	if a.GetSubresource() == "status" {
+		if !p.csiVolumeHealthEnabled {
+			return admission.NewForbidden(a, fmt.Errorf("CSIVolumeHealth feature gate is disabled"))
+		}
+		return p.admitCSINodeStatus(nodeName, a)
+	}
+
 	return nil
+}
+
+// admitCSINodeStatus ensures a node cannot modify CSINode Spec via the status subresource.
+func (p *Plugin) admitCSINodeStatus(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Update:
+		oldCSINode, ok := a.GetOldObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+		}
+		newCSINode, ok := a.GetObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if !apiequality.Semantic.DeepEqual(oldCSINode.Spec, newCSINode.Spec) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify CSINode spec via status", nodeName))
+		}
+		return nil
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
+	}
 }
 
 func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {

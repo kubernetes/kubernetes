@@ -23,6 +23,8 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Preference stores elements of KubeRC configuration file
+//
+// Deprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.
 type Preference struct {
 	metav1.TypeMeta `json:""`
 
@@ -115,6 +117,8 @@ const (
 // specified fields must be met. That is, the result of an individual entry is
 // the logical AND of all checks corresponding to the specified fields within
 // the entry.
+//
+// Deprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.
 type AllowlistEntry struct {
 	// Name matching is performed by first resolving the absolute path of both
 	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
@@ -133,6 +137,8 @@ type AllowlistEntry struct {
 }
 
 // AliasOverride stores the alias definitions.
+//
+// Deprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.
 type AliasOverride struct {
 	// name is the name of alias that can only include alphabetical characters
 	// If the alias name conflicts with the built-in command,
@@ -157,6 +163,8 @@ type AliasOverride struct {
 
 // CommandDefaults stores the commands and their associated option's
 // default values.
+//
+// Deprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.
 type CommandDefaults struct {
 	// command refers to a command whose option's default value is changed.
 	Command string `json:"command"`
@@ -167,6 +175,8 @@ type CommandDefaults struct {
 
 // CommandOptionDefault stores the name and the specified default
 // value of an option.
+//
+// Deprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.
 type CommandOptionDefault struct {
 	// Option name (long form, without dashes).
 	Name string `json:"name"`

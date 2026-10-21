@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -80,10 +79,11 @@ func (s *seLinuxMountTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return s.tsInfo
 }
 
-func (s *seLinuxMountTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (s *seLinuxMountTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	if !driver.GetDriverInfo().Capabilities[storageframework.CapSELinuxMount] {
-		e2eskipper.Skipf("Driver %q does not support SELinuxMount - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support SELinuxMount", driver.GetDriverInfo().Name)
 	}
+	return ""
 }
 
 func (s *seLinuxMountTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

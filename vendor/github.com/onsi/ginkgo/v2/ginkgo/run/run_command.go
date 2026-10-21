@@ -39,6 +39,10 @@ func BuildRunCommand() command.Command {
 			cliConfig, goFlagsConfig, errors = types.VetAndInitializeCLIAndGoConfig(cliConfig, goFlagsConfig)
 			command.AbortIfErrors("Ginkgo detected configuration issues:", errors)
 
+			if types.ReconcileFdOutputConfiguration(reporterConfig, &suiteConfig, &cliConfig) {
+				fmt.Println("--fd is incompatible with parallel runs (-p/-procs) and -randomize-all; ignoring those flags and running specs in series, in declaration order.")
+			}
+
 			runner := &SpecRunner{
 				cliConfig:      cliConfig,
 				goFlagsConfig:  goFlagsConfig,

@@ -20,7 +20,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,7 +36,7 @@ func makeLink(link, target string) error {
 }
 
 func TestDoSafeMakeDir(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestDoSafeMakeDir")
+	base, err := os.MkdirTemp("", "TestDoSafeMakeDir")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
@@ -133,7 +132,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 }
 
 func TestLockAndCheckSubPath(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestLockAndCheckSubPath")
+	base, err := os.MkdirTemp("", "TestLockAndCheckSubPath")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
@@ -237,7 +236,7 @@ func TestLockAndCheckSubPath(t *testing.T) {
 }
 
 func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestLockAndCheckSubPathWithoutSymlink")
+	base, err := os.MkdirTemp("", "TestLockAndCheckSubPathWithoutSymlink")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
@@ -341,7 +340,7 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 }
 
 func TestFindExistingPrefix(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestFindExistingPrefix")
+	base, err := os.MkdirTemp("", "TestFindExistingPrefix")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
@@ -473,6 +472,73 @@ func TestIsDriveLetterorEmptyPath(t *testing.T) {
 	for _, test := range tests {
 		result := isDriveLetterorEmptyPath(test.path)
 		assert.Equal(t, test.expectedResult, result, "Expect result not equal with isDriveLetterorEmptyPath(%s) return: %t, expected: %t",
+			test.path, result, test.expectedResult)
+	}
+}
+
+func TestIsDeviceOrUncPath(t *testing.T) {
+	tests := []struct {
+		path           string
+		expectedResult bool
+	}{
+		{
+			// ordinary local path must be resolvable
+			path:           `c:\tmp\foo`,
+			expectedResult: false,
+		},
+		{
+			// empty path is not a device/UNC path
+			path:           ``,
+			expectedResult: false,
+		},
+		{
+			// UNC network path: must be refused so it is never followed,
+			// otherwise resolving it triggers forced NTLM authentication.
+			path:           `\\attacker\share`,
+			expectedResult: true,
+		},
+		{
+			// UNC network path referenced by IP
+			path:           `\\127.0.0.1\share\dir`,
+			expectedResult: true,
+		},
+		{
+			// forward-slash UNC form: evalSymlink normalizes "/" to "\" via
+			// mount.NormalizeWindowsPath before this check, but asserting it
+			// here guards against callers that pass an unnormalized target.
+			path:           `//attacker/share`,
+			expectedResult: true,
+		},
+		{
+			// device-form UNC path (extended-length prefix)
+			path:           `\\?\UNC\server\share`,
+			expectedResult: true,
+		},
+		{
+			// device namespace path
+			path:           `\\.\PhysicalDrive0`,
+			expectedResult: true,
+		},
+		{
+			// extended-length local path
+			path:           `\\?\c:\tmp`,
+			expectedResult: true,
+		},
+		{
+			// stripped device-form UNC path
+			path:           `UNC\server\share`,
+			expectedResult: true,
+		},
+		{
+			// volume GUID path
+			path:           `Volume{00000000-0000-0000-0000-000000000000}\`,
+			expectedResult: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := isDeviceOrUncPath(test.path)
+		assert.Equal(t, test.expectedResult, result, "Expect result not equal with isDeviceOrUncPath(%s) return: %t, expected: %t",
 			test.path, result, test.expectedResult)
 	}
 }

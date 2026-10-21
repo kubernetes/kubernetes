@@ -17,17 +17,17 @@ limitations under the License.
 package csinode
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/csinode"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
-
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -71,9 +71,97 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	})
 
 	updateObj := mkCSINode()
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy,
+		meta.WithStringentFinalizerValidation())
 }
 
+func TestDeclarativeValidateStatusUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "apis",
+			APIGroup:          "storage.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "csinodes",
+			Subresource:       "status",
+			Name:              "valid-obj",
+			IsResourceRequest: true,
+			Verb:              "update",
+		})
+
+		conditionReasonPath := field.NewPath("status", "storageHealth").Index(0).Child("healthConditions").Index(0).Child("reason")
+		tests := map[string]struct {
+			storageHealth []storage.StorageHealth
+			expectedErrs  field.ErrorList
+		}{
+			"valid": {
+				storageHealth: []storage.StorageHealth{{Name: "foo"}},
+			},
+			"name required": {
+				storageHealth: []storage.StorageHealth{{}},
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("status", "storageHealth").Index(0).Child("name"), "").MarkAlpha(),
+				},
+			},
+			"reason valid": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageUnreachable,
+						Reason: "BackendDown",
+					}},
+				}},
+			},
+			"reason is required": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageUnreachable,
+						Reason: "",
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.Required(conditionReasonPath, "").MarkAlpha(),
+				},
+			},
+			"reason length can not be greater than 256": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageUnreachable,
+						Reason: strings.Repeat("a", 257),
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.TooLong(conditionReasonPath, "", 256).WithOrigin("maxBytes").MarkAlpha(),
+				},
+			},
+			"reason format is invalid": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageUnreachable,
+						Reason: "1-not-valid!",
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.Invalid(conditionReasonPath, "", "").WithOrigin("format=k8s-condition-reason").MarkAlpha(),
+				},
+			},
+		}
+
+		for name, tc := range tests {
+			t.Run(apiVersion+"/"+name, func(t *testing.T) {
+				oldObj := mkCSINode()
+				oldObj.ResourceVersion = "1"
+				updateObj := oldObj.DeepCopy()
+				updateObj.Status.StorageHealth = tc.storageHealth
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, &oldObj,
+					registry.StatusStrategy, tc.expectedErrs,
+					apitesting.WithSubResources("status"))
+			})
+		}
+	}
+}
 func mkCSINode(tweaks ...func(node *storage.CSINode)) storage.CSINode {
 	node := storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{

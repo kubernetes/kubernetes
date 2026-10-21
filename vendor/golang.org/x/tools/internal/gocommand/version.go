@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -41,9 +42,9 @@ func GoVersion(ctx context.Context, inv Invocation, r *Runner) (int, error) {
 	}
 	// Split up "[go1.1 go1.15]" and return highest go1.X value.
 	tags := strings.Fields(stdout[1 : len(stdout)-2])
-	for i := len(tags) - 1; i >= 0; i-- {
+	for _, tag := range slices.Backward(tags) {
 		var version int
-		if _, err := fmt.Sscanf(tags[i], "go1.%d", &version); err != nil {
+		if _, err := fmt.Sscanf(tag, "go1.%d", &version); err != nil {
 			continue
 		}
 		return version, nil

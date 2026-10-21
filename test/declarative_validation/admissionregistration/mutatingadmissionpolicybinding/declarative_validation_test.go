@@ -29,9 +29,6 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
-
 // Helper function to create a baseline valid MutatingAdmissionPolicyBinding with optional tweaks
 func mkMutatingAdmissionPolicyBinding(tweaks ...func(*admissionregistration.MutatingAdmissionPolicyBinding)) admissionregistration.MutatingAdmissionPolicyBinding {
 	obj := admissionregistration.MutatingAdmissionPolicyBinding{

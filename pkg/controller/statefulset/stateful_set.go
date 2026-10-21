@@ -43,12 +43,12 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -169,7 +169,10 @@ func NewStatefulSetController(
 		revListerSynced: revInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "statefulset"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "statefulset",
+			},
 		),
 		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder, OnWrite: podWriteCallback},
 
@@ -178,7 +181,7 @@ func NewStatefulSetController(
 		consistencyStore: consistencyStore,
 	}
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		// lookup the statefulset and enqueue
 		AddFunc: func(obj interface{}) {
 			ssc.addPod(logger, obj)
@@ -191,12 +194,14 @@ func NewStatefulSetController(
 		DeleteFunc: func(obj interface{}) {
 			ssc.deletePod(logger, obj)
 		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 	controller.AddPodControllerIndexer(podInformer.Informer())
 	ssc.podIndexer = podInformer.Informer().GetIndexer()
-	setInformer.Informer().AddEventHandler(
+	_, _ = setInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ssc.enqueueStatefulSet(logger, obj)
@@ -213,6 +218,7 @@ func NewStatefulSetController(
 				ssc.enqueueStatefulSet(logger, obj)
 			},
 		},
+		cache.HandlerOptions{Logger: &logger},
 	)
 	ssc.setLister = setInformer.Lister()
 	ssc.setListerSynced = setInformer.Informer().HasSynced

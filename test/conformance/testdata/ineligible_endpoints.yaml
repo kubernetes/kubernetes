@@ -301,3 +301,12 @@
 - endpoint: connectCoreV1PostNamespacedPodPortforward
   reason: Deprecated and uses a sometime unreliable SPDY protocol
   link: https://github.com/kubernetes/kubernetes/issues/133689#issuecomment-3233952615
+- endpoint: readStorageV1CSINodeStatus
+  reason: CSINode status subresource is behind the alpha CSIVolumeHealth feature gate
+  link: https://github.com/kubernetes/enhancements/issues/1432
+- endpoint: patchStorageV1CSINodeStatus
+  reason: CSINode status subresource is behind the alpha CSIVolumeHealth feature gate
+  link: https://github.com/kubernetes/enhancements/issues/1432
+- endpoint: replaceStorageV1CSINodeStatus
+  reason: CSINode status subresource is behind the alpha CSIVolumeHealth feature gate
+  link: https://github.com/kubernetes/enhancements/issues/1432

@@ -67,6 +67,12 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 		b.iscsiDisk.Iface = b.iscsiDisk.Portals[0] + ":" + b.iscsiDisk.VolName
 	}
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
+
+	pluginDir := b.plugin.host.GetPluginDir(iscsiPluginName)
+	if err := validateISCSIPluginPath(globalPDPath, pluginDir); err != nil {
+		return err
+	}
+
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = mounter.MountSensitiveWithoutSystemd(globalPDPath, volPath, "", mountOptions, nil)
 	if err != nil {

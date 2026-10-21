@@ -94,7 +94,8 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "cronjob",
+				Logger: &logger,
+				Name:   "cronjob",
 			},
 		),
 		kubeClient:  kubeClient,
@@ -114,13 +115,13 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		now: time.Now,
 	}
 
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addJob,
 		UpdateFunc: jm.updateJob,
 		DeleteFunc: jm.deleteJob,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
-	cronJobsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = cronJobsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.enqueueController(obj)
 		},
@@ -130,7 +131,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		DeleteFunc: func(obj interface{}) {
 			jm.enqueueController(obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	err := jobInformer.Informer().AddIndexers(cache.Indexers{
 		jobControllerUIDIndex: func(obj interface{}) ([]string, error) {
@@ -155,7 +156,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 
 // Run starts the main goroutine responsible for watching and syncing jobs.
 func (jm *ControllerV2) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)

@@ -38,14 +38,14 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *bestEffortPolicy) canAdmitPodResult(_ *TopologyHint) bool {
 	return true
 }
 
 func (p *bestEffortPolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(logger, providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
-	bestHint := merger.Merge()
+	bestHint := merger.Merge(logger)
 	admit := p.canAdmitPodResult(&bestHint)
 	return bestHint, admit
 }

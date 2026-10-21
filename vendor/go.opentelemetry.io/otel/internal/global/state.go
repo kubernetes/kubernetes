@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package global // import "go.opentelemetry.io/otel/internal/global"
+package global
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"go.opentelemetry.io/otel/internal/errorhandler"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -26,16 +27,22 @@ type (
 	meterProviderHolder struct {
 		mp metric.MeterProvider
 	}
+
+	loggerProviderHolder struct {
+		provider log.LoggerProvider
+	}
 )
 
 var (
-	globalTracer        = defaultTracerValue()
-	globalPropagators   = defaultPropagatorsValue()
-	globalMeterProvider = defaultMeterProvider()
+	globalTracer         = defaultTracerValue()
+	globalPropagators    = defaultPropagatorsValue()
+	globalMeterProvider  = defaultMeterProvider()
+	globalLoggerProvider = defaultLoggerProvider()
 
 	delegateTraceOnce             sync.Once
 	delegateTextMapPropagatorOnce sync.Once
 	delegateMeterOnce             sync.Once
+	delegateLoggerOnce            sync.Once
 )
 
 // GetErrorHandler returns the global ErrorHandler instance.
@@ -150,6 +157,32 @@ func SetMeterProvider(mp metric.MeterProvider) {
 	globalMeterProvider.Store(meterProviderHolder{mp: mp})
 }
 
+// LoggerProvider is the internal implementation for global.LoggerProvider.
+func LoggerProvider() log.LoggerProvider {
+	return globalLoggerProvider.Load().(loggerProviderHolder).provider
+}
+
+// SetLoggerProvider is the internal implementation for global.SetLoggerProvider.
+func SetLoggerProvider(provider log.LoggerProvider) {
+	current := LoggerProvider()
+	if _, cOk := current.(*loggerProvider); cOk {
+		if _, lpOk := provider.(*loggerProvider); lpOk && current == provider {
+			Error(
+				errors.New("no delegate configured in logger provider"),
+				"Setting logger provider to its current value. No delegate will be configured",
+			)
+			return
+		}
+	}
+
+	delegateLoggerOnce.Do(func() {
+		if def, ok := current.(*loggerProvider); ok {
+			def.setDelegate(provider)
+		}
+	})
+	globalLoggerProvider.Store(loggerProviderHolder{provider: provider})
+}
+
 func defaultTracerValue() *atomic.Value {
 	v := &atomic.Value{}
 	v.Store(tracerProviderHolder{tp: &tracerProvider{}})
@@ -165,5 +198,11 @@ func defaultPropagatorsValue() *atomic.Value {
 func defaultMeterProvider() *atomic.Value {
 	v := &atomic.Value{}
 	v.Store(meterProviderHolder{mp: &meterProvider{}})
+	return v
+}
+
+func defaultLoggerProvider() *atomic.Value {
+	v := &atomic.Value{}
+	v.Store(loggerProviderHolder{provider: &loggerProvider{}})
 	return v
 }

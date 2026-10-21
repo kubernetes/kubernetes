@@ -54,7 +54,7 @@ func (e endpoint) listen(ctx context.Context) (net.Listener, error) {
 	listener, err := cfg.Listen(ctx, "unix", socketpath)
 	if err != nil {
 		if removeErr := e.removeSocket(); removeErr != nil {
-			err = errors.Join(err, err)
+			err = errors.Join(err, removeErr)
 		}
 		return nil, err
 	}
@@ -77,7 +77,7 @@ type unixListener struct {
 func (l *unixListener) Close() error {
 	err := l.Listener.Close()
 	if removeErr := l.endpoint.removeSocket(); removeErr != nil {
-		err = errors.Join(err, err)
+		err = errors.Join(err, removeErr)
 	}
 	return err
 }

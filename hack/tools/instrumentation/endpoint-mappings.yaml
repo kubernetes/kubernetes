@@ -39,12 +39,6 @@ coreComponents:
   cloud-controller-manager:
     - "staging/src/k8s.io/cloud-provider/"
 
-# Standalone components: these have their own specific metrics and do NOT
-# share the common infrastructure metrics.
-standaloneComponents:
-  etcd-version-monitor:
-    - "cluster/images/etcd-version-monitor/"
-
 # Shared paths: metrics from these paths are available across ALL core components.
 sharedPaths:
   - "staging/src/k8s.io/component-base/"

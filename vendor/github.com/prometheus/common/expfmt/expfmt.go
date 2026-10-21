@@ -16,50 +16,48 @@ package expfmt
 
 import (
 	"errors"
+	"mime"
 	"strings"
 
 	"github.com/prometheus/common/model"
 )
 
-// Format specifies the HTTP content type of the different wire protocols.
-type Format string
-
 // Constants to assemble the Content-Type values for the different wire
-// protocols. The Content-Type strings here are all for the legacy exposition
-// formats, where valid characters for metric names and label names are limited.
-// Support for arbitrary UTF-8 characters in those names is already partially
-// implemented in this module (see model.ValidationScheme), but to actually use
-// it on the wire, new content-type strings will have to be agreed upon and
-// added here.
+// protocols.
 const (
 	TextVersion   = "0.0.4"
 	ProtoType     = `application/vnd.google.protobuf`
 	ProtoProtocol = `io.prometheus.client.MetricFamily`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoCompact) instead.
-	ProtoFmt        = ProtoType + "; proto=" + ProtoProtocol + ";"
+	ProtoFmt      = ProtoType + "; proto=" + ProtoProtocol + ";"
+
 	OpenMetricsType = `application/openmetrics-text`
 	//nolint:revive // Allow for underscores.
 	OpenMetricsVersion_0_0_1 = "0.0.1"
 	//nolint:revive // Allow for underscores.
 	OpenMetricsVersion_1_0_0 = "1.0.0"
+	//nolint:revive // Allow for underscores.
+	OpenMetricsVersion_2_0_0 = "2.0.0"
+)
 
-	// The Content-Type values for the different wire protocols. Do not do direct
-	// comparisons to these constants, instead use the comparison functions.
-	//
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeUnknown) instead.
-	FmtUnknown Format = `<unknown>`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeTextPlain) instead.
-	FmtText Format = `text/plain; version=` + TextVersion + `; charset=utf-8`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoDelim) instead.
-	FmtProtoDelim Format = ProtoFmt + ` encoding=delimited`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoText) instead.
-	FmtProtoText Format = ProtoFmt + ` encoding=text`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoCompact) instead.
+// Format specifies the HTTP content type of the different wire protocols.
+// The Content-Type values for the different wire protocols represent
+// baseline Content-Types used for HTTP headers and content negotiation.
+//
+// Because Content-Types on the wire may include dynamic parameters
+// (such as "; escaping=...") or whitespace variations, avoid comparing Format
+// values using direct equality (==).
+type Format string
+
+const (
+	FmtUnknown      Format = `<unknown>`
+	FmtText         Format = `text/plain; version=` + TextVersion + `; charset=utf-8`
+	FmtProtoDelim   Format = ProtoFmt + ` encoding=delimited`
+	FmtProtoText    Format = ProtoFmt + ` encoding=text`
 	FmtProtoCompact Format = ProtoFmt + ` encoding=compact-text`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeOpenMetrics) instead.
+	//nolint:revive // Allow for underscores.
+	FmtOpenMetrics_2_0_0 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_2_0_0 + `; charset=utf-8`
 	//nolint:revive // Allow for underscores.
 	FmtOpenMetrics_1_0_0 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_1_0_0 + `; charset=utf-8`
-	// Deprecated: Use expfmt.NewFormat(expfmt.TypeOpenMetrics) instead.
 	//nolint:revive // Allow for underscores.
 	FmtOpenMetrics_0_0_1 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_0_0_1 + `; charset=utf-8`
 )
@@ -86,7 +84,7 @@ const (
 
 // NewFormat generates a new Format from the type provided. Mostly used for
 // tests, most Formats should be generated as part of content negotiation in
-// encode.go. If a type has more than one version, the latest version will be
+// encode.go. If a type has more than one version, the latest stable version will be
 // returned.
 func NewFormat(t FormatType) Format {
 	switch t {
@@ -107,6 +105,9 @@ func NewFormat(t FormatType) Format {
 
 // NewOpenMetricsFormat generates a new OpenMetrics format matching the
 // specified version number.
+//
+// Note: OpenMetrics version 2.0.0 is experimental and encode-only (supporting
+// counter, gauge, summary, untyped, histogram, and gaugehistogram metric types).
 func NewOpenMetricsFormat(version string) (Format, error) {
 	if version == OpenMetricsVersion_0_0_1 {
 		return FmtOpenMetrics_0_0_1, nil
@@ -114,30 +115,22 @@ func NewOpenMetricsFormat(version string) (Format, error) {
 	if version == OpenMetricsVersion_1_0_0 {
 		return FmtOpenMetrics_1_0_0, nil
 	}
+	if version == OpenMetricsVersion_2_0_0 {
+		// OpenMetrics 2.0.0 is experimental and encode-only.
+		return FmtOpenMetrics_2_0_0, nil
+	}
 	return FmtUnknown, errors.New("unknown open metrics version string")
 }
 
-// WithEscapingScheme returns a copy of Format with the specified escaping
-// scheme appended to the end. If an escaping scheme already exists it is
-// removed.
-func (f Format) WithEscapingScheme(s model.EscapingScheme) Format {
-	var terms []string
-	for _, p := range strings.Split(string(f), ";") {
-		toks := strings.Split(p, "=")
-		if len(toks) != 2 {
-			trimmed := strings.TrimSpace(p)
-			if len(trimmed) > 0 {
-				terms = append(terms, trimmed)
-			}
-			continue
-		}
-		key := strings.TrimSpace(toks[0])
-		if key != model.EscapingKey {
-			terms = append(terms, strings.TrimSpace(p))
-		}
+// Version returns the version parameter without validating whether it is supported.
+// It returns an empty string if the parameter is absent or the Content-Type
+// cannot be parsed.
+func (f Format) Version() string {
+	_, params, err := mime.ParseMediaType(string(f))
+	if err != nil {
+		return ""
 	}
-	terms = append(terms, model.EscapingKey+"="+s.String())
-	return Format(strings.Join(terms, "; "))
+	return params["version"]
 }
 
 // FormatType deduces an overall FormatType for the given format.
@@ -189,12 +182,35 @@ func (f Format) FormatType() FormatType {
 	}
 }
 
-// ToEscapingScheme returns an EscapingScheme depending on the Format. Iff the
-// Format contains a escaping=allow-utf-8 term, it will select NoEscaping. If a valid
+// WithEscapingScheme returns a copy of Format with the specified escaping
+// scheme appended to the end. If an escaping scheme already exists it is
+// removed.
+func (f Format) WithEscapingScheme(s model.EscapingScheme) Format {
+	var terms []string
+	for p := range strings.SplitSeq(string(f), ";") {
+		toks := strings.Split(p, "=")
+		if len(toks) != 2 {
+			trimmed := strings.TrimSpace(p)
+			if len(trimmed) > 0 {
+				terms = append(terms, trimmed)
+			}
+			continue
+		}
+		key := strings.TrimSpace(toks[0])
+		if key != model.EscapingKey {
+			terms = append(terms, strings.TrimSpace(p))
+		}
+	}
+	terms = append(terms, model.EscapingKey+"="+s.String())
+	return Format(strings.Join(terms, "; "))
+}
+
+// ToEscapingScheme returns an EscapingScheme depending on the Format. IFF the
+// Format contains an escaping=allow-utf-8 term, it will select NoEscaping. If a valid
 // "escaping" term exists, that will be used. Otherwise, the global default will
 // be returned.
 func (f Format) ToEscapingScheme() model.EscapingScheme {
-	for _, p := range strings.Split(string(f), ";") {
+	for p := range strings.SplitSeq(string(f), ";") {
 		toks := strings.Split(p, "=")
 		if len(toks) != 2 {
 			continue

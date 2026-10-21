@@ -27,11 +27,23 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics"
+	metricsv1api "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	"k8s.io/utils/ptr"
 )
+
+// metricsAPIVersions lists the metrics API versions the top commands support,
+// so tests can run every case against each version.
+var metricsAPIVersions = []struct {
+	name     string
+	apisBody string
+}{
+	{"v1", apisV1BodyWithMetrics},
+	{"v1beta1", apisV1beta1BodyWithMetrics},
+}
 
 func TestTopSubcommandsExist(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
@@ -53,12 +65,66 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(result)), nil
 }
 
-func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeList) {
-	metrics := &metricsv1beta1api.NodeMetricsList{
+// versionedNodeMetricsList converts internal node metrics to the given
+// metrics API version, returning the list and its first item for use as fake
+// clientset reactor return values.
+func versionedNodeMetricsList(t *testing.T, version string, in *metricsapi.NodeMetricsList) (list, first runtime.Object) {
+	t.Helper()
+	switch version {
+	case "v1":
+		out := &metricsv1api.NodeMetricsList{}
+		if err := metricsv1api.Convert_metrics_NodeMetricsList_To_v1_NodeMetricsList(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		return out, &out.Items[0]
+	case "v1beta1":
+		out := &metricsv1beta1api.NodeMetricsList{}
+		if err := metricsv1beta1api.Convert_metrics_NodeMetricsList_To_v1beta1_NodeMetricsList(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		return out, &out.Items[0]
+	default:
+		t.Fatalf("unsupported metrics API version %q", version)
+		return nil, nil
+	}
+}
+
+// versionedPodMetricsList converts internal pod metrics to the given metrics
+// API version, returning the list and its first item (nil for an empty list)
+// for use as fake clientset reactor return values.
+func versionedPodMetricsList(t *testing.T, version string, in *metricsapi.PodMetricsList) (list, first runtime.Object) {
+	t.Helper()
+	switch version {
+	case "v1":
+		out := &metricsv1api.PodMetricsList{}
+		if err := metricsv1api.Convert_metrics_PodMetricsList_To_v1_PodMetricsList(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if len(out.Items) == 0 {
+			return out, nil
+		}
+		return out, &out.Items[0]
+	case "v1beta1":
+		out := &metricsv1beta1api.PodMetricsList{}
+		if err := metricsv1beta1api.Convert_metrics_PodMetricsList_To_v1beta1_PodMetricsList(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if len(out.Items) == 0 {
+			return out, nil
+		}
+		return out, &out.Items[0]
+	default:
+		t.Fatalf("unsupported metrics API version %q", version)
+		return nil, nil
+	}
+}
+
+func testNodeMetricsData() (*metricsapi.NodeMetricsList, *v1.NodeList) {
+	metrics := &metricsapi.NodeMetricsList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
 		},
-		Items: []metricsv1beta1api.NodeMetrics{
+		Items: []metricsapi.NodeMetrics{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10", Labels: map[string]string{"key": "value"}},
 				Window:     metav1.Duration{Duration: time.Minute},
@@ -106,7 +172,7 @@ func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeL
 					},
 					NodeInfo: v1.NodeSystemInfo{
 						Swap: &v1.NodeSwapStatus{
-							Capacity: ptr.To(int64(10 * (1024 * 1024 * 1024))),
+							Capacity: new(int64(10 * (1024 * 1024 * 1024))),
 						},
 					},
 				},
@@ -121,7 +187,7 @@ func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeL
 					},
 					NodeInfo: v1.NodeSystemInfo{
 						Swap: &v1.NodeSwapStatus{
-							Capacity: ptr.To(int64(20 * (1024 * 1024 * 1024))),
+							Capacity: new(int64(20 * (1024 * 1024 * 1024))),
 						},
 					},
 				},
@@ -136,7 +202,7 @@ func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeL
 					},
 					NodeInfo: v1.NodeSystemInfo{
 						Swap: &v1.NodeSwapStatus{
-							Capacity: ptr.To(int64(30 * (1024 * 1024 * 1024))),
+							Capacity: new(int64(30 * (1024 * 1024 * 1024))),
 						},
 					},
 				},

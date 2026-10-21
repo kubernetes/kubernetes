@@ -48,17 +48,17 @@ type FakeContainerManager struct {
 	nodeConfig                          NodeConfig
 	cpuManager                          cpumanager.Manager
 	memoryManager                       memorymanager.Manager
+	// ExclusiveCPUs controls the return value of ContainerHasExclusiveCPUs and PodHasExclusiveCPUs.
+	ExclusiveCPUs bool
 }
 
 var _ ContainerManager = &FakeContainerManager{}
 
-func NewFakeContainerManager() *FakeContainerManager {
+func NewFakeContainerManager(logger klog.Logger) *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-		cpuManager:    cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager: memorymanager.NewFakeManager(klog.TODO()),
+		cpuManager:          cpumanager.NewFakeManager(logger),
+		memoryManager:       memorymanager.NewFakeManager(logger),
 	}
 }
 
@@ -104,7 +104,7 @@ func (cm *FakeContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *FakeContainerManager) UpdateQOSCgroups(logger klog.Logger) error {
+func (cm *FakeContainerManager) UpdateQOSCgroups(_ klog.Logger) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateQOSCgroups")
@@ -168,7 +168,7 @@ func (cm *FakeContainerManager) NewPodContainerManager() PodContainerManager {
 	return cm.PodContainerManager
 }
 
-func (cm *FakeContainerManager) GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+func (cm *FakeContainerManager) GetResources(_ context.Context, _ *v1.Pod, _ *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetResources")
@@ -203,7 +203,7 @@ func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+func (cm *FakeContainerManager) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
@@ -224,17 +224,24 @@ func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler(logger klog.
 	return topologymanager.NewFakeManager(logger)
 }
 
-func (cm *FakeContainerManager) UpdateAllocatedDevices() {
+func (cm *FakeContainerManager) UpdateAllocatedDevices(_ klog.Logger) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateAllocatedDevices")
 	return
 }
 
-func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
+func (cm *FakeContainerManager) GetCPUs(_ *v1.Pod, _ *v1.Container) []int64 {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetPodCPUs(_ string) []int64 {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCPUs")
 	return nil
 }
 
@@ -244,20 +251,27 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *FakeContainerManager) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *FakeContainerManager) GetMemory(_ klog.Logger, _ *v1.Pod, _ *v1.Container) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetMemory")
 	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *FakeContainerManager) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodMemory")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetAllocatableMemory(_ klog.Logger) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()
 	return nil
 }
 
-func (cm *FakeContainerManager) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+func (cm *FakeContainerManager) GetDynamicResources(_ klog.Logger, _ *v1.Pod, _ *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 
@@ -271,7 +285,7 @@ func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	}
 }
 
-func (cm *FakeContainerManager) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+func (cm *FakeContainerManager) PrepareDynamicResources(_ context.Context, _ *v1.Pod) error {
 	return nil
 }
 
@@ -279,19 +293,19 @@ func (cm *FakeContainerManager) UnprepareDynamicResources(context.Context, *v1.P
 	return nil
 }
 
-func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
+func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(_ types.UID) bool {
 	return false
 }
-func (cm *FakeContainerManager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+func (cm *FakeContainerManager) UpdateAllocatedResourcesStatus(_ klog.Logger, _ *v1.Pod, _ *v1.PodStatus) {
 }
 func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 	return nil
 }
 
-func (cm *FakeContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
-	return false
+func (cm *FakeContainerManager) PodHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod) bool {
+	return cm.ExclusiveCPUs
 }
 
-func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
-	return false
+func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod, _ *v1.Container) bool {
+	return cm.ExclusiveCPUs
 }

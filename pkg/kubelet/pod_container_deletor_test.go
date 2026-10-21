@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/ktesting"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetContainersToDeleteInPodWithFilter(t *testing.T) {

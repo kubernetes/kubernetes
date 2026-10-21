@@ -175,10 +175,13 @@ func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) er
 }
 
 func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interface) (authorizer.Authorizer, error) {
-	var authorizers []authorizer.Authorizer
+	var authorizers []union.NamedAuthorizer
 
 	if len(s.AlwaysAllowGroups) > 0 {
-		authorizers = append(authorizers, authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...))
+		authorizers = append(authorizers, union.NamedAuthorizer{
+			AuthorizerName: "always-allow-groups.authorizer.kubernetes.io",
+			Authorizer:     authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...),
+		})
 	}
 
 	if len(s.AlwaysAllowPaths) > 0 {
@@ -186,26 +189,33 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		if err != nil {
 			return nil, err
 		}
-		authorizers = append(authorizers, a)
+		authorizers = append(authorizers, union.NamedAuthorizer{
+			AuthorizerName: "always-allow-paths.authorizer.kubernetes.io",
+			Authorizer:     a,
+		})
 	}
 
 	if client == nil {
 		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
-			SubjectAccessReviewClient: client.AuthorizationV1(),
-			AllowCacheTTL:             s.AllowCacheTTL,
-			DenyCacheTTL:              s.DenyCacheTTL,
-			WebhookRetryBackoff:       s.WebhookRetryBackoff,
+			SubjectAccessReviewClient:           client.AuthorizationV1(),
+			AllowCacheTTL:                       s.AllowCacheTTL,
+			DenyCacheTTL:                        s.DenyCacheTTL,
+			WebhookRetryBackoff:                 s.WebhookRetryBackoff,
+			AuthorizationConditionsReviewClient: client.AuthorizationV1alpha1(),
 		}
 		delegatedAuthorizer, err := cfg.New()
 		if err != nil {
 			return nil, err
 		}
-		authorizers = append(authorizers, delegatedAuthorizer)
+		authorizers = append(authorizers, union.NamedAuthorizer{
+			AuthorizerName: "webhook.authorizer.kubernetes.io",
+			Authorizer:     delegatedAuthorizer,
+		})
 	}
 
-	return union.New(authorizers...), nil
+	return union.New(authorizers...)
 }
 
 func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, error) {

@@ -36,10 +36,10 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      subsystem,
 			Name:           "resourceclaim_creates_total",
-			Help:           "Number of ResourceClaims creation requests, categorized by creation status and admin access",
+			Help:           "Number of ResourceClaims creation requests, categorized by creation status, admin access, and owning API group and kind (either Pod or scheduling.k8s.io/PodGroup)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"status", "admin_access"},
+		[]string{"status", "admin_access", "owner_api_group", "owner_api_kind"},
 	)
 )
 

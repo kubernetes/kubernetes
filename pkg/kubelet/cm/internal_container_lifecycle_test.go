@@ -19,7 +19,6 @@ package cm
 import (
 	"testing"
 
-	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +33,7 @@ type mockCPUManager struct {
 	cpumanager.Manager
 }
 
-func (cpuManager *mockCPUManager) AddContainer(logr.Logger, *v1.Pod, *v1.Container, string) {
+func (cpuManager *mockCPUManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
 	cpuManager.called = true
 }
 
@@ -43,7 +42,7 @@ type mockMemoryManager struct {
 	memorymanager.Manager
 }
 
-func (memoryManager *mockMemoryManager) AddContainer(logr.Logger, *v1.Pod, *v1.Container, string) {
+func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
 	memoryManager.called = true
 }
 

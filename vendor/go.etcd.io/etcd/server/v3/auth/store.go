@@ -1072,7 +1072,7 @@ func (as *authStore) AuthInfoFromCtx(ctx context.Context) (*AuthInfo, error) {
 		return nil, nil
 	}
 
-	token := ts[0]
+	token := strings.TrimPrefix(ts[0], "Bearer ")
 	authInfo, uok := as.authInfoFromToken(ctx, token)
 	if !uok {
 		tokenFingerprint := redactToken(token)

@@ -197,8 +197,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	// Pod Requests default values must be applied after container-level default values
-	// have been populated.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+	// have been populated. When PodLevelResourcesFixDefaulting is enabled, this
+	// defaulting is deferred to PrepareForCreate so it runs after admission webhooks
+	// have injected all containers, giving a complete view of the pod.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
 	}
@@ -211,6 +214,12 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	if obj.Spec.HostNetwork {
 		defaultHostNetworkPorts(&obj.Spec.Containers)
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+		defaultHTTPProbeProtocol(obj.Spec.Containers)
+		defaultHTTPProbeProtocol(obj.Spec.InitContainers)
+		defaultHTTPProbeProtocolEphemeral(obj.Spec.EphemeralContainers)
 	}
 }
 func SetDefaults_PodStatus(obj *v1.PodStatus) {
@@ -438,6 +447,57 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 	}
 }
 
+func defaultHTTPGetProtocol(action *v1.HTTPGetAction) {
+	if action != nil && action.Protocol == nil {
+		defaultProtocol := v1.HTTPProtocolHTTP1
+		action.Protocol = &defaultProtocol
+	}
+}
+
+func defaultHTTPProbeProtocol(containers []v1.Container) {
+	for i := range containers {
+		if containers[i].LivenessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].LivenessProbe.HTTPGet)
+		}
+		if containers[i].ReadinessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].ReadinessProbe.HTTPGet)
+		}
+		if containers[i].StartupProbe != nil {
+			defaultHTTPGetProtocol(containers[i].StartupProbe.HTTPGet)
+		}
+		if containers[i].Lifecycle != nil {
+			if containers[i].Lifecycle.PostStart != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PostStart.HTTPGet)
+			}
+			if containers[i].Lifecycle.PreStop != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PreStop.HTTPGet)
+			}
+		}
+	}
+}
+
+func defaultHTTPProbeProtocolEphemeral(containers []v1.EphemeralContainer) {
+	for i := range containers {
+		if containers[i].LivenessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].LivenessProbe.HTTPGet)
+		}
+		if containers[i].ReadinessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].ReadinessProbe.HTTPGet)
+		}
+		if containers[i].StartupProbe != nil {
+			defaultHTTPGetProtocol(containers[i].StartupProbe.HTTPGet)
+		}
+		if containers[i].Lifecycle != nil {
+			if containers[i].Lifecycle.PostStart != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PostStart.HTTPGet)
+			}
+			if containers[i].Lifecycle.PreStop != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PreStop.HTTPGet)
+			}
+		}
+	}
+}
+
 func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
@@ -463,6 +523,7 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // This defaulting behavior ensures consistent resource accounting at the pod-level
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
+// TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultPodRequests(obj *v1.Pod) {
 	// We only populate defaults when the pod-level resources are partly specified already.
 	if obj.Spec.Resources == nil {
@@ -516,6 +577,7 @@ func defaultPodRequests(obj *v1.Pod) {
 // limits set:
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
+// TODO(ndixita): Remove defaultHugePagePodLimits once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultHugePagePodLimits(pod *v1.Pod) {
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
 	if pod.Spec.Resources == nil {

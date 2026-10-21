@@ -29,7 +29,6 @@ import (
 	"google.golang.org/grpc/codes"
 	grpccredentials "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
@@ -326,52 +325,7 @@ func (c *Client) dial(creds grpccredentials.TransportCredentials, dopts ...grpc.
 	opts = append(opts, c.cfg.DialOptions...)
 
 	target := fmt.Sprintf("%s://%p/%s", resolver.Schema, c, authority(c.endpoints[0]))
-	conn, err := grpc.NewClient(target, opts...)
-	if err != nil {
-		return nil, err
-	}
-	if dialTimeout := c.cfg.DialTimeout; dialTimeout > 0 {
-		dctx, cancel := context.WithTimeout(c.ctx, dialTimeout)
-		defer cancel()
-
-		if err := waitForConnection(dctx, conn); err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-	return conn, nil
-}
-
-func waitForConnection(ctx context.Context, conn *grpc.ClientConn) error {
-	cli := healthpb.NewHealthClient(conn)
-
-	// Use WaitForReady to wait until the connection is ready. The health check
-	// may return Unimplemented if the server does not expose the health endpoint,
-	// or FailedPrecondition if the leader has not yet applied the configuration
-	// change that enables it. In both cases, we can still treat the connection as
-	// healthy enough to proceed.
-	//
-	// Use withMax to disable retrying on Unimplemented, so that we can
-	// return the original error immediately.
-	_, err := cli.Check(ctx, &healthpb.HealthCheckRequest{}, grpc.WaitForReady(true), withMax(0))
-	if err == nil {
-		return nil
-	}
-	if cerr := ctx.Err(); cerr != nil {
-		if serr, ok := status.FromError(err); ok && serr.Message() != "" {
-			return fmt.Errorf("etcdclient: failed to connect to the etcd server: %s: %w", serr.Message(), cerr)
-		}
-		return fmt.Errorf("etcdclient: failed to connect to the etcd server: %w", cerr)
-	}
-
-	serr, ok := status.FromError(err)
-	if ok {
-		switch serr.Code() {
-		case codes.Unimplemented, codes.FailedPrecondition:
-			return nil
-		}
-	}
-	return fmt.Errorf("etcdclient: failed to dial by invoking health endpoint: %w", err)
+	return grpc.NewClient(target, opts...)
 }
 
 func authority(endpoint string) string {

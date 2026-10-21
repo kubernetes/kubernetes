@@ -26,6 +26,16 @@ import (
 	"k8s.io/client-go/features"
 )
 
+// replaceFeatureGatesForTest installs newGates globally and restores the previous gates when the test ends, so fake gates don't leak across tests when unit test run order gets shuffled.
+func replaceFeatureGatesForTest(t *testing.T, newGates features.Gates) {
+	t.Helper()
+	original := features.FeatureGates()
+	t.Cleanup(func() {
+		features.ReplaceFeatureGates(original)
+	})
+	features.ReplaceFeatureGates(newGates)
+}
+
 func TestDriveInitDefaultFeatureGates(t *testing.T) {
 	featureGates := features.FeatureGates()
 	assertFunctionPanicsWithMessage(t, func() { featureGates.Enabled("FakeFeatureGate") }, "features.FeatureGates().Enabled", fmt.Sprintf("feature %q is not registered in FeatureGate", "FakeFeatureGate"))
@@ -33,7 +43,7 @@ func TestDriveInitDefaultFeatureGates(t *testing.T) {
 	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
 	require.True(t, fakeGates.Enabled("FakeFeatureGate"))
 
-	features.ReplaceFeatureGates(fakeGates)
+	replaceFeatureGatesForTest(t, fakeGates)
 	featureGates = features.FeatureGates()
 
 	assertFeatureGatesType(t, featureGates)
@@ -44,7 +54,7 @@ func TestSetFeatureGatesDuringTest(t *testing.T) {
 	featureA := features.Feature("FeatureA")
 	featureB := features.Feature("FeatureB")
 	fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true, featureB: true}}
-	features.ReplaceFeatureGates(fakeGates)
+	replaceFeatureGatesForTest(t, fakeGates)
 	t.Cleanup(func() {
 		// since cleanup functions will be called in last added, first called order.
 		// check if the original feature wasn't restored
@@ -60,11 +70,11 @@ func TestSetFeatureGatesDuringTest(t *testing.T) {
 func TestSetFeatureGatesDuringTestPanics(t *testing.T) {
 	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
 
-	features.ReplaceFeatureGates(fakeGates)
+	replaceFeatureGatesForTest(t, fakeGates)
 	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "UnknownFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("feature %q is not registered in featureGates", "UnknownFeature"))
 
 	readOnlyGates := &readOnlyAlwaysDisabledFeatureGates{}
-	features.ReplaceFeatureGates(readOnlyGates)
+	replaceFeatureGatesForTest(t, readOnlyGates)
 	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "FakeFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("clientfeatures.FeatureGates(): %T does not implement featureGatesSetter interface", readOnlyGates))
 }
 
@@ -102,7 +112,7 @@ func TestOverridesForSetFeatureGatesDuringTest(t *testing.T) {
 			fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true}}
 			fakeTesting := &fakeT{fakeTestName: scenario.firstTestName, TB: t}
 
-			features.ReplaceFeatureGates(fakeGates)
+			replaceFeatureGatesForTest(t, fakeGates)
 			require.NoError(t, setFeatureDuringTestInternal(fakeTesting, featureA, true))
 			require.True(t, features.FeatureGates().Enabled(featureA))
 

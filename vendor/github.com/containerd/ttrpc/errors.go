@@ -36,6 +36,12 @@ var (
 
 	// ErrStreamClosed is when the streaming connection is closed.
 	ErrStreamClosed = errors.New("ttrpc: stream closed")
+
+	// ErrStreamFull is returned when a stream's receive buffer is full
+	// and the message cannot be delivered without blocking the
+	// connection's receive loop. This prevents a single unconsumed
+	// stream from deadlocking all other streams on the same connection.
+	ErrStreamFull = errors.New("ttrpc: stream buffer full")
 )
 
 // OversizedMessageErr is used to indicate refusal to send an oversized message.

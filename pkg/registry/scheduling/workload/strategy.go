@@ -52,17 +52,15 @@ func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.
 	return validation.ValidateWorkload(workloadScheduling)
 }
 
-// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
-// validation options to the generic BeforeCreate/BeforeUpdate code path.
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
 func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	opts := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		opts = append(opts, string(features.DRAWorkloadResourceClaims))
-	}
-	return rest.DeclarativeValidationConfig{Options: opts}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		string(features.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+	}}
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -88,7 +86,7 @@ func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 }
 
 func (workloadStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
-	return true
+	return false
 }
 
 // dropDisabledWorkloadFields removes fields which are covered by a feature gate.
@@ -112,6 +110,22 @@ func dropDisabledWorkloadSpecFields(workloadSpec, oldWorkloadSpec *scheduling.Wo
 		oldTemplates = oldWorkloadSpec.PodGroupTemplates
 	}
 	dropDisabledPodGroupTemplatesFields(templates, oldTemplates)
+
+	var cpgTemplates, oldCpgTemplates []scheduling.CompositePodGroupTemplate
+	if workloadSpec != nil {
+		cpgTemplates = workloadSpec.CompositePodGroupTemplates
+	}
+	if oldWorkloadSpec != nil {
+		oldCpgTemplates = oldWorkloadSpec.CompositePodGroupTemplates
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		if oldWorkloadSpec == nil || len(oldWorkloadSpec.CompositePodGroupTemplates) == 0 {
+			if workloadSpec != nil {
+				workloadSpec.CompositePodGroupTemplates = nil
+			}
+		}
+	}
+	dropDisabledCompositePodGroupTemplatesFields(cpgTemplates, oldCpgTemplates)
 }
 
 func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.PodGroupTemplate) {
@@ -124,6 +138,39 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
 		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
+		dropDisabledPGPreemptionPolicyFields(template, oldTemplate)
+	}
+}
+
+func dropDisabledCompositePodGroupTemplatesFields(templates, oldTemplates []scheduling.CompositePodGroupTemplate) {
+	oldTemplatesMap := make(map[string]*scheduling.CompositePodGroupTemplate)
+	for i := range oldTemplates {
+		oldTemplatesMap[oldTemplates[i].Name] = &oldTemplates[i]
+	}
+	for i := range templates {
+		template := &templates[i]
+		oldTemplate := oldTemplatesMap[template.Name]
+
+		dropDisabledCPGPreemptionPolicyFields(template, oldTemplate)
+
+		var cpgTemplates, oldCpgTemplates []scheduling.CompositePodGroupTemplate
+		cpgTemplates = template.CompositePodGroupTemplates
+		if oldTemplate != nil {
+			oldCpgTemplates = oldTemplate.CompositePodGroupTemplates
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			if oldTemplate == nil || len(oldTemplate.CompositePodGroupTemplates) == 0 {
+				template.CompositePodGroupTemplates = nil
+			}
+		}
+		dropDisabledCompositePodGroupTemplatesFields(cpgTemplates, oldCpgTemplates)
+
+		var pgTemplates, oldPgTemplates []scheduling.PodGroupTemplate
+		pgTemplates = template.PodGroupTemplates
+		if oldTemplate != nil {
+			oldPgTemplates = oldTemplate.PodGroupTemplates
+		}
+		dropDisabledPodGroupTemplatesFields(pgTemplates, oldPgTemplates)
 	}
 }
 
@@ -145,10 +192,38 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 	template.ResourceClaims = nil
 }
 
+// dropDisabledPGPreemptionPolicyFields removes the PreemptionPolicy field
+// from the PodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
+// unless the field already used in the old PodGroupTemplate.
+func dropDisabledPGPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && len(pgt.ResourceClaims) > 0
+}
+
+func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.PreemptionPolicy != nil
+}
+
+// dropDisabledCPGPreemptionPolicyFields removes the PreemptionPolicy field
+// from the CompositePodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
+// unless the field already used in the old CompositePodGroupTemplate.
+func dropDisabledCPGPreemptionPolicyFields(template, oldTemplate *scheduling.CompositePodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || cpgPreemptionPolicyInUse(oldTemplate) {
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
+func cpgPreemptionPolicyInUse(cpgt *scheduling.CompositePodGroupTemplate) bool {
+	return cpgt != nil && cpgt.PreemptionPolicy != nil
 }

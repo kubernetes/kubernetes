@@ -144,6 +144,34 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	if timeout != 4500 {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
 	}
+
+	// Largest size whose timeout fits the activeDeadlineSeconds ceiling.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582788Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 2147483640 {
+		t.Errorf("Expected 2147483640 for timeout but got %v", timeout)
+	}
+
+	// TODO(#141166): The size fits int64 but the product does not fit int32; the timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582789Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 2147483670 {
+		t.Errorf("Expected 2147483670 for timeout but got %v", timeout)
+	}
+
+	// TODO(#141166): The timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 257698037730 {
+		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	}
+
+	// TODO(#141166): The timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("18446744073709551616")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 257698037730 {
+		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	}
 }
 
 func TestFsUserFrom(t *testing.T) {
@@ -961,5 +989,126 @@ func TestGetPodVolumeNames(t *testing.T) {
 				t.Errorf("Expected SELinuxContexts: %+v\ngot: %+v", test.expectedSELinuxContexts, contexts)
 			}
 		})
+	}
+}
+
+func TestVolumeHealthConditionSetsEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    []v1.VolumeHealthCondition
+		b    []v1.VolumeHealthCondition
+		want bool
+	}{
+		{
+			name: "nil and empty are equal",
+			a:    nil,
+			b:    []v1.VolumeHealthCondition{},
+			want: true,
+		},
+		{
+			name: "same condition different message is equal",
+			a: []v1.VolumeHealthCondition{{
+				Status:  v1.VolumeHealthInaccessible,
+				Reason:  "TargetPathNotFound",
+				Message: "old message",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status:  v1.VolumeHealthInaccessible,
+				Reason:  "TargetPathNotFound",
+				Message: "new message",
+			}},
+			want: true,
+		},
+		{
+			name: "same set different order is equal",
+			a: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthInaccessible,
+					Reason: "TargetPathNotFound",
+				},
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+			},
+			b: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+				{
+					Status: v1.VolumeHealthInaccessible,
+					Reason: "TargetPathNotFound",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "duplicates do not change set equality",
+			a: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+			},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			want: true,
+		},
+		{
+			name: "different status is not equal",
+			a: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDataLoss,
+				Reason: "DiskSlow",
+			}},
+			want: false,
+		},
+		{
+			name: "different reason is not equal",
+			a: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "TargetPathNotFound",
+			}},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := VolumeHealthConditionSetsEqual(tc.a, tc.b); got != tc.want {
+				t.Fatalf("VolumeHealthConditionSetsEqual() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVolumeHealthConditionSetsEqual_IgnoresMessageChanges(t *testing.T) {
+	a := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "first message",
+	}}
+	b := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "second message",
+	}}
+
+	if !VolumeHealthConditionSetsEqual(a, b) {
+		t.Fatal("expected same status/reason with different message to be equal")
 	}
 }

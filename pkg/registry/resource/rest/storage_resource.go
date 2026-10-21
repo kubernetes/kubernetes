@@ -89,6 +89,15 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = deviceclassStorage
 	}
 
+	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1.SchemeGroupVersion.WithResource(resource)) {
+		deviceTaintRuleStorage, deviceTaintRuleStatusStorage, err := devicetaintrulestore.NewRESTv1(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = deviceTaintRuleStorage
+		storage[resource+"/status"] = deviceTaintRuleStatusStorage
+	}
+
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1.SchemeGroupVersion.WithResource(resource)) {
 		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
@@ -121,7 +130,7 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		deviceTaintStorage, deviceTaintStatusStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
+		deviceTaintStorage, deviceTaintStatusStorage, err := devicetaintrulestore.NewRESTLegacy(restOptionsGetter)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +201,7 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 	}
 
 	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
-		deviceTaintRuleStorage, deviceTaintRuleStatusStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
+		deviceTaintRuleStorage, deviceTaintRuleStatusStorage, err := devicetaintrulestore.NewRESTLegacy(restOptionsGetter)
 		if err != nil {
 			return nil, err
 		}

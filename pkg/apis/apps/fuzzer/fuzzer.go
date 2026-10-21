@@ -26,7 +26,6 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/utils/ptr"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.
@@ -40,25 +39,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *apps.StatefulSet, c randfill.Continue) {
 			c.FillNoCustom(s) // fuzz self without calling this function again
 
-			// match defaulter
-			if len(s.Spec.PodManagementPolicy) == 0 {
-				s.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
-			}
-			if len(s.Spec.UpdateStrategy.Type) == 0 {
-				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
-			}
-			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
-			}
-			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
-				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
-			}
-			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
-				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
-			}
-			if s.Spec.RevisionHistoryLimit == nil {
-				s.Spec.RevisionHistoryLimit = new(int32)
-				*s.Spec.RevisionHistoryLimit = 10
+			if len(s.Labels) == 0 {
+				s.Labels = s.Spec.Template.Labels
 			}
 			if s.Status.ObservedGeneration == nil {
 				s.Status.ObservedGeneration = new(int64)
@@ -66,14 +48,49 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if s.Status.CollisionCount == nil {
 				s.Status.CollisionCount = new(int32)
 			}
-			if s.Spec.Selector == nil {
-				s.Spec.Selector = &metav1.LabelSelector{MatchLabels: s.Spec.Template.Labels}
+		},
+		func(s *apps.StatefulSetSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
+
+			if s.Selector == nil {
+				s.Selector = &metav1.LabelSelector{MatchLabels: s.Template.Labels}
 			}
-			if len(s.Labels) == 0 {
-				s.Labels = s.Spec.Template.Labels
+			if s.RevisionHistoryLimit == nil {
+				s.RevisionHistoryLimit = new(int32)
+				*s.RevisionHistoryLimit = 10
 			}
-			if s.Spec.UpdateStrategy.RollingUpdate != nil && s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-				s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
+			if len(s.PodManagementPolicy) == 0 {
+				s.PodManagementPolicy = apps.OrderedReadyPodManagement
+			}
+		},
+		func(s *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, c randfill.Continue) {
+			c.FillNoCustom(s)
+
+			if s == nil {
+				s = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+			}
+			if len(s.WhenDeleted) == 0 {
+				s.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
+			}
+			if len(s.WhenScaled) == 0 {
+				s.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
+			}
+		},
+		func(s *apps.StatefulSetUpdateStrategy, c randfill.Continue) {
+			c.FillNoCustom(s)
+
+			strategyTypes := []apps.StatefulSetUpdateStrategyType{
+				apps.RollingUpdateStatefulSetStrategyType,
+				apps.OnDeleteStatefulSetStrategyType,
+				apps.RecreateStatefulSetStrategyType}
+
+			s.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if s.Type == apps.RecreateStatefulSetStrategyType || s.Type == apps.OnDeleteStatefulSetStrategyType {
+				s.RollingUpdate = nil
+			}
+
+			if s.RollingUpdate != nil && s.RollingUpdate.MaxUnavailable == nil {
+				s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
 			}
 		},
 		func(j *apps.Deployment, c randfill.Continue) {

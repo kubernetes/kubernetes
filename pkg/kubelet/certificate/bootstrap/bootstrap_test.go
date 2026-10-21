@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -195,7 +195,8 @@ users:
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 
-	store, err := certificate.NewFileStore("kubelet-client", dir, dir, "", "")
+	logger, _ := ktesting.NewTestContext(t)
+	store, err := certificate.NewFileStoreWithLogger(logger, "kubelet-client", dir, dir, "", "")
 	if err != nil {
 		t.Errorf("unable to build bootstrap cert store")
 	}
@@ -273,7 +274,6 @@ users:
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			certConfig, clientConfig, err := LoadClientConfig(logger, test.kubeconfigPath, test.bootstrapPath, test.certDir)

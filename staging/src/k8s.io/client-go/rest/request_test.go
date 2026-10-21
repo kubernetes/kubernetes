@@ -55,6 +55,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
@@ -72,6 +74,20 @@ func TestNewRequestSetsAccept(t *testing.T) {
 	}
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
 	if r.headers.Get("Accept") != "application/other, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
+	// A CBOR ContentType set directly still needs the ClientsAllowCBOR feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/cbor"}, nil).Verb("get")
+	if r.headers.Get("Accept") != "application/json, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
+	// DropManagedFields set directly still needs the ManagedFieldsOptOutClient feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{DropManagedFields: true}, nil).Verb("get")
+	if r.headers.Get("Accept") != "application/json, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 }
@@ -2530,26 +2546,6 @@ func TestThrottledLogger(t *testing.T) {
 }
 
 func TestRequestMaxRetries(t *testing.T) {
-	successAtNthCalls := 1
-	actualCalls := 0
-	retryOneTimeHandler := func(w http.ResponseWriter, req *http.Request) {
-		defer func() { actualCalls++ }()
-		if actualCalls >= successAtNthCalls {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(http.StatusTooManyRequests)
-		actualCalls++
-	}
-	testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler))
-	defer testServer.Close()
-
-	u, err := url.Parse(testServer.URL)
-	if err != nil {
-		t.Error(err)
-	}
-
 	testCases := []struct {
 		name        string
 		maxRetries  int
@@ -2574,8 +2570,26 @@ func TestRequestMaxRetries(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer func() { actualCalls = 0 }()
-			_, err := NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
+			const successAtNthCall = 1
+			var actualCalls atomic.Int64
+
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if actualCalls.Load() >= successAtNthCall {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusTooManyRequests)
+				actualCalls.Add(1)
+			}))
+			defer testServer.Close()
+
+			u, err := url.Parse(testServer.URL)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
 				Verb("get").
 				MaxRetries(testCase.maxRetries).
 				AbsPath("/foo").

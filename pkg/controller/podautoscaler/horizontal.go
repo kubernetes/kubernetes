@@ -49,13 +49,13 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -126,9 +126,9 @@ type HorizontalController struct {
 	scaleDownEvents     map[string][]timestampedScaleEvent
 	scaleDownEventsLock sync.RWMutex
 
-	// Storage of HPAs and their selectors.
-	hpaSelectors    *selectors.BiMultimap
-	hpaSelectorsMux sync.Mutex
+	// this tracks HPAs and their selectors. The exact
+	// implementation is selected by the HPAOptimizedSelectorStore feature gate.
+	selectorTracker hpaSelectorTracker
 
 	// consistencyStore is used to track the state of the controller's operations.
 	consistencyStore consistencyutil.ConsistencyStore
@@ -150,6 +150,7 @@ func NewHorizontalController(
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
 ) *HorizontalController {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
@@ -174,7 +175,8 @@ func NewHorizontalController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			NewDefaultHPARateLimiter(resyncPeriod),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "horizontalpodautoscaler",
+				Logger: &logger,
+				Name:   "horizontalpodautoscaler",
 			},
 		),
 		mapper:              mapper,
@@ -184,17 +186,22 @@ func NewHorizontalController(
 		scaleUpEventsLock:   sync.RWMutex{},
 		scaleDownEvents:     map[string][]timestampedScaleEvent{},
 		scaleDownEventsLock: sync.RWMutex{},
-		hpaSelectors:        selectors.NewBiMultimap(),
 		consistencyStore:    consistencyStore,
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
+		hpaController.selectorTracker = newHPASelectorStore()
+	} else {
+		hpaController.selectorTracker = newBiMultimapSelectorTracker()
+	}
+
+	_, _ = hpaInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
 			DeleteFunc: hpaController.deleteHPA,
 		},
-		resyncPeriod,
+		cache.HandlerOptions{Logger: &logger, ResyncPeriod: &resyncPeriod},
 	)
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
@@ -217,7 +224,7 @@ func NewHorizontalController(
 
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")
@@ -291,13 +298,9 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	// Registering first avoids a race where immediate reconciliation starts
 	// before selector bookkeeping exists.
 	hpaKey := selectors.Parse(key)
-	a.hpaSelectorsMux.Lock()
-	if !a.hpaSelectors.SelectorExists(hpaKey) {
-		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
-		// Observe HPA addition - only when it's a new HPA
+	if a.selectorTracker.PutIfAbsent(hpaKey.Namespace, hpaKey, labels.Nothing()) {
 		a.monitor.ObserveHPAAddition()
 	}
-	a.hpaSelectorsMux.Unlock()
 
 	// Add the HPA to the queue for immediate processing. Deduplication is handled
 	// by the queue: if the key is already queued or being processed, this is a no-op.
@@ -328,9 +331,8 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.queue.Forget(key)
 
 	// Remove HPA and attached selector.
-	a.hpaSelectorsMux.Lock()
-	defer a.hpaSelectorsMux.Unlock()
-	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
+	hpaKey := selectors.Parse(key)
+	a.selectorTracker.Delete(hpaKey.Namespace, hpaKey)
 	// Observe HPA deletion
 	a.monitor.ObserveHPADeletion()
 }
@@ -425,34 +427,6 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 	return replicas, metric, statuses, timestamp, invalidMetricError
 }
 
-// hpasControllingPodsUnderSelector returns a list of keys of all HPAs that control a given list of pods.
-func (a *HorizontalController) hpasControllingPodsUnderSelector(pods []*v1.Pod) []selectors.Key {
-	a.hpaSelectorsMux.Lock()
-	defer a.hpaSelectorsMux.Unlock()
-
-	hpas := map[selectors.Key]struct{}{}
-	for _, p := range pods {
-		podKey := selectors.Key{Name: p.Name, Namespace: p.Namespace}
-		a.hpaSelectors.Put(podKey, p.Labels)
-
-		selectingHpas, ok := a.hpaSelectors.ReverseSelect(podKey)
-		if !ok {
-			continue
-		}
-		for _, hpa := range selectingHpas {
-			hpas[hpa] = struct{}{}
-		}
-	}
-	// Clean up all added pods.
-	a.hpaSelectors.KeepOnly([]selectors.Key{})
-
-	hpaList := []selectors.Key{}
-	for hpa := range hpas {
-		hpaList = append(hpaList, hpa)
-	}
-	return hpaList
-}
-
 // validateAndParseSelector verifies that:
 // - selector is not empty;
 // - selector format is valid;
@@ -476,21 +450,20 @@ func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.Horiz
 	}
 
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
-	a.hpaSelectorsMux.Lock()
-	if a.hpaSelectors.SelectorExists(hpaKey) {
-		// Update HPA selector only if the HPA was registered in enqueueHPA.
-		a.hpaSelectors.PutSelector(hpaKey, parsedSelector)
+	// Update HPA selector only if the HPA was registered in enqueueHPA.
+	if !a.selectorTracker.PutIfPresent(hpaKey.Namespace, hpaKey, parsedSelector) {
+		// short circuit if HPA is deleted already by now
+		return nil, fmt.Errorf("HPA %s/%s was deleted during reconciliation", hpa.Namespace, hpa.Name)
 	}
-	a.hpaSelectorsMux.Unlock()
 
 	pods, err := a.podLister.Pods(hpa.Namespace).List(parsedSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	selectingHpas := a.hpasControllingPodsUnderSelector(pods)
+	selectingHpas := a.selectorTracker.HPAsMatchingPods(hpa.Namespace, pods, 2)
 	if len(selectingHpas) > 1 {
-		errMsg := fmt.Sprintf("pods by selector %v are controlled by multiple HPAs: %v", selector, selectingHpas)
+		errMsg := fmt.Sprintf("pods by selector %v are controlled by more than one HPA (e.g. %v)", selector, selectingHpas)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "AmbiguousSelector", errMsg)
 		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "AmbiguousSelector", "%s", errMsg)
 		return nil, errors.New(errMsg)
@@ -651,7 +624,7 @@ func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, status
 		}
 		metricStatus.Object.Current.AverageValue = resource.NewMilliQuantity(usageProposal, resource.DecimalSI)
 		*status = metricStatus
-		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.Object.Metric.Name, metricSpec.Object.Metric.Selector), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
+		return replicaCountProposal, timestampProposal, fmt.Sprintf("%s metric %s", metricSpec.Object.DescribedObject.Kind, metricSpec.Object.Metric.Name), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
 	errMsg := "invalid object metric source: neither a value target nor an average value target was set"
 	err = errors.New(errMsg)
@@ -1481,7 +1454,7 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleUpEvents,
 			proposed = periodStartReplicas + policy.Value
 		} else if policy.Type == autoscalingv2.PercentScalingPolicy {
 			// the proposal has to be rounded up because the proposed change might not increase the replica count causing the target to never scale up
-			proposed = int32(math.Ceil(float64(periodStartReplicas) * (1 + float64(policy.Value)/100)))
+			proposed = ceilToInt32(float64(periodStartReplicas) * (1 + float64(policy.Value)/100))
 		}
 		result = selectPolicyFn(result, proposed)
 	}

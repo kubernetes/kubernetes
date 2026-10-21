@@ -232,15 +232,24 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		if utilsnet.IsIPv6String(localAPIEndpoint.AdvertiseAddress) {
 			etcdLocalhostAddress = "::1"
 		}
-		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", fmt.Sprintf("https://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort))), 1)
+		etcdServers := fmt.Sprintf("https://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort)))
+		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", etcdServers, 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-cafile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName), 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-certfile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName), 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-keyfile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName), 1)
 
 		// Apply user configurations for local etcd
 		if cfg.Etcd.Local != nil {
-			if value, idx := kubeadmapi.GetArgValue(cfg.Etcd.Local.ExtraArgs, "advertise-client-urls", -1); idx > -1 {
-				defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", value, 1)
+			if _, idx := kubeadmapi.GetArgValue(cfg.Etcd.Local.ExtraArgs, "advertise-client-urls", -1); idx > -1 {
+				// advertise-client-urls may replace or for append/prepend extend the etcd
+				// client URLs. Apply the same merge onto the default etcd-servers.
+				arg := cfg.Etcd.Local.ExtraArgs[idx]
+				if arg.MergeMethod != "" {
+					klog.Warningf("the local etcd --advertise-client-urls flag has a merge method %q and value %q; merging it with --etcd-servers %q",
+						arg.MergeMethod, arg.Value, etcdServers)
+				}
+				etcdServers = kubeadmapi.MergeArgWithBase(etcdServers, arg)
+				defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", etcdServers, 1)
 			}
 		}
 	}
@@ -248,10 +257,14 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 	if cfg.APIServer.ExtraArgs == nil {
 		cfg.APIServer.ExtraArgs = []kubeadmapi.Arg{}
 	}
-	authzVal, _ := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-mode", -1)
+	_, authzIdx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-mode", -1)
 	_, hasStructuredAuthzVal := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-config", -1)
 	if hasStructuredAuthzVal == -1 {
-		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "authorization-mode", getAuthzModes(authzVal), 1)
+		var authzArg *kubeadmapi.Arg
+		if authzIdx > -1 {
+			authzArg = &cfg.APIServer.ExtraArgs[authzIdx]
+		}
+		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "authorization-mode", getAuthzModes(authzArg), 1)
 	}
 	command = append(command, kubeadmutil.ArgumentsToCommand(defaultArguments, cfg.APIServer.ExtraArgs)...)
 
@@ -261,34 +274,44 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 // getAuthzModes gets the authorization-related parameters to the api server
 // Node,RBAC is the default mode if nothing is passed to kubeadm. User provided modes override
 // the default.
-func getAuthzModes(authzModeExtraArgs string) string {
+func getAuthzModes(arg *kubeadmapi.Arg) string {
 	defaultMode := []string{
 		kubeadmconstants.ModeNode,
 		kubeadmconstants.ModeRBAC,
 	}
+	defaultModeString := strings.Join(defaultMode, ",")
 
-	if len(authzModeExtraArgs) > 0 {
-		mode := []string{}
-		for _, requested := range strings.Split(authzModeExtraArgs, ",") {
-			if isValidAuthzMode(requested) {
-				mode = append(mode, requested)
-			} else {
-				klog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
-			}
+	if arg == nil || len(arg.Value) == 0 {
+		return defaultModeString
+	}
+
+	mode := []string{}
+	for requested := range strings.SplitSeq(arg.Value, ",") {
+		if len(requested) == 0 { // Skip empty values.
+			continue
 		}
-
-		// only return the user provided mode if at least one was valid
-		if len(mode) > 0 {
-			if !compareAuthzModes(defaultMode, mode) {
-				klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
-					strings.Join(defaultMode, ","),
-					strings.Join(mode, ","),
-				)
-			}
-			return strings.Join(mode, ",")
+		if isValidAuthzMode(requested) {
+			mode = append(mode, requested)
+		} else {
+			klog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
 		}
 	}
-	return strings.Join(defaultMode, ",")
+
+	if len(mode) == 0 {
+		return defaultModeString
+	}
+
+	// Only validate the whole list of modes if there is no merge method.
+	if arg.MergeMethod == "" && !compareAuthzModes(defaultMode, mode) {
+		modeString := strings.Join(mode, ",")
+		klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
+			defaultModeString,
+			modeString,
+		)
+		return modeString
+	}
+
+	return defaultModeString
 }
 
 // compareAuthzModes compares two given authz modes and returns false if they do not match

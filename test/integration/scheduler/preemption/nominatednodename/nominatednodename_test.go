@@ -330,10 +330,10 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 		entity, _ := f(klog.FromContext(testCtx.Ctx))
 		// Scheduler.NextEntity() may return nil when scheduler is shutting down.
 		if entity != nil {
-			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			for pInfo := range entity.ForEachPodInfo() {
+				pInfo.Pod = pInfo.Pod.DeepCopy()
 				pInfo.Pod.Status.NominatedNodeName = "node-1"
-				return true
-			})
+			}
 		}
 		return entity, nil
 	}

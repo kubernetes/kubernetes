@@ -28,9 +28,12 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"github.com/google/cel-go/interpreter"
 )
 
 const (
@@ -42,6 +45,8 @@ const (
 // As a general note, all indices are zero-based.
 //
 // # CharAt
+//
+// Introduced at version: 0 (cost support in version 5)
 //
 // Returns the character at the given position. If the position is negative, or greater than
 // the length of the string, the function will produce an error:
@@ -56,7 +61,7 @@ const (
 //
 // # Format
 //
-// Introduced at version: 1
+// Introduced at version: 1 (cost at version 5)
 //
 // Returns a new string with substitutions being performed, printf-style.
 // The valid formatting clauses are:
@@ -103,6 +108,8 @@ const (
 //
 // # IndexOf
 //
+// Introduced at version: 0 (cost support in version 5)
+//
 // Returns the integer index of the first occurrence of the search string. If the search string is
 // not found the function returns -1.
 //
@@ -124,6 +131,8 @@ const (
 //
 // # Join
 //
+// Introduced at version: 0 (cost support in version 5)
+//
 // Returns a new string where the elements of string list are concatenated.
 //
 // The function also accepts an optional separator which is placed between elements in the resulting string.
@@ -139,6 +148,8 @@ const (
 //	[].join('/') // returns ''
 //
 // # LastIndexOf
+//
+// Introduced at version: 0 (cost support in version 5)
 //
 // Returns the integer index at the start of the last occurrence of the search string. If the
 // search string is not found the function returns -1.
@@ -161,6 +172,8 @@ const (
 //
 // # LowerAscii
 //
+// Introduced at version: 0 (cost support in version 5)
+//
 // Returns a new string where all ASCII characters are lower-cased.
 //
 // This function does not perform Unicode case-mapping for characters outside the ASCII range.
@@ -174,7 +187,7 @@ const (
 //
 // # Strings.Quote
 //
-// Introduced in version: 1
+// Introduced in version: 1 (cost support in version 5)
 //
 // Takes the given string and makes it safe to print (without any formatting due to escape sequences).
 // If any invalid UTF-8 characters are encountered, they are replaced with \uFFFD.
@@ -187,6 +200,8 @@ const (
 // strings.quote("two escape sequences \a\n") // returns '"two escape sequences \\a\\n"'
 //
 // # Replace
+//
+// Introduced at version: 0 (cost support in version 5)
 //
 // Returns a new string based on the target, which replaces the occurrences of a search string
 // with a replacement string if present. The function accepts an optional limit on the number of
@@ -209,6 +224,8 @@ const (
 //
 // # Split
 //
+// Introduced at version: 0 (cost support in version 5)
+//
 // Returns a list of strings split from the input by the given separator. The function accepts
 // an optional argument specifying a limit on the number of substrings produced by the split.
 //
@@ -228,6 +245,8 @@ const (
 //	'hello hello hello'.split(' ', -1) // returns ['hello', 'hello', 'hello']
 //
 // # Substring
+//
+// Introduced at version: 0 (cost support in version 5)
 //
 // Returns the substring given a numeric range corresponding to character positions. Optionally
 // may omit the trailing range for a substring from a given character position until the end of
@@ -249,6 +268,8 @@ const (
 //
 // # Trim
 //
+// Introduced at version: 0 (cost support in version 5)
+//
 // Returns a new string which removes the leading and trailing whitespace in the target string.
 // The trim function uses the Unicode definition of whitespace which does not include the
 // zero-width spaces. See: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
@@ -260,6 +281,8 @@ const (
 //	'  \ttrim\n    '.trim() // returns 'trim'
 //
 // # UpperAscii
+//
+// Introduced at version: 0 (cost support in version 5)
 //
 // Returns a new string where all ASCII characters are upper-cased.
 //
@@ -274,7 +297,7 @@ const (
 //
 // # Reverse
 //
-// Introduced at version: 3
+// Introduced at version: 3 (cost support in version 5)
 //
 // Returns a new string whose characters are the same as the target string, only formatted in
 // reverse order.
@@ -287,7 +310,7 @@ const (
 //	'gums'.reverse() // returns 'smug'
 //	'John Smith'.reverse() // returns 'htimS nhoJ'
 //
-// Introduced at version: 4
+// Introduced at version: 4 (cost support in version 5)
 //
 // Formatting updated to adhere to https://github.com/google/cel-spec/blob/master/doc/extensions/strings.md.
 //
@@ -303,8 +326,9 @@ func Strings(options ...StringsOption) cel.EnvOption {
 }
 
 type stringLib struct {
-	locale  string
-	version uint32
+	locale       string
+	version      uint32
+	maxPrecision int
 }
 
 // LibraryName implements the SingletonLibrary interface method.
@@ -350,6 +374,16 @@ func StringsVersion(version uint32) StringsOption {
 func StringsValidateFormatCalls(value bool) StringsOption {
 	return func(s *stringLib) *stringLib {
 		return s
+	}
+}
+
+// StringsMaxPrecision configures the maximum precision for floating-point format clauses.
+//
+// If not set, the default is 100 for version >= 5, and no limit for earlier versions.
+func StringsMaxPrecision(limit int) StringsOption {
+	return func(lib *stringLib) *stringLib {
+		lib.maxPrecision = limit
+		return lib
 	}
 }
 
@@ -470,6 +504,13 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					return stringOrError(upperASCII(string(s)))
 				}))),
 	}
+	// maxPrecision is unbounded (0) for versions < 5 to maintain backward
+	// compatibility. For version >= 5, the default is 100 if not explicitly
+	// configured via StringsMaxPrecision().
+	maxPrecision := lib.maxPrecision
+	if maxPrecision == 0 && lib.version >= 5 {
+		maxPrecision = 100
+	}
 	if lib.version >= 1 {
 		if lib.version >= 4 {
 			opts = append(opts, cel.Function("format",
@@ -477,7 +518,7 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 						s := string(args[0].(types.String))
 						formatArgs := args[1].(traits.Lister)
-						return stringOrError(parseFormatStringV2(s, &stringFormatterV2{}, &stringArgList{formatArgs}))
+						return stringOrError(parseFormatStringV2(s, &stringFormatterV2{}, &stringArgList{formatArgs}, maxPrecision))
 					}))))
 		} else {
 			opts = append(opts, cel.Function("format",
@@ -485,7 +526,7 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 						s := string(args[0].(types.String))
 						formatArgs := args[1].(traits.Lister)
-						return stringOrError(parseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale))
+						return stringOrError(parseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale, maxPrecision))
 					}))))
 		}
 		opts = append(opts,
@@ -544,16 +585,64 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 	}
 	if lib.version >= 1 {
 		if lib.version >= 4 {
-			opts = append(opts, cel.ASTValidators(stringFormatValidatorV2{}))
+			opts = append(opts, cel.ASTValidators(stringFormatValidatorV2{maxPrecision: maxPrecision}))
 		} else {
-			opts = append(opts, cel.ASTValidators(stringFormatValidator{}))
+			opts = append(opts, cel.ASTValidators(stringFormatValidator{maxPrecision: maxPrecision}))
 		}
+	}
+
+	if lib.version >= 5 {
+		// Cost estimators for string extension functions.
+		estimators := []checker.CostOption{
+			// Format is captured in the core cost estimator logic and needs to be extracted out.
+			checker.OverloadCostEstimate("string_char_at_int", estimateStringCharAtCost),
+			checker.OverloadCostEstimate("string_index_of_string", estimateStringSearchCost),
+			checker.OverloadCostEstimate("string_index_of_string_int", estimateStringSearchCost),
+			checker.OverloadCostEstimate("string_last_index_of_string", estimateStringSearchCost),
+			checker.OverloadCostEstimate("string_last_index_of_string_int", estimateStringSearchCost),
+			checker.OverloadCostEstimate("string_lower_ascii", estimateStringFixedTransformCost),
+			checker.OverloadCostEstimate("string_upper_ascii", estimateStringFixedTransformCost),
+			checker.OverloadCostEstimate("string_replace_string_string", estimateStringReplaceCost),
+			checker.OverloadCostEstimate("string_replace_string_string_int", estimateStringReplaceCost),
+			checker.OverloadCostEstimate("string_split_string", estimateStringSplitCost),
+			checker.OverloadCostEstimate("string_split_string_int", estimateStringSplitCost),
+			checker.OverloadCostEstimate("string_substring_int", estimateSubstringCost),
+			checker.OverloadCostEstimate("string_substring_int_int", estimateSubstringCost),
+			checker.OverloadCostEstimate("string_trim", estimateStringVariableTransformCost),
+			checker.OverloadCostEstimate("string_reverse", estimateStringFixedTransformCost),
+			checker.OverloadCostEstimate("list_join", estimateStringJoinCost),
+			checker.OverloadCostEstimate("list_join_string", estimateStringJoinCost),
+		}
+		opts = append(opts, cel.CostEstimatorOptions(estimators...))
 	}
 	return opts
 }
 
 // ProgramOptions implements the Library interface method.
-func (*stringLib) ProgramOptions() []cel.ProgramOption {
+func (lib *stringLib) ProgramOptions() []cel.ProgramOption {
+	if lib.version >= 5 {
+		return []cel.ProgramOption{
+			cel.CostTrackerOptions(
+				interpreter.OverloadCostTracker("string_char_at_int", trackStringCharAtCost),
+				interpreter.OverloadCostTracker("string_index_of_string", trackStringSearchCost),
+				interpreter.OverloadCostTracker("string_index_of_string_int", trackStringSearchCost),
+				interpreter.OverloadCostTracker("string_last_index_of_string", trackStringSearchCost),
+				interpreter.OverloadCostTracker("string_last_index_of_string_int", trackStringSearchCost),
+				interpreter.OverloadCostTracker("string_lower_ascii", trackStringTransformCost),
+				interpreter.OverloadCostTracker("string_upper_ascii", trackStringTransformCost),
+				interpreter.OverloadCostTracker("string_replace_string_string", trackStringReplaceCost),
+				interpreter.OverloadCostTracker("string_replace_string_string_int", trackStringReplaceCost),
+				interpreter.OverloadCostTracker("string_split_string", trackStringSplitCost),
+				interpreter.OverloadCostTracker("string_split_string_int", trackStringSplitCost),
+				interpreter.OverloadCostTracker("string_substring_int", trackStringTransformCost),
+				interpreter.OverloadCostTracker("string_substring_int_int", trackStringTransformCost),
+				interpreter.OverloadCostTracker("string_trim", trackStringTransformCost),
+				interpreter.OverloadCostTracker("string_reverse", trackStringTransformCost),
+				interpreter.OverloadCostTracker("list_join", trackStringJoinCost),
+				interpreter.OverloadCostTracker("list_join_string", trackStringJoinCost),
+			),
+		}
+	}
 	return []cel.ProgramOption{}
 }
 
@@ -574,15 +663,19 @@ func indexOf(str, substr string) (int64, error) {
 }
 
 func indexOfOffset(str, substr string, offset int64) (int64, error) {
-	if substr == "" {
-		return offset, nil
-	}
 	off := int(offset)
-	runes := []rune(str)
-	subrunes := []rune(substr)
 	if off < 0 {
 		return -1, fmt.Errorf("index out of range: %d", off)
 	}
+	runes := []rune(str)
+	if substr == "" {
+		// The empty string matches at the search offset, clamped to the end of the string.
+		if off > len(runes) {
+			return int64(len(runes)), nil
+		}
+		return offset, nil
+	}
+	subrunes := []rune(substr)
 	// If the offset exceeds the length, return -1 rather than error.
 	if off >= len(runes) {
 		return -1, nil
@@ -615,15 +708,19 @@ func lastIndexOf(str, substr string) (int64, error) {
 }
 
 func lastIndexOfOffset(str, substr string, offset int64) (int64, error) {
-	if substr == "" {
-		return offset, nil
-	}
 	off := int(offset)
-	runes := []rune(str)
-	subrunes := []rune(substr)
 	if off < 0 {
 		return -1, fmt.Errorf("index out of range: %d", off)
 	}
+	runes := []rune(str)
+	if substr == "" {
+		// The empty string matches at the search offset, clamped to the end of the string.
+		if off > len(runes) {
+			return int64(len(runes)), nil
+		}
+		return offset, nil
+	}
+	subrunes := []rune(substr)
 	// If the offset is far greater than the length return -1
 	if off >= len(runes) {
 		return -1, nil
@@ -792,5 +889,196 @@ func sanitize(s string) string {
 }
 
 var (
-	stringListType = reflect.TypeOf([]string{})
+	stringListType = reflect.TypeFor[[]string]()
 )
+
+// Cost estimation functions for string extensions.
+//
+// These functions provide compile-time cost estimates proportional to the size of
+// the input string(s), ensuring that the CEL cost system accurately reflects the
+// computational work performed by string operations.
+
+// estimateStringFixedTransformCost estimates cost for O(n) string operations such as
+// lowerAscii, upperAsciil, reverse and quote.
+func estimateStringFixedTransformCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil {
+		return nil
+	}
+	cost, size := estimateStringScan(estimateSize(estimator, *target))
+	return callEstimate(cost.Add(callCostEstimate).Add(size.AsCost()), size)
+}
+
+// estimateStringVariableTransformCost estimates cost for O(n) string operations that result
+// in a variable sized string which may be empty to the exact input string.
+func estimateStringVariableTransformCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil {
+		return nil
+	}
+	cost, size := estimateStringScan(estimateSize(estimator, *target))
+	transformSize := rangedSizeEstimate(0, size.Max)
+	return callEstimate(cost.Add(callCostEstimate).Add(transformSize.AsCost()), &transformSize)
+}
+
+// estimateStringCharAtCost includes a cost of 1 for the allocation, plus the string traversal cost.
+func estimateStringCharAtCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) != 1 {
+		return nil
+	}
+	cost, _ := estimateStringScan(estimateSize(estimator, *target))
+	resultSize := rangedSizeEstimate(0, 1)
+	return callEstimate(cost.Add(callCostEstimate).Add(callCostEstimate), &resultSize)
+}
+
+// estimateSubstringCost estimates the cost for an O(n) traversal and allocation.
+func estimateSubstringCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) < 1 || len(args) > 2 {
+		return nil
+	}
+	targetSize := estimateSize(estimator, *target)
+	cost, _ := estimateStringScan(targetSize)
+
+	start := nodeAsUintValue(args[0], 0)
+	end := targetSize.Max
+	if len(args) == 2 {
+		end = nodeAsUintValue(args[1], end)
+	}
+	resultSize := fixedSizeEstimate(end - start)
+	return callEstimate(cost.Add(callCostEstimate).Add(resultSize.AsCost()), &resultSize)
+}
+
+// estimateStringSearchCost estimates cost for O(n*m) string search operations
+// such as indexOf and lastIndexOf.
+func estimateStringSearchCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) < 1 {
+		return nil
+	}
+	targetSize := estimateSize(estimator, *target)
+	needleSize := estimateSize(estimator, args[0])
+	searchSize := targetSize.Multiply(needleSize)
+	searchCost, _ := estimateStringScan(searchSize)
+	// Search cost is proportional to target size * substring size.
+	return callEstimate(searchCost.Add(callCostEstimate), nil)
+}
+
+// estimateStringReplaceCost estimates cost for string replace operations.
+// The cost accounts for search (O(n*m)) and potential output size growth.
+func estimateStringReplaceCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) < 2 {
+		return nil
+	}
+	// Compute the search for the replacement string, by 'm' times
+	targetSize := estimateSize(estimator, *target)
+	needleSize := atLeastOne(estimateSize(estimator, args[0]))
+	searchCost := atLeastOne(targetSize).Multiply(needleSize).MultiplyByCostFactor(stringCostFactor)
+
+	replacementSize := estimateSize(estimator, args[1]).Add(fixedSizeEstimate(1))
+	allReplacedSize := safeMul(safeAdd(targetSize.Max, 1), replacementSize.Max)
+	resultMinSize := targetSize.Min
+	if resultMinSize > replacementSize.Min {
+		resultMinSize = replacementSize.Min
+	}
+	resultSize := rangedSizeEstimate(resultMinSize, allReplacedSize)
+	return callEstimate(
+		searchCost.Add(resultSize.AsCost()).Add(callCostEstimate), &resultSize,
+	)
+}
+
+// estimateStringSplitCost estimates cost for string split operations.
+// Split creates a list of substrings, so cost includes both traversal and
+// list allocation proportional to the input size.
+func estimateStringSplitCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) < 1 {
+		return nil
+	}
+	targetSize := estimateSize(estimator, *target)
+	// Traversal cost proportional to input size.
+	traversalCost := targetSize.Add(fixedSizeEstimate(1)).MultiplyByCostFactor(stringCostFactor)
+	// Worst case: split("") produces N elements for a string of size N.
+	resultSize := rangedSizeEstimate(0, targetSize.Max)
+	// Include list creation base cost plus allocation for each element.
+	allocationCost := resultSize.MultiplyByCostFactor(1).Add(checker.FixedCostEstimate(common.ListCreateBaseCost))
+	cost := traversalCost.Add(allocationCost).Add(callCostEstimate)
+	return callEstimate(cost, &resultSize)
+}
+
+// estimateStringJoinCost estimates cost for string join operations.
+// Join iterates over all list elements and concatenates them, so cost is
+// proportional to the total size of all elements plus separator overhead.
+func estimateStringJoinCost(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil {
+		return nil
+	}
+	targetSize := estimateSize(estimator, *target)
+	sepSize := fixedSizeEstimate(0)
+	if len(args) >= 1 {
+		sepSize = estimateSize(estimator, args[0])
+	}
+	// Traversal cost proportional to the number of list elements.
+	traversalCost := targetSize.Add(fixedSizeEstimate(1)).MultiplyByCostFactor(stringCostFactor)
+	// Result size: sum of element sizes + (n-1) * separator size.
+	// Worst case estimate: use list size * max element size + list size * separator size.
+	maxResultSize := safeAdd(safeMul(targetSize.Max, (safeAdd(1, sepSize.Max))), sepSize.Max)
+	resultSize := rangedSizeEstimate(0, maxResultSize)
+	cost := traversalCost.Add(resultSize.MultiplyByCostFactor(1)).Add(callCostEstimate)
+	return callEstimate(cost, &resultSize)
+}
+
+// Runtime cost tracking functions for string extensions.
+//
+// These functions compute the actual cost of string operations after evaluation,
+// using the real sizes of the inputs and outputs.
+
+// trackStringCharAtCost tracks runtime cost for O(n) string operations.
+func trackStringCharAtCost(args []ref.Val, result ref.Val) *uint64 {
+	size := float64(actualSize(args[0])) * stringCostFactor
+	cost := safeAdd(callCost, uint64(math.Ceil(size)), 1)
+	return &cost
+}
+
+// trackStringTransformCost tracks runtime cost for O(n) string operations.
+func trackStringTransformCost(args []ref.Val, result ref.Val) *uint64 {
+	transformCost := math.Ceil(float64(actualSize(args[0])) * stringCostFactor)
+	resultSize := actualSize(result)
+	cost := safeAdd(callCost, uint64(transformCost), resultSize)
+	return &cost
+}
+
+// trackStringSearchCost tracks runtime cost for O(n*m) string search operations.
+func trackStringSearchCost(args []ref.Val, _ ref.Val) *uint64 {
+	searchCost := float64(actualSize(args[0])*actualSize(args[1])) * stringCostFactor
+	cost := safeAdd(uint64(math.Ceil(searchCost)), callCost)
+	return &cost
+}
+
+// trackStringReplaceCost tracks runtime cost for string replace operations,
+// accounting for search cost and the size of the result.
+func trackStringReplaceCost(args []ref.Val, result ref.Val) *uint64 {
+	targetSize := actualSize(args[0])
+	if targetSize == 0 {
+		targetSize = 1
+	}
+	needleSize := actualSize(args[1])
+	if needleSize == 0 {
+		needleSize = 1
+	}
+	searchCost := uint64(math.Ceil(float64(targetSize*needleSize) * stringCostFactor))
+	cost := safeAdd(callCost, searchCost, actualSize(result))
+	return &cost
+}
+
+// trackStringSplitCost tracks runtime cost for string split operations,
+// accounting for traversal and list allocation.
+func trackStringSplitCost(args []ref.Val, result ref.Val) *uint64 {
+	traversalCost := float64(safeAdd(actualSize(args[0]), 1)) * stringCostFactor
+	resultSize := actualSize(result)
+	cost := safeAdd(callCost, uint64(math.Ceil(traversalCost)), resultSize, common.ListCreateBaseCost)
+	return &cost
+}
+
+// trackStringJoinCost tracks runtime cost for string join operations,
+// accounting for traversal and the size of the result.
+func trackStringJoinCost(args []ref.Val, result ref.Val) *uint64 {
+	traversalCost := float64(safeAdd(actualSize(args[0]), 1)) * stringCostFactor
+	cost := safeAdd(callCost, uint64(math.Ceil(traversalCost)), actualSize(result))
+	return &cost
+}

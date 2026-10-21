@@ -1,0 +1,316 @@
+/*
+Copyright 2023 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package ktesting
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"os/signal"
+	"reflect"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+)
+
+var (
+	// defaultProgressReporter is inactive until init is called.
+	defaultProgressReporter = &progressReporter{}
+
+	// interruptCtx tracks whether the process got interrupted via SIGINT.
+	// In that case, interrupted gets called to cancel interruptCtx with
+	// a suitable message.
+	//
+	// This gets set up once per process and never gets reset.
+	interruptCtx, interrupted = context.WithCancelCause(context.Background())
+)
+
+const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
+
+// Ginkgo specifies https://pkg.go.dev/github.com/onsi/ginkgo/v2@v2.32.1/internal#SpecContext.
+// But Gomega only needs AttachProgressReporter, so we only support that.
+type ginkgoReporter interface {
+	AttachProgressReporter(reporter func() string) func()
+}
+
+type progressReporter struct {
+	// initMutex protects initialization and finalization of the reporter.
+	initMutex sync.Mutex
+
+	usageCount      int64
+	wg              sync.WaitGroup
+	testCtx         context.Context
+	signalChannel   chan os.Signal
+	progressChannel chan os.Signal
+
+	// reportMutex protects report creation and settings.
+	reportMutex     sync.Mutex
+	reporterCounter int64
+	reporters       map[int64]func() string
+	runningTests    map[string]struct{} // cannot use sets.Set here (import restriction)
+	out             io.Writer
+	closeOut        func() error
+}
+
+var _ ginkgoReporter = &progressReporter{}
+
+// init is invoked by Init. It returns the context to be used for the
+// new TContext.
+//
+// By default, that is just context.Background. In a Go unit test, it
+// is a context connected to os.Interrupt.
+//
+// Once activated like that in a Go unit test, the progressReporter implements
+// support for triggering a progress report in a running test when sending it a
+// USR1 signal, similar to the corresponding Ginkgo feature.
+//
+// This support is active until the last test terminates.
+//
+// Inside a bubble, signal.Notify fails with "select on synctest channel from
+// outside bubble" if (and only if) it gets called for the first time, so we
+// have to avoid setting up signal handling to be on the safe side.
+// We still register the sync test, but progress reporting will only work
+// if some other tests sets up the signal handling.
+func (p *progressReporter) init(tb TB, isSyncTest bool) context.Context {
+	tbType := reflect.TypeOf(tb)
+	if tbType.Kind() == reflect.Pointer {
+		tbType = tbType.Elem()
+	}
+	tbPkg := tbType.PkgPath()
+	if strings.Contains(tbPkg, "k8s.io/kubernetes/test/e2e/framework") ||
+		strings.Contains(tbPkg, "github.com/onsi/ginkgo") {
+		// Do nothing when running under Ginkgo.
+		// It wouldn't be wrong to register the running test,
+		// but it's useless and visible to users in the Ginkgo timeline
+		// of a test when the registered cleanup callback runs.
+		return context.Background()
+	}
+
+	// Register the test. Even if we can't set up progress reporting,
+	// someone else might and then this test will show up.
+	tb.Helper()
+	p.trackRunningTest(tb)
+
+	if _, ok := tb.(testing.TB); !ok {
+		// Not in a Go unit test: don't handle progress signals.
+		// This ensures that we don't interfere with e.g. Ginkgo
+		// signal handling.
+		return context.Background()
+	}
+
+	if isSyncTest {
+		// Cannot initialize progress signal handling.
+		return context.Background()
+	}
+
+	// If already interrupted, then don't start the new test.
+	// This is necessary because normally CTRL-C would exit
+	// the entire process immediately. Now we keep running
+	// to clean up.
+	if interruptCtx.Err() != nil {
+		tb.Fatalf("testing has been interrupted: %v", context.Cause(interruptCtx))
+	}
+
+	p.initMutex.Lock()
+	defer p.initMutex.Unlock()
+
+	p.usageCount++
+	tb.Cleanup(p.finalize)
+	if p.usageCount > 1 {
+		// Was already initialized.
+		return p.testCtx
+	}
+
+	// Might have been set for testing purposes.
+	if p.out == nil {
+		// os.Stderr gets redirected by "go test". "go test -v" has to be
+		// used to see that output while a test runs.
+		//
+		// Opening /dev/tty during init avoids the redirection.
+		// May fail, depending on the OS, in which case
+		// os.Stderr is used.
+		if console, err := os.OpenFile("/dev/tty", os.O_RDWR|os.O_APPEND, 0); err == nil {
+			p.out = console
+			p.closeOut = console.Close
+
+		} else {
+			p.out = os.Stdout
+			p.closeOut = nil
+		}
+	}
+
+	p.signalChannel = make(chan os.Signal)
+	signal.Notify(p.signalChannel, os.Interrupt)
+	p.wg.Go(func() {
+		_, ok := <-p.signalChannel
+		if ok {
+			_, _ = fmt.Fprint(p.out, "\n\nINFO: canceling test context: received interrupt signal\n\n")
+			interrupted(errors.New("received interrupt signal"))
+		}
+	})
+
+	// This reimplements the contract between Ginkgo and Gomega for progress reporting.
+	// When using Ginkgo contexts, Ginkgo will implement it. This here is for "go test".
+	//
+	// nolint:staticcheck // It complains about using a plain string. This can only be fixed
+	// by Ginkgo and Gomega formalizing this interface and define a type (somewhere...
+	// probably cannot be in either Ginkgo or Gomega).
+	p.testCtx = context.WithValue(interruptCtx, ginkgoSpecContextKey, defaultProgressReporter)
+
+	p.progressChannel = make(chan os.Signal, 1)
+	// progressSignals will be empty on Windows.
+	if len(progressSignals) > 0 {
+		signal.Notify(p.progressChannel, progressSignals...)
+	}
+
+	p.wg.Go(p.run)
+
+	return p.testCtx
+}
+
+func (p *progressReporter) finalize() {
+	p.initMutex.Lock()
+	defer p.initMutex.Unlock()
+
+	p.usageCount--
+	if p.usageCount > 0 {
+		// Still in use.
+		return
+	}
+
+	signal.Stop(p.signalChannel)
+	close(p.signalChannel)
+	signal.Stop(p.progressChannel)
+	close(p.progressChannel)
+	p.wg.Wait()
+
+	// Now that all goroutines are stopped, we can clean up some more.
+	if p.closeOut != nil {
+		_ = p.closeOut()
+		p.out = nil
+	}
+}
+
+// AttachProgressReporter implements Gomega's contextWithAttachProgressReporter.
+func (p *progressReporter) AttachProgressReporter(reporter func() string) func() {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	// TODO (?): identify the caller and record that for dumpProgress.
+	p.reporterCounter++
+	id := p.reporterCounter
+	if p.reporters == nil {
+		p.reporters = make(map[int64]func() string)
+	}
+	p.reporters[id] = reporter
+	return func() {
+		p.detachProgressReporter(id)
+	}
+}
+
+func (p *progressReporter) detachProgressReporter(id int64) {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	delete(p.reporters, id)
+}
+
+// addRunningTest records that a test with the given name is now running, so
+// that it shows up in the next progress report. It returns true if the name
+// was newly added, i.e. the caller is responsible for eventually calling
+// removeRunningTest. Because test names are unique, a second call for the
+// same name (for example because Init got called more than once for the
+// same test) is a no-op and returns false.
+func (p *progressReporter) addRunningTest(name string) bool {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	if _, ok := p.runningTests[name]; ok {
+		return false
+	}
+	if p.runningTests == nil {
+		p.runningTests = make(map[string]struct{})
+	}
+	p.runningTests[name] = struct{}{}
+	return true
+}
+
+func (p *progressReporter) removeRunningTest(name string) {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	delete(p.runningTests, name)
+}
+
+// trackRunningTest registers tb's name so that it shows up in the "Currently
+// running" list of a progress report, removing it again through tb.Cleanup.
+// It is safe to call more than once for the same tb (for example, because
+// Init gets called again just to obtain a TContext): only the first call
+// adds the name and registers the cleanup callback that removes it.
+func (p *progressReporter) trackRunningTest(tb TB) {
+	if p.addRunningTest(tb.Name()) {
+		tb.Cleanup(func() { p.removeRunningTest(tb.Name()) })
+	}
+}
+
+func (p *progressReporter) run() {
+	for {
+		_, ok := <-p.progressChannel
+		if !ok {
+			// Shut down.
+			return
+		}
+		p.dumpProgress()
+	}
+}
+
+// dumpProgress is less useful than the Ginkgo progress report because it
+// cannot show source code backtraces for the running tests. But at least
+// the names of the currently running tests are included, which helps
+// figuring out where a test binary got stuck.
+func (p *progressReporter) dumpProgress() {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	var buffer strings.Builder
+	buffer.WriteString("You requested a progress report.\n")
+	if len(p.runningTests) == 0 {
+		buffer.WriteString("Currently there is no test running.\n")
+	} else {
+		buffer.WriteString("Currently running:\n")
+		for _, name := range slices.Sorted(maps.Keys(p.runningTests)) {
+			buffer.WriteString("\t" + name + "\n")
+		}
+	}
+	if len(p.reporters) == 0 {
+		buffer.WriteString("Currently there is no information about test progress available.\n")
+	}
+	for _, reporter := range p.reporters {
+		report := reporter()
+		buffer.WriteRune('\n')
+		buffer.WriteString(report)
+		if !strings.HasSuffix(report, "\n") {
+			buffer.WriteRune('\n')
+		}
+	}
+
+	_, _ = p.out.Write([]byte(buffer.String()))
+}

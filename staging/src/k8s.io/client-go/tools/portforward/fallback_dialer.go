@@ -82,6 +82,7 @@ func (f *FallbackDialer) Dial(protocols ...string) (httpstream.Connection, strin
 func (f *StreamingFallbackDialer) Dial(protocols ...string) (streamhttp.Connection, string, error) {
 	conn, version, err := f.primary.Dial(protocols...)
 	if err != nil && f.shouldFallback(err) {
+		//nolint:logcheck // This code is only used by kubectl and E2E testing where contextual logging is not that useful.
 		klog.V(4).Infof("fallback to secondary dialer from primary dialer err: %v", err)
 		return f.secondary.Dial(protocols...)
 	}

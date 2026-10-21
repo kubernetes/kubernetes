@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //go:build linux
-// +build linux
 
 package procfs
 
@@ -25,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // CPUInfo contains general information about a system CPU found in /proc/cpuinfo.
@@ -66,7 +65,7 @@ var (
 // CPUInfo returns information about current system CPUs.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) CPUInfo() ([]CPUInfo, error) {
-	data, err := util.ReadFileNoStat(fs.proc.Path("cpuinfo"))
+	data, err := parsers.ReadFileNoStat(fs.proc.Path("cpuinfo"))
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +501,7 @@ func parseCPUInfoRISCV(info []byte) ([]CPUInfo, error) {
 	return cpuinfo, nil
 }
 
-func parseCPUInfoDummy(_ []byte) ([]CPUInfo, error) { // nolint:unused,deadcode
+func parseCPUInfoDummy(_ []byte) ([]CPUInfo, error) { //nolint:unused
 	return nil, errors.New("not implemented")
 }
 

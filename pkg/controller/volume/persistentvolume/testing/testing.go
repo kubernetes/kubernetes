@@ -271,11 +271,11 @@ func (r *VolumeReactor) React(ctx context.Context, action core.Action) (handled 
 
 // Watch watches objects from the VolumeReactor. Watch returns a channel which
 // will push added / modified / deleted object.
-func (r *VolumeReactor) Watch(gvr schema.GroupVersionResource, ns string) (watch.Interface, error) {
+func (r *VolumeReactor) Watch(logger klog.Logger, gvr schema.GroupVersionResource, ns string) (watch.Interface, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	fakewatcher := watch.NewRaceFreeFake()
+	fakewatcher := watch.NewRaceFreeFakeWithLogger(logger)
 
 	if _, exists := r.watchers[gvr]; !exists {
 		r.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)

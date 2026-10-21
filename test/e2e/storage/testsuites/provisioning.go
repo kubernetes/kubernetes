@@ -109,15 +109,16 @@ func (p *provisioningTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (p *provisioningTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	// Check preconditions.
 	if pattern.VolType != storageframework.DynamicPV {
-		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
 	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
-		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
+		return fmt.Sprintf("Driver %s doesn't support %v", dInfo.Name, pattern.VolMode)
 	}
+	return ""
 }
 
 func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

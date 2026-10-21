@@ -26,6 +26,7 @@ package v1beta1
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 type IngressRuleValueApplyConfiguration struct {
+	// http is a HTTP IngressRuleValue, which contains a list of http selectors
 	HTTP *HTTPIngressRuleValueApplyConfiguration `json:"http,omitempty"`
 }
 

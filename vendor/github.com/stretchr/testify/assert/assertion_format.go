@@ -84,7 +84,7 @@ func Equalf(t TestingT, expected interface{}, actual interface{}, msg string, ar
 	return Equal(t, expected, actual, append([]interface{}{msg}, args...)...)
 }
 
-// EqualErrorf asserts that a function returned an error (i.e. not `nil`)
+// EqualErrorf asserts that a function returned a non-nil error (i.e. an error)
 // and that it is equal to the provided error.
 //
 //	actualObj, err := SomeFunction()
@@ -124,7 +124,7 @@ func EqualValuesf(t TestingT, expected interface{}, actual interface{}, msg stri
 	return EqualValues(t, expected, actual, append([]interface{}{msg}, args...)...)
 }
 
-// Errorf asserts that a function returned an error (i.e. not `nil`).
+// Errorf asserts that a function returned a non-nil error (ie. an error).
 //
 //	actualObj, err := SomeFunction()
 //	assert.Errorf(t, err, "error message %s", "formatted")
@@ -144,8 +144,8 @@ func ErrorAsf(t TestingT, err error, target interface{}, msg string, args ...int
 	return ErrorAs(t, err, target, append([]interface{}{msg}, args...)...)
 }
 
-// ErrorContainsf asserts that a function returned an error (i.e. not `nil`)
-// and that the error contains the specified substring.
+// ErrorContainsf asserts that a function returned a non-nil error (i.e. an
+// error) and that the error contains the specified substring.
 //
 //	actualObj, err := SomeFunction()
 //	assert.ErrorContainsf(t, err,  expectedErrorSubString, "error message %s", "formatted")
@@ -190,10 +190,10 @@ func Eventuallyf(t TestingT, condition func() bool, waitFor time.Duration, tick 
 //		time.Sleep(8*time.Second)
 //		externalValue = true
 //	}()
-//	assert.EventuallyWithTf(t, func(c *assert.CollectT, "error message %s", "formatted") {
+//	assert.EventuallyWithTf(t, func(c *assert.CollectT) {
 //		// add assertions as needed; any assertion failure will fail the current tick
 //		assert.True(c, externalValue, "expected 'externalValue' to be true")
-//	}, 10*time.Second, 1*time.Second, "external state has not changed to 'true'; still false")
+//	}, 10*time.Second, 1*time.Second, "error message %s", "formatted")
 func EventuallyWithTf(t TestingT, condition func(collect *CollectT), waitFor time.Duration, tick time.Duration, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -552,7 +552,7 @@ func NoDirExistsf(t TestingT, path string, msg string, args ...interface{}) bool
 	return NoDirExists(t, path, append([]interface{}{msg}, args...)...)
 }
 
-// NoErrorf asserts that a function returned no error (i.e. `nil`).
+// NoErrorf asserts that a function returned a nil error (ie. no error).
 //
 //	  actualObj, err := SomeFunction()
 //	  if assert.NoErrorf(t, err, "error message %s", "formatted") {
@@ -849,7 +849,19 @@ func WithinRangef(t TestingT, actual time.Time, start time.Time, end time.Time, 
 	return WithinRange(t, actual, start, end, append([]interface{}{msg}, args...)...)
 }
 
-// YAMLEqf asserts that two YAML strings are equivalent.
+// YAMLEqf asserts that the first documents in the two YAML strings are equivalent.
+//
+//	expected := `---
+//	key: value
+//	---
+//	key: this is a second document, it is not evaluated
+//	`
+//	actual := `---
+//	key: value
+//	---
+//	key: this is a subsequent document, it is not evaluated
+//	`
+//	assert.YAMLEqf(t, expected, actual, "error message %s", "formatted")
 func YAMLEqf(t TestingT, expected string, actual string, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()

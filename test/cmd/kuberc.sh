@@ -27,7 +27,7 @@ run_kuberc_tests() {
 
   KUBERC_FILE="${TMPDIR:-/tmp}"/kuberc_file
   cat > "$KUBERC_FILE" << EOF
-apiVersion: kubectl.config.k8s.io/v1beta1
+apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 EOF
 
@@ -47,7 +47,7 @@ EOF
   kube::log::status "Testing kubectl kuberc view commands"
   # Test: kubectl kuberc view
   output_message=$(kubectl kuberc view --kuberc="$KUBERC_FILE")
-  kube::test::if_has_string "${output_message}" "apiVersion: kubectl.config.k8s.io/v1beta1"
+  kube::test::if_has_string "${output_message}" "apiVersion: kubectl.config.k8s.io/v1"
   kube::test::if_has_string "${output_message}" "kind: Preference"
   kube::test::if_has_string "${output_message}" "command: apply"
   kube::test::if_has_string "${output_message}" "name: runx"
@@ -58,7 +58,7 @@ EOF
 
   # Test: kubectl kuberc view with json output
   output_message=$(kubectl kuberc view --kuberc="$KUBERC_FILE" -o json)
-  kube::test::if_has_string "${output_message}" "\"apiVersion\": \"kubectl.config.k8s.io/v1beta1\""
+  kube::test::if_has_string "${output_message}" "\"apiVersion\": \"kubectl.config.k8s.io/v1\""
   kube::test::if_has_string "${output_message}" "\"kind\": \"Preference\""
 
   # Test: Attempt to set existing default without --overwrite flag should fail
@@ -127,6 +127,14 @@ EOF
   output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=barbaz --allowlist-entry=command= 2>&1)
   kube::test::if_has_string "${output_message}" "empty value in allowlist entry for field \"command\""
 
+  # Test: switching from Allowlist to AllowAll removes the allowlist
+  kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=AllowAll
+  output_message=$(kubectl kuberc view --kuberc="$KUBERC_FILE")
+  kube::test::if_has_string "${output_message}" "credentialPluginPolicy: AllowAll"
+  kube::test::if_has_not_string "${output_message}" "command: foobar"
+  # Restore credential plugin policy back to the original Allowlist
+  kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=foobar
+
   # Restore getn alias back to "namespace" for remaining tests
   kubectl kuberc set --kuberc="$KUBERC_FILE" --section=aliases --name=getn --command=get --prependarg=namespace --option=output=wide --overwrite
   # Restore get defaults back to namespace=test-kuberc-ns and output=json for remaining tests
@@ -192,11 +200,6 @@ EOF
   output_message=$(kubectl get pod/test-pod-2 2>&1 "${kube_flags[@]:?}" --kuberc="$KUBERC_FILE")
   kube::test::if_has_string "${output_message}" "test-pod-2"
 
-  # verify getn alias is working or not, depending if KUBECTL_KUBERC is on or off
-  output_message=$(! KUBECTL_KUBERC=false kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="$KUBERC_FILE")
-  kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
-  KUBECTL_KUBERC=true kubectl getn "${kube_flags[@]:?}" --kuberc="$KUBERC_FILE"
-
   # verify KUBERC=off is working as expected
   output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="$KUBERC_FILE")
   kube::test::if_has_string "${output_message}" "KUBERC=off and passing kuberc flag are mutually exclusive"
@@ -205,7 +208,7 @@ EOF
 
   cat > "${TMPDIR:-/tmp}"/kuberc_file_multi << EOF
 ---
-apiVersion: kubectl.config.k8s.io/v1beta1
+apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 defaults:
 - command: get

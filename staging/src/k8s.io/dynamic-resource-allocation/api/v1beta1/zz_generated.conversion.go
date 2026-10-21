@@ -249,6 +249,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceDerivedAttribute)(nil), (*resourcev1beta1.DeviceDerivedAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(a.(*v1.DeviceDerivedAttribute), b.(*resourcev1beta1.DeviceDerivedAttribute), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.DeviceDerivedAttribute)(nil), (*v1.DeviceDerivedAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(a.(*resourcev1beta1.DeviceDerivedAttribute), b.(*v1.DeviceDerivedAttribute), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.DeviceRequestAllocationResult)(nil), (*resourcev1beta1.DeviceRequestAllocationResult)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DeviceRequestAllocationResult_To_v1beta1_DeviceRequestAllocationResult(a.(*v1.DeviceRequestAllocationResult), b.(*resourcev1beta1.DeviceRequestAllocationResult), scope)
 	}); err != nil {
@@ -309,13 +319,33 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableResourceMapping)(nil), (*resourcev1beta1.NodeAllocatableResourceMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping(a.(*v1.NodeAllocatableResourceMapping), b.(*resourcev1beta1.NodeAllocatableResourceMapping), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableMapping)(nil), (*resourcev1beta1.NodeAllocatableMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableMapping_To_v1beta1_NodeAllocatableMapping(a.(*v1.NodeAllocatableMapping), b.(*resourcev1beta1.NodeAllocatableMapping), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.NodeAllocatableResourceMapping)(nil), (*v1.NodeAllocatableResourceMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(a.(*resourcev1beta1.NodeAllocatableResourceMapping), b.(*v1.NodeAllocatableResourceMapping), scope)
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.NodeAllocatableMapping)(nil), (*v1.NodeAllocatableMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(a.(*resourcev1beta1.NodeAllocatableMapping), b.(*v1.NodeAllocatableMapping), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableOverhead)(nil), (*resourcev1beta1.NodeAllocatableOverhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableOverhead_To_v1beta1_NodeAllocatableOverhead(a.(*v1.NodeAllocatableOverhead), b.(*resourcev1beta1.NodeAllocatableOverhead), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.NodeAllocatableOverhead)(nil), (*v1.NodeAllocatableOverhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(a.(*resourcev1beta1.NodeAllocatableOverhead), b.(*v1.NodeAllocatableOverhead), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableResource)(nil), (*resourcev1beta1.NodeAllocatableResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(a.(*v1.NodeAllocatableResource), b.(*resourcev1beta1.NodeAllocatableResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.NodeAllocatableResource)(nil), (*v1.NodeAllocatableResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource(a.(*resourcev1beta1.NodeAllocatableResource), b.(*v1.NodeAllocatableResource), scope)
 	}); err != nil {
 		return err
 	}
@@ -645,7 +675,7 @@ func autoConvert_v1_Device_To_v1beta1_Device(in *v1.Device, out *resourcev1beta1
 	// WARNING: in.BindingConditions requires manual conversion: does not exist in peer-type
 	// WARNING: in.BindingFailureConditions requires manual conversion: does not exist in peer-type
 	// WARNING: in.AllowMultipleAllocations requires manual conversion: does not exist in peer-type
-	// WARNING: in.NodeAllocatableResourceMappings requires manual conversion: does not exist in peer-type
+	// WARNING: in.NodeAllocatableResources requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -947,6 +977,26 @@ func Convert_v1beta1_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in 
 	return autoConvert_v1beta1_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in, out, s)
 }
 
+func autoConvert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(in *v1.DeviceDerivedAttribute, out *resourcev1beta1.DeviceDerivedAttribute, s conversion.Scope) error {
+	*out = *(*resourcev1beta1.DeviceDerivedAttribute)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute is an autogenerated conversion function.
+func Convert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(in *v1.DeviceDerivedAttribute, out *resourcev1beta1.DeviceDerivedAttribute, s conversion.Scope) error {
+	return autoConvert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(in, out, s)
+}
+
+func autoConvert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in *resourcev1beta1.DeviceDerivedAttribute, out *v1.DeviceDerivedAttribute, s conversion.Scope) error {
+	*out = *(*v1.DeviceDerivedAttribute)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute is an autogenerated conversion function.
+func Convert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in *resourcev1beta1.DeviceDerivedAttribute, out *v1.DeviceDerivedAttribute, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in, out, s)
+}
+
 func autoConvert_v1_DeviceRequest_To_v1beta1_DeviceRequest(in *v1.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
 	out.Name = in.Name
 	// WARNING: in.Exactly requires manual conversion: does not exist in peer-type
@@ -964,6 +1014,7 @@ func autoConvert_v1beta1_DeviceRequest_To_v1_DeviceRequest(in *resourcev1beta1.D
 	out.FirstAvailable = *(*[]v1.DeviceSubRequest)(unsafe.Pointer(&in.FirstAvailable))
 	// WARNING: in.Tolerations requires manual conversion: does not exist in peer-type
 	// WARNING: in.Capacity requires manual conversion: does not exist in peer-type
+	// WARNING: in.DerivedAttributes requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -1087,24 +1138,64 @@ func Convert_v1beta1_NetworkDeviceData_To_v1_NetworkDeviceData(in *resourcev1bet
 	return autoConvert_v1beta1_NetworkDeviceData_To_v1_NetworkDeviceData(in, out, s)
 }
 
-func autoConvert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping(in *v1.NodeAllocatableResourceMapping, out *resourcev1beta1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	*out = *(*resourcev1beta1.NodeAllocatableResourceMapping)(unsafe.Pointer(in))
+func autoConvert_v1_NodeAllocatableMapping_To_v1beta1_NodeAllocatableMapping(in *v1.NodeAllocatableMapping, out *resourcev1beta1.NodeAllocatableMapping, s conversion.Scope) error {
+	*out = *(*resourcev1beta1.NodeAllocatableMapping)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping is an autogenerated conversion function.
-func Convert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping(in *v1.NodeAllocatableResourceMapping, out *resourcev1beta1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	return autoConvert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping(in, out, s)
+// Convert_v1_NodeAllocatableMapping_To_v1beta1_NodeAllocatableMapping is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableMapping_To_v1beta1_NodeAllocatableMapping(in *v1.NodeAllocatableMapping, out *resourcev1beta1.NodeAllocatableMapping, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableMapping_To_v1beta1_NodeAllocatableMapping(in, out, s)
 }
 
-func autoConvert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in *resourcev1beta1.NodeAllocatableResourceMapping, out *v1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	*out = *(*v1.NodeAllocatableResourceMapping)(unsafe.Pointer(in))
+func autoConvert_v1beta1_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in *resourcev1beta1.NodeAllocatableMapping, out *v1.NodeAllocatableMapping, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableMapping)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping is an autogenerated conversion function.
-func Convert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in *resourcev1beta1.NodeAllocatableResourceMapping, out *v1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in, out, s)
+// Convert_v1beta1_NodeAllocatableMapping_To_v1_NodeAllocatableMapping is an autogenerated conversion function.
+func Convert_v1beta1_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in *resourcev1beta1.NodeAllocatableMapping, out *v1.NodeAllocatableMapping, s conversion.Scope) error {
+	return autoConvert_v1beta1_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in, out, s)
+}
+
+func autoConvert_v1_NodeAllocatableOverhead_To_v1beta1_NodeAllocatableOverhead(in *v1.NodeAllocatableOverhead, out *resourcev1beta1.NodeAllocatableOverhead, s conversion.Scope) error {
+	*out = *(*resourcev1beta1.NodeAllocatableOverhead)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_NodeAllocatableOverhead_To_v1beta1_NodeAllocatableOverhead is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableOverhead_To_v1beta1_NodeAllocatableOverhead(in *v1.NodeAllocatableOverhead, out *resourcev1beta1.NodeAllocatableOverhead, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableOverhead_To_v1beta1_NodeAllocatableOverhead(in, out, s)
+}
+
+func autoConvert_v1beta1_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in *resourcev1beta1.NodeAllocatableOverhead, out *v1.NodeAllocatableOverhead, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableOverhead)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead is an autogenerated conversion function.
+func Convert_v1beta1_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in *resourcev1beta1.NodeAllocatableOverhead, out *v1.NodeAllocatableOverhead, s conversion.Scope) error {
+	return autoConvert_v1beta1_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in, out, s)
+}
+
+func autoConvert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(in *v1.NodeAllocatableResource, out *resourcev1beta1.NodeAllocatableResource, s conversion.Scope) error {
+	*out = *(*resourcev1beta1.NodeAllocatableResource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(in *v1.NodeAllocatableResource, out *resourcev1beta1.NodeAllocatableResource, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(in, out, s)
+}
+
+func autoConvert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource(in *resourcev1beta1.NodeAllocatableResource, out *v1.NodeAllocatableResource, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableResource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource is an autogenerated conversion function.
+func Convert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource(in *resourcev1beta1.NodeAllocatableResource, out *v1.NodeAllocatableResource, s conversion.Scope) error {
+	return autoConvert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource(in, out, s)
 }
 
 func autoConvert_v1_OpaqueDeviceConfiguration_To_v1beta1_OpaqueDeviceConfiguration(in *v1.OpaqueDeviceConfiguration, out *resourcev1beta1.OpaqueDeviceConfiguration, s conversion.Scope) error {
@@ -1472,6 +1563,8 @@ func autoConvert_v1_ResourceSliceSpec_To_v1beta1_ResourceSliceSpec(in *v1.Resour
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resourcev1beta1.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.PartitionTypeAttribute = (*resourcev1beta1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
+	out.SkipNodeOperations = *(*[]resourcev1beta1.SkipNodeOperation)(unsafe.Pointer(&in.SkipNodeOperations))
 	return nil
 }
 
@@ -1500,5 +1593,7 @@ func autoConvert_v1beta1_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *resourcev
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]v1.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.PartitionTypeAttribute = (*v1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
+	out.SkipNodeOperations = *(*[]v1.SkipNodeOperation)(unsafe.Pointer(&in.SkipNodeOperations))
 	return nil
 }

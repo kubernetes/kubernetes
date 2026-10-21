@@ -17,13 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
-
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -37,28 +34,13 @@ type Example struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (e *Example) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshalingV3 {
-		return internal.DeterministicMarshal(e)
-	}
-	b1, err := json.Marshal(e.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(e.ExampleProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(e.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	return internal.DeterministicMarshal(e)
 }
 func (e *Example) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		Ref          string `json:"$ref,omitempty"`
-		ExampleProps `json:",inline"`
-		Extensions   spec.Extensions `json:",inline"`
+		ExampleProps `json:",embed"`
+		Extensions   spec.Extensions `json:",embed"`
 	}
 	x.Ref = e.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(e.Extensions)
@@ -67,24 +49,12 @@ func (e *Example) MarshalJSONTo(enc *jsontext.Encoder) error {
 }
 
 func (e *Example) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, e)
-	}
-	if err := json.Unmarshal(data, &e.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &e.ExampleProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return jsonv2.Unmarshal(data, e)
 }
 
 func (e *Example) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions spec.Extensions `json:",inline"`
+		Extensions spec.Extensions `json:",embed"`
 		ExampleProps
 	}
 	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {

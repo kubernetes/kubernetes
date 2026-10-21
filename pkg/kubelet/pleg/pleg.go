@@ -72,12 +72,3 @@ type PodLifecycleEventGenerator interface {
 	// RequestRelist queues up the pod for an on-demand relist.
 	RequestRelist(logger klog.Logger, podUID types.UID)
 }
-
-// podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs
-// and need not be exposed to rest of the kubelet
-type podLifecycleEventGeneratorHandler interface {
-	PodLifecycleEventGenerator
-	Stop()
-	Update(relistDuration *RelistDuration)
-	Relist(ctx context.Context)
-}

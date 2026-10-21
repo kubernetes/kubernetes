@@ -26,8 +26,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/features"
@@ -35,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/clock"
 )
 
 func BenchmarkCacherInit(b *testing.B) {
@@ -43,26 +40,12 @@ func BenchmarkCacherInit(b *testing.B) {
 
 	ctx := context.Background()
 
-	server, etcdStorage := newCorev1EtcdTestStorage(b)
+	server, etcdStorage := benchmarkEtcdTestStorage(b)
 	b.Cleanup(func() { server.Terminate(b) })
 
 	seedCorev1PodsParallel(b, ctx, etcdStorage, 1, pods, 32)
 
-	config := Config{
-		Storage:             etcdStorage,
-		Versioner:           storage.APIObjectVersioner{},
-		GroupResource:       schema.GroupResource{Resource: "pods"},
-		EventsHistoryWindow: DefaultEventFreshDuration,
-		ResourcePrefix:      "/pods/",
-		KeyFunc: func(obj runtime.Object) (string, error) {
-			return storage.NamespaceKeyFunc("/pods/", obj)
-		},
-		GetAttrsFunc: getCorev1PodAttrs,
-		NewFunc:      func() runtime.Object { return &corev1.Pod{} },
-		NewListFunc:  func() runtime.Object { return &corev1.PodList{} },
-		Codec:        corev1ProtoCodec,
-		Clock:        clock.RealClock{},
-	}
+	config := benchmarkConfig(etcdStorage)
 
 	for _, rangeStream := range []bool{false, true} {
 		for _, concurrentDecode := range []bool{false, true} {
@@ -99,7 +82,7 @@ func loadExemplarPod(b *testing.B) *corev1.Pod {
 		b.Fatalf("read %q: %v", path, err)
 	}
 	var pod corev1.Pod
-	if err := yaml.Unmarshal(data, &pod); err != nil {
+	if err := yaml.UnmarshalStrict(data, &pod); err != nil {
 		b.Fatalf("decode %q: %v", path, err)
 	}
 	return &pod

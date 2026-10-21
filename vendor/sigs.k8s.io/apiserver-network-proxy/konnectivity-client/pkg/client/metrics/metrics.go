@@ -64,6 +64,13 @@ const (
 	DialFailureTunnelClosed DialFailureReason = "tunnelclosed"
 	// DialFailureAlreadyStarted indicates that a single-use tunnel dialer was already used once.
 	DialFailureAlreadyStarted DialFailureReason = "tunnelstarted"
+	// DialFailureStreamSetup indicates that opening a new Proxy stream on a
+	// reusable tunnel's shared gRPC connection failed before any DIAL_REQ was
+	// sent. Distinct from DialFailureEndpoint (backend dial) and
+	// DialFailureContext (caller-side cancellation) so callers can selectively
+	// invalidate the shared transport on stream-setup failures while leaving
+	// it intact on backend or caller-class failures.
+	DialFailureStreamSetup DialFailureReason = "streamsetup"
 )
 
 type ClientConnectionStatus string

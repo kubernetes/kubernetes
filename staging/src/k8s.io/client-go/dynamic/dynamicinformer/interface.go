@@ -17,6 +17,8 @@ limitations under the License.
 package dynamicinformer
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
@@ -26,7 +28,13 @@ import (
 type DynamicSharedInformerFactory interface {
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
+	//
+	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
+
+	// StartWithContext initializes all requested informers. They are handled in goroutines
+	// which run until the context gets canceled.
+	StartWithContext(ctx context.Context)
 
 	// ForResource gives generic access to a shared informer of the matching type.
 	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer

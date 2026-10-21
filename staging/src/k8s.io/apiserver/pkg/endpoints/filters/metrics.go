@@ -19,6 +19,7 @@ package filters
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -95,12 +96,21 @@ var (
 	)
 )
 
-func init() {
-	legacyregistry.MustRegister(authenticatedUserCounter)
-	legacyregistry.MustRegister(authenticatedAttemptsCounter)
-	legacyregistry.MustRegister(authenticationLatency)
-	legacyregistry.MustRegister(authorizationAttemptsCounter)
-	legacyregistry.MustRegister(authorizationLatency)
+var registerMetricsOnce sync.Once
+
+// RegisterMetrics registers the authentication and authorization filter metrics
+// with the legacy registry. It is invoked when the authentication/authorization
+// filters are installed into the handler chain (rather than from an init()
+// function), so that metric feature gates such as NativeHistograms have been
+// applied before these histogram metrics are created.
+func RegisterMetrics() {
+	registerMetricsOnce.Do(func() {
+		legacyregistry.MustRegister(authenticatedUserCounter)
+		legacyregistry.MustRegister(authenticatedAttemptsCounter)
+		legacyregistry.MustRegister(authenticationLatency)
+		legacyregistry.MustRegister(authorizationAttemptsCounter)
+		legacyregistry.MustRegister(authorizationLatency)
+	})
 }
 
 func recordAuthorizationMetrics(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time) {

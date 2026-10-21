@@ -41,6 +41,7 @@ type NetworkPolicyInterface interface {
 	Create(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy, opts metav1.CreateOptions) (*networkingv1.NetworkPolicy, error)
 	Update(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy, opts metav1.UpdateOptions) (*networkingv1.NetworkPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkingv1.NetworkPolicy, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*networkingv1.NetworkPolicyList, error)

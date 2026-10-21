@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	ifEnabledTag  = "k8s:ifEnabled"
-	ifDisabledTag = "k8s:ifDisabled"
+	ifEnabledTag  = "ifEnabled"
+	ifDisabledTag = "ifDisabled"
 )
 
 func init() {
@@ -84,7 +84,7 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 func (itv ifTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Args: []TagArgDoc{{
 			Description: "<option>",
 			Type:        codetags.ArgTypeString,

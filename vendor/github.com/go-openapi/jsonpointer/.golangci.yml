@@ -4,14 +4,19 @@ linters:
   disable:
     - depguard
     - funlen
+    - goconst
     - godox
+    - gomodguard
+    - gomodguard_v2
     - exhaustruct
+    - exhaustruct_v5
     - nlreturn
     - nonamedreturns
     - noinlineerr
     - paralleltest
     - recvcheck
     - testpackage
+    - thelper
     - tparallel
     - varnamelen
     - whitespace
@@ -24,10 +29,12 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 3
+    gocognit:
+      min-complexity: 35
     cyclop:
-      max-complexity: 20
+      max-complexity: 25
     gocyclo:
-      min-complexity: 20
+      min-complexity: 35
     exhaustive:
       default-signifies-exhaustive: true
       default-case-required: true

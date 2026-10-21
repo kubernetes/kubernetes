@@ -77,7 +77,7 @@ func NewCSRCleanerController(
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (ccc *CSRCleanerController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting CSR cleaner controller")

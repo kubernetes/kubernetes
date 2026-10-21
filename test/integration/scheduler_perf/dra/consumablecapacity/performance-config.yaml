@@ -27,7 +27,6 @@
 # This means eight pods fit onto one node.
 - name: ConsumableCapacity
   featureGates:
-    DynamicResourceAllocation: true
     DRAConsumableCapacity: true
   workloadTemplate:
   - opcode: createNodes

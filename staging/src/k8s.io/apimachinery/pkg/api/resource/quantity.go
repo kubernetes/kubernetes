@@ -36,33 +36,39 @@ import (
 //
 // The serialization format is:
 //
-// ```
-// <quantity>        ::= <signedNumber><suffix>
+// - `<quantity>`: `<signedNumber><suffix>`
 //
-//	(Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+// - `<digit>`: `0 | 1 | ... | 9`
 //
-// <digit>           ::= 0 | 1 | ... | 9
-// <digits>          ::= <digit> | <digit><digits>
-// <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
-// <sign>            ::= "+" | "-"
-// <signedNumber>    ::= <number> | <sign><number>
-// <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
-// <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
+// - `<digits>`: `<digit> | <digit><digits>`
 //
-//	(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+// - `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`
 //
-// <decimalSI>       ::= m | "" | k | M | G | T | P | E
+// - `<sign>`: `"+" | "-"`
 //
-//	(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+// - `<signedNumber>`: `<number> | <sign><number>`
 //
-// <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
-// ```
+// - `<signedDigits>`: `<digits> | <sign><digits>`
 //
-// No matter which of the three exponent forms is used, no quantity may represent
-// a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal
-// places. Numbers larger or more precise will be capped or rounded up.
-// (E.g.: 0.1m will rounded up to 1m.)
-// This may be extended in the future if we require larger or smaller quantities.
+// - `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`
+//
+// - `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`
+//
+// - `<decimalSI>`: `n | u | m | "" | k | M | G | T | P | E`
+//
+// - `<decimalExponent>`: `"e" <signedDigits> | "E" <signedDigits>`
+//
+// Note that `<suffix>` may be empty, from the `""` case in `<decimalSI>`.
+// For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the
+// capitalization. See http://physics.nist.gov/cuu/Units/binary.html.
+//
+// A decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is
+// limited to three decimal places: "18446744073709551616" keeps its value, and
+// "1.2345" keeps its precision (String reports it as "1234500u"). Parsing does
+// cap a binarySI quantity, silently, at 2^63-1: "8Ei" parses as 2^63-1.
+// Parsing also preserves a value only down to nano, rounding a finer non-zero
+// value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
+// may overflow on top of that: see Value, MilliValue and ScaledValue.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
 // it had, and will use the same type again when it is serialized.
@@ -72,7 +78,9 @@ import (
 // corresponding increase or decrease in Mantissa) such that:
 //
 // - No precision is lost
+//
 // - No fractional digits will be emitted
+//
 // - The exponent (or suffix) is as large as possible.
 //
 // The sign will be omitted unless the number is negative.
@@ -80,6 +88,7 @@ import (
 // Examples:
 //
 // - 1.5 will be serialized as "1500m"
+//
 // - 1.5Gi will be serialized as "1536Mi"
 //
 // Note that the quantity will NEVER be internally represented by a
@@ -93,6 +102,9 @@ import (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
+// ---
+// Quantity is a value type. Each shallow copy is independent from its source.
+//
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
@@ -105,11 +117,22 @@ type Quantity struct {
 	i int64Amount
 	// d is the quantity in inf.Dec form if d.Dec != nil
 	d infDecAmount
-	// s is the generated value of this quantity to avoid recalculation
-	s string
-
-	// Change Format at will. See the comment for Canonicalize for
-	// more details.
+	// s caches a Quantity's string form to avoid recalculation. Functions that
+	// mutate Quantity must clear this cached string to invalidate it. Functions
+	// that read the value must check if Format (an exported field) has changed,
+	// since that also invalidates the cached string. If the cached string is
+	// found to be invalid due to a Format change, the read function must then
+	// compute a valid result and return it, but must not clear the cached
+	// string, since that would lead to race conditions in read-only paths.
+	s cachedString
+	// Format provides access to the Format of this quantity. Format is unsafe to
+	// modify concurrently with method calls from other goroutines (even to
+	// read-only methods). Modifying Format is supported but discouraged and can
+	// have negative performance implications since it can invalidate the cached
+	// string value and force all read paths to recompute the string until
+	// CacheString() is called. Consider creating a new Quantity with the desired
+	// Format instead.
+	// See the comment for Canonicalize for more details about Format.
 	Format
 }
 
@@ -133,6 +156,53 @@ const (
 	BinarySI        = Format("BinarySI")        // e.g., 12Mi (12 * 2^20)
 	DecimalSI       = Format("DecimalSI")       // e.g., 12M  (12 * 10^6)
 )
+
+// cachedString holds a Quantity's string form.
+type cachedString struct {
+	// str is the string representation.
+	str string
+
+	// format tracks the format of this string. Note that it can differ from the
+	// Quantity's Format field after a caller updates the exported Format field
+	// directly. If this happens, this cachedString is stale and is not used.
+	format formatCode
+}
+
+// validFor reports whether this cachedString is set and still valid for a
+// Quantity's current Format. This provides a read path cache invalidation check
+// for a Quantity's cachedString. This does not handle invalidation of Quantity
+// value changes. This must be handled by the functions that update the value by
+// clearing the cachedString.
+func (s cachedString) validFor(format Format) bool {
+	return len(s.str) > 0 && s.format == formatCodeOf(format)
+}
+
+// formatCode identifies a Format in a compact byte representation.
+type formatCode uint8
+
+const (
+	formatCodeUnknown formatCode = iota
+	formatCodeDecimalExponent
+	formatCodeBinarySI
+	formatCodeDecimalSI
+)
+
+func formatCodeOf(format Format) formatCode {
+	switch format {
+	case DecimalExponent:
+		return formatCodeDecimalExponent
+	case BinarySI:
+		return formatCodeBinarySI
+	case DecimalSI:
+		return formatCodeDecimalSI
+	}
+	return formatCodeUnknown
+}
+
+// newCachedString records str, a string form of a Quantity written for format.
+func newCachedString(str string, format Format) cachedString {
+	return cachedString{str: str, format: formatCodeOf(format)}
+}
 
 // MustParse turns the given string into a quantity or panics; for tests
 // or other cases where you know the string is valid.
@@ -280,7 +350,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{}, ErrFormatWrong
 	}
 	if str == "0" {
-		return Quantity{Format: DecimalSI, s: str}, nil
+		return Quantity{Format: DecimalSI, s: newCachedString(str, DecimalSI)}, nil
 	}
 
 	positive, value, num, denom, suf, err := parseQuantityString(str)
@@ -296,10 +366,13 @@ func ParseQuantity(str string) (Quantity, error) {
 	precision := int32(0)
 	scale := int32(0)
 	mantissa := int64(1)
+	forceRecanonicalize := false
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
 		precision = maxInt64Factors - int32(len(num)+len(denom))
+		// preserves compatibility with recanonicalizing integers >18 digits long, even if they are in int64 range
+		forceRecanonicalize = precision <= 0
 	case BinarySI:
 		scale = 0
 		switch {
@@ -320,27 +393,42 @@ func ParseQuantity(str string) (Quantity, error) {
 		if scale >= int32(Nano) {
 			shifted := num + denom
 
-			var value int64
-			value, err := strconv.ParseInt(shifted, 10, 64)
-			if err != nil {
-				return Quantity{}, ErrNumeric
-			}
-			if result, ok := int64Multiply(value, int64(mantissa)); ok {
-				if !positive {
-					result = -result
+			uvalue, err := strconv.ParseUint(shifted, 10, 64)
+			if err == nil {
+				var value int64
+				signApplied := false
+				inRange := false
+				if uvalue <= math.MaxInt64 {
+					// fits in positive int64 range
+					value = int64(uvalue)
+					inRange = true
+				} else if !positive && uvalue == uint64(math.MaxInt64)+1 {
+					// special case: absolute value of math.MinInt64
+					value = math.MinInt64 // already negative, skip negation later
+					signApplied = true
+					inRange = true
 				}
-				// if the number is in canonical form, reuse the string
-				switch format {
-				case BinarySI:
-					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
-					}
-				default:
-					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+				if inRange {
+					if result, ok := int64Multiply(value, int64(mantissa)); ok {
+						if !positive && !signApplied {
+							result = -result
+						}
+						// if the number is in canonical form, reuse the string
+						switch format {
+						case BinarySI:
+							if !forceRecanonicalize && exponent%10 == 0 && (value&0x07 != 0) {
+								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: newCachedString(str, format)}, nil
+							}
+						default:
+							if !forceRecanonicalize && scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: newCachedString(str, format)}, nil
+							}
+						}
+						q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}
+						q.CacheString()
+						return q, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 			}
 		}
 	}
@@ -352,7 +440,12 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
+		exponentInfScale, canInfScale := Scale(exponent).infScale()
+		if !canInfScale {
+			return Quantity{}, ErrSuffix
+		}
+		// TODO: handle scale addition overflow
+		amount.SetScale(amount.Scale() + exponentInfScale)
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
@@ -371,7 +464,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		amount.Round(amount, nanoInfScale, inf.RoundUp)
 	}
 
 	// The max is just a simple cap.
@@ -388,16 +481,17 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+	q := Quantity{d: infDecAmount{amount}, Format: format}
+	q.CacheString()
+	return q, nil
 }
 
-// DeepCopy returns a deep-copy of the Quantity value.  Note that the method
-// receiver is a value, so we can mutate it in-place and return it.
+// DeepCopy returns a deep-copy of the Quantity value.
+//
+// Deprecated: Quantity is now a normal value type, so a regular shallow copy can be used instead of this method. No need to update existing code, DeepCopy is not going to be removed.
+//
+//go:fix inline
 func (q Quantity) DeepCopy() Quantity {
-	if q.d.Dec != nil {
-		tmp := &inf.Dec{}
-		q.d.Dec = tmp.Set(q.d.Dec)
-	}
 	return q
 }
 
@@ -451,12 +545,31 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		number, exponent := q.AsCanonicalBytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(10, exponent, format)
+		suffix, ok := quantitySuffixer.constructBytes(10, exponent, format)
+		if !ok {
+			// DecimalSI only defines suffixes up to "E" (10^18). For a larger
+			// exponent there is no suffix, so fall back to decimal exponent
+			// notation ("e") instead of dropping the exponent, which would
+			// silently corrupt the value (e.g. "1000E" serializing to "1").
+			suffix, _ = quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+		}
 		return number, suffix
 	default:
 		// format must be BinarySI
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(2, exponent*10, format)
+		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
+		if !ok && exponent != 0 {
+			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
+			// exponent there is no suffix, so fall back to decimal exponent
+			// notation ("e") instead of dropping the suffix, which would
+			// silently corrupt the value (e.g. 2^70 serializing to "1").
+			// The base-1024 mantissa/exponent cannot be reused for "e"
+			// notation, so recompute the canonical mantissa and exponent in
+			// base 10.
+			number, exponent := rounded.AsCanonicalBytes(out)
+			suffix, _ := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			return number, suffix
+		}
 		return number, suffix
 	}
 }
@@ -475,7 +588,8 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 		base = float64(q.i.value)
 		exponent = int(q.i.scale)
 	}
-	if exponent == 0 {
+	// Avoid 0 * Inf, which returns NaN.
+	if base == 0 || exponent == 0 {
 		return base
 	}
 
@@ -487,7 +601,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 // value of the quantity is outside the range of a float64 +Inf/-Inf will be
 // returned.
 func (q *Quantity) AsFloat64Slow() float64 {
-	infDec := q.AsDec()
+	infDec := q.internalReadOnlyDec()
 
 	var absScale int64
 	if infDec.Scale() < 0 {
@@ -522,6 +636,9 @@ func (q *Quantity) AsInt64() (int64, bool) {
 }
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) ToDec() *Quantity {
 	if q.d.Dec == nil {
 		q.d.Dec = q.i.AsDec()
@@ -530,14 +647,23 @@ func (q *Quantity) ToDec() *Quantity {
 	return q
 }
 
-// AsDec returns the quantity as represented by a scaled inf.Dec.
+// AsDec returns the quantity as represented by a scaled inf.Dec. The returned
+// quantity is a copy to avoid accidentally modifying the original.
 func (q *Quantity) AsDec() *inf.Dec {
+	if q.d.Dec != nil {
+		return new(inf.Dec).Set(q.d.Dec)
+	}
+	return q.i.AsDec()
+}
+
+// internalReadOnlyDec is AsDec without the defensive copy. This may only be
+// used internally in the Quantity implementation where we can guarantee the
+// returned value will not be modified.
+func (q *Quantity) internalReadOnlyDec() *inf.Dec {
 	if q.d.Dec != nil {
 		return q.d.Dec
 	}
-	q.d.Dec = q.i.AsDec()
-	q.i = int64Amount{}
-	return q.d.Dec
+	return q.i.AsDec()
 }
 
 // AsCanonicalBytes returns the canonical byte representation of this quantity as a mantissa
@@ -567,8 +693,15 @@ func (q *Quantity) Sign() int {
 	return q.i.Sign()
 }
 
-// AsScale returns the current value, rounded up to the provided scale, and returns
-// false if the scale resulted in a loss of precision.
+// AsScale returns the current value, rounded away from zero to set a minimum
+// scale, and returns false if the scale resulted in a loss of precision.
+//
+// For example:
+//   - (1.1e5).AsScale(3) returns 1.1e5, true
+//   - (1.1e5).AsScale(4) returns 1.1e5, true
+//   - (1.1e5).AsScale(5) returns 2e5, false
+//   - (1.1e5).AsScale(6) returns 1e6, false
+//   - (-1.1e5).AsScale(5) returns -2e5, false
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 	if q.d.Dec != nil {
 		return q.d.AsScale(scale)
@@ -579,27 +712,43 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 // RoundUp updates the quantity to the provided scale, ensuring that the value is at
 // least 1. False is returned if the rounding operation resulted in a loss of precision.
 // Negative numbers are rounded away from zero (-9 scale 1 rounds to -10).
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) RoundUp(scale Scale) bool {
+	// avoid clearing the string value if we have already calculated it
+	if q.widenedScale() >= widenScale(scale) {
+		return true
+	}
+	q.s = cachedString{}
 	if q.d.Dec != nil {
-		q.s = ""
 		d, exact := q.d.AsScale(scale)
 		q.d = d
 		return exact
 	}
-	// avoid clearing the string value if we have already calculated it
-	if q.i.scale >= scale {
-		return true
-	}
-	q.s = ""
 	i, exact := q.i.AsScale(scale)
 	q.i = i
 	return exact
 }
 
+// widenedScale returns the base-10 scale exponent as a widenedScale.
+func (q *Quantity) widenedScale() widenedScale {
+	if q.d.Dec != nil {
+		return q.d.widenedScale()
+	}
+	return q.i.widenedScale()
+}
+
 // Add adds the provide y quantity to the current value. If the current value is zero,
 // the format of the quantity will be updated to the format of y.
+//
+// If non-zero operand values are more than 29 orders of magnitude apart, the finer-grained
+// operand is rounded away from zero before the values are summed.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) Add(y Quantity) {
-	q.s = ""
+	q.s = cachedString{}
 	if q.d.Dec == nil && y.d.Dec == nil {
 		if q.i.value == 0 {
 			q.Format = y.Format
@@ -610,58 +759,88 @@ func (q *Quantity) Add(y Quantity) {
 	} else if q.IsZero() {
 		q.Format = y.Format
 	}
-	q.ToDec().d.Dec.Add(q.d.Dec, y.AsDec())
+	q.ToDec()
+	q.d.Dec = addDecBoundedScale(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Sub subtracts the provided quantity from the current value in place. If the current
 // value is zero, the format of the quantity will be updated to the format of y.
+//
+// If non-zero operand values are more than 29 orders of magnitude apart, the finer-grained
+// operand is rounded away from zero before the values are subtracted.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) Sub(y Quantity) {
-	q.s = ""
+	q.s = cachedString{}
 	if q.IsZero() {
 		q.Format = y.Format
+	}
+	if q.d.Dec == nil && y.d.Dec == nil && q.i.value == 0 && y.i.value == mostNegative {
+		// 0 - y is exactly -y. Negating a copy of y keeps y's own scale and avoids
+		// aligning it against a scale-0 zero in the inf.Dec fallback, which builds
+		// 10^scale and overflows inf.Dec at the most negative scale.
+		q.i = y.i
+		q.Neg()
+		return
 	}
 	if q.d.Dec == nil && y.d.Dec == nil && q.i.Sub(y.i) {
 		return
 	}
-	q.ToDec().d.Dec.Sub(q.d.Dec, y.AsDec())
+	q.ToDec()
+	q.d.Dec = subDecBoundedScale(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Mul multiplies the provided y to the current value.
 // It will return false if the result is inexact. Otherwise, it will return true.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) Mul(y int64) bool {
-	q.s = ""
+	q.s = cachedString{}
 	if q.d.Dec == nil && q.i.Mul(y) {
 		return true
 	}
-	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
+	q.ToDec()
+	q.d.Dec = new(inf.Dec).Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0)))
+	return q.d.Dec.UnscaledBig().IsInt64()
 }
 
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
+// Cmp does not modify q or y.
 func (q *Quantity) Cmp(y Quantity) int {
 	if q.d.Dec == nil && y.d.Dec == nil {
 		return q.i.Cmp(y.i)
 	}
-	return q.AsDec().Cmp(y.AsDec())
+	return cmpDec(q.internalReadOnlyDec(), y.internalReadOnlyDec())
 }
 
 // CmpInt64 returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) CmpInt64(y int64) int {
 	if q.d.Dec != nil {
-		return q.d.Dec.Cmp(inf.NewDec(y, inf.Scale(0)))
+		return cmpDec(q.d.Dec, inf.NewDec(y, inf.Scale(0)))
 	}
 	return q.i.Cmp(int64Amount{value: y})
 }
 
 // Neg sets quantity to be the negative value of itself.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) Neg() {
-	q.s = ""
+	q.s = cachedString{}
 	if q.d.Dec == nil {
-		q.i.value = -q.i.value
-		return
+		// -mostNegative overflows int64 and switches to inf.Dec, unless its scale
+		// can't be represented there, in which case it keeps the wrapped result.
+		if q.i.value != mostNegative || !q.i.scale.canInfScale() {
+			q.i.value = -q.i.value
+			return
+		}
+		q.ToDec()
 	}
-	q.d.Dec.Neg(q.d.Dec)
+	q.d.Dec = new(inf.Dec).Neg(q.d.Dec)
 }
 
 // Equal checks equality of two Quantities. This is useful for testing with
@@ -674,28 +853,56 @@ func (q Quantity) Equal(v Quantity) bool {
 // of most Quantity values.
 const int64QuantityExpectedBytes = 18
 
-// String formats the Quantity as a string, caching the result if not calculated.
-// String is an expensive operation and caching this result significantly reduces the cost of
-// normal parse / marshal operations on Quantity.
+// String formats the Quantity as a string, returning the cached value if it was
+// already calculated.
+//
+// String is an expensive operation which may get called multiple times during
+// encoding, therefore [ParseQuantity] takes care to always cache the string.
+// After constructing a quantity differently or when modifying an existing
+// instance through math operations, [CacheString] can be called to
+// cache the final result at a time when the caller owns the instance.
 func (q *Quantity) String() string {
 	if q == nil {
 		return "<nil>"
 	}
-	if len(q.s) == 0 {
+	if !q.s.validFor(q.Format) {
 		result := make([]byte, 0, int64QuantityExpectedBytes)
 		number, suffix := q.CanonicalizeBytes(result)
-		number = append(number, suffix...)
-		q.s = string(number)
+		return string(append(number, suffix...))
 	}
-	return q.s
+	return q.s.str
+}
+
+// CacheString formats the Quantity as a string, same as String, but also
+// caches the result on the receiver so that later calls to String don't have
+// to recompute it.
+//
+// May only be called at times when the caller can safely mutate the instance.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
+func (q *Quantity) CacheString() string {
+	if q == nil {
+		return "<nil>"
+	}
+	s := q.s
+	if !s.validFor(q.Format) {
+		s = newCachedString(q.String(), q.Format)
+	}
+	// This intentionally *always* writes the value back:
+	// it's unnecessary when it was already set, but writing anyway
+	// ensures that data races related to calling CacheString
+	// are more likely to be reported, regardless of the state of the instance.
+	q.s = s
+	return s.str
 }
 
 // MarshalJSON implements the json.Marshaller interface.
 func (q Quantity) MarshalJSON() ([]byte, error) {
-	if len(q.s) > 0 {
-		out := make([]byte, len(q.s)+2)
+	if q.s.validFor(q.Format) {
+		out := make([]byte, len(q.s.str)+2)
 		out[0], out[len(out)-1] = '"', '"'
-		copy(out[1:], q.s)
+		copy(out[1:], q.s.str)
 		return out, nil
 	}
 	result := make([]byte, int64QuantityExpectedBytes)
@@ -730,11 +937,13 @@ func (q Quantity) ToUnstructured() interface{} {
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 // TODO: Remove support for leading/trailing whitespace
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) UnmarshalJSON(value []byte) error {
 	l := len(value)
 	if l == 4 && bytes.Equal(value, []byte("null")) {
-		q.d.Dec = nil
-		q.i = int64Amount{}
+		q.Set(0)
 		return nil
 	}
 	if l >= 2 && value[0] == '"' && value[l-1] == '"' {
@@ -751,6 +960,10 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// UnmarshalCBOR implements the cbor.Unmarshaler interface.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) UnmarshalCBOR(value []byte) error {
 	var s *string
 	if err := cbor.Unmarshal(value, &s); err != nil {
@@ -758,8 +971,7 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 	}
 
 	if s == nil {
-		q.d.Dec = nil
-		q.i = int64Amount{}
+		q.Set(0)
 		return nil
 	}
 
@@ -776,7 +988,8 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 // value in the given format.
 func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
 	return &Quantity{
-		d:      infDecAmount{&b},
+		// b is a shallow copy and shares the big.Int.abs slice from the original, so we make a defensive copy.
+		d:      infDecAmount{new(inf.Dec).Set(&b)},
 		Format: format,
 	}
 }
@@ -810,43 +1023,69 @@ func NewScaledQuantity(value int64, scale Scale) *Quantity {
 	}
 }
 
-// Value returns the unscaled value of q rounded up to the nearest integer away from 0.
+// Value returns the value of q rounded to an integer, away from zero. It
+// saturates to math.MinInt64 or math.MaxInt64 when the value does not fit;
+// call AsScaledInt64 to detect that.
 func (q *Quantity) Value() int64 {
-	return q.ScaledValue(0)
+	value, _ := q.AsScaledInt64(0)
+	return value
 }
 
-// MilliValue returns the value of ceil(q * 1000); this could overflow an int64;
-// if that's a concern, call Value() first to verify the number is small enough.
+// MilliValue returns the value of q*1000 rounded to an integer, away from zero.
+// It saturates like Value; call AsMilliInt64 to detect overflow.
 func (q *Quantity) MilliValue() int64 {
-	return q.ScaledValue(Milli)
+	value, _ := q.AsMilliInt64()
+	return value
 }
 
-// ScaledValue returns the value of ceil(q / 10^scale).
-// For example, NewQuantity(1, DecimalSI).ScaledValue(Milli) returns 1000.
-// This could overflow an int64.
-// To detect overflow, call Value() first and verify the expected magnitude.
+// ScaledValue returns the value of q/10^scale rounded to an integer, away from
+// zero. It saturates like Value; call AsScaledInt64 to detect overflow.
 func (q *Quantity) ScaledValue(scale Scale) int64 {
+	value, _ := q.AsScaledInt64(scale)
+	return value
+}
+
+// AsScaledInt64 returns the value of q/10^scale as an int64, rounded away from
+// zero. ok is false when the value overflows int64, and then value saturates to
+// math.MinInt64 or math.MaxInt64. The int64 and inf.Dec backends agree for
+// values both can represent; a source scale near the int32 minimum is not
+// representable in inf.Dec, so calling q.ToDec() first can differ there.
+func (q *Quantity) AsScaledInt64(scale Scale) (value int64, ok bool) {
 	if q.d.Dec == nil {
-		i, _ := q.i.AsScaledInt64(scale)
-		return i
+		return q.i.AsScaledInt64(scale)
 	}
-	dec := q.d.Dec
-	return scaledValue(dec.UnscaledBig(), int(dec.Scale()), int(scale.infScale()))
+	return scaledValue(q.d.Dec.UnscaledBig(), q.d.widenedScale(), widenScale(scale))
+}
+
+// AsMilliInt64 returns the value of q*1000 as an int64, rounded away from zero.
+// ok is false when the value overflows int64, and then value saturates as
+// AsScaledInt64 describes.
+func (q *Quantity) AsMilliInt64() (value int64, ok bool) {
+	return q.AsScaledInt64(Milli)
 }
 
 // Set sets q's value to be value.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) Set(value int64) {
 	q.SetScaled(value, 0)
 }
 
 // SetMilli sets q's value to be value * 1/1000.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) SetMilli(value int64) {
 	q.SetScaled(value, Milli)
 }
 
 // SetScaled sets q's value to be value * 10^scale
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (q *Quantity) SetScaled(value int64, scale Scale) {
-	q.s = ""
+	q.s = cachedString{}
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
 }
@@ -877,4 +1116,15 @@ func (q *QuantityValue) Set(s string) error {
 // Type implements pflag.Value.Type.
 func (q QuantityValue) Type() string {
 	return "quantity"
+}
+
+// QuantityPtrEqual compares two Quantity pointers and returns true if they are both nil or point to equal quantities.
+func QuantityPtrEqual(a, b *Quantity) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
 }

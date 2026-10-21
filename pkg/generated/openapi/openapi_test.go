@@ -20,6 +20,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+
 	"github.com/go-openapi/jsonreference"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -64,6 +68,33 @@ func TestOpenAPIRoundtrip(t *testing.T) {
 			if !cmp.Equal(value.Schema, roundTripped, opts...) {
 				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", cmp.Diff(value.Schema, roundTripped, opts...))
 				return
+			}
+		})
+	}
+}
+
+func TestEventSeriesSchemasAreAtomic(t *testing.T) {
+	dummyRef := func(name string) spec.Ref { return spec.MustCreateRef("#/definitions/dummy") }
+	testCases := map[string]string{
+		"core/v1":               corev1.EventSeries{}.OpenAPIModelName(),
+		"events.k8s.io/v1":      eventsv1.EventSeries{}.OpenAPIModelName(),
+		"events.k8s.io/v1beta1": eventsv1beta1.EventSeries{}.OpenAPIModelName(),
+	}
+
+	definitions := GetOpenAPIDefinitions(dummyRef)
+	for name, modelName := range testCases {
+		t.Run(name, func(t *testing.T) {
+			definition, ok := definitions[modelName]
+			if !ok {
+				t.Fatalf("missing OpenAPI definition for %s", modelName)
+			}
+
+			got, ok := definition.Schema.Extensions["x-kubernetes-map-type"].(string)
+			if !ok {
+				t.Fatalf("missing x-kubernetes-map-type extension for %s", modelName)
+			}
+			if got != "atomic" {
+				t.Fatalf("expected x-kubernetes-map-type=atomic for %s, got %q", modelName, got)
 			}
 		})
 	}

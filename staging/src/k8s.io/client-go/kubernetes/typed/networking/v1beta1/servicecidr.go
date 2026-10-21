@@ -43,6 +43,7 @@ type ServiceCIDRInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, serviceCIDR *networkingv1beta1.ServiceCIDR, opts v1.UpdateOptions) (*networkingv1beta1.ServiceCIDR, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*networkingv1beta1.ServiceCIDR, error)
 	List(ctx context.Context, opts v1.ListOptions) (*networkingv1beta1.ServiceCIDRList, error)

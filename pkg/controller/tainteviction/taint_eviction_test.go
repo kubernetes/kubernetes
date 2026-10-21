@@ -37,6 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -1001,4 +1003,49 @@ func TestPodDeletionEvent(t *testing.T) {
 			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
 		}
 	})
+}
+
+func TestPodDeletionsLatencyObservedInSeconds(t *testing.T) {
+	metrics.Register()
+
+	// PodDeletionsLatency is a plain Histogram, which has no Reset(), and other
+	// tests in this package observe it, so compare against a baseline.
+	histogram := metrics.PodDeletionsLatency.ObserverMetric
+	countBefore, err := metricstestutil.GetHistogramMetricCount(histogram)
+	if err != nil {
+		t.Fatalf("failed to get latency count: %v", err)
+	}
+	sumBefore, err := metricstestutil.GetHistogramMetricValue(histogram)
+	if err != nil {
+		t.Fatalf("failed to get latency sum: %v", err)
+	}
+
+	pod := testutil.NewPod("pod1", "node1")
+	fakeClientset := fake.NewSimpleClientset(pod)
+
+	// Regression test for https://github.com/kubernetes/kubernetes/issues/142617.
+	// Before the fix, the latency was computed as time.Since(fireAt) * time.Second,
+	// which overflows int64 above ~9.2s, so a 10s latency was recorded as negative.
+	elapsed := 10 * time.Second
+	handler := deletePodHandler(fakeClientset, nil, "test")
+	// fireAt is elapsed in the past, so the handler should observe a latency of about elapsed.
+	if err := handler(context.Background(), time.Now().Add(-elapsed), NewWorkArgs(pod.Name, pod.Namespace)); err != nil {
+		t.Fatalf("deletePodHandler failed: %v", err)
+	}
+
+	countAfter, err := metricstestutil.GetHistogramMetricCount(histogram)
+	if err != nil {
+		t.Fatalf("failed to get latency count: %v", err)
+	}
+	sumAfter, err := metricstestutil.GetHistogramMetricValue(histogram)
+	if err != nil {
+		t.Fatalf("failed to get latency sum: %v", err)
+	}
+	if got := countAfter - countBefore; got != 1 {
+		t.Fatalf("latency sample count increased by %d, want 1", got)
+	}
+	// Exactly one sample was added, so the difference of the sums is that sample's value.
+	if observed := sumAfter - sumBefore; observed < elapsed.Seconds() || observed > elapsed.Seconds()+1 {
+		t.Errorf("observed latency = %v seconds, want between %v and %v", observed, elapsed.Seconds(), elapsed.Seconds()+1)
+	}
 }

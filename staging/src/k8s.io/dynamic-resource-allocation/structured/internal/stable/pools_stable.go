@@ -63,6 +63,16 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			continue
 		}
 
+		// While the DRADeviceCompatibilityGroups feature is disabled, this
+		// allocator cannot validate co-allocation against compatibility
+		// groups, so slices with devices which declare them get ignored.
+		// This makes the pool incomplete (checked below), which prevents
+		// allocating the pool's other devices, too.
+		if !features.CompatibilityGroups && sliceUsesCompatibilityGroups(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses compatibility groups while the DRADeviceCompatibilityGroups feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
+			continue
+		}
+
 		// Always include slices with SharedCounters since they are needed to use a pool
 		// regardless of their node selector.
 		if len(slice.Spec.SharedCounters) > 0 {
@@ -137,6 +147,13 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			//
 			// Let's ignore the old device information by ignoring the pool.
 			continue
+		}
+		if !features.CompatibilityGroups {
+			// Stay consistent with the filtering above: ignored slices must
+			// not count towards pool completeness, otherwise a pool could be
+			// considered complete even though its devices with compatibility
+			// groups are not visible to the allocator.
+			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
 		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
@@ -351,7 +368,11 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 // - current generation is obsolete -> no further checking
 // - all slices with the generation in the pool
 //
-// Future TODO: detect inconsistent ResourceSliceCount, also in poolIsInvalid.
+// Not checked: consistency of a pool generation's ResourceSliceCount, meaning
+// slices that disagree on the declared count or outnumber it. The count still
+// decides completeness. The extra cross-slice check was considered in
+// https://github.com/kubernetes/kubernetes/pull/141118 and left out to keep the
+// allocation path cheap. Drivers must publish consistent counts.
 func checkSlicesInPool(slices []*resourceapi.ResourceSlice, poolID PoolID, generation int64) (bool, []*resourceapi.ResourceSlice) {
 	// A cached index by pool ID would make this more efficient.
 	// It may be needed long-term to support features which always have to consider all slices.

@@ -223,6 +223,9 @@ func (o *LabelOptions) Validate() error {
 	if o.all && len(o.fieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
+	if o.list && (len(o.newLabels) > 0 || len(o.removeLabels) > 0) {
+		return fmt.Errorf("cannot modify labels when --list is specified")
+	}
 	if o.local {
 		if o.dryRunStrategy == cmdutil.DryRunServer {
 			return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
@@ -314,7 +317,7 @@ func (o *LabelOptions) RunLabel() error {
 			}
 			for _, label := range o.removeLabels {
 				if _, ok := accessor.GetLabels()[label]; !ok {
-					fmt.Fprintf(o.Out, "label %q not found.\n", label)
+					fmt.Fprintf(o.ErrOut, "label %q not found.\n", label)
 				}
 			}
 

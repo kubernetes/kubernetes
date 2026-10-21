@@ -24,33 +24,33 @@ import (
 )
 
 type SnapshotCache interface {
-	Add(snapshot Snapshot)
+	Add(snapshot *Snapshot)
 
 	Delete(i int)
 
-	List(ready bool) []csi.Snapshot
+	List(ready bool) []*csi.Snapshot
 
-	FindSnapshot(k, v string) (int, Snapshot)
+	FindSnapshot(k, v string) (int, *Snapshot)
 }
 
 type Snapshot struct {
 	Name        string
 	Parameters  map[string]string
-	SnapshotCSI csi.Snapshot
+	SnapshotCSI *csi.Snapshot
 }
 
 type snapshotCache struct {
 	snapshotsRWL sync.RWMutex
-	snapshots    []Snapshot
+	snapshots    []*Snapshot
 }
 
 func NewSnapshotCache() SnapshotCache {
 	return &snapshotCache{
-		snapshots: make([]Snapshot, 0),
+		snapshots: make([]*Snapshot, 0),
 	}
 }
 
-func (snap *snapshotCache) Add(snapshot Snapshot) {
+func (snap *snapshotCache) Add(snapshot *Snapshot) {
 	snap.snapshotsRWL.Lock()
 	defer snap.snapshotsRWL.Unlock()
 
@@ -62,14 +62,15 @@ func (snap *snapshotCache) Delete(i int) {
 	defer snap.snapshotsRWL.Unlock()
 
 	copy(snap.snapshots[i:], snap.snapshots[i+1:])
+	snap.snapshots[len(snap.snapshots)-1] = nil
 	snap.snapshots = snap.snapshots[:len(snap.snapshots)-1]
 }
 
-func (snap *snapshotCache) List(ready bool) []csi.Snapshot {
+func (snap *snapshotCache) List(ready bool) []*csi.Snapshot {
 	snap.snapshotsRWL.RLock()
 	defer snap.snapshotsRWL.RUnlock()
 
-	snapshots := make([]csi.Snapshot, 0)
+	snapshots := make([]*csi.Snapshot, 0)
 	for _, v := range snap.snapshots {
 		if v.SnapshotCSI.GetReadyToUse() {
 			snapshots = append(snapshots, v.SnapshotCSI)
@@ -79,11 +80,10 @@ func (snap *snapshotCache) List(ready bool) []csi.Snapshot {
 	return snapshots
 }
 
-func (snap *snapshotCache) FindSnapshot(k, v string) (int, Snapshot) {
+func (snap *snapshotCache) FindSnapshot(k, v string) (int, *Snapshot) {
 	snap.snapshotsRWL.RLock()
 	defer snap.snapshotsRWL.RUnlock()
 
-	snapshotIdx := -1
 	for i, vi := range snap.snapshots {
 		switch k {
 		case "id":
@@ -91,7 +91,7 @@ func (snap *snapshotCache) FindSnapshot(k, v string) (int, Snapshot) {
 				return i, vi
 			}
 		case "sourceVolumeId":
-			if strings.EqualFold(v, vi.SnapshotCSI.SourceVolumeId) {
+			if strings.EqualFold(v, vi.SnapshotCSI.GetSourceVolumeId()) {
 				return i, vi
 			}
 		case "name":
@@ -101,5 +101,5 @@ func (snap *snapshotCache) FindSnapshot(k, v string) (int, Snapshot) {
 		}
 	}
 
-	return snapshotIdx, Snapshot{}
+	return -1, nil
 }

@@ -21,6 +21,16 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func encodeContinueOrDie(apiVersion string, resourceVersion int64, nextKey string) string {
@@ -108,6 +118,69 @@ func Test_decodeContinue(t *testing.T) {
 			}
 			if gotRv != tt.wantRv {
 				t.Errorf("decodeContinue() gotRv = %v, want %v", gotRv, tt.wantRv)
+			}
+		})
+	}
+}
+
+func TestPrepareContinueTokenRemainingItemCount(t *testing.T) {
+	tests := []struct {
+		name                      string
+		enableShardedListAndWatch bool
+		label                     labels.Selector
+		field                     fields.Selector
+		shardSelector             sharding.Selector
+		wantRemaining             *int64
+	}{
+		{
+			name:          "empty predicate reports remaining count",
+			label:         labels.Everything(),
+			field:         fields.Everything(),
+			wantRemaining: ptr.To[int64](3),
+		},
+		{
+			name:          "label selector omits remaining count",
+			label:         labels.SelectorFromSet(labels.Set{"name": "foo"}),
+			field:         fields.Everything(),
+			wantRemaining: nil,
+		},
+		{
+			name:                      "shard selector omits remaining count when ShardedListAndWatch enabled",
+			enableShardedListAndWatch: true,
+			label:                     labels.Everything(),
+			field:                     fields.Everything(),
+			shardSelector:             shardSelectorMatchingEverything(),
+			wantRemaining:             nil,
+		},
+		{
+			name:                      "shard selector reports remaining count when ShardedListAndWatch disabled",
+			enableShardedListAndWatch: false,
+			label:                     labels.Everything(),
+			field:                     fields.Everything(),
+			shardSelector:             shardSelectorMatchingEverything(),
+			wantRemaining:             ptr.To[int64](3),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, tt.enableShardedListAndWatch)
+			opts := ListOptions{
+				Predicate: SelectionPredicate{
+					Label:         tt.label,
+					Field:         tt.field,
+					ShardSelector: tt.shardSelector,
+					Limit:         2,
+				},
+			}
+			continueValue, remaining, err := PrepareContinueToken("/test/pod-2", "/test/", 12345, 5, true, opts)
+			if err != nil {
+				t.Fatalf("PrepareContinueToken() returned unexpected error: %v", err)
+			}
+			if len(continueValue) == 0 {
+				t.Error("PrepareContinueToken() returned empty continue token")
+			}
+			if diff := cmp.Diff(tt.wantRemaining, remaining); diff != "" {
+				t.Errorf("PrepareContinueToken() unexpected remainingItemCount (-want, +got):\n%s", diff)
 			}
 		})
 	}

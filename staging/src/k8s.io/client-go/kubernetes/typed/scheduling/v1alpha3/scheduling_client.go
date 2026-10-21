@@ -28,6 +28,7 @@ import (
 
 type SchedulingV1alpha3Interface interface {
 	RESTClient() rest.Interface
+	CompositePodGroupsGetter
 	PodGroupsGetter
 	WorkloadsGetter
 }
@@ -35,6 +36,10 @@ type SchedulingV1alpha3Interface interface {
 // SchedulingV1alpha3Client is used to interact with features provided by the scheduling.k8s.io group.
 type SchedulingV1alpha3Client struct {
 	restClient rest.Interface
+}
+
+func (c *SchedulingV1alpha3Client) CompositePodGroups(namespace string) CompositePodGroupInterface {
+	return newCompositePodGroups(c, namespace)
 }
 
 func (c *SchedulingV1alpha3Client) PodGroups(namespace string) PodGroupInterface {
@@ -89,7 +94,9 @@ func setConfigDefaults(config *rest.Config) {
 	gv := schedulingv1alpha3.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
+	}
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

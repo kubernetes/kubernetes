@@ -74,25 +74,28 @@ func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() storageframework.TestS
 	return s.tsInfo
 }
 
-func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.CSIInlineVolume, storageframework.GenericEphemeralVolume))
+func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	if reason := checkVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.CSIInlineVolume, storageframework.GenericEphemeralVolume)); reason != "" {
+		return reason
+	}
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[storageframework.CapFsGroup] {
-		e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support FsGroup", dInfo.Name)
 	}
 
 	if pattern.VolMode == v1.PersistentVolumeBlock {
-		e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
+		return "Test does not support non-filesystem volume mode"
 	}
 
 	if pattern.VolType != storageframework.DynamicPV {
-		e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
 	}
 
 	_, ok := driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
-		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Driver %s doesn't support %v", dInfo.Name, pattern.VolType)
 	}
+	return ""
 }
 
 func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

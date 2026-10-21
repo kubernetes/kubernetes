@@ -28,8 +28,10 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -41,6 +43,12 @@ import (
 type ClaimInfo struct {
 	state.ClaimInfoState
 	prepared bool
+	// unpreparing is true from the moment unprepareResources commits to
+	// calling NodeUnprepareResources for the last referencing pod until
+	// the cache entry is deleted. While set, prepareResources must not
+	// attach new pods to this claim: the claim resources are being unprepared
+	// and new pods shouldn't prepare this claim until it has been fully unprepared.
+	unpreparing bool
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
@@ -53,24 +61,82 @@ type claimInfoCache struct {
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
 // It verifies that the kubelet can handle the claim.
 func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error) {
-	claimInfoState := state.ClaimInfoState{
-		ClaimUID:    claim.UID,
-		ClaimName:   claim.Name,
-		Namespace:   claim.Namespace,
-		PodUIDs:     sets.New[string](),
-		DriverState: make(map[string]state.DriverState),
-	}
 	if claim.Status.Allocation == nil {
 		return nil, errors.New("not allocated")
 	}
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		claimInfoState.DriverState[result.Driver] = state.DriverState{}
+
+	driverState, err := computeDriverStates(claim)
+	if err != nil {
+		return nil, err
 	}
+
 	info := &ClaimInfo{
-		ClaimInfoState: claimInfoState,
-		prepared:       false,
+		ClaimInfoState: state.ClaimInfoState{
+			ClaimUID:    claim.UID,
+			ClaimName:   claim.Name,
+			Namespace:   claim.Namespace,
+			PodUIDs:     sets.New[string](),
+			DriverState: driverState,
+		},
+		prepared: false,
 	}
 	return info, nil
+}
+
+func computeDriverStates(claim *resourceapi.ResourceClaim) (map[string]state.DriverState, error) {
+	devicesPerDriver := make(map[string]int)
+	opCountsPerDriver := make(map[string]map[resourceapi.SkipNodeOperation]int)
+
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		devicesPerDriver[result.Driver]++
+		if len(result.SkipNodeOperations) == 0 {
+			continue
+		}
+		if opCountsPerDriver[result.Driver] == nil {
+			opCountsPerDriver[result.Driver] = make(map[resourceapi.SkipNodeOperation]int)
+		}
+		// SkipNodeOperationAll already subsumes all individual operations for this result.
+		if slices.Contains(result.SkipNodeOperations, resourceapi.SkipNodeOperationAll) {
+			opCountsPerDriver[result.Driver][resourceapi.SkipNodeOperationAll]++
+			continue
+		}
+		// API validation (+listType=set) guarantees slice items are unique.
+		for _, op := range result.SkipNodeOperations {
+			opCountsPerDriver[result.Driver][op]++
+		}
+	}
+
+	driverStates := make(map[string]state.DriverState, len(devicesPerDriver))
+	for driver, total := range devicesPerDriver {
+		var skippedOps []resourceapi.SkipNodeOperation
+		driverOpCounts := opCountsPerDriver[driver]
+		if driverOpCounts != nil {
+			allCount := driverOpCounts[resourceapi.SkipNodeOperationAll]
+			if allCount == total {
+				skippedOps = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}
+			} else {
+				for op, count := range driverOpCounts {
+					if op == resourceapi.SkipNodeOperationAll {
+						continue
+					}
+					if count+allCount == total {
+						skippedOps = append(skippedOps, op)
+					}
+				}
+				slices.Sort(skippedOps)
+			}
+		}
+
+		if len(skippedOps) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+			return nil, errors.New("DRAOptionalNodeOperations feature gate is disabled on kubelet")
+		}
+
+		driverStates[driver] = state.DriverState{
+			SkipNodeOperations: skippedOps,
+		}
+	}
+
+	return driverStates, nil
 }
 
 // newClaimInfoFromClaim creates a new claim info from a checkpointed claim info state object.
@@ -89,6 +155,22 @@ func (info *ClaimInfo) addDevice(driverName string, deviceState state.Device) {
 	}
 	driverState := info.DriverState[driverName]
 	driverState.Devices = append(driverState.Devices, deviceState)
+	info.DriverState[driverName] = driverState
+}
+
+// resetDevices clears the device list for a given driver, keeping the
+// entry present in DriverState. Used to discard stale devices left over
+// from a previous NodePrepareResources attempt before applying the
+// new response.
+func (info *ClaimInfo) resetDevices(driverName string) {
+	if info.DriverState == nil {
+		return
+	}
+	driverState, ok := info.DriverState[driverName]
+	if !ok {
+		return
+	}
+	driverState.Devices = nil
 	info.DriverState[driverName] = driverState
 }
 
@@ -115,6 +197,18 @@ func (info *ClaimInfo) setPrepared() {
 // isPrepared checks if claim info is prepared or not.
 func (info *ClaimInfo) isPrepared() bool {
 	return info.prepared
+}
+
+// setUnpreparing marks the claim info as being torn down, so
+// prepareResources refuses to attach new pods to it.
+func (info *ClaimInfo) setUnpreparing() {
+	info.unpreparing = true
+}
+
+// isUnpreparing reports whether unprepareResources is in the process
+// of calling NodeUnprepareResources on this claim.
+func (info *ClaimInfo) isUnpreparing() bool {
+	return info.unpreparing
 }
 
 // cdiDevicesAsList returns a list of CDIDevices from the provided claim info.

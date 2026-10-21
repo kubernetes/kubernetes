@@ -29,6 +29,11 @@ func (s *MemoryGroup) Name() string {
 	return "memory"
 }
 
+// ID returns the controller ID for memory subsystem.
+func (s *MemoryGroup) ID() cgroups.Controller {
+	return cgroups.Memory
+}
+
 func (s *MemoryGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

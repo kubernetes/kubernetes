@@ -29,7 +29,7 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AggregationRule = map[string]string{
 	"":                     "AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole",
-	"clusterRoleSelectors": "ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules. If any of the selectors match, then the ClusterRole's permissions will be added",
+	"clusterRoleSelectors": "clusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules. If any of the selectors match, then the ClusterRole's permissions will be added",
 }
 
 func (AggregationRule) SwaggerDoc() map[string]string {
@@ -38,9 +38,9 @@ func (AggregationRule) SwaggerDoc() map[string]string {
 
 var map_ClusterRole = map[string]string{
 	"":                "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
-	"metadata":        "Standard object's metadata.",
-	"rules":           "Rules holds all the PolicyRules for this ClusterRole",
-	"aggregationRule": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
+	"metadata":        "metadata is the standard object's metadata.",
+	"rules":           "rules holds all the PolicyRules for this ClusterRole",
+	"aggregationRule": "aggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
 }
 
 func (ClusterRole) SwaggerDoc() map[string]string {
@@ -49,9 +49,9 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 
 var map_ClusterRoleBinding = map[string]string{
 	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
-	"metadata": "Standard object's metadata.",
-	"subjects": "Subjects holds references to the objects the role applies to.",
-	"roleRef":  "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
+	"metadata": "metadata is the standard object's metadata.",
+	"subjects": "subjects holds references to the objects the role applies to.",
+	"roleRef":  "roleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
 }
 
 func (ClusterRoleBinding) SwaggerDoc() map[string]string {
@@ -80,11 +80,11 @@ func (ClusterRoleList) SwaggerDoc() map[string]string {
 
 var map_PolicyRule = map[string]string{
 	"":                "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
-	"verbs":           "Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.",
-	"apiGroups":       "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
-	"resources":       "Resources is a list of resources this rule applies to. '*' represents all resources.",
-	"resourceNames":   "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
-	"nonResourceURLs": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
+	"verbs":           "verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.",
+	"apiGroups":       "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
+	"resources":       "resources is a list of resources this rule applies to. '*' represents all resources.",
+	"resourceNames":   "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
+	"nonResourceURLs": "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
 }
 
 func (PolicyRule) SwaggerDoc() map[string]string {
@@ -93,8 +93,8 @@ func (PolicyRule) SwaggerDoc() map[string]string {
 
 var map_Role = map[string]string{
 	"":         "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
-	"metadata": "Standard object's metadata.",
-	"rules":    "Rules holds all the PolicyRules for this Role",
+	"metadata": "metadata is the standard object's metadata.",
+	"rules":    "rules holds all the PolicyRules for this Role",
 }
 
 func (Role) SwaggerDoc() map[string]string {
@@ -103,9 +103,9 @@ func (Role) SwaggerDoc() map[string]string {
 
 var map_RoleBinding = map[string]string{
 	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
-	"metadata": "Standard object's metadata.",
-	"subjects": "Subjects holds references to the objects the role applies to.",
-	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
+	"metadata": "metadata is the standard object's metadata.",
+	"subjects": "subjects holds references to the objects the role applies to.",
+	"roleRef":  "roleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
 }
 
 func (RoleBinding) SwaggerDoc() map[string]string {
@@ -134,9 +134,9 @@ func (RoleList) SwaggerDoc() map[string]string {
 
 var map_RoleRef = map[string]string{
 	"":         "RoleRef contains information that points to the role being used",
-	"apiGroup": "APIGroup is the group for the resource being referenced",
-	"kind":     "Kind is the type of resource being referenced",
-	"name":     "Name is the name of resource being referenced",
+	"apiGroup": "apiGroup is the group for the resource being referenced",
+	"kind":     "kind is the type of resource being referenced",
+	"name":     "name is the name of resource being referenced",
 }
 
 func (RoleRef) SwaggerDoc() map[string]string {
@@ -145,10 +145,10 @@ func (RoleRef) SwaggerDoc() map[string]string {
 
 var map_Subject = map[string]string{
 	"":          "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
-	"kind":      "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
-	"apiGroup":  "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
-	"name":      "Name of the object being referenced.",
-	"namespace": "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
+	"kind":      "kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
+	"apiGroup":  "apiGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
+	"name":      "name of the object being referenced.",
+	"namespace": "namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
 }
 
 func (Subject) SwaggerDoc() map[string]string {

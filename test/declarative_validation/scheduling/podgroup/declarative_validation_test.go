@@ -61,6 +61,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
 		enablePodGroupPreemptionPolicy  bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid": {
@@ -201,11 +202,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid negative priority": {
 			input: mkValidPodGroup(setPriority(-2147483648)),
 		},
-		"too high priority": {
+		"valid priority above user-defined maximum": {
 			input: mkValidPodGroup(setPriority(scheduling.HighestUserDefinablePriority + 1)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("maximum"),
-			},
+		},
+		"valid system-cluster-critical priority": {
+			input: mkValidPodGroup(setPriority(scheduling.SystemCriticalPriority)),
+		},
+		"valid system-node-critical priority": {
+			input: mkValidPodGroup(setPriority(scheduling.SystemCriticalPriority + 1000)),
 		},
 		"preemption policy set, pod group preemptionPolicy disabled": {
 			input:        mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
@@ -315,6 +319,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "resourceClaims").Index(0).Child("name"), ""),
 			},
 		},
+		"correct parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"forbidden parentCompositePodGroupName (feature disabled)": {
+			input:        mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "parentCompositePodGroupName"), "")},
+		},
+		"invalid parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("invalid/name")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), nil, "").WithOrigin("format=k8s-long-name")},
+		},
+		"dependentRequired missing workloadRef when parent is set": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent"), unsetWorkloadRef()),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired").MarkAlpha()},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -323,6 +348,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
@@ -357,6 +383,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
 		enablePodGroupPreemptionPolicy  bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid update": {
@@ -411,6 +438,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"invalid update of gang minCount to 0": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupMinCount(0)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedulingPolicy", "gang", "minCount"), ""),
+			},
+		},
 		"invalid update of gang minCount": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupMinCount(-1)),
@@ -423,6 +457,30 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic to gang policy": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic policy with neither basic nor gang": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), clearPodGroupPolicy()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"invalid update from basic policy with both basic and gang": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setBothPolicies()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
 			},
 		},
@@ -554,6 +612,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), clearPreemptionPolicy()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
 		},
+		"invalid update of parentCompositePodGroupName": {
+			oldObj:                        mkValidPodGroup(setResourceVersion("1")),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), setParentCompositePodGroupName("new-parent")),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), "new-parent", "").WithOrigin("immutable")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -562,6 +627,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			strategy := registry.NewStrategy()
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
@@ -896,5 +962,11 @@ func setPreemptionPolicy(policy scheduling.PreemptionPolicy) func(obj *schedulin
 func clearPreemptionPolicy() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.PreemptionPolicy = nil
+	}
+}
+
+func setParentCompositePodGroupName(name string) func(obj *scheduling.PodGroup) {
+	return func(obj *scheduling.PodGroup) {
+		obj.Spec.ParentCompositePodGroupName = &name
 	}
 }

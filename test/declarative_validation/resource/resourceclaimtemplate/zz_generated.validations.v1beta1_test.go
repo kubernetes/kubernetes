@@ -30,6 +30,42 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceClaimTemplate"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.spec.devices.config": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -47,8 +83,13 @@ func init() {
 			"spec.spec.devices.constraints": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"spec.spec.devices.constraints[*].distinctAttribute": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
+			},
 			"spec.spec.devices.constraints[*].matchAttribute": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.spec.devices.constraints[*].requests": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -65,6 +106,17 @@ func init() {
 			"spec.spec.devices.requests[*].allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
+			"spec.spec.devices.requests[*].derivedAttributes": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.spec.devices.requests[*].derivedAttributes[*].expression": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.spec.devices.requests[*].derivedAttributes[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
+			},
 			"spec.spec.devices.requests[*].firstAvailable": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -73,6 +125,17 @@ func init() {
 			},
 			"spec.spec.devices.requests[*].firstAvailable[*].allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes[*].expression": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.spec.devices.requests[*].firstAvailable[*].deviceClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},

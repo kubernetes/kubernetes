@@ -25,7 +25,7 @@ import (
 const (
 	// maxInt64Factors is the highest value that will be checked when removing factors of 10 from an int64.
 	// It is also the maximum decimal digits that can be represented with an int64.
-	maxInt64Factors = 18
+	maxInt64Factors = 19
 )
 
 var (
@@ -43,14 +43,35 @@ var (
 	// Largest (in magnitude) number allowed.
 	maxAllowed = infDecAmount{inf.NewDec((1<<63)-1, 0)} // == max int64
 
-	// The maximum value we can represent milli-units for.
-	// Compare with the return value of Quantity.Value() to
-	// see if it's safe to use Quantity.MilliValue().
+	// MaxMilliValue is the largest whole number whose value in milli-units fits an
+	// int64. It bounds a value, not a quantity: a quantity may be fractional, so a
+	// quantity greater than MaxMilliValue can still have a MilliValue that fits. For
+	// a non-negative quantity, compare it against MaxMilliQuantity with Quantity.Cmp
+	// instead. Comparing Quantity.Value against MaxMilliValue is unreliable: Value
+	// saturates for a quantity outside int64, so it cannot tell one that is merely
+	// large from one that is larger still.
 	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
 )
 
+// MaxMilliQuantity returns the largest Quantity whose value in milli-units fits
+// an int64, so that MilliValue and ScaledValue(Milli) do not overflow. For a
+// non-negative q, q.Cmp(MaxMilliQuantity()) <= 0 reports whether q.MilliValue()
+// and q.ScaledValue(Milli) fit an int64. Prefer it over comparing q.Value()
+// against MaxMilliValue, which is unreliable because Value saturates for a
+// quantity outside int64.
+//
+// The bound is one-sided: a large negative q also overflows those methods (its
+// value in milli-units is below MinInt64), so a q that may be negative must be
+// checked with q.Sign() first.
+func MaxMilliQuantity() Quantity {
+	return *NewMilliQuantity(mostPositive, DecimalSI)
+}
+
 const mostNegative = -(mostPositive + 1)
 const mostPositive = 1<<63 - 1
+
+// log10MaxInt64 is the exponent of the first power of ten that exceeds mostPositive.
+const log10MaxInt64 = 19
 
 // int64Add returns a+b, or false if that would overflow int64.
 func int64Add(a, b int64) (int64, bool) {
@@ -135,32 +156,46 @@ func int64MultiplyScale1000(a int64) (int64, bool) {
 	return c, c/1000 == a
 }
 
-// positiveScaleInt64 multiplies base by 10^scale, returning false if the
-// value overflows. Passing a negative scale is undefined.
+// positiveScaleInt64 multiplies base by 10^scale. On overflow it returns false
+// and saturates to the int64 rail matching base's sign. Passing a negative
+// scale is undefined.
 func positiveScaleInt64(base int64, scale Scale) (int64, bool) {
+	if base == 0 {
+		// 0 stays 0; the default case would otherwise loop scale times for nothing.
+		return 0, true
+	}
+	var result int64
+	ok := true
 	switch scale {
 	case 0:
 		return base, true
 	case 1:
-		return int64MultiplyScale10(base)
+		result, ok = int64MultiplyScale10(base)
 	case 2:
-		return int64MultiplyScale100(base)
+		result, ok = int64MultiplyScale100(base)
 	case 3:
-		return int64MultiplyScale1000(base)
+		result, ok = int64MultiplyScale1000(base)
 	case 6:
-		return int64MultiplyScale(base, 1000000)
+		result, ok = int64MultiplyScale(base, 1000000)
 	case 9:
-		return int64MultiplyScale(base, 1000000000)
+		result, ok = int64MultiplyScale(base, 1000000000)
 	default:
-		value := base
-		var ok bool
+		result = base
 		for i := Scale(0); i < scale; i++ {
-			if value, ok = int64MultiplyScale(value, 10); !ok {
-				return 0, false
+			if result, ok = int64MultiplyScale(result, 10); !ok {
+				break
 			}
 		}
-		return value, true
 	}
+	if !ok {
+		// base * 10^scale keeps base's sign until it overflows, so the rail is
+		// determined by that sign.
+		if base < 0 {
+			return mostNegative, false
+		}
+		return mostPositive, false
+	}
+	return result, true
 }
 
 // negativeScaleInt64 reduces base by the provided scale, rounding up, until the

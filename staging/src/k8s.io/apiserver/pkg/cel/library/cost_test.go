@@ -198,6 +198,66 @@ func TestIndexOfCost(t *testing.T) {
 	}
 }
 
+func TestIncludesCost(t *testing.T) {
+	cases := []struct {
+		opts  []string
+		costs []comparableCost
+	}{
+		{
+			opts: []string{".includes(%s)"},
+			costs: []comparableCost{
+				{
+					comparableLiteral: intListLiteral, param: "3",
+					expectedEstimatedCost: checker.CostEstimate{Min: 15, Max: 15}, expectedRuntimeCost: 15,
+				},
+				{
+					comparableLiteral: uintListLiteral, param: "uint(3)",
+					expectedEstimatedCost: checker.CostEstimate{Min: 21, Max: 21}, expectedRuntimeCost: 21, // +5 for numeric casts
+				},
+				{
+					comparableLiteral: doubleListLiteral, param: "3.0",
+					expectedEstimatedCost: checker.CostEstimate{Min: 15, Max: 15}, expectedRuntimeCost: 15,
+				},
+				{
+					comparableLiteral: boolListLiteral, param: "true",
+					expectedEstimatedCost: checker.CostEstimate{Min: 15, Max: 15}, expectedRuntimeCost: 15,
+				},
+				{
+					comparableLiteral: stringListLiteral, param: "'x'",
+					expectedEstimatedCost: checker.CostEstimate{Min: 15, Max: 25}, expectedRuntimeCost: 15, // +5 for string comparisons
+				},
+				{
+					comparableLiteral: bytesListLiteral, param: "bytes('x')",
+					expectedEstimatedCost: checker.CostEstimate{Min: 26, Max: 36}, expectedRuntimeCost: 26, // +11 for casts from string to byte, +5 for byte comparisons
+				},
+				{
+					comparableLiteral: durationListLiteral, param: "duration('3s')",
+					expectedEstimatedCost: checker.CostEstimate{Min: 21, Max: 21}, expectedRuntimeCost: 21, // +6 for casts from duration to byte
+				},
+				{
+					comparableLiteral: timestampListLiteral, param: "timestamp('2011-01-03T00:00:00.000+01:00')",
+					expectedEstimatedCost: checker.CostEstimate{Min: 21, Max: 21}, expectedRuntimeCost: 21, // +6 for casts from timestamp to byte
+				},
+				{
+					comparableLiteral: stringLiteral, param: "'123'",
+					expectedEstimatedCost: checker.CostEstimate{Min: 50, Max: 50}, expectedRuntimeCost: 5,
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, op := range tc.opts {
+			for _, typ := range tc.costs {
+				opWithParam := fmt.Sprintf(op, typ.param)
+				t.Run(typ.comparableLiteral+opWithParam, func(t *testing.T) {
+					e := typ.comparableLiteral + opWithParam
+					testCost(t, e, typ.expectedEstimatedCost, typ.expectedRuntimeCost)
+				})
+			}
+		}
+	}
+}
+
 func TestURLsCost(t *testing.T) {
 	cases := []struct {
 		ops                []string
@@ -1290,7 +1350,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		ext.Strings(ext.StringsVersion(2)),
 		URLs(),
 		Regex(),
-		Lists(),
+		Lists(ListsVersion(1)),
 		Authz(),
 		AuthzSelectors(),
 		Quantity(),
@@ -1402,6 +1462,55 @@ func TestSize(t *testing.T) {
 			targetSize: exactSize(4),
 			argSizes:   []checker.SizeEstimate{{Min: 1, Max: 2}, {Min: 1, Max: 1}},
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
+		},
+		{
+			name:       "getScheme result size",
+			function:   "getScheme",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHostname result size",
+			function:   "getHostname",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHost result size",
+			function:   "getHost",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getPort result size",
+			function:   "getPort",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getQuery result size",
+			function:   "getQuery",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getEscapedPath result size with 3x expansion",
+			function:   "getEscapedPath",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 100, Max: 300},
+		},
+		{
+			name:       "getEscapedPath result size preserves range",
+			function:   "getEscapedPath",
+			targetSize: checker.SizeEstimate{Min: 10, Max: 100},
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 10, Max: 300},
 		},
 	}
 

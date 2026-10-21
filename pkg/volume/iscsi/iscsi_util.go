@@ -481,6 +481,17 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	return devicePath, nil
 }
 
+func validateISCSIPluginPath(path, pluginDir string) error {
+	if !mount.PathWithinBase(path, pluginDir) {
+		return fmt.Errorf(
+			"iscsi: resolved path %q escapes plugin directory %q",
+			path,
+			pluginDir,
+		)
+	}
+	return nil
+}
+
 // persistISCSI saves iSCSI volume configuration for DetachDisk into global
 // mount / map directory.
 func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
@@ -490,6 +501,17 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		globalPDPath = b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
 	} else {
 		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
+	}
+
+	var pluginDir string
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		pluginDir = b.iscsiDisk.plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
+	} else {
+		pluginDir = b.iscsiDisk.plugin.host.GetPluginDir(iscsiPluginName)
+	}
+
+	if err := validateISCSIPluginPath(globalPDPath, pluginDir); err != nil {
+		return err
 	}
 
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -701,8 +723,19 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 
 	devicePath := getDevByPath(portals[0], iqn, lun)
 	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
-	if _, err = os.Stat(devicePath); err != nil {
-		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
+	if _, err := os.Stat(devicePath); err != nil {
+		if !os.IsNotExist(err) {
+			// The path exists but cannot be accessed (permissions, corrupted
+			// filesystem, ...): surface it instead of continuing.
+			return fmt.Errorf("failed to access devicePath %s: %w", devicePath, err)
+		}
+		// The by-path link may already be gone if the iSCSI session was lost
+		// before teardown ran. The remaining steps handle a missing session
+		// (detachISCSIDisk ignores ISCSI_ERR_NO_OBJS_FOUND and
+		// ISCSI_ERR_SESS_NOT_FOUND, and isSessionBusy counts plugin
+		// directories rather than devices), so continue instead of failing
+		// detach permanently and stranding the volume in volumesInUse.
+		klog.V(4).Infof("iscsi: devicePath %s already gone, continuing to detach", devicePath)
 	}
 
 	// Lock the target while we determine if we can safely log out or not

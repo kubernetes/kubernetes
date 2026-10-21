@@ -21,12 +21,13 @@ import (
 	"reflect"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v7/merge"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/structured-merge-diff/v6/merge"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -155,6 +156,7 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 		if liveAccessor, aErr := meta.Accessor(liveObj); aErr == nil {
 			if newAccessor, aErr := meta.Accessor(newObj); aErr == nil {
 				atMostEverySecond.Do(func() {
+					//nolint:logcheck // Should not be reached.
 					klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields (restored previous managedFields from live object)", "versionKind",
 						newObj.GetObjectKind().GroupVersionKind(), "namespace", newAccessor.GetNamespace(), "name", newAccessor.GetName())
 				})

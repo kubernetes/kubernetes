@@ -692,6 +692,55 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 }
 
+func TestGetAPIServerCommandEtcdServers(t *testing.T) {
+	base := fmt.Sprintf("https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort)
+	tests := []struct {
+		name string
+		arg  kubeadmapi.Arg
+		want string
+	}{
+		{
+			name: "replace overrides etcd-servers with the value",
+			arg:  kubeadmapi.Arg{Name: "advertise-client-urls", Value: "https://10.0.0.5:2379"},
+			want: "--etcd-servers=https://10.0.0.5:2379",
+		},
+		{
+			name: "append joins the value onto the default",
+			arg:  kubeadmapi.Arg{Name: "advertise-client-urls", Value: ",https://10.0.0.5:2379", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+			want: "--etcd-servers=" + base + ",https://10.0.0.5:2379",
+		},
+		{
+			name: "prepend joins the value before the default",
+			arg:  kubeadmapi.Arg{Name: "advertise-client-urls", Value: "https://10.0.0.5:2379,", MergeMethod: kubeadmapi.ArgMergeMethodPrepend},
+			want: "--etcd-servers=https://10.0.0.5:2379," + base,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
+				CertificatesDir: testCertsDir,
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{ExtraArgs: []kubeadmapi.Arg{tt.arg}},
+				},
+			}
+			endpoint := &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"}
+
+			var got string
+			for _, c := range getAPIServerCommand(cfg, endpoint) {
+				if strings.HasPrefix(c, "--etcd-servers=") {
+					got = c
+					break
+				}
+			}
+			if got != tt.want {
+				t.Errorf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
 func errorDiffArguments(t *testing.T, name string, actual, expected []string) {
 	expectedShort := removeCommon(expected, actual)
 	actualShort := removeCommon(actual, expected)
@@ -1133,9 +1182,10 @@ func TestGetSchedulerCommand(t *testing.T) {
 
 func TestGetAuthzModes(t *testing.T) {
 	var tests = []struct {
-		name     string
-		authMode []string
-		expected string
+		name        string
+		authMode    []string
+		mergeMethod kubeadmapi.ArgMergeMethod
+		expected    string
 	}{
 		{
 			name:     "default if empty",
@@ -1167,11 +1217,36 @@ func TestGetAuthzModes(t *testing.T) {
 			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeWebhook, kubeadmconstants.ModeRBAC, kubeadmconstants.ModeABAC},
 			expected: "Node,Webhook,RBAC,ABAC",
 		},
+		{
+			name:        "append returns the default and lets ArgumentsToCommand merge the value",
+			authMode:    []string{kubeadmconstants.ModeWebhook},
+			mergeMethod: kubeadmapi.ArgMergeMethodAppend,
+			expected:    "Node,RBAC",
+		},
+		{
+			name:        "prepend returns the default and lets ArgumentsToCommand merge the value",
+			authMode:    []string{kubeadmconstants.ModeWebhook},
+			mergeMethod: kubeadmapi.ArgMergeMethodPrepend,
+			expected:    "Node,RBAC",
+		},
+		{
+			name:        "append still returns the default even with an unknown mode",
+			authMode:    []string{"FooAuthzMode"},
+			mergeMethod: kubeadmapi.ArgMergeMethodAppend,
+			expected:    "Node,RBAC",
+		},
+		{
+			name:        "append with a leading separator is handled",
+			authMode:    []string{"", kubeadmconstants.ModeWebhook}, // ",Webhook"
+			mergeMethod: kubeadmapi.ArgMergeMethodAppend,
+			expected:    "Node,RBAC",
+		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := getAuthzModes(strings.Join(rt.authMode, ","))
+			arg := &kubeadmapi.Arg{Value: strings.Join(rt.authMode, ","), MergeMethod: rt.mergeMethod}
+			actual := getAuthzModes(arg)
 			if actual != rt.expected {
 				t.Errorf("failed getAuthzModes:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 			}

@@ -28,16 +28,4 @@ dirs=()
 kube::util::read-array dirs < <(grep -v -e'^#' -e '^$' "${KUBE_ROOT}/hack/go-apidocs.conf")
 
 # Base and target revisions are detected automatically by the script.
-if "${KUBE_ROOT}/hack/apidiff.sh" -u "${dirs[@]}"; then
-    cat <<EOF
-
-Congratulations, no Go API changes need to be documented in CHANGELOG.md files!
-EOF
-else
-    cat <<EOF
-
-One or more CHANGELOG.md files were updated using placeholder text.
-Replace that text and include the documentation of your change in
-your branch.
-EOF
-fi
+"${KUBE_ROOT}/hack/apidiff.sh" -u "${dirs[@]}"

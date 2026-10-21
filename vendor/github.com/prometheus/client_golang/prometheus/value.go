@@ -23,7 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -196,11 +195,11 @@ func populateMetric(
 	m.Label = labelPairs
 	switch t {
 	case CounterValue:
-		m.Counter = &dto.Counter{Value: proto.Float64(v), Exemplar: e, CreatedTimestamp: ct}
+		m.Counter = &dto.Counter{Value: new(v), Exemplar: e, CreatedTimestamp: ct}
 	case GaugeValue:
-		m.Gauge = &dto.Gauge{Value: proto.Float64(v)}
+		m.Gauge = &dto.Gauge{Value: new(v)}
 	case UntypedValue:
-		m.Untyped = &dto.Untyped{Value: proto.Float64(v)}
+		m.Untyped = &dto.Untyped{Value: new(v)}
 	default:
 		return fmt.Errorf("encountered unknown type %v", t)
 	}
@@ -227,8 +226,8 @@ func MakeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {
 	labelPairs := make([]*dto.LabelPair, 0, totalLen)
 	for i, l := range desc.variableLabels.names {
 		labelPairs = append(labelPairs, &dto.LabelPair{
-			Name:  proto.String(l),
-			Value: proto.String(labelValues[i]),
+			Name:  new(l),
+			Value: new(labelValues[i]),
 		})
 	}
 	labelPairs = append(labelPairs, desc.constLabelPairs...)
@@ -244,7 +243,7 @@ const ExemplarMaxRunes = 128
 // number of runes in the label names and values exceeds ExemplarMaxRunes.
 func newExemplar(value float64, ts time.Time, l Labels) (*dto.Exemplar, error) {
 	e := &dto.Exemplar{}
-	e.Value = proto.Float64(value)
+	e.Value = new(value)
 	tsProto := timestamppb.New(ts)
 	if err := tsProto.CheckValid(); err != nil {
 		return nil, err
@@ -262,8 +261,8 @@ func newExemplar(value float64, ts time.Time, l Labels) (*dto.Exemplar, error) {
 		}
 		runes += utf8.RuneCountInString(value)
 		labelPairs = append(labelPairs, &dto.LabelPair{
-			Name:  proto.String(name),
-			Value: proto.String(value),
+			Name:  new(name),
+			Value: new(value),
 		})
 	}
 	if runes > ExemplarMaxRunes {

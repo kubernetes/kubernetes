@@ -257,6 +257,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceDerivedAttribute)(nil), (*resourcev1beta2.DeviceDerivedAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceDerivedAttribute_To_v1beta2_DeviceDerivedAttribute(a.(*v1.DeviceDerivedAttribute), b.(*resourcev1beta2.DeviceDerivedAttribute), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceDerivedAttribute)(nil), (*v1.DeviceDerivedAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(a.(*resourcev1beta2.DeviceDerivedAttribute), b.(*v1.DeviceDerivedAttribute), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.DeviceRequest)(nil), (*resourcev1beta2.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DeviceRequest_To_v1beta2_DeviceRequest(a.(*v1.DeviceRequest), b.(*resourcev1beta2.DeviceRequest), scope)
 	}); err != nil {
@@ -307,6 +317,56 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceTaintRule)(nil), (*resourcev1beta2.DeviceTaintRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaintRule_To_v1beta2_DeviceTaintRule(a.(*v1.DeviceTaintRule), b.(*resourcev1beta2.DeviceTaintRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceTaintRule)(nil), (*v1.DeviceTaintRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceTaintRule_To_v1_DeviceTaintRule(a.(*resourcev1beta2.DeviceTaintRule), b.(*v1.DeviceTaintRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceTaintRuleList)(nil), (*resourcev1beta2.DeviceTaintRuleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaintRuleList_To_v1beta2_DeviceTaintRuleList(a.(*v1.DeviceTaintRuleList), b.(*resourcev1beta2.DeviceTaintRuleList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceTaintRuleList)(nil), (*v1.DeviceTaintRuleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceTaintRuleList_To_v1_DeviceTaintRuleList(a.(*resourcev1beta2.DeviceTaintRuleList), b.(*v1.DeviceTaintRuleList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceTaintRuleSpec)(nil), (*resourcev1beta2.DeviceTaintRuleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec(a.(*v1.DeviceTaintRuleSpec), b.(*resourcev1beta2.DeviceTaintRuleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceTaintRuleSpec)(nil), (*v1.DeviceTaintRuleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec(a.(*resourcev1beta2.DeviceTaintRuleSpec), b.(*v1.DeviceTaintRuleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceTaintRuleStatus)(nil), (*resourcev1beta2.DeviceTaintRuleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus(a.(*v1.DeviceTaintRuleStatus), b.(*resourcev1beta2.DeviceTaintRuleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceTaintRuleStatus)(nil), (*v1.DeviceTaintRuleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus(a.(*resourcev1beta2.DeviceTaintRuleStatus), b.(*v1.DeviceTaintRuleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceTaintSelector)(nil), (*resourcev1beta2.DeviceTaintSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaintSelector_To_v1beta2_DeviceTaintSelector(a.(*v1.DeviceTaintSelector), b.(*resourcev1beta2.DeviceTaintSelector), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.DeviceTaintSelector)(nil), (*v1.DeviceTaintSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_DeviceTaintSelector_To_v1_DeviceTaintSelector(a.(*resourcev1beta2.DeviceTaintSelector), b.(*v1.DeviceTaintSelector), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.DeviceToleration)(nil), (*resourcev1beta2.DeviceToleration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DeviceToleration_To_v1beta2_DeviceToleration(a.(*v1.DeviceToleration), b.(*resourcev1beta2.DeviceToleration), scope)
 	}); err != nil {
@@ -337,13 +397,33 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableResourceMapping)(nil), (*resourcev1beta2.NodeAllocatableResourceMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeAllocatableResourceMapping_To_v1beta2_NodeAllocatableResourceMapping(a.(*v1.NodeAllocatableResourceMapping), b.(*resourcev1beta2.NodeAllocatableResourceMapping), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableMapping)(nil), (*resourcev1beta2.NodeAllocatableMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableMapping_To_v1beta2_NodeAllocatableMapping(a.(*v1.NodeAllocatableMapping), b.(*resourcev1beta2.NodeAllocatableMapping), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.NodeAllocatableResourceMapping)(nil), (*v1.NodeAllocatableResourceMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(a.(*resourcev1beta2.NodeAllocatableResourceMapping), b.(*v1.NodeAllocatableResourceMapping), scope)
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.NodeAllocatableMapping)(nil), (*v1.NodeAllocatableMapping)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(a.(*resourcev1beta2.NodeAllocatableMapping), b.(*v1.NodeAllocatableMapping), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableOverhead)(nil), (*resourcev1beta2.NodeAllocatableOverhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableOverhead_To_v1beta2_NodeAllocatableOverhead(a.(*v1.NodeAllocatableOverhead), b.(*resourcev1beta2.NodeAllocatableOverhead), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.NodeAllocatableOverhead)(nil), (*v1.NodeAllocatableOverhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(a.(*resourcev1beta2.NodeAllocatableOverhead), b.(*v1.NodeAllocatableOverhead), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.NodeAllocatableResource)(nil), (*resourcev1beta2.NodeAllocatableResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeAllocatableResource_To_v1beta2_NodeAllocatableResource(a.(*v1.NodeAllocatableResource), b.(*resourcev1beta2.NodeAllocatableResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.NodeAllocatableResource)(nil), (*v1.NodeAllocatableResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_NodeAllocatableResource_To_v1_NodeAllocatableResource(a.(*resourcev1beta2.NodeAllocatableResource), b.(*v1.NodeAllocatableResource), scope)
 	}); err != nil {
 		return err
 	}
@@ -928,6 +1008,26 @@ func Convert_v1beta2_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in 
 	return autoConvert_v1beta2_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in, out, s)
 }
 
+func autoConvert_v1_DeviceDerivedAttribute_To_v1beta2_DeviceDerivedAttribute(in *v1.DeviceDerivedAttribute, out *resourcev1beta2.DeviceDerivedAttribute, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.DeviceDerivedAttribute)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceDerivedAttribute_To_v1beta2_DeviceDerivedAttribute is an autogenerated conversion function.
+func Convert_v1_DeviceDerivedAttribute_To_v1beta2_DeviceDerivedAttribute(in *v1.DeviceDerivedAttribute, out *resourcev1beta2.DeviceDerivedAttribute, s conversion.Scope) error {
+	return autoConvert_v1_DeviceDerivedAttribute_To_v1beta2_DeviceDerivedAttribute(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in *resourcev1beta2.DeviceDerivedAttribute, out *v1.DeviceDerivedAttribute, s conversion.Scope) error {
+	*out = *(*v1.DeviceDerivedAttribute)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute is an autogenerated conversion function.
+func Convert_v1beta2_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in *resourcev1beta2.DeviceDerivedAttribute, out *v1.DeviceDerivedAttribute, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(in, out, s)
+}
+
 func autoConvert_v1_DeviceRequest_To_v1beta2_DeviceRequest(in *v1.DeviceRequest, out *resourcev1beta2.DeviceRequest, s conversion.Scope) error {
 	*out = *(*resourcev1beta2.DeviceRequest)(unsafe.Pointer(in))
 	return nil
@@ -1028,6 +1128,120 @@ func Convert_v1beta2_DeviceTaint_To_v1_DeviceTaint(in *resourcev1beta2.DeviceTai
 	return autoConvert_v1beta2_DeviceTaint_To_v1_DeviceTaint(in, out, s)
 }
 
+func autoConvert_v1_DeviceTaintRule_To_v1beta2_DeviceTaintRule(in *v1.DeviceTaintRule, out *resourcev1beta2.DeviceTaintRule, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_DeviceTaintRule_To_v1beta2_DeviceTaintRule is an autogenerated conversion function.
+func Convert_v1_DeviceTaintRule_To_v1beta2_DeviceTaintRule(in *v1.DeviceTaintRule, out *resourcev1beta2.DeviceTaintRule, s conversion.Scope) error {
+	return autoConvert_v1_DeviceTaintRule_To_v1beta2_DeviceTaintRule(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceTaintRule_To_v1_DeviceTaintRule(in *resourcev1beta2.DeviceTaintRule, out *v1.DeviceTaintRule, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta2_DeviceTaintRule_To_v1_DeviceTaintRule is an autogenerated conversion function.
+func Convert_v1beta2_DeviceTaintRule_To_v1_DeviceTaintRule(in *resourcev1beta2.DeviceTaintRule, out *v1.DeviceTaintRule, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceTaintRule_To_v1_DeviceTaintRule(in, out, s)
+}
+
+func autoConvert_v1_DeviceTaintRuleList_To_v1beta2_DeviceTaintRuleList(in *v1.DeviceTaintRuleList, out *resourcev1beta2.DeviceTaintRuleList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]resourcev1beta2.DeviceTaintRule)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1_DeviceTaintRuleList_To_v1beta2_DeviceTaintRuleList is an autogenerated conversion function.
+func Convert_v1_DeviceTaintRuleList_To_v1beta2_DeviceTaintRuleList(in *v1.DeviceTaintRuleList, out *resourcev1beta2.DeviceTaintRuleList, s conversion.Scope) error {
+	return autoConvert_v1_DeviceTaintRuleList_To_v1beta2_DeviceTaintRuleList(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceTaintRuleList_To_v1_DeviceTaintRuleList(in *resourcev1beta2.DeviceTaintRuleList, out *v1.DeviceTaintRuleList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1.DeviceTaintRule)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta2_DeviceTaintRuleList_To_v1_DeviceTaintRuleList is an autogenerated conversion function.
+func Convert_v1beta2_DeviceTaintRuleList_To_v1_DeviceTaintRuleList(in *resourcev1beta2.DeviceTaintRuleList, out *v1.DeviceTaintRuleList, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceTaintRuleList_To_v1_DeviceTaintRuleList(in, out, s)
+}
+
+func autoConvert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec(in *v1.DeviceTaintRuleSpec, out *resourcev1beta2.DeviceTaintRuleSpec, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.DeviceTaintRuleSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec is an autogenerated conversion function.
+func Convert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec(in *v1.DeviceTaintRuleSpec, out *resourcev1beta2.DeviceTaintRuleSpec, s conversion.Scope) error {
+	return autoConvert_v1_DeviceTaintRuleSpec_To_v1beta2_DeviceTaintRuleSpec(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec(in *resourcev1beta2.DeviceTaintRuleSpec, out *v1.DeviceTaintRuleSpec, s conversion.Scope) error {
+	*out = *(*v1.DeviceTaintRuleSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec is an autogenerated conversion function.
+func Convert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec(in *resourcev1beta2.DeviceTaintRuleSpec, out *v1.DeviceTaintRuleSpec, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceTaintRuleSpec_To_v1_DeviceTaintRuleSpec(in, out, s)
+}
+
+func autoConvert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus(in *v1.DeviceTaintRuleStatus, out *resourcev1beta2.DeviceTaintRuleStatus, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.DeviceTaintRuleStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus is an autogenerated conversion function.
+func Convert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus(in *v1.DeviceTaintRuleStatus, out *resourcev1beta2.DeviceTaintRuleStatus, s conversion.Scope) error {
+	return autoConvert_v1_DeviceTaintRuleStatus_To_v1beta2_DeviceTaintRuleStatus(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus(in *resourcev1beta2.DeviceTaintRuleStatus, out *v1.DeviceTaintRuleStatus, s conversion.Scope) error {
+	*out = *(*v1.DeviceTaintRuleStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus is an autogenerated conversion function.
+func Convert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus(in *resourcev1beta2.DeviceTaintRuleStatus, out *v1.DeviceTaintRuleStatus, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceTaintRuleStatus_To_v1_DeviceTaintRuleStatus(in, out, s)
+}
+
+func autoConvert_v1_DeviceTaintSelector_To_v1beta2_DeviceTaintSelector(in *v1.DeviceTaintSelector, out *resourcev1beta2.DeviceTaintSelector, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.DeviceTaintSelector)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceTaintSelector_To_v1beta2_DeviceTaintSelector is an autogenerated conversion function.
+func Convert_v1_DeviceTaintSelector_To_v1beta2_DeviceTaintSelector(in *v1.DeviceTaintSelector, out *resourcev1beta2.DeviceTaintSelector, s conversion.Scope) error {
+	return autoConvert_v1_DeviceTaintSelector_To_v1beta2_DeviceTaintSelector(in, out, s)
+}
+
+func autoConvert_v1beta2_DeviceTaintSelector_To_v1_DeviceTaintSelector(in *resourcev1beta2.DeviceTaintSelector, out *v1.DeviceTaintSelector, s conversion.Scope) error {
+	*out = *(*v1.DeviceTaintSelector)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_DeviceTaintSelector_To_v1_DeviceTaintSelector is an autogenerated conversion function.
+func Convert_v1beta2_DeviceTaintSelector_To_v1_DeviceTaintSelector(in *resourcev1beta2.DeviceTaintSelector, out *v1.DeviceTaintSelector, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeviceTaintSelector_To_v1_DeviceTaintSelector(in, out, s)
+}
+
 func autoConvert_v1_DeviceToleration_To_v1beta2_DeviceToleration(in *v1.DeviceToleration, out *resourcev1beta2.DeviceToleration, s conversion.Scope) error {
 	*out = *(*resourcev1beta2.DeviceToleration)(unsafe.Pointer(in))
 	return nil
@@ -1088,24 +1302,64 @@ func Convert_v1beta2_NetworkDeviceData_To_v1_NetworkDeviceData(in *resourcev1bet
 	return autoConvert_v1beta2_NetworkDeviceData_To_v1_NetworkDeviceData(in, out, s)
 }
 
-func autoConvert_v1_NodeAllocatableResourceMapping_To_v1beta2_NodeAllocatableResourceMapping(in *v1.NodeAllocatableResourceMapping, out *resourcev1beta2.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	*out = *(*resourcev1beta2.NodeAllocatableResourceMapping)(unsafe.Pointer(in))
+func autoConvert_v1_NodeAllocatableMapping_To_v1beta2_NodeAllocatableMapping(in *v1.NodeAllocatableMapping, out *resourcev1beta2.NodeAllocatableMapping, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.NodeAllocatableMapping)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_v1_NodeAllocatableResourceMapping_To_v1beta2_NodeAllocatableResourceMapping is an autogenerated conversion function.
-func Convert_v1_NodeAllocatableResourceMapping_To_v1beta2_NodeAllocatableResourceMapping(in *v1.NodeAllocatableResourceMapping, out *resourcev1beta2.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	return autoConvert_v1_NodeAllocatableResourceMapping_To_v1beta2_NodeAllocatableResourceMapping(in, out, s)
+// Convert_v1_NodeAllocatableMapping_To_v1beta2_NodeAllocatableMapping is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableMapping_To_v1beta2_NodeAllocatableMapping(in *v1.NodeAllocatableMapping, out *resourcev1beta2.NodeAllocatableMapping, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableMapping_To_v1beta2_NodeAllocatableMapping(in, out, s)
 }
 
-func autoConvert_v1beta2_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in *resourcev1beta2.NodeAllocatableResourceMapping, out *v1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	*out = *(*v1.NodeAllocatableResourceMapping)(unsafe.Pointer(in))
+func autoConvert_v1beta2_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in *resourcev1beta2.NodeAllocatableMapping, out *v1.NodeAllocatableMapping, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableMapping)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_v1beta2_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping is an autogenerated conversion function.
-func Convert_v1beta2_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in *resourcev1beta2.NodeAllocatableResourceMapping, out *v1.NodeAllocatableResourceMapping, s conversion.Scope) error {
-	return autoConvert_v1beta2_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(in, out, s)
+// Convert_v1beta2_NodeAllocatableMapping_To_v1_NodeAllocatableMapping is an autogenerated conversion function.
+func Convert_v1beta2_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in *resourcev1beta2.NodeAllocatableMapping, out *v1.NodeAllocatableMapping, s conversion.Scope) error {
+	return autoConvert_v1beta2_NodeAllocatableMapping_To_v1_NodeAllocatableMapping(in, out, s)
+}
+
+func autoConvert_v1_NodeAllocatableOverhead_To_v1beta2_NodeAllocatableOverhead(in *v1.NodeAllocatableOverhead, out *resourcev1beta2.NodeAllocatableOverhead, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.NodeAllocatableOverhead)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_NodeAllocatableOverhead_To_v1beta2_NodeAllocatableOverhead is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableOverhead_To_v1beta2_NodeAllocatableOverhead(in *v1.NodeAllocatableOverhead, out *resourcev1beta2.NodeAllocatableOverhead, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableOverhead_To_v1beta2_NodeAllocatableOverhead(in, out, s)
+}
+
+func autoConvert_v1beta2_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in *resourcev1beta2.NodeAllocatableOverhead, out *v1.NodeAllocatableOverhead, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableOverhead)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead is an autogenerated conversion function.
+func Convert_v1beta2_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in *resourcev1beta2.NodeAllocatableOverhead, out *v1.NodeAllocatableOverhead, s conversion.Scope) error {
+	return autoConvert_v1beta2_NodeAllocatableOverhead_To_v1_NodeAllocatableOverhead(in, out, s)
+}
+
+func autoConvert_v1_NodeAllocatableResource_To_v1beta2_NodeAllocatableResource(in *v1.NodeAllocatableResource, out *resourcev1beta2.NodeAllocatableResource, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.NodeAllocatableResource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_NodeAllocatableResource_To_v1beta2_NodeAllocatableResource is an autogenerated conversion function.
+func Convert_v1_NodeAllocatableResource_To_v1beta2_NodeAllocatableResource(in *v1.NodeAllocatableResource, out *resourcev1beta2.NodeAllocatableResource, s conversion.Scope) error {
+	return autoConvert_v1_NodeAllocatableResource_To_v1beta2_NodeAllocatableResource(in, out, s)
+}
+
+func autoConvert_v1beta2_NodeAllocatableResource_To_v1_NodeAllocatableResource(in *resourcev1beta2.NodeAllocatableResource, out *v1.NodeAllocatableResource, s conversion.Scope) error {
+	*out = *(*v1.NodeAllocatableResource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_NodeAllocatableResource_To_v1_NodeAllocatableResource is an autogenerated conversion function.
+func Convert_v1beta2_NodeAllocatableResource_To_v1_NodeAllocatableResource(in *resourcev1beta2.NodeAllocatableResource, out *v1.NodeAllocatableResource, s conversion.Scope) error {
+	return autoConvert_v1beta2_NodeAllocatableResource_To_v1_NodeAllocatableResource(in, out, s)
 }
 
 func autoConvert_v1_OpaqueDeviceConfiguration_To_v1beta2_OpaqueDeviceConfiguration(in *v1.OpaqueDeviceConfiguration, out *resourcev1beta2.OpaqueDeviceConfiguration, s conversion.Scope) error {

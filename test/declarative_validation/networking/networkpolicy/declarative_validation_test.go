@@ -60,7 +60,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "ingress").Index(0).Child("from").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 				"egress rule rejects empty CIDR in ipBlock": {
@@ -69,7 +69,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "egress").Index(0).Child("to").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 			}
@@ -127,7 +127,7 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "ingress").Index(0).Child("from").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 
@@ -138,7 +138,7 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "egress").Index(0).Child("to").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 			}

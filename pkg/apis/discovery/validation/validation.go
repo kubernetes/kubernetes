@@ -27,25 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	netutils "k8s.io/utils/net"
 )
 
 var (
-	supportedAddressTypes = sets.New(
-		discovery.AddressTypeIPv4,
-		discovery.AddressTypeIPv6,
-		discovery.AddressTypeFQDN,
-	)
 	supportedPortProtocols = sets.New(
-		api.ProtocolTCP,
-		api.ProtocolUDP,
-		api.ProtocolSCTP,
+		corev1.ProtocolTCP,
+		corev1.ProtocolUDP,
+		corev1.ProtocolSCTP,
 	)
 	maxTopologyLabels = 16
-	maxAddresses      = 100
 	maxPorts          = 20000
 	maxEndpoints      = 1000
 	maxZoneHints      = 8
@@ -60,7 +53,6 @@ var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 // ValidateEndpointSlice validates an EndpointSlice.
 func ValidateEndpointSlice(endpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType)...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
 
 	endpointsErrs := validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))
@@ -85,10 +77,7 @@ func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.E
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	return allErrs
+	return ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
 }
 
 func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.AddressType, fldPath *field.Path) field.ErrorList {
@@ -103,11 +92,6 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		idxPath := fldPath.Index(i)
 		addressPath := idxPath.Child("addresses")
 
-		if len(endpoint.Addresses) == 0 {
-			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address").MarkCoveredByDeclarative())
-		} else if len(endpoint.Addresses) > maxAddresses {
-			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses).WithOrigin("maxItems").MarkCoveredByDeclarative())
-		}
 		for i, address := range endpoint.Addresses {
 			// This validates known address types, unknown types fall through
 			// and do not get validated.
@@ -198,18 +182,6 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		if endpointPort.AppProtocol != nil {
 			allErrs = append(allErrs, apivalidation.ValidateQualifiedName(*endpointPort.AppProtocol, idxPath.Child("appProtocol"))...)
 		}
-	}
-
-	return allErrs
-}
-
-func validateAddressType(addressType discovery.AddressType) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if addressType == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), "").MarkCoveredByDeclarative())
-	} else if !supportedAddressTypes.Has(addressType) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List(supportedAddressTypes)).MarkCoveredByDeclarative())
 	}
 
 	return allErrs

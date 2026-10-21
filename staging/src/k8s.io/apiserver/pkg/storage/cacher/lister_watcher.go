@@ -114,6 +114,7 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 		Recursive:         true,
 		ProgressNotify:    true,
 		SendInitialEvents: options.SendInitialEvents,
+		RecordTimestamps:  true,
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {

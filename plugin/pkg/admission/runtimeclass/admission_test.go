@@ -487,6 +487,24 @@ func TestValidate(t *testing.T) {
 			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
 		},
+		{
+			name: "Empty RuntimeClassName",
+			runtimeClass: &nodev1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Overhead: &nodev1.Overhead{
+					PodFixed: corev1.ResourceList{
+						corev1.ResourceName(corev1.ResourceCPU):    resource.MustParse("100m"),
+						corev1.ResourceName(corev1.ResourceMemory): resource.MustParse("1"),
+					},
+				},
+			},
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "empty-runtimeclassname", Namespace: "test"},
+				Spec:       core.PodSpec{RuntimeClassName: new("")},
+			},
+			expectError: false,
+		},
 	}
 	rt := NewRuntimeClass()
 	o := NewObjectInterfacesForTest()

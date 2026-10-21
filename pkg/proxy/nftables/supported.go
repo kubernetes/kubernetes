@@ -24,6 +24,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"sigs.k8s.io/knftables"
 )
@@ -37,6 +39,11 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 		nftablesFamily = knftables.IPv6Family
 	}
 
+	var options []knftables.Option
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NFTablesNetlink) {
+		options = append(options, knftables.UseNetlink)
+	}
+
 	// We require (or rather, knftables.New does) that the nft binary be version 1.0.1
 	// or later, because versions before that would always attempt to parse the entire
 	// nft ruleset at startup, even if you were only operating on a single table.
@@ -45,7 +52,7 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 	// crash. Thus, if kube-proxy used nft < 1.0.1, it could potentially get locked
 	// out of its rules because of something some other component had done in a
 	// completely different table.
-	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	nft, err := knftables.New(nftablesFamily, kubeProxyTable, options...)
 	if err != nil {
 		return nil, err
 	}

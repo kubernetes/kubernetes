@@ -16,7 +16,10 @@ limitations under the License.
 
 package workqueue
 
-import "k8s.io/utils/clock"
+import (
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
+)
 
 // RateLimitingInterface is an interface that rate limits items being added to the queue.
 //
@@ -46,6 +49,10 @@ type RateLimitingQueueConfig = TypedRateLimitingQueueConfig[any]
 
 // TypedRateLimitingQueueConfig specifies optional configurations to customize a TypedRateLimitingInterface.
 type TypedRateLimitingQueueConfig[T comparable] struct {
+	// An optional logger. The name of the queue does *not* get added to it, this should
+	// be done by the caller if desired.
+	Logger *klog.Logger
+
 	// Name for the queue. If unnamed, the metrics will not be registered.
 	Name string
 
@@ -97,6 +104,7 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 
 	if config.DelayingQueue == nil {
 		config.DelayingQueue = NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[T]{
+			Logger:          config.Logger,
 			Name:            config.Name,
 			MetricsProvider: config.MetricsProvider,
 			Clock:           config.Clock,
@@ -110,6 +118,7 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 }
 
 // NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
+//
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
@@ -119,6 +128,7 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 
 // NewRateLimitingQueueWithDelayingInterface constructs a new named workqueue with rateLimited queuing ability
 // with the option to inject a custom delaying queue instead of the default one.
+//
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{

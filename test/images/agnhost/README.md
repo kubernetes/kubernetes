@@ -311,7 +311,7 @@ controlled with the time delay or via http control server.
   start endpoint as NOT_SERVING.
 - `--port` (default: `5000`) can be used to override the gRPC port number.
 - `--http-port` (default: `8080`) can be used to override the http control server port number.
-- `--service` (default: ``) can be used used to specify which service this endpoint will respond to.
+- `--service` (default: ``) can be used to specify which service this endpoint will respond to.
 - `--tls-cert-file` File containing an x509 certificate for gRPC TLS. (CA cert, if any, concatenated after server cert).
 - `--tls-private-key-file` File containing an x509 private key matching `--tls-cert-file`.
 

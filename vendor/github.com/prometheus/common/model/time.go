@@ -123,44 +123,38 @@ func (t Time) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (t *Time) UnmarshalJSON(b []byte) error {
-	p := strings.Split(string(b), ".")
-	switch len(p) {
-	case 1:
-		v, err := strconv.ParseInt(p[0], 10, 64)
+	base, frac, found := strings.Cut(string(b), ".")
+	if !found {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
 		*t = Time(v * second)
-
-	case 2:
-		v, err := strconv.ParseInt(p[0], 10, 64)
+	} else {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
-		v *= second
 
-		prec := dotPrecision - len(p[1])
+		prec := dotPrecision - len(frac)
 		if prec < 0 {
-			p[1] = p[1][:dotPrecision]
-		} else if prec > 0 {
-			p[1] += strings.Repeat("0", prec)
+			frac = frac[:dotPrecision]
 		}
-
-		va, err := strconv.ParseInt(p[1], 10, 32)
+		va, err := strconv.ParseInt(frac, 10, 32)
 		if err != nil {
 			return err
 		}
-
-		// If the value was something like -0.1 the negative is lost in the
-		// parsing because of the leading zero, this ensures that we capture it.
-		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
-			*t = Time(v+va) * -1
-		} else {
-			*t = Time(v + va)
+		switch prec {
+		case 1:
+			va *= 10
+		case 2:
+			va *= 100
 		}
 
-	default:
-		return fmt.Errorf("invalid time %q", string(b))
+		if len(base) > 0 && base[0] == '-' {
+			va = -va
+		}
+		*t = Time(v*second + va)
 	}
 	return nil
 }
@@ -169,6 +163,34 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // from YAML.
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
+
+// Common durations. Day and Week are included because ParseDuration supports
+// those units (unlike the standard time package).
+//
+// To count the number of units in a Duration, divide:
+//
+//	second := model.Second
+//	fmt.Print(int64(second/model.Millisecond)) // prints 1000
+//
+// To convert an integer number of units to a Duration, multiply:
+//
+//	seconds := 10
+//	fmt.Print(model.Duration(seconds)*model.Second) // prints 10s
+const (
+	Nanosecond  Duration = 1
+	Microsecond          = 1000 * Nanosecond
+	Millisecond          = 1000 * Microsecond
+	Second               = 1000 * Millisecond
+	Minute               = 60 * Second
+	Hour                 = 60 * Minute
+	Day                  = 24 * Hour
+	Week                 = 7 * Day
+)
+
+// Milliseconds returns the duration as an integer millisecond count.
+// Prometheus stores timestamps in milliseconds; time.Duration already
+// covers the other units.
+func (d Duration) Milliseconds() int64 { return time.Duration(d).Milliseconds() }
 
 // Set implements pflag/flag.Value.
 func (d *Duration) Set(s string) error {
@@ -340,12 +362,12 @@ func (d *Duration) UnmarshalText(text []byte) error {
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.
-func (d Duration) MarshalYAML() (interface{}, error) {
+func (d Duration) MarshalYAML() (any, error) {
 	return d.String(), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
 	var s string
 	if err := unmarshal(&s); err != nil {
 		return err

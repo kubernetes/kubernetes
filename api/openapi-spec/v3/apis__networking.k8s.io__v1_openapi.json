@@ -5,17 +5,17 @@
         "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
         "properties": {
           "apiGroup": {
-            "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
+            "description": "apiGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
             "type": "string"
           },
           "kind": {
             "default": "",
-            "description": "Kind is the type of resource being referenced",
+            "description": "kind is the type of resource being referenced",
             "type": "string"
           },
           "name": {
             "default": "",
-            "description": "Name is the name of resource being referenced",
+            "description": "name is the name of resource being referenced",
             "type": "string"
           }
         },
@@ -88,7 +88,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -161,7 +161,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.networking.v1.ParentReference"
               }
             ],
-            "description": "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object."
+            "description": "parentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object."
           }
         },
         "required": [
@@ -209,7 +209,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -279,7 +279,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -291,6 +291,9 @@
             "description": "spec is the desired state of the IngressClass. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -388,6 +391,9 @@
             "description": "parameters is a link to a custom resource containing additional configuration for the controller. This is optional if the controller does not require extra parameters."
           }
         },
+        "required": [
+          "controller"
+        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1.IngressList": {
@@ -485,10 +491,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "port",
-          "protocol"
-        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1.IngressRule": {
@@ -499,7 +501,12 @@
             "type": "string"
           },
           "http": {
-            "$ref": "#/components/schemas/io.k8s.api.networking.v1.HTTPIngressRuleValue"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.HTTPIngressRuleValue"
+              }
+            ],
+            "description": "http is a HTTP IngressRuleValue, which contains a list of http selectors"
           }
         },
         "type": "object"
@@ -612,7 +619,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -813,19 +820,19 @@
         "description": "ParentReference describes a reference to a parent object.",
         "properties": {
           "group": {
-            "description": "Group is the group of the object being referenced.",
+            "description": "group is the group of the object being referenced.",
             "type": "string"
           },
           "name": {
-            "description": "Name is the name of the object being referenced.",
+            "description": "name is the name of the object being referenced.",
             "type": "string"
           },
           "namespace": {
-            "description": "Namespace is the namespace of the object being referenced.",
+            "description": "namespace is the namespace of the object being referenced.",
             "type": "string"
           },
           "resource": {
-            "description": "Resource is the resource of the object being referenced.",
+            "description": "resource is the resource of the object being referenced.",
             "type": "string"
           }
         },
@@ -869,7 +876,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -943,7 +950,7 @@
         "description": "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
         "properties": {
           "cidrs": {
-            "description": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+            "description": "cidrs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
             "items": {
               "type": "string"
             },
@@ -1119,8 +1126,7 @@
           "type",
           "status",
           "lastTransitionTime",
-          "reason",
-          "message"
+          "reason"
         ],
         "type": "object"
       },

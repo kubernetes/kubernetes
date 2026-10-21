@@ -43,6 +43,7 @@ type HorizontalPodAutoscalerInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	List(ctx context.Context, opts v1.ListOptions) (*autoscalingv2.HorizontalPodAutoscalerList, error)

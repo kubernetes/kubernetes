@@ -27,7 +27,7 @@ import (
 //
 // FlowDistinguisherMethod specifies the method of a flow distinguisher.
 type FlowDistinguisherMethodApplyConfiguration struct {
-	// `type` is the type of flow distinguisher method
+	// type is the type of flow distinguisher method
 	// The supported types are "ByUser" and "ByNamespace".
 	// Required.
 	Type *flowcontrolv1.FlowDistinguisherMethodType `json:"type,omitempty"`

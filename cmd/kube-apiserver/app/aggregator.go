@@ -47,6 +47,7 @@ var apiVersionPriorities = merge(controlplaneapiserver.DefaultGenericAPIServiceP
 	{Group: "storage.k8s.io", Version: "v1beta1"}:     {Group: 16800, Version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:    {Group: 16800, Version: 1},
 	{Group: "scheduling.k8s.io", Version: "v1"}:       {Group: 16600, Version: 15},
+	{Group: "scheduling.k8s.io", Version: "v1beta1"}:  {Group: 16600, Version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1alpha3"}: {Group: 16600, Version: 3},
 	{Group: "node.k8s.io", Version: "v1"}:             {Group: 16300, Version: 15},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:       {Group: 16300, Version: 1},
@@ -55,6 +56,7 @@ var apiVersionPriorities = merge(controlplaneapiserver.DefaultGenericAPIServiceP
 	{Group: "resource.k8s.io", Version: "v1beta2"}:    {Group: 16200, Version: 15},
 	{Group: "resource.k8s.io", Version: "v1beta1"}:    {Group: 16200, Version: 9},
 	{Group: "resource.k8s.io", Version: "v1alpha3"}:   {Group: 16200, Version: 1},
+	{Group: "lifecycle.k8s.io", Version: "v1alpha1"}:  {Group: 15700, Version: 1},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

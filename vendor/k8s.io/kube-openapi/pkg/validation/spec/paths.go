@@ -15,14 +15,12 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"strings"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // Paths holds the relative paths to the individual endpoints.
@@ -38,37 +36,7 @@ type Paths struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (p *Paths) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, p)
-	}
-
-	var res map[string]json.RawMessage
-	if err := json.Unmarshal(data, &res); err != nil {
-		return err
-	}
-	for k, v := range res {
-		if strings.HasPrefix(strings.ToLower(k), "x-") {
-			if p.Extensions == nil {
-				p.Extensions = make(map[string]interface{})
-			}
-			var d interface{}
-			if err := json.Unmarshal(v, &d); err != nil {
-				return err
-			}
-			p.Extensions[k] = d
-		}
-		if strings.HasPrefix(k, "/") {
-			if p.Paths == nil {
-				p.Paths = make(map[string]PathItem)
-			}
-			var pi PathItem
-			if err := json.Unmarshal(v, &pi); err != nil {
-				return err
-			}
-			p.Paths[k] = pi
-		}
-	}
-	return nil
+	return jsonv2.Unmarshal(data, p)
 }
 
 func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
@@ -127,26 +95,7 @@ func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // MarshalJSON converts this items object to JSON
 func (p Paths) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(p)
-	}
-	b1, err := json.Marshal(p.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-
-	pths := make(map[string]PathItem)
-	for k, v := range p.Paths {
-		if strings.HasPrefix(k, "/") {
-			pths[k] = v
-		}
-	}
-	b2, err := json.Marshal(pths)
-	if err != nil {
-		return nil, err
-	}
-	concated := swag.ConcatJSON(b1, b2)
-	return concated, nil
+	return internal.DeterministicMarshal(p)
 }
 
 func (p Paths) MarshalJSONTo(enc *jsontext.Encoder) error {

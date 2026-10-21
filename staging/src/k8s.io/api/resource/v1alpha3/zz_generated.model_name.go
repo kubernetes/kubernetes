@@ -62,6 +62,11 @@ func (in DeviceTaintSelector) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PartitionTypeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.PartitionTypeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PoolStatus) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1alpha3.PoolStatus"
 }
@@ -84,4 +89,14 @@ func (in ResourcePoolStatusRequestSpec) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourcePoolStatusRequestStatus) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ShareableCapacityStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ShareableCapacityStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ShareableSummaryStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ShareableSummaryStatus"
 }

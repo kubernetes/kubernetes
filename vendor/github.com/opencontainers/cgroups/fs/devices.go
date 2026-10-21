@@ -10,6 +10,12 @@ func (s *DevicesGroup) Name() string {
 	return "devices"
 }
 
+// ID returns the controller ID for devices subsystem.
+// Returns 0 as devices is not a cgroups.Controller.
+func (s *DevicesGroup) ID() cgroups.Controller {
+	return 0
+}
+
 func (s *DevicesGroup) Apply(path string, r *cgroups.Resources, pid int) error {
 	if r.SkipDevices {
 		return nil

@@ -702,10 +702,27 @@ const (
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig
 
+// ArgMergeMethod defines the method used to merge an argument with the same name.
+type ArgMergeMethod string
+
+const (
+	// ArgMergeMethodAppend appends the new value to the existing argument.
+	ArgMergeMethodAppend ArgMergeMethod = "append"
+	// ArgMergeMethodPrepend prepends the new value to the existing argument.
+	ArgMergeMethodPrepend ArgMergeMethod = "prepend"
+)
+
 // Arg represents an argument with a name and a value.
+// MergeMethod defines how to merge this argument with an existing base argument
+// with the same name. If no merge method is specified the default is to replace
+// the existing base argument. If multiple override arguments with the same name
+// exist and have a defined merge method, the last one will be used.
+// If a merge method is defined on an override argument but there is no matching
+// base argument, the override argument will be ignored.
 type Arg struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	MergeMethod ArgMergeMethod
 }
 
 // EnvVar represents an environment variable present in a Container.
@@ -727,6 +744,12 @@ const (
 	EncryptionAlgorithmRSA3072 EncryptionAlgorithmType = "RSA-3072"
 	// EncryptionAlgorithmRSA4096 defines the RSA encryption algorithm type with key size 4096 bits.
 	EncryptionAlgorithmRSA4096 EncryptionAlgorithmType = "RSA-4096"
+	// EncryptionAlgorithmMLDSA44 defines the ML-DSA-44 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA44 EncryptionAlgorithmType = "ML-DSA-44"
+	// EncryptionAlgorithmMLDSA65 defines the ML-DSA-65 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA65 EncryptionAlgorithmType = "ML-DSA-65"
+	// EncryptionAlgorithmMLDSA87 defines the ML-DSA-87 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA87 EncryptionAlgorithmType = "ML-DSA-87"
 )
 
 // Timeouts holds various timeouts that apply to kubeadm commands.

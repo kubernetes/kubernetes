@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -45,7 +46,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume", f.WithNodeConformance(), func(ctx context.Context) {
-		doSecretE2EWithoutMapping(ctx, f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
+		doSecretE2EWithoutMapping(ctx, f, nil, nil, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
@@ -56,7 +57,7 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0400)
-		doSecretE2EWithoutMapping(ctx, f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil)
+		doSecretE2EWithoutMapping(ctx, f, &defaultMode, nil, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
@@ -68,7 +69,12 @@ var _ = SIGDescribe("Secrets", func() {
 	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
-		doSecretE2EWithoutMapping(ctx, f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
+		doSecretE2EWithoutMapping(ctx, f, &defaultMode, nil, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
+	})
+
+	f.It("should be consumable from pods in volume as non-root with defaultUser set [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		defaultUser := int64(1000)
+		doSecretE2EWithoutMapping(ctx, f, nil, &defaultUser, "secret-test-"+string(uuid.NewUUID()), nil, &nonRootTestUserID)
 	})
 
 	/*
@@ -77,7 +83,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings", f.WithNodeConformance(), func(ctx context.Context) {
-		doSecretE2EWithMapping(ctx, f, nil)
+		doSecretE2EWithMapping(ctx, f, nil, nil, nil)
 	})
 
 	/*
@@ -88,7 +94,12 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		mode := int32(0400)
-		doSecretE2EWithMapping(ctx, f, &mode)
+		doSecretE2EWithMapping(ctx, f, &mode, nil, nil)
+	})
+
+	f.It("should be consumable from pods in volume with mappings and Item User set [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		user := int64(1000)
+		doSecretE2EWithMapping(ctx, f, nil, &user, &user)
 	})
 
 	/*
@@ -114,7 +125,7 @@ var _ = SIGDescribe("Secrets", func() {
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(ctx, secret2, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doSecretE2EWithoutMapping(ctx, f, nil /* default mode */, secret2.Name, nil, nil)
+		doSecretE2EWithoutMapping(ctx, f, nil, nil, secret2.Name, nil, nil)
 	})
 
 	/*
@@ -470,7 +481,7 @@ func secretForTest(namespace, name string) *v1.Secret {
 	}
 }
 
-func doSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defaultMode *int32, secretName string,
+func doSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defaultMode *int32, defaultUser *int64, secretName string,
 	fsGroup *int64, uid *int64) {
 	var (
 		volumeName      = "secret-volume"
@@ -507,7 +518,9 @@ func doSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defa
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/secret-volume/data-1",
-						"--file_mode=/etc/secret-volume/data-1"},
+						"--file_mode=/etc/secret-volume/data-1",
+						"--file_owner=/etc/secret-volume/data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -523,6 +536,9 @@ func doSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defa
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
 	}
+	if defaultUser != nil {
+		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultUser = defaultUser
+	}
 
 	if fsGroup != nil || uid != nil {
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
@@ -536,11 +552,14 @@ func doSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defa
 		"content of file \"/etc/secret-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
+	if defaultUser != nil {
+		expectedOutput = append(expectedOutput, fmt.Sprintf("owner UID of \"/etc/secret-volume/data-1\": %d", *defaultUser))
+	}
 
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume secrets", pod, 0, expectedOutput)
 }
 
-func doSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *int32) {
+func doSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *int32, user, runAsUser *int64) {
 	var (
 		name            = "secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "secret-volume"
@@ -582,7 +601,9 @@ func doSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *i
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/secret-volume/new-path-data-1",
-						"--file_mode=/etc/secret-volume/new-path-data-1"},
+						"--file_mode=/etc/secret-volume/new-path-data-1",
+						"--file_owner=/etc/secret-volume/new-path-data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -598,11 +619,22 @@ func doSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *i
 	if mode != nil {
 		pod.Spec.Volumes[0].VolumeSource.Secret.Items[0].Mode = mode
 	}
+	if user != nil {
+		pod.Spec.Volumes[0].VolumeSource.Secret.Items[0].User = user
+	}
+	if runAsUser != nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			RunAsUser: runAsUser,
+		}
+	}
 
 	fileModeRegexp := getFileModeRegex("/etc/secret-volume/new-path-data-1", mode)
 	expectedOutput := []string{
 		"content of file \"/etc/secret-volume/new-path-data-1\": value-1",
 		fileModeRegexp,
+	}
+	if user != nil {
+		expectedOutput = append(expectedOutput, fmt.Sprintf("owner UID of \"/etc/secret-volume/new-path-data-1\": %d", *user))
 	}
 
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume secrets", pod, 0, expectedOutput)

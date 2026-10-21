@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/daemonset"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
@@ -66,10 +67,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			APIGroup:   "apps",
 			APIVersion: apiVersion,
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *apps.DaemonSet
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkDaemonSet(),
 			},
@@ -85,7 +87,35 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(0)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(2147483648)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkDaemonSet(tweakPodSpec(tc.Tweaks...)),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
@@ -94,6 +124,10 @@ func TestDeclarativeValidate(t *testing.T) {
 		meta.RunObjectMetaTestCases(t, ctx, mkDaemonSet(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
+		poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), mkDaemonSet(), func(baseObj *apps.DaemonSet, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Spec.Template.Spec.EvictionResponders = responders
+			baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+		})
 	}
 }
 

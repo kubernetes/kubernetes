@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -63,8 +62,8 @@ func Validate_FrozenUserList(
 	obj, oldObj FrozenUserList) (errs field.ErrorList) {
 
 	// lists with map semantics require unique keys
-	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+	if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+		func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -86,13 +85,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, nil, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -115,13 +114,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, nil, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -144,13 +143,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -158,7 +157,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -177,13 +176,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -191,7 +190,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -210,13 +209,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -224,7 +223,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -243,14 +242,14 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -258,8 +257,8 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -278,14 +277,14 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -293,8 +292,8 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -313,14 +312,16 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *CompositeKeyItem, b *CompositeKeyItem) bool {
+					return a.Name == b.Name && a.Priority == b.Priority
+				}, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -328,8 +329,10 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *CompositeKeyItem, b *CompositeKeyItem) bool {
+					return a.Name == b.Name && a.Priority == b.Priority
+				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -348,13 +351,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -362,7 +365,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -381,14 +384,14 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -396,8 +399,8 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -416,13 +419,13 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -430,7 +433,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -449,14 +452,14 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -481,26 +484,21 @@ func Validate_UpdateListStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.DirectEqual,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UpdateItem) field.ErrorList {
 					return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
-				}).MarkShortCircuit(); len(e) != 0 {
+				}); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -510,6 +508,115 @@ func Validate_UpdateListStruct(
 				return oldObj.EachValNoModifyList
 			})
 		errs = append(errs, fn(fldPath.Child("eachValNoModifyList"), obj.EachValNoModifyList, oldVal, oldObj != nil)...)
+	}
+
+	{ // field UpdateListStruct.PointerSliceNoSet
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrSliceNoNils[string](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.PtrSliceUpdate(ctx, op, fldPath, obj, oldObj, nil, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateListStruct) []*string {
+				return oldObj.PointerSliceNoSet
+			})
+		errs = append(errs, fn(fldPath.Child("pointerSliceNoSet"), obj.PointerSliceNoSet, oldVal, oldObj != nil)...)
+	}
+
+	{ // field UpdateListStruct.PointerSetNoAdd
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrSliceNoNils[string](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.PtrSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.PtrSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateListStruct) []*string {
+				return oldObj.PointerSetNoAdd
+			})
+		errs = append(errs, fn(fldPath.Child("pointerSetNoAdd"), obj.PointerSetNoAdd, oldVal, oldObj != nil)...)
+	}
+
+	{ // field UpdateListStruct.PointerMapListNoRemove
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*UpdateItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrSliceNoNils[UpdateItem](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.PtrSliceUpdate(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.PtrSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateListStruct) []*UpdateItem {
+				return oldObj.PointerMapListNoRemove
+			})
+		errs = append(errs, fn(fldPath.Child("pointerMapListNoRemove"), obj.PointerMapListNoRemove, oldVal, oldObj != nil)...)
 	}
 
 	return errs

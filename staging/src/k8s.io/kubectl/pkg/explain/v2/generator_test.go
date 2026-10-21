@@ -46,7 +46,7 @@ func TestGeneratorMissingOutput(t *testing.T) {
 
 	gen := NewGenerator()
 	badTemplateName := "bad-template"
-	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, &buf)
+	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, 0, &buf)
 
 	require.ErrorContains(t, err, "unrecognized format: "+badTemplateName)
 	require.Zero(t, buf.Len())
@@ -54,7 +54,7 @@ func TestGeneratorMissingOutput(t *testing.T) {
 	err = gen.AddTemplate(badTemplateName, "ok")
 	require.NoError(t, err)
 
-	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, &buf)
+	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, 0, &buf)
 	require.NoError(t, err)
 	require.Equal(t, "ok", buf.String())
 }
@@ -84,6 +84,7 @@ func TestGeneratorContext(t *testing.T) {
 		expectedContext.GVR,
 		expectedContext.FieldPath,
 		expectedContext.Recursive,
+		expectedContext.MaxDepth,
 		&buf)
 	require.NoError(t, err)
 

@@ -218,14 +218,19 @@ func isCIDR(s string) bool {
 	return err == nil
 }
 
-// Base64 represents a base64 encoded string, using URLEncoding alphabet
+// base64Encoding is the canonical encoding for the Base64 format.
+// OpenAPI format: byte means standard base64 (RFC 4648 section 4, the +/ alphabet),
+// not base64url.
+var base64Encoding = base64.StdEncoding
+
+// Base64 represents a base64 encoded string
 //
 // swagger:strfmt byte
 type Base64 []byte
 
 // MarshalText turns this instance into text
 func (b Base64) MarshalText() ([]byte, error) {
-	enc := base64.URLEncoding
+	enc := base64Encoding
 	src := []byte(b)
 	buf := make([]byte, enc.EncodedLen(len(src)))
 	enc.Encode(buf, src)
@@ -234,7 +239,7 @@ func (b Base64) MarshalText() ([]byte, error) {
 
 // UnmarshalText hydrates this instance from text
 func (b *Base64) UnmarshalText(data []byte) error { // validation is performed later on
-	enc := base64.URLEncoding
+	enc := base64Encoding
 	dbuf := make([]byte, enc.DecodedLen(len(data)))
 
 	n, err := enc.Decode(dbuf, data)
@@ -247,7 +252,7 @@ func (b *Base64) UnmarshalText(data []byte) error { // validation is performed l
 }
 
 func (b Base64) String() string {
-	return base64.StdEncoding.EncodeToString([]byte(b))
+	return base64Encoding.EncodeToString([]byte(b))
 }
 
 // MarshalJSON returns the Base64 as JSON
@@ -261,7 +266,7 @@ func (b *Base64) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &b64str); err != nil {
 		return err
 	}
-	vb, err := base64.StdEncoding.DecodeString(b64str)
+	vb, err := base64Encoding.DecodeString(b64str)
 	if err != nil {
 		return err
 	}

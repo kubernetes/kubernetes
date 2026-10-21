@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -228,6 +229,67 @@ func TestPodDisruptionBudgetStatusValidationByApiVersion(t *testing.T) {
 			}
 			if tc.validation && !hasErrors {
 				t.Errorf("Expected validation errors but didn't get any")
+			}
+		})
+	}
+}
+
+func TestDropDisabledFields(t *testing.T) {
+	testcases := []struct {
+		name      string
+		pdb       *policy.PodDisruptionBudget
+		oldPDB    *policy.PodDisruptionBudget
+		expectPDB *policy.PodDisruptionBudget
+	}{
+		{
+			name: "match none selector is stripped",
+			pdb: &policy.PodDisruptionBudget{
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{Key: "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match", Operator: metav1.LabelSelectorOpExists},
+						},
+					},
+				},
+			},
+			oldPDB: nil,
+			expectPDB: &policy.PodDisruptionBudget{
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{Key: "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match", Operator: metav1.LabelSelectorOpExists},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "match all selector is stripped",
+			pdb: &policy.PodDisruptionBudget{
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{Key: "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match", Operator: metav1.LabelSelectorOpDoesNotExist},
+						},
+					},
+				},
+			},
+			oldPDB: nil,
+			expectPDB: &policy.PodDisruptionBudget{
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			dropDisabledFields(tc.pdb, tc.oldPDB)
+			if !apiequality.Semantic.DeepEqual(tc.pdb, tc.expectPDB) {
+				t.Errorf("expected %v, got %v", tc.expectPDB.Spec.Selector, tc.pdb.Spec.Selector)
 			}
 		})
 	}

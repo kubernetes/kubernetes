@@ -20,8 +20,6 @@ package internal
 // See https://github.com/kubernetes/kubernetes/issues/133161.
 
 import (
-	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -31,7 +29,6 @@ import (
 // definitions are maintained. This ensures that any changes to these types
 // require autoscaler approval.
 type DeviceID = schedulerapi.DeviceID
-type SharedDeviceID = schedulerapi.SharedDeviceID
 type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
@@ -42,20 +39,12 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
 }
 
-func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
-}
-
 func NewConsumedCapacity() ConsumedCapacity {
 	return schedulerapi.NewConsumedCapacity()
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
-}
-
-func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
@@ -67,11 +56,8 @@ func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
 	}
 
 	// Check if device is partially consumed via shared allocations (consumable capacity case).
-	// We need to check if any shared device ID corresponds to our device.
-	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
-		if sharedDeviceID.GetDeviceID() == deviceID {
-			return true
-		}
+	if allocatedState.AllocatedSharedDeviceIDs.Has(deviceID) {
+		return true
 	}
 
 	// For scheduler-generated state, consumed capacity is recorded together with

@@ -419,6 +419,7 @@ func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -455,6 +456,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -482,6 +484,7 @@ func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *conf
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -515,6 +518,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *conf
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(configv1.Plugins)
@@ -767,6 +771,12 @@ func autoConvert_v1_Plugins_To_config_Plugins(in *configv1.Plugins, out *config.
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
 		return err
 	}
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PlacementFeasible, &out.PlacementFeasible, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PodGroupPostFilter, &out.PodGroupPostFilter, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -819,6 +829,12 @@ func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *configv1.
 		return err
 	}
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
+		return err
+	}
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PlacementFeasible, &out.PlacementFeasible, s); err != nil {
+		return err
+	}
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PodGroupPostFilter, &out.PodGroupPostFilter, s); err != nil {
 		return err
 	}
 	return nil

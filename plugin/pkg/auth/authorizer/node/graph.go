@@ -21,8 +21,9 @@ import (
 	"sync"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
@@ -387,20 +388,34 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		g.addEdgeLocked(serviceAccountVertex, podVertex, nodeVertex)
 	}
 
+	// Secrets
+	added := sets.New[string]()
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
+		if added.Has(secret) {
+			return true
+		}
+		added.Insert(secret)
 		secretVertex := g.getOrCreateVertexLocked(secretVertexType, pod.Namespace, secret)
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 		g.addEdgeLocked(secretVertex, podVertex, nodeVertex)
 		return true
 	})
 
+	// ConfigMaps
+	added.Clear()
 	podutil.VisitPodConfigmapNames(pod, func(configmap string) bool {
+		if added.Has(configmap) {
+			return true
+		}
+		added.Insert(configmap)
 		configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, pod.Namespace, configmap)
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 		g.addEdgeLocked(configmapVertex, podVertex, nodeVertex)
 		return true
 	})
 
+	// PVCs
+	added.Clear()
 	for _, v := range pod.Spec.Volumes {
 		claimName := ""
 		if v.PersistentVolumeClaim != nil {
@@ -408,28 +423,26 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		} else if v.Ephemeral != nil {
 			claimName = ephemeral.VolumeClaimName(pod, &v)
 		}
-		if claimName != "" {
+		if claimName != "" && !added.Has(claimName) {
+			added.Insert(claimName)
 			pvcVertex := g.getOrCreateVertexLocked(pvcVertexType, pod.Namespace, claimName)
 			// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 			g.addEdgeLocked(pvcVertex, podVertex, nodeVertex)
 		}
 	}
 
-	for _, podResourceClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
-		// Do we have a valid claim name? If yes, add an edge that grants
-		// kubelet access to that claim. An error indicates that a claim
-		// still needs to be created, nil that intentionally no claim
-		// was created and never will be because it isn't needed.
-		if err == nil && claimName != nil {
-			claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, *claimName)
-			// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
-			g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
+	// ResourceClaims
+	// Grant kubelet access to all ResourceClaims referenced by or created for
+	// the pod (including extended resource claims). Claims that still need to
+	// be created or intentionally were not created because they are not needed
+	// are skipped by PodClaims.
+	added.Clear()
+	for claimName := range resourceclaim.PodClaims(pod) {
+		if added.Has(claimName) {
+			continue
 		}
-	}
-
-	if pod.Status.ExtendedResourceClaimStatus != nil && len(pod.Status.ExtendedResourceClaimStatus.ResourceClaimName) > 0 {
-		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		added.Insert(claimName)
+		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, claimName)
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 		g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
 	}
@@ -479,7 +492,7 @@ func (g *Graph) DeletePod(name, namespace string) {
 // authorization, and it's a shorter graph traversal.  The noderestriction
 // admission plugin ensures that all PCRs created have a valid node,
 // serviceaccount, and pod combination that actually exists in the cluster.
-func (g *Graph) AddPodCertificateRequest(pcr *certsv1beta1.PodCertificateRequest) {
+func (g *Graph) AddPodCertificateRequest(pcr *certsv1.PodCertificateRequest) {
 	start := time.Now()
 	defer func() {
 		graphActionsDuration.WithLabelValues("AddPodCertificateRequest").Observe(time.Since(start).Seconds())
@@ -494,7 +507,7 @@ func (g *Graph) AddPodCertificateRequest(pcr *certsv1beta1.PodCertificateRequest
 }
 
 // DeletePodCertificateRequest removes it from the graph.
-func (g *Graph) DeletePodCertificateRequest(pcr *certsv1beta1.PodCertificateRequest) {
+func (g *Graph) DeletePodCertificateRequest(pcr *certsv1.PodCertificateRequest) {
 	start := time.Now()
 	defer func() {
 		graphActionsDuration.WithLabelValues("DeletePodCertificateRequest").Observe(time.Since(start).Seconds())
@@ -527,11 +540,16 @@ func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 		// since we don't know the other end of the pvc -> pod -> node chain (or it may not even exist yet), we can't decorate these edges with kubernetes node info
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 		g.addEdgeLocked(pvVertex, g.getOrCreateVertexLocked(pvcVertexType, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name), nil)
+		added := sets.New[int]()
 		pvutil.VisitPVSecretNames(pv, func(namespace, secret string, kubeletVisible bool) bool {
 			// This grants access to the named secret in the same namespace as the bound PVC
 			if kubeletVisible {
-				// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
-				g.addEdgeLocked(g.getOrCreateVertexLocked(secretVertexType, namespace, secret), pvVertex, nil)
+				secretVertex := g.getOrCreateVertexLocked(secretVertexType, namespace, secret)
+				if !added.Has(secretVertex.ID()) {
+					added.Insert(secretVertex.ID())
+					// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+					g.addEdgeLocked(secretVertex, pvVertex, nil)
+				}
 			}
 			return true
 		})

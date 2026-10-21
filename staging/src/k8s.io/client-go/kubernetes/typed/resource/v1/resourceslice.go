@@ -41,6 +41,7 @@ type ResourceSliceInterface interface {
 	Create(ctx context.Context, resourceSlice *resourcev1.ResourceSlice, opts metav1.CreateOptions) (*resourcev1.ResourceSlice, error)
 	Update(ctx context.Context, resourceSlice *resourcev1.ResourceSlice, opts metav1.UpdateOptions) (*resourcev1.ResourceSlice, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*resourcev1.ResourceSlice, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*resourcev1.ResourceSliceList, error)

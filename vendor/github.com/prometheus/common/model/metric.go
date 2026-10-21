@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strconv"
@@ -24,7 +25,6 @@ import (
 	"unicode/utf8"
 
 	dto "github.com/prometheus/client_model/go"
-	"go.yaml.in/yaml/v2"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -77,14 +77,6 @@ const (
 	// strings.
 	UTF8Validation
 )
-
-var _ interface {
-	yaml.Marshaler
-	yaml.Unmarshaler
-	json.Marshaler
-	json.Unmarshaler
-	fmt.Stringer
-} = new(ValidationScheme)
 
 // String returns the string representation of s.
 func (s ValidationScheme) String() string {
@@ -267,9 +259,7 @@ func (m Metric) Before(o Metric) bool {
 // Clone returns a copy of the Metric.
 func (m Metric) Clone() Metric {
 	clone := make(Metric, len(m))
-	for k, v := range m {
-		clone[k] = v
-	}
+	maps.Copy(clone, m)
 	return clone
 }
 

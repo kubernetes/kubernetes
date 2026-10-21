@@ -22,8 +22,12 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
+	"sigs.k8s.io/randfill"
+
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
@@ -39,14 +43,13 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"sigs.k8s.io/randfill"
 )
 
 // skippedEquivalenceGroupVersions opt out of declarative validation
 // (+k8s:validation-gen=false) but share an internal type with versions that do
 // not. Only intentional opt-outs belong here; any other version missing
 // declarative validation should fail the sweep, not be skipped.
-var skippedEquivalenceGroupVersions = sets.New("extensions/v1beta1")
+var skippedEquivalenceGroupVersions = sets.New("extensions/v1beta1", "events.k8s.io/v1beta1")
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
 // It accepts optional configuration to handle path normalization across API versions where structures differ.
@@ -81,6 +84,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 				}
 			}
 		}
+
 		// Re-sort the error list based primarily on the normalized field paths
 		// to ensure errors align correctly during index-by-index comparison,
 		// regardless of their original structure.
@@ -109,8 +113,16 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 	if opts.Fuzzer != nil {
 		opts.Fuzzer.Fill(internalObj)
 	}
+	kinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(kinds) == 0 {
+		t.Fatalf("no kind found for %T", obj)
+	}
+	kind := kinds[0].Kind
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, opts.Options, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	} else {
 		// Convert old versioned object to internal format before validation.
 		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
@@ -125,7 +137,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		if opts.Fuzzer != nil {
 			opts.Fuzzer.Fill(internalOld)
 		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, opts.Options, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -154,6 +166,23 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 			if !found {
 				continue // done already
 			}
+
+			lGV, err := schema.ParseGroupVersion(lk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lGVK := lGV.WithKind(kind)
+			rGV, err := schema.ParseGroupVersion(rk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rGVK := rGV.WithKind(kind)
+			// remove items from lv that we don't expect in rk
+			// shadow lv so this only applies to this loop.
+			lv := omitErrorsForPaths(lv, opts.OmittedFieldPaths[rGVK])
+			// remove items from rv we don't expect in lk
+			rv = omitErrorsForPaths(rv, opts.OmittedFieldPaths[lGVK])
+
 			if len(lv) != len(rv) {
 				t.Errorf("different error count (%d vs. %d)\n%s: %v\n%s: %v", len(lv), len(rv), lk, fmtErrs(lv), rk, fmtErrs(rv))
 				continue
@@ -177,6 +206,32 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 			}
 		}
 	}
+}
+
+// omitErrorsForPaths drops errors whose field path equals, or is nested under, any of omittedFieldPaths.
+func omitErrorsForPaths(errs field.ErrorList, omittedFieldPaths []string) field.ErrorList {
+	var retainedErrs field.ErrorList
+	for i := range errs {
+		currentPath := errs[i].Field
+		omitted := false
+		for _, omittedFieldPath := range omittedFieldPaths {
+			if currentPath == omittedFieldPath {
+				omitted = true
+				break
+			}
+			if strings.HasPrefix(currentPath, omittedFieldPath) {
+				nextChar := currentPath[len(omittedFieldPath)]
+				if nextChar == '.' || nextChar == '[' {
+					omitted = true
+					break
+				}
+			}
+		}
+		if !omitted {
+			retainedErrs = append(retainedErrs, errs[i])
+		}
+	}
+	return retainedErrs
 }
 
 // helper for nicer output
@@ -227,12 +282,26 @@ type validationOption struct {
 	// NormalizationRules are the rules to apply to field paths before comparison.
 	NormalizationRules []field.NormalizationRule
 
+	// OmittedFieldPaths maps a GVK to field paths that do not exist in that version. When comparing
+	// another version against this GVK, errors at (or nested under) these paths are dropped.
+	// Paths are matched after NormalizationRules have been applied.
+	OmittedFieldPaths map[schema.GroupVersionKind][]string
+
 	// IgnoreObjectConversions skips the tests if the conversion from the internal object
 	// to the versioned object fails.
 	IgnoreObjectConversionErrors bool
 
 	// Fuzzer is the fuzzer to use for generating test objects.
 	Fuzzer *randfill.Filler
+
+	// Options are the validation options to apply.
+	Options map[string]bool
+}
+
+func WithOptions(options map[string]bool) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.Options = options
+	}
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -244,6 +313,12 @@ func WithSubResources(subResources ...string) ValidationTestConfig {
 func WithNormalizationRules(rules ...field.NormalizationRule) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.NormalizationRules = rules
+	}
+}
+
+func WithOmittedFieldPaths(paths map[schema.GroupVersionKind][]string) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.OmittedFieldPaths = paths
 	}
 }
 
@@ -284,6 +359,13 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateCreate(c, obj, strategy)
 	}, ctx, opts, obj)
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, nil).Options))
+		}
+	}
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
@@ -312,6 +394,13 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateUpdate(c, obj, old, strategy)
 	}, ctx, opts, obj)
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, old).Options))
+		}
+	}
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
@@ -407,7 +496,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidationBeta: true,
 		})
-		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
+		testCtx := validate.WithAllDeclarativeEnforcedForTest(ctx)
 		allDeclarativeErrs := runValidations(testCtx)
 
 		// Record the declarative-validation rules observed in this subtest so

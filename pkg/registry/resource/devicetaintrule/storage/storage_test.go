@@ -44,7 +44,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "devicetaintrules",
 	}
-	deviceTaintStorage, statusStorage, err := NewREST(restOptions)
+	deviceTaintStorage, statusStorage, err := NewRESTv1(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -158,12 +158,15 @@ func TestUpdateStatus(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	deviceTaintStart := validNewDeviceTaint("foo")
-	err := storage.Storage.Create(ctx, key, deviceTaintStart, nil, 0, false)
+	// v1 enforces ResourceVersion comparison on status update (see AllowUnconditionalUpdate),
+	// so we need the created object and its ResourceVersion.
+	var deviceTaintCreated resource.DeviceTaintRule
+	err := storage.Storage.Create(ctx, key, deviceTaintStart, &deviceTaintCreated, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	deviceTaint := deviceTaintStart.DeepCopy()
+	deviceTaint := deviceTaintCreated.DeepCopy()
 	deviceTaint.Status.Conditions = []metav1.Condition{{
 		Type:               "EvicitionInProgress",
 		Status:             metav1.ConditionTrue,

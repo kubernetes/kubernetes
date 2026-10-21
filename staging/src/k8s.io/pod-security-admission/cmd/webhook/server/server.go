@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,6 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/signals"
 	kubeinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -91,7 +92,7 @@ func runServer(ctx context.Context, opts *options.Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go func() {
-		stopCh := apiserver.SetupSignalHandler()
+		stopCh := signals.SetupSignalHandler()
 		<-stopCh
 		cancel()
 	}()
@@ -182,7 +183,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
-	if body, err = ioutil.ReadAll(limitedReader); err != nil {
+	if body, err = io.ReadAll(limitedReader); err != nil {
 		logger.Error(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
 		return

@@ -77,7 +77,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource string
-		options     []string
+		options     map[string]bool
 		expected    field.ErrorList
 	}{
 		{
@@ -114,7 +114,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		},
 		{
 			name:     "update with option",
-			options:  []string{"option1"},
+			options:  map[string]bool{"option1": true},
 			object:   valid,
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
@@ -131,7 +131,7 @@ func TestValidateDeclaratively(t *testing.T) {
 
 	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList {
 		results := field.ErrorList{}
-		if op.HasOption("option1") {
+		if enabled, _ := op.HasOption("option1"); enabled {
 			results = append(results, invalidIfOptionErr)
 		}
 		if slices.Equal(op.Request.Subresources, []string{"status"}) {

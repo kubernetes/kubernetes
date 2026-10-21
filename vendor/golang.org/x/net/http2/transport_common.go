@@ -24,6 +24,8 @@ import (
 // It returns an error if t1 has already been HTTP/2-enabled.
 //
 // Use ConfigureTransports instead to configure the HTTP/2 Transport.
+//
+// Deprecated: Set [http.Transport.Protocols] instead.
 func ConfigureTransport(t1 *http.Transport) error {
 	return configureTransport(t1)
 }
@@ -31,6 +33,8 @@ func ConfigureTransport(t1 *http.Transport) error {
 // ConfigureTransports configures a net/http HTTP/1 Transport to use HTTP/2.
 // It returns a new HTTP/2 Transport for further configuration.
 // It returns an error if t1 has already been HTTP/2-enabled.
+//
+// Deprecated: Set [http.Transport.Protocols] instead.
 func ConfigureTransports(t1 *http.Transport) (*Transport, error) {
 	return configureTransports(t1)
 }
@@ -39,6 +43,8 @@ func ConfigureTransports(t1 *http.Transport) (*Transport, error) {
 //
 // A Transport internally caches connections to servers. It is safe
 // for concurrent use by multiple goroutines.
+//
+// Deprecated: Use [http.Transport] instead.
 type Transport struct {
 	// DialTLSContext specifies an optional dial function with context for
 	// creating TLS connections for requests.
@@ -47,6 +53,8 @@ type Transport struct {
 	//
 	// If the returned net.Conn has a ConnectionState method like tls.Conn,
 	// it will be used to set http.Response.TLS.
+	//
+	// Deprecated: Use [http.Transport.DialTLSContext] instead.
 	DialTLSContext func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error)
 
 	// DialTLS specifies an optional dial function for creating
@@ -54,17 +62,21 @@ type Transport struct {
 	//
 	// If DialTLSContext and DialTLS is nil, tls.Dial is used.
 	//
-	// Deprecated: Use DialTLSContext instead, which allows the transport
-	// to cancel dials as soon as they are no longer needed.
-	// If both are set, DialTLSContext takes priority.
+	// Deprecated: Use [http.Transport.DialTLSContext] instead.
 	DialTLS func(network, addr string, cfg *tls.Config) (net.Conn, error)
 
 	// TLSClientConfig specifies the TLS configuration to use with
 	// tls.Client. If nil, the default configuration is used.
+	//
+	// Deprecated: Use [http.Transport.TLSClientConfig] instead.
 	TLSClientConfig *tls.Config
 
 	// ConnPool optionally specifies an alternate connection pool to use.
 	// If nil, the default is used.
+	//
+	// Deprecated: To create a custom connection pool, implement
+	// [http.RoundTripper]. Use [http.Transport.NewClientConn]
+	// to create connections for the pool.
 	ConnPool ClientConnPool
 
 	// DisableCompression, if true, prevents the Transport from
@@ -75,10 +87,14 @@ type Transport struct {
 	// decoded in the Response.Body. However, if the user
 	// explicitly requested gzip it is not automatically
 	// uncompressed.
+	//
+	// Deprecated: Use [http.Transport.DisableCompression] instead.
 	DisableCompression bool
 
 	// AllowHTTP, if true, permits HTTP/2 requests using the insecure,
 	// plain-text "http" scheme. Note that this does not enable h2c support.
+	//
+	// Deprecated: Use [http.Transport.Protocols] instead.
 	AllowHTTP bool
 
 	// MaxHeaderListSize is the http2 SETTINGS_MAX_HEADER_LIST_SIZE to
@@ -88,6 +104,8 @@ type Transport struct {
 	// want to advertise an unlimited value to the peer, Transport
 	// interprets the highest possible value here (0xffffffff or 1<<32-1)
 	// to mean no limit.
+	//
+	// Deprecated: Use [http.Transport.MaxResponseHeaderBytes] instead.
 	MaxHeaderListSize uint32
 
 	// MaxReadFrameSize is the http2 SETTINGS_MAX_FRAME_SIZE to send in the
@@ -97,6 +115,9 @@ type Transport struct {
 	// according to the spec:
 	// https://datatracker.ietf.org/doc/html/rfc7540#section-6.5.2.
 	// Values are bounded in the range 16k to 16M.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.MaxReadFrameSize] instead.
 	MaxReadFrameSize uint32
 
 	// MaxDecoderHeaderTableSize optionally specifies the http2
@@ -104,12 +125,18 @@ type Transport struct {
 	// informs the remote endpoint of the maximum size of the header compression
 	// table used to decode header blocks, in octets. If zero, the default value
 	// of 4096 is used.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.MaxDecoderHeaderTableSize] instead.
 	MaxDecoderHeaderTableSize uint32
 
 	// MaxEncoderHeaderTableSize optionally specifies an upper limit for the
 	// header compression table used for encoding request headers. Received
 	// SETTINGS_HEADER_TABLE_SIZE settings are capped at this limit. If zero,
 	// the default value of 4096 is used.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.MaxEncoderHeaderTableSize] instead.
 	MaxEncoderHeaderTableSize uint32
 
 	// StrictMaxConcurrentStreams controls whether the server's
@@ -120,12 +147,17 @@ type Transport struct {
 	// server's SETTINGS_MAX_CONCURRENT_STREAMS is interpreted as
 	// a global limit and callers of RoundTrip block when needed,
 	// waiting for their turn.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.StrictMaxConcurrentRequests] instead.
 	StrictMaxConcurrentStreams bool
 
 	// IdleConnTimeout is the maximum amount of time an idle
 	// (keep-alive) connection will remain idle before closing
 	// itself.
 	// Zero means no limit.
+	//
+	// Deprecated: Use [http.Transport.IdleConnTimeout] instead.
 	IdleConnTimeout time.Duration
 
 	// ReadIdleTimeout is the timeout after which a health check using ping
@@ -134,22 +166,34 @@ type Transport struct {
 	// there is no other traffic on the connection, the health check will
 	// be performed every ReadIdleTimeout interval.
 	// If zero, no health check is performed.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.SendPingTimeout] instead.
 	ReadIdleTimeout time.Duration
 
 	// PingTimeout is the timeout after which the connection will be closed
 	// if a response to Ping is not received.
 	// Defaults to 15s.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.PingTimeout] instead.
 	PingTimeout time.Duration
 
 	// WriteByteTimeout is the timeout after which the connection will be
 	// closed no data can be written to it. The timeout begins when data is
 	// available to write, and is extended whenever any bytes are written.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.WriteByteTimeout] instead.
 	WriteByteTimeout time.Duration
 
 	// CountError, if non-nil, is called on HTTP/2 transport errors.
 	// It's intended to increment a metric for monitoring, such
 	// as an expvar or Prometheus metric.
 	// The errType consists of only ASCII word characters.
+	//
+	// Deprecated: Use [http.Transport.HTTP2] and
+	// [http.HTTP2Config.CountError] instead.
 	CountError func(errType string)
 
 	// Internal state, differs between wrapped and non-wrapped implementations.
@@ -165,6 +209,10 @@ var (
 )
 
 // ClientConnPool manages a pool of HTTP/2 client connections.
+//
+// Deprecated: To create a custom connection pool, implement
+// [http.RoundTripper]. Use [http.Transport.NewClientConn]
+// to create connections for the pool.
 type ClientConnPool interface {
 	// GetClientConn returns a specific HTTP/2 connection (usually
 	// a TLS-TCP connection) to an HTTP/2 server. On success, the
@@ -177,6 +225,8 @@ type ClientConnPool interface {
 }
 
 // ClientConnState describes the state of a ClientConn.
+//
+// Deprecated: Use [http.ClientConn] instead.
 type ClientConnState struct {
 	// Closed is whether the connection is closed.
 	Closed bool
@@ -210,6 +260,8 @@ type ClientConnState struct {
 }
 
 // RoundTripOpt are options for the Transport.RoundTripOpt method.
+//
+// Deprecated: There are no options to set.
 type RoundTripOpt struct {
 	// OnlyCachedConn controls whether RoundTripOpt may
 	// create a new TCP connection. If set true and
@@ -222,11 +274,14 @@ type RoundTripOpt struct {
 	allowHTTP bool // allow http:// URLs
 }
 
+// Deprecated: Use [http.Transport.RoundTrip] instead.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.RoundTripOpt(req, RoundTripOpt{})
 }
 
 // RoundTripOpt is like RoundTrip, but takes options.
+//
+// Deprecated: Use [http.Transport.RoundTrip] instead.
 func (t *Transport) RoundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Response, error) {
 	return t.roundTripOpt(req, opt)
 }
@@ -234,10 +289,15 @@ func (t *Transport) RoundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 // CloseIdleConnections closes any connections which were previously
 // connected from previous requests but are now sitting idle.
 // It does not interrupt any connections currently in use.
+//
+// Deprecated: Use [http.Transport.CloseIdleConnections] instead.
 func (t *Transport) CloseIdleConnections() {
 	t.closeIdleConnections()
 }
 
+// NewClientConn is deprecated.
+//
+// Deprecated: Use [http.Transport.NewClientConn] instead.
 func (t *Transport) NewClientConn(c net.Conn) (*ClientConn, error) {
 	return t.newUserClientConn(c)
 }
@@ -256,8 +316,15 @@ func authorityAddr(scheme string, authority string) (addr string) {
 			port = "80"
 		}
 	}
-	if a, err := idna.ToASCII(host); err == nil {
-		host = a
+	// Skip IDNA processing on hosts which are already ASCII.
+	// This is consistent with net/http and the WHATWG URL Specification.
+	// (We currently don't follow all of WHATWG, but we're aligned on
+	// permitting all-ASCII hostnames which fail IDNA validation.
+	// There are existing, valid domain names which TR #46 processing rejects.)
+	if !isASCII(host) {
+		if a, err := idna.Lookup.ToASCII(host); err == nil && a != "" {
+			host = a
+		}
 	}
 	// IPv6 address literal, without a port:
 	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
@@ -414,6 +481,8 @@ func (t *Transport) dialTLSWithContext(ctx context.Context, network, addr string
 
 // GoAwayError is returned by the Transport when the server closes the
 // TCP connection after sending a GOAWAY frame.
+//
+// Deprecated: GoAwayError is deprecated.
 type GoAwayError struct {
 	LastStreamID uint32
 	ErrCode      ErrCode

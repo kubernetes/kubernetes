@@ -178,7 +178,7 @@ type CSIDriverSpecApplyConfiguration struct {
 	//
 	// Default behavior if unset is to pass tokens in the VolumeContext field.
 	ServiceAccountTokenInSecrets *bool `json:"serviceAccountTokenInSecrets,omitempty"`
-	// PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
+	// preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
 	// scheduling if the CSI driver on the node is missing.
 	//
 	// Enabling this option will prevent the scheduler (or any other
@@ -193,7 +193,7 @@ type CSIDriverSpecApplyConfiguration struct {
 	// newly created node may be rejected by the scheduler because of missing CSI driver
 	// information from the node.
 	//
-	// This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+	// This is a beta feature and requires the VolumeLimitScaling feature gate to be enabled.
 	// Default is "false".
 	PreventPodSchedulingIfMissing *bool `json:"preventPodSchedulingIfMissing,omitempty"`
 }

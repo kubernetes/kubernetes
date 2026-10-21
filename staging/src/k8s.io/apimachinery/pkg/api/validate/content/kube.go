@@ -99,3 +99,19 @@ func prefixEach(msgs []string, prefix string) []string {
 	}
 	return msgs
 }
+
+// IsPrefixedLabelKey tests whether the value passed is a valid label key with
+// a domain prefix. This allows "example.com/key" but not "key".
+// If the value is not valid, a list of error strings is returned. Otherwise,
+// an empty list (or nil) is returned.
+func IsPrefixedLabelKey(value string) []string {
+	if errs := IsLabelKey(value); len(errs) > 0 {
+		return errs
+	}
+
+	segments := strings.Split(value, "/")
+	if len(segments) != 2 {
+		return []string{"must include a prefix (e.g. 'example.com/key')"}
+	}
+	return nil
+}

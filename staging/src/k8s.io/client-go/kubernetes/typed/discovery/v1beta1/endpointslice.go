@@ -41,6 +41,7 @@ type EndpointSliceInterface interface {
 	Create(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSlice, opts v1.CreateOptions) (*discoveryv1beta1.EndpointSlice, error)
 	Update(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSlice, opts v1.UpdateOptions) (*discoveryv1beta1.EndpointSlice, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*discoveryv1beta1.EndpointSlice, error)
 	List(ctx context.Context, opts v1.ListOptions) (*discoveryv1beta1.EndpointSliceList, error)

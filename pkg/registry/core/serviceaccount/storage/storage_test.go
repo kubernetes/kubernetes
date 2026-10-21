@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -55,7 +55,7 @@ func newTokenStorage(t *testing.T, issuer token.TokenGenerator, auds authenticat
 		ResourcePrefix:          "serviceaccounts",
 	}
 	// set issuer, podStore and secretStore to allow the token endpoint to be initialised
-	rest, err := NewREST(restOptions, issuer, auds, 0, podStorage, secretStorage, nodeStorage, false, time.Hour*9999)
+	rest, err := NewREST(restOptions, issuer, auds, nil, 0, podStorage, secretStorage, nodeStorage, nil, nil, false, time.Hour*9999)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 			Name:      serviceAccount.Name,
 			Namespace: serviceAccount.Namespace,
 		},
-		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: 3600},
+		Spec: authenticationapi.TokenRequestSpec{ExpirationSeconds: new(int64(3600))},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed calling /token endpoint for service account: %v", err)

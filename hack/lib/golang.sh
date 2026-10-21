@@ -277,7 +277,6 @@ readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
-  test/kubemark
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
@@ -289,7 +288,6 @@ readonly KUBE_TEST_PORTABLE=(
 # These binaries will be distributed in the kubernetes-test tarball.
 kube::golang::server_test_targets() {
   local targets=(
-    cmd/kubemark
     ginkgo
   )
 
@@ -320,20 +318,7 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
-readonly KUBE_STATIC_BINARIES=(
-  apiextensions-apiserver
-  kube-aggregator
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
-  kube-proxy
-  kube-log-runner
-  kubeadm
-  kubectl
-  kubectl-convert
-  kubemark
-  mounter
-)
+readonly KUBE_CGO_BINARIES=()
 
 # Fully-qualified package names that we want to instrument for coverage information.
 readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
@@ -346,12 +331,11 @@ readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
 
 # KUBE_CGO_OVERRIDES is a space-separated list of binaries which should be built
 # with CGO enabled, assuming CGO is supported on the target platform.
-# This overrides any entry in KUBE_STATIC_BINARIES.
+# This overrides KUBE_STATIC_OVERRIDES.
 IFS=" " read -ra KUBE_CGO_OVERRIDES_LIST <<< "${KUBE_CGO_OVERRIDES:-}"
 readonly KUBE_CGO_OVERRIDES_LIST
 # KUBE_STATIC_OVERRIDES is a space-separated list of binaries which should be
-# built with CGO disabled. This is in addition to the list in
-# KUBE_STATIC_BINARIES.
+# built with CGO disabled even if they are listed in KUBE_CGO_BINARIES.
 IFS=" " read -ra KUBE_STATIC_OVERRIDES_LIST <<< "${KUBE_STATIC_OVERRIDES:-}"
 readonly KUBE_STATIC_OVERRIDES_LIST
 
@@ -363,11 +347,11 @@ kube::golang::is_statically_linked() {
   if [[ -n "${KUBE_CGO_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_CGO_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   fi
-  for e in "${KUBE_STATIC_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   if [[ -n "${KUBE_STATIC_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_STATIC_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
-  return 1;
+  for e in "${KUBE_CGO_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
+  return 0;
 }
 
 # kube::golang::best_guess_go_targets takes a list of build targets, which might
@@ -572,7 +556,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.26
+  minimum_go_version=go1.27
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -821,11 +805,18 @@ kube::golang::build_binaries_for_platform() {
   local -a statics=()
   local -a nonstatics=()
   local -a tests=()
+  local -A static_tests=()
 
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
-      kube::log::info "    ${binary} (test${KUBE_RACE:+, race detection})"
+      # -race needs cgo.
+      if [[ -z "${KUBE_RACE:-}" ]] && kube::golang::is_statically_linked "${binary}"; then
+        static_tests["${binary}"]=1
+        kube::log::info "    ${binary} (test, static)"
+      else
+        kube::log::info "    ${binary} (test${KUBE_RACE:+, race detection})"
+      fi
     elif kube::golang::is_statically_linked "${binary}"; then
       statics+=("${binary}")
       kube::log::info "    ${binary} (static)"
@@ -880,7 +871,11 @@ kube::golang::build_binaries_for_platform() {
     if [[ -n "${KUBE_RACE:-}" ]]; then
       build_args+=("${KUBE_RACE}")
     fi
-    go test "${build_args[@]}" "${testpkg}"
+    if [[ -n "${static_tests[${test}]:-}" ]]; then
+      CGO_ENABLED=0 go test "${build_args[@]}" "${testpkg}"
+    else
+      go test "${build_args[@]}" "${testpkg}"
+    fi
   done
 }
 
@@ -949,8 +944,9 @@ kube::golang::build_binaries() {
       grpcnotrace=",grpcnotrace"
   fi
 
-  # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  # Extract tags if any specified in GOFLAGS. kubectl never enables kustomize Go
+  # plugins; the std plugin package plus cgo makes the linker keep every method.
+  gotags="selinux,notest,kustomize_disable_go_plugin_support${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
   local -a targets=()
   local arg

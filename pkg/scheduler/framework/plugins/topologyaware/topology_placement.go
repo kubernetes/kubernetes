@@ -21,11 +21,11 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -37,6 +37,7 @@ const (
 // TopologyPlacement is a plugin that generates placements for a pod group based on its topology constraints.
 type TopologyPlacement struct {
 	handle fwk.Handle
+	fts    feature.Features
 }
 
 var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
@@ -45,6 +46,7 @@ var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (*TopologyPlacement, error) {
 	return &TopologyPlacement{
 		handle: fh,
+		fts:    fts,
 	}, nil
 }
 
@@ -56,8 +58,7 @@ func (pl *TopologyPlacement) Name() string {
 // GeneratePlacements generates placements for a pod group based on the topology constraints in the pod group spec.
 // It uses the parent placement to find the nodes that are available for placement.
 func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
-	podGroupResource := podGroup.GetPodGroup()
-	topologyKey, ok := pl.getTopologyKey(podGroupResource)
+	topologyKey, ok := pl.getTopologyKey(podGroup)
 	if !ok {
 		// No topology constraints, return a single placement with no constraints.
 		return &fwk.GeneratePlacementsResult{Placements: []*fwk.Placement{parentPlacement}}, nil
@@ -78,7 +79,7 @@ func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.P
 
 	nodesPerTopologyDomain := make(map[string][]fwk.NodeInfo)
 	for _, node := range parentPlacement.Nodes {
-		if domain, ok := node.Node().Labels[topologyKey]; ok {
+		if domain, ok := node.Node().Labels[topologyKey]; ok && domain != "" {
 			if requiredDomain == nil || *requiredDomain == domain {
 				nodesPerTopologyDomain[domain] = append(nodesPerTopologyDomain[domain], node)
 			}
@@ -109,8 +110,12 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 		if !ok {
 			return "", fmt.Errorf("no topology domain found for pod %v", klog.KObj(pod))
 		}
+		// An empty label value is treated as a node labeling mistake, not as a domain.
+		if domain == "" {
+			return "", fmt.Errorf("empty topology domain found for pod %v", klog.KObj(pod))
+		}
 		if topologyDomain != "" && topologyDomain != domain {
-			return "", fmt.Errorf("more than 1 domain found for pod group: %v, %v", topologyDomain, domain)
+			return "", fmt.Errorf("more than 1 domain found for pod group: %q, %q", topologyDomain, domain)
 		}
 		topologyDomain = domain
 	}
@@ -118,15 +123,32 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 }
 
 // getTopologyKey returns the topology key for the pod group if there's any specified.
-func (pl *TopologyPlacement) getTopologyKey(podGroupResource *schedulingapi.PodGroup) (string, bool) {
-	if schedulingConstraints := podGroupResource.Spec.SchedulingConstraints; schedulingConstraints != nil && len(schedulingConstraints.Topology) > 0 {
-		// Right now, we only support a single topology constraint on the API level.
-		return schedulingConstraints.Topology[0].Key, true
+func (pl *TopologyPlacement) getTopologyKey(pgi fwk.PodGroupInfo) (string, bool) {
+	if pg := pgi.GetPodGroup(); pg != nil {
+		if schedulingConstraints := pg.Spec.SchedulingConstraints; schedulingConstraints != nil && len(schedulingConstraints.Topology) > 0 {
+			// Right now, we only support a single topology constraint on the API level.
+			return schedulingConstraints.Topology[0].Key, true
+		}
+	} else if cpg := pgi.GetCompositePodGroup(); cpg != nil {
+		if schedulingConstraints := cpg.Spec.SchedulingConstraints; schedulingConstraints != nil && len(schedulingConstraints.Topology) > 0 {
+			// Right now, we only support a single topology constraint on the API level.
+			return schedulingConstraints.Topology[0].Key, true
+		}
 	}
 	return "", false
 }
 
 func (pl *TopologyPlacement) getScheduledPods(podGroup fwk.PodGroupInfo) ([]*v1.Pod, error) {
+	if pl.fts.EnableCompositePodGroup {
+		var results []*v1.Pod
+		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, podGroupState.ScheduledPods()...)
+		}
+		return results, nil
+	}
 	name := podGroup.GetName()
 	podGroupState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), name)
 	if err != nil {

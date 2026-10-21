@@ -331,6 +331,66 @@ func TestPreferredAffinity(t *testing.T) {
 			},
 		},
 	}
+	affinityNegativeNamespaceSelector := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 5,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "team",
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"team1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	antiAffinityNegativeNamespaceSelector := &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 5,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "team",
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"team1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 	invalidAffinityLabels := &v1.Affinity{
 		PodAffinity: &v1.PodAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
@@ -742,6 +802,34 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 			},
 			expectedList: []fwk.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: fwk.MaxNodeScore}},
+		},
+		{
+			name: "Affinity with pods correctly enforcing negative NamespaceSelector",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Affinity: affinityNegativeNamespaceSelector}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node2"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabelSecurityS1}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
+			},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: fwk.MaxScore}},
+		},
+		{
+			name: "AntiAffinity with pods correctly enforcing negative NamespaceSelector",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Affinity: antiAffinityNegativeNamespaceSelector}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node2"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabelSecurityS1}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
+			},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxScore}, {Name: "node2", Score: 0}},
 		},
 		{
 			name: "Ignore preferred terms of existing pods",

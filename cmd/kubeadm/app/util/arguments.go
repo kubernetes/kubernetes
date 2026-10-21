@@ -21,7 +21,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -30,36 +29,37 @@ import (
 
 // ArgumentsToCommand takes two Arg slices, one with the base arguments and one
 // with optional override arguments. In the return list, base arguments will precede
-// override arguments. If an argument is present in the overrides, it will cause
-// all instances of the same argument in the base list to be discarded, leaving
-// only the instances of this argument in the overrides to be applied.
+// override arguments. Depending on MergeMethod, the overrides can append to,
+// prepend to, or replace a base argument.
 func ArgumentsToCommand(base, overrides []kubeadmapi.Arg) []string {
 	// Sort only the base.
 	sortArgsSlice(&base)
 
-	// Collect all overrides in a set.
-	overrideArgs := sets.New[string]()
+	// Collect the "replace" overrides.
+	overrideArgs := make(map[string]kubeadmapi.Arg, len(overrides))
+	tail := make([]string, 0, len(overrides))
 	for _, arg := range overrides {
-		overrideArgs.Insert(arg.Name)
-	}
-
-	// Append only the base args that do not have overrides.
-	args := make([]kubeadmapi.Arg, 0, len(base)+len(overrides))
-	for _, arg := range base {
-		if !overrideArgs.Has(arg.Name) {
-			args = append(args, arg)
+		overrideArgs[arg.Name] = arg
+		if arg.MergeMethod == "" {
+			tail = append(tail, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
 		}
 	}
 
-	// Append the overrides.
-	args = append(args, overrides...)
-
-	command := make([]string, len(args))
-	for i, arg := range args {
-		command[i] = fmt.Sprintf("--%s=%s", arg.Name, arg.Value)
+	command := make([]string, 0, len(base)+len(tail))
+	for _, arg := range base {
+		ov, ok := overrideArgs[arg.Name]
+		switch {
+		case !ok:
+			// Base arg is unchanged.
+		case ov.MergeMethod == "":
+			continue
+		default:
+			arg.Value = kubeadmapi.MergeArgWithBase(arg.Value, ov)
+		}
+		command = append(command, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
 	}
 
-	return command
+	return append(command, tail...)
 }
 
 // ArgumentsFromCommand parses a CLI command in the form "--foo=bar" to an Arg slice.

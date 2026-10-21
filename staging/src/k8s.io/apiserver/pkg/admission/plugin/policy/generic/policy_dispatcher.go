@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,6 +35,7 @@ import (
 	webhookgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -452,7 +454,28 @@ func getParamDirectly(
 		resourceClient = dynamicClient.Resource(mapping.Resource)
 	}
 
-	return resourceClient.Get(ctx, paramRef.Name, metav1.GetOptions{})
+	param, err := resourceClient.Get(ctx, paramRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return convertParamToInformerRepresentation(gvk, param)
+}
+
+// convertParamToInformerRepresentation makes a get response object look like an informer object by
+// representing it as unstructured and without TypeMeta. This ensures that CEL expressions
+// receive param objects identically regardless of if the object was received via the informer
+// or if an informer cache miss resulted in a get request to fetch the object.
+func convertParamToInformerRepresentation(gvk schema.GroupVersionKind, param *unstructured.Unstructured) (runtime.Object, error) {
+	typed, err := clientgoscheme.Scheme.New(gvk)
+	if err != nil {
+		// The kind has no typed representation, so its informer also serves unstructured objects.
+		return param, nil
+	}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(param.UnstructuredContent(), typed); err != nil {
+		return nil, fmt.Errorf("failed to convert param %v to typed object: %w", gvk, err)
+	}
+	typed.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	return typed, nil
 }
 
 var _ webhookgeneric.VersionedAttributeAccessor = &versionedAttributeAccessor{}

@@ -25,9 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -220,7 +218,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 					zoneHints.Insert(zone.Name)
 				}
 			}
-			if len(endpoint.Hints.ForNodes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+			if len(endpoint.Hints.ForNodes) > 0 {
 				nodeHints = sets.New[string]()
 				for _, node := range endpoint.Hints.ForNodes {
 					nodeHints.Insert(node.Name)
@@ -301,21 +299,10 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			}
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
-
-			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 
 	return endpointsMap
-}
-
-// formatEndpointsList returns a string list converted from an endpoints list.
-func formatEndpointsList(endpoints []Endpoint) []string {
-	var formattedList []string
-	for _, ep := range endpoints {
-		formattedList = append(formattedList, ep.String())
-	}
-	return formattedList
 }
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.

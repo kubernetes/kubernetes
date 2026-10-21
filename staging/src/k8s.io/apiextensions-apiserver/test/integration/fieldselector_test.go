@@ -31,10 +31,8 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/conversion"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,11 +41,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi3"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
@@ -586,234 +582,6 @@ func TestFieldSelectorOpenAPI(t *testing.T) {
 `
 		if v2selectableFields.Value.Yaml != expected {
 			t.Errorf("Expected %s but got %s", v2selectableFields.Value.Yaml, expected)
-		}
-	})
-}
-
-func TestFieldSelectorDropFields(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t, "--emulated-version=1.31", "--feature-gates=CustomResourceFieldSelectors=false")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
-
-	group := myCRDV1Beta1.Group
-	version := myCRDV1Beta1.Version
-	resource := myCRDV1Beta1.Resource
-	kind := fakeRESTMapper[myCRDV1Beta1]
-
-	myCRD := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: resource + "." + group},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: group,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
-				Name:    version,
-				Served:  true,
-				Storage: true,
-				Schema: &apiextensionsv1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						Type: "object",
-						Properties: map[string]apiextensionsv1.JSONSchemaProps{
-							"spec": {
-								Type: "object",
-								Properties: map[string]apiextensionsv1.JSONSchemaProps{
-									"field": {Type: "string"},
-								},
-								Required: []string{"field"},
-							},
-						},
-					},
-				},
-				SelectableFields: []apiextensionsv1.SelectableField{
-					{JSONPath: ".spec.field"},
-				},
-			}},
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural:   resource,
-				Kind:     kind,
-				ListKind: kind + "List",
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-		},
-	}
-
-	created, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, myCRD, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if created.Spec.Versions[0].SelectableFields != nil {
-		t.Errorf("Expected SelectableFields field to be dropped for create when feature gate is disabled")
-	}
-
-	var updated *apiextensionsv1.CustomResourceDefinition
-	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		existing, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, created.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		existing.Spec.Versions[0].SelectableFields = []apiextensionsv1.SelectableField{{JSONPath: ".spec.field"}}
-		updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, existing, metav1.UpdateOptions{})
-		if err != nil {
-			if apierrors.IsConflict(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error waiting for CRD update: %v", err)
-	}
-
-	if updated.Spec.Versions[0].SelectableFields != nil {
-		t.Errorf("Expected SelectableFields field to be dropped for create when feature gate is disabled")
-	}
-}
-
-func TestFieldSelectorDisablement(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	tearDown, config, _, err := fixtures.StartDefaultServer(t, "--emulated-version=1.31")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
-
-	apiExtensionClient, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	crd := selectableFieldFixture.DeepCopy()
-	// Write a field that uses the feature while the feature gate is enabled
-	t.Run("CustomResourceFieldSelectors", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
-		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, false)
-
-	// Now that the feature gate is disabled again, update the CRD to trigger an openAPI update
-	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
-	crd.Spec.Versions[0].SelectableFields = []apiextensionsv1.SelectableField{
-		{JSONPath: ".spec.color"},
-		{JSONPath: ".spec.quantity"},
-	}
-	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	shirtClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
-
-	invalidRequestCases := []struct {
-		fieldSelector string
-	}{
-		{
-			fieldSelector: "spec.color=blue",
-		},
-	}
-
-	t.Run("watch", func(t *testing.T) {
-		for _, tc := range invalidRequestCases {
-			t.Run(tc.fieldSelector, func(t *testing.T) {
-				w, err := shirtClient.Watch(ctx, metav1.ListOptions{FieldSelector: tc.fieldSelector})
-				if err == nil {
-					w.Stop()
-					t.Fatal("Expected error but got none")
-				}
-				if !apierrors.IsBadRequest(err) {
-					t.Errorf("Expected BadRequest but got %v", err)
-				}
-			})
-		}
-	})
-
-	for _, instance := range []string{shirtInstance1, shirtInstance2, shirtInstance3} {
-		shirt := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal([]byte(instance), &shirt.Object); err != nil {
-			t.Fatal(err)
-		}
-
-		_, err = shirtClient.Create(ctx, shirt, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("Unable to create CR: %v", err)
-		}
-	}
-
-	t.Run("list", func(t *testing.T) {
-		for _, tc := range invalidRequestCases {
-			t.Run(tc.fieldSelector, func(t *testing.T) {
-				_, err := shirtClient.List(ctx, metav1.ListOptions{FieldSelector: tc.fieldSelector})
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
-				if !apierrors.IsBadRequest(err) {
-					t.Errorf("Expected BadRequest but got %v", err)
-				}
-				expected := "field label not supported: spec.color"
-				if err.Error() != expected {
-					t.Errorf("Expected '%s' but got '%s'", expected, err.Error())
-				}
-			})
-		}
-	})
-
-	t.Run("OpenAPIv3", func(t *testing.T) {
-		var spec *spec3.OpenAPI
-		err = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-			// wait for the CRD to be published.
-			root := openapi3.NewRoot(discoveryClient.OpenAPIV3())
-			spec, err = root.GVSpec(schema.GroupVersion{Group: crd.Spec.Group, Version: "v1"})
-			if err != nil {
-				return false, nil
-			}
-			shirtSchema, ok := spec.Components.Schemas["com.example.tests.v1.Shirt"]
-			if !ok {
-				return false, nil
-			}
-			_, found := shirtSchema.VendorExtensible.Extensions["x-kubernetes-selectable-fields"]
-			return !found, nil // the feature gate is disabled, so selectable fields should be absent
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	t.Run("OpenAPIv2", func(t *testing.T) {
-		v2, err := discoveryClient.OpenAPISchema()
-		if err != nil {
-			t.Fatal(err)
-		}
-		var v2Prop *openapi_v2.NamedSchema
-		for _, prop := range v2.Definitions.AdditionalProperties {
-			if prop.Name == "com.example.tests.v1.Shirt" {
-				v2Prop = prop
-			}
-		}
-		if v2Prop == nil {
-			t.Fatal("Expected com.example.tests.v1.Shirt definition")
-		}
-		var v2selectableFields *openapi_v2.NamedAny
-		for _, ve := range v2Prop.Value.VendorExtension {
-			if ve.Name == "x-kubernetes-selectable-fields" {
-				v2selectableFields = ve
-			}
-		}
-		if v2selectableFields != nil {
-			t.Fatal("Did not expect to find x-kubernetes-selectable-fields")
 		}
 	})
 }

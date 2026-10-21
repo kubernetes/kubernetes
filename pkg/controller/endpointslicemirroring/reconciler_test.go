@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
 	endpointsliceutil "k8s.io/endpointslice/util"
+	"k8s.io/ktesting"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -1106,6 +1106,36 @@ func TestReconcile(t *testing.T) {
 			endpointSlices := fetchEndpointSlices(t, client, namespace)
 			expectEndpointSlices(t, tc.expectedNumSlices, int(maxEndpointsPerSubset), endpoints, endpointSlices)
 		})
+	}
+}
+
+func TestFinalizeIgnoresNotFoundWhenDeletingEndpointSlice(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	r := newReconciler(tCtx, newClientset(), defaultMaxEndpointsPerSubset)
+	//nolint:staticcheck // EndpointSlice mirroring reconciles legacy Endpoints objects.
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: "test"},
+	}
+	slices := slicesByAction{
+		toDelete: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{Name: "already-deleted", Namespace: endpoints.Namespace},
+		}},
+	}
+
+	if err := r.finalize(tCtx, endpoints, slices); err != nil {
+		t.Fatalf("Expected NotFound error to be ignored, got %v", err)
+	}
+}
+
+func TestDeleteEndpointsIgnoresNotFound(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	r := newReconciler(tCtx, newClientset(), defaultMaxEndpointsPerSubset)
+	endpointSlices := []*discovery.EndpointSlice{{
+		ObjectMeta: metav1.ObjectMeta{Name: "already-deleted", Namespace: "test"},
+	}}
+
+	if err := r.deleteEndpoints(tCtx, "test", "test-ep", endpointSlices); err != nil {
+		t.Fatalf("Expected NotFound error to be ignored, got %v", err)
 	}
 }
 

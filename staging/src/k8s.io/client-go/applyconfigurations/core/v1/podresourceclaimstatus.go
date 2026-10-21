@@ -25,11 +25,11 @@ package v1
 // which references a ResourceClaimTemplate. It stores the generated name for
 // the corresponding ResourceClaim.
 type PodResourceClaimStatusApplyConfiguration struct {
-	// Name uniquely identifies this resource claim inside the pod.
+	// name uniquely identifies this resource claim inside the pod.
 	// This must match the name of an entry in pod.spec.resourceClaims,
 	// which implies that the string must be a DNS_LABEL.
 	Name *string `json:"name,omitempty"`
-	// ResourceClaimName is the name of the ResourceClaim that was
+	// resourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
 	//
 	// When the DRAWorkloadResourceClaims feature is enabled and the

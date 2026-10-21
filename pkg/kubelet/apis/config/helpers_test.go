@@ -163,6 +163,7 @@ var (
 	kubeletConfigurationNonPathFieldPaths = sets.New[string](
 		"Address",
 		"AllowedUnsafeSysctls[*]",
+		"DefaultPodSysctls[*]",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
 		"Authentication.Webhook.Enabled",
@@ -254,6 +255,8 @@ var (
 		"MakeIPTablesUtilChains",
 		"RotateCertificates",
 		"ServerTLSBootstrap",
+		"ClientCertificateKeyAlgorithm",
+		"ServerCertificateKeyAlgorithm",
 		"StaticPodURL",
 		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",

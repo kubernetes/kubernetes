@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,17 +37,17 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-const extendedResourceName = "example.com/combined-resource"
+const extendedResourceDomain = "example.com/"
 
 var (
-	gangPolicy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-		Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 2},
+	gangPolicy = schedulingv1beta1.PodGroupSchedulingPolicy{
+		Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 2},
 	}
-	singleDisruption = schedulingv1alpha3.DisruptionMode{
-		Single: &schedulingv1alpha3.SingleDisruptionMode{},
+	singleDisruption = schedulingv1beta1.DisruptionMode{
+		Single: &schedulingv1beta1.SingleDisruptionMode{},
 	}
-	allDisruption = schedulingv1alpha3.DisruptionMode{
-		All: &schedulingv1alpha3.AllDisruptionMode{},
+	allDisruption = schedulingv1beta1.DisruptionMode{
+		All: &schedulingv1beta1.AllDisruptionMode{},
 	}
 )
 
@@ -62,10 +62,10 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 	f := framework.NewDefaultFramework("workload-aware-preemption")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	createPodGroup := func(ctx context.Context, pg *schedulingv1alpha3.PodGroup) {
+	createPodGroup := func(ctx context.Context, pg *schedulingv1beta1.PodGroup) {
 		cs := f.ClientSet
 		ns := f.Namespace.Name
-		_, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
+		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create PodGroup %s", pg.Name)
 	}
 
@@ -73,7 +73,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		cs := f.ClientSet
 		ns := f.Namespace.Name
 		ginkgo.By("Deleting PodGroup")
-		err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{})
+		err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete PodGroup")
 	}
 
@@ -90,20 +90,18 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		framework.ExpectNoError(err, "failed to delete priority class: %s", name)
 	}
 
-	addExtendedResource := func(ctx context.Context, nodeName string) {
+	addExtendedResource := func(ctx context.Context, nodeName string, resourceName v1.ResourceName) {
 		cs := f.ClientSet
-		resName := v1.ResourceName(extendedResourceName)
-		e2enode.AddExtendedResource(ctx, cs, nodeName, resName, resource.MustParse("2"))
+		e2enode.AddExtendedResource(ctx, cs, nodeName, resourceName, resource.MustParse("2"))
 	}
 
-	removeExtendedResource := func(ctx context.Context, nodeName string) {
+	removeExtendedResource := func(ctx context.Context, nodeName string, resourceName v1.ResourceName) {
 		cs := f.ClientSet
-		resName := v1.ResourceName(extendedResourceName)
 		ginkgo.By("Removing extended resource from node")
-		e2enode.RemoveExtendedResource(ctx, cs, nodeName, resName)
+		e2enode.RemoveExtendedResource(ctx, cs, nodeName, resourceName)
 	}
 
-	makePod := func(nodeName string, name, pgName string, priority string) *v1.Pod {
+	makePod := func(nodeName string, name, pgName string, priority string, resourceName v1.ResourceName) *v1.Pod {
 		ns := f.Namespace.Name
 		p := e2epod.MakePod(ns, map[string]string{"kubernetes.io/hostname": nodeName}, nil, admissionapi.LevelPrivileged, "")
 		p.ObjectMeta.GenerateName = name + "-"
@@ -111,17 +109,17 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		if pgName != "" {
 			p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pgName}
 		}
-		p.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceName(extendedResourceName): resource.MustParse("1")}
-		p.Spec.Containers[0].Resources.Limits = v1.ResourceList{v1.ResourceName(extendedResourceName): resource.MustParse("1")}
+		p.Spec.Containers[0].Resources.Requests = v1.ResourceList{resourceName: resource.MustParse("1")}
+		p.Spec.Containers[0].Resources.Limits = v1.ResourceList{resourceName: resource.MustParse("1")}
 		return p
 	}
 
-	makePodGroup := func(pgName string, priorityName string, schedulingPolicy schedulingv1alpha3.PodGroupSchedulingPolicy, disruptionMode schedulingv1alpha3.DisruptionMode) *schedulingv1alpha3.PodGroup {
+	makePodGroup := func(pgName string, priorityName string, schedulingPolicy schedulingv1beta1.PodGroupSchedulingPolicy, disruptionMode schedulingv1beta1.DisruptionMode) *schedulingv1beta1.PodGroup {
 		ns := f.Namespace.Name
 
-		return &schedulingv1alpha3.PodGroup{
+		return &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: ns},
-			Spec: schedulingv1alpha3.PodGroupSpec{
+			Spec: schedulingv1beta1.PodGroupSpec{
 				PriorityClassName: priorityName,
 				SchedulingPolicy:  schedulingPolicy,
 				DisruptionMode:    &disruptionMode,
@@ -200,13 +198,14 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 
 	type preemptionTestArgs struct {
 		preemptorType        preemptorType
-		victimDisruptionMode schedulingv1alpha3.DisruptionMode
+		victimDisruptionMode schedulingv1beta1.DisruptionMode
 		verify               func(context.Context, []*v1.Pod)
 	}
 
 	runPreemptionTest := func(ctx context.Context, args preemptionTestArgs) {
 		cs := f.ClientSet
 		ns := f.Namespace.Name
+		extendedResourceName := v1.ResourceName(extendedResourceDomain + ns)
 
 		ginkgo.By("Creating PriorityClasses")
 		lowPriorityName := "low-priority-" + ns
@@ -225,8 +224,8 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 
 		nodeName := getNodeName(ctx)
 		ginkgo.By("Adding extended resource to node")
-		addExtendedResource(ctx, nodeName)
-		defer removeExtendedResource(ctx, nodeName)
+		addExtendedResource(ctx, nodeName, extendedResourceName)
+		defer removeExtendedResource(ctx, nodeName, extendedResourceName)
 
 		ginkgo.By(fmt.Sprintf("Creating low-priority pod group PG-victim with disruptionMode %v", args.victimDisruptionMode))
 		pgVictimName := "pg-victim-" + ns
@@ -238,7 +237,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		for i := range gangPolicy.Gang.MinCount {
 			name := fmt.Sprintf("victim%d", i+1)
 			ginkgo.By(fmt.Sprintf("Creating low-priority pod %s belonging to PG-victim", name))
-			p := makePod(nodeName, name, pgVictimName, lowPriorityName)
+			p := makePod(nodeName, name, pgVictimName, lowPriorityName, extendedResourceName)
 			createdPod, err := cs.CoreV1().Pods(ns).Create(ctx, p, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod %s", name)
 			pods = append(pods, createdPod)
@@ -253,15 +252,15 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		if args.preemptorType == podGroup {
 			pgPreemptorName = "pg-preemptor-" + ns
 			ginkgo.By("Creating high-priority pod group PG-preemptor with gang policy")
-			pgPreemptor := makePodGroup(pgPreemptorName, highPriorityName, schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 1},
+			pgPreemptor := makePodGroup(pgPreemptorName, highPriorityName, schedulingv1beta1.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 1},
 			}, singleDisruption)
 			createPodGroup(ctx, pgPreemptor)
 			defer deletePodGroup(ctx, pgPreemptor.Name)
 		}
 
 		ginkgo.By("Creating high-priority individual pod hp1")
-		hp1 := makePod(nodeName, "hp1", pgPreemptorName, highPriorityName)
+		hp1 := makePod(nodeName, "hp1", pgPreemptorName, highPriorityName, extendedResourceName)
 		var err error
 		hp1, err = cs.CoreV1().Pods(ns).Create(ctx, hp1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod hp1")

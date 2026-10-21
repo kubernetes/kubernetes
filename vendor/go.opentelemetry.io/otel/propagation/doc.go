@@ -10,4 +10,4 @@ package is the W3C Trace Context encoding
 (https://www.w3.org/TR/trace-context/), and W3C Baggage
 (https://www.w3.org/TR/baggage/).
 */
-package propagation // import "go.opentelemetry.io/otel/propagation"
+package propagation

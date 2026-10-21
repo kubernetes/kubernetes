@@ -102,3 +102,29 @@ func TestCacheConcurrency(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// Test that compiling the same expression under different scopes (selector vs.
+// derived attribute) isolates the results in different cache keyspaces,
+// preventing collisions
+func TestCacheIsolation(t *testing.T) {
+	cache := NewCache(10, Features{})
+
+	// 1. Compiling "42" as a derived attribute must succeed, as derived attributes
+	// are allowed to evaluate to integers.
+	resultDerived := cache.GetOrCompileDerivedAttribute("42")
+	require.Nil(t, resultDerived.Error)
+
+	// 2. Compiling "42" as a selector must fail, as selectors are strictly
+	// restricted to boolean results.
+	resultSelector := cache.GetOrCompile("42")
+	require.NotNil(t, resultSelector.Error)
+
+	// 3. Re-compiling as a derived attribute must return the cached success entry,
+	// proving that the failed selector compilation did not pollute or overwrite
+	// the derived namespace.
+	resultDerivedAgain := cache.GetOrCompileDerivedAttribute("42")
+	require.Nil(t, resultDerivedAgain.Error)
+	if resultDerived != resultDerivedAgain {
+		t.Fatal("successful derived attribute compilation should have been cached")
+	}
+}

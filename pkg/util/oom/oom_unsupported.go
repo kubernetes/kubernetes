@@ -26,15 +26,10 @@ var unsupportedErr = errors.New("setting OOM scores is unsupported in this build
 
 func NewOOMAdjuster() *OOMAdjuster {
 	return &OOMAdjuster{
-		ApplyOOMScoreAdj:          unsupportedApplyOOMScoreAdj,
-		ApplyOOMScoreAdjContainer: unsupportedApplyOOMScoreAdjContainer,
+		ApplyOOMScoreAdj: unsupportedApplyOOMScoreAdj,
 	}
 }
 
 func unsupportedApplyOOMScoreAdj(pid int, oomScoreAdj int) error {
-	return unsupportedErr
-}
-
-func unsupportedApplyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
 	return unsupportedErr
 }

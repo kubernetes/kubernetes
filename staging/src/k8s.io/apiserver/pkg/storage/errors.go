@@ -19,6 +19,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,6 +117,20 @@ type StorageError struct {
 
 	// inner error
 	err error
+}
+
+func ResourceVersion(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	var e *StorageError
+	if !errors.As(err, &e) {
+		return "", false
+	}
+	if e.ResourceVersion <= 0 {
+		return "", false
+	}
+	return strconv.FormatInt(e.ResourceVersion, 10), true
 }
 
 func (e *StorageError) Unwrap() error { return e.err }
