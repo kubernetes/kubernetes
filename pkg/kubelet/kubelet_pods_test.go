@@ -8895,7 +8895,7 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			found, err := getentUserExists("kubelet-nonexistent-test-user")
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
