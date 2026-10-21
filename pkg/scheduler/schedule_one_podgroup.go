@@ -1182,8 +1182,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 			}, nil
 		}
-		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupCycleState(podGroupCycleState)
+		placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 		subtreeResult := map[fwk.EntityKey]*podGroupAlgorithmResult{}
 		result, placementRevertFns := sched.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
 		placementRevertFns.revert()
@@ -1339,8 +1338,7 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 			status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 		}
 	}
-	placementCycleState := framework.NewCycleState()
-	placementCycleState.SetPodGroupCycleState(podGroupCycleState)
+	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 	result, placementRevertFns := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
 	placementRevertFns.revert()
 
@@ -1356,6 +1354,15 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 	}
 	metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), metrics.SinceInSeconds(evaluationStart))
 	return result
+}
+
+// newPlacementCycleState creates a PlacementCycleState linked to podGroupCycleState and seeds
+// it with cloned copies of any per-placement StateData from placement generation.
+func newPlacementCycleState(podGroupCycleState *framework.CycleState, placement *fwk.Placement) *framework.CycleState {
+	placementCycleState := framework.NewCycleState()
+	placementCycleState.SetPodGroupCycleState(podGroupCycleState)
+	podGroupCycleState.CopyPlacementDataInto(placement, placementCycleState)
+	return placementCycleState
 }
 
 // nominatedPlacement returns the placement to evaluate first because it holds the pods'
