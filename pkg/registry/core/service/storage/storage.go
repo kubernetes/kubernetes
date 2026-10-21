@@ -96,17 +96,6 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    svcreg.GetAttrs,
-	}
-	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, nil, nil, err
-	}
-
-	statusStore := *store
-	statusStore.UpdateStrategy = svcreg.StatusStrategy
-	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
 
 	var primaryIPFamily api.IPFamily = serviceIPFamily
 	var secondaryIPFamily api.IPFamily = "" // sentinel value
@@ -122,7 +111,20 @@ func NewREST(
 		pods:              pods,
 		proxyTransport:    proxyTransport,
 	}
-	store.Decorator = genericStore.defaultOnRead
+
+	options := &generic.StoreOptions{
+		RESTOptions:     optsGetter,
+		AttrFunc:        svcreg.GetAttrs,
+		DecodeDecorator: genericStore.defaultOnRead, // plumb the decorator down into storage
+	}
+	if err := store.CompleteWithOptions(options); err != nil {
+		return nil, nil, nil, err
+	}
+
+	statusStore := *store
+	statusStore.UpdateStrategy = svcreg.StatusStrategy
+	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
+
 	store.AfterDelete = genericStore.afterDelete
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate

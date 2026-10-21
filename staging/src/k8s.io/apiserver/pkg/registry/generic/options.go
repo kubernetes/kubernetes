@@ -57,4 +57,6 @@ type StoreOptions struct {
 	TriggerFunc storage.IndexerFuncs
 	AttrFunc    storage.AttrFunc
 	Indexers    *cache.Indexers
+
+	DecodeDecorator func(runtime.Object)
 }
