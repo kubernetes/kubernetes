@@ -116,6 +116,7 @@ type Manager interface {
 type PodProvider interface {
 	GetActivePods() []*v1.Pod
 	GetPodByUID(types.UID) (*v1.Pod, bool)
+	IsPodTerminatingOrTerminal(*v1.Pod) bool
 	SyncPodNow(ctx context.Context, pod *v1.Pod)
 }
 
@@ -241,6 +242,16 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 		}
 
 		oldResizeStatus := m.statusManager.GetPodResizeConditions(uid)
+		// The pod may have started terminating after its resize was queued.
+		if m.podProvider.IsPodTerminatingOrTerminal(pod) {
+			logger.V(4).Info("Pod is terminating or terminal; removing from pending resizes", "pod", klog.KObj(pod))
+			m.statusManager.ClearPodResizePendingCondition(uid, metrics.DeferredResizeResolutionTerminated)
+			if !apiequality.Semantic.DeepEqual(oldResizeStatus, m.statusManager.GetPodResizeConditions(uid)) {
+				m.podProvider.SyncPodNow(ctx, pod)
+			}
+			continue
+		}
+
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
 		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)

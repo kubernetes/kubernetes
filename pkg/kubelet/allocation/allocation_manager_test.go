@@ -3959,6 +3959,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 type fakePodProvider struct {
 	pods        []*v1.Pod
 	getPodByUID func(types.UID) (*v1.Pod, bool)
+	// terminating is returned by IsPodTerminatingOrTerminal for every pod.
+	terminating bool
 	syncPodNow  func(context.Context, *v1.Pod)
 }
 
@@ -3978,6 +3980,10 @@ func (f *fakePodProvider) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (f *fakePodProvider) IsPodTerminatingOrTerminal(*v1.Pod) bool {
+	return f.terminating
 }
 
 func (f *fakePodProvider) SyncPodNow(ctx context.Context, pod *v1.Pod) {
@@ -4239,4 +4245,127 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	})
 
 	return allocationManager, runningPod, pendingPod, logger
+}
+
+func TestRetryPendingResizesTerminatingPods(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	mem100Mi := resource.MustParse("100Mi")
+
+	tests := []struct {
+		name                 string
+		terminating          bool
+		hadDeferredCondition bool
+		expectAllocatedCPU   resource.Quantity
+		expectInProgress     bool
+		expectSyncTriggered  bool
+	}{
+		{
+			name:                 "running pod allocates pending resize",
+			hadDeferredCondition: true,
+			expectAllocatedCPU:   cpu200m,
+			expectInProgress:     true,
+			expectSyncTriggered:  true,
+		},
+		{
+			name:                 "terminating pod with pending condition clears it and halts allocation",
+			terminating:          true,
+			hadDeferredCondition: true,
+			expectAllocatedCPU:   cpu100m,
+			expectInProgress:     false,
+			expectSyncTriggered:  true,
+		},
+		{
+			name:                 "terminating pod without pending condition drops resize without sync",
+			terminating:          true,
+			hadDeferredCondition: false,
+			expectAllocatedCPU:   cpu100m,
+			expectInProgress:     false,
+			expectSyncTriggered:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			allocatedPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-1",
+					Name:       "pod-1",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "test-image",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100Mi},
+						},
+					}},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			}
+
+			podStatus := kubecontainer.PodStatus{
+				ID:        allocatedPod.UID,
+				Name:      allocatedPod.Name,
+				Namespace: allocatedPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "c1",
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest:    &cpu100m,
+						MemoryRequest: &mem100Mi,
+					},
+				}},
+			}
+
+			resizedPod := allocatedPod.DeepCopy()
+			resizedPod.Generation = 2
+			resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: podStatus}, []*v1.Pod{resizedPod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			t.Cleanup(func() {
+				allocationManager.RemovePod(logger, allocatedPod.UID)
+			})
+
+			am := allocationManager.(*manager)
+
+			if tc.hadDeferredCondition {
+				am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "deferred", resizedPod.Generation)
+			}
+
+			allocationManager.PushPendingResize(logger, resizedPod.UID)
+			require.True(t, allocationManager.HasPendingResizes())
+
+			am.podProvider.(*fakePodProvider).terminating = tc.terminating
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			assert.False(t, allocationManager.HasPendingResizes(), "pending resize queue should be drained")
+
+			alloc, found := allocationManager.GetContainerResourceAllocation(resizedPod.UID, "c1")
+			require.True(t, found)
+			assert.True(t, tc.expectAllocatedCPU.Equal(*alloc.Requests.Cpu()), "expected allocated CPU %s, got %s", tc.expectAllocatedCPU.String(), alloc.Requests.Cpu().String())
+
+			conditions := am.statusManager.GetPodResizeConditions(resizedPod.UID)
+			if tc.expectInProgress {
+				require.Len(t, conditions, 1)
+				assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type)
+			} else {
+				assert.Empty(t, conditions)
+			}
+
+			assert.Equal(t, tc.expectSyncTriggered, resizedPod.Annotations["pod-sync-triggered"] == "true")
+		})
+	}
 }
