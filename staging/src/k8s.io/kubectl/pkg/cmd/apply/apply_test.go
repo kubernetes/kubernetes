@@ -785,6 +785,48 @@ func TestOpenAPIV3DoesNotLoadV2(t *testing.T) {
 		}
 	})
 
+	t.Run("test apply when an unstructured object is specified - json merge patch", func(t *testing.T) {
+		nameWidget, currentWidget := readAndAnnotateUnstructured(t, filenameWidgetClientside)
+		pathWidget := "/namespaces/test/widgets/" + nameWidget
+
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+
+		tf.UnstructuredClient = &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == pathWidget && m == "GET":
+					bodyWidget := io.NopCloser(bytes.NewReader(currentWidget))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyWidget}, nil
+				case p == pathWidget && m == "PATCH":
+					validatePatchApplication(t, req, types.MergePatchType)
+					bodyWidget := io.NopCloser(bytes.NewReader(currentWidget))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyWidget}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.OpenAPISchemaFunc = AlwaysPanicSchema.OpenAPISchemaFn
+		tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
+		tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+		ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		require.NoError(t, cmd.Flags().Set("filename", filenameWidgetClientside))
+		require.NoError(t, cmd.Flags().Set("output", "name"))
+		cmd.Run(cmd, []string{})
+
+		expectWidget := "widget.unit-test.test.com/" + nameWidget + "\n"
+		if buf.String() != expectWidget {
+			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectWidget)
+		}
+		if errBuf.String() != "" {
+			t.Fatalf("unexpected error output: %s", errBuf.String())
+		}
+	})
 }
 
 func TestApplyObject(t *testing.T) {
