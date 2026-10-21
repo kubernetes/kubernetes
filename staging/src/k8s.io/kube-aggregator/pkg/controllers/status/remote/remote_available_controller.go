@@ -19,6 +19,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -315,7 +316,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", "", []string{"system:masters"}, nil)
 					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
-						resp.Body.Close()
+						drainAndClose(resp.Body)
 						// we should always been in the 200s or 300s
 						if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 							errCh <- fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
@@ -375,6 +376,11 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
+}
+
+func drainAndClose(body io.ReadCloser) {
+	_, _ = io.Copy(io.Discard, body)
+	_ = body.Close()
 }
 
 func hasAvailableEndpoint(portName string, es ...*discoveryv1.EndpointSlice) bool {
