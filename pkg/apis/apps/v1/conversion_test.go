@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -404,6 +405,40 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						SecurityContext: new(v1.PodSecurityContext),
+					},
+				},
+			},
+		},
+		// Scheduling is apps/v1-only and cleared by the fuzzer, so cover its
+		// roundtrip here instead.
+		"DeploymentSpec Conversion 4 (Scheduling)": {
+			deploymentSpec1: &apps.DeploymentSpec{
+				Replicas: *replica,
+				Template: api.PodTemplateSpec{
+					Spec: api.PodSpec{
+						SecurityContext: new(api.PodSecurityContext),
+					},
+				},
+				Scheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+							MinCount: new(int32(2)),
+						},
+					},
+				},
+			},
+			deploymentSpec2: &appsv1.DeploymentSpec{
+				Replicas: replica,
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						SecurityContext: new(v1.PodSecurityContext),
+					},
+				},
+				Scheduling: &appsv1.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+							MinCount: new(int32(2)),
+						},
 					},
 				},
 			},

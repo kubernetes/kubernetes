@@ -131,13 +131,18 @@ func setup(t *testing.T) (context.Context, *replicaset.ReplicaSetController, inf
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "rs-informers")), resyncPeriod)
 
-	rm := replicaset.NewReplicaSetController(
+	rm, err := replicaset.NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 
 	// The replicaset controller runs with tCtx, so tCtx must get canceled
 	// before the server shuts down, to avoid the controller logging errors
