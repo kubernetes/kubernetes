@@ -43,6 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
@@ -1044,9 +1046,16 @@ type setupOptions struct {
 	groupResource  schema.GroupResource
 	transformer    value.Transformer
 	leaseConfig    LeaseManagerConfig
+	decorator      func(runtime.Object)
 }
 
 type setupOption func(*setupOptions)
+
+func withDecorator(decorator func(runtime.Object)) setupOption {
+	return func(options *setupOptions) {
+		options.decorator = decorator
+	}
+}
 
 func withClientConfig(f func(config *embed.Config)) setupOption {
 	return func(options *setupOptions) {
@@ -1127,8 +1136,9 @@ func benchmarkSetup(b *testing.B) (context.Context, *store) {
 		config.GroupResource,
 		newTestTransformer(),
 		newTestLeaseManagerConfig(),
-		NewDefaultDecoder(config.Codec, config.Versioner),
+		NewDefaultDecoder(config.Codec, config.Versioner, nil),
 		config.Versioner,
+		nil,
 	)
 	if err != nil {
 		b.Fatal(err)
@@ -1159,8 +1169,9 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		setupOpts.groupResource,
 		setupOpts.transformer,
 		setupOpts.leaseConfig,
-		NewDefaultDecoder(setupOpts.codec, versioner),
+		NewDefaultDecoder(setupOpts.codec, versioner, setupOpts.decorator),
 		versioner,
+		setupOpts.decorator,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1533,4 +1544,97 @@ func TestCorrectness(t *testing.T) {
 		pod := obj.(*example.Pod)
 		return computePodKey(pod), nil
 	}, compactStorage(store, client.Client))
+}
+
+func TestDecorator(t *testing.T) {
+	decorator := func(obj runtime.Object) {
+		if pod, ok := obj.(*example.Pod); ok {
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
+			pod.Annotations["decorated"] = "true"
+		}
+	}
+	ctx, store, _ := testSetup(t, withDecorator(decorator))
+
+	w, err := store.Watch(ctx, "/pods/", storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	defer w.Stop()
+
+	key := "/pods/ns/foo"
+	input := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "ns",
+		},
+	}
+
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, input, out, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if out.Annotations["decorated"] != "true" {
+		t.Errorf("expected Create output to be decorated, got annotations: %v", out.Annotations)
+	}
+
+	got := &example.Pod{}
+	if err := store.Get(ctx, key, storage.GetOptions{}, got); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got.Annotations["decorated"] != "true" {
+		t.Errorf("expected Get output to be decorated, got annotations: %v", got.Annotations)
+	}
+
+	list := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, list); err != nil {
+		t.Fatalf("GetList failed: %v", err)
+	}
+	if len(list.Items) != 1 || list.Items[0].Annotations["decorated"] != "true" {
+		t.Errorf("expected GetList item to be decorated, got items: %+v", list.Items)
+	}
+
+	updated := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, key, updated, false, nil, func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := input.(*example.Pod).DeepCopy()
+		delete(pod.Annotations, "decorated")
+		pod.Labels = map[string]string{"updated": "true"}
+		return pod, nil, nil
+	}, nil); err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+	if updated.Annotations["decorated"] != "true" {
+		t.Errorf("expected GuaranteedUpdate output to be decorated, got annotations: %v", updated.Annotations)
+	}
+
+	deleted := &example.Pod{}
+	if err := store.Delete(ctx, key, deleted, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+	if deleted.Annotations["decorated"] != "true" {
+		t.Errorf("expected Delete output to be decorated, got annotations: %v", deleted.Annotations)
+	}
+
+	for _, expectedType := range []watch.EventType{watch.Added, watch.Modified, watch.Deleted} {
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != expectedType {
+				t.Fatalf("expected watch event %v, got %v", expectedType, event.Type)
+			}
+			pod, ok := event.Object.(*example.Pod)
+			if !ok {
+				t.Fatalf("expected *example.Pod in watch event, got %T", event.Object)
+			}
+			if pod.Annotations["decorated"] != "true" {
+				t.Errorf("expected %v watch event object to be decorated, got annotations: %v", expectedType, pod.Annotations)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("timed out waiting for %v watch event", expectedType)
+		}
+	}
 }

@@ -97,8 +97,9 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		schema.GroupResource{Resource: "pods"},
 		transformer,
 		etcd3.NewDefaultLeaseManagerConfig(),
-		etcd3.NewDefaultDecoder(codec, versioner),
-		versioner)
+		etcd3.NewDefaultDecoder(codec, versioner, nil),
+		versioner,
+		nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,8 +130,9 @@ func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		config.GroupResource,
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
-		etcd3.NewDefaultDecoder(config.Codec, config.Versioner),
-		config.Versioner)
+		etcd3.NewDefaultDecoder(config.Codec, config.Versioner, nil),
+		config.Versioner,
+		nil)
 	if err != nil {
 		t.Fatal(err)
 	}

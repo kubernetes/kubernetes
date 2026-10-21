@@ -96,6 +96,7 @@ type watcher struct {
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
 	transformer              value.Transformer
+	decorator                func(runtime.Object)
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
 }
@@ -844,7 +845,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		if err != nil {
 			return nil, nil, err
 		}
-		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev, wc.watcher.decorator)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -861,7 +862,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		}
 		// Note that this sends the *old* object with the etcd revision for the time at
 		// which it gets deleted.
-		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev, wc.watcher.decorator)
 		if err != nil {
 			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}
@@ -891,7 +892,7 @@ func (w *watcher) transformIfCorruptObjectError(e *event, err error) error {
 	return &corruptObjectDeletedError{err: corruptObjErr}
 }
 
-func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
+func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64, decorator func(runtime.Object)) (_ runtime.Object, err error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
 		if fatalOnDecodeError.Load() {
@@ -905,6 +906,9 @@ func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, re
 	// ensure resource version is set on the object we load from etcd
 	if err := versioner.UpdateObject(obj, uint64(rev)); err != nil {
 		return nil, fmt.Errorf("failure to version api object (%d) %#v: %v", rev, obj, err)
+	}
+	if decorator != nil {
+		decorator(obj)
 	}
 	return obj, nil
 }

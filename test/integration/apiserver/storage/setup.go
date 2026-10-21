@@ -88,6 +88,7 @@ func setupStore(tCtx ktesting.TContext) (storage.Interface, string) {
 		func() runtime.Object { return &api.PodList{} },
 		nil,
 		"/pods",
+		nil,
 	)
 	if err != nil {
 		tCtx.Fatalf("failed to create storage: %v", err)

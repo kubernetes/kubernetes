@@ -119,10 +119,6 @@ type Config struct {
 	// objects of type Type.
 	NewListFunc func() runtime.Object
 
-	// Decorator is a function applied to objects before they are wrapped in
-	// CachingObject for watch dispatch.
-	Decorator func(runtime.Object)
-
 	Codec runtime.Codec
 
 	Clock clock.WithTicker
@@ -311,10 +307,6 @@ type Cacher struct {
 	// newListFunc is a function that creates new empty list for storing objects of type Type.
 	newListFunc func() runtime.Object
 
-	// decorator is a function applied to objects before they are wrapped in
-	// CachingObject for watch dispatch.
-	decorator func(runtime.Object)
-
 	// indexedTrigger is used for optimizing amount of watchers that needs to process
 	// an incoming event.
 	indexedTrigger *indexedTriggerFunc
@@ -410,7 +402,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		versioner:      config.Versioner,
 		newFunc:        config.NewFunc,
 		newListFunc:    config.NewListFunc,
-		decorator:      config.Decorator,
 		indexedTrigger: indexedTrigger,
 		watcherIdx:     0,
 		watchers: indexedWatchers{
@@ -1053,16 +1044,6 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		//
 		// Make a shallow copy to allow overwriting Object and PrevObject.
 		wcEvent := *event
-		if c.decorator != nil {
-			switch wcEvent.Type {
-			case watch.Added, watch.Modified:
-				wcEvent.Object = wcEvent.Object.DeepCopyObject()
-				c.decorator(wcEvent.Object)
-			case watch.Deleted:
-				wcEvent.PrevObject = wcEvent.PrevObject.DeepCopyObject()
-				c.decorator(wcEvent.PrevObject)
-			}
-		}
 		setCachingObjects(&wcEvent, c.versioner)
 		wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
 		event = &wcEvent

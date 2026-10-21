@@ -30,10 +30,11 @@ import (
 )
 
 // NewDefaultDecoder returns the default decoder for etcd3 store
-func NewDefaultDecoder(codec runtime.Codec, versioner storage.Versioner) Decoder {
+func NewDefaultDecoder(codec runtime.Codec, versioner storage.Versioner, decorator func(runtime.Object)) Decoder {
 	return &defaultDecoder{
 		codec:     codec,
 		versioner: versioner,
+		decorator: decorator,
 	}
 }
 
@@ -54,6 +55,7 @@ var _ Decoder = &defaultDecoder{}
 type defaultDecoder struct {
 	codec     runtime.Codec
 	versioner storage.Versioner
+	decorator func(runtime.Object)
 }
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
@@ -70,6 +72,9 @@ func (d *defaultDecoder) Decode(value []byte, objPtr runtime.Object, rev int64) 
 	// being unable to set the version does not prevent the object from being extracted
 	if err := d.versioner.UpdateObject(objPtr, uint64(rev)); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
+	}
+	if d.decorator != nil {
+		d.decorator(objPtr)
 	}
 	return nil
 }
@@ -88,6 +93,9 @@ func (d *defaultDecoder) DecodeListItem(ctx context.Context, data []byte, rev ui
 
 	if err := d.versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
+	}
+	if d.decorator != nil {
+		d.decorator(obj)
 	}
 
 	return obj, nil
