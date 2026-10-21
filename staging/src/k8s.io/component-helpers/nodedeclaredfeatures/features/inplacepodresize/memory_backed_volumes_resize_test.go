@@ -570,6 +570,99 @@ func TestMemoryBackedVolumesResizeFeatureInferForUpdate(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "VolumeAddedAndExistingMemoryBackedVolumeResized",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity100Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-added",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity100Mi,
+								},
+							},
+						},
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity200Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "VolumesReorderedAndResized",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp",
+								},
+							},
+						},
+						{
+							Name: "vol-2",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity100Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-2",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity200Mi,
+								},
+							},
+						},
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
