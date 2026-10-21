@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -425,6 +426,30 @@ func TestCgroupCommonToResources(t *testing.T) {
 						}
 					}
 					assert.True(t, found, "Should have found translated 2MB hugepage limit under cgroup v2")
+				}
+			},
+		},
+		{
+			name: "unsupported hugepage size is filtered out",
+			resourceConfig: &ResourceConfig{
+				HugePageLimit: map[int64]int64{
+					// 32KB hugepages are not a real kernel hugepage size on any
+					// architecture, so this must be silently dropped.
+					32 * 1024: 64 * 1024,
+				},
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				supportedSizes := sets.New[string](libcontainercgroups.HugePageSizes()...)
+				for _, limit := range res.HugetlbLimit {
+					assert.True(t, supportedSizes.Has(limit.Pagesize),
+						"unsupported hugepage size %s should not appear in HugetlbLimit", limit.Pagesize)
+				}
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				supportedSizes := sets.New[string](libcontainercgroups.HugePageSizes()...)
+				for _, limit := range res.HugetlbLimit {
+					assert.True(t, supportedSizes.Has(limit.Pagesize),
+						"unsupported hugepage size %s should not appear in HugetlbLimit", limit.Pagesize)
 				}
 			},
 		},
