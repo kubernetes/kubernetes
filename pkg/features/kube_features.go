@@ -1165,7 +1165,7 @@ const (
 	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.
 	TaintTolerationComparisonOperators featuregate.Feature = "TaintTolerationComparisonOperators"
 
-	// owner: @44past4
+	// owner: @44past4 @helayoty
 	// kep: https://kep.k8s.io/5732
 	//
 	// Enables topology-aware workload scheduling feature in kube-scheduler and related PodGroup API fields.
@@ -2115,6 +2115,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	TopologyAwareWorkloadScheduling: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	TopologyManagerPolicyAlphaOptions: {
