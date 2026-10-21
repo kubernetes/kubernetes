@@ -27,6 +27,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,6 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -116,6 +118,10 @@ func setupSharding(t *testing.T, flags ...string) (context.Context, clientset.In
 	if err != nil {
 		t.Fatal(err)
 	}
+	metadataClient, err := metadata.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 	apiExtensionsClient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -185,6 +191,36 @@ func setupSharding(t *testing.T, flags ...string) (context.Context, clientset.In
 			},
 			delete: func(ctx context.Context, namespace, name string) error {
 				return dynamicClient.Resource(crGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+		{
+			name: "metadata",
+			gvr:  v1.SchemeGroupVersion.WithResource("configmaps"),
+			create: func(ctx context.Context, namespace, generateName string) (metav1.Object, error) {
+				return client.CoreV1().ConfigMaps(namespace).Create(ctx, &v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: generateName},
+				}, metav1.CreateOptions{})
+			},
+			list: func(ctx context.Context, namespace string, opts metav1.ListOptions) (*shardedList, error) {
+				list, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).List(ctx, opts)
+				if err != nil {
+					return nil, err
+				}
+				items := make([]metav1.Object, 0, len(list.Items))
+				for i := range list.Items {
+					items = append(items, &list.Items[i])
+				}
+				return &shardedList{resourceVersion: list.ResourceVersion, shardInfo: list.ShardInfo, items: items}, nil
+			},
+			watch: func(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+				return metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Watch(ctx, opts)
+			},
+			update: func(ctx context.Context, obj metav1.Object) error {
+				_, err := client.CoreV1().ConfigMaps(obj.GetNamespace()).Update(ctx, obj.(*v1.ConfigMap), metav1.UpdateOptions{})
+				return err
+			},
+			delete: func(ctx context.Context, namespace, name string) error {
+				return metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 			},
 		},
 	}
@@ -622,5 +658,44 @@ func verifyObjectInOneShard(ctx context.Context, t *testing.T, res dynamic.Resou
 
 	if err := res.Delete(context.TODO(), created.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 		t.Logf("cleanup delete failed: %v", err)
+	}
+}
+
+func TestShardedInvalidSelector(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+
+	ctx, client, _, resources := setupSharding(t)
+
+	invalidSelectors := []string{
+		"invalidSelector()",
+		"shardRange(object.metadata.invalidField, '0x0000000000000000', '0x8000000000000000')",
+		"shardRange(object.metadata.uid, '0x8000000000000000', '0x0000000000000000')",
+		"shardRange(object.metadata.uid, 'not-hex', '0x8000000000000000')",
+	}
+
+	for _, r := range resources {
+		t.Run(r.name, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(client, "shard-invalid-"+r.name, t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+			for _, selector := range invalidSelectors {
+				_, err := r.list(ctx, ns.Name, metav1.ListOptions{
+					ShardSelector: selector,
+				})
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("List with invalid selector %q: expected BadRequest (400), got: %v", selector, err)
+				}
+
+				w, err := r.watch(ctx, ns.Name, metav1.ListOptions{
+					ShardSelector: selector,
+				})
+				if err == nil {
+					w.Stop()
+				}
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("Watch with invalid selector %q: expected BadRequest (400), got: %v", selector, err)
+				}
+			}
+		})
 	}
 }
