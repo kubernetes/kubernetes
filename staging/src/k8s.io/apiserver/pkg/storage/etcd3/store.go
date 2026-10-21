@@ -121,6 +121,35 @@ type objState struct {
 	stale bool
 }
 
+// refreshOnError transitions a non-current state to the current state from etcd
+// when a precondition, validation, or update error occurs. If the state is already
+// current, or if the revision in etcd matches the cached revision, it returns the
+// original error.
+func refreshOnError(st *objState, err error, getCurrentState func() (*objState, error)) (*objState, error) {
+	// If our data is already up to date, return the error
+	if st.current {
+		return st, err
+	}
+
+	// It's possible we were working with stale data.
+	// Remember the revision of the potentially stale data and the resulting error.
+	cachedRev := st.rev
+	cachedErr := err
+
+	currentState, err := getCurrentState()
+	if err != nil {
+		return nil, err
+	}
+
+	// It turns out our cached data was not stale, return the original error.
+	if cachedRev == currentState.rev {
+		return currentState, cachedErr
+	}
+
+	// Retry
+	return currentState, nil
+}
+
 // listItemErrors stores a slice of item storage errors during LIST operations.
 // They are iteratively added, and eventually returned as an aggregated error. On
 // each Append, it signals whether it considers itself full or the error to be fatal.
@@ -409,52 +438,18 @@ func (s *store) conditionalDelete(
 	for {
 		if preconditions != nil {
 			if err := preconditions.Check(key, origState.obj); err != nil {
-				if origState.current {
-					return err
-				}
-
-				// It's possible we're working with stale data.
-				// Remember the revision of the potentially stale data and the resulting update error
-				cachedRev := origState.rev
-				cachedUpdateErr := err
-
-				// Actually fetch
-				origState, err = getCurrentState()
+				origState, err = refreshOnError(origState, err, getCurrentState)
 				if err != nil {
 					return err
 				}
-
-				// it turns out our cached data was not stale, return the error
-				if cachedRev == origState.rev {
-					return cachedUpdateErr
-				}
-
-				// Retry
 				continue
 			}
 		}
 		if err := validateDeletion(ctx, origState.obj); err != nil {
-			if origState.current {
-				return err
-			}
-
-			// It's possible we're working with stale data.
-			// Remember the revision of the potentially stale data and the resulting update error
-			cachedRev := origState.rev
-			cachedUpdateErr := err
-
-			// Actually fetch
-			origState, err = getCurrentState()
+			origState, err = refreshOnError(origState, err, getCurrentState)
 			if err != nil {
 				return err
 			}
-
-			// it turns out our cached data was not stale, return the error
-			if cachedRev == origState.rev {
-				return cachedUpdateErr
-			}
-
-			// Retry
 			continue
 		}
 
@@ -531,45 +526,19 @@ func (s *store) GuaranteedUpdate(
 
 	for {
 		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
-			// If our data is already up to date, return the error
-			if origState.current {
-				return err
-			}
-
-			// It's possible we were working with stale data
-			// Actually fetch
-			origState, err = getCurrentState()
+			origState, err = refreshOnError(origState, err, getCurrentState)
 			if err != nil {
 				return err
 			}
-			// Retry
 			continue
 		}
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
-			// If our data is already up to date, return the error
-			if origState.current {
-				return err
-			}
-
-			// It's possible we were working with stale data
-			// Remember the revision of the potentially stale data and the resulting update error
-			cachedRev := origState.rev
-			cachedUpdateErr := err
-
-			// Actually fetch
-			origState, err = getCurrentState()
+			origState, err = refreshOnError(origState, err, getCurrentState)
 			if err != nil {
 				return err
 			}
-
-			// it turns out our cached data was not stale, return the error
-			if cachedRev == origState.rev {
-				return cachedUpdateErr
-			}
-
-			// Retry
 			continue
 		}
 
