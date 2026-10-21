@@ -3647,6 +3647,18 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: device_plugin_devices
+  subsystem: kubelet
+  help: Number of devices currently known to the device manager. Broken down by resource
+    name and health state.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - health_state
+  - resource_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: device_plugin_registration_total
   subsystem: kubelet
   help: Cumulative number of device plugin registrations. Broken down by resource
