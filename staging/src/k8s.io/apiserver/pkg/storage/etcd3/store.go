@@ -109,10 +109,15 @@ func (s *store) RequestWatchProgress(ctx context.Context) error {
 }
 
 type objState struct {
-	obj   runtime.Object
-	meta  *storage.ResponseMeta
-	rev   int64
-	data  []byte
+	obj  runtime.Object
+	meta *storage.ResponseMeta
+	rev  int64
+	data []byte
+	// current is true when this state was loaded from etcd, and false when
+	// it was initialized in-memory from cachedExistingObject.
+	current bool
+	// stale is true when TransformFromStorage reported that the value in etcd
+	// needs to be rewritten via TransformToStorage even if data has not changed.
 	stale bool
 }
 
@@ -392,12 +397,10 @@ func (s *store) conditionalDelete(
 
 	var origState *objState
 	var err error
-	var origStateIsCurrent bool
 	if cachedExistingObject != nil && !expectTransformOrDecodeError {
-		origState, err = s.getStateFromObject(cachedExistingObject)
+		origState, err = s.getStateFromObject(cachedExistingObject, false)
 	} else {
 		origState, err = getCurrentState()
-		origStateIsCurrent = true
 	}
 	if err != nil {
 		return err
@@ -406,7 +409,7 @@ func (s *store) conditionalDelete(
 	for {
 		if preconditions != nil {
 			if err := preconditions.Check(key, origState.obj); err != nil {
-				if origStateIsCurrent {
+				if origState.current {
 					return err
 				}
 
@@ -420,7 +423,6 @@ func (s *store) conditionalDelete(
 				if err != nil {
 					return err
 				}
-				origStateIsCurrent = true
 
 				// it turns out our cached data was not stale, return the error
 				if cachedRev == origState.rev {
@@ -432,7 +434,7 @@ func (s *store) conditionalDelete(
 			}
 		}
 		if err := validateDeletion(ctx, origState.obj); err != nil {
-			if origStateIsCurrent {
+			if origState.current {
 				return err
 			}
 
@@ -446,7 +448,6 @@ func (s *store) conditionalDelete(
 			if err != nil {
 				return err
 			}
-			origStateIsCurrent = true
 
 			// it turns out our cached data was not stale, return the error
 			if cachedRev == origState.rev {
@@ -465,7 +466,6 @@ func (s *store) conditionalDelete(
 		if success {
 			return nil
 		}
-		origStateIsCurrent = true
 	}
 }
 
@@ -481,7 +481,7 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, 
 	success = txnResp.Succeeded
 	if !success {
 		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
+		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 		return origState, success, err
 	}
 
@@ -519,12 +519,10 @@ func (s *store) GuaranteedUpdate(
 	getCurrentState := s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
 
 	var origState *objState
-	var origStateIsCurrent bool
 	if cachedExistingObject != nil {
-		origState, err = s.getStateFromObject(cachedExistingObject)
+		origState, err = s.getStateFromObject(cachedExistingObject, false)
 	} else {
 		origState, err = getCurrentState()
-		origStateIsCurrent = true
 	}
 	if err != nil {
 		return err
@@ -534,7 +532,7 @@ func (s *store) GuaranteedUpdate(
 	for {
 		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
 			// If our data is already up to date, return the error
-			if origStateIsCurrent {
+			if origState.current {
 				return err
 			}
 
@@ -544,7 +542,6 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			origStateIsCurrent = true
 			// Retry
 			continue
 		}
@@ -552,7 +549,7 @@ func (s *store) GuaranteedUpdate(
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			// If our data is already up to date, return the error
-			if origStateIsCurrent {
+			if origState.current {
 				return err
 			}
 
@@ -566,7 +563,6 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			origStateIsCurrent = true
 
 			// it turns out our cached data was not stale, return the error
 			if cachedRev == origState.rev {
@@ -588,12 +584,11 @@ func (s *store) GuaranteedUpdate(
 			// if we skipped the original Get in this loop, we must refresh from
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
-			if !origStateIsCurrent {
+			if !origState.current {
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
-				origStateIsCurrent = true
 				if !bytes.Equal(data, origState.data) {
 					// original data changed, restart loop
 					continue
@@ -618,7 +613,6 @@ func (s *store) GuaranteedUpdate(
 		if success {
 			return nil
 		}
-		origStateIsCurrent = true
 	}
 }
 
@@ -655,7 +649,7 @@ func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey 
 	span.AddEvent("Transaction committed")
 	if !success {
 		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
+		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 		if err != nil {
 			return origState, success, err
 		}
@@ -1207,17 +1201,18 @@ func (s *store) getCurrentState(ctx context.Context, verb, key string, v reflect
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(ctx, getResp.KV, getResp.Revision, key, v, ignoreNotFound, expectTransformOrDecodeError)
+		return s.stateFromEtcdResponse(ctx, getResp.KV, getResp.Revision, key, v, ignoreNotFound, expectTransformOrDecodeError)
 	}
 }
 
-// getState constructs a new objState from the given response from the storage. If
+// stateFromEtcdResponse constructs a new objState from the given response from the storage. If
 // expectTransformOrDecodeError is true and neither transformation nor decode fails, returns an
 // InvalidObj error; if either fails, the returned error and the 'obj' field of the returned
 // objState will both be nil.
-func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*objState, error) {
+func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*objState, error) {
 	state := &objState{
-		meta: &storage.ResponseMeta{},
+		meta:    &storage.ResponseMeta{},
+		current: true,
 	}
 
 	if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
@@ -1272,10 +1267,11 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, ke
 	return state, nil
 }
 
-func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
+func (s *store) getStateFromObject(obj runtime.Object, current bool) (*objState, error) {
 	state := &objState{
-		obj:  obj,
-		meta: &storage.ResponseMeta{},
+		obj:     obj,
+		meta:    &storage.ResponseMeta{},
+		current: current,
 	}
 
 	rv, err := s.versioner.ObjectResourceVersion(obj)
