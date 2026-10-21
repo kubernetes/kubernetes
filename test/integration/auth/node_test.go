@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -736,7 +737,7 @@ func expectedForbiddenMessage(t *testing.T, f func() error, expectedMessage stri
 // - forbids kubelet to request a token for a service account token when pod is not found
 // - kubelet successfully requests a token for a service account token when pod is found and uid matches
 // This test is run with the ServiceAccountNodeAudienceRestriction feature disabled
-// to validate the default behavior of the NodeRestriction admission plugin.
+// at emulation version 1.37 to validate behavior before the feature was locked on.
 func TestNodeRestrictionServiceAccount(t *testing.T) {
 	const (
 		// Define credentials
@@ -757,6 +758,7 @@ func TestNodeRestrictionServiceAccount(t *testing.T) {
 	checkNilError(t, err)
 	checkNilError(t, tokenFile.Close())
 
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{

@@ -112,7 +112,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 
 	// create a symlink of gcp-credential-provider binary to use for testing
 	// service account token for credential providers.
-	// feature-gate: KubeletServiceAccountTokenForCredentialProviders=true
 	binary := "gcp-credential-provider" // Use relative path instead of full path
 	symlink := filepath.Join(tardir, "gcp-credential-provider-with-sa")
 	if _, err := os.Lstat(symlink); err == nil {
@@ -150,7 +149,7 @@ func prependMemcgNotificationFlag(args string) string {
 // a credential provider plugin.
 func prependCredentialProviderFlag(args, workspace string) string {
 	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
-	featureGateFlag := "--kubelet-flags=--feature-gates=KubeletServiceAccountTokenForCredentialProviders=true,KubeletEnsureSecretPulledImages=true"
+	featureGateFlag := "--kubelet-flags=--feature-gates=KubeletEnsureSecretPulledImages=true"
 	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
 	binFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-bin-dir=%s", workspace)
 	return fmt.Sprintf("%s %s %s %s", featureGateFlag, configFlag, binFlag, args)

@@ -120,7 +120,6 @@ shutdownGracePeriodByPodPriority:
   - priority: 6
     shutdownGracePeriodSeconds: 30
 featureGates:
-  KubeletServiceAccountTokenForCredentialProviders: true
   PodAndContainerStatsFromCRI: false`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
 			ginkgo.By("Restarting the kubelet")
@@ -173,7 +172,6 @@ featureGates:
 				overrides = map[string]bool{}
 			}
 			overrides["PodAndContainerStatsFromCRI"] = false
-			overrides["KubeletServiceAccountTokenForCredentialProviders"] = true
 
 			// In some CI jobs, `NodeSwap` is explicitly disabled as the images are cgroupv1 based,
 			// so such flags should be picked up directly from the initial configuration
