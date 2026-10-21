@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -2830,6 +2831,211 @@ func TestValidateDeployment(t *testing.T) {
 	}
 }
 
+func TestValidateDeploymentGangScheduling(t *testing.T) {
+	replicas := int32(3)
+
+	validGangDeployment := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Replicas = replicas
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+			},
+		}
+		d.Spec.Strategy = apps.DeploymentStrategy{
+			Type: apps.RecreateDeploymentStrategyType,
+		}
+	})
+	if errs := ValidateDeployment(validGangDeployment, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected success for valid gang deployment: %v", errs)
+	}
+
+	validGangWithMinCount := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Replicas = replicas
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					MinCount: new(int32(2)),
+				},
+			},
+		}
+		d.Spec.Strategy = apps.DeploymentStrategy{
+			Type: apps.RecreateDeploymentStrategyType,
+		}
+	})
+	if errs := ValidateDeployment(validGangWithMinCount, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected success for user-set minCount <= replicas: %v", errs)
+	}
+
+	validGangZeroReplicas := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Replicas = 0
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					MinCount: new(int32(1)),
+				},
+			},
+		}
+		d.Spec.Strategy = apps.DeploymentStrategy{
+			Type: apps.RecreateDeploymentStrategyType,
+		}
+	})
+	if errs := ValidateDeployment(validGangZeroReplicas, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected success for minCount with replicas=0: %v", errs)
+	}
+
+	errorCases := map[string]*apps.Deployment{}
+
+	gangMinCountExceeds := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Replicas = replicas
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					MinCount: new(int32(5)),
+				},
+			},
+		}
+		d.Spec.Strategy = apps.DeploymentStrategy{
+			Type: apps.RecreateDeploymentStrategyType,
+		}
+	})
+	errorCases["minCount must not exceed replicas"] = gangMinCountExceeds
+
+	gangRollingUpdate := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Replicas = replicas
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+			},
+		}
+		d.Spec.Strategy = apps.DeploymentStrategy{
+			Type: apps.RollingUpdateDeploymentStrategyType,
+			RollingUpdate: &apps.RollingUpdateDeployment{
+				MaxSurge:       intstr.FromInt32(3),
+				MaxUnavailable: intstr.FromInt32(0),
+			},
+		}
+	})
+	errorCases["gang-scheduled Deployment requires strategy type Recreate"] = gangRollingUpdate
+
+	for k, v := range errorCases {
+		errs := ValidateDeployment(v, corevalidation.PodValidationOptions{})
+		if len(errs) == 0 {
+			t.Errorf("[%s] expected failure", k)
+		} else {
+			found := false
+			for _, e := range errs {
+				if strings.Contains(e.Error(), k) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("[%s] expected error containing %q, got: %v", k, k, errs)
+			}
+		}
+	}
+}
+
+func TestValidateDeploymentSchedulingPolicy(t *testing.T) {
+	basic := &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+			Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+		},
+	}
+	basicSingle := &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: basic.SchedulingPolicy,
+		DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+			Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+		},
+	}
+	basicAll := &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: basic.SchedulingPolicy,
+		DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		},
+	}
+	gangAll := &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+				MinCount: new(int32(2)),
+			},
+		},
+		DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		},
+	}
+	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
+	cases := map[string]struct {
+		scheduling *apps.DeploymentSchedulingConfiguration
+		err        *field.Error
+	}{
+		"basic policy default": {
+			scheduling: &apps.DeploymentSchedulingConfiguration{},
+		},
+		"basic policy with single disruption": {
+			scheduling: basicSingle,
+		},
+		"gang policy with all disruption": {
+			scheduling: gangAll,
+		},
+		"basic policy with all disruption": {
+			scheduling: basicAll,
+			err: field.Invalid(
+				disruptionModePath, "", "the disruptionMode `all` is not supported with the Basic scheduling policy"),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			d := validDeployment(func(d *apps.Deployment) {
+				d.Spec.Scheduling = tc.scheduling
+				if tc.scheduling != nil && tc.scheduling.SchedulingPolicy != nil && tc.scheduling.SchedulingPolicy.Gang != nil {
+					d.Spec.Replicas = 3
+					d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+				}
+			})
+			errs := ValidateDeployment(d, corevalidation.PodValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateDeploymentSchedulingGroupConflict(t *testing.T) {
+	podGroupName := "existing-podgroup"
+
+	userManaged := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Template.Spec.SchedulingGroup = &api.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		}
+	})
+	if errs := ValidateDeployment(userManaged, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected user-managed PodGroup reference to be valid: %v", errs)
+	}
+
+	conflicting := validDeployment(func(d *apps.Deployment) {
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{}
+		d.Spec.Template.Spec.SchedulingGroup = &api.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		}
+	})
+	errs := ValidateDeployment(conflicting, corevalidation.PodValidationOptions{})
+	if len(errs) == 0 {
+		t.Fatal("expected spec.scheduling and template schedulingGroup to conflict")
+	}
+	const want = "cannot be set when spec.scheduling is configured"
+	for _, err := range errs {
+		if strings.Contains(err.Error(), want) {
+			return
+		}
+	}
+	t.Fatalf("expected error containing %q, got: %v", want, errs)
+}
+
 func TestValidateDeploymentStatus(t *testing.T) {
 	collisionCount := int32(-3)
 	tests := []struct {
@@ -3223,6 +3429,83 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestValidateDeploymentSchedulingImmutability(t *testing.T) {
+	noSchedulingChange := validDeployment(func(d *apps.Deployment) {
+		d.ObjectMeta.ResourceVersion = "1"
+		d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					MinCount: new(int32(1)),
+				},
+			},
+		}
+		d.Spec.Replicas = 3
+	})
+	noSchedulingChangeUpdate := noSchedulingChange.DeepCopy()
+	noSchedulingChangeUpdate.ObjectMeta.ResourceVersion = "2"
+	noSchedulingChangeUpdate.Spec.Replicas = 5
+	if errs := ValidateDeploymentUpdate(noSchedulingChangeUpdate, noSchedulingChange, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected no error when scheduling unchanged, got: %v", errs)
+	}
+
+	gangSchedulingOrig := validDeployment(func(d *apps.Deployment) {
+		d.ObjectMeta.ResourceVersion = "1"
+		d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+		d.Spec.Replicas = 3
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					MinCount: new(int32(1)),
+				},
+			},
+		}
+	})
+	gangMinCountUpdate := gangSchedulingOrig.DeepCopy()
+	gangMinCountUpdate.ObjectMeta.ResourceVersion = "2"
+	gangMinCountUpdate.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = new(int32(2))
+	if errs := ValidateDeploymentUpdate(gangMinCountUpdate, gangSchedulingOrig, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		t.Errorf("expected minCount update to be allowed, got: %v", errs)
+	}
+
+	gangToBasic := gangSchedulingOrig.DeepCopy()
+	gangToBasic.ObjectMeta.ResourceVersion = "2"
+	gangToBasic.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+			Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+		},
+	}
+	errs := ValidateDeploymentUpdate(gangToBasic, gangSchedulingOrig, corevalidation.PodValidationOptions{})
+	if len(errs) == 0 {
+		t.Errorf("expected error when changing scheduling policy variant")
+	} else if !strings.Contains(errs[0].Error(), "basic/gang policy variant is immutable") {
+		t.Errorf("unexpected error: %v", errs[0])
+	}
+
+	basicSchedulingOrig := validDeployment(func(d *apps.Deployment) {
+		d.ObjectMeta.ResourceVersion = "1"
+		d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+		d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			},
+		}
+	})
+	basicToGang := basicSchedulingOrig.DeepCopy()
+	basicToGang.ObjectMeta.ResourceVersion = "2"
+	basicToGang.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+		},
+	}
+	errs = ValidateDeploymentUpdate(basicToGang, basicSchedulingOrig, corevalidation.PodValidationOptions{})
+	if len(errs) == 0 {
+		t.Errorf("expected error when changing scheduling policy variant")
+	} else if !strings.Contains(errs[0].Error(), "basic/gang policy variant is immutable") {
+		t.Errorf("unexpected error: %v", errs[0])
 	}
 }
 
