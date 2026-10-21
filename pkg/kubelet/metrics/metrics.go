@@ -17,8 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -1657,4 +1660,33 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 	default:
 		return PriorityBucketVeryLow
 	}
+}
+
+// GetImageNameForMetrics strips the tag and digest from an image reference for use in metrics
+// labels. This bounds cardinality to distinct repositories regardless of tagging scheme.
+// Only a ':' after the last '/' is treated as a tag separator so registry ports are preserved.
+func GetImageNameForMetrics(image string) string {
+	if before, _, found := strings.Cut(image, "@"); found {
+		image = before
+	}
+	slash := strings.LastIndex(image, "/")
+	tail := image[slash+1:]
+	if before, _, found := strings.Cut(tail, ":"); found {
+		image = image[:slash+1] + before
+	}
+	return image
+}
+
+// ObserveImagePullDuration records an image pull duration observation with image and pull_policy
+// attached as exemplar labels rather than metric labels, avoiding unbounded cardinality growth.
+func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
+	observer := ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize))
+	if eo, ok := observer.(prometheus.ExemplarObserver); ok {
+		eo.ObserveWithExemplar(duration, prometheus.Labels{
+			"image":       GetImageNameForMetrics(image),
+			"pull_policy": pullPolicy,
+		})
+		return
+	}
+	observer.Observe(duration)
 }
