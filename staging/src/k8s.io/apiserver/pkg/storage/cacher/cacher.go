@@ -254,8 +254,6 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 	return expiredWatchers
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, obj runtime.Object) bool
-
 type indexedTriggerFunc struct {
 	indexName   string
 	indexerFunc storage.IndexerFunc
@@ -527,7 +525,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	if err != nil {
 		return nil, err
 	}
-	pred := opts.Predicate
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
@@ -538,7 +535,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
-	selector := c.watchSelector(ctx, pred)
+	eventFilter := newWatchEventFilter(key, opts, c.groupResource)
+	selector := c.watchSelector(ctx, opts.Predicate)
 
 	// It boils down to a tradeoff between:
 	// - having it as small as possible to reduce memory usage
@@ -562,7 +560,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
 
-	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
+	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, opts.Predicate.Label, opts.Predicate.Field)
 
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
@@ -570,11 +568,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// to compute watcher.forget function (which has to happen under lock).
 	watcher := newCacheWatcher(
 		chanSize,
-		filterWithAttrsAndPrefixFunction(key, pred, opts.Recursive, c.groupResource),
+		eventFilter,
 		emptyFunc,
 		c.versioner,
 		deadline,
-		pred.AllowWatchBookmarks,
+		opts.Predicate.AllowWatchBookmarks,
 		c.groupResource,
 		c.watcherMetrics,
 		c.clock,
@@ -633,7 +631,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		addedWatcher = true
 
 		// Add it to the queue only when the client support watch bookmarks.
-		if watcher.allowWatchBookmarks {
+		if opts.Predicate.AllowWatchBookmarks {
 			c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
 		}
 		c.watcherIdx++
@@ -647,7 +645,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newImmediateCloseWatcher(), nil
 	}
 
-	if pred.ShardingEnabled() {
+	if opts.Predicate.ShardingEnabled() {
 		metrics.RecordShardedWatchStarted(c.groupResource)
 		originalForget := watcher.forget
 		watcher.forget = func(drainWatcher bool) {
@@ -1276,29 +1274,41 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, selector watchSelector
 	}
 }
 
-func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, recursive bool, groupResource schema.GroupResource) filterWithAttrsFunc {
-	return func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
-		if recursive {
-			if !key.HasPathPrefix(objKey, prefix) {
-				return false
-			}
-		} else if objKey != prefix {
-			return false
-		}
-		if !p.MatchesObjectAttributes(label, field) {
-			return false
-		}
-		matches, err := p.MatchesSharding(obj)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
-			return false
-		}
-		if !matches {
-			metrics.RecordWatchFilteredEvent(groupResource)
-			return false
-		}
-		return true
+type watchEventFilter struct {
+	prefix        string
+	opts          storage.ListOptions
+	groupResource schema.GroupResource
+}
+
+func newWatchEventFilter(prefix string, opts storage.ListOptions, groupResource schema.GroupResource) watchEventFilter {
+	return watchEventFilter{
+		prefix:        prefix,
+		opts:          opts,
+		groupResource: groupResource,
 	}
+}
+
+func (f *watchEventFilter) filterWithAttrsAndPrefix(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
+	if f.opts.Recursive {
+		if !key.HasPathPrefix(objKey, f.prefix) {
+			return false
+		}
+	} else if objKey != f.prefix {
+		return false
+	}
+	if !f.opts.Predicate.MatchesObjectAttributes(label, field) {
+		return false
+	}
+	matches, err := f.opts.Predicate.MatchesSharding(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", f.groupResource, err))
+		return false
+	}
+	if !matches {
+		metrics.RecordWatchFilteredEvent(f.groupResource)
+		return false
+	}
+	return true
 }
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.

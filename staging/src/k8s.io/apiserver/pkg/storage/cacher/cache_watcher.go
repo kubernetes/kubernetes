@@ -56,7 +56,7 @@ type cacheWatcher struct {
 	input     chan *watchCacheEvent
 	result    chan watch.Event
 	done      chan struct{}
-	filter    filterWithAttrsFunc
+	filter    watchEventFilter
 	stopped   bool
 	forget    func(bool)
 	versioner storage.Versioner
@@ -93,7 +93,7 @@ type cacheWatcher struct {
 
 func newCacheWatcher(
 	chanSize int,
-	filter filterWithAttrsFunc,
+	filter watchEventFilter,
 	forget func(bool),
 	versioner storage.Versioner,
 	deadline time.Time,
@@ -382,10 +382,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return e
 	}
 
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.Object)
+	curObjPasses := event.Type != watch.Deleted && c.filter.filterWithAttrsAndPrefix(event.Key, event.ObjLabels, event.ObjFields, event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObject)
+		oldObjPasses = c.filter.filterWithAttrsAndPrefix(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObject)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
