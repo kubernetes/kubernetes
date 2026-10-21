@@ -132,11 +132,10 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
 	testCases := map[string]struct {
-		obj                            *scheduling.PodGroup
-		expectObj                      *scheduling.PodGroup
-		enableTopologyAwareScheduling  bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationError          string
+		obj                           *scheduling.PodGroup
+		expectObj                     *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		expectValidationError         string
 	}{
 		"simple": {
 			obj:       podGroup,
@@ -256,28 +255,17 @@ func TestStrategyCreate(t *testing.T) {
 				return pg
 			}(),
 		},
-		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
+		"preserve preemptionPolicy (Never)": {
 			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj: podGroup,
+			expectObj: podGroupWithPreemptionPolicy(scheduling.PreemptNever),
 		},
-		"podgroup preemptionPolicy disabled - drop invalid preemptionPolicy": {
-			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			expectObj: podGroup,
+		"preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectObj: podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
 		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (Never)": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - invalid preemptionPolicy": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+		"invalid preemptionPolicy": {
+			obj:                   podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			expectValidationError: supportedPoliciesError,
 		},
 	}
 
@@ -286,7 +274,6 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.obj.DeepCopy()
 
@@ -325,11 +312,10 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                         *scheduling.PodGroup
-		newObj                         *scheduling.PodGroup
-		enableTopologyAwareScheduling  bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationErrors         []string
+		oldObj                        *scheduling.PodGroup
+		newObj                        *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		expectValidationErrors        []string
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -431,16 +417,10 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy disabled": {
+		"changing preemptionPolicy not allowed": {
 			oldObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptNever),
 			newObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
-		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy enabled": {
-			oldObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			newObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 	}
 
@@ -449,7 +429,6 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()

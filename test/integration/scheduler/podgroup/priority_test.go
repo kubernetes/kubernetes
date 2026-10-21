@@ -45,7 +45,6 @@ func TestPodGroupPriorityClassPreemptionPolicy(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload:                 true,
 		features.CompositePodGroup:               true,
-		features.PodGroupPreemptionPolicy:        true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 	// The scheduler test helpers disable Priority admission, which this regression needs.
@@ -270,90 +269,66 @@ func TestPodGroupPreemptionPolicyCompatibility(t *testing.T) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	tests := []struct {
-		name                           string
-		enablePodGroupPreemptionPolicy bool
-		disablePriorityAdmission       bool
-	}{
-		{
-			name: "created before enabling PodGroupPreemptionPolicy",
-		},
-		{
-			name:                           "created with Priority admission disabled",
-			enablePodGroupPreemptionPolicy: true,
-			disablePriorityAdmission:       true,
-		},
+	// Reuse the storage prefix so the restarted server reads the original objects.
+	etcdConfig := framework.SharedEtcd()
+	flags := []string{"--runtime-config=scheduling.k8s.io/v1alpha3=true,scheduling.k8s.io/v1beta1=true"}
+	createFlags := append([]string{"--disable-admission-plugins=Priority"}, flags...)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, createFlags, etcdConfig)
+	defer server.TearDownFn()
+	client := kubernetes.NewForConfigOrDie(server.ClientConfig)
+
+	originalPG, err := client.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Create(t.Context(),
+		st.MakePodGroup().Name("pg").BasicPolicy().Obj(), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("creating PodGroup: %v", err)
+	}
+	originalCPG, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Create(t.Context(),
+		st.MakeCompositePodGroup().Name("cpg").WorkloadRef("workload", "template").BasicPolicy().Obj(), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("creating CompositePodGroup: %v", err)
+	}
+	if originalPG.Spec.PreemptionPolicy != nil || originalCPG.Spec.PreemptionPolicy != nil {
+		t.Fatal("expected both groups to be created without a preemptionPolicy")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reuse the storage prefix so the restarted server reads the original objects.
-			etcdConfig := framework.SharedEtcd()
-			flags := []string{"--runtime-config=scheduling.k8s.io/v1alpha3=true,scheduling.k8s.io/v1beta1=true"}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodGroupPreemptionPolicy, tt.enablePodGroupPreemptionPolicy)
-			createFlags := append([]string{}, flags...)
-			if tt.disablePriorityAdmission {
-				createFlags = append(createFlags, "--disable-admission-plugins=Priority")
-			}
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, createFlags, etcdConfig)
-			defer server.TearDownFn()
-			client := kubernetes.NewForConfigOrDie(server.ClientConfig)
+	server.TearDownFn()
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, flags, etcdConfig)
+	defer server.TearDownFn()
+	client = kubernetes.NewForConfigOrDie(server.ClientConfig)
 
-			originalPG, err := client.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Create(t.Context(),
-				st.MakePodGroup().Name("pg").BasicPolicy().Obj(), metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("creating PodGroup: %v", err)
-			}
-			originalCPG, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Create(t.Context(),
-				st.MakeCompositePodGroup().Name("cpg").WorkloadRef("workload", "template").BasicPolicy().Obj(), metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("creating CompositePodGroup: %v", err)
-			}
-			if originalPG.Spec.PreemptionPolicy != nil || originalCPG.Spec.PreemptionPolicy != nil {
-				t.Fatal("expected both groups to be created without a preemptionPolicy")
-			}
+	pg, err := client.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Get(t.Context(), originalPG.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading PodGroup after restart: %v", err)
+	}
+	if pg.UID != originalPG.UID || pg.Spec.PreemptionPolicy != nil {
+		t.Fatalf("expected original PodGroup with nil preemptionPolicy, got UID %q and policy %v", pg.UID, pg.Spec.PreemptionPolicy)
+	}
+	alphaPG, err := client.SchedulingV1alpha3().PodGroups(metav1.NamespaceDefault).Get(t.Context(), originalPG.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading v1alpha3 PodGroup after restart: %v", err)
+	}
+	if alphaPG.UID != originalPG.UID || alphaPG.Spec.PreemptionPolicy != nil {
+		t.Fatalf("expected original v1alpha3 PodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaPG.UID, alphaPG.Spec.PreemptionPolicy)
+	}
 
-			server.TearDownFn()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodGroupPreemptionPolicy, true)
-			server = kubeapiservertesting.StartTestServerOrDie(t, nil, flags, etcdConfig)
-			defer server.TearDownFn()
-			client = kubernetes.NewForConfigOrDie(server.ClientConfig)
+	cpg, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading CompositePodGroup after restart: %v", err)
+	}
+	if cpg.UID != originalCPG.UID || cpg.Spec.PreemptionPolicy != nil {
+		t.Fatalf("expected original CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", cpg.UID, cpg.Spec.PreemptionPolicy)
+	}
+	alphaCPG, err := client.SchedulingV1alpha3().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading v1alpha3 CompositePodGroup after restart: %v", err)
+	}
+	if alphaCPG.UID != originalCPG.UID || alphaCPG.Spec.PreemptionPolicy != nil {
+		t.Fatalf("expected original v1alpha3 CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaCPG.UID, alphaCPG.Spec.PreemptionPolicy)
+	}
 
-			pg, err := client.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Get(t.Context(), originalPG.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("reading PodGroup after restart: %v", err)
-			}
-			if pg.UID != originalPG.UID || pg.Spec.PreemptionPolicy != nil {
-				t.Fatalf("expected original PodGroup with nil preemptionPolicy, got UID %q and policy %v", pg.UID, pg.Spec.PreemptionPolicy)
-			}
-			alphaPG, err := client.SchedulingV1alpha3().PodGroups(metav1.NamespaceDefault).Get(t.Context(), originalPG.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("reading v1alpha3 PodGroup after restart: %v", err)
-			}
-			if alphaPG.UID != originalPG.UID || alphaPG.Spec.PreemptionPolicy != nil {
-				t.Fatalf("expected original v1alpha3 PodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaPG.UID, alphaPG.Spec.PreemptionPolicy)
-			}
-
-			cpg, err := client.SchedulingV1beta1().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("reading CompositePodGroup after restart: %v", err)
-			}
-			if cpg.UID != originalCPG.UID || cpg.Spec.PreemptionPolicy != nil {
-				t.Fatalf("expected original CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", cpg.UID, cpg.Spec.PreemptionPolicy)
-			}
-			alphaCPG, err := client.SchedulingV1alpha3().CompositePodGroups(metav1.NamespaceDefault).Get(t.Context(), originalCPG.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("reading v1alpha3 CompositePodGroup after restart: %v", err)
-			}
-			if alphaCPG.UID != originalCPG.UID || alphaCPG.Spec.PreemptionPolicy != nil {
-				t.Fatalf("expected original v1alpha3 CompositePodGroup with nil preemptionPolicy, got UID %q and policy %v", alphaCPG.UID, alphaCPG.Spec.PreemptionPolicy)
-			}
-
-			for _, group := range []*fwk.GenericPodGroup{fwk.NewGenericPodGroup(pg), fwk.NewGenericCompositePodGroup(cpg)} {
-				if policy := group.GetPreemptionPolicy(); policy != v1.PreemptLowerPriority {
-					t.Errorf("scheduler preemption policy for %q = %q, want %q", group.GetName(), policy, v1.PreemptLowerPriority)
-				}
-			}
-		})
+	for _, group := range []*fwk.GenericPodGroup{fwk.NewGenericPodGroup(pg), fwk.NewGenericCompositePodGroup(cpg)} {
+		if policy := group.GetPreemptionPolicy(); policy != v1.PreemptLowerPriority {
+			t.Errorf("scheduler preemption policy for %q = %q, want %q", group.GetName(), policy, v1.PreemptLowerPriority)
+		}
 	}
 }
