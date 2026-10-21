@@ -247,6 +247,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		appsv1.Deployment{}.OpenAPIModelName():                                                                          schema_k8sio_api_apps_v1_Deployment(ref),
 		appsv1.DeploymentCondition{}.OpenAPIModelName():                                                                 schema_k8sio_api_apps_v1_DeploymentCondition(ref),
 		appsv1.DeploymentList{}.OpenAPIModelName():                                                                      schema_k8sio_api_apps_v1_DeploymentList(ref),
+		appsv1.DeploymentSchedulingConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_apps_v1_DeploymentSchedulingConfiguration(ref),
 		appsv1.DeploymentSpec{}.OpenAPIModelName():                                                                      schema_k8sio_api_apps_v1_DeploymentSpec(ref),
 		appsv1.DeploymentStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_apps_v1_DeploymentStatus(ref),
 		appsv1.DeploymentStrategy{}.OpenAPIModelName():                                                                  schema_k8sio_api_apps_v1_DeploymentStrategy(ref),
@@ -8077,6 +8078,62 @@ func schema_k8sio_api_apps_v1_DeploymentList(ref common.ReferenceCallback) commo
 	}
 }
 
+func schema_k8sio_api_apps_v1_DeploymentSchedulingConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeploymentSchedulingConfiguration composes the reusable scheduling building blocks from scheduling.k8s.io for use on a Deployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingPolicy defines the scheduling policy for this Deployment. If spec.scheduling.schedulingPolicy is omitted, the Basic policy is used. Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may be omitted to derive it from replicas.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for the Deployment's pods.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the Deployment. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.WorkloadPodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadPodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -8144,12 +8201,18 @@ func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) commo
 							Format:      "int32",
 						},
 					},
+					"scheduling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for policy.gang.minCount.",
+							Ref:         ref(appsv1.DeploymentSchedulingConfiguration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"selector", "template"},
 			},
 		},
 		Dependencies: []string{
-			appsv1.DeploymentStrategy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
+			appsv1.DeploymentSchedulingConfiguration{}.OpenAPIModelName(), appsv1.DeploymentStrategy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
