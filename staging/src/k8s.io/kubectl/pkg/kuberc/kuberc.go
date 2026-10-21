@@ -369,7 +369,8 @@ func LoadKuberc(kuberc string) (string, bool, error) {
 		explicitly = true
 	}
 
-	if kubeRCFile == RecommendedKubeRCFile && os.Getenv("KUBERC") != "" {
+	// Fall back to KUBERC only when --kuberc is not passed.
+	if !explicitly && os.Getenv("KUBERC") != "" {
 		kubeRCFile = os.Getenv("KUBERC")
 		explicitly = true
 	}
