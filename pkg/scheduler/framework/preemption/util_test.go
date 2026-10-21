@@ -17,7 +17,6 @@ limitations under the License.
 package preemption
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -25,35 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-type mockPodGroupLister struct {
-	podGroups map[string]*schedulingv1beta1.PodGroup
-}
-
-func (m *mockPodGroupLister) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
-	if pg, ok := m.podGroups[name]; ok {
-		return pg, nil
-	}
-	return nil, fmt.Errorf("pod group %s not found", name)
-}
-
-type mockCompositePodGroupLister struct {
-	compositePodGroups map[string]*schedulingv1alpha3.CompositePodGroup
-}
-
-func (m *mockCompositePodGroupLister) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
-	if cpg, ok := m.compositePodGroups[name]; ok {
-		return cpg, nil
-	}
-	return nil, fmt.Errorf("composite pod group %s not found", name)
-}
 
 func TestFilterVictimsWithPDBViolation(t *testing.T) {
 	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
@@ -873,181 +848,6 @@ func TestPodTerminatingByPreemption(t *testing.T) {
 			got := PodTerminatingByPreemption(tt.pod)
 			if got != tt.want {
 				t.Errorf("PodTerminatingByPreemption() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestTraverseHierarchyUp(t *testing.T) {
-	namespace := metav1.NamespaceDefault
-
-	tests := []struct {
-		name                    string
-		startKey                fwk.EntityKey
-		podGroupLister          fwk.PodGroupLister
-		compositePodGroupLister fwk.CompositePodGroupLister
-		stopAt                  string
-		expectedVisitedKeys     []fwk.EntityKey
-	}{
-		{
-			name:                    "unsupported key type",
-			startKey:                fwk.PodKey(namespace, "p1"),
-			podGroupLister:          &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:     "single PG without parent CPG",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-			},
-		},
-		{
-			name:     "PG -> parent CPG -> grandparent CPG",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:           "start directly from CPG",
-			startKey:       fwk.CompositePodGroupKey(namespace, "cpg1"),
-			podGroupLister: &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:     "early stop via visitFn",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			stopAt: "cpg1",
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-			},
-		},
-		{
-			name:     "cycle detection between CPGs",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:                    "missing PG in lister",
-			startKey:                fwk.PodGroupKey(namespace, "missing-pg"),
-			podGroupLister:          &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:     "missing parent CPG in lister stops gracefully",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("missing-cpg").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var visitedKeys []fwk.EntityKey
-			for gpg := range traverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister) {
-				visitedKeys = append(visitedKeys, gpg.GetKey())
-				if gpg.GetName() == tt.stopAt {
-					break
-				}
-			}
-			if diff := cmp.Diff(tt.expectedVisitedKeys, visitedKeys); diff != "" {
-				t.Errorf("TraverseHierarchyUp() mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}

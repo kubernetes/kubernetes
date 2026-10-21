@@ -17,14 +17,10 @@ limitations under the License.
 package preemption
 
 import (
-	"iter"
-
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 )
@@ -103,59 +99,6 @@ func victimRank(vi Victim) int {
 		return 2
 	default:
 		return 1
-	}
-}
-
-// traverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
-// If the next parent is missing, or cannot be listed, the traversal stops.
-// Feature gating is left to the listers: when GenericWorkload or CompositePodGroup is disabled,
-// the corresponding lister rejects lookups, so the traversal ends there.
-// TODO: log/return an error if there is a gap in the hierarchy.
-func traverseHierarchyUp(
-	namespace string,
-	startKey fwk.EntityKey,
-	pgLister fwk.PodGroupLister,
-	cpgLister fwk.CompositePodGroupLister,
-) iter.Seq[*fwk.GenericPodGroup] {
-	return func(yield func(*fwk.GenericPodGroup) bool) {
-		currentKey := startKey
-		visited := sets.New[fwk.EntityKey]()
-		for range schedulingv1beta1.WorkloadMaxTreeDepth {
-			if visited.Has(currentKey) {
-				break
-			}
-			visited.Insert(currentKey)
-
-			var gpg *fwk.GenericPodGroup
-			switch currentKey.Type {
-			case fwk.PodGroupKeyType:
-				pg, err := pgLister.Get(namespace, currentKey.Name)
-				if err != nil {
-					return
-				}
-				gpg = fwk.NewGenericPodGroup(pg)
-
-			case fwk.CompositePodGroupKeyType:
-				cpg, err := cpgLister.Get(namespace, currentKey.Name)
-				if err != nil {
-					return
-				}
-				gpg = fwk.NewGenericCompositePodGroup(cpg)
-
-			default:
-				return
-			}
-
-			if !yield(gpg) {
-				return
-			}
-
-			parentKey, hasParent := gpg.GetParentKey()
-			if !hasParent {
-				return
-			}
-			currentKey = parentKey
-		}
 	}
 }
 
