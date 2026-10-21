@@ -33,7 +33,6 @@ import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -5883,873 +5882,729 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 	}
 }
 
-func TestCPGHierarchicalScheduling_RecursiveAlgorithm(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.CompositePodGroup:               true,
-		features.GenericWorkload:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
+func setupBindChan(client *clientsetfake.Clientset, bufferSize int) <-chan string {
+	bindChan := make(chan string, bufferSize)
+	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "binding" {
+			return false, nil, nil
+		}
+		binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+		bindChan <- binding.Name
+		return true, binding, nil
 	})
-
-	// Tree structure:
-	//                  cpg-root (Gang, MinGroupCount: 2)
-	//                  /       |       \
-	//                pg1      pg2      pg3
-	//               (Min:1)  (Min:1)  (Min:1)
-	//
-	// We will schedule cpg-root.
-	// Since MinGroupCount: 2, if 2 out of 3 child pod groups are schedulable, it should succeed!
-
-	namespace := "default"
-
-	cpgRoot := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg-root"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2},
-			},
-		},
-	}
-
-	pg1 := st.MakePodGroup().Name("pg1").Namespace(namespace).ParentCompositePodGroup("cpg-root").MinCount(1).Obj()
-	pg2 := st.MakePodGroup().Name("pg2").Namespace(namespace).ParentCompositePodGroup("cpg-root").MinCount(1).Obj()
-	pg3 := st.MakePodGroup().Name("pg3").Namespace(namespace).ParentCompositePodGroup("cpg-root").MinCount(1).Obj()
-
-	p1 := st.MakePod().Name("p1").Namespace(namespace).UID("p1").PodGroupName("pg1").SchedulerName("test-scheduler").Obj()
-	p2 := st.MakePod().Name("p2").Namespace(namespace).UID("p2").PodGroupName("pg2").SchedulerName("test-scheduler").Obj()
-	p3 := st.MakePod().Name("p3").Namespace(namespace).UID("p3").PodGroupName("pg3").SchedulerName("test-scheduler").Obj()
-
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
-
-	cpgRootInfo := newQueuedPodGroupInfo(
-		framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpgRoot),
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg3)},
-		),
-		qInfo1, qInfo2, qInfo3,
-	)
-	cpgRootInfo.Timestamp = time.Now()
-
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Mock PlacementFeasible plugin
-	fakePlacementFeasible := &fakePlacementFeasiblePlugin{}
-	fakePlacementFeasible.placementFeasibleStatuses = [][]fwk.Code{
-		// Four distinct scheduling cycles:
-		// 1. cpg-root (success, 1 call: before children scheduling, evaluated=0)
-		// 2. pg1 scheduling (success, 2 calls: before and after p1, evaluated=0 and 1)
-		// 3. pg2 scheduling (success, 2 calls: before and after p2, evaluated=0 and 1)
-		// 4. pg3 scheduling (fails early on Evaluated=0)
-		{fwk.Success},
-		{fwk.Success, fwk.Success},
-		{fwk.Success, fwk.Success, fwk.Success},
-		{fwk.Unschedulable},
-	}
-
-	registry := frameworkruntime.Registry{
-		queuesort.Name:     queuesort.New,
-		defaultbinder.Name: defaultbinder.New,
-		fakePlacementFeasible.Name(): func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-			return fakePlacementFeasible, nil
-		},
-	}
-
-	profileCfg := config.KubeSchedulerProfile{
-		SchedulerName: "test-scheduler",
-		Plugins: &config.Plugins{
-			QueueSort: config.PluginSet{
-				Enabled: []config.Plugin{{Name: queuesort.Name}},
-			},
-			Bind: config.PluginSet{
-				Enabled: []config.Plugin{{Name: defaultbinder.Name}},
-			},
-			PlacementFeasible: config.PluginSet{
-				Enabled: []config.Plugin{{Name: fakePlacementFeasible.Name()}},
-			},
-		},
-	}
-
-	client := clientsetfake.NewSimpleClientset(cpgRoot, pg1, pg2, pg3)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-
-	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
-		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create framework: %v", err)
-	}
-
-	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
-	cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpgRoot))
-	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg1))
-	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg2))
-	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg3))
-
-	sched := &Scheduler{
-		Profiles:         profile.Map{"test-scheduler": schedFwk},
-		Cache:            cache,
-		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
-		client:           client,
-		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
-	}
-	if err := sched.initAlgorithm(); err != nil {
-		t.Fatalf("Failed to initialize scheduling algorithm: %v", err)
-	}
-	schedFwk.SetPodNominator(sched.SchedulingQueue)
-
-	// Mock SchedulePod to return success for all pods
-	sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
-		return ScheduleResult{SuggestedHost: "node1"}, nil
-	}
-
-	// Prepare nodeInfoSnapshot which matches Cache
-	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
-		t.Fatalf("Failed to update snapshot: %v", err)
-	}
-
-	// Run podGroupSchedulingRecursiveAlgorithm
-	res := map[fwk.EntityKey]*podGroupAlgorithmResult{}
-	result, _ := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgRootInfo, cpgRootInfo.PodGroupInfo, res)
-
-	status := result.status
-	if status.Code() != fwk.Success {
-		t.Errorf("Expected recursive scheduling algorithm status to be Success, got: %v", status)
-	}
-
-	// Verify that exactly the successful child pod groups (pg1 and pg2) are in the scheduled pod results
-	// pg3 should NOT be in the results because its placement was not feasible!
-	var successPodNames []string
-	for _, childRes := range res {
-		if childRes.podGroupInfo.CompositePodGroup != nil {
-			continue
-		}
-		for _, pr := range childRes.podResults {
-			if childRes.status.IsSuccess() && pr.status.IsSuccess() {
-				successPodNames = append(successPodNames, pr.podInfo.Pod.Name)
-			}
-		}
-	}
-
-	scheduledPodNames := sets.New(successPodNames...)
-	if scheduledPodNames.Len() != 2 {
-		t.Errorf("Expected 2 scheduled pod results, got %d", scheduledPodNames.Len())
-	}
-
-	if !scheduledPodNames.Has("p1") || !scheduledPodNames.Has("p2") {
-		t.Errorf("Expected p1 and p2 to be scheduled, got: %v", scheduledPodNames.UnsortedList())
-	}
-	if scheduledPodNames.Has("p3") {
-		t.Errorf("Expected p3 NOT to be scheduled, but got in results")
-	}
+	return bindChan
 }
 
-// TestCPGHierarchicalScheduling_Internal tests a complex, multi-level hierarchy of CompositePodGroups.
-// It verifies that Gang and Basic scheduling semantics apply correctly at each level.
-//
-// Tree structure:
-//
-//	                   cpg-root (Gang, MinGroup: 2)
-//	                /               |                \
-//	      cpg-sub1               cpg-sub2             cpg-sub3
-//	(Gang, MinGroup: 2)          (Basic)         (Gang, MinGroup: 2)
-//	    /    |    \               /     \              /     \
-//	  pg1   pg2   pg3           pg4     pg5          pg6     pg7
-//	  (S)   (S)   (F)           (S)     (S)          (S->F)  (F)
-//
-// (S) = Success
-// (F) = Fail (filter unschedulable)
-// (S->F) = Success initially, but fails because its parent cpg-sub3 (MinGroup: 2) fails.
-//
-// Results:
-// - cpg-sub1 succeeds (2 out of 3 groups succeed: pg1, pg2).
-// - cpg-sub2 succeeds (Basic, so pg4 and pg5 succeed independently).
-// - cpg-sub3 fails (only 1 group, pg6, succeeds, which is < MinGroup: 2. pg7 fails).
-// - cpg-root succeeds (2 out of 3 sub-groups succeed: cpg-sub1, cpg-sub2).
-func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.CompositePodGroup:               true,
-		features.GenericWorkload:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
-	})
-
-	testNode := st.MakeNode().Name("node1").UID("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "100", v1.ResourceMemory: "100Gi", v1.ResourcePods: "100"}).Obj()
-	testNode.Status.Allocatable = testNode.Status.Capacity
-
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
-	cache.AddNode(logger, testNode)
-
-	ns := "default"
-
-	// Helper function to create PodGroups
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
-		var policy schedulingv1beta1.PodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
-			}
-		} else {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
-			}
-		}
-		pg := &schedulingv1beta1.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1beta1.PodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: new(parentCPG),
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
-		return pg
-	}
-
-	createCPG := func(name string, minCount int32, parentCPG *string) *schedulingv1alpha3.CompositePodGroup {
-		var policy schedulingv1alpha3.CompositePodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: minCount},
-			}
-		} else {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
-			}
-		}
-		cpg := &schedulingv1alpha3.CompositePodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.CompositePodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: parentCPG,
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
-		return cpg
-	}
-
-	rootCPG := createCPG("cpg-root", 2, nil)
-	cpgSub1 := createCPG("cpg-sub1", 2, new("cpg-root"))
-	cpgSub2 := createCPG("cpg-sub2", 0, new("cpg-root"))
-	cpgSub3 := createCPG("cpg-sub3", 2, new("cpg-root"))
-
-	pg1 := createPG("pg1", 3, "cpg-sub1")
-	pg2 := createPG("pg2", 3, "cpg-sub1")
-	pg3 := createPG("pg3", 3, "cpg-sub1")
-
-	pg4 := createPG("pg4", 0, "cpg-sub2")
-	pg5 := createPG("pg5", 3, "cpg-sub2")
-
-	pg6 := createPG("pg6", 3, "cpg-sub3")
-	pg7 := createPG("pg7", 3, "cpg-sub3")
-
-	var allPods []*v1.Pod
-	var queuedPodInfos []*framework.QueuedPodInfo
-
-	createPods := func(pgName string, count int) {
-		for i := range count {
-			pod := st.MakePod().Namespace(ns).Name(fmt.Sprintf("%s-pod-%d", pgName, i)).
-				UID(fmt.Sprintf("%s-pod-%d", pgName, i)).
-				PodGroupName(pgName).Priority(100).SchedulerName("test-scheduler").Obj()
-
-			allPods = append(allPods, pod)
-			queuedPodInfos = append(queuedPodInfos, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
-			cache.AddPodGroupMember(pod)
+func waitForExpectedBindings(t *testing.T, bindChan <-chan string, expectedCount int) sets.Set[string] {
+	t.Helper()
+	boundPods := sets.New[string]()
+	for range expectedCount {
+		select {
+		case podName := <-bindChan:
+			boundPods.Insert(podName)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("Timed out waiting for %d expected bindings, got %d (%v)", expectedCount, len(boundPods), sets.List(boundPods))
 		}
 	}
-
-	createPods("pg1", 3)
-	createPods("pg2", 3)
-	createPods("pg3", 3)
-	createPods("pg4", 3)
-	createPods("pg5", 3)
-	createPods("pg6", 3)
-	createPods("pg7", 3)
-
-	podGroupInfo := newQueuedPodGroupInfo(
-		framework.NewPodGroupInfo(
-			fwk.NewGenericCompositePodGroup(rootCPG),
-			framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpgSub1),
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg3)},
-			),
-			framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpgSub2),
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg4)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg5)},
-			),
-			framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpgSub3),
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg6)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg7)},
-			),
-		),
-		queuedPodInfos...,
-	)
-
-	fakePlugin := &fakePodGroupPlugin{
-		filterStatus: map[string]*fwk.Status{
-			"pg3-pod-0": fwk.NewStatus(fwk.Unschedulable),
-			"pg3-pod-1": fwk.NewStatus(fwk.Unschedulable),
-			"pg3-pod-2": fwk.NewStatus(fwk.Unschedulable),
-			"pg7-pod-0": fwk.NewStatus(fwk.Unschedulable),
-			"pg7-pod-1": fwk.NewStatus(fwk.Unschedulable),
-			"pg7-pod-2": fwk.NewStatus(fwk.Unschedulable),
-			"pg1-pod-0": nil,
-			"pg1-pod-1": nil,
-			"pg1-pod-2": nil,
-			"pg2-pod-0": nil,
-			"pg2-pod-1": nil,
-			"pg2-pod-2": nil,
-			"pg4-pod-0": nil,
-			"pg4-pod-1": nil,
-			"pg4-pod-2": nil,
-			"pg5-pod-0": nil,
-			"pg5-pod-1": nil,
-			"pg5-pod-2": nil,
-			"pg6-pod-0": nil,
-			"pg6-pod-1": nil,
-			"pg6-pod-2": nil,
-		},
-	}
-
-	gangPluginFactory := func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-		return gangscheduling.New(ctx, obj, handle, feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableCompositePodGroup: true})
-	}
-
-	registry := []tf.RegisterPluginFunc{
-		tf.RegisterFilterPlugin(fakePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-			return fakePlugin, nil
-		}),
-		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
-	}
-
-	clientObjs := []runtime.Object{testNode, rootCPG, cpgSub1, cpgSub2, cpgSub3, pg1, pg2, pg3, pg4, pg5, pg6, pg7}
-	for _, pod := range allPods {
-		clientObjs = append(clientObjs, pod)
-	}
-	client := clientsetfake.NewSimpleClientset(clientObjs...)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
-	snapshot := internalcache.NewEmptySnapshot()
-
-	schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
-		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(queue),
-		frameworkruntime.WithPodActivator(queue),
-		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
-		frameworkruntime.WithPodGroupManager(cache),
-	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err != nil {
-		t.Fatalf("Failed to create new framework: %v", err)
-	}
-
-	handledPods := make(map[string]*fwk.Status)
-	var lock sync.Mutex
-
-	sched := &Scheduler{
-		Profiles:         profile.Map{"test-scheduler": schedFwk},
-		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
-		Cache:            cache,
-		client:           client,
-		nodeInfoSnapshot: snapshot, // will be updated by UpdateSnapshot
-		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
-			lock.Lock()
-			defer lock.Unlock()
-			handledPods[p.Pod.Name] = status
-		},
-	}
-	initTestAlgorithm(t, sched)
-
-	// Run the scheduling cycle
-	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-		t.Fatalf("Failed to update snapshot: %v", err)
-	}
-	t.Logf("Node info list size: %d", func() int { l, _ := snapshot.NodeInfos().List(); return len(l) }())
-	podGroupCycleState := framework.NewCycleState()
-	podGroupCycleState.SetPodGroupCycleState(podGroupCycleState)
-	sched.podGroupCycle(ctx, schedFwk, podGroupCycleState, podGroupInfo, time.Now())
-
-	lock.Lock()
-	defer lock.Unlock()
-
-	// Verify the results
-	successPods := []string{
-		"pg1-pod-0", "pg1-pod-1", "pg1-pod-2",
-		"pg2-pod-0", "pg2-pod-1", "pg2-pod-2",
-		"pg4-pod-0", "pg4-pod-1", "pg4-pod-2",
-		"pg5-pod-0", "pg5-pod-1", "pg5-pod-2",
-	}
-
-	failPods := []string{
-		"pg3-pod-0", "pg3-pod-1", "pg3-pod-2",
-		"pg6-pod-0", "pg6-pod-1", "pg6-pod-2",
-		"pg7-pod-0", "pg7-pod-1", "pg7-pod-2",
-	}
-
-	for _, p := range successPods {
-		if status, ok := handledPods[p]; ok {
-			t.Errorf("Expected pod %s to be scheduled successfully, but got error: %v", p, status.AsError())
-		}
-	}
-
-	for _, p := range failPods {
-		if _, ok := handledPods[p]; !ok {
-			t.Errorf("Expected pod %s to fail, but it was scheduled successfully", p)
-		}
-	}
+	return boundPods
 }
 
-// TestCPGMinGroupCount_Internal verifies that a Gang CompositePodGroup schedules its children
-// if at least MinGroupCount of them are fully schedulable.
-//
-// Tree structure:
-//
-//	   cpg-root (Gang, MinGroup: 2)
-//	  /             |              \
-//	pg1            pg2            pg3
-//	(S)            (S)            (F)
-//
-// (S) = Success
-// (F) = Fail
-func TestCPGMinGroupCount_Internal(t *testing.T) {
+func TestCPGHierarchicalScheduling(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               true,
 		features.GenericWorkload:                 true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	logger := klog.FromContext(ctx)
-
-	// Capacity matches 2 groups. pg3 pods fail.
-	testNode := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()
-	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
-	cache.AddNode(logger, testNode)
-
-	ns := "default"
-
-	createCPG := func(name string, minCount int32, parentCPG *string) *schedulingv1alpha3.CompositePodGroup {
-		var policy schedulingv1alpha3.CompositePodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: minCount},
-			}
-		} else {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
-			}
-		}
-		cpg := &schedulingv1alpha3.CompositePodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.CompositePodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: parentCPG,
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
-		return cpg
+	// podSpec describes the pods that a phase creates for a single PodGroup.
+	type podSpec struct {
+		// count is the number of pods to create. Pod names continue the
+		// "<podGroup>-pod-<index>" numbering from previous phases.
+		count int
+		// unschedulable makes the fake Filter plugin reject all created pods as Unschedulable.
+		// Otherwise the plugin accepts them.
+		unschedulable bool
 	}
 
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
-		var policy schedulingv1beta1.PodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
-			}
-		} else {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
-			}
-		}
-		pg := &schedulingv1beta1.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1beta1.PodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: new(parentCPG),
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
-		return pg
+	type phaseSpec struct {
+		// PodGroups and CompositePodGroups, and pods introduced or updated in this phase, with pods keyed by PodGroup name.
+		podGroups        []*fwk.GenericPodGroup
+		updatedPodGroups []*fwk.GenericPodGroup
+		pods             map[string]podSpec
+
+		// wantBoundPods is the exact set of pods bound in this phase.
+		wantBoundPods sets.Set[string]
+		// wantFailPods is the exact set of pods rejected in this phase.
+		wantFailPods sets.Set[string]
 	}
 
-	rootCPG := createCPG("cpg-root", 2, nil)
-
-	pg1 := createPG("pg1", 3, "cpg-root")
-	pg2 := createPG("pg2", 3, "cpg-root")
-	pg3 := createPG("pg3", 3, "cpg-root")
-
-	var queuedPodInfos []*framework.QueuedPodInfo
-	var allPods []*v1.Pod
-
-	createPods := func(pgName string, count int, schedulable bool) {
-		for i := range count {
-			pod := st.MakePod().Namespace(ns).Name(fmt.Sprintf("%s-pod-%d", pgName, i)).UID(fmt.Sprintf("%s-pod-%d", pgName, i)).
-				PodGroupName(pgName).Priority(100).Obj()
-
-			if !schedulable && i == 0 {
-				pod.Spec.Containers = []v1.Container{{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100")},
+	tests := []struct {
+		name   string
+		phases []phaseSpec
+	}{
+		{
+			// Tree structure:
+			//
+			//	                 cpg-root (S)
+			//	                (Gang, Min: 2)
+			//	           ___________|___________
+			//	          /           |           \
+			//	   pg1 (S)         pg2 (S)         pg3 (F)
+			//	(Gang, Min: 1)  (Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			// (F) = Fail
+			//
+			// Results:
+			// - The fake Filter plugin rejects pg3's pod.
+			// - cpg-root succeeds with 2 of its 3 child groups, which meets its Min: 2.
+			name: "root CPG with gang policy schedules satisfied child PodGroups while unschedulable PodGroup fails",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(2).Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg3").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}, "pg3": {count: 1, unschedulable: true}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+				wantFailPods:  sets.New("pg3-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	                                                    cpg-root (S)
+			//	                                                   (Gang, Min: 2)
+			//	                              ___________________________|_______________________
+			//	                             /                           |                       \
+			//	                 cpg-sub1 (S)                       cpg-sub2 (S)                  cpg-sub3 (F)
+			//	                (Gang, Min: 2)                     (Gang, Min: 1)                (Gang, Min: 2)
+			//	           ___________|___________                    /       \                   /          \
+			//	          /           |           \            pg4 (S)         pg5 (S)      pg6 (S->F)       pg7 (F)
+			//	   pg1 (S)         pg2 (S)         pg3 (F)  (Gang, Min: 1)  (Gang, Min: 3) (Gang, Min: 3)  (Gang, Min: 3)
+			//	(Gang, Min: 3)  (Gang, Min: 3)  (Gang, Min: 3)
+			//
+			// (S) = Success
+			// (F) = Fail
+			// (S->F) = Success initially, but fails because its parent fails
+			//
+			// Results:
+			// - The fake Filter plugin rejects the pods of pg3 and pg7.
+			// - cpg-sub1 succeeds with 2 of its 3 child groups (pg1, pg2), which meets its Min: 2.
+			// - cpg-sub2 succeeds with both of its child groups (pg4, pg5), which meets its Min: 1.
+			// - cpg-sub3 fails with 1 of its 2 child groups (pg6), which is below its Min: 2, so pg6 fails with it.
+			// - cpg-root succeeds with 2 of its 3 child groups (cpg-sub1, cpg-sub2), which meets its Min: 2.
+			name: "multi-level CPG hierarchy schedules satisfied sub-CPGs and fails unsatisfied sub-CPG",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(2).Obj()),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub1").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub2").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub3").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(3).ParentCompositePodGroup("cpg-sub1").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(3).ParentCompositePodGroup("cpg-sub1").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg3").MinCount(3).ParentCompositePodGroup("cpg-sub1").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg4").MinCount(1).ParentCompositePodGroup("cpg-sub2").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg5").MinCount(3).ParentCompositePodGroup("cpg-sub2").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg6").MinCount(3).ParentCompositePodGroup("cpg-sub3").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg7").MinCount(3).ParentCompositePodGroup("cpg-sub3").Obj()),
+				},
+				pods: map[string]podSpec{
+					"pg1": {count: 3},
+					"pg2": {count: 3},
+					"pg3": {count: 3, unschedulable: true},
+					"pg4": {count: 3},
+					"pg5": {count: 3},
+					"pg6": {count: 3},
+					"pg7": {count: 3, unschedulable: true},
+				},
+				wantBoundPods: sets.New("pg1-pod-0", "pg1-pod-1", "pg1-pod-2", "pg2-pod-0", "pg2-pod-1", "pg2-pod-2", "pg4-pod-0", "pg4-pod-1", "pg4-pod-2", "pg5-pod-0", "pg5-pod-1", "pg5-pod-2"),
+				wantFailPods:  sets.New("pg3-pod-0", "pg3-pod-1", "pg3-pod-2", "pg6-pod-0", "pg6-pod-1", "pg6-pod-2", "pg7-pod-0", "pg7-pod-1", "pg7-pod-2"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (S)
+			//	           (Basic)
+			//	          /       \
+			//	   pg1 (S)         pg2 (F)
+			//	(Gang, Min: 3)  (Gang, Min: 3)
+			//
+			// (S) = Success
+			// (F) = Fail
+			//
+			// Results:
+			// - The fake Filter plugin rejects pg2's pods.
+			// - cpg-root is Basic, so it succeeds with pg1 alone.
+			name: "root CPG with basic policy schedules valid gang PodGroup and fails unschedulable gang PodGroup independently",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(3).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(3).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 3}, "pg2": {count: 3, unschedulable: true}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg1-pod-1", "pg1-pod-2"),
+				wantFailPods:  sets.New("pg2-pod-0", "pg2-pod-1", "pg2-pod-2"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	  cpg-root (S)
+			//	    (Basic)
+			//	     /    \
+			//	pg1 (S)  pg2 (F)
+			//	(Basic)  (Basic)
+			//
+			// (S) = Success
+			// (F) = Fail
+			//
+			// Results:
+			// - The fake Filter plugin rejects pg2's pods.
+			// - cpg-root is Basic, so it succeeds with pg1 alone.
+			name: "root CPG with basic policy schedules valid basic PodGroup and fails unschedulable basic PodGroup independently",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").BasicPolicy().ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").BasicPolicy().ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 2}, "pg2": {count: 2, unschedulable: true}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg1-pod-1"),
+				wantFailPods:  sets.New("pg2-pod-0", "pg2-pod-1"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (F)
+			//	        (Gang, Min: 3)
+			//	          /        \
+			//	pg1 (Skipped)   pg2 (Skipped)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (F) = Fail
+			// (Skipped) = Not evaluated, because an ancestor fails before reaching it
+			//
+			// Results:
+			// - cpg-root has 2 child groups, fewer than its Min: 3, so it fails before evaluating any of them.
+			name: "root CPG fails all child PodGroups when total available child groups is less than minGroupCount",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(3).Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:         map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+				wantFailPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	 cpg-root (S)
+			//	   (Basic)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 1)
+			//
+			// (S) = Success
+			name: "root CPG with basic policy schedules single schedulable child PodGroup",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}},
+				wantBoundPods: sets.New("pg1-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	 cpg-root (F)
+			//	   (Basic)
+			//	      |
+			//	   pg1 (F)
+			//	(Gang, Min: 1)
+			//
+			// (F) = Fail
+			//
+			// Results:
+			// - The fake Filter plugin rejects pg1's pod.
+			// - cpg-root fails because its only child group fails.
+			name: "root CPG with basic policy fails when single child PodGroup is unschedulable",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:         map[string]podSpec{"pg1": {count: 1, unschedulable: true}},
+				wantFailPods: sets.New("pg1-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (S)
+			//	           (Basic)
+			//	          /       \
+			//	   pg1 (S)         pg2 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			name: "root CPG with basic policy schedules multiple schedulable child PodGroups",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (S)
+			//	        (Gang, Min: 2)
+			//	        /           \
+			//	   pg1 (S)         pg2 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			name: "root CPG with gang policy (minGroupCount=2) schedules all child PodGroups when all are schedulable",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(2).Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (S)
+			//	           (Basic)
+			//	           /      \
+			//	 cpg-sub (S)       pg2 (S)
+			//	   (Basic)      (Gang, Min: 1)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 1)
+			//
+			// (S) = Success
+			name: "hierarchical CPG with intermediate CPG and direct PodGroup under basic policy schedules successfully",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Obj()),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub").BasicPolicy().ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-sub").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+			}},
+		},
+		{
+			// Tree structure:
+			//
+			//	         cpg-root (S)
+			//	        (Gang, Min: 2)
+			//	         /          \
+			//	 cpg-sub (S)       pg2 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 1)
+			//
+			// (S) = Success
+			name: "hierarchical CPG with intermediate CPG and direct PodGroup under gang policy schedules successfully",
+			phases: []phaseSpec{{
+				podGroups: []*fwk.GenericPodGroup{
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(2).Obj()),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-sub").Obj()),
+					fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+				},
+				pods:          map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+				wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+			}},
+		},
+		{
+			// Tree structure in phase 1:
+			//
+			//	             cpg-root (F)
+			//	            (Gang, Min: 3)
+			//	              /        \
+			//	cpg-sub1 (Skipped)  cpg-sub2 (Skipped)
+			//	  (Gang, Min: 1)      (Gang, Min: 1)
+			//	        |                   |
+			//	  pg1 (Skipped)       pg2 (Skipped)
+			//	  (Gang, Min: 1)      (Gang, Min: 1)
+			//
+			// Tree structure in phase 2, after adding cpg-sub3 (with pg3) and pg4:
+			//
+			//	                         cpg-root (S)
+			//	                        (Gang, Min: 3)
+			//	              ________________|___________________
+			//	             /               /  \                 \
+			//	 cpg-sub1 (F)    cpg-sub2 (S)    cpg-sub3 (S)      pg4 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)  (Gang, Min: 1)  (Gang, Min: 1)
+			//	      |               |               |
+			//	   pg1 (F)         pg2 (S)         pg3 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			// (F) = Fail
+			// (Skipped) = Not evaluated, because an ancestor fails before reaching it
+			//
+			// Results:
+			// - Phase 1: cpg-root has 2 child groups, fewer than its Min: 3, so it fails before evaluating any of them.
+			// - Phase 2: the fake Filter plugin rejects pg1's pod, so cpg-sub1 fails. cpg-root succeeds with 3 of its
+			//   4 child groups (cpg-sub2, cpg-sub3, pg4), which meets its Min: 3.
+			name: "multi-phase: unsatisfiable CPG hierarchy fails initially and succeeds after adding more child CPGs and PodGroups",
+			phases: []phaseSpec{
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(3).Obj()),
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub1").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub2").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-sub1").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-sub2").Obj()),
 					},
-				}}
-			} else {
-				pod.Spec.Containers = []v1.Container{{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					pods:         map[string]podSpec{"pg1": {count: 1, unschedulable: true}, "pg2": {count: 1}},
+					wantFailPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+				},
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub3").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg3").MinCount(1).ParentCompositePodGroup("cpg-sub3").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg4").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
 					},
-				}}
-			}
-
-			queuedPodInfos = append(queuedPodInfos, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
-			allPods = append(allPods, pod)
-			cache.AddPodGroupMember(pod)
-		}
-	}
-
-	createPods("pg1", 3, true)
-	createPods("pg2", 3, true)
-	createPods("pg3", 3, false)
-
-	snapshot := internalcache.NewEmptySnapshot()
-	clientObjs := []runtime.Object{testNode, rootCPG, pg1, pg2, pg3}
-	for _, pod := range allPods {
-		clientObjs = append(clientObjs, pod)
-	}
-	client := clientsetfake.NewSimpleClientset(clientObjs...)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-	fakePlugin := &fakePodGroupPlugin{
-		filterStatus: map[string]*fwk.Status{
-			"pg1-pod-0": nil,
-			"pg1-pod-1": nil,
-			"pg1-pod-2": nil,
-			"pg2-pod-0": nil,
-			"pg2-pod-1": nil,
-			"pg2-pod-2": nil,
-			"pg3-pod-0": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-			"pg3-pod-1": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-			"pg3-pod-2": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
+					pods:          map[string]podSpec{"pg3": {count: 1}, "pg4": {count: 1}},
+					wantBoundPods: sets.New("pg2-pod-0", "pg3-pod-0", "pg4-pod-0"),
+					wantFailPods:  sets.New("pg1-pod-0"),
+				},
+			},
+		},
+		{
+			// Tree structure in phase 1:
+			//
+			//	 cpg-root (S)
+			//	(Gang, Min: 1)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 1)
+			//
+			// Tree structure in phase 2, after adding pg2:
+			//
+			//	         cpg-root (S)
+			//	        (Gang, Min: 1)
+			//	        /           \
+			//	   pg1 (S)         pg2 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			//
+			// Results:
+			// - Phase 2: pg1 has no pods left to schedule, but its pod scheduled in phase 1 meets its Min: 1,
+			//   so pg1 succeeds again.
+			name: "multi-phase: schedulable root CPG schedules initial PodGroup and subsequently added PodGroup",
+			phases: []phaseSpec{
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					},
+					pods:          map[string]podSpec{"pg1": {count: 1}},
+					wantBoundPods: sets.New("pg1-pod-0"),
+				},
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					},
+					pods:          map[string]podSpec{"pg2": {count: 1}},
+					wantBoundPods: sets.New("pg2-pod-0"),
+				},
+			},
+		},
+		{
+			// Tree structure in phase 1:
+			//
+			//	 cpg-root (S)
+			//	(Gang, Min: 1)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 1)
+			//
+			// Tree structure in phase 2, after adding cpg-sub1 (with pg2):
+			//
+			//	         cpg-root (S)
+			//	        (Gang, Min: 1)
+			//	        /          \
+			//	   pg1 (S)       cpg-sub1 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//	                      |
+			//	                   pg2 (S)
+			//	                (Gang, Min: 1)
+			//
+			// (S) = Success
+			//
+			// Results:
+			// - Phase 2: pg1 has no pods left to schedule, but its pod scheduled in phase 1 meets its Min: 1,
+			//   so pg1 succeeds again.
+			name: "multi-phase: schedulable root CPG schedules initial PodGroup and subsequently added child CPG hierarchy",
+			phases: []phaseSpec{
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					},
+					pods:          map[string]podSpec{"pg1": {count: 1}},
+					wantBoundPods: sets.New("pg1-pod-0"),
+				},
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-sub1").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-sub1").Obj()),
+					},
+					pods:          map[string]podSpec{"pg2": {count: 1}},
+					wantBoundPods: sets.New("pg2-pod-0"),
+				},
+			},
+		},
+		{
+			// Tree structure in phase 1, with 1 pod in pg1:
+			//
+			//	 cpg-root (F)
+			//	(Gang, Min: 1)
+			//	      |
+			//	   pg1 (F)
+			//	(Gang, Min: 2)
+			//
+			// Tree structure in phase 2, after adding the second pod to pg1:
+			//
+			//	 cpg-root (S)
+			//	(Gang, Min: 1)
+			//	      |
+			//	   pg1 (S)
+			//	(Gang, Min: 2)
+			//
+			// (S) = Success
+			// (F) = Fail
+			//
+			// Results:
+			// - Phase 1: pg1 has 1 pod, fewer than its Min: 2, so it fails before evaluating its pod.
+			//   cpg-root fails because its only child group fails.
+			name: "multi-phase: gang PodGroup under CPG fails when under-replicated and succeeds after remaining pods arrive",
+			phases: []phaseSpec{
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(2).ParentCompositePodGroup("cpg-root").Obj()),
+					},
+					pods:         map[string]podSpec{"pg1": {count: 1}},
+					wantFailPods: sets.New("pg1-pod-0"),
+				},
+				{
+					pods:          map[string]podSpec{"pg1": {count: 1}},
+					wantBoundPods: sets.New("pg1-pod-0", "pg1-pod-1"),
+				},
+			},
+		},
+		{
+			// Tree structure in phase 1:
+			//
+			//	         cpg-root (F)
+			//	        (Gang, Min: 3)
+			//	          /        \
+			//	pg1 (Skipped)   pg2 (Skipped)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// Tree structure in phase 2, after lowering cpg-root's Min to 2:
+			//
+			//	         cpg-root (S)
+			//	        (Gang, Min: 2)
+			//	        /           \
+			//	   pg1 (S)         pg2 (S)
+			//	(Gang, Min: 1)  (Gang, Min: 1)
+			//
+			// (S) = Success
+			// (F) = Fail
+			// (Skipped) = Not evaluated, because an ancestor fails before reaching it
+			//
+			// Results:
+			// - Phase 1: cpg-root has 2 child groups, fewer than its Min: 3, so it fails before evaluating any of them.
+			name: "multi-phase: unsatisfied CPG hierarchy becomes schedulable after root minGroupCount is reduced",
+			phases: []phaseSpec{
+				{
+					podGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(3).Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+						fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").MinCount(1).ParentCompositePodGroup("cpg-root").Obj()),
+					},
+					pods:         map[string]podSpec{"pg1": {count: 1}, "pg2": {count: 1}},
+					wantFailPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+				},
+				{
+					updatedPodGroups: []*fwk.GenericPodGroup{
+						fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(2).Obj()),
+					},
+					wantBoundPods: sets.New("pg1-pod-0", "pg2-pod-0"),
+				},
+			},
 		},
 	}
 
-	gangPluginFactory := func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-		return gangscheduling.New(ctx, obj, handle, feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableCompositePodGroup: true})
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
+			cache.AddNode(logger, st.MakeNode().Name("node1").Obj())
 
-	registry := []tf.RegisterPluginFunc{
-		tf.RegisterFilterPlugin(fakePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-			return fakePlugin, nil
-		}),
-		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
-	}
+			filterStatus := make(map[string]*fwk.Status)
+			nextPodIndex := make(map[string]int)
 
-	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
-	schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
-		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(queue),
-		frameworkruntime.WithPodActivator(queue),
-		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
-		frameworkruntime.WithPodGroupManager(cache),
-	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err != nil {
-		t.Fatalf("Failed to create new framework: %v", err)
-	}
+			client := clientsetfake.NewSimpleClientset()
+			snapshot := internalcache.NewEmptySnapshot()
 
-	handledPods := make(map[string]*fwk.Status)
-	var lock sync.Mutex
-
-	sched := &Scheduler{
-		Profiles:         profile.Map{"test-scheduler": schedFwk},
-		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
-		Cache:            cache,
-		client:           client,
-		nodeInfoSnapshot: snapshot,
-		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
-			lock.Lock()
-			defer lock.Unlock()
-			handledPods[p.Pod.Name] = status
-		},
-	}
-	initTestAlgorithm(t, sched)
-
-	podGroupInfo := newQueuedPodGroupInfo(
-		framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(rootCPG),
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg3)},
-		),
-		queuedPodInfos...,
-	)
-
-	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-		t.Fatalf("Failed to update snapshot: %v", err)
-	}
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
-
-	lock.Lock()
-	defer lock.Unlock()
-
-	successPods := []string{
-		"pg1-pod-0", "pg1-pod-1", "pg1-pod-2",
-		"pg2-pod-0", "pg2-pod-1", "pg2-pod-2",
-	}
-
-	for _, p := range successPods {
-		if status, ok := handledPods[p]; ok {
-			t.Errorf("Expected pod %s to be scheduled successfully, but got error: %v", p, status.AsError())
-		}
-	}
-
-	failPods := []string{
-		"pg3-pod-0", "pg3-pod-1", "pg3-pod-2",
-	}
-
-	for _, p := range failPods {
-		if _, ok := handledPods[p]; !ok {
-			t.Errorf("Expected pod %s to fail scheduling, but it was scheduled successfully", p)
-		}
-	}
-}
-
-// TestCPGBasicWithGangChildren_Internal verifies that a Basic CompositePodGroup allows its ready
-// child Gang groups to schedule independently of each other.
-//
-// Tree structure:
-//
-//	   cpg-root (Basic)
-//	  /            \
-//	pg1            pg2
-//	(S)            (F)
-//
-// (S) = Success
-// (F) = Fail
-func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.CompositePodGroup:               true,
-		features.GenericWorkload:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	logger := klog.FromContext(ctx)
-
-	testNode := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()
-	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
-	cache.AddNode(logger, testNode)
-
-	ns := "default"
-
-	createCPG := func(name string, minCount int32, parentCPG *string) *schedulingv1alpha3.CompositePodGroup {
-		var policy schedulingv1alpha3.CompositePodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: minCount},
-			}
-		} else {
-			policy = schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
-			}
-		}
-		cpg := &schedulingv1alpha3.CompositePodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.CompositePodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: parentCPG,
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
-		return cpg
-	}
-
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
-		var policy schedulingv1beta1.PodGroupSchedulingPolicy
-		if minCount > 0 {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
-			}
-		} else {
-			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
-			}
-		}
-		pg := &schedulingv1beta1.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1beta1.PodGroupSpec{
-				SchedulingPolicy:            policy,
-				ParentCompositePodGroupName: new(parentCPG),
-			},
-		}
-		cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
-		return pg
-	}
-
-	rootCPG := createCPG("cpg-root", 0, nil)
-
-	pg1 := createPG("pg1", 3, "cpg-root")
-	pg2 := createPG("pg2", 3, "cpg-root")
-
-	var queuedPodInfos []*framework.QueuedPodInfo
-	var allPods []*v1.Pod
-
-	createPods := func(pgName string, count int, schedulable bool) {
-		for i := range count {
-			pod := st.MakePod().Namespace(ns).Name(fmt.Sprintf("%s-pod-%d", pgName, i)).UID(fmt.Sprintf("%s-pod-%d", pgName, i)).
-				PodGroupName(pgName).Priority(100).Obj()
-
-			if !schedulable && i == 0 {
-				pod.Spec.Containers = []v1.Container{{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100")},
-					},
-				}}
-			} else {
-				pod.Spec.Containers = []v1.Container{{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-				}}
+			fakePlugin := &fakePodGroupPlugin{
+				filterStatus: filterStatus,
 			}
 
-			queuedPodInfos = append(queuedPodInfos, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
-			allPods = append(allPods, pod)
-			cache.AddPodGroupMember(pod)
-		}
-	}
+			gangPluginFactory := func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+				return gangscheduling.New(ctx, obj, handle, feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableCompositePodGroup: true})
+			}
 
-	createPods("pg1", 3, true)
-	createPods("pg2", 3, false)
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterFilterPlugin(fakePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return fakePlugin, nil
+				}),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
+			}
 
-	snapshot := internalcache.NewEmptySnapshot()
-	clientObjs := []runtime.Object{testNode, rootCPG, pg1, pg2}
-	for _, pod := range allPods {
-		clientObjs = append(clientObjs, pod)
-	}
-	client := clientsetfake.NewSimpleClientset(clientObjs...)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
+			schedulingQueue := internalqueue.NewTestQueue(ctx, nil, internalqueue.WithPodMaxBackoffDuration(0))
+			schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(schedulingQueue),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithPodGroupManager(cache),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
 
-	fakePlugin := &fakePodGroupPlugin{
-		filterStatus: map[string]*fwk.Status{
-			"pg1-pod-0": nil,
-			"pg1-pod-1": nil,
-			"pg1-pod-2": nil,
-			"pg2-pod-0": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-			"pg2-pod-1": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-			"pg2-pod-2": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-		},
-	}
+			createPods := func(podsMap map[string]podSpec) {
+				for pgName, spec := range podsMap {
+					startIndex := nextPodIndex[pgName]
+					for i := range spec.count {
+						podIdx := startIndex + i
+						podName := fmt.Sprintf("%s-pod-%d", pgName, podIdx)
+						pod := st.MakePod().Name(podName).UID(podName).PodGroupName(pgName).SchedulerName("test-scheduler").Obj()
 
-	gangPluginFactory := func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-		return gangscheduling.New(ctx, obj, handle, feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableCompositePodGroup: true})
-	}
+						filterStatus[podName] = nil
+						if spec.unschedulable {
+							filterStatus[podName] = fwk.NewStatus(fwk.Unschedulable, "unschedulable")
+						}
 
-	registry := []tf.RegisterPluginFunc{
-		tf.RegisterFilterPlugin(fakePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-			return fakePlugin, nil
-		}),
-		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
-	}
+						cache.AddPodGroupMember(pod)
+						schedulingQueue.Add(ctx, pod)
+					}
+					nextPodIndex[pgName] = startIndex + spec.count
+				}
+			}
 
-	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
-	schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
-		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(queue),
-		frameworkruntime.WithPodActivator(queue),
-		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
-		frameworkruntime.WithPodGroupManager(cache),
-	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err != nil {
-		t.Fatalf("Failed to create new framework: %v", err)
-	}
+			var totalPods int
+			for _, phase := range tt.phases {
+				for _, spec := range phase.pods {
+					totalPods += spec.count
+				}
+			}
+			bindChan := setupBindChan(client, totalPods)
 
-	handledPods := make(map[string]*fwk.Status)
-	var lock sync.Mutex
+			failedPods := make(map[string]*fwk.Status)
+			var mu sync.Mutex
 
-	sched := &Scheduler{
-		Profiles:         profile.Map{"test-scheduler": schedFwk},
-		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
-		Cache:            cache,
-		client:           client,
-		nodeInfoSnapshot: snapshot,
-		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
-			lock.Lock()
-			defer lock.Unlock()
-			handledPods[p.Pod.Name] = status
-		},
-	}
-	initTestAlgorithm(t, sched)
+			sched := &Scheduler{
+				Profiles:         profile.Map{"test-scheduler": schedFwk},
+				SchedulingQueue:  schedulingQueue,
+				Cache:            cache,
+				client:           client,
+				nodeInfoSnapshot: snapshot,
+				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+					mu.Lock()
+					defer mu.Unlock()
+					failedPods[p.Pod.Name] = status
+					if err := schedulingQueue.AddUnschedulablePodIfNotPresent(ctx, p, schedulingQueue.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error when adding an unschedulable pod %q to queue: %v", p.Pod.Name, err)
+					}
+				},
+			}
+			initTestAlgorithm(t, sched)
 
-	podGroupInfo := newQueuedPodGroupInfo(
-		framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(rootCPG),
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
-		),
-		queuedPodInfos...,
-	)
+			for phaseIdx, phase := range tt.phases {
+				mu.Lock()
+				clear(failedPods)
+				mu.Unlock()
 
-	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-		t.Fatalf("Failed to update snapshot: %v", err)
-	}
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
+				for _, gpg := range phase.podGroups {
+					cache.AddGenericPodGroup(gpg)
+					schedulingQueue.AddGenericPodGroup(logger, gpg)
+				}
+				for _, gpg := range phase.updatedPodGroups {
+					cache.UpdateGenericPodGroup(logger, gpg)
+					schedulingQueue.UpdateGenericPodGroup(logger, gpg)
+				}
 
-	lock.Lock()
-	defer lock.Unlock()
+				createPods(phase.pods)
 
-	successPods := []string{
-		"pg1-pod-0", "pg1-pod-1", "pg1-pod-2",
-	}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Phase %d: Failed to update snapshot: %v", phaseIdx, err)
+				}
 
-	for _, p := range successPods {
-		if status, ok := handledPods[p]; ok {
-			t.Errorf("Expected pod %s to be scheduled successfully, but got error: %v", p, status.AsError())
-		}
-	}
+				entity, err := schedulingQueue.Pop(logger)
+				if err != nil {
+					t.Fatalf("Phase %d: Failed to pop from scheduling queue: %v", phaseIdx, err)
+				}
+				podGroupInfo, ok := entity.(*framework.QueuedPodGroupInfo)
+				if !ok {
+					t.Fatalf("Phase %d: Expected to pop *framework.QueuedPodGroupInfo, got %T", phaseIdx, entity)
+				}
 
-	failPods := []string{
-		"pg2-pod-0", "pg2-pod-1", "pg2-pod-2",
-	}
+				sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
 
-	for _, p := range failPods {
-		if _, ok := handledPods[p]; !ok {
-			t.Errorf("Expected pod %s to fail scheduling, but it was scheduled successfully", p)
-		}
+				mu.Lock()
+				for p, status := range failedPods {
+					if !status.IsRejected() {
+						t.Errorf("Phase %d: Expected pod %s to be rejected, but got status: %v", phaseIdx, p, status.AsError())
+					}
+				}
+				if diff := cmp.Diff(phase.wantFailPods, sets.KeySet(failedPods), cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("Phase %d: Unexpected failed pods (-want, +got):\n%s", phaseIdx, diff)
+				}
+				mu.Unlock()
+
+				boundPods := waitForExpectedBindings(t, bindChan, len(phase.wantBoundPods))
+				if diff := cmp.Diff(phase.wantBoundPods, boundPods, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("Phase %d: Unexpected bound pods (-want, +got):\n%s", phaseIdx, diff)
+				}
+			}
+		})
 	}
 }
 
@@ -8477,15 +8332,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					sched.SchedulePod = sched.algorithm.SchedulePod
 					sched.FailureHandler = sched.handleSchedulingFailure
 
-					bindChan := make(chan string, len(tt.pods))
-					client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-						if action.GetSubresource() != "binding" {
-							return false, nil, nil
-						}
-						binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
-						bindChan <- binding.Name
-						return true, binding, nil
-					})
+					bindChan := setupBindChan(client, len(tt.pods))
 
 					informerFactory.Start(ctx.Done())
 					informerFactory.WaitForCacheSync(ctx.Done())
@@ -8496,15 +8343,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 
 					sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), tt.podGroupInfo, time.Now())
 
-					boundPods := sets.New[string]()
-					for i := 0; i < len(tt.expectedBindings); i++ {
-						select {
-						case podName := <-bindChan:
-							boundPods.Insert(podName)
-						case <-time.After(5 * time.Second):
-							t.Fatalf("Timed out waiting for expected bindings")
-						}
-					}
+					boundPods := waitForExpectedBindings(t, bindChan, len(tt.expectedBindings))
 					if diff := cmp.Diff(tt.expectedBindings, boundPods); diff != "" {
 						t.Errorf("Unexpected bound pods (-want, +got):\n%s", diff)
 					}
