@@ -719,6 +719,7 @@ func autoConvert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.Deployme
 	out.Paused = in.Paused
 	// WARNING: in.RollbackTo requires manual conversion: does not exist in peer-type
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	// WARNING: in.Scheduling requires manual conversion: does not exist in peer-type
 	return nil
 }
 
