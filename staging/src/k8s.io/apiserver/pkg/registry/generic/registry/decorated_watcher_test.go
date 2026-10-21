@@ -18,15 +18,37 @@ package registry
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 )
+
+type fakeCacheableObject struct {
+	runtime.Object
+}
+
+func (f *fakeCacheableObject) CacheEncode(id runtime.Identifier, encode func(runtime.Object, io.Writer) error, w io.Writer) error {
+	return encode(f.Object, w)
+}
+
+func (f *fakeCacheableObject) GetObject() runtime.Object {
+	return f.Object
+}
+
+func (f *fakeCacheableObject) GetObjectKind() schema.ObjectKind {
+	return f.Object.GetObjectKind()
+}
+
+func (f *fakeCacheableObject) DeepCopyObject() runtime.Object {
+	return &fakeCacheableObject{Object: f.Object.DeepCopyObject()}
+}
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
@@ -101,6 +123,37 @@ func expectErrorEvent(t *testing.T, dw *decoratedWatcher) {
 		}
 		if e.Type != watch.Error {
 			t.Fatalf("expected type %s, got %s", watch.Error, e.Type)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
+	}
+}
+
+func TestDecoratedWatcherSkipsCacheableObject(t *testing.T) {
+	w := watch.NewFake()
+	decoratedCalls := 0
+	decorator := func(obj runtime.Object) {
+		decoratedCalls++
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dw := newDecoratedWatcher(ctx, w, decorator)
+	defer dw.Stop()
+
+	cacheable := &fakeCacheableObject{
+		Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cached"}},
+	}
+	go func() {
+		w.Add(cacheable)
+	}()
+
+	select {
+	case e := <-dw.ResultChan():
+		if _, ok := e.Object.(runtime.CacheableObject); !ok {
+			t.Fatalf("expected runtime.CacheableObject, got %T", e.Object)
+		}
+		if decoratedCalls != 0 {
+			t.Fatalf("expected decorator not to be called for CacheableObject, got %d calls", decoratedCalls)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)

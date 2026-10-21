@@ -57,11 +57,12 @@ func (c *countingRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
 		trigger storage.IndexerFuncs,
-		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
+		indexers *cache.Indexers,
+		objDecorator func(runtime.Object)) (storage.Interface, factory.DestroyFunc, error) {
 		c.lock.Lock()
 		c.counts[resource]++
 		c.lock.Unlock()
-		return decorator(config, resourcePrefix, cacheKeyFunc, reverseKeyFunc, newFunc, newListFunc, getAttrsFunc, trigger, indexers)
+		return decorator(config, resourcePrefix, cacheKeyFunc, reverseKeyFunc, newFunc, newListFunc, getAttrsFunc, trigger, indexers, objDecorator)
 	}
 	return opts, nil
 }

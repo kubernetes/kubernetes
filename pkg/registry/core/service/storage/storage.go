@@ -96,18 +96,6 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    svcreg.GetAttrs,
-	}
-	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, nil, nil, err
-	}
-
-	statusStore := *store
-	statusStore.UpdateStrategy = svcreg.StatusStrategy
-	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
-
 	var primaryIPFamily api.IPFamily = serviceIPFamily
 	var secondaryIPFamily api.IPFamily = "" // sentinel value
 	if len(ipAllocs) > 1 {
@@ -117,7 +105,6 @@ func NewREST(
 		Store:             store,
 		primaryIPFamily:   primaryIPFamily,
 		secondaryIPFamily: secondaryIPFamily,
-		alloc:             makeAlloc(serviceIPFamily, ipAllocs, portAlloc),
 		endpointSlices:    endpointSliceGetter,
 		pods:              pods,
 		proxyTransport:    proxyTransport,
@@ -127,10 +114,18 @@ func NewREST(
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
-	// users can patch the status to remove the finalizer,
-	// hence statusStore must participate on the AfterDelete
-	// hook to release the allocated resources
-	statusStore.AfterDelete = genericStore.afterDelete
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    svcreg.GetAttrs,
+	}
+	if err := store.CompleteWithOptions(options); err != nil {
+		return nil, nil, nil, err
+	}
+	genericStore.alloc = makeAlloc(serviceIPFamily, ipAllocs, portAlloc)
+
+	statusStore := *store
+	statusStore.UpdateStrategy = svcreg.StatusStrategy
+	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
 
 	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil
 }

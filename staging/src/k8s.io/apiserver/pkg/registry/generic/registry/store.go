@@ -1784,6 +1784,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			attrFunc,
 			options.TriggerFunc,
 			options.Indexers,
+			e.Decorator,
 		)
 		if err != nil {
 			return err

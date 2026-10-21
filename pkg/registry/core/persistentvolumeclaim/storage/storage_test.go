@@ -17,20 +17,28 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -278,4 +286,104 @@ func TestDefaultOnReadPvc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultOnReadWatchWithCacher(t *testing.T) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	defer server.Terminate(t)
+	etcdStorage.EventsHistoryWindow = storagebackend.DefaultEventsHistoryWindow
+
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "persistentvolumeclaims"}),
+		Decorator:               genericregistry.StorageWithCacher(),
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          "persistentvolumeclaims",
+	}
+	storage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	defer storage.Store.DestroyFunc()
+
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+	statusCtx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault, "status")
+
+	// Wait for Cacher to be ready and obtain the current ResourceVersion.
+	var listRV string
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		listObj, err := storage.List(ctx, &metainternalversion.ListOptions{ResourceVersion: "0"})
+		if err != nil {
+			return false, nil
+		}
+		listRV = listObj.(*api.PersistentVolumeClaimList).ResourceVersion
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed waiting for cacher to be ready: %v", err)
+	}
+
+	w, err := storage.Watch(ctx, &metainternalversion.ListOptions{ResourceVersion: listRV})
+	if err != nil {
+		t.Fatalf("unexpected error starting watch: %v", err)
+	}
+	defer w.Stop()
+
+	// Simulate a pre-existing PVC in etcd that has Spec.DataSource set without Spec.DataSourceRef.
+	pvc := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
+	pvc.Spec.DataSource = &api.TypedLocalObjectReference{
+		Kind: "PersistentVolumeClaim",
+		Name: "my-source-pvc",
+	}
+	key, err := storage.KeyFunc(ctx, pvc.Name)
+	if err != nil {
+		t.Fatalf("unexpected key error: %v", err)
+	}
+	out := &api.PersistentVolumeClaim{}
+	if err := storage.Storage.Create(ctx, key, pvc, out, 0, false); err != nil {
+		t.Fatalf("unexpected error creating PVC in storage: %v", err)
+	}
+
+	expectNormalizedWatchEvent := func(expectedType watch.EventType) *api.PersistentVolumeClaim {
+		t.Helper()
+		select {
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				t.Fatalf("watch channel closed unexpectedly waiting for %v", expectedType)
+			}
+			if event.Type != expectedType {
+				t.Fatalf("expected watch event type %v, got %v (%#v)", expectedType, event.Type, event.Object)
+			}
+			obj := event.Object
+			if co, ok := obj.(runtime.CacheableObject); ok {
+				obj = co.GetObject()
+			}
+			gotPVC, ok := obj.(*api.PersistentVolumeClaim)
+			if !ok {
+				t.Fatalf("expected *api.PersistentVolumeClaim, got %T", obj)
+			}
+			if gotPVC.Spec.DataSourceRef == nil {
+				t.Errorf("%v watch event: expected Spec.DataSourceRef to be populated by defaultOnRead, got nil", expectedType)
+			}
+			return gotPVC
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("timed out waiting for %v watch event", expectedType)
+			return nil
+		}
+	}
+
+	// 1. Live ADDED event from watch cache.
+	createdPVC := expectNormalizedWatchEvent(watch.Added)
+
+	// 2. Live MODIFIED event triggered via status update (normal API operation on a pre-existing PVC).
+	updatedInput := createdPVC.DeepCopy()
+	updatedInput.Status.Phase = api.ClaimBound
+	if _, _, err := statusStorage.Update(statusCtx, updatedInput.Name, rest.DefaultUpdatedObjectInfo(updatedInput), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error updating status: %v", err)
+	}
+	expectNormalizedWatchEvent(watch.Modified)
+
+	// 3. Live DELETED event triggered via normal Delete.
+	if _, _, err := storage.Delete(ctx, pvc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("unexpected error deleting PVC: %v", err)
+	}
+	expectNormalizedWatchEvent(watch.Deleted)
 }

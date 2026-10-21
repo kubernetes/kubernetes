@@ -3941,3 +3941,95 @@ func TestOptimisticConcurrency(t *testing.T) {
 		})
 	}
 }
+
+func TestCacherDecoratorOnWatchDispatch(t *testing.T) {
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	cacher.decorator = func(obj runtime.Object) {
+		if pod, ok := obj.(*example.Pod); ok {
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
+			pod.Annotations["decorated"] = "true"
+		}
+	}
+
+	w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+		ResourceVersion: "100",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w.Stop()
+
+	makePod := func(rv string, labelVal string) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "foo",
+				Namespace:       "ns",
+				ResourceVersion: rv,
+				Labels:          map[string]string{"k": labelVal},
+			},
+		}
+	}
+
+	expectWatchEvent := func(expectedType watch.EventType, expectedLabel string) {
+		t.Helper()
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != expectedType {
+				t.Fatalf("expected event type %v, got %v", expectedType, event.Type)
+			}
+			co, ok := event.Object.(runtime.CacheableObject)
+			if !ok {
+				t.Fatalf("expected runtime.CacheableObject, got %T", event.Object)
+			}
+			pod, ok := co.GetObject().(*example.Pod)
+			if !ok {
+				t.Fatalf("expected *example.Pod inside CacheableObject, got %T", co.GetObject())
+			}
+			if pod.Annotations["decorated"] != "true" {
+				t.Errorf("expected pod in %v watch event to be decorated, got annotations: %v", expectedType, pod.Annotations)
+			}
+			if pod.Labels["k"] != expectedLabel {
+				t.Errorf("expected label k=%q, got %q", expectedLabel, pod.Labels["k"])
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("timed out waiting for %v event", expectedType)
+		}
+	}
+
+	// 1. Add
+	if err := cacher.watchCache.Add(makePod("101", "v1")); err != nil {
+		t.Fatalf("unexpected error adding to watchCache: %v", err)
+	}
+	expectWatchEvent(watch.Added, "v1")
+
+	// Verify the object stored in watchCache is not mutated by the decorator.
+	cachedPod := &example.Pod{}
+	if err := cacher.Get(context.Background(), "/pods/ns/foo", storage.GetOptions{ResourceVersion: "0"}, cachedPod); err != nil {
+		t.Fatalf("unexpected error getting item from cacher: %v", err)
+	}
+	if cachedPod.Annotations["decorated"] != "" {
+		t.Errorf("expected watchCache object to remain undecorated, got annotations: %v", cachedPod.Annotations)
+	}
+
+	// 2. Modify
+	if err := cacher.watchCache.Update(makePod("102", "v2")); err != nil {
+		t.Fatalf("unexpected error updating watchCache: %v", err)
+	}
+	expectWatchEvent(watch.Modified, "v2")
+
+	// 3. Delete
+	if err := cacher.watchCache.Delete(makePod("103", "v2")); err != nil {
+		t.Fatalf("unexpected error deleting from watchCache: %v", err)
+	}
+	expectWatchEvent(watch.Deleted, "v2")
+}
