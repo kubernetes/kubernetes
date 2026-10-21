@@ -652,3 +652,71 @@ func TestGenericPodGroup_GetMinCount(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericPodGroup_GetPreemptionPolicy(t *testing.T) {
+	preemptNeverPG := schedulingv1beta1.PreemptNever
+	preemptLowerPG := schedulingv1beta1.PreemptLowerPriority
+	preemptNeverCPG := schedulingv1alpha3.PreemptNever
+	preemptLowerCPG := schedulingv1alpha3.PreemptLowerPriority
+
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want v1.PreemptionPolicy
+	}{
+		{
+			name: "PodGroup with nil PreemptionPolicy defaults to PreemptLowerPriority",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			want: v1.PreemptLowerPriority,
+		},
+		{
+			name: "PodGroup with PreemptNever",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					PreemptionPolicy: &preemptNeverPG,
+				},
+			}),
+			want: v1.PreemptNever,
+		},
+		{
+			name: "PodGroup with PreemptLowerPriority",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					PreemptionPolicy: &preemptLowerPG,
+				},
+			}),
+			want: v1.PreemptLowerPriority,
+		},
+		{
+			name: "CompositePodGroup with nil PreemptionPolicy defaults to PreemptLowerPriority",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			want: v1.PreemptLowerPriority,
+		},
+		{
+			name: "CompositePodGroup with PreemptNever",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					PreemptionPolicy: &preemptNeverCPG,
+				},
+			}),
+			want: v1.PreemptNever,
+		},
+		{
+			name: "CompositePodGroup with PreemptLowerPriority",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					PreemptionPolicy: &preemptLowerCPG,
+				},
+			}),
+			want: v1.PreemptLowerPriority,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetPreemptionPolicy(); got != tt.want {
+				t.Errorf("GetPreemptionPolicy() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

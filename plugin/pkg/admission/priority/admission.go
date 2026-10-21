@@ -222,7 +222,7 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 	pg.Spec.PriorityClassName = priorityClassName
 
 	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+	if preemptionPolicy != nil {
 		switch *preemptionPolicy {
 		case apiv1.PreemptLowerPriority:
 			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority
@@ -264,7 +264,7 @@ func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
 	cpg.Spec.PriorityClassName = priorityClassName
 
 	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+	if preemptionPolicy != nil {
 		switch *preemptionPolicy {
 		case apiv1.PreemptLowerPriority:
 			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority
