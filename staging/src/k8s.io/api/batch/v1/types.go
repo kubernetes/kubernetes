@@ -263,6 +263,8 @@ type PodFailurePolicyRule struct {
 	// PodFailurePolicyName feature gate.
 	// +featureGate=PodFailurePolicyName
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=111
 	Name *string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 
@@ -275,6 +277,8 @@ type PodFailurePolicy struct {
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:customValidation
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -367,6 +371,7 @@ type JobSpec struct {
 	// with restartPolicy=OnFailure.
 	//
 	// +optional
+	// +k8s:optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
 	// successPolicy specifies the policy when the Job can be declared as succeeded.

@@ -340,7 +340,11 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 		rulePath := rulesPath.Index(i)
 		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulePath, containerNames)...)
 		if rule.Name != nil {
-			allErrs = append(allErrs, validatePodFailurePolicyRuleName(*rule.Name, i, len(spec.PodFailurePolicy.Rules), ruleNames, rulePath.Child("name"))...)
+			namePath := rulePath.Child("name")
+			allErrs = append(allErrs, ValidatePodFailurePolicyRuleName(*rule.Name, i, len(spec.PodFailurePolicy.Rules), ruleNames, namePath).MarkCoveredByDeclarative()...)
+			if len(*rule.Name) > maxPodFailurePolicyRuleNameLength {
+				allErrs = append(allErrs, field.TooLong(namePath, "", maxPodFailurePolicyRuleNameLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
+			}
 		}
 	}
 	return allErrs
@@ -389,27 +393,23 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 	return allErrs
 }
 
-// validatePodFailurePolicyRuleName validates a rule name, which the Job
-// controller turns into the Job Failed condition reason
-// "PodFailurePolicy_<name>". Unnamed rules use "PodFailurePolicy_<index>"
-// instead, so a name must not reproduce another rule's index.
-func validatePodFailurePolicyRuleName(name string, index, numRules int, seen sets.Set[string], fldPath *field.Path) field.ErrorList {
+// ValidatePodFailurePolicyRuleName checks syntax and collisions for the name
+// used in "PodFailurePolicy_<name>". The length bound is validated separately
+// by a declarative tag. Unnamed rules use their index instead.
+func ValidatePodFailurePolicyRuleName(name string, index, numRules int, seen sets.Set[string], fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(name) == 0 {
-		return append(allErrs, field.Invalid(fldPath, name, "must not be empty when set"))
+		return append(allErrs, field.Invalid(fldPath, name, "must not be empty when set").WithOrigin("minLength"))
 	}
 	if seen.Has(name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath, name))
 	}
 	seen.Insert(name)
 	if n, err := strconv.Atoi(name); err == nil && strconv.Itoa(n) == name && n != index && n >= 0 && n < numRules {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must not equal the index of another rule; a numeric name is only allowed if it equals the rule's own index (%d)", index)))
-	}
-	if len(name) > maxPodFailurePolicyRuleNameLength {
-		allErrs = append(allErrs, field.TooLong(fldPath, "", maxPodFailurePolicyRuleNameLength))
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must not equal the index of another rule; a numeric name is only allowed if it equals the rule's own index (%d)", index)).WithOrigin("indexCollision"))
 	}
 	for _, msg := range unversionedvalidation.IsValidConditionReason(podFailurePolicyReasonPrefix + name) {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("generated reason %q is invalid: %s", podFailurePolicyReasonPrefix+name, msg)))
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("generated reason %q is invalid: %s", podFailurePolicyReasonPrefix+name, msg)).WithOrigin("format=condition-reason"))
 	}
 	return allErrs
 }

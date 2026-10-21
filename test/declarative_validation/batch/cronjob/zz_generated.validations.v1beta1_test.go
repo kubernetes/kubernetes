@@ -80,6 +80,9 @@ func init() {
 			"spec.jobTemplate.spec.parallelism": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.jobTemplate.spec.podFailurePolicy.rules[*].name": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"spec.jobTemplate.spec.scheduling": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "update"},

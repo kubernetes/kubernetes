@@ -1516,27 +1516,27 @@ func TestValidateJobCreatePodFailurePolicyRuleNames(t *testing.T) {
 		},
 		"empty name": {
 			job:      jobWithRuleNames(new("")),
-			wantErrs: field.ErrorList{field.Invalid(namePath(0), "", "")},
+			wantErrs: field.ErrorList{field.Invalid(namePath(0), "", "").WithOrigin("minLength").MarkCoveredByDeclarative()},
 		},
 		"duplicate names": {
 			job:      jobWithRuleNames(new("a"), nil, new("a")),
-			wantErrs: field.ErrorList{field.Duplicate(namePath(2), "a")},
+			wantErrs: field.ErrorList{field.Duplicate(namePath(2), "a").MarkCoveredByDeclarative()},
 		},
 		"name equal to another rule's index": {
 			job:      jobWithRuleNames(nil, new("0")),
-			wantErrs: field.ErrorList{field.Invalid(namePath(1), "0", "")},
+			wantErrs: field.ErrorList{field.Invalid(namePath(1), "0", "").WithOrigin("indexCollision").MarkCoveredByDeclarative()},
 		},
 		"name too long": {
 			job:      jobWithRuleNames(new(maxLenName + "a")),
-			wantErrs: field.ErrorList{field.TooLong(namePath(0), "", 0)},
+			wantErrs: field.ErrorList{field.TooLong(namePath(0), "", 0).WithOrigin("maxBytes").MarkCoveredByDeclarative()},
 		},
 		"name with spaces": {
 			job:      jobWithRuleNames(new("bad name")),
-			wantErrs: field.ErrorList{field.Invalid(namePath(0), "bad name", "")},
+			wantErrs: field.ErrorList{field.Invalid(namePath(0), "bad name", "").WithOrigin("format=condition-reason").MarkCoveredByDeclarative()},
 		},
 		"name ending with a colon": {
 			job:      jobWithRuleNames(new("reason:")),
-			wantErrs: field.ErrorList{field.Invalid(namePath(0), "reason:", "")},
+			wantErrs: field.ErrorList{field.Invalid(namePath(0), "reason:", "").WithOrigin("format=condition-reason").MarkCoveredByDeclarative()},
 		},
 	}
 	for name, tc := range cases {

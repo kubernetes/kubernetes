@@ -284,6 +284,7 @@ message JobSpec {
   // with restartPolicy=OnFailure.
   //
   // +optional
+  // +k8s:optional
   optional PodFailurePolicy podFailurePolicy = 11;
 
   // successPolicy specifies the policy when the Job can be declared as succeeded.
@@ -575,6 +576,8 @@ message PodFailurePolicy {
   // the backoffLimit. At most 20 elements are allowed.
   // +listType=atomic
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:customValidation
   repeated PodFailurePolicyRule rules = 1;
 }
 
@@ -673,6 +676,8 @@ message PodFailurePolicyRule {
   // PodFailurePolicyName feature gate.
   // +featureGate=PodFailurePolicyName
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=111
   optional string name = 4;
 }
 
