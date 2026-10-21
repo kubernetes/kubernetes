@@ -19,14 +19,18 @@ package storage
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -248,6 +252,10 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
+		var oldAnnotations map[string]string
+		if len(annotations) > 0 {
+			oldAnnotations = maps.Clone(pod.Annotations)
+		}
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
@@ -260,6 +268,18 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})
+
+		if len(annotations) > 0 {
+			// validate updated annotations
+			fldPath := field.NewPath("metadata", "annotations")
+			allErrs := validation.ValidatePodSpecificAnnotationUpdates(pod, oldAnnotations, fldPath, validation.PodValidationOptions{})
+			if err := apimachineryvalidation.ValidateAnnotationsSize(pod.Annotations); err != nil {
+				allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, apimachineryvalidation.TotalAnnotationSizeLimitB))
+			}
+			if len(allErrs) > 0 {
+				return nil, errors.NewInvalid(schema.GroupKind{Group: "", Kind: "Binding"}, "", allErrs)
+			}
+		}
 
 		finalPod = pod
 		return pod, nil
