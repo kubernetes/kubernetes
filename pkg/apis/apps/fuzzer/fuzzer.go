@@ -110,6 +110,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			pds := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
 			j.ProgressDeadlineSeconds = &pds
+			// Scheduling is apps/v1-only and dropped by the deprecated-version
+			// conversions, so a fuzzed value can't survive their roundtrip.
+			j.Scheduling = nil
 		},
 		func(j *apps.DeploymentStrategy, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again

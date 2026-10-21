@@ -18,6 +18,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -463,6 +464,22 @@ type DeploymentSpec struct {
 	// Defaults to 600s.
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
+	// scheduling defines the Workload-aware Scheduling configuration for this Deployment.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
+	// Deployment uses standard pod-by-pod scheduling.
+	// This field is alpha-level and requires the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for policy.gang.minCount.
+	//
+	// +featureGate=WorkloadWithDeployment
+	// +optional
+	// +k8s:ifDisabled(WorkloadWithDeployment)=+k8s:forbidden
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	Scheduling *DeploymentSchedulingConfiguration `json:"scheduling,omitempty" protobuf:"bytes,10,opt,name=scheduling"`
 }
 
 const (
@@ -524,6 +541,57 @@ type RollingUpdateDeployment struct {
 	// at any time during the update is at most 130% of desired pods.
 	// +optional
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
+}
+
+// DeploymentSchedulingConfiguration composes the reusable scheduling building blocks
+// from scheduling.k8s.io for use on a Deployment.
+type DeploymentSchedulingConfiguration struct {
+	// schedulingPolicy defines the scheduling policy for this Deployment. If
+	// spec.scheduling.schedulingPolicy is omitted, the Basic policy is used.
+	// Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may
+	// be omitted to derive it from replicas.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
+
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology)
+	// for the Deployment's pods.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
+
+	// disruptionMode defines the mode in which the Deployment's pods can be disrupted.
+	// One of Single or All.
+	// If omitted, standard per-pod disruption behavior is used.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=4
+	// +k8s:immutable
+	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.

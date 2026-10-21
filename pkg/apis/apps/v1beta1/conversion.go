@@ -121,3 +121,12 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 	}
 	return nil
 }
+
+// Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec drops fields not present in v1beta1.
+func Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta1.DeploymentSpec, s conversion.Scope) error {
+	if err := autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in, out, s); err != nil {
+		return err
+	}
+	// v1beta1 does not have the Scheduling field - it is silently dropped
+	return nil
+}
