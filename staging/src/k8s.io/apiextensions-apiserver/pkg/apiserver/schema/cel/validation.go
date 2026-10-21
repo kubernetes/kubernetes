@@ -23,6 +23,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -818,8 +819,15 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 
 	correlatable := MapIsCorrelatable(s.Schema.XMapType)
 
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
 	if s.AdditionalProperties != nil {
-		for k, v := range obj {
+		for _, k := range keys {
+			v := obj[k]
 			var oldV interface{}
 			if correlatable {
 				oldV = oldObj[k] // +k8s:verify-mutation:reason=clone
@@ -834,7 +842,8 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 		}
 	}
 	if s.Properties != nil {
-		for k, v := range obj {
+		for _, k := range keys {
+			v := obj[k]
 			sub, ok := s.Properties[k]
 			if ok {
 				var oldV interface{}
