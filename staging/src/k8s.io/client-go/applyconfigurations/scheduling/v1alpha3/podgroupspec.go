@@ -80,7 +80,6 @@ type PodGroupSpecApplyConfiguration struct {
 	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
 	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	PreemptionPolicy *schedulingv1alpha3.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
