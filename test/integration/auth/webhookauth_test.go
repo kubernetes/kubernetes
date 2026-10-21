@@ -19,24 +19,36 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
+	"encoding/pem"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	jose "github.com/go-jose/go-jose/v4"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	admissionauth "k8s.io/component-helpers/auth/admission"
 	"k8s.io/ktesting"
@@ -309,6 +321,393 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 			}
 			if _, status := postReview(review, ""); status != http.StatusUnauthorized || admissions.Load() != 2 {
 				t.Fatalf("missing bearer HTTP status=%d admissions=%d, want 401 without admission", status, admissions.Load())
+			}
+		})
+	}
+}
+
+func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
+
+	ctx := ktesting.Init(t)
+	var activeToken atomic.Value
+	activeToken.Store("")
+
+	var issuer, signingKeyFile string
+	kubeClient, kubeConfig, tearDown := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			issuer = "https://" + opts.SecureServing.Listener.Addr().String()
+			signingKeyFile = opts.ServiceAccountSigningKeyFile
+			opts.Authentication.ServiceAccounts.Issuers = []string{issuer}
+			opts.Authentication.ServiceAccounts.JWKSURI = issuer + "/openid/v1/jwks"
+			opts.Authentication.APIAudiences = authenticator.Audiences{"api"}
+			opts.Authorization.Modes = []string{"RBAC"}
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+	})
+	defer tearDown()
+
+	cs, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		t.Fatalf("create Kubernetes client: %v", err)
+	}
+	discoveryClient, err := rest.HTTPClientFor(kubeConfig)
+	if err != nil {
+		t.Fatalf("create client for issuer discovery: %v", err)
+	}
+
+	// Borrow kube-apiserver's own ServiceAccount signing key so we can also
+	// forge adversarial JWTs signed by the exact key advertised at /openid/v1/jwks.
+	rawKey, err := keyutil.PrivateKeyFromFile(signingKeyFile)
+	if err != nil {
+		t.Fatalf("load apiserver signing key %q: %v", signingKeyFile, err)
+	}
+	ecdsaKey, ok := rawKey.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatalf("expected *ecdsa.PrivateKey in %q, got %T", signingKeyFile, rawKey)
+	}
+	var jwksDoc jose.JSONWebKeySet
+	jwksResp, err := discoveryClient.Get(issuer + "/openid/v1/jwks")
+	if err != nil {
+		t.Fatalf("fetch live apiserver JWKS: %v", err)
+	}
+	defer jwksResp.Body.Close()
+	if err := json.NewDecoder(jwksResp.Body).Decode(&jwksDoc); err != nil || len(jwksDoc.Keys) == 0 {
+		t.Fatalf("decode live apiserver JWKS: %v (keys=%d)", err, len(jwksDoc.Keys))
+	}
+	borrowedSigner, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: jose.ES256,
+			Key:       jose.JSONWebKey{Key: ecdsaKey, KeyID: jwksDoc.Keys[0].KeyID},
+		},
+		(&jose.SignerOptions{}).WithType("JWT"),
+	)
+	if err != nil {
+		t.Fatalf("create borrowed apiserver signer: %v", err)
+	}
+	signWithBorrowedKey := func(claims map[string]any) string {
+		payload, err := json.Marshal(claims)
+		if err != nil {
+			t.Fatalf("marshal forged claims: %v", err)
+		}
+		jws, err := borrowedSigner.Sign(payload)
+		if err != nil {
+			t.Fatalf("sign forged claims: %v", err)
+		}
+		tok, err := jws.CompactSerialize()
+		if err != nil {
+			t.Fatalf("compact serialize forged JWS: %v", err)
+		}
+		return tok
+	}
+
+	// Stand up the target webhook server running admission.WithTokenVerification
+	// and a front TLS proxy that kube-apiserver dials. Because kube-apiserver
+	// does not yet attach webhook tokens automatically on outbound admission calls,
+	// the proxy injects the test's activeToken as Authorization: Bearer <token>
+	// before forwarding the live AdmissionReview over HTTP to verifiedHandler.
+	var targetHandler atomic.Value
+	targetWebhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetHandler.Load().(http.Handler).ServeHTTP(w, r)
+	}))
+	defer targetWebhook.Close()
+
+	webhookProxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		outReq, err := http.NewRequestWithContext(r.Context(), r.Method, targetWebhook.URL+r.URL.RequestURI(), r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		outReq.Header = r.Header.Clone()
+		if tok := activeToken.Load().(string); tok != "" {
+			outReq.Header.Set("Authorization", "Bearer "+tok)
+		}
+		resp, err := targetWebhook.Client().Do(outReq)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		for k, vals := range resp.Header {
+			for _, v := range vals {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+	}))
+	defer webhookProxy.Close()
+
+	webhookURL := webhookProxy.URL + "/validate"
+	var admittedCount atomic.Int32
+	verifiedHandler, err := admissionauth.WithTokenVerification(
+		ctx,
+		func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+			admittedCount.Add(1)
+			return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+		},
+		admissionauth.WithRemoteIssuer(issuer, webhookURL, discoveryClient),
+	)
+	if err != nil {
+		t.Fatalf("construct admission.WithTokenVerification handler: %v", err)
+	}
+	targetHandler.Store(http.Handler(verifiedHandler))
+
+	caBundle := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: webhookProxy.Certificate().Raw,
+	})
+
+	ns := framework.CreateNamespaceOrDie(kubeClient, "webhook-live-e2e", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
+	sa, deleteSA := createDeleteSvcAcct(t, cs, &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: "apiserver-webhook-sa", Namespace: ns.Name},
+	})
+	defer deleteSA()
+
+	authutil.GrantServiceAccountAuthorization(t, ctx, cs, sa.Name, ns.Name, rbacv1.PolicyRule{
+		Verbs:         []string{"attest"},
+		APIGroups:     []string{"authentication.k8s.io"},
+		Resources:     []string{"admissionReviewAPIGroups"},
+		ResourceNames: []string{"apps"},
+	})
+	authutil.GrantServiceAccountAuthorization(t, ctx, cs, sa.Name, ns.Name, rbacv1.PolicyRule{
+		Verbs:     []string{"create"},
+		APIGroups: []string{""},
+		Resources: []string{"serviceaccounts/token"},
+	})
+
+	// Register a ValidatingWebhookConfiguration that intercepts both apps/v1
+	// deployments (+ deployments/scale) AND batch/v1 jobs. It uses
+	// failurePolicy: Ignore on the batch/v1 rule so we can prove that post-decode
+	// token verification failures return HTTP 200 Allowed:false (which Ignore
+	// cannot bypass), whereas pre-decode 401 with failurePolicy: Fail blocks admission.
+	failPolicy := admissionregistrationv1.Fail
+	ignorePolicy := admissionregistrationv1.Ignore
+	sideEffects := admissionregistrationv1.SideEffectClassNone
+	vwc, deleteVWC := createDeleteValidating(t, cs, &admissionregistrationv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "live-kep6060-validating"},
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
+			{
+				Name:         "validate.kep6060.webhook.test",
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{URL: &webhookURL, CABundle: caBundle},
+				Rules: []admissionregistrationv1.RuleWithOperations{
+					{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}},
+					},
+				},
+				FailurePolicy:           &failPolicy,
+				SideEffects:             &sideEffects,
+				AdmissionReviewVersions: []string{"v1"},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns.Name},
+				},
+			},
+			{
+				Name:         "validate-ignore.kep6060.webhook.test",
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{URL: &webhookURL, CABundle: caBundle},
+				Rules: []admissionregistrationv1.RuleWithOperations{
+					{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{"batch"}, APIVersions: []string{"v1"}, Resources: []string{"jobs"}},
+					},
+				},
+				FailurePolicy:           &ignorePolicy,
+				SideEffects:             &sideEffects,
+				AdmissionReviewVersions: []string{"v1"},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns.Name},
+				},
+			},
+		},
+	})
+	defer deleteVWC()
+
+	// Mint a genuine KEP-6060 token bound to vwc authorizing only the "apps" API group.
+	issuedToken, err := cs.CoreV1().ServiceAccounts(ns.Name).CreateToken(ctx, sa.Name, &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences: []string{webhookURL},
+			BoundObjectRef: &authenticationv1.BoundObjectReference{
+				Kind:       "ValidatingWebhookConfiguration",
+				APIVersion: "admissionregistration.k8s.io/v1",
+				Name:       vwc.Name,
+			},
+			Attestations: map[string]authenticationv1.AttestationValue{
+				"admissionReviewAPIGroups": {"apps"},
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("issue real webhook-bound token via CreateToken: %v", err)
+	}
+
+	makeDeployment := func(name string) *appsv1.Deployment {
+		replicas := int32(1)
+		return &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns.Name},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": name}},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": name}},
+					Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "pause", Image: "pause"}}},
+				},
+			},
+		}
+	}
+
+	// Wait until the ValidatingWebhookConfiguration informer in kube-apiserver is active:
+	// with no bearer token set, our handler returns HTTP 401 pre-decode, which client-go's
+	// RESTClient translates to "the server has asked for the client to provide credentials"
+	// and failurePolicy: Fail rejects the admission.
+	err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, createErr := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("warmup-probe"), metav1.CreateOptions{})
+		if createErr == nil {
+			_ = cs.AppsV1().Deployments(ns.Name).Delete(ctx, "warmup-probe", metav1.DeleteOptions{})
+			return false, nil
+		}
+		return strings.Contains(createErr.Error(), "the server has asked for the client to provide credentials"), nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for webhook registration to intercept Deployment creation: %v", err)
+	}
+	if admittedCount.Load() != 0 {
+		t.Fatalf("unauthenticated warmup requests must never reach downstream handler, got %d", admittedCount.Load())
+	}
+
+	// 1. Live positive dispatch: configure the real CreateToken-issued bearer.
+	// Creating an apps/v1 Deployment and updating its /scale subresource must both succeed.
+	activeToken.Store(issuedToken.Status.Token)
+	createdDeploy, err := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("verified-deploy"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("create Deployment with valid webhook token failed: %v", err)
+	}
+	if admittedCount.Load() != 1 {
+		t.Fatalf("admittedCount after Deployment create = %d, want 1", admittedCount.Load())
+	}
+
+	_, err = cs.AppsV1().Deployments(ns.Name).UpdateScale(ctx, createdDeploy.Name, &autoscalingv1.Scale{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            createdDeploy.Name,
+			Namespace:       ns.Name,
+			ResourceVersion: createdDeploy.ResourceVersion,
+		},
+		Spec: autoscalingv1.ScaleSpec{Replicas: 2},
+	}, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("update Deployment /scale with valid apps webhook token failed: %v", err)
+	}
+	if admittedCount.Load() != 2 {
+		t.Fatalf("admittedCount after Deployment /scale update = %d, want 2", admittedCount.Load())
+	}
+
+	// 2. Unauthorized API group with failurePolicy: Ignore:
+	// The token only authorizes "apps", not "batch". Even though the batch webhook
+	// rule uses failurePolicy: Ignore, our handler returns HTTP 200 Allowed:false,
+	// so kube-apiserver must deny the Job creation.
+	_, err = cs.BatchV1().Jobs(ns.Name).Create(ctx, &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "unauthorized-job", Namespace: ns.Name},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:    []corev1.Container{{Name: "job", Image: "busybox"}},
+				},
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
+		t.Fatalf("create batch/v1 Job with apps-only token: got %v, want explicit webhook token verification failed denial", err)
+	}
+	if admittedCount.Load() != 2 {
+		t.Fatalf("unauthorized batch/v1 Job must not reach downstream handler, admittedCount=%d", admittedCount.Load())
+	}
+
+	// 3. Ordinary unbound ServiceAccount token minted by kube-apiserver for the
+	// exact webhook audience: must be rejected because it has no webhook binding.
+	ordinarySAToken, err := cs.CoreV1().ServiceAccounts(ns.Name).CreateToken(ctx, sa.Name, &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences: []string{webhookURL},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("issue ordinary ServiceAccount token: %v", err)
+	}
+	activeToken.Store(ordinarySAToken.Status.Token)
+	_, err = cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("ordinary-sa-token-deploy"), metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
+		t.Fatalf("create Deployment with ordinary SA token: got %v, want webhook token verification failed", err)
+	}
+	if admittedCount.Load() != 2 {
+		t.Fatalf("ordinary SA token must not reach downstream handler, admittedCount=%d", admittedCount.Load())
+	}
+
+	// 4. Forged tokens signed with kube-apiserver's own borrowed ECDSA signing key:
+	// verify that tokens bypassing CreateToken validation (dual bindings, multi-group
+	// attestation, wrong audience, expired) are all rejected with the identical generic message.
+	now := time.Now()
+	forgedProbes := []struct {
+		name   string
+		claims map[string]any
+	}{
+		{
+			name: "borrowed-key token bound to both Validating and Mutating webhook configs",
+			claims: map[string]any{
+				"iss": issuer,
+				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
+				"aud": []string{webhookURL},
+				"exp": now.Add(5 * time.Minute).Unix(),
+				"nbf": now.Add(-1 * time.Minute).Unix(),
+				"iat": now.Unix(),
+				"kubernetes.io": map[string]any{
+					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": string(vwc.UID)},
+					"mutatingwebhookconfiguration":   map[string]any{"name": "mwc", "uid": "mwc-uid"},
+					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps"}},
+				},
+			},
+		},
+		{
+			name: "borrowed-key token carrying multiple admissionReviewAPIGroups",
+			claims: map[string]any{
+				"iss": issuer,
+				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
+				"aud": []string{webhookURL},
+				"exp": now.Add(5 * time.Minute).Unix(),
+				"nbf": now.Add(-1 * time.Minute).Unix(),
+				"iat": now.Unix(),
+				"kubernetes.io": map[string]any{
+					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": string(vwc.UID)},
+					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps", "batch"}},
+				},
+			},
+		},
+		{
+			name: "borrowed-key token with missing webhook UID",
+			claims: map[string]any{
+				"iss": issuer,
+				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
+				"aud": []string{webhookURL},
+				"exp": now.Add(5 * time.Minute).Unix(),
+				"nbf": now.Add(-1 * time.Minute).Unix(),
+				"iat": now.Unix(),
+				"kubernetes.io": map[string]any{
+					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": ""},
+					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps"}},
+				},
+			},
+		},
+	}
+
+	for i, fp := range forgedProbes {
+		t.Run(fp.name, func(t *testing.T) {
+			activeToken.Store(signWithBorrowedKey(fp.claims))
+			_, err := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("forged-deploy-"+string(rune('a'+i))), metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
+				t.Fatalf("forged probe %q: got %v, want webhook token verification failed", fp.name, err)
+			}
+			if admittedCount.Load() != 2 {
+				t.Fatalf("forged probe %q reached downstream handler", fp.name)
 			}
 		})
 	}
