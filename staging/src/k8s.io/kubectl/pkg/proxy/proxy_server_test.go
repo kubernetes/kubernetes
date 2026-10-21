@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -450,6 +451,108 @@ func TestAPIRequests(t *testing.T) {
 			want := strings.Join([]string{tt.method, path, tt.body}, " ")
 			if w.Body.String() != want {
 				t.Errorf("%d: response body = %q; want %q", i, w.Body.String(), want)
+			}
+		})
+	}
+}
+
+func TestNodeProxyRequestFiltering(t *testing.T) {
+	var backendRequests atomic.Int32
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		backendRequests.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer backend.Close()
+
+	filter := &FilterServer{
+		AcceptPaths:   MakeRegexpArrayOrDie(DefaultPathAcceptRE),
+		RejectPaths:   MakeRegexpArrayOrDie(DefaultPathRejectRE),
+		AcceptHosts:   MakeRegexpArrayOrDie(DefaultHostAcceptRE),
+		RejectMethods: MakeRegexpArrayOrDie(DefaultMethodRejectRE),
+	}
+	tests := []struct {
+		name       string
+		path       string
+		expectCode int
+	}{
+		{"run", "run/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"encoded slash run", "%2frun/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"encoded repeated slash run", "%2F%2frun/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"encoded dot run", "%2e/run/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"dot encoded slash run", ".%2frun/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"encoded parent run", "x%2f..%2frun/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"encoded root parent run", "%2e%2e%2frun/ns/pod/container?cmd=id", http.StatusForbidden},
+		{"exec", "exec/ns/pod/container", http.StatusForbidden},
+		{"exec with UID", "exec/ns/pod/uid/container", http.StatusForbidden},
+		{"encoded slash exec", "%2fexec/ns/pod/container", http.StatusForbidden},
+		{"encoded repeated slash exec", "%2F%2fexec/ns/pod/container", http.StatusForbidden},
+		{"encoded dot exec", "%2e/exec/ns/pod/container", http.StatusForbidden},
+		{"dot encoded slash exec", ".%2fexec/ns/pod/container", http.StatusForbidden},
+		{"encoded parent exec", "x%2f..%2fexec/ns/pod/container", http.StatusForbidden},
+		{"encoded root parent exec", "%2e%2e%2fexec/ns/pod/container", http.StatusForbidden},
+		{"newline before parent exec", "%0a/%2e%2e/exec/ns/pod/container", http.StatusForbidden},
+		{"attach", "attach/ns/pod/container", http.StatusForbidden},
+		{"attach with UID", "attach/ns/pod/uid/container", http.StatusForbidden},
+		{"encoded slash attach", "%2Fattach/ns/pod/container", http.StatusForbidden},
+		{"encoded repeated slash attach", "%2f%2Fattach/ns/pod/container", http.StatusForbidden},
+		{"encoded dot attach", "%2E/attach/ns/pod/container", http.StatusForbidden},
+		{"dot encoded slash attach", ".%2fattach/ns/pod/container", http.StatusForbidden},
+		{"encoded parent attach", "x%2f..%2fattach/ns/pod/container", http.StatusForbidden},
+		{"encoded root parent attach", "%2E%2E%2fattach/ns/pod/container", http.StatusForbidden},
+		{"logs", "logs/", http.StatusNoContent},
+		{"encoded slash logs", "%2flogs/", http.StatusNoContent},
+		{"trailing dot segment", "logs/%2e", http.StatusForbidden},
+		{"trailing parent segment", "logs/%2e%2e", http.StatusForbidden},
+		{"hidden log", "logs/%2ehidden", http.StatusNoContent},
+		{"dotted log", "logs/some..log", http.StatusNoContent},
+		{"three dots", "logs/%2e%2e%2e/", http.StatusNoContent},
+		{"nested operation name", "logs/exec", http.StatusNoContent},
+		{"metrics", "metrics", http.StatusNoContent},
+		{"encoded slash metrics", "%2Fmetrics", http.StatusNoContent},
+	}
+
+	for _, prefix := range []string{"/", "/custom/"} {
+		t.Run(prefix, func(t *testing.T) {
+			p, err := NewServer("", prefix, "/unused/", filter, &rest.Config{Host: backend.URL}, 0, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			server := httptest.NewServer(p.handler)
+			defer server.Close()
+			client := server.Client()
+			client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+
+			for _, method := range []string{http.MethodGet, http.MethodPost} {
+				for _, tt := range tests {
+					t.Run(method+"/"+tt.name, func(t *testing.T) {
+						req, err := http.NewRequest(method, server.URL+prefix+"api/v1/nodes/somenode/proxy/"+tt.path, nil)
+						if err != nil {
+							t.Fatal(err)
+						}
+						before := backendRequests.Load()
+						resp, err := client.Do(req)
+						if err != nil {
+							t.Fatal(err)
+						}
+						defer func() {
+							if err := resp.Body.Close(); err != nil {
+								t.Errorf("Failed to close response body: %v", err)
+							}
+						}()
+						if resp.StatusCode != tt.expectCode {
+							t.Errorf("status code = %d, want %d", resp.StatusCode, tt.expectCode)
+						}
+						expectRequests := int32(0)
+						if tt.expectCode == http.StatusNoContent {
+							expectRequests = 1
+						}
+						if got := backendRequests.Load() - before; got != expectRequests {
+							t.Errorf("backend requests = %d, want %d", got, expectRequests)
+						}
+					})
+				}
 			}
 		})
 	}

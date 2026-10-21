@@ -40,7 +40,9 @@ const (
 	// DefaultPathAcceptRE is the default path to accept.
 	DefaultPathAcceptRE = "^.*"
 	// DefaultPathRejectRE is the default set of paths to reject.
-	DefaultPathRejectRE = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach,^/api/.*/nodes/.*/proxy/run"
+	// Node proxy dot segments are rejected to prevent bypasses during backend path normalization.
+	DefaultPathRejectRE = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach,^/api/.*/nodes/.*/proxy/+(run|exec|attach)," +
+		`^/api/[^/]+/nodes/[^/]+/proxy/([^/]*/)*\.\.?(/|$)`
 	// DefaultMethodRejectRE is the set of HTTP methods to reject by default.
 	DefaultMethodRejectRE = "^$"
 )
