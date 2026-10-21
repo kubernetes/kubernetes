@@ -88,6 +88,10 @@ type Helper struct {
 
 	DryRunStrategy cmdutil.DryRunStrategy
 
+	// ConditionReporter publishes drain lifecycle observations. It is optional
+	// so existing library consumers do not write Node conditions.
+	ConditionReporter ConditionReporter
+
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	//
 	// Deprecated: use OnPodDeletionOrEvictionFinished instead

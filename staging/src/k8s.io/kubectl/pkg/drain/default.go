@@ -32,8 +32,10 @@ import (
 // You should first cordon the node, e.g. using RunCordonOrUncordon
 func RunNodeDrain(drainer *Helper, nodeName string) error {
 	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
+	reportCondition(drainer, nodeName, NodeConditionDrainStarted)
 	list, errs := drainer.GetPodsForDeletion(nodeName)
 	if errs != nil {
+		reportCondition(drainer, nodeName, NodeConditionDrainFailed)
 		return utilerrors.NewAggregate(errs)
 	}
 	if warnings := list.Warnings(); warnings != "" {
@@ -42,8 +44,10 @@ func RunNodeDrain(drainer *Helper, nodeName string) error {
 
 	if err := drainer.DeleteOrEvictPods(list.Pods()); err != nil {
 		// Maybe warn about non-deleted pods here
+		reportCondition(drainer, nodeName, NodeConditionDrainFailed)
 		return err
 	}
+	reportCondition(drainer, nodeName, NodeConditionDrainCompleted)
 	return nil
 }
 
@@ -60,6 +64,9 @@ func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error
 
 	if updateRequired := c.UpdateIfRequired(desired); !updateRequired {
 		// Already done
+		if !desired {
+			reportCondition(drainer, node.Name, NodeConditionUncordoned)
+		}
 		return nil
 	}
 
@@ -71,5 +78,17 @@ func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error
 		return fmt.Errorf("cordon error: %w", err)
 	}
 
+	if !desired {
+		reportCondition(drainer, node.Name, NodeConditionUncordoned)
+	}
 	return nil
+}
+
+func reportCondition(drainer *Helper, nodeName string, event NodeConditionEvent) {
+	if drainer.ConditionReporter == nil {
+		return
+	}
+	if err := drainer.ConditionReporter.Report(drainer.getContext(), nodeName, event); err != nil && drainer.ErrOut != nil {
+		_, _ = fmt.Fprintf(drainer.ErrOut, "WARNING: failed to update drain conditions on node %q: %v\n", nodeName, err)
+	}
 }
