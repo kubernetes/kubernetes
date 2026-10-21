@@ -717,9 +717,8 @@ type PodGroupInfo interface {
 	GetChildren() []PodGroupInfo
 	// GetPriority returns the priority of the inner pod group or composite pod group.
 	GetPriority() int32
-	// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-	// or the default policy (PreemptLowerPriority) if not set.
-	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+	// GetPreemptionPolicy returns the PreemptionPolicy of the inner pod group or composite pod group,
+	// or an empty string if not set.
 	GetPreemptionPolicy() v1.PreemptionPolicy
 	// GetMinCount returns the minimum number of pods or child groups required
 	// to satisfy the group's scheduling policy requirements.
@@ -955,9 +954,8 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 	return gpg.CompositePodGroup.CreationTimestamp.Time
 }
 
-// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-// or the default policy (PreemptLowerPriority) if not set.
-// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+// GetPreemptionPolicy returns the PreemptionPolicy of the inner PodGroup or CompositePodGroup,
+// or an empty string if not set.
 func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
@@ -965,7 +963,7 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
 	}
-	return v1.PreemptLowerPriority
+	return ""
 }
 
 // HasDisruptionModeAll returns true if the wrapped object has disruption mode All.
