@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
@@ -209,6 +210,15 @@ func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.Ingres
 		if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in.DefaultBackend, out.Backend, s); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec drops Scheduling because
+// extensions/v1beta1 does not define that field.
+func Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *extensionsv1beta1.DeploymentSpec, s conversion.Scope) error {
+	if err := autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in, out, s); err != nil {
+		return err
 	}
 	return nil
 }
