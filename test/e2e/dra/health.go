@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -107,10 +108,22 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		// Healthy) reported by the DRA plugin are reflected in the pod's
 		// status, and that the kubelet consumed them through the expected
 		// DRAResourceHealth gRPC API version.
-		testHealthTransitions := func(ctx context.Context, b *drautils.Builder) {
+		//
+		// With restartableInit, the claim is also used by a restartable init
+		// container (sidecar) and the health is checked in its status instead
+		// of the status of the regular container.
+		testHealthTransitions := func(ctx context.Context, b *drautils.Builder, restartableInit bool) {
 			driver := b.Driver
 			claim := b.ExternalClaim()
 			pod := b.PodExternal(claim.Name)
+			initContainerName := ""
+			if restartableInit {
+				initContainer := pod.Spec.Containers[0].DeepCopy()
+				initContainer.Name += "-init"
+				initContainer.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+				pod.Spec.InitContainers = []v1.Container{*initContainer}
+				initContainerName = initContainer.Name
+			}
 			b.Create(f.TContext(ctx), claim, pod)
 			b.TestPod(f.TContext(ctx), pod)
 
@@ -157,6 +170,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				}
 			}
 			getHealth := func(ctx context.Context) (string, error) {
+				if restartableInit {
+					return getInitContainerDeviceHealth(ctx, f.ClientSet, pod.Namespace, pod.Name, initContainerName, statusName, driver.Name)
+				}
 				return getDeviceHealth(ctx, f.ClientSet, pod.Namespace, pod.Name, statusName, driver.Name)
 			}
 
@@ -178,7 +194,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b := drautils.NewBuilder(f, driver)
 
 			ginkgo.It("must reflect device health changes in the pod status", func(ctx context.Context) {
-				testHealthTransitions(ctx, b)
+				testHealthTransitions(ctx, b, false)
+			})
+
+			// Health reporting for restartable init containers was added in
+			// Kubernetes 1.38.
+			f.It("must reflect device health changes in the status of a restartable init container", f.WithKubeletMinVersion("1.38"), func(ctx context.Context) {
+				testHealthTransitions(ctx, b, true)
 			})
 		})
 
@@ -190,7 +212,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b := drautils.NewBuilder(f, driver)
 
 			ginkgo.It("must reflect device health changes in the pod status", func(ctx context.Context) {
-				testHealthTransitions(ctx, b)
+				testHealthTransitions(ctx, b, false)
 			})
 		})
 
@@ -203,7 +225,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// Kubelets older than minKubeletVersionForHealthV1 only have the
 			// v1alpha1 client and cannot consume health from such a driver.
 			f.It("must reflect device health changes in the pod status", f.WithKubeletMinVersion(minKubeletVersionForHealthV1), func(ctx context.Context) {
-				testHealthTransitions(ctx, b)
+				testHealthTransitions(ctx, b, false)
 			})
 		})
 	})
@@ -226,18 +248,39 @@ func getDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namesp
 		return "", fmt.Errorf("get pod %s/%s: %w", namespace, podName, err)
 	}
 
-	for _, containerStatus := range pod.Status.ContainerStatuses {
+	return deviceHealthFromStatuses(pod.Status.ContainerStatuses, statusName, driverName), nil
+}
+
+// getInitContainerDeviceHealth is like getDeviceHealth, but for the init
+// container with the given name.
+func getInitContainerDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namespace, podName, initContainerName string, statusName v1.ResourceName, driverName string) (string, error) {
+	pod, err := clientSet.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("get pod %s/%s: %w", namespace, podName, err)
+	}
+
+	for _, containerStatus := range pod.Status.InitContainerStatuses {
+		if containerStatus.Name == initContainerName {
+			return deviceHealthFromStatuses([]v1.ContainerStatus{containerStatus}, statusName, driverName), nil
+		}
+	}
+
+	return "NotFound", nil
+}
+
+func deviceHealthFromStatuses(containerStatuses []v1.ContainerStatus, statusName v1.ResourceName, driverName string) string {
+	for _, containerStatus := range containerStatuses {
 		for _, resourceStatus := range containerStatus.AllocatedResourcesStatus {
 			if resourceStatus.Name != statusName {
 				continue
 			}
 			for _, resourceHealth := range resourceStatus.Resources {
 				if strings.HasPrefix(string(resourceHealth.ResourceID), driverName+"/") {
-					return string(resourceHealth.Health), nil
+					return string(resourceHealth.Health)
 				}
 			}
 		}
 	}
 
-	return "NotFound", nil
+	return "NotFound"
 }
