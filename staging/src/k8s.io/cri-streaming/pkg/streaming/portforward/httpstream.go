@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"k8s.io/streaming/pkg/httpstream"
@@ -249,6 +250,17 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
+
+	// ECONNRESET/EPIPE mean the target closed this one connection abruptly, e.g.
+	// PostgreSQL closing a TLS session with unread close_notify data. Reset the
+	// streams without writing to the error stream: clients treat any error-stream
+	// message as fatal and tear down the whole port-forward session.
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
+		klog.V(5).InfoS("Connection request forwarding ended with connection reset", "connection", h.conn, "request", p.requestID, "port", portString, "err", err)
+		p.dataStream.Reset()  // nolint:errcheck
+		p.errorStream.Reset() // nolint:errcheck
+		return
+	}
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)

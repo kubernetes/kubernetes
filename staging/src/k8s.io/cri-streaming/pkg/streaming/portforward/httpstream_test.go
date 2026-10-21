@@ -17,7 +17,14 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -228,9 +235,65 @@ func TestRequestID(t *testing.T) {
 	}
 }
 
+type fakePortForwarder struct {
+	err error
+}
+
+func (f *fakePortForwarder) PortForward(_ context.Context, _ string, _ string, _ int32, _ io.ReadWriteCloser) error {
+	return f.err
+}
+
+func TestPortForwardErrorHandling(t *testing.T) {
+	tests := map[string]struct {
+		err              error
+		expectErrMessage bool
+		expectReset      bool
+	}{
+		"success": {},
+		"connection reset by target": {
+			err:         fmt.Errorf("failed to execute portforward in network namespace %q: %w", "/var/run/netns/test", &os.SyscallError{Syscall: "read", Err: syscall.ECONNRESET}),
+			expectReset: true,
+		},
+		"broken pipe to target": {
+			err:         fmt.Errorf("failed to execute portforward in network namespace %q: %w", "/var/run/netns/test", syscall.EPIPE),
+			expectReset: true,
+		},
+		"other error": {
+			err:              errors.New("network namespace for sandbox \"abc\" is closed"),
+			expectErrMessage: true,
+			expectReset:      true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			dataStream := newFakeHTTPStream()
+			dataStream.headers.Set(PortHeader, "5432")
+			errorStream := newFakeHTTPStream()
+			h := &httpStreamHandler{
+				pod:       "pod",
+				uid:       "uid",
+				forwarder: &fakePortForwarder{err: test.err},
+			}
+
+			h.portForward(&httpStreamPair{requestID: "1", dataStream: dataStream, errorStream: errorStream})
+
+			if msg := string(errorStream.written); test.expectErrMessage != (len(msg) > 0) {
+				t.Errorf("expected error message written: %v, got %q", test.expectErrMessage, msg)
+			} else if test.expectErrMessage && !strings.Contains(msg, test.err.Error()) {
+				t.Errorf("expected error message to contain %q, got %q", test.err.Error(), msg)
+			}
+			if dataStream.reset != test.expectReset || errorStream.reset != test.expectReset {
+				t.Errorf("expected streams reset: %v, got data=%v error=%v", test.expectReset, dataStream.reset, errorStream.reset)
+			}
+		})
+	}
+}
+
 type fakeHTTPStream struct {
 	headers http.Header
 	id      uint32
+	written []byte
+	reset   bool
 }
 
 func newFakeHTTPStream() *fakeHTTPStream {
@@ -246,7 +309,8 @@ func (s *fakeHTTPStream) Read(data []byte) (int, error) {
 }
 
 func (s *fakeHTTPStream) Write(data []byte) (int, error) {
-	return 0, nil
+	s.written = append(s.written, data...)
+	return len(data), nil
 }
 
 func (s *fakeHTTPStream) Close() error {
@@ -254,6 +318,7 @@ func (s *fakeHTTPStream) Close() error {
 }
 
 func (s *fakeHTTPStream) Reset() error {
+	s.reset = true
 	return nil
 }
 
