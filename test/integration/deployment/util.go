@@ -120,18 +120,24 @@ func dcSetup(ctx context.Context, t ktesting.TB) (kubeapiservertesting.TearDownF
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-controller")),
 	)
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
-	rm := replicaset.NewReplicaSetController(
+	rm, err := replicaset.NewReplicaSetController(
 		ctx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 	return server.TearDownFn, rm, dc, informers, clientSet
 }
 

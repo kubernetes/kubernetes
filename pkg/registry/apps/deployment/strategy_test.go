@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -126,6 +127,63 @@ func TestStatusUpdatesWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) 
 
 			if len(errs) != 0 {
 				t.Errorf("Unexpected error %v", errs)
+			}
+		})
+	}
+}
+
+func TestDeploymentStrategy_PrepareForUpdateScheduling(t *testing.T) {
+	schedulingWithMinCount := func(minCount int32) *apps.DeploymentSchedulingConfiguration {
+		return &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                         string
+		enableWorkloadWithDeployment bool
+		oldScheduling                *apps.DeploymentSchedulingConfiguration
+		newScheduling                *apps.DeploymentSchedulingConfiguration
+		wantScheduling               *apps.DeploymentSchedulingConfiguration
+	}{
+		{
+			name:                         "scheduling retained on update when feature gate disabled and old value set",
+			enableWorkloadWithDeployment: false,
+			oldScheduling:                schedulingWithMinCount(2),
+			newScheduling:                schedulingWithMinCount(4),
+			wantScheduling:               schedulingWithMinCount(4),
+		},
+		{
+			name:                         "scheduling dropped on update when feature gate disabled and old value unset",
+			enableWorkloadWithDeployment: false,
+			newScheduling:                schedulingWithMinCount(2),
+		},
+		{
+			name:                         "scheduling retained on update when feature gate enabled and old value unset",
+			enableWorkloadWithDeployment: true,
+			newScheduling:                schedulingWithMinCount(2),
+			wantScheduling:               schedulingWithMinCount(2),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.enableWorkloadWithDeployment,
+				features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
+			})
+
+			oldDeployment := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+			oldDeployment.Spec.Scheduling = tc.oldScheduling
+			newDeployment := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+			newDeployment.Spec.Scheduling = tc.newScheduling
+
+			Strategy.PrepareForUpdate(genericapirequest.NewDefaultContext(), newDeployment, oldDeployment)
+
+			if !reflect.DeepEqual(tc.wantScheduling, newDeployment.Spec.Scheduling) {
+				t.Errorf("Scheduling = %#v, want %#v", newDeployment.Spec.Scheduling, tc.wantScheduling)
 			}
 		})
 	}
