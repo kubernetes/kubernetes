@@ -5870,7 +5870,11 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 			}
 			expected := test.expected.DeepCopy()
-			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
+			podState := SyncPod
+			if test.isPodTerminal {
+				podState = TerminatedPod
+			}
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, podState)
 			expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
 			if test.expectedPodDisruptionCondition != nil {
 				expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
@@ -6015,7 +6019,7 @@ func Test_generateAPIPodStatusOnKubeletRestart(t *testing.T) {
 				}},
 			}
 
-			actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, false /* podIsTerminal */)
+			actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 
 			require.Len(t, actual.ContainerStatuses, 1)
 			cStatus := actual.ContainerStatuses[0]
@@ -6129,7 +6133,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 
 			oldStatus := test.pod.Status
 			kl.statusManager.SetPodStatus(logger, test.pod, oldStatus)
-			actual := kl.generateAPIPodStatus(tCtx, test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, &testKubecontainerPodStatus /* criStatus */, SyncPod)
 			for _, c := range actual.Conditions {
 				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
 					t.Fatalf("unexpected resize status: %v", c)
@@ -6448,7 +6452,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -6573,7 +6577,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			}
 			podStatus.IPs = tc.nodeIPs
 
-			status := kl.generateAPIPodStatus(tCtx, pod, podStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, podStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.expectedPodIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedPodIPs, status.PodIPs)
 			}
@@ -6707,7 +6711,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -10027,4 +10031,94 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	require.Len(t, mounts, 3) // 2 volume mounts + /etc/hosts
 	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
 	assert.Empty(t, mounts[1].BindMountOptions)
+}
+
+func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	tests := []struct {
+		name             string
+		podState         PodWorkerState
+		expectPending    bool
+		expectInProgress bool
+	}{
+		{
+			name:             "SyncPod preserves both PodResizePending and PodResizeInProgress",
+			podState:         SyncPod,
+			expectPending:    true,
+			expectInProgress: true,
+		},
+		{
+			name:             "TerminatingPod clears PodResizePending but preserves PodResizeInProgress",
+			podState:         TerminatingPod,
+			expectPending:    false,
+			expectInProgress: true,
+		},
+		{
+			name:             "TerminatedPod clears both PodResizePending and PodResizeInProgress",
+			podState:         TerminatedPod,
+			expectPending:    false,
+			expectInProgress: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "resize-state-pod",
+					Name:       "resize-state-pod",
+					Namespace:  "default",
+					Generation: 3,
+				},
+				Spec: v1.PodSpec{
+					NodeName:      "machine",
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "img",
+					}},
+				},
+			}
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			}
+
+			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 2)
+			kl.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", 3)
+
+			apiStatus := kl.generateAPIPodStatus(tCtx, pod, criStatus, tc.podState)
+
+			var gotPending, gotInProgress bool
+			for _, c := range apiStatus.Conditions {
+				switch c.Type {
+				case v1.PodResizePending:
+					gotPending = true
+				case v1.PodResizeInProgress:
+					gotInProgress = true
+				}
+			}
+			assert.Equal(t, tc.expectPending, gotPending, "PodResizePending in generated status")
+			assert.Equal(t, tc.expectInProgress, gotInProgress, "PodResizeInProgress in generated status")
+
+			var cachedPending, cachedInProgress bool
+			for _, c := range kl.statusManager.GetPodResizeConditions(pod.UID) {
+				switch c.Type {
+				case v1.PodResizePending:
+					cachedPending = true
+				case v1.PodResizeInProgress:
+					cachedInProgress = true
+				}
+			}
+			assert.Equal(t, tc.expectPending, cachedPending, "PodResizePending in statusManager")
+			assert.Equal(t, tc.expectInProgress, cachedInProgress, "PodResizeInProgress in statusManager")
+		})
+	}
 }
