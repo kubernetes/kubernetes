@@ -187,9 +187,6 @@ func (fe *podGroupFitError) addPluginStatus(s *fwk.Status) {
 // In case of non-placement algorithm's error, it will not contain any placement context.
 func (fe *podGroupFitError) Error() string {
 	reason := fe.status.Message()
-	if err := fe.status.AsError(); err != nil {
-		reason = err.Error()
-	}
 	if fe.numPlacements == 0 {
 		return reason
 	}

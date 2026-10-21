@@ -19,6 +19,7 @@ package podgroup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,6 +48,8 @@ type WaitForAnyPodsScheduled struct {
 type Groups struct {
 	PodGroups          []string
 	CompositePodGroups []string
+	// Messages is an optional map keyed by group's name and a fragment of the message their condition should contain.
+	Messages map[string]string
 }
 
 type VerifyAssignments struct {
@@ -235,7 +238,7 @@ func podInIncompletePodGroupPods(queue queue.SchedulingQueue, podName string) bo
 	return false
 }
 
-func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason string) wait.ConditionWithContextFunc {
+func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason, messageContains string) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
 		pg, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
@@ -247,14 +250,16 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 		for _, c := range pg.Status.Conditions {
 			if c.Type == schedulingapi.PodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
-				return true, nil
+				if messageContains == "" || strings.Contains(c.Message, messageContains) {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
 	}
 }
 
-func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason string) wait.ConditionWithContextFunc {
+func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason, messageContains string) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
 		cpg, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
@@ -266,7 +271,9 @@ func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name st
 		for _, c := range cpg.Status.Conditions {
 			if c.Type == schedulingv1alpha3.CompositePodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
-				return true, nil
+				if messageContains == "" || strings.Contains(c.Message, messageContains) {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
@@ -735,53 +742,57 @@ func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny 
 	return nil
 }
 
-func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pgNames []string) error {
+func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pgNames []string, messages map[string]string) error {
 	cs := testCtx.ClientSet
 	for _, pgName := range pgNames {
+		expectedMsg := messages[pgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable))
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, expectedMsg))
 		if err != nil {
-			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
-				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, err)
+			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
+				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, expectedMsg, err)
 		}
 	}
 	return nil
 }
 
-func waitForPodGroupsError(testCtx *testutils.TestContext, ns string, pgNames []string) error {
+func waitForPodGroupsError(testCtx *testutils.TestContext, ns string, pgNames []string, messages map[string]string) error {
 	cs := testCtx.ClientSet
 	for _, pgName := range pgNames {
+		expectedMsg := messages[pgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError))
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, expectedMsg))
 		if err != nil {
-			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
-				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, err)
+			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
+				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonPodGroupError, expectedMsg, err)
 		}
 	}
 	return nil
 }
 
-func waitForCompositePodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
+func waitForCompositePodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, cpgNames []string, messages map[string]string) error {
 	cs := testCtx.ClientSet
 	for _, cpgName := range cpgNames {
+		expectedMsg := messages[cpgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable))
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, expectedMsg))
 		if err != nil {
-			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s): %w",
-				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, err)
+			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
+				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, expectedMsg, err)
 		}
 	}
 	return nil
 }
 
-func waitForCompositePodGroupsError(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
+func waitForCompositePodGroupsError(testCtx *testutils.TestContext, ns string, cpgNames []string, messages map[string]string) error {
 	cs := testCtx.ClientSet
 	for _, cpgName := range cpgNames {
+		expectedMsg := messages[cpgName]
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError))
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError, expectedMsg))
 		if err != nil {
-			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s): %w",
-				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError, err)
+			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s, messageContains=%s): %w",
+				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonCompositePodGroupError, expectedMsg, err)
 		}
 	}
 	return nil
@@ -795,17 +806,17 @@ func waitForGroupsScheduled(testCtx *testutils.TestContext, t utiltesting.TB, ns
 }
 
 func waitForGroupsUnschedulable(testCtx *testutils.TestContext, ns string, groups *Groups) error {
-	if err := waitForCompositePodGroupsUnschedulable(testCtx, ns, groups.CompositePodGroups); err != nil {
+	if err := waitForCompositePodGroupsUnschedulable(testCtx, ns, groups.CompositePodGroups, groups.Messages); err != nil {
 		return err
 	}
-	return waitForPodGroupsUnschedulable(testCtx, ns, groups.PodGroups)
+	return waitForPodGroupsUnschedulable(testCtx, ns, groups.PodGroups, groups.Messages)
 }
 
 func waitForGroupsError(testCtx *testutils.TestContext, ns string, groups *Groups) error {
-	if err := waitForCompositePodGroupsError(testCtx, ns, groups.CompositePodGroups); err != nil {
+	if err := waitForCompositePodGroupsError(testCtx, ns, groups.CompositePodGroups, groups.Messages); err != nil {
 		return err
 	}
-	return waitForPodGroupsError(testCtx, ns, groups.PodGroups)
+	return waitForPodGroupsError(testCtx, ns, groups.PodGroups, groups.Messages)
 }
 
 func verifyAssignments(testCtx *testutils.TestContext, ns string, verify *VerifyAssignments) error {

@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -1516,8 +1517,8 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 		t.Errorf("Expected FailureHandler to be called for 3 pods, but got called for %d", len(handledPods))
 	}
 
-	expectedGroupErrMsg := "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter error for p2"
-	expectedP2ErrMsg := "running \"FakePodGroupPlugin\" filter plugin: filter error for p2"
+	expectedGroupErrMsg := `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter error for p2`
+	expectedP2ErrMsg := `running "FakePodGroupPlugin" filter plugin: filter error for p2`
 
 	if status, ok := handledPods["p1"]; !ok {
 		t.Errorf("Expected FailureHandler to be called for p1")
@@ -3294,7 +3295,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 				},
 			},
 			expectedResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Error, "running PlacementScore plugins: plugin \"FakePlacementPlugin\" failed with: error for test").WithPlugin("FakePlacementPlugin"),
+				status: fwk.NewStatus(fwk.Error, `running PlacementScore plugins: plugin "FakePlacementPlugin" failed with: error for test`).WithPlugin("FakePlacementPlugin"),
 			},
 		},
 		"when a placement evaluation errors, returns error": {
@@ -3321,10 +3322,10 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						scheduleResult: ScheduleResult{
 							nominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride},
 						},
-						status: fwk.NewStatus(fwk.Error, "running \"FakePlacementPlugin\" filter plugin: error for test"),
+						status: fwk.NewStatus(fwk.Error, `running "FakePlacementPlugin" filter plugin: error for test`),
 					},
 				},
-				status: fwk.NewStatus(fwk.Error, "failed to schedule other pod from a pod group: running \"FakePlacementPlugin\" filter plugin: error for test"),
+				status: fwk.NewStatus(fwk.Error, `failed to schedule other pod from a pod group: running "FakePlacementPlugin" filter plugin: error for test`),
 			},
 		},
 	}
@@ -4902,7 +4903,7 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 			expectedResults: map[fwk.EntityKey]podGroupAlgorithmResult{
 				rootPGInfo.GetKey(): {
-					status: fwk.NewStatus(fwk.Error, "composite pod group evaluation failed due to child error: injected error"),
+					status: fwk.NewStatus(fwk.Error, `composite pod group "cpg" evaluation failed due to child "pg2" error: injected error`),
 				},
 				childPGInfo1.GetKey(): {
 					podResults: []algorithmResult{
@@ -7784,19 +7785,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7830,19 +7831,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8118,7 +8119,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8156,7 +8157,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8220,13 +8221,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "composite pod group evaluation failed due to child error: failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8258,13 +8259,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "composite pod group evaluation failed due to child error: failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+					Message: `running "FakePodGroupPlugin" filter plugin: filter internal error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8296,13 +8297,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8334,13 +8335,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `ancestor composite pod group "cpg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8370,13 +8371,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -9801,5 +9802,288 @@ func TestNewShufflePlacementsRandomizesOrder(t *testing.T) {
 
 	if len(firstNames) <= 1 {
 		t.Errorf("Expected the default shuffler to randomize placement order, but saw only %d distinct first placement(s) over %d runs", len(firstNames), runs)
+	}
+}
+
+func TestCompleteCompositePodGroupAlgorithmResultMap(t *testing.T) {
+	pgInfo1 := newPGInfo(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg-sub1").Obj())
+	pgInfo2 := newPGInfo(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg-sub1").Obj())
+	pgInfo3 := newPGInfo(st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg-sub2").Obj())
+	pgInfo4 := newPGInfo(st.MakePodGroup().Name("pg4").Namespace("default").ParentCompositePodGroup("cpg-sub2").Obj())
+	pgInfo5 := newPGInfo(st.MakePodGroup().Name("pg5").Namespace("default").ParentCompositePodGroup("cpg-sub3").Obj())
+
+	subInfo1 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub1").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo1, pgInfo2)
+	subInfo2 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub2").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo3, pgInfo4)
+	subInfo3 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub3").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo5)
+
+	rootInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-root").Namespace("default").Obj(), subInfo1, subInfo2, subInfo3)
+
+	singleSubtreePGInfo1 := newPGInfo(st.MakePodGroup().Name("single-pg1").Namespace("default").ParentCompositePodGroup("cpg-single-sub").Obj())
+	singleSubtreePGInfo2 := newPGInfo(st.MakePodGroup().Name("single-pg2").Namespace("default").ParentCompositePodGroup("cpg-single-sub").Obj())
+	singleSubtreeCPGInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-single-sub").Namespace("default").ParentCompositePodGroup("cpg-single-root").Obj(), singleSubtreePGInfo1, singleSubtreePGInfo2)
+	singleSubtreeRootInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-single-root").Namespace("default").Obj(), singleSubtreeCPGInfo)
+
+	newStatusWithFitError := func(code fwk.Code, msg, unschedPlugin, pendingPlugin string) *fwk.Status {
+		fitErr := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, msg))
+		fitErr.addPluginStatus(fwk.NewStatus(fwk.Unschedulable).WithPlugin(unschedPlugin))
+		fitErr.addPluginStatus(fwk.NewStatus(fwk.Pending).WithPlugin(pendingPlugin))
+		return fwk.NewStatus(code).WithError(fitErr)
+	}
+
+	tests := []struct {
+		name             string
+		rootInfo         *framework.PodGroupInfo
+		initialStatuses  map[*framework.PodGroupInfo]*fwk.Status
+		expectedStatuses map[*framework.PodGroupInfo]*fwk.Status
+	}{
+		{
+			name:     "Hierarchical failure context propagation preserves granular errors",
+			rootInfo: rootInfo,
+			// Tree structure & failure states:
+			//
+			//	                                         cpg-root (Unschedulable)
+			//	                         /                           |                           \
+			//	      cpg-sub1 (Success)                 cpg-sub2 (Unschedulable)             cpg-sub3 (Skipped)
+			//	         /          \                           /          \                          |
+			//	pg1 (Success)  pg2 (Unschedulable)     pg3 (Success)  pg4 (Unschedulable)       pg5 (Skipped)
+			//
+			// Expected outcome:
+			// - cpg-root: preserves root error
+			// - cpg-sub1: gets ancestor "cpg-root" context
+			// - pg1: gets ancestor "cpg-root" context
+			// - pg2: preserves local minimum threshold error
+			// - cpg-sub2: preserves local minimum threshold error
+			// - pg3: gets ancestor "cpg-sub2" context
+			// - pg4: preserves local minimum threshold error
+			// - cpg-sub3: populated with ancestor "cpg-root" context
+			// - pg5: populated with ancestor "cpg-root" context
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo1: fwk.NewStatus(fwk.Success),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo2: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				pgInfo3:  fwk.NewStatus(fwk.Success),
+				pgInfo4:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining"),
+				// subInfo3 and pgInfo5 were skipped (not present in pgResults)
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo1: fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-root" is unschedulable`),
+				pgInfo1:  fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-root" is unschedulable`),
+				pgInfo2:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo2: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				pgInfo3:  fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-sub2" is unschedulable`),
+				pgInfo4:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining"),
+				subInfo3: fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-root" is unschedulable`),
+				pgInfo5:  fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-root" is unschedulable`),
+			},
+		},
+		{
+			name:     "Skipped leaf under unschedulable intermediate CPG inherits nearest ancestor failure and plugins",
+			rootInfo: singleSubtreeRootInfo,
+			// Tree structure & failure states:
+			//
+			//	           cpg-single-root (Unschedulable)
+			//	                         |
+			//	            cpg-single-sub (Unschedulable)
+			//	                /                 \
+			//	single-pg1 (Unschedulable)    single-pg2 (Skipped)
+			//
+			// When single-pg1 fails, cpg-single-sub cannot satisfy its minGroupCount (2) and stops evaluating
+			// remaining children early, leaving single-pg2 skipped.
+			// - single-pg2 (Skipped): inherits nearest ancestor cpg-single-sub's failure message and plugins (not cpg-single-root's)
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				singleSubtreeRootInfo: fwk.NewStatus(fwk.Unschedulable, "root unschedulable"),
+				singleSubtreeCPGInfo:  newStatusWithFitError(fwk.Unschedulable, "sub unschedulable", "SubUnschedPlugin", "SubPendingPlugin"),
+				singleSubtreePGInfo1:  fwk.NewStatus(fwk.Unschedulable, "pg1 unschedulable"),
+				// singleSubtreePGInfo2 was skipped after singleSubtreePGInfo1 failed
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				singleSubtreeRootInfo: fwk.NewStatus(fwk.Unschedulable, "root unschedulable"),
+				singleSubtreeCPGInfo:  newStatusWithFitError(fwk.Unschedulable, "sub unschedulable", "SubUnschedPlugin", "SubPendingPlugin"),
+				singleSubtreePGInfo1:  fwk.NewStatus(fwk.Unschedulable, "pg1 unschedulable"),
+				singleSubtreePGInfo2:  newStatusWithFitError(fwk.Unschedulable, `ancestor composite pod group "cpg-single-sub" is unschedulable`, "SubUnschedPlugin", "SubPendingPlugin"),
+			},
+		},
+		{
+			name:     "Skipped descendants inherit the plugin of an ancestor rejected with a raw plugin status",
+			rootInfo: singleSubtreeRootInfo,
+			// Tree structure & failure states:
+			//
+			//	    cpg-single-root (UnschedulableAndUnresolvable)
+			//	                        |
+			//	            cpg-single-sub (Skipped)
+			//	               /                \
+			//	    single-pg1 (Skipped)    single-pg2 (Skipped)
+			//
+			// RunPlacementGeneratePlugins returns the plugin's status as is, without a podGroupFitError.
+			//
+			// Expected outcome:
+			// - cpg-single-root: preserves its raw UnschedulableAndUnresolvable status
+			// - cpg-single-sub, single-pg1, single-pg2: populated with ancestor "cpg-single-root" status code, context and plugin
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				singleSubtreeRootInfo: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "no matching topology domain").WithPlugin("TopologyPlacementGenerator"),
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				singleSubtreeRootInfo: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "no matching topology domain"),
+				singleSubtreeCPGInfo:  newStatusWithFitError(fwk.UnschedulableAndUnresolvable, `ancestor composite pod group "cpg-single-root" is unschedulable`, "TopologyPlacementGenerator", ""),
+				singleSubtreePGInfo1:  newStatusWithFitError(fwk.UnschedulableAndUnresolvable, `ancestor composite pod group "cpg-single-root" is unschedulable`, "TopologyPlacementGenerator", ""),
+				singleSubtreePGInfo2:  newStatusWithFitError(fwk.UnschedulableAndUnresolvable, `ancestor composite pod group "cpg-single-root" is unschedulable`, "TopologyPlacementGenerator", ""),
+			},
+		},
+		{
+			name:     "Child error propagation overwrites non-error nodes while preserving specific child errors",
+			rootInfo: rootInfo,
+			// Tree structure & failure states:
+			//
+			//	                                           cpg-root (Error)
+			//	                         /                         |                         \
+			//	      cpg-sub1 (Unschedulable)             cpg-sub2 (Error)              cpg-sub3 (Skipped)
+			//	         /          \                         /        \                          |
+			//	pg1 (Success)  pg2 (Unschedulable)  pg3 (Success)    pg4 (Error)            pg5 (Skipped)
+			//
+			// Expected outcome:
+			// - cpg-root: preserves root error
+			// - cpg-sub1, pg1, pg2, cpg-sub3, pg5: overwritten/populated with root error
+			// - cpg-sub2: preserves its own error and overwrites pg3 with it
+			// - pg4: preserves its own original leaf error
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Error, `composite pod group "cpg-root" evaluation failed due to child "cpg-sub2" error: composite pod group "cpg-sub2" evaluation failed due to child "pg4" error: filter internal error`),
+				subInfo1: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				subInfo2: fwk.NewStatus(fwk.Error, `composite pod group "cpg-sub2" evaluation failed due to child "pg4" error: filter internal error`),
+				pgInfo3:  fwk.NewStatus(fwk.Success),
+				pgInfo4:  fwk.NewStatus(fwk.Error, "filter internal error"),
+				// subInfo3 and pgInfo5 were skipped
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Error, `composite pod group "cpg-root" evaluation failed due to child "cpg-sub2" error: composite pod group "cpg-sub2" evaluation failed due to child "pg4" error: filter internal error`),
+				subInfo1: fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-root" encountered an error`),
+				pgInfo1:  fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-root" encountered an error`),
+				pgInfo2:  fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-root" encountered an error`),
+				subInfo2: fwk.NewStatus(fwk.Error, `composite pod group "cpg-sub2" evaluation failed due to child "pg4" error: filter internal error`),
+				pgInfo3:  fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-sub2" encountered an error`),
+				pgInfo4:  fwk.NewStatus(fwk.Error, "filter internal error"),
+				subInfo3: fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-root" encountered an error`),
+				pgInfo5:  fwk.NewStatus(fwk.Error, `ancestor composite pod group "cpg-root" encountered an error`),
+			},
+		},
+		{
+			name:     "Root succeeds while unschedulable subtrees propagate failures locally",
+			rootInfo: rootInfo,
+			// Tree structure & failure states:
+			//
+			//	                                          cpg-root (Success)
+			//	                         /                         |                         \
+			//	      cpg-sub1 (Success)               cpg-sub2 (Unschedulable)        cpg-sub3 (Unschedulable)
+			//	         /          \                         /            \                      |
+			//	pg1 (Success)  pg2 (Unschedulable)  pg3 (Success)  pg4 (Unschedulable)      pg5 (Skipped)
+			//
+			// Expected outcome:
+			// - cpg-root, cpg-sub1, pg1: remain Success
+			// - pg2: preserves local unschedulable error under successful parent
+			// - cpg-sub2: preserves local unschedulable error
+			// - pg3: gets ancestor "cpg-sub2" context
+			// - pg4: preserves local unschedulable error
+			// - cpg-sub3: preserves local unschedulable error
+			// - pg5: populated with ancestor "cpg-sub3" context
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Success),
+				subInfo1: fwk.NewStatus(fwk.Success),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo2: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				pgInfo3:  fwk.NewStatus(fwk.Success),
+				pgInfo4:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining"),
+				subInfo3: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (1) cannot be satisfied: 0 scheduled, 0 remaining"),
+				// pgInfo5 was skipped
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Success),
+				subInfo1: fwk.NewStatus(fwk.Success),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining"),
+				subInfo2: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining"),
+				pgInfo3:  fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-sub2" is unschedulable`),
+				pgInfo4:  fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining"),
+				subInfo3: fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (1) cannot be satisfied: 0 scheduled, 0 remaining"),
+				pgInfo5:  fwk.NewStatus(fwk.Unschedulable, `ancestor composite pod group "cpg-sub3" is unschedulable`),
+			},
+		},
+		{
+			name:     "All successful results remain unchanged",
+			rootInfo: rootInfo,
+			// Tree structure & failure states:
+			//
+			//	                                     cpg-root (Success)
+			//	                      /                       |                       \
+			//	        cpg-sub1 (Success)            cpg-sub2 (Success)           cpg-sub3 (Success)
+			//	          /            \                /            \                     |
+			//	pg1 (Success)    pg2 (Success)    pg3 (Success)    pg4 (Success)     pg5 (Success)
+			//
+			// Expected outcome:
+			// - All nodes preserve Success status.
+			initialStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Success),
+				subInfo1: fwk.NewStatus(fwk.Success),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Success),
+				subInfo2: fwk.NewStatus(fwk.Success),
+				pgInfo3:  fwk.NewStatus(fwk.Success),
+				pgInfo4:  fwk.NewStatus(fwk.Success),
+				subInfo3: fwk.NewStatus(fwk.Success),
+				pgInfo5:  fwk.NewStatus(fwk.Success),
+			},
+			expectedStatuses: map[*framework.PodGroupInfo]*fwk.Status{
+				rootInfo: fwk.NewStatus(fwk.Success),
+				subInfo1: fwk.NewStatus(fwk.Success),
+				pgInfo1:  fwk.NewStatus(fwk.Success),
+				pgInfo2:  fwk.NewStatus(fwk.Success),
+				subInfo2: fwk.NewStatus(fwk.Success),
+				pgInfo3:  fwk.NewStatus(fwk.Success),
+				pgInfo4:  fwk.NewStatus(fwk.Success),
+				subInfo3: fwk.NewStatus(fwk.Success),
+				pgInfo5:  fwk.NewStatus(fwk.Success),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pgResults := make(map[fwk.EntityKey]*podGroupAlgorithmResult, len(tt.initialStatuses))
+			for pgi, status := range tt.initialStatuses {
+				pgResults[pgi.GetKey()] = &podGroupAlgorithmResult{
+					podGroupInfo: pgi,
+					status:       status.Clone(),
+				}
+			}
+
+			completeCompositePodGroupAlgorithmResultMap(tt.rootInfo, pgResults, nil)
+
+			for pgi, expectStatus := range tt.expectedStatuses {
+				key := pgi.GetKey()
+				gotResult, exists := pgResults[key]
+				if !exists {
+					t.Errorf("Expected result for key %v, but was not found", key)
+					continue
+				}
+				if gotResult.status.Code() != expectStatus.Code() {
+					t.Errorf("Key %v status code mismatch: want %v, got %v", key, expectStatus.Code(), gotResult.status.Code())
+				}
+				if gotResult.status.Message() != expectStatus.Message() {
+					t.Errorf("Key %v status message mismatch:\n  want: %q\n   got: %q", key, expectStatus.Message(), gotResult.status.Message())
+				}
+				if expectFitErr, ok := errors.AsType[*podGroupFitError](expectStatus.AsError()); ok {
+					if diff := cmp.Diff(expectFitErr, gotResult.status.AsError(), cmp.AllowUnexported(podGroupFitError{})); diff != "" {
+						t.Errorf("Key %v fitError mismatch (-want +got):\n%s", key, diff)
+					}
+				}
+			}
+			if len(pgResults) != len(tt.expectedStatuses) {
+				t.Errorf("Result count mismatch: expected %d keys, got %d results", len(tt.expectedStatuses), len(pgResults))
+			}
+		})
 	}
 }
