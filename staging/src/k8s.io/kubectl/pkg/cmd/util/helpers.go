@@ -437,6 +437,16 @@ const (
 	//
 	// Publish kubectl drain lifecycle conditions on Nodes.
 	DrainNodeConditions FeatureGate = "KUBECTL_DRAIN_NODE_CONDITIONS"
+
+	// owner: @pohly
+	// beta: v1.38
+	// kep: none
+	//
+	// If enabled (the default), kubectl get -o json/yaml and kubectl describe
+	// for types without a dedicated describer preserve the order of fields as
+	// defined in the API types and sent by the apiserver instead of sorting
+	// them alphabetically.
+	PreserveFieldOrder FeatureGate = "KUBECTL_PRESERVE_FIELD_ORDER"
 )
 
 // IsEnabled returns true iff environment variable is set to true.

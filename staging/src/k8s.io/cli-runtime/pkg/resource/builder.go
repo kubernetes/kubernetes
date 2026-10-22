@@ -69,6 +69,9 @@ type Builder struct {
 	// codecFactory describes which codecs you want to use
 	negotiatedSerializer runtime.NegotiatedSerializer
 
+	// stableUnstructured selects unstructured.StableUnstructured instead of unstructured.Unstructured.
+	stableUnstructured bool
+
 	// local indicates that we cannot make server calls
 	local bool
 
@@ -316,6 +319,25 @@ func (b *Builder) Unstructured() *Builder {
 		restMapperFn: b.restMapperFn,
 		clientFn:     b.getClient,
 		decoder:      &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
+	}
+
+	return b
+}
+
+// StableUnstructured is like Unstructured, but the objects are
+// unstructured.StableUnstructured, which preserve the order of fields.
+func (b *Builder) StableUnstructured() *Builder {
+	if b.mapper != nil {
+		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use unstructured types"))
+		return b
+	}
+	b.stableUnstructured = true
+	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
+	b.mapper = &mapper{
+		localFn:      b.isLocal,
+		restMapperFn: b.restMapperFn,
+		clientFn:     b.getClient,
+		decoder:      &metadataValidatingDecoder{unstructured.StableUnstructuredJSONScheme},
 	}
 
 	return b
@@ -975,7 +997,7 @@ func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
 	case b.negotiatedSerializer != nil:
 		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).clientForGroupVersion(gv, b.negotiatedSerializer)
 	default:
-		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).unstructuredClientForGroupVersion(gv)
+		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).unstructuredClientForGroupVersion(gv, b.stableUnstructured)
 	}
 
 	if err != nil {
