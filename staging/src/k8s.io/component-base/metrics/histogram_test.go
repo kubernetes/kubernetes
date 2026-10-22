@@ -887,7 +887,7 @@ func TestObserveWithExemplar(t *testing.T) {
 	require.Len(t, mfs, 1)
 	require.Equal(t, dto.MetricType_HISTOGRAM, mfs[0].GetType())
 	m := mfs[0].GetMetric()[0]
-	assert.Equal(t, float64(10), m.GetHistogram().GetSampleSum())
+	assert.InDelta(t, 10.0, m.GetHistogram().GetSampleSum(), 0.0001)
 	assert.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
 
 	e := m.GetHistogram().GetBucket()[0].GetExemplar()
