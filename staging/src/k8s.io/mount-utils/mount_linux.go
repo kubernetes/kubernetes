@@ -738,7 +738,8 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 			// the last split() item is empty string following the last \n
 			continue
 		}
-		fields := strings.Fields(line)
+		// Split on spaces to preserve an empty mount source in /proc/mounts.
+		fields := strings.Split(line, " ")
 		if len(fields) != expectedNumFieldsPerLine {
 			// Do not log line in case it contains sensitive Mount options
 			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d)", expectedNumFieldsPerLine, len(fields))
