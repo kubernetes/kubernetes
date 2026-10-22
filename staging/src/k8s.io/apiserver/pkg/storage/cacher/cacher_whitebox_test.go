@@ -2750,85 +2750,120 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 	close(b.done)
 }
 
-// TestWatchListStopDuringDispatch reproduces a goroutine leak.
+// TestWatchListStopDuringDispatch verifies that the watcher goroutine ends.
 // A watch-list watcher has received its initial-events-end bookmark but not
 // sent it, because the client does not read. A dispatch blocks on the
-// watcher, the client stops the watcher, and the dispatch then closes the
-// watcher for unresponsiveness in draining mode. The draining close wins, so
-// the watcher goroutine keeps waiting to send to a client that is gone.
+// watcher, the watcher may be stopped, and the dispatch then closes the watcher
+// for unresponsiveness in draining mode. A stop must stay final. After a client
+// Stop, a draining close would leave the watcher goroutine waiting forever to
+// send to a client that is gone.
 func TestWatchListStopDuringDispatch(t *testing.T) {
 	forceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
 	// goroutines at any time, so goleak may report those as well.
 	const watcherGoroutine = "cacher.(*cacheWatcher).process"
-	ignoreRunning := goleak.IgnoreCurrent()
 
-	makePod := func(rv int) *example.Pod {
-		return &example.Pod{ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("pod-%d", rv),
-			Namespace:       "ns",
-			ResourceVersion: strconv.Itoa(rv),
-		}}
-	}
-	// More initial events than the result channel holds block the
-	// watcher goroutine before it reads its input channel.
-	const initialEvents = minWatchChanSize + 2
-	backingStorage := &cachertesting.MockStorage{
-		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
-			podList := listObj.(*example.PodList)
-			podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
-			for rv := 1; rv <= initialEvents; rv++ {
-				podList.Items = append(podList.Items, *makePod(rv))
-			}
-			return nil
+	scenarios := []struct {
+		name   string
+		stop   func(cacher *Cacher, w watch.Interface)
+		drains bool
+	}{
+		{
+			name: "client Stop",
+			stop: func(_ *Cacher, w watch.Interface) { w.Stop() },
+		},
+		{
+			// It asks for an immediate stop, which must not become a drain.
+			name: "terminateAllWatchers",
+			stop: func(cacher *Cacher, _ watch.Interface) { cacher.terminateAllWatchers() },
+		},
+		{
+			// Nothing stops the watcher, so the dispatch closes it in draining
+			// mode and the client still gets the bookmark.
+			name:   "no stop",
+			stop:   func(_ *Cacher, _ watch.Interface) {},
+			drains: true,
 		},
 	}
-	// On a fake clock the cacher sends bookmarks only when the test steps it.
-	fakeClock := testingclock.NewFakeClock(time.Now())
-	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
-	require.NoError(t, err)
-	require.NoError(t, cacher.Wait(context.Background()))
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			ignoreRunning := goleak.IgnoreCurrent()
 
-	pred := storage.Everything
-	pred.AllowWatchBookmarks = true
-	// The client never reads from this watcher.
-	w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
-		ResourceVersion:   "100",
-		SendInitialEvents: new(true),
-		Predicate:         pred,
-		Recursive:         true,
-	})
-	require.NoError(t, err)
-	// A bookmark that is received but not sent makes the dispatch close
-	// the watcher in draining mode.
-	require.NoError(t, wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
-		fakeClock.Step(2 * time.Second)
-		return w.(*cacheWatcher).wasBookmarkAfterRvReceived(), nil
-	}))
-	require.False(t, w.(*cacheWatcher).wasBookmarkAfterRvSent())
+			makePod := func(rv int) *example.Pod {
+				return &example.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name:            fmt.Sprintf("pod-%d", rv),
+					Namespace:       "ns",
+					ResourceVersion: strconv.Itoa(rv),
+				}}
+			}
+			// More initial events than the result channel holds block the
+			// watcher goroutine before it reads its input channel.
+			const initialEvents = minWatchChanSize + 2
+			backingStorage := &cachertesting.MockStorage{
+				GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+					podList := listObj.(*example.PodList)
+					podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
+					for rv := 1; rv <= initialEvents; rv++ {
+						podList.Items = append(podList.Items, *makePod(rv))
+					}
+					return nil
+				},
+			}
+			// On a fake clock the cacher sends bookmarks only when the test steps it.
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
+			require.NoError(t, err)
+			require.NoError(t, cacher.Wait(context.Background()))
 
-	budget := &stopDuringDispatchBudget{stop: w.Stop, done: make(chan struct{})}
-	cacher.dispatchTimeoutBudget = budget
-	// Events fill the input channel of w until a dispatch blocks on it.
-	timeout := time.After(wait.ForeverTestTimeout)
-fill:
-	for rv := 101; ; rv++ {
-		select {
-		case <-budget.done:
-			break fill
-		case <-timeout:
-			t.Fatal("no dispatch blocked on the watcher")
-		default:
-			require.NoError(t, cacher.watchCache.Add(makePod(rv)))
-		}
-	}
+			pred := storage.Everything
+			pred.AllowWatchBookmarks = true
+			// The client never reads from this watcher.
+			w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+				ResourceVersion:   "100",
+				SendInitialEvents: new(true),
+				Predicate:         pred,
+				Recursive:         true,
+			})
+			require.NoError(t, err)
+			// A bookmark that is received but not sent makes the dispatch close
+			// the watcher in draining mode.
+			require.NoError(t, wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+				fakeClock.Step(2 * time.Second)
+				return w.(*cacheWatcher).wasBookmarkAfterRvReceived(), nil
+			}))
+			require.False(t, w.(*cacheWatcher).wasBookmarkAfterRvSent())
 
-	cacher.Stop()
-	// TODO: Expect no leaked goroutine: Stop must end the watcher goroutine.
-	require.ErrorContains(t, goleak.Find(ignoreRunning), watcherGoroutine)
+			budget := &stopDuringDispatchBudget{stop: func() { scenario.stop(cacher, w) }, done: make(chan struct{})}
+			cacher.dispatchTimeoutBudget = budget
+			// Events fill the input channel of w until a dispatch blocks on it.
+			timeout := time.After(wait.ForeverTestTimeout)
+		fill:
+			for rv := 101; ; rv++ {
+				select {
+				case <-budget.done:
+					break fill
+				case <-timeout:
+					t.Fatal("no dispatch blocked on the watcher")
+				default:
+					require.NoError(t, cacher.watchCache.Add(makePod(rv)))
+				}
+			}
 
-	// Read the result channel so the leaked goroutine ends before the next test.
-	for range w.ResultChan() {
+			cacher.Stop()
+			if scenario.drains {
+				bookmarks := 0
+				for event := range w.ResultChan() {
+					if event.Type == watch.Bookmark {
+						bookmarks++
+					}
+				}
+				require.Positive(t, bookmarks, "the watcher did not drain")
+				return
+			}
+			if err := goleak.Find(ignoreRunning); err != nil {
+				require.NotContains(t, err.Error(), watcherGoroutine)
+			}
+		})
 	}
 }
 
