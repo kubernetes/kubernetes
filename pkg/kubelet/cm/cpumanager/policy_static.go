@@ -1271,31 +1271,51 @@ func (p *staticPolicy) allocateCPUsForResize(logger klog.Logger, s state.State, 
 		allocatableCPUs = allocatableCPUs.Union(p.GetAvailableCPUs(s).Union(reusableCPUs))
 	}
 
-	// If there are aligned CPUs in numaAffinity, attempt to take those first.
+	// Initiate result with CPUs that must be kept:
+	// * currently allocated for scale up;
+	// * baseline for scale down.
 	result := topology.EmptyAllocation()
-	if numaAffinity != nil {
-		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
-
-		numAlignedToAlloc := alignedCPUs.Size()
-		if min(numCPUs, numAlignedToAlloc) == numCPUs {
-			numAlignedToAlloc = numCPUs
+	if !currentlyAllocatedCPUs.IsEmpty() {
+		if numCPUs >= currentlyAllocatedCPUs.Size() {
+			result.CPUs = currentlyAllocatedCPUs.Clone()
+		} else {
+			result.CPUs = baselineCPUs.Clone()
 		}
+	}
 
-		allocatedCPUs, err := p.takeByTopologyForResize(logger, alignedCPUs, numAlignedToAlloc, currentlyAllocatedCPUs, baselineCPUs)
-		if err != nil {
-			return topology.EmptyAllocation(), err
+	// Protect against CPU leaks by failing early
+	if !result.CPUs.IsSubsetOf(allocatableCPUs) {
+		return topology.EmptyAllocation(), fmt.Errorf("retained CPUs %s are not a subset of allocatable CPUs %s", result.CPUs.String(), allocatableCPUs.String())
+	}
+	numRetainedCPUs := result.CPUs.Size()
+
+	// If there are aligned CPUs in numaAffinity, attempt to take those first.
+	if numaAffinity != nil && numCPUs > result.CPUs.Size() {
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs.Difference(result.CPUs))
+		numAlignedToAlloc := min(numCPUs-result.CPUs.Size(), alignedCPUs.Size())
+
+		if numAlignedToAlloc > 0 {
+			allocatedCPUs, err := p.takeByTopologyForResize(logger, alignedCPUs, result.CPUs.Size()+numAlignedToAlloc, result.CPUs, baselineCPUs)
+			if err != nil {
+				return topology.EmptyAllocation(), fmt.Errorf("unable to take %d of %d requested CPUs from NUMA affinity %s (%d CPUs retained): %w",
+					numAlignedToAlloc, numCPUs, numaAffinity, numRetainedCPUs, err)
+			}
+			result.CPUs = allocatedCPUs
 		}
-
-		result.CPUs = result.CPUs.Union(allocatedCPUs)
 	}
 
 	if numCPUs > result.CPUs.Size() {
 		// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-		remainingCPUs, err := p.takeByTopologyForResize(logger, allocatableCPUs.Difference(result.CPUs), numCPUs-result.CPUs.Size(), currentlyAllocatedCPUs, baselineCPUs)
+		remainingCPUs, err := p.takeByTopologyForResize(logger, allocatableCPUs.Difference(result.CPUs), numCPUs, result.CPUs, baselineCPUs)
 		if err != nil {
-			return topology.EmptyAllocation(), err
+			if numaAffinity == nil {
+				return topology.EmptyAllocation(), fmt.Errorf("unable to take %d of %d requested CPUs (%d CPUs retained): %w",
+					numCPUs-result.CPUs.Size(), numCPUs, numRetainedCPUs, err)
+			}
+			return topology.EmptyAllocation(), fmt.Errorf("unable to take remaining %d of %d requested CPUs outside of NUMA affinity %s (%d CPUs retained, %d CPUs taken from NUMA affinity): %w",
+				numCPUs-result.CPUs.Size(), numCPUs, numaAffinity, numRetainedCPUs, result.CPUs.Size()-numRetainedCPUs, err)
 		}
-		result.CPUs = result.CPUs.Union(remainingCPUs)
+		result.CPUs = remainingCPUs
 	}
 
 	if !baselineCPUs.IsEmpty() && !baselineCPUs.IsSubsetOf(result.CPUs) {
@@ -2105,15 +2125,6 @@ func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CP
 }
 
 func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs cpuset.CPUSet, numCPUs int, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
-
-	// Protect against CPU leaks by failing early
-	if !baselineCPUs.IsEmpty() && !baselineCPUs.IsSubsetOf(availableCPUs) {
-		return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of available CPUs %s", baselineCPUs.String(), availableCPUs.String())
-	}
-	if !currentlyAllocatedCPUs.IsEmpty() && !currentlyAllocatedCPUs.IsSubsetOf(availableCPUs) {
-		return cpuset.New(), fmt.Errorf("reusable CPUs %s are not a subset of available CPUs %s", currentlyAllocatedCPUs.String(), availableCPUs.String())
-	}
-
 	cpuSortingStrategy := CPUSortingStrategyPacked
 	if p.options.DistributeCPUsAcrossCores {
 		cpuSortingStrategy = CPUSortingStrategySpread

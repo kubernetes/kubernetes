@@ -5453,6 +5453,259 @@ func TestTopologyAwareAllocateCPUsAlongsideInPlacePodVerticalScalingExclusiveCPU
 	}
 }
 
+func TestStaticPolicyAllocateCPUsForResize(t *testing.T) {
+	// topoDualSocketHT: {cores} by NUMA:
+	// NUMA0 (even CPUs): {0,6}, {2,8}, {4,10}
+	// NUMA1 (odd  CPUs): {1,7}, {3,9}, {5,11}
+	allCPUs := topoDualSocketHT.CPUDetails.CPUs()
+	testCases := []struct {
+		description  string
+		options      map[string]string
+		currentCPUs  cpuset.CPUSet
+		baselineCPUs cpuset.CPUSet
+		// otherCPUs are exclusively allocated to another container.
+		otherCPUs    cpuset.CPUSet
+		numRequested int
+		numaAffinity bitmask.BitMask
+		expCSet      cpuset.CPUSet
+		expErr       string
+	}{
+		// Scale up
+		{
+			description:  "scale up, NUMA affinity has enough CPUs, full cores are taken",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 2, 6, 8),
+		},
+		{
+			description:  "scale up, NUMA affinity has enough CPUs, distribute-cpus-across-cores, one CPU per core is taken",
+			options:      map[string]string{DistributeCPUsAcrossCoresOption: "true"},
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 2, 4, 6),
+		},
+		{
+			description:  "scale up, NUMA affinity has not enough CPUs, remaining full core taken from other NUMA node",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(4, 10),
+			numRequested: 6,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 1, 2, 6, 7, 8),
+		},
+		{
+			description:  "scale up, NUMA affinity has not enough CPUs, distribute-cpus-across-cores, remaining CPUs taken from different cores of other NUMA node",
+			options:      map[string]string{DistributeCPUsAcrossCoresOption: "true"},
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(4, 10),
+			numRequested: 6,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 1, 2, 3, 6, 8),
+		},
+		{
+			description:  "scale up, no NUMA affinity, request exceeds a NUMA node, NUMA node of currently allocated CPUs is filled first",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 8,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 2, 4, 6, 7, 8, 10),
+		},
+		{
+			description:  "scale up, no NUMA affinity, request exceeds a NUMA node, distribute-cpus-across-numa, CPUs evenly distributed across NUMA nodes",
+			options:      map[string]string{DistributeCPUsAcrossNUMAOption: "true"},
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 8,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 2, 3, 6, 7, 8, 9),
+		},
+		{
+			description:  "scale up, no NUMA affinity, NUMA node of currently allocated CPUs has not enough CPUs",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(4, 10),
+			numRequested: 6,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 2, 6, 7, 8),
+		},
+		{
+			description:  "scale up, no NUMA affinity, NUMA node of currently allocated CPUs has not enough CPUs, distribute-cpus-across-numa, CPUs evenly distributed across NUMA nodes",
+			options:      map[string]string{DistributeCPUsAcrossNUMAOption: "true"},
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(4, 10),
+			numRequested: 6,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 2, 3, 6, 7),
+		},
+		{
+			description:  "scale up, no NUMA affinity, NUMA node of currently allocated CPUs has not enough CPUs, distribute-cpus-across-numa and full-pcpus-only, full cores distributed across NUMA nodes",
+			options:      map[string]string{DistributeCPUsAcrossNUMAOption: "true", FullPCPUsOnlyOption: "true"},
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(4, 10),
+			numRequested: 6,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 3, 6, 7, 9),
+		},
+		{
+			description:  "scale up, not enough CPUs available",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(1, 3, 4, 5, 7, 9, 10, 11),
+			numRequested: 6,
+			numaAffinity: newNUMAAffinity(0),
+			expErr:       "unable to take remaining 2 of 6 requested CPUs outside of NUMA affinity 01 (2 CPUs retained, 2 CPUs taken from NUMA affinity): not enough cpus available to satisfy request: requested=6 (of which 4 already allocated), available=0",
+		},
+		{
+			description:  "scale up, no NUMA affinity, not enough CPUs available",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(1, 3, 4, 5, 7, 9, 10, 11),
+			numRequested: 6,
+			numaAffinity: nil,
+			expErr:       "unable to take 4 of 6 requested CPUs (2 CPUs retained): not enough cpus available to satisfy request: requested=6 (of which 2 already allocated), available=2",
+		},
+		// No scaling
+		{
+			description:  "no change of CPUs",
+			currentCPUs:  cpuset.New(0, 2, 6, 8),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 2, 6, 8),
+		},
+		// Scale down
+		{
+			description:  "scale down to baseline, only baseline CPUs are kept regardless of NUMA affinity",
+			currentCPUs:  cpuset.New(0, 1, 6, 7),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 2,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 6),
+		},
+		{
+			description:  "scale down above baseline, CPUs released from NUMA node outside of NUMA affinity",
+			currentCPUs:  cpuset.New(0, 1, 2, 6, 7, 8),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 2, 6, 8),
+		},
+		{
+			description:  "scale down above baseline, NUMA affinity has not enough CPUs, remaining CPUs taken from other NUMA node",
+			currentCPUs:  cpuset.New(0, 1, 3, 6, 7, 9),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 1, 6, 7),
+		},
+		{
+			description:  "scale down above baseline, no NUMA affinity, distribute-cpus-across-numa, kept CPUs evenly distributed across NUMA nodes",
+			options:      map[string]string{DistributeCPUsAcrossNUMAOption: "true"},
+			currentCPUs:  cpuset.New(0, 1, 2, 3, 6, 7, 8, 9),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 6,
+			numaAffinity: nil,
+			expCSet:      cpuset.New(0, 1, 2, 3, 6, 7),
+		},
+		{
+			description:  "scale down above baseline, distribute-cpus-across-numa, CPUs from NUMA affinity kept first",
+			options:      map[string]string{DistributeCPUsAcrossNUMAOption: "true"},
+			currentCPUs:  cpuset.New(0, 1, 2, 3, 6, 7, 8, 9),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 6,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 1, 2, 6, 7, 8),
+		},
+		{
+			description:  "scale down below baseline",
+			currentCPUs:  cpuset.New(0, 1, 6, 7),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(),
+			numRequested: 1,
+			numaAffinity: newNUMAAffinity(0),
+			expErr:       "requested number of CPUs ( 1 ) are less than number of retained CPUs ( 2 )",
+		},
+		{
+			description:  "scale down, baseline CPUs are not part of currently allocated CPUs",
+			currentCPUs:  cpuset.New(0, 1, 6, 7),
+			baselineCPUs: cpuset.New(2, 8),
+			otherCPUs:    cpuset.New(),
+			numRequested: 2,
+			numaAffinity: newNUMAAffinity(0),
+			expErr:       "retained CPUs 2,8 are not a subset of allocatable CPUs 0-1,6-7",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			p, err := NewStaticPolicy(logger, topoDualSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), tc.options)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+			policy := p.(*staticPolicy)
+
+			assignments := state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{"fakeContainer": tc.currentCPUs},
+			}
+			if !tc.otherCPUs.IsEmpty() {
+				assignments["otherPod"] = map[string]cpuset.CPUSet{"otherContainer": tc.otherCPUs}
+			}
+			st := &mockState{
+				assignments: assignments,
+				baselines: state.ContainerCPUBaselines{
+					"fakePod": map[string]state.ContainerCPUBaseline{"fakeContainer": {Baseline: tc.baselineCPUs}},
+				},
+				defaultCPUSet: allCPUs.Difference(tc.currentCPUs).Difference(tc.otherCPUs),
+			}
+			expDefaultCPUSet := st.defaultCPUSet
+
+			cpuAlloc, err := policy.allocateCPUsForResize(logger, st, tc.numRequested, tc.numaAffinity, cpuset.New(), tc.currentCPUs, tc.baselineCPUs)
+			if tc.expErr != "" {
+				if err == nil || err.Error() != tc.expErr {
+					t.Fatalf("expected error %q but got %v", tc.expErr, err)
+				}
+				if !st.defaultCPUSet.Equals(expDefaultCPUSet) {
+					t.Errorf("expected default CPUSet to stay %v but got %v", expDefaultCPUSet, st.defaultCPUSet)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected CPUSet %v but got error %v", tc.expCSet, err)
+			}
+			if !tc.expCSet.Equals(cpuAlloc.CPUs) {
+				t.Errorf("expected CPUSet %v but got %v", tc.expCSet, cpuAlloc.CPUs)
+			}
+			if !tc.baselineCPUs.IsSubsetOf(cpuAlloc.CPUs) {
+				t.Errorf("expected baseline CPUs %v to be retained in %v", tc.baselineCPUs, cpuAlloc.CPUs)
+			}
+			expDefaultCPUSet = allCPUs.Difference(cpuAlloc.CPUs).Difference(tc.otherCPUs)
+			if !st.defaultCPUSet.Equals(expDefaultCPUSet) {
+				t.Errorf("expected default CPUSet %v but got %v", expDefaultCPUSet, st.defaultCPUSet)
+			}
+		})
+	}
+}
+
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 // with InPlacePodVerticalScalingExclusiveCPUs enabled
