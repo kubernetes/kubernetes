@@ -1134,3 +1134,210 @@ func TestGetTopologyHintsForResize(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPodTopologyHintsForResize(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	m0001, _ := bitmask.NewBitMask(0)
+	m0011, _ := bitmask.NewBitMask(0, 1)
+	m0101, _ := bitmask.NewBitMask(0, 2)
+	m1001, _ := bitmask.NewBitMask(0, 3)
+	m0111, _ := bitmask.NewBitMask(0, 1, 2)
+	m1011, _ := bitmask.NewBitMask(0, 1, 3)
+	m1101, _ := bitmask.NewBitMask(0, 2, 3)
+	m1111, _ := bitmask.NewBitMask(0, 1, 2, 3)
+
+	testCases := []struct {
+		description   string
+		pod           *v1.Pod
+		assignments   state.ContainerCPUAssignments
+		baselines     state.ContainerCPUBaselines
+		defaultCPUSet cpuset.CPUSet
+		cpusToReuse   map[string]cpuset.CPUSet
+		expectedHints []topologymanager.TopologyHint
+		policyOptions map[string]string
+	}{
+		{
+			description: "No scaling containers, assigned CPUs of all containers are on one NUMA",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "4", limit: "4"},
+				{request: "4", limit: "4"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-3"),
+				"appContainer-1": mustParseCPUSet(t, "4-7"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "4-7")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "8-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0001, Preferred: true},
+				{NUMANodeAffinity: m0011, Preferred: false},
+				{NUMANodeAffinity: m0101, Preferred: false},
+				{NUMANodeAffinity: m1001, Preferred: false},
+				{NUMANodeAffinity: m0111, Preferred: false},
+				{NUMANodeAffinity: m1011, Preferred: false},
+				{NUMANodeAffinity: m1101, Preferred: false},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+		{
+			description: "One scale-up container 4->5, assigned CPUs of all containers are on one NUM",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "4", limit: "4"},
+				{request: "5", limit: "5"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-3"),
+				"appContainer-1": mustParseCPUSet(t, "4-7"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "4-7")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "8-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0001, Preferred: true},
+				{NUMANodeAffinity: m0011, Preferred: false},
+				{NUMANodeAffinity: m0101, Preferred: false},
+				{NUMANodeAffinity: m1001, Preferred: false},
+				{NUMANodeAffinity: m0111, Preferred: false},
+				{NUMANodeAffinity: m1011, Preferred: false},
+				{NUMANodeAffinity: m1101, Preferred: false},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+		// Container 1 scale up from 4 to 5.
+		{
+			description: "One scale-up container 4->5, assigned CPUs of all containers are across two NUMAs",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "4", limit: "4"},
+				{request: "5", limit: "5"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-3"),
+				"appContainer-1": mustParseCPUSet(t, "10-13"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "10-13")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "4-9,14-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0011, Preferred: false},
+				{NUMANodeAffinity: m0111, Preferred: false},
+				{NUMANodeAffinity: m1011, Preferred: false},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+		{
+			description: "Both containers scale down 30->25 and 30->15, assigned CPUs of all containers are across four NUMAs",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "25", limit: "25"},
+				{request: "15", limit: "15"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-19,40-49"),
+				"appContainer-1": mustParseCPUSet(t, "20-39,60-69"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "20-23")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "50-59,70-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0111, Preferred: false},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+		{
+			description: "Both containers scale down 30->25 and 20->15, assigned CPUs of all containers are across three NUMAs",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "25", limit: "25"},
+				{request: "15", limit: "15"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-19,40-49"),
+				"appContainer-1": mustParseCPUSet(t, "20-29,60-69"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "20-23")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "30-39,50-59,70-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0111, Preferred: false},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+		{
+			description: "One container scales up 20->40 while another scales down 20->15, assigned CPUs of all containers are across two NUMAs",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "40", limit: "40"},
+				{request: "15", limit: "15"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0-9,40-49"),
+				"appContainer-1": mustParseCPUSet(t, "20-29,60-69"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0-3")},
+				"appContainer-1": {Baseline: mustParseCPUSet(t, "20-23")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "10-19,30-39,50-59,70-79"),
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: m0111, Preferred: true},
+				{NUMANodeAffinity: m1101, Preferred: true},
+				{NUMANodeAffinity: m1111, Preferred: false},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+			var activePods []*v1.Pod
+			for p := range tc.assignments {
+				pod := v1.Pod{}
+				pod.UID = types.UID(p)
+				for c := range tc.assignments[p] {
+					container := v1.Container{}
+					container.Name = c
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+				activePods = append(activePods, &pod)
+			}
+			m := manager{
+				policy: &staticPolicy{
+					topology:    topoDualSocketMultiNumaPerSocketHT,
+					numaNodes:   topoDualSocketMultiNumaPerSocketHT.CPUDetails.NUMANodes().List(),
+					cpusToReuse: tc.cpusToReuse,
+				},
+				state: &mockState{
+					assignments:   tc.assignments,
+					baselines:     tc.baselines,
+					defaultCPUSet: tc.defaultCPUSet,
+				},
+				topology:          topoDualSocketMultiNumaPerSocketHT,
+				activePods:        func() []*v1.Pod { return activePods },
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+			}
+
+			podHints := m.GetPodTopologyHints(logger, tc.pod, lifecycle.ResizeOperation)[string(v1.ResourceCPU)]
+			sort.SliceStable(podHints, func(i, j int) bool {
+				return podHints[i].LessThan(podHints[j])
+			})
+			sort.SliceStable(tc.expectedHints, func(i, j int) bool {
+				return tc.expectedHints[i].LessThan(tc.expectedHints[j])
+			})
+			if !reflect.DeepEqual(tc.expectedHints, podHints) {
+				t.Errorf("Expected in result to be %v, got %v", tc.expectedHints, podHints)
+			}
+		})
+	}
+}
