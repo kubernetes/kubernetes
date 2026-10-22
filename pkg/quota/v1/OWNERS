@@ -6,7 +6,6 @@ approvers:
 reviewers:
   - deads2k
   - derekwaynecarr
-  - smarterclayton
 labels:
   - sig/api-machinery
 emeritus_approvers:
