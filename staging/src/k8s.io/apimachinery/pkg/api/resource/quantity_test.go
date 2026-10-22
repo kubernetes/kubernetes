@@ -5430,6 +5430,10 @@ func TestParseQuantity(t *testing.T) {
 		{input: "00000000000000000001e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1, scale: 2147483647}, Format: DecimalExponent}},                                     // leading zeros do not count as digits
 		{input: "1e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		{input: "1000000000.0000000001e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		// zero with fractional digits
+		{input: "0.0000", wantAsInt64: nil, wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{i: int64Amount{value: 0, scale: -4}, Format: DecimalSI}},
+		{input: "0.0000000000000000000", wantAsInt64: nil, wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{d: scaledDec("0", 19), Format: DecimalSI}},
+		{input: "0.0e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{d: scaledDec("0", 9), Format: DecimalExponent}},
 		// TODO: edge case that wraps before serialization to canonical form
 		{input: "1.25e-2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("125", -2147483647)), canonical: "1250e2147483646", want: Quantity{i: int64Amount{value: 125, scale: 2147483647}, Format: DecimalExponent}},
 		// TODO: the exponent wraps around int32, so this tiny value parses as 1e2147483647.
