@@ -384,7 +384,7 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	// The image is deliberately not a metric label (unbounded cardinality) and is only a sampled
 	// exemplar on the histogram. This line has every pull, so per-image latency can be aggregated
 	// from logs.
-	logger.V(2).Info("Image pull finished", "image", image, "pullPolicy", pullPolicy, "pullDuration", imagePullResult.pullDuration.Truncate(time.Millisecond), "pullDurationWithWaiting", imagePullDuration, "imageSizeBytes", imagePullResult.imageSize)
+	logger.V(4).Info("Image pull finished", "image", image, "pullPolicy", pullPolicy, "pullDuration", imagePullResult.pullDuration.Truncate(time.Millisecond), "pullDurationWithWaiting", imagePullDuration, "imageSizeBytes", imagePullResult.imageSize)
 	m.backOff.GC()
 	finalPullCredentials = imagePullResult.credentialsUsed
 	pullSucceeded = true

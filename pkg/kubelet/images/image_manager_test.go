@@ -1675,7 +1675,7 @@ func TestPullLogsImagePullFinished(t *testing.T) {
 	}
 	puller, fakeClock, _, container, _, _ := pullerTestEnv(t, c, false, nil)
 
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.Verbosity(2), klogtesting.BufferLogs(true)))
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.Verbosity(4), klogtesting.BufferLogs(true)))
 	ctx := klog.NewContext(context.Background(), logger)
 
 	pod := &v1.Pod{
