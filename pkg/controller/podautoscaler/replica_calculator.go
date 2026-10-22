@@ -307,12 +307,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s on %s %s/%s: %w", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if change is large enough
-		replicaCount = ceilToInt32(float64(usage) / float64(targetAverageUsage))
-	}
+	replicaCount = getPerPodReplicas(usage, targetAverageUsage, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
@@ -391,14 +386,22 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		}
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if the change is large enough
-		replicaCount = ceilToInt32(float64(usage) / float64(targetUsagePerPod))
-	}
+	replicaCount = getPerPodReplicas(usage, targetUsagePerPod, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
+}
+
+// getPerPodReplicas returns the current replica count if usage is within tolerance,
+// else the desired count (total usage / per-pod target, rounded up).
+// With zero running pods the ratio is undefined, so skip the tolerance check and use the desired count.
+func getPerPodReplicas(totalUsage int64, targetPerPod int64, statusReplicas int32, tolerances Tolerances) int32 {
+	if statusReplicas != 0 {
+		usageRatio := float64(totalUsage) / (float64(targetPerPod) * float64(statusReplicas))
+		if tolerances.isWithin(usageRatio) {
+			return statusReplicas
+		}
+	}
+	return ceilToInt32(float64(totalUsage) / float64(targetPerPod))
 }
 
 // getPerPodUsage calculates the per-pod usage based on total usage and replica count,
