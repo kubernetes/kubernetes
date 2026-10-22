@@ -63,13 +63,13 @@ func TestWatch(t *testing.T) {
 		ctx, store, client := testSetup(t, withPrefix("/"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
 		recorder := storagetesting.NewWatchRecorder(client.Watcher)
 		client.Watcher = recorder
-		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "ns", true, recorder)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, true, true, recorder)
 	})
 	t.Run("WatchWithoutPrevKVClusterScoped", func(t *testing.T) {
 		ctx, store, client := testSetup(t, withPrefix("/custom/prefix"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", false)))
 		recorder := storagetesting.NewWatchRecorder(client.Watcher)
 		client.Watcher = recorder
-		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "", true, recorder)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, false, true, recorder)
 	})
 	t.Run("WatchWithoutPrevKVReverseError", func(t *testing.T) {
 		wantErr := errors.New("invalid resource key")
@@ -116,7 +116,7 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "test-ns", false, nil)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, true, false, nil)
 	})
 	t.Run("WatchInitializationSignal", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)

@@ -261,15 +261,21 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 					if watchTest.watchType == watch.Deleted {
 						expectObj = prevObj
 						expectObj.ResourceVersion = out.ResourceVersion
-						if tt.watchWithoutPrevKV && !watchCacheEnabled {
-							expectObj = &example.Pod{ObjectMeta: metav1.ObjectMeta{
-								Name: prevObj.Name, Namespace: prevObj.Namespace, ResourceVersion: out.ResourceVersion,
-							}}
-						}
 					}
 					expectEvent = &watch.Event{Type: watchTest.watchType, Object: expectObj}
 				}
-				testCheckResult(t, w, expectEvent)
+				if tt.watchWithoutPrevKV && watchTest.watchType == watch.Deleted {
+					testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+						require.Equal(t, watch.Deleted, actualEvent.Type)
+						obj, err := meta.Accessor(actualEvent.Object)
+						require.NoError(t, err)
+						require.Equal(t, prevObj.Name, obj.GetName())
+						require.Equal(t, prevObj.Namespace, obj.GetNamespace())
+						require.Equal(t, out.ResourceVersion, obj.GetResourceVersion())
+					})
+				} else {
+					testCheckResult(t, w, expectEvent)
+				}
 				prevObj = out
 			}
 			w.Stop()
@@ -653,7 +659,11 @@ func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Inte
 	}
 }
 
-func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T, store storage.Interface, namespace string, watchWithoutPrevKV bool, recorder *WatchRecorder) {
+func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T, store storage.Interface, isNamespaceScoped, watchWithoutPrevKV bool, recorder *WatchRecorder) {
+	var namespace string
+	if isNamespaceScoped {
+		namespace = "test-ns"
+	}
 	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: namespace, Labels: map[string]string{"app": "test"}}}
 	key := path.Join("/pods", namespace, pod.Name)
 	storedObj := &example.Pod{}
@@ -681,13 +691,18 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 		t.Fatalf("ResourceVersion didn't changed on deletion: %s", deletedObj.ResourceVersion)
 	}
 
-	expectedObj := deletedObj
 	if watchWithoutPrevKV {
-		expectedObj = &example.Pod{ObjectMeta: metav1.ObjectMeta{
-			Name: pod.Name, Namespace: namespace, ResourceVersion: deletedObj.ResourceVersion,
-		}}
+		testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+			require.Equal(t, watch.Deleted, actualEvent.Type)
+			obj, err := meta.Accessor(actualEvent.Object)
+			require.NoError(t, err)
+			require.Equal(t, pod.Name, obj.GetName())
+			require.Equal(t, namespace, obj.GetNamespace())
+			require.Equal(t, deletedObj.ResourceVersion, obj.GetResourceVersion())
+		})
+	} else {
+		testCheckResult(t, w, &watch.Event{Type: watch.Deleted, Object: deletedObj})
 	}
-	testCheckResult(t, w, &watch.Event{Type: watch.Deleted, Object: expectedObj})
 	if recorder != nil {
 		requests := recorder.WatchRequests()
 		require.Len(t, requests, 1)
