@@ -1,5 +1,3 @@
-//go:build go1.8
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -28,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	netutils "k8s.io/utils/net"
@@ -936,6 +935,43 @@ func TestPingTimeoutSeconds(t *testing.T) {
 	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", "illegal value")
 	if e, a := 15, pingTimeoutSeconds(); e != a {
 		t.Errorf("expected %d, got %d", e, a)
+	}
+}
+
+func TestSetTransportDefaultsHTTP2Timeouts(t *testing.T) {
+	t.Setenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "")
+	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", "")
+	testcases := []struct {
+		name         string
+		http2        *http.HTTP2Config
+		wantSendPing time.Duration
+		wantPing     time.Duration
+	}{
+		{
+			name:         "unset gets the defaults",
+			wantSendPing: 30 * time.Second,
+			wantPing:     15 * time.Second,
+		},
+		{
+			name:         "caller values are kept",
+			http2:        &http.HTTP2Config{SendPingTimeout: 7 * time.Second, PingTimeout: 3 * time.Second},
+			wantSendPing: 7 * time.Second,
+			wantPing:     3 * time.Second,
+		},
+		{
+			name:         "caller zero values are filled",
+			http2:        &http.HTTP2Config{PingTimeout: 3 * time.Second},
+			wantSendPing: 30 * time.Second,
+			wantPing:     3 * time.Second,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := SetTransportDefaults(&http.Transport{HTTP2: tc.http2})
+			if tr.HTTP2.SendPingTimeout != tc.wantSendPing || tr.HTTP2.PingTimeout != tc.wantPing {
+				t.Errorf("got SendPingTimeout=%s PingTimeout=%s, want %s and %s", tr.HTTP2.SendPingTimeout, tr.HTTP2.PingTimeout, tc.wantSendPing, tc.wantPing)
+			}
+		})
 	}
 }
 
