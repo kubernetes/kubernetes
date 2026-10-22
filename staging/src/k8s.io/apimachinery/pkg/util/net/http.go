@@ -206,8 +206,14 @@ func configureHTTP2Transport(t *http.Transport) {
 	if t.HTTP2 == nil {
 		t.HTTP2 = new(http.HTTP2Config)
 	}
-	t.HTTP2.SendPingTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
-	t.HTTP2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	// Only fill zero values: callers may set their own timeouts, and the
+	// x/net path let those win.
+	if t.HTTP2.SendPingTimeout == 0 {
+		t.HTTP2.SendPingTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
+	}
+	if t.HTTP2.PingTimeout == 0 {
+		t.HTTP2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	}
 }
 
 func allowsHTTP2(t *http.Transport) bool {
