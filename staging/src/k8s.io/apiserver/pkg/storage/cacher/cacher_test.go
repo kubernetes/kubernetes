@@ -316,6 +316,18 @@ func TestMarkConsistent(t *testing.T) {
 		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
 	}
 
+	t.Log("Consistent cache marked consistent again keeps snapshots, list skips etcd")
+	cacher.cacher.MarkConsistent(true)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+
 	t.Log("Inconsistent cache clears old snapshots, list hits etcd")
 	cacher.cacher.MarkConsistent(false)
 	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
