@@ -174,12 +174,13 @@ func TestPodGroupAlgorithmLatency(t *testing.T) {
 		{"test-profile", CompositePodGroup, 1},
 		{"test-profile-2", CompositePodGroup, 1},
 	} {
-		gotCount, err := testutil.GetHistogramMetricCount(PodGroupSchedulingAlgorithmLatency.WithLabelValues(tc.profile, tc.entityType))
+		labels := map[string]string{"profile": tc.profile, "entity": tc.entityType}
+		vec, err := testutil.GetHistogramVecFromGatherer(registry, "scheduler_podgroup_scheduling_algorithm_duration_seconds", labels)
 		if err != nil {
 			t.Errorf("Failed to get sample count for podgroup_scheduling_algorithm_duration_seconds{profile=%q,entity=%q}: %v", tc.profile, tc.entityType, err)
 			continue
 		}
-		if gotCount != tc.wantCount {
+		if gotCount := vec.GetAggregatedSampleCount(); gotCount != tc.wantCount {
 			t.Errorf("podgroup_scheduling_algorithm_duration_seconds{profile=%q,entity=%q}: got %d samples, want %d", tc.profile, tc.entityType, gotCount, tc.wantCount)
 		}
 	}
