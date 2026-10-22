@@ -40,12 +40,12 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/webhookauth"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
-	"k8s.io/apiserver/pkg/util/webhook"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	netutils "k8s.io/utils/net"
@@ -125,7 +125,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd, serverConfig.ResourceTransformers, serverConfig.StorageObjectCountTracker),
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, noopoteltrace.NewTracerProvider()),
+			AuthResolverWrapper:  webhookauth.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, noopoteltrace.NewTracerProvider()),
 		},
 	}
 	return config, nil

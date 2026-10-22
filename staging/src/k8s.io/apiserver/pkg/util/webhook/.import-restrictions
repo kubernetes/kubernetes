@@ -1,0 +1,10 @@
+# This package is imported by the token and authorizer webhook plugins and by
+# admission and CRD validation, which is why it must stay light. The egress
+# selector (gRPC, konnectivity) and the OpenTelemetry SDK and exporters would
+# be linked into every one of their importers, so the code that wires them
+# into webhook clients lives in k8s.io/apiserver/pkg/server/webhookauth.
+rules:
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/server/egressselector$|^k8s[.]io/component-base/tracing$|^google[.]golang[.]org/grpc|^go[.]opentelemetry[.]io/otel/(sdk|exporters)
+    forbiddenPrefixes:
+      - ''
+    transitive: true
