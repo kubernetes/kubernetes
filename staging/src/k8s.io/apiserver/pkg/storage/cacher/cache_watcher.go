@@ -467,9 +467,6 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 }
 
 func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, error) {
-	if cacheInterval == nil {
-		return resourceVersion, nil
-	}
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually

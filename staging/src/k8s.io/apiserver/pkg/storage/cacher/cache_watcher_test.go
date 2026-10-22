@@ -242,7 +242,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
-		go w.process(ctx, nil, 0)
+		go w.process(ctx, intervalFromEvents(nil), 0)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
