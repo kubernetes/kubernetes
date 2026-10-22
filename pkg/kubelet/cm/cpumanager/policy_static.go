@@ -1295,7 +1295,7 @@ func (p *staticPolicy) allocateCPUsForResize(logger klog.Logger, s state.State, 
 		numAlignedToAlloc := min(numCPUs-result.CPUs.Size(), alignedCPUs.Size())
 
 		if numAlignedToAlloc > 0 {
-			allocatedCPUs, err := p.takeByTopologyForResize(logger, alignedCPUs, result.CPUs.Size()+numAlignedToAlloc, result.CPUs, baselineCPUs)
+			allocatedCPUs, err := p.takeByTopologyForResize(logger, alignedCPUs, result.CPUs.Size()+numAlignedToAlloc, result.CPUs, baselineCPUs, numaAffinity.Count())
 			if err != nil {
 				return topology.EmptyAllocation(), fmt.Errorf("unable to take %d of %d requested CPUs from NUMA affinity %s (%d CPUs retained): %w",
 					numAlignedToAlloc, numCPUs, numaAffinity, numRetainedCPUs, err)
@@ -1306,7 +1306,7 @@ func (p *staticPolicy) allocateCPUsForResize(logger klog.Logger, s state.State, 
 
 	if numCPUs > result.CPUs.Size() {
 		// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-		remainingCPUs, err := p.takeByTopologyForResize(logger, allocatableCPUs.Difference(result.CPUs), numCPUs, result.CPUs, baselineCPUs)
+		remainingCPUs, err := p.takeByTopologyForResize(logger, allocatableCPUs.Difference(result.CPUs), numCPUs, result.CPUs, baselineCPUs, 0)
 		if err != nil {
 			if numaAffinity == nil {
 				return topology.EmptyAllocation(), fmt.Errorf("unable to take %d of %d requested CPUs (%d CPUs retained): %w",
@@ -2124,7 +2124,7 @@ func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CP
 	return hints
 }
 
-func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs cpuset.CPUSet, numCPUs int, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
+func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs cpuset.CPUSet, numCPUs int, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet, minNUMAsFromHint int) (cpuset.CPUSet, error) {
 	cpuSortingStrategy := CPUSortingStrategyPacked
 	if p.options.DistributeCPUsAcrossCores {
 		cpuSortingStrategy = CPUSortingStrategySpread
@@ -2135,7 +2135,7 @@ func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs
 		if p.options.FullPhysicalCPUsOnly {
 			cpuGroupSize = p.cpuGroupSize
 		}
-		return takeByTopologyNUMADistributedForResize(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, p.options.AlignBySocket, currentlyAllocatedCPUs, baselineCPUs)
+		return takeByTopologyNUMADistributedForResize(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, p.options.AlignBySocket, currentlyAllocatedCPUs, baselineCPUs, minNUMAsFromHint)
 	}
 
 	// If requested CPUs to be retained or reusable CPUs are empty
