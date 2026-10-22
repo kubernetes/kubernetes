@@ -1174,8 +1174,6 @@ func AddPodControllerIndexer(podInformer cache.SharedIndexInformer) error {
 
 // FilterPodsByOwner gets the Pods managed by an owner or orphan Pods in the owner's namespace
 func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta, ownerKind string, includeOrphanedPods bool) ([]*v1.Pod, error) {
-	result := []*v1.Pod{}
-
 	if len(owner.Namespace) == 0 {
 		return nil, fmt.Errorf("no owner namespace provided")
 	}
@@ -1188,27 +1186,38 @@ func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta, owner
 	if len(ownerKind) == 0 {
 		return nil, fmt.Errorf("no owner kind provided")
 	}
-	// Always include the owner key, which identifies Pods that are controlled by the owner
-	keys := []string{PodControllerIndexKey(owner.Namespace, &metav1.OwnerReference{Name: owner.Name, Kind: ownerKind, UID: owner.UID})}
-	if includeOrphanedPods {
-		// Optionally include the unowned key, which identifies orphaned Pods in the owner's namespace and might be adopted by the owner later
-		keys = append(keys, PodControllerIndexKey(owner.Namespace, nil))
+	// Pods controlled by the owner.
+	ownedObjects, err := podIndexer.ByIndex(PodControllerIndex, PodControllerIndexKey(owner.Namespace, &metav1.OwnerReference{Name: owner.Name, Kind: ownerKind, UID: owner.UID}))
+	if err != nil {
+		return nil, err
 	}
-	for _, key := range keys {
-		pods, err := podIndexer.ByIndex(PodControllerIndex, key)
+	// Orphaned Pods in the owner's namespace might be adopted by the owner later.
+	var orphanedObjects []interface{}
+	if includeOrphanedPods {
+		orphanedObjects, err = podIndexer.ByIndex(PodControllerIndex, PodControllerIndexKey(owner.Namespace, nil))
 		if err != nil {
 			return nil, err
 		}
-		for _, obj := range pods {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			result = append(result, pod)
-		}
 	}
+	// The size of both index lookups is known up front, so allocate the result
+	// with the exact capacity to avoid repeatedly growing it while appending.
+	result := make([]*v1.Pod, 0, len(ownedObjects)+len(orphanedObjects))
+	result = appendPodsFromIndexer(result, ownedObjects)
+	result = appendPodsFromIndexer(result, orphanedObjects)
 	return result, nil
+}
+
+// appendPodsFromIndexer appends the Pods in objects to result, skipping objects of other types.
+func appendPodsFromIndexer(result []*v1.Pod, objects []interface{}) []*v1.Pod {
+	for _, obj := range objects {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+			continue
+		}
+		result = append(result, pod)
+	}
+	return result
 }
 
 // PodKey returns a key unique to the given pod within a cluster.
