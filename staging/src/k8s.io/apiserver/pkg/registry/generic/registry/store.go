@@ -1772,10 +1772,20 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	if e.Storage.Storage == nil {
-		e.Storage.Codec = opts.StorageConfig.Codec
+		storageConfig := opts.StorageConfig
+
+		if options.DecodeDecorator != nil {
+			// make a shallow copy of the storageConfig and wrap the codec to decorate on Decode
+			storageConfigCopy := *storageConfig
+			storageConfigCopy.Codec = &decoratedDecoder{Encoder: storageConfig.Codec, decoder: storageConfig.Codec, decorator: options.DecodeDecorator}
+			storageConfig = &storageConfigCopy
+		}
+
+		e.Storage.Codec = storageConfig.Codec
+
 		var err error
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
-			opts.StorageConfig,
+			storageConfig,
 			prefix,
 			keyFuncs.objectKeyFunc,
 			keyFuncs.reverseKeyFunc,

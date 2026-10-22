@@ -46,6 +46,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -3678,5 +3679,100 @@ func TestStoreInvalidShardSelector(t *testing.T) {
 	}
 	if !errors.IsBadRequest(err) {
 		t.Errorf("Watch with invalid ShardSelector: expected BadRequest (400), got %v", err)
+	}
+}
+
+func TestStoreDecodeDecorator(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	defer server.Terminate(t)
+
+	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
+	sc.EventsHistoryWindow = cacherstorage.DefaultEventFreshDuration
+
+	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	resource := example.Resource("pods")
+	store := &Store{
+		NewFunc:                   func() runtime.Object { return &example.Pod{} },
+		NewListFunc:               func() runtime.Object { return &example.PodList{} },
+		DefaultQualifiedResource:  resource,
+		SingularQualifiedResource: example.Resource("pod"),
+		CreateStrategy:            strategy,
+		UpdateStrategy:            strategy,
+		DeleteStrategy:            strategy,
+		TableConvertor:            rest.NewDefaultTableConvertor(resource),
+	}
+
+	err := store.CompleteWithOptions(&generic.StoreOptions{
+		RESTOptions: generic.RESTOptions{
+			StorageConfig:  sc.ForResource(resource),
+			Decorator:      StorageWithCacher(),
+			ResourcePrefix: "pods",
+		},
+		DecodeDecorator: func(obj runtime.Object) {
+			if pod, ok := obj.(*example.Pod); ok {
+				pod.Labels = map[string]string{"decorated": "true"}
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("CompleteWithOptions failed: %v", err)
+	}
+	defer store.DestroyFunc()
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return store.ReadinessCheck() == nil, nil
+	}); err != nil {
+		t.Fatalf("storage did not become ready: %v", err)
+	}
+	w, err := store.Watch(ctx, &metainternalversion.ListOptions{ResourceVersion: "0"})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	defer w.Stop()
+
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "test"}}
+	key, err := store.KeyFunc(ctx, pod.Name)
+	if err != nil {
+		t.Fatalf("KeyFunc failed: %v", err)
+	}
+	out := &example.Pod{}
+	if err := store.Storage.Create(ctx, key, pod, out, 0, false); err != nil {
+		t.Fatalf("Storage.Create failed: %v", err)
+	}
+	if out.Labels["decorated"] != "true" {
+		t.Errorf("Create: expected decorated pod, got labels %v", out.Labels)
+	}
+
+	select {
+	case event, ok := <-w.ResultChan():
+		if !ok || event.Type != watch.Added {
+			t.Fatalf("Watch: expected Added event, got ok=%v event=%+v", ok, event)
+		}
+		cacheable, ok := event.Object.(runtime.CacheableObject)
+		if !ok {
+			t.Fatalf("Watch: expected runtime.CacheableObject, got %T", event.Object)
+		}
+		if watchedPod := cacheable.GetObject().(*example.Pod); watchedPod.Labels["decorated"] != "true" {
+			t.Errorf("Watch: expected decorated pod, got labels %v", watchedPod.Labels)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for watch event")
+	}
+
+	gotObj, err := store.Get(ctx, pod.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if gotPod := gotObj.(*example.Pod); gotPod.Labels["decorated"] != "true" {
+		t.Errorf("Get: expected decorated pod, got labels %v", gotPod.Labels)
+	}
+
+	listObj, err := store.List(ctx, &metainternalversion.ListOptions{})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if items := listObj.(*example.PodList).Items; len(items) != 1 || items[0].Labels["decorated"] != "true" {
+		t.Errorf("List: expected 1 decorated pod, got %+v", items)
 	}
 }
