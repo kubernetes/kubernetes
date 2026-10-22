@@ -447,13 +447,12 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
 
-	resourceVersion, err := c.processInitialEvents(cacheInterval, resourceVersion)
-	if err != nil {
+	if err := c.processInitialEvents(cacheInterval); err != nil {
 		return
 	}
 	// At this point we already start processing incoming watch events.
@@ -463,10 +462,10 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	//   the initialization signal proportionally to the number of events to
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
-	c.processIncomingEvents(ctx, resourceVersion)
+	c.processIncomingEvents(ctx, cacheInterval.resourceVersion)
 }
 
-func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, error) {
+func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) error {
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
@@ -482,13 +481,6 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 	// consider increase size of result buffer in those cases.
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
-
-	// cacheInterval may be created from a version being more fresh than requested
-	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
-	// with lower resourceVersion from being delivered to ensure watch contract.
-	if cacheInterval.resourceVersion > resourceVersion {
-		resourceVersion = cacheInterval.resourceVersion
-	}
 
 	initEventCount := 0
 	for event, err := range cacheInterval.All() {
@@ -508,22 +500,9 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 			// custom clients, the cost of it is something that we
 			// are fully accepting.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-			return resourceVersion, err
+			return err
 		}
 		c.sendWatchCacheEvent(event)
-
-		// With some events already sent, update resourceVersion so that
-		// events that were buffered and not yet processed won't be delivered
-		// to this watcher second time causing going back in time.
-		//
-		// There is one case where events are not necessary ordered by
-		// resourceVersion, being a case of watching from resourceVersion=0,
-		// which at the beginning returns the state of each objects.
-		// For the purpose of it, we need to max it with the resource version
-		// that we have so far.
-		if event.ResourceVersion > resourceVersion {
-			resourceVersion = event.ResourceVersion
-		}
 		initEventCount++
 	}
 
@@ -539,7 +518,7 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
 	}
-	return resourceVersion, nil
+	return nil
 }
 
 func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersion uint64) {

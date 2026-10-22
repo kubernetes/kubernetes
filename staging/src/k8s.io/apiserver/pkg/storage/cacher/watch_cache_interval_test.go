@@ -67,9 +67,11 @@ func generateEvents(start, end int) []*watchCacheEvent {
 	n := end - start
 	events := make([]*watchCacheEvent, n)
 	for i := 0; i < n; i++ {
+		rv := uint64(start + i + 1)
 		events[i] = &watchCacheEvent{
-			Type:   watch.Added,
-			Object: makeTestPod(fmt.Sprintf("pod%d", start+i), uint64(start+i)),
+			Type:            watch.Added,
+			Object:          makeTestPod(fmt.Sprintf("pod%d", start+i), rv),
+			ResourceVersion: rv,
 		}
 	}
 	return events
@@ -298,7 +300,9 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 			wc := newTestWatchCache(capacity, DefaultEventFreshDuration, &cache.Indexers{})
 			defer wc.Stop()
 			for i := 0; i < c.eventsAddedToWatchcache; i++ {
-				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
+				if err := wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i+1))); err != nil {
+					t.Fatal(err)
+				}
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
 				return wc.history.cache[i%wc.history.capacity]
