@@ -542,40 +542,8 @@ func (s *store) GuaranteedUpdate(
 			continue
 		}
 
-		span.AddEvent("About to Encode")
-		data, err := runtime.Encode(s.codec, ret)
-		if err != nil {
-			span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			return err
-		}
-		span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
-		if !origState.stale && bytes.Equal(data, origState.data) {
-			// if we skipped the original Get in this loop, we must refresh from
-			// etcd in order to be sure the data in the store is equivalent to
-			// our desired serialization
-			if !origState.current {
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				if !bytes.Equal(data, origState.data) {
-					// original data changed, restart loop
-					continue
-				}
-			}
-			// recheck that the data from etcd is not stale before short-circuiting a write
-			if !origState.stale {
-				err = s.decoder.Decode(origState.data, destination, origState.rev)
-				if err != nil {
-					recordDecodeError(s.groupResource, preparedKey)
-					return err
-				}
-				return nil
-			}
-		}
-
 		var success bool
-		origState, success, err = s.updateOnce(ctx, span, preparedKey, destination, origState, data, ttl, v, ignoreNotFound)
+		origState, success, err = s.updateOnce(ctx, span, preparedKey, destination, origState, ret, ttl, v, ignoreNotFound, getCurrentState)
 		if err != nil {
 			return err
 		}
@@ -585,7 +553,40 @@ func (s *store) GuaranteedUpdate(
 	}
 }
 
-func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey string, destination runtime.Object, origState *objState, data []byte, ttl uint64, v reflect.Value, ignoreNotFound bool) (state *objState, success bool, err error) {
+func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey string, destination runtime.Object, origState *objState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound bool, getCurrentState func() (*objState, error)) (state *objState, success bool, err error) {
+	span.AddEvent("About to Encode")
+	data, err := runtime.Encode(s.codec, ret)
+	if err != nil {
+		span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+		return origState, false, err
+	}
+	span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
+
+	if !origState.stale && bytes.Equal(data, origState.data) {
+		// If we skipped the original Get in this loop, we must refresh from
+		// etcd in order to be sure the data in the store is equivalent to
+		// our desired serialization before short-circuiting a write.
+		if !origState.current {
+			origState, err = getCurrentState()
+			if err != nil {
+				return origState, false, err
+			}
+			if !bytes.Equal(data, origState.data) {
+				// original data changed, restart loop
+				return origState, false, nil
+			}
+		}
+		// recheck that the data from etcd is not stale before short-circuiting a write
+		if !origState.stale {
+			err = s.decoder.Decode(origState.data, destination, origState.rev)
+			if err != nil {
+				recordDecodeError(s.groupResource, preparedKey)
+				return origState, false, err
+			}
+			return origState, true, nil
+		}
+	}
+
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(preparedKey))
 	if err != nil {
 		span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
