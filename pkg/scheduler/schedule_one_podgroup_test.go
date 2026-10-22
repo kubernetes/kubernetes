@@ -9926,3 +9926,275 @@ func TestCompleteCompositePodGroupAlgorithmResultMap(t *testing.T) {
 		})
 	}
 }
+
+func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
+	testRegistry := componentmetrics.NewKubeRegistry()
+	testRegistry.MustRegister(
+		metrics.PodGroupScheduleAttempts,
+		metrics.PodGroupSchedulingLatency,
+	)
+
+	tests := []struct {
+		name                string
+		isCPG               bool
+		wantType            string
+		status              *fwk.Status
+		waitingOnPreemption bool
+		wantResult          string
+	}{
+		{
+			name:       "podgroup scheduled successfully",
+			isCPG:      false,
+			wantType:   metrics.PodGroup,
+			status:     fwk.NewStatus(fwk.Success),
+			wantResult: metrics.ScheduledResult,
+		},
+		{
+			name:       "compositepodgroup scheduled successfully",
+			isCPG:      true,
+			wantType:   metrics.CompositePodGroup,
+			status:     fwk.NewStatus(fwk.Success),
+			wantResult: metrics.ScheduledResult,
+		},
+		{
+			name:       "podgroup unschedulable",
+			isCPG:      false,
+			wantType:   metrics.PodGroup,
+			status:     fwk.NewStatus(fwk.Unschedulable),
+			wantResult: metrics.UnschedulableResult,
+		},
+		{
+			name:       "compositepodgroup unschedulable",
+			isCPG:      true,
+			wantType:   metrics.CompositePodGroup,
+			status:     fwk.NewStatus(fwk.Unschedulable),
+			wantResult: metrics.UnschedulableResult,
+		},
+		{
+			name:                "podgroup waiting on preemption",
+			isCPG:               false,
+			wantType:            metrics.PodGroup,
+			status:              fwk.NewStatus(fwk.Unschedulable),
+			waitingOnPreemption: true,
+			wantResult:          metrics.WaitingOnPreemptionResult,
+		},
+		{
+			name:                "compositepodgroup waiting on preemption",
+			isCPG:               true,
+			wantType:            metrics.CompositePodGroup,
+			status:              fwk.NewStatus(fwk.Unschedulable),
+			waitingOnPreemption: true,
+			wantResult:          metrics.WaitingOnPreemptionResult,
+		},
+		{
+			name:       "podgroup error",
+			isCPG:      false,
+			wantType:   metrics.PodGroup,
+			status:     fwk.NewStatus(fwk.Error, "internal error"),
+			wantResult: metrics.ErrorResult,
+		},
+		{
+			name:       "compositepodgroup error",
+			isCPG:      true,
+			wantType:   metrics.CompositePodGroup,
+			status:     fwk.NewStatus(fwk.Error, "internal error"),
+			wantResult: metrics.ErrorResult,
+		},
+	}
+
+	gateSetups := []struct {
+		name       string
+		cpgEnabled bool
+		features   featuregatetesting.FeatureOverrides
+	}{
+		{
+			name:       "Generic",
+			cpgEnabled: false,
+			features: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			},
+		},
+		{
+			name:       "CPG",
+			cpgEnabled: true,
+			// CompositePodGroup depends on GenericWorkload and TopologyAwareWorkloadScheduling.
+			features: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			},
+		},
+	}
+
+	for _, setup := range gateSetups {
+		t.Run(setup.name, func(t *testing.T) {
+			for _, tt := range tests {
+				if tt.isCPG && !setup.cpgEnabled {
+					continue
+				}
+				t.Run(tt.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, setup.features)
+
+					metrics.PodGroupScheduleAttempts.Reset()
+					metrics.PodGroupSchedulingLatency.Reset()
+
+					logger, ctx := ktesting.NewTestContext(t)
+					testNode := st.MakeNode().Name("node1").Obj()
+					p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").SchedulerName("test-scheduler").Obj()
+
+					var qpgi *framework.QueuedPodGroupInfo
+					if tt.isCPG {
+						cpg := st.MakeCompositePodGroup().Name("root-cpg").Namespace("default").Obj()
+						pg := st.MakePodGroup().Name("child-pg").Namespace("default").ParentCompositePodGroup("root-cpg").Obj()
+						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pg.Name}
+						qpgi = newQueuedPodGroupInfo(
+							framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg),
+								&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg), UnscheduledPods: []*v1.Pod{p1}},
+							),
+							&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}},
+						)
+					} else {
+						pg := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pg.Name}
+						qpgi = newQueuedPodGroupInfo(
+							&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg), UnscheduledPods: []*v1.Pod{p1}},
+							&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}},
+						)
+					}
+
+					var lock sync.Mutex
+					boundPods := sets.New[string]()
+					failedPods := sets.New[string]()
+
+					client := clientsetfake.NewSimpleClientset(testNode, p1)
+					queue := internalqueue.NewTestQueue(ctx, nil)
+					client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						if action.GetSubresource() != "binding" {
+							return false, nil, nil
+						}
+						lock.Lock()
+						binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+						boundPods.Insert(binding.Name)
+						lock.Unlock()
+						return true, binding, nil
+					})
+
+					schedFwk, err := tf.NewFramework(ctx, []tf.RegisterPluginFunc{
+						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+					}, "test-scheduler",
+						frameworkruntime.WithPodNominator(queue),
+						frameworkruntime.WithClientSet(client),
+						frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+					)
+					if err != nil {
+						t.Fatalf("Failed to create framework: %v", err)
+					}
+
+					cache := internalcache.New(ctx, nil, true, setup.cpgEnabled)
+					cache.AddNode(logger, testNode)
+
+					sched := &Scheduler{
+						Profiles:         profile.Map{"test-scheduler": schedFwk},
+						SchedulingQueue:  queue,
+						Cache:            cache,
+						client:           client,
+						nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+						FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+							lock.Lock()
+							failedPods.Insert(p.Pod.Name)
+							lock.Unlock()
+						},
+					}
+					if err := sched.initAlgorithm(); err != nil {
+						t.Fatalf("Failed to initialize scheduling algorithm: %v", err)
+					}
+
+					// submitPodGroupAlgorithmResult finishes the cycle and records attempt and latency metrics
+					podGroupCycleState := framework.NewCycleState()
+					placementCycleState := framework.NewCycleState()
+					placementCycleState.SetPodGroupCycleState(podGroupCycleState)
+					podCtx := initPodSchedulingContext(ctx, p1, placementCycleState)
+
+					resultsMap := make(map[fwk.EntityKey]*podGroupAlgorithmResult)
+					if tt.isCPG {
+						resultsMap[qpgi.PodGroupInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        qpgi.PodGroupInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+						}
+						childPGInfo := qpgi.PodGroupInfo.Children()[0]
+						resultsMap[childPGInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        childPGInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+							podResults: []algorithmResult{
+								{
+									status:         tt.status,
+									podCtx:         podCtx,
+									podInfo:        qpgi.PodInfosForGroup(childPGInfo.GetKey())[0],
+									scheduleResult: ScheduleResult{SuggestedHost: testNode.Name},
+								},
+							},
+						}
+					} else {
+						resultsMap[qpgi.PodGroupInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        qpgi.PodGroupInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+							podResults: []algorithmResult{
+								{
+									status:         tt.status,
+									podCtx:         podCtx,
+									podInfo:        qpgi.PodInfosForGroup(qpgi.PodGroupInfo.GetKey())[0],
+									scheduleResult: ScheduleResult{SuggestedHost: testNode.Name},
+								},
+							},
+						}
+					}
+					sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, qpgi, resultsMap, time.Now(), tt.status)
+
+					if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+						lock.Lock()
+						defer lock.Unlock()
+						return len(boundPods)+len(failedPods) == qpgi.Size(), nil
+					}); err != nil {
+						t.Errorf("Failed waiting for all pods to be either bound or failed")
+					}
+
+					lock.Lock()
+					wantBound, wantFailed := sets.New[string](), sets.New("p1")
+					if tt.status.IsSuccess() {
+						wantBound, wantFailed = sets.New("p1"), sets.New[string]()
+					}
+					if !boundPods.Equal(wantBound) || !failedPods.Equal(wantFailed) {
+						t.Errorf("Unexpected pod outcome: bound=%v failed=%v, want bound=%v failed=%v", sets.List(boundPods), sets.List(failedPods), sets.List(wantBound), sets.List(wantFailed))
+					}
+					lock.Unlock()
+
+					// Verify podgroup_schedule_attempts_total
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "entity", tt.wantType, 1)
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "result", tt.wantResult, 1)
+
+					// Verify podgroup_scheduling_attempt_duration_seconds sample count
+					labels := map[string]string{
+						"result":  tt.wantResult,
+						"profile": "test-scheduler",
+						"entity":  tt.wantType,
+					}
+					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", labels, 1)
+
+					// Only the root's type is recorded; a CPG child must not be reported on its own.
+					otherType := metrics.CompositePodGroup
+					if tt.wantType == metrics.CompositePodGroup {
+						otherType = metrics.PodGroup
+					}
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "entity", otherType, 0)
+					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", map[string]string{"entity": otherType}, 0)
+				})
+			}
+		})
+	}
+}
