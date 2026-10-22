@@ -218,6 +218,16 @@ var (
 		pod.Spec.Containers = append(pod.Spec.Containers, container)
 		return pod
 	}()
+	// podWithStaleExtraNodeAllocatableResources still has the status written by an earlier scheduling attempt.
+	podWithStaleExtraNodeAllocatableResources = func() *v1.Pod {
+		pod := podWithClaimReferenceInContainer.DeepCopy()
+		pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(apiresource.MustParse("1"))}},
+		}}
+		return pod
+	}()
 	groupedPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -3452,7 +3462,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				// ExtraNodeAllocatableResources in the cache before PreBind runs.
 				// Because this plugin unit test skips the Assume phase, we must manually
 				// inject the expected status into the mock Pod to satisfy the equality check
-				// in patchExtraNodeAllocatableResources.
+				// in patchPodStatus.
 				tc.pod = tc.pod.DeepCopy()
 				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
@@ -3534,6 +3544,60 @@ func testPlugin(tCtx ktesting.TContext) {
 							return pod
 						},
 					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-prebind": {
+			// No device on the chosen node maps node allocatable resources, so no write
+			// would replace the entries of the earlier attempt.
+			enableDRANodeAllocatableResources: true,
+			pod:                               podWithStaleExtraNodeAllocatableResources,
+			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			objs:                              []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithStaleExtraNodeAllocatableResources)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.Allocation = allocationResult
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-clear-failure": {
+			// Binding with the entries of the earlier attempt would account for them.
+			enableDRANodeAllocatableResources: true,
+			failPatch:                         true,
+			pod:                               podWithStaleExtraNodeAllocatableResources,
+			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			objs:                              []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Unschedulable, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
 				},
 			},
 		},
@@ -4260,6 +4324,22 @@ func testPlugin(tCtx ktesting.TContext) {
 								Name:     v1.ResourceCPU,
 								Quantity: new(apiresource.MustParse("1")),
 							},
+						},
+					},
+				}
+				var podStatusPatches int
+				tc.reactors = []cgotesting.Reactor{
+					&cgotesting.SimpleReactor{
+						Verb:     "patch",
+						Resource: "pods",
+						Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+							if action.GetSubresource() == "status" {
+								podStatusPatches++
+								if podStatusPatches > 1 {
+									return true, nil, fmt.Errorf("expected a single pod status patch, got %d", podStatusPatches)
+								}
+							}
+							return false, nil, nil
 						},
 					},
 				}

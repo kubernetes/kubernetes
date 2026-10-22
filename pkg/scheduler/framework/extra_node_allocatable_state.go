@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -29,17 +30,35 @@ import (
 var ExtraNodeAllocatableResourcesStateKey fwk.StateKey = "kubernetes.io/extra-node-allocatable-resources"
 
 // ExtraNodeAllocatableResourcesState stores per-node extra node
-// allocatable resources reported by plugins during a scheduling cycle.
+// allocatable resources reported by plugins during a scheduling cycle,
+// and which plugins wrote them to the pod status in PreBind.
+//
+// status.extraNodeAllocatableResources is one list, and each write replaces it. A plugin that
+// contributes entries:
+//  1. In Filter, records its entries for each node with Set.
+//  2. In PreBind, writes GetPersisted plus its own entries in one request, then calls
+//     SetPersisted. If it changed its entries in PreBind, for example to name an object that it
+//     created, it calls Set with the written entries first.
+//  3. In Unreserve, clears the field in the pod status.
+//
+// Entries that plugins only recorded are left out, because the objects that they reference may
+// not exist yet. Plugins that write the field must not run PreBind in parallel with each other.
 type ExtraNodeAllocatableResourcesState struct {
 	mu sync.RWMutex
 	// nodeToPluginResources maps node name to per-plugin extra node allocatable resources.
 	nodeToPluginResources map[string]map[string][]v1.ExtraNodeAllocatableResource
+	// persisted holds the plugins whose PreBind wrote their entries to the pod status. PreBind
+	// runs only for the node that the pod is bound to, so we do not need to key this by node name.
+	// Nothing removes plugins from it: a failed attempt drops this state, and Unreserve clears
+	// the pod status.
+	persisted sets.Set[string]
 }
 
 // NewExtraNodeAllocatableResourcesState instantiates an ExtraNodeAllocatableResourcesState object.
 func NewExtraNodeAllocatableResourcesState() *ExtraNodeAllocatableResourcesState {
 	return &ExtraNodeAllocatableResourcesState{
 		nodeToPluginResources: make(map[string]map[string][]v1.ExtraNodeAllocatableResource),
+		persisted:             sets.New[string](),
 	}
 }
 
@@ -74,24 +93,52 @@ func (s *ExtraNodeAllocatableResourcesState) Set(nodeName, pluginName string, en
 
 // Get returns a copy of all entries recorded for nodeName.
 func (s *ExtraNodeAllocatableResourcesState) Get(nodeName string) []v1.ExtraNodeAllocatableResource {
-	return s.get(nodeName, "")
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return flattenByPluginName(s.nodeToPluginResources[nodeName], "")
 }
 
 // GetExcludingPlugin returns a copy of the entries recorded for nodeName by all plugins except pluginName.
 func (s *ExtraNodeAllocatableResourcesState) GetExcludingPlugin(nodeName, pluginName string) []v1.ExtraNodeAllocatableResource {
-	return s.get(nodeName, pluginName)
-}
-
-func (s *ExtraNodeAllocatableResourcesState) get(nodeName, excludedPlugin string) []v1.ExtraNodeAllocatableResource {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return flattenByPluginName(s.nodeToPluginResources[nodeName], pluginName)
+}
 
-	pluginRes := s.nodeToPluginResources[nodeName]
-	if len(pluginRes) == 0 {
+// GetFromPlugin returns a copy of the entries recorded for nodeName by pluginName.
+func (s *ExtraNodeAllocatableResourcesState) GetFromPlugin(nodeName, pluginName string) []v1.ExtraNodeAllocatableResource {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return copyEntries(s.nodeToPluginResources[nodeName][pluginName])
+}
+
+// GetPersisted returns a copy of the entries recorded for nodeName by plugins whose PreBind
+// wrote them to the pod status, ordered by plugin name.
+func (s *ExtraNodeAllocatableResourcesState) GetPersisted(nodeName string) []v1.ExtraNodeAllocatableResource {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []v1.ExtraNodeAllocatableResource
+	for _, pluginName := range sets.List(s.persisted) {
+		out = append(out, copyEntries(s.nodeToPluginResources[nodeName][pluginName])...)
+	}
+	return out
+}
+
+// SetPersisted marks the entries of pluginName as written to the pod status.
+func (s *ExtraNodeAllocatableResourcesState) SetPersisted(pluginName string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.persisted.Insert(pluginName)
+}
+
+// flattenByPluginName returns copies of the entries of all plugins in entriesByPlugin except
+// excludedPlugin, sorted by plugin name.
+func flattenByPluginName(entriesByPlugin map[string][]v1.ExtraNodeAllocatableResource, excludedPlugin string) []v1.ExtraNodeAllocatableResource {
+	if len(entriesByPlugin) == 0 {
 		return nil
 	}
-	pluginNames := make([]string, 0, len(pluginRes))
-	for pluginName := range pluginRes {
+	pluginNames := make([]string, 0, len(entriesByPlugin))
+	for pluginName := range entriesByPlugin {
 		if pluginName != excludedPlugin {
 			pluginNames = append(pluginNames, pluginName)
 		}
@@ -102,9 +149,15 @@ func (s *ExtraNodeAllocatableResourcesState) get(nodeName, excludedPlugin string
 
 	var out []v1.ExtraNodeAllocatableResource
 	for _, pluginName := range pluginNames {
-		for _, entry := range pluginRes[pluginName] {
-			out = append(out, *entry.DeepCopy())
-		}
+		out = append(out, copyEntries(entriesByPlugin[pluginName])...)
+	}
+	return out
+}
+
+func copyEntries(entries []v1.ExtraNodeAllocatableResource) []v1.ExtraNodeAllocatableResource {
+	var out []v1.ExtraNodeAllocatableResource
+	for _, entry := range entries {
+		out = append(out, *entry.DeepCopy())
 	}
 	return out
 }

@@ -46,10 +46,11 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 	c1 := makeExtraNodeAllocatableResource("c1")
 
 	tests := []struct {
-		name                    string
-		setup                   func(state *ExtraNodeAllocatableResourcesState)
-		wantGet                 []v1.ExtraNodeAllocatableResource
-		wantGetExcludingPluginA []v1.ExtraNodeAllocatableResource
+		name                   string
+		setup                  func(state *ExtraNodeAllocatableResourcesState)
+		wantGet                []v1.ExtraNodeAllocatableResource
+		wantGetExcludingPlugin []v1.ExtraNodeAllocatableResource
+		wantGetFromPlugin      []v1.ExtraNodeAllocatableResource
 	}{
 		{
 			name: "empty store returns nothing",
@@ -59,7 +60,8 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 			setup: func(state *ExtraNodeAllocatableResourcesState) {
 				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a1})
 			},
-			wantGet: []v1.ExtraNodeAllocatableResource{a1},
+			wantGet:           []v1.ExtraNodeAllocatableResource{a1},
+			wantGetFromPlugin: []v1.ExtraNodeAllocatableResource{a1},
 		},
 		{
 			name: "entries of another node are not returned",
@@ -73,7 +75,8 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a1})
 				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a2})
 			},
-			wantGet: []v1.ExtraNodeAllocatableResource{a2},
+			wantGet:           []v1.ExtraNodeAllocatableResource{a2},
+			wantGetFromPlugin: []v1.ExtraNodeAllocatableResource{a2},
 		},
 		{
 			name: "set without entries removes the plugin's entries",
@@ -81,6 +84,8 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a1})
 				state.Set(node, "PluginA", nil)
 			},
+			wantGet:           nil,
+			wantGetFromPlugin: nil,
 		},
 		{
 			name: "entries are sorted by plugin name and keep each plugin's order",
@@ -89,8 +94,9 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				state.Set(node, "PluginB", []v1.ExtraNodeAllocatableResource{b1})
 				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a2, a1})
 			},
-			wantGet:                 []v1.ExtraNodeAllocatableResource{a2, a1, b1, c1},
-			wantGetExcludingPluginA: []v1.ExtraNodeAllocatableResource{b1, c1},
+			wantGet:                []v1.ExtraNodeAllocatableResource{a2, a1, b1, c1},
+			wantGetExcludingPlugin: []v1.ExtraNodeAllocatableResource{b1, c1},
+			wantGetFromPlugin:      []v1.ExtraNodeAllocatableResource{a2, a1},
 		},
 		{
 			name: "removing one plugin's entries keeps the others",
@@ -99,8 +105,8 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				state.Set(node, "PluginB", []v1.ExtraNodeAllocatableResource{b1})
 				state.Set(node, "PluginA", nil)
 			},
-			wantGet:                 []v1.ExtraNodeAllocatableResource{b1},
-			wantGetExcludingPluginA: []v1.ExtraNodeAllocatableResource{b1},
+			wantGet:                []v1.ExtraNodeAllocatableResource{b1},
+			wantGetExcludingPlugin: []v1.ExtraNodeAllocatableResource{b1},
 		},
 		{
 			name: "changing the set input does not change the store",
@@ -110,7 +116,8 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				entries[0].Source.Name = "changed"
 				entries[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
 			},
-			wantGet: []v1.ExtraNodeAllocatableResource{a1},
+			wantGet:           []v1.ExtraNodeAllocatableResource{a1},
+			wantGetFromPlugin: []v1.ExtraNodeAllocatableResource{a1},
 		},
 		{
 			name: "changing a get result does not change the store",
@@ -120,7 +127,21 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 				got[0].Source.Name = "changed"
 				got[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
 			},
-			wantGet: []v1.ExtraNodeAllocatableResource{a1},
+			wantGet:           []v1.ExtraNodeAllocatableResource{a1},
+			wantGetFromPlugin: []v1.ExtraNodeAllocatableResource{a1},
+		},
+		{
+			name: "changing a GetFromPlugin or GetPersisted result does not change the store",
+			setup: func(state *ExtraNodeAllocatableResourcesState) {
+				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{*a1.DeepCopy()})
+				state.SetPersisted("PluginA")
+				for _, got := range [][]v1.ExtraNodeAllocatableResource{state.GetFromPlugin(node, "PluginA"), state.GetPersisted(node)} {
+					got[0].Source.Name = "changed"
+					got[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
+				}
+			},
+			wantGet:           []v1.ExtraNodeAllocatableResource{a1},
+			wantGetFromPlugin: []v1.ExtraNodeAllocatableResource{a1},
 		},
 	}
 
@@ -133,8 +154,11 @@ func TestExtraNodeAllocatableResourcesState(t *testing.T) {
 			if diff := cmp.Diff(tc.wantGet, state.Get(node)); diff != "" {
 				t.Errorf("Get() mismatch (-want +got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantGetExcludingPluginA, state.GetExcludingPlugin(node, "PluginA")); diff != "" {
+			if diff := cmp.Diff(tc.wantGetExcludingPlugin, state.GetExcludingPlugin(node, "PluginA")); diff != "" {
 				t.Errorf("GetExcludingPlugin() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantGetFromPlugin, state.GetFromPlugin(node, "PluginA")); diff != "" {
+				t.Errorf("GetFromPlugin() mismatch (-want +got):\n%s", diff)
 			}
 			if got, want := state.Has(node), len(tc.wantGet) > 0; got != want {
 				t.Errorf("Has() = %v, want %v", got, want)
@@ -158,6 +182,9 @@ func TestExtraNodeAllocatableResourcesStateConcurrent(t *testing.T) {
 			state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{makeExtraNodeAllocatableResource(node)})
 			_ = state.Get(node)
 			_ = state.GetExcludingPlugin(node, "PluginA")
+			_ = state.GetFromPlugin(node, "PluginA")
+			state.SetPersisted("PluginA")
+			_ = state.GetPersisted(node)
 			_ = state.Has(fmt.Sprintf("node-%d", (i+1)%numNodes))
 		})
 	}
@@ -168,6 +195,59 @@ func TestExtraNodeAllocatableResourcesStateConcurrent(t *testing.T) {
 		if diff := cmp.Diff([]v1.ExtraNodeAllocatableResource{makeExtraNodeAllocatableResource(node)}, state.Get(node)); diff != "" {
 			t.Errorf("Get(%q) mismatch (-want +got):\n%s", node, diff)
 		}
+	}
+}
+
+func TestExtraNodeAllocatableResourcesStatePersisted(t *testing.T) {
+	const node = "node-1"
+	a1 := makeExtraNodeAllocatableResource("a1")
+	b1 := makeExtraNodeAllocatableResource("b1")
+	c1 := makeExtraNodeAllocatableResource("c1")
+
+	tests := []struct {
+		name          string
+		setup         func(state *ExtraNodeAllocatableResourcesState)
+		wantPersisted []v1.ExtraNodeAllocatableResource
+	}{
+		{
+			name: "nothing persisted",
+		},
+		{
+			name: "recorded entries are not persisted",
+			setup: func(state *ExtraNodeAllocatableResourcesState) {
+				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a1})
+			},
+		},
+		{
+			name: "entries of persisted plugins, in plugin name order",
+			setup: func(state *ExtraNodeAllocatableResourcesState) {
+				state.Set(node, "PluginA", []v1.ExtraNodeAllocatableResource{a1})
+				state.Set(node, "PluginB", []v1.ExtraNodeAllocatableResource{b1})
+				state.Set(node, "PluginC", []v1.ExtraNodeAllocatableResource{c1})
+				state.SetPersisted("PluginB")
+				state.SetPersisted("PluginA")
+			},
+			wantPersisted: []v1.ExtraNodeAllocatableResource{a1, b1},
+		},
+		{
+			name: "entries of another node are not returned",
+			setup: func(state *ExtraNodeAllocatableResourcesState) {
+				state.Set("node-2", "PluginA", []v1.ExtraNodeAllocatableResource{a1})
+				state.SetPersisted("PluginA")
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state := NewExtraNodeAllocatableResourcesState()
+			if tc.setup != nil {
+				tc.setup(state)
+			}
+			if diff := cmp.Diff(tc.wantPersisted, state.GetPersisted(node)); diff != "" {
+				t.Errorf("GetPersisted() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

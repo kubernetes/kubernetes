@@ -38,7 +38,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
@@ -516,7 +515,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
 // otherEntries, recorded by other plugins, count towards the demand but are not returned.
-func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, extendedResourceRequestMappings []v1.ContainerExtendedResourceRequest, otherEntries []v1.ExtraNodeAllocatableResource, slices []*draapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.ExtraNodeAllocatableResource, *fwk.Status) {
+func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, extendedResourceRequestMappings []v1.ContainerExtendedResourceRequest, otherEntries []v1.ExtraNodeAllocatableResource, nodeSlices []*draapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.ExtraNodeAllocatableResource, *fwk.Status) {
 	nodeAllocatableDRAAllocations := make(map[v1.ObjectReference]*resourceapi.AllocationResult)
 	// Add pre-allocated claims
 	for _, claim := range nodeAllocatableClaims {
@@ -540,7 +539,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		return nil, nil, statusError(logger, fmt.Errorf("processing pod resource claims: %w", err))
 	}
 
-	extraResources, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID, extendedResourceRequestMappings, slices, node)
+	extraResources, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID, extendedResourceRequestMappings, nodeSlices, node)
 	if err != nil {
 		return nil, nil, statusError(logger, err)
 	}
@@ -552,7 +551,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 	}
 	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
 	podCopy := *pod
-	podCopy.Status.ExtraNodeAllocatableResources = append(otherEntries, extraResources...)
+	podCopy.Status.ExtraNodeAllocatableResources = slices.Concat(otherEntries, extraResources)
 	totalPodDemandRes := resourcehelper.PodRequests(&podCopy, optsTotal)
 
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
@@ -671,51 +670,47 @@ func replaceSpecialClaimNameInStatus(extendedClaim *resourceapi.ResourceClaim, r
 	}
 }
 
-func (pl *DynamicResources) patchExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod, extraResources []v1.ExtraNodeAllocatableResource, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
-
-	if len(extraResources) == 0 {
-		return nil
+// draExtraNodeAllocatableResourcesStatus validates the calculated ExtraNodeAllocatableResources
+// against the assumed pod status, replaces any placeholder claim name, and returns the
+// entries of this plugin to be patched onto the pod's status during PreBind.
+func (pl *DynamicResources) draExtraNodeAllocatableResourcesStatus(
+	ctx context.Context,
+	pod *v1.Pod,
+	nodeName string,
+	state *stateData,
+) ([]v1.ExtraNodeAllocatableResource, error) {
+	if !pl.fts.EnableDRANodeAllocatableResources || state.extraNodeAllocatableResources == nil {
+		return nil, nil
+	}
+	nodeExtraResources := state.extraNodeAllocatableResources.Get(nodeName)
+	if len(nodeExtraResources) == 0 {
+		return nil, nil
 	}
 	logger := klog.FromContext(ctx)
 
 	// The incoming 'pod' is from the scheduler cache and would have ExtraNodeAllocatableResources
-	// pre-populated in the assume phase without persisting to the API server.
-	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
-	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
-	baseStatus := pod.Status.DeepCopy()
-	if !apiequality.Semantic.DeepEqual(baseStatus.ExtraNodeAllocatableResources, extraResources) {
+	// of all plugins pre-populated in the assume phase without persisting to the API server.
+	if !apiequality.Semantic.DeepEqual(pod.Status.ExtraNodeAllocatableResources, nodeExtraResources) {
 		logger.V(5).Info("ExtraNodeAllocatableResources difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
-		return statusError(logger, errors.New("assumed pod status does not match calculated status to be patched"))
+		return nil, errors.New("assumed pod status does not match calculated status to be patched")
 	}
 
+	pluginExtraResources := state.extraNodeAllocatableResources.GetFromPlugin(nodeName, Name)
 	// After bindClaim, the in-memory placeholder "<extended-resources>" must be
 	// replaced with the real claim name before the status is persisted. This
 	// must run after the DeepEqual check: assume() copied the Filter-time
 	// status (still using the placeholder) onto the cached pod, so comparing
 	// after the rename would fail even when the assumed and calculated
 	// allocations match.
-	replaceSpecialClaimNameInStatus(extendedClaim, extraResources)
+	replaceSpecialClaimNameInStatus(state.claims.extendedResourceClaim(), pluginExtraResources)
 
-	baseStatus.ExtraNodeAllocatableResources = nil
-
-	targetStatus := pod.Status.DeepCopy()
-
-	targetStatus.ExtraNodeAllocatableResources = extraResources
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
-		return statusError(logger, fmt.Errorf("updating pod %s/%s ExtraNodeAllocatableResources: %w", pod.Namespace, pod.Name, err))
-	}
-	logger.V(5).Info("Patched pod status with ExtraNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.ExtraNodeAllocatableResources)
-
-	return nil
+	return pluginExtraResources, nil
 }
 
-func (pl *DynamicResources) clearExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod) {
-	if len(pod.Status.ExtraNodeAllocatableResources) == 0 {
-		return
-	}
-
+// clearExtraNodeAllocatableResources removes the entries of all plugins from the pod status.
+func (pl *DynamicResources) clearExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod) error {
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Clearing ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
+	logger.V(5).Info("Clearing ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
 
 	// An explicit empty list distinguishes an intentional clear from an old
 	// client omitting a field that it does not know about. PatchPodStatus cannot
@@ -726,8 +721,8 @@ func (pl *DynamicResources) clearExtraNodeAllocatableResources(ctx context.Conte
 	// same name in the meantime.
 	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"extraNodeAllocatableResources":[]}}`, pod.UID)
 	if _, err := pl.clientset.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
-		logger.Error(err, "Failed to clear ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
-	} else {
-		logger.V(5).Info("Cleared ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
+		return fmt.Errorf("clear extraNodeAllocatableResources of pod %s: %w", klog.KObj(pod), err)
 	}
+	logger.V(5).Info("Cleared ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
+	return nil
 }
