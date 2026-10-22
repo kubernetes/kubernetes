@@ -41,6 +41,7 @@ import (
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
+	evictionrequestconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/evictionrequest/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
@@ -181,6 +182,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := ephemeralconfigv1alpha1.Convert_v1alpha1_EphemeralVolumeControllerConfiguration_To_config_EphemeralVolumeControllerConfiguration(&in.EphemeralVolumeController, &out.EphemeralVolumeController, s); err != nil {
 		return err
 	}
+	if err := evictionrequestconfigv1alpha1.Convert_v1alpha1_EvictionRequestControllerConfiguration_To_config_EvictionRequestControllerConfiguration(&in.EvictionRequestController, &out.EvictionRequestController, s); err != nil {
+		return err
+	}
 	if err := garbagecollectorconfigv1alpha1.Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
 		return err
 	}
@@ -287,6 +291,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := ephemeralconfigv1alpha1.Convert_config_EphemeralVolumeControllerConfiguration_To_v1alpha1_EphemeralVolumeControllerConfiguration(&in.EphemeralVolumeController, &out.EphemeralVolumeController, s); err != nil {
+		return err
+	}
+	if err := evictionrequestconfigv1alpha1.Convert_config_EvictionRequestControllerConfiguration_To_v1alpha1_EvictionRequestControllerConfiguration(&in.EvictionRequestController, &out.EvictionRequestController, s); err != nil {
 		return err
 	}
 	if err := garbagecollectorconfigv1alpha1.Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
