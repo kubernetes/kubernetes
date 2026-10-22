@@ -695,19 +695,23 @@ func TestNamespaceScopedList(t *testing.T) {
 }
 
 func compactStorage(s *store, client *clientv3.Client) storagetesting.Compaction {
+	var currentVersion int64
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var currentVersion int64
-		currentVersion, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
-		if err != nil {
-			_, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
+		var compactRev int64
+		currentVersion, _, compactRev, err = Compact(ctx, client, currentVersion, int64(rv))
+		if err == nil && compactRev != int64(rv) {
+			currentVersion, _, compactRev, err = Compact(ctx, client, currentVersion, int64(rv))
 		}
 		if err != nil {
 			t.Fatal(err)
+		}
+		if compactRev != int64(rv) {
+			t.Fatalf("expected compact revision %d, got %d", rv, compactRev)
 		}
 		// Wait for compaction to be observed.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {

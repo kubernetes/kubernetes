@@ -5785,6 +5785,18 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
 		t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
 	}
+	// Call twice: the first syncs watchCache to expectCompactedRV via bookmark (falling back after waiting),
+	// and the second exercises upfront delegation once watchCache is already fresh.
+	for range 2 {
+		if err := store.GetList(ctx, "/pods/", storage.ListOptions{
+			Predicate:            storage.Everything,
+			Recursive:            true,
+			ResourceVersion:      fmt.Sprintf("%d", expectCompactedRV),
+			ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		}, listOut); err != nil {
+			t.Errorf("Unexpected error listing at compacted RV %d: %v", expectCompactedRV, err)
+		}
+	}
 	compactedRV = store.CompactRevision()
 	if compactedRV != int64(expectCompactedRV) {
 		t.Errorf("CompactRevision()=%d, expected: %d", store.CompactRevision(), expectCompactedRV)
