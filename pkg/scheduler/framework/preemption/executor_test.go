@@ -653,6 +653,7 @@ func TestPrepareCandidate(t *testing.T) {
 					NumPDBViolations: 1,
 				},
 				numPodGroupDisruptions: 1,
+				nodes:                  []string{node1Name},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
