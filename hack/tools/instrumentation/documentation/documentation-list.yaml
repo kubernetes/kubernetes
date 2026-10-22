@@ -3200,6 +3200,52 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: job_scheduling_object_sync_duration_seconds
+  subsystem: job_controller
+  help: |-
+    `The time it took the Job controller to make a Workload or PodGroup API call.
+    Possible values of the "kind" label are: "Workload", "PodGroup".
+    Possible values of the "action" label are: "create", "update", "delete".`
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - action
+  - kind
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+- name: job_scheduling_object_syncs_total
+  subsystem: job_controller
+  help: |-
+    `The number of Workload and PodGroup API calls made by the Job controller.
+    Possible values of the "kind" label are: "Workload", "PodGroup".
+    Possible values of the "action" label are: "create", "update", "delete".
+    Possible values of the "result" label are: "success", "error".`
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - action
+  - kind
+  - result
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: jobs_by_external_controller_total
   subsystem: job_controller
   help: The number of Jobs managed by an external controller

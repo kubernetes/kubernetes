@@ -28,6 +28,8 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,6 +43,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
@@ -347,6 +350,54 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ensureHistoryLimits(ctx, f.ClientSet, f.Namespace.Name, cronJob)
 	})
+
+	f.It("should give each gang Job its own Workload and PodGroup and remove them with the Job",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.WorkloadWithJob),
+		func(ctx context.Context) {
+			ginkgo.By("Creating a gang CronJob that keeps one successful Job")
+			successLimit := int32(1)
+			failedLimit := int32(0)
+			cronJob := newTestCronJob("gang", "*/1 * * * ?", batchv1.AllowConcurrent,
+				successCommand, &successLimit, &failedLimit)
+			cronJob.Spec.JobTemplate.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+				},
+			}
+			cronJob, err := createCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob)
+			framework.ExpectNoError(err, "Failed to create gang cronjob in namespace %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring the first finished Job has its own Workload and PodGroup")
+			err = waitForAnyFinishedJob(ctx, f.ClientSet, f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed to ensure a finished job exists in namespace %s", f.Namespace.Name)
+			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
+			_, finishedJobs := filterActiveJobs(jobs)
+			gomega.Expect(finishedJobs).NotTo(gomega.BeEmpty())
+			first := finishedJobs[0]
+			firstWorkload := waitForJobWorkload(ctx, f.ClientSet, first)
+			firstPodGroup := waitForJobPodGroup(ctx, f.ClientSet, first, func(*schedulingv1beta1.PodGroup) bool { return true })
+
+			ginkgo.By("Ensuring the Job and its Workload and PodGroup are removed once the next Job finishes")
+			err = waitForJobToDisappear(ctx, f.ClientSet, f.Namespace.Name, first)
+			framework.ExpectNoError(err, "Failed to ensure that job %s does not exist anymore in namespace %s", first.Name, f.Namespace.Name)
+			waitForJobSchedulingObjectsGone(ctx, f.ClientSet, first)
+
+			ginkgo.By("Ensuring the next Job has a Workload and PodGroup of its own")
+			jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
+			_, finishedJobs = filterActiveJobs(jobs)
+			gomega.Expect(finishedJobs).NotTo(gomega.BeEmpty())
+			next := finishedJobs[0]
+			gomega.Expect(waitForJobWorkload(ctx, f.ClientSet, next).Name).NotTo(gomega.Equal(firstWorkload.Name))
+			gomega.Expect(waitForJobPodGroup(ctx, f.ClientSet, next, func(*schedulingv1beta1.PodGroup) bool { return true }).Name).
+				NotTo(gomega.Equal(firstPodGroup.Name))
+
+			ginkgo.By("Removing cronjob")
+			err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
+			framework.ExpectNoError(err, "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		})
 
 	ginkgo.It("should support timezone", func(ctx context.Context) {
 		ginkgo.By("Creating a cronjob with TimeZone")

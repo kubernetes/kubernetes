@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -472,6 +473,9 @@ type PodControlInterface interface {
 	CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
 	// CreatePodsWithGenerateName creates new pods according to the spec, sets object as the pod's controller and sets pod's generateName.
 	CreatePodsWithGenerateName(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error
+	// CreatePodsWithOwnerReferences creates new pods according to the spec, sets object as the pod's controller,
+	// appends ownerRefs as non-controller ownerReferences and sets pod's generateName.
+	CreatePodsWithOwnerReferences(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateName string, ownerRefs []metav1.OwnerReference) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error
 	// PatchPod patches the pod.
@@ -542,6 +546,10 @@ func (r RealPodControl) CreatePods(ctx context.Context, namespace string, templa
 }
 
 func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error {
+	return r.CreatePodsWithOwnerReferences(ctx, namespace, template, controllerObject, controllerRef, generateName, nil)
+}
+
+func (r RealPodControl) CreatePodsWithOwnerReferences(ctx context.Context, namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference, generateName string, ownerRefs []metav1.OwnerReference) error {
 	if err := validateControllerRef(controllerRef); err != nil {
 		return err
 	}
@@ -549,6 +557,7 @@ func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespac
 	if err != nil {
 		return err
 	}
+	pod.OwnerReferences = append(pod.OwnerReferences, ownerRefs...)
 	if len(generateName) > 0 {
 		pod.ObjectMeta.GenerateName = generateName
 	}
@@ -640,6 +649,7 @@ type FakePodControl struct {
 	sync.Mutex
 	Templates       []v1.PodTemplateSpec
 	ControllerRefs  []metav1.OwnerReference
+	OwnerRefs       [][]metav1.OwnerReference
 	DeletePodName   []string
 	Patches         [][]byte
 	Err             error
@@ -665,6 +675,10 @@ func (f *FakePodControl) CreatePods(ctx context.Context, namespace string, spec 
 }
 
 func (f *FakePodControl) CreatePodsWithGenerateName(ctx context.Context, namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateNamePrefix string) error {
+	return f.CreatePodsWithOwnerReferences(ctx, namespace, spec, object, controllerRef, generateNamePrefix, nil)
+}
+
+func (f *FakePodControl) CreatePodsWithOwnerReferences(ctx context.Context, namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateNamePrefix string, ownerRefs []metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
 	f.CreateCallCount++
@@ -677,6 +691,7 @@ func (f *FakePodControl) CreatePodsWithGenerateName(ctx context.Context, namespa
 	spec.GenerateName = generateNamePrefix
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
+	f.OwnerRefs = append(f.OwnerRefs, slices.Clone(ownerRefs))
 	if f.Err != nil {
 		return f.Err
 	}
@@ -702,6 +717,7 @@ func (f *FakePodControl) Clear() {
 	f.DeletePodName = []string{}
 	f.Templates = []v1.PodTemplateSpec{}
 	f.ControllerRefs = []metav1.OwnerReference{}
+	f.OwnerRefs = [][]metav1.OwnerReference{}
 	f.Patches = [][]byte{}
 	f.CreateLimit = 0
 	f.CreateCallCount = 0
