@@ -552,26 +552,31 @@ func TestWatch(t *testing.T) {
 		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
 			t.Run("Watch", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestWatch(ctx, t, cacher, true)
 			})
 			t.Run("WatchFromZero", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
 			})
 			t.Run("DeleteTriggerWatch", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
 			})
 			t.Run("WatchFromNonZero", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
 			})
 			t.Run("DelayedWatchDelivery", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
@@ -588,40 +593,48 @@ func TestWatch(t *testing.T) {
 				storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
 			})
 			t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher, "test-ns", false, nil)
+				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher, true, false, nil)
 			})
 			t.Run("WatchInitializationSignal", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
 			})
 			t.Run("ClusterScopedWatch", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
 				t.Cleanup(terminate)
 				storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 			})
 			t.Run("NamespaceScopedWatch", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 				t.Cleanup(terminate)
 				storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 			})
 			t.Run("WatchDispatchBookmarkEvents", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 			})
 			t.Run("WatchBookmarksWithCorrectResourceVersion", func(t *testing.T) {
+				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
 			})
 			t.Run("SendInitialEventsBackwardCompatibility", func(t *testing.T) {
+				t.Parallel()
 				ctx, store, terminate := testSetup(t)
 				t.Cleanup(terminate)
 				storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 			})
+			// These tests override WatchList and must finish before the parallel subtests start.
 			t.Run("WatchSemantics", func(t *testing.T) {
 				store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 				t.Cleanup(terminate)
