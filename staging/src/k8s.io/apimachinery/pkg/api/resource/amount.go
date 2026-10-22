@@ -500,7 +500,9 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 		}
 		// 'times' is always positive, and the `e > 0` case above handles positive overflow,
 		// so this means we could not round down to SI exponent without negative overflow, so keep e as-is
-		c, _ = narrowScale(e)
+		if c, fits = narrowScale(e); !fits {
+			assertUnreachable("int64Amount.AsCanonicalBytes: exponent does not fit in a Scale")
+		}
 	} else {
 		// If the rounded-down exponent fits,
 		// add the zeros that c no longer covers to the mantissa
@@ -604,7 +606,10 @@ func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int3
 		if e > 0 {
 			c = math.MaxInt32 - 1 // largest multiple of 3 in int32 is math.MaxInt32-1
 		} else {
-			c, _ = narrowScale(e) // no multiple of 3 below e fits, so keep e
+			// no multiple of 3 below e fits, so keep e
+			if c, fits = narrowScale(e); !fits {
+				assertUnreachable("infDecAmount.AsCanonicalBytes: exponent does not fit in a Scale")
+			}
 		}
 	}
 

@@ -177,6 +177,10 @@ func (s cachedString) validFor(format Format) bool {
 	return len(s.str) > 0 && s.format == formatCodeOf(format)
 }
 
+// assertUnreachable is called from code paths that should be unreachable,
+// and is swappable for a panic when exercised from tests.
+var assertUnreachable = func(msg string) {}
+
 // formatCode identifies a Format in a compact byte representation.
 type formatCode uint8
 
@@ -466,7 +470,10 @@ func ParseQuantity(str string) (Quantity, error) {
 
 			// The exponent is negative here, so the result (-9 minus a negative exponent)
 			// always fits.
-			scaleBeforeExponent, _ := narrowScale(widenScale(Nano) - widenedExponentScale)
+			scaleBeforeExponent, fits := narrowScale(widenScale(Nano) - widenedExponentScale)
+			if !fits {
+				assertUnreachable("scaleBeforeExponent did not fit")
+			}
 			beforeExponentAmount, _ := infDecAmount{amount}.AsScale(scaleBeforeExponent)
 			amount = beforeExponentAmount.Dec // TODO: If we add an inf.Dec asScale utility, we can avoid converting to/from infDecAmount here
 
@@ -582,7 +589,9 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 			// exponent there is no suffix, so fall back to decimal exponent
 			// notation ("e") instead of dropping the exponent, which would
 			// silently corrupt the value (e.g. "1000E" serializing to "1").
-			suffix, _ = quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			if suffix, ok = quantitySuffixer.constructBytes(10, exponent, DecimalExponent); !ok {
+				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
+			}
 		}
 		return number, suffix
 	default:
@@ -598,7 +607,10 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 			// notation, so recompute the canonical mantissa and exponent in
 			// base 10.
 			number, exponent := rounded.AsCanonicalBytes(out)
-			suffix, _ := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			suffix, ok := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			if !ok {
+				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
+			}
 			return number, suffix
 		}
 		return number, suffix
