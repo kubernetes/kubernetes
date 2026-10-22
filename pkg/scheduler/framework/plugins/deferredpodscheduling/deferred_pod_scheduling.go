@@ -19,25 +19,30 @@ package deferredpodscheduling
 import (
 	"context"
 	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type DeferredPodScheduling struct {
+	handle                                             fwk.Handle
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &DeferredPodScheduling{}
 var _ fwk.FilterPlugin = &DeferredPodScheduling{}
 var _ fwk.EnqueueExtensions = &DeferredPodScheduling{}
-var _ fwk.PermitPlugin = &DeferredPodScheduling{}
+var _ fwk.BindPlugin = &DeferredPodScheduling{}
+var _ fwk.RelevancePlugin = &DeferredPodScheduling{}
+var _ fwk.SignPlugin = &DeferredPodScheduling{}
 
 const (
 	Name                                  = names.DeferredPodScheduling
@@ -48,9 +53,27 @@ func (pl *DeferredPodScheduling) Name() string {
 	return Name
 }
 
+// IsRelevantForPodResize returns nil to indicate that DeferredPodScheduling is relevant for pod resizes.
+func (pl *DeferredPodScheduling) IsRelevantForPodResize(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod) *fwk.Status {
+	return nil
+}
+
+// SignPod returns Unschedulable for pods with deferred resize since their scheduling
+// depends on pod-specific resize requests, and nil for regular pods so opportunistic
+// batching remains enabled for the default scheduler profile.
+func (pl *DeferredPodScheduling) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with deferred resize are not signable")
+	}
+	return nil, nil
+}
+
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *DeferredPodScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption {
+		return nil, nil
+	}
 	return []fwk.ClusterEventWithHint{
 		{
 			Event:          fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodePreemptionPolicy},
@@ -145,18 +168,64 @@ func (pl *DeferredPodScheduling) Filter(ctx context.Context, _ fwk.CycleState, p
 	return nil
 }
 
-// Permit invoked at the permit extension point.
-// It rejects deferred resize pods that successfully fit in order to keep them in the Unschedulable queue until
-// Kubelet can successfully actuate the resize.
-func (pl *DeferredPodScheduling) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+// Bind sets the SchedulerEvaluationCompleted condition on deferred resize pods that pass
+// scheduling evaluation, skipping DefaultBinder because the pod is already bound to its node.
+func (pl *DeferredPodScheduling) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || !resource.IsPodResizeDeferred(p) {
-		return nil, 0
+		return fwk.NewStatus(fwk.Skip)
 	}
-	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod resize fits, waiting for Kubelet actuation"), 0
+
+	cachedPod, err := pl.handle.SharedInformerFactory().Core().V1().Pods().Lister().Pods(p.Namespace).Get(p.Name)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
+	// Complete the binding cycle without a patch if the pod was deleted or recreated, its deferred resize was
+	// resolved while in flight, or an earlier cycle already set the condition: bindingCycle marks the pod Done
+	// before Bind, so an update in between can queue it again.
+	if cachedPod.UID != p.UID || !resource.IsPodResizeDeferred(cachedPod) || resource.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
+		return nil
+	}
+	// The queue drops updates received while the pod is in flight, so retry the new spec after backoff
+	// instead of marking an evaluation of the old one complete.
+	if cachedPod.Generation != p.Generation {
+		return fwk.AsStatus(fmt.Errorf("pod spec changed from generation %d to %d during scheduling, retrying", p.Generation, cachedPod.Generation))
+	}
+	p = cachedPod
+
+	condition := &v1.PodCondition{
+		Type:               v1.SchedulerEvaluationCompleted,
+		Status:             v1.ConditionTrue,
+		Reason:             v1.PodReasonDeferredPodResize,
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&p.Status, p.Generation, v1.SchedulerEvaluationCompleted),
+	}
+
+	if pl.handle.APICacher() != nil {
+		onFinish, err := pl.handle.APICacher().PatchPodStatus(p, []*v1.PodCondition{condition}, nil)
+		if err != nil {
+			return fwk.AsStatus(err)
+		}
+		if err := pl.handle.APICacher().WaitOnFinish(ctx, onFinish); err != nil {
+			return fwk.AsStatus(err)
+		}
+		return nil
+	}
+
+	podStatusCopy := p.Status.DeepCopy()
+	if !podutil.UpdatePodCondition(podStatusCopy, condition) {
+		return nil
+	}
+	if err := util.PatchPodStatus(ctx, pl.handle.ClientSet(), p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
+		return fwk.AsStatus(err)
+	}
+	return nil
 }
 
-func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &DeferredPodScheduling{
+		handle: h,
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}, nil
 }

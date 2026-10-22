@@ -26,12 +26,14 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
@@ -96,10 +98,17 @@ type DefaultPreemption struct {
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
 var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.RelevancePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// IsRelevantForPodResize returns nil to indicate that DefaultPreemption is relevant for pod resizes,
+// as it evaluates and executes preemption on the pod's node to make room for the deferred resize.
+func (pl *DefaultPreemption) IsRelevantForPodResize(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod) *fwk.Status {
+	return nil
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
@@ -144,7 +153,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
-		metrics.PreemptionAttempts.Inc()
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod) {
+			metrics.ResizePreemptionAttempts.Inc()
+		} else {
+			metrics.PreemptionAttempts.Inc()
+		}
 	}()
 
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
@@ -159,7 +172,10 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
+	// A deferred resize preempts as an individual pod (see PriorityQueue.isPodGroupMember),
+	// so its preemption is tracked under the pod's UID, not the group's.
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(p)
+	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload && !isResize {
 		var rootUID types.UID
 		if !pl.fts.EnableCompositePodGroup {
 			pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
@@ -297,9 +313,17 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 		return nil
 	}
+	isDeferredResizePreemptor := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(preemptor)
 	addVictim := func(pu *preemption.DomainVictim) error {
 		for _, pi := range pu.Pods() {
 			nodeInfo := nameToNode[pi.GetPod().Spec.NodeName]
+			if isDeferredResizePreemptor {
+				// During reprieve for a deferred resize preemptor, evaluate candidate victims using
+				// max(allocated, actual) by overwriting unfulfilled desired spec requests with allocated
+				// resources, matching Kubelet's admission calculation and avoiding over-preemption when
+				// multiple pods on the node have pending resizes.
+				pi = podInfoWithAllocatedResources(pi)
+			}
 			// See the block comment in SelectVictimsOnNode: only mainNode's NodeInfo
 			// is mutated; remote nodes go through PreFilterExtension only.
 			if pi.GetPod().Spec.NodeName == mainNodeName {
@@ -323,6 +347,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No preemption victims found for incoming preemptor, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
+		if isDeferredResizePreemptor {
+			return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for pod resize")
+		}
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
@@ -422,8 +449,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 // There're several reasons:
 //  1. The pod has a preemptionPolicy of Never.
 //  2. The pod has already preempted other pods and the victims are in their graceful termination period.
-//     Currently we check the node that is nominated for this pod, and as long as there are
-//     terminating pods on this node, we don't attempt to preempt more pods.
+//     Currently we check the node that is nominated for this pod (or the assigned node for a deferred
+//     in-place resize pod), and as long as there are terminating pods on this node, we don't attempt to
+//     preempt more pods.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
@@ -431,17 +459,28 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
+	isResize := len(nomNodeName) == 0 && pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod)
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
 		if nominatedNodeStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			return true, ""
 		}
+	} else if isResize {
+		// Deferred resize pods are already bound to a node and do not set NominatedNodeName.
+		// Check their assigned node so they do not trigger another round of preemption while
+		// previously preempted victims on that node are still terminating.
+		nomNodeName = pod.Spec.NodeName
+	}
 
+	if len(nomNodeName) > 0 {
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
 				victim := preemption.NewPodVictim(p)
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
+					if isResize {
+						return false, "not eligible due to a terminating pod on the assigned node."
+					}
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -500,4 +539,53 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
+}
+
+// podInfoWithAllocatedResources returns a PodInfo whose spec requests are replaced with the
+// allocated resources from status, so CalculateResource() evaluates max(allocated, actual)
+// instead of max(desired, allocated, actual). CalculateResource takes the desired term from
+// spec: container requests, or pod-level requests when set. Pod-level status only replaces the
+// allocated and actual terms, so both spec levels are replaced.
+func podInfoWithAllocatedResources(pi fwk.PodInfo) fwk.PodInfo {
+	if pi.GetPod() == nil {
+		return pi
+	}
+	pod := pi.GetPod().DeepCopy()
+
+	// Status.AllocatedResources is the kubelet's pod-level aggregate (which can include overhead
+	// or DRA node-allocatable quantities), so only overwrite resource names already present in
+	// pod-level spec requests.
+	if pod.Spec.Resources != nil && pod.Status.AllocatedResources != nil {
+		for rName := range pod.Spec.Resources.Requests {
+			if qty, ok := pod.Status.AllocatedResources[rName]; ok {
+				pod.Spec.Resources.Requests[rName] = qty
+			}
+		}
+	}
+
+	allocByContainer := make(map[string]v1.ResourceList, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		if alloc, ok := allocByContainer[pod.Spec.InitContainers[i].Name]; ok {
+			pod.Spec.InitContainers[i].Resources.Requests = alloc
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if alloc, ok := allocByContainer[pod.Spec.Containers[i].Name]; ok {
+			pod.Spec.Containers[i].Resources.Requests = alloc
+		}
+	}
+
+	// Ignore the error: NewPodInfo still returns a usable PodInfo when affinity terms fail to parse.
+	newPI, _ := framework.NewPodInfo(pod)
+	return newPI
 }

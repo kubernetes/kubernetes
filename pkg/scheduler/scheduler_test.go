@@ -1068,8 +1068,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				// NodeDeclaredFeatures adds fwk.Update
 				fwk.AssignedPod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:   fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
-				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature; DeferredPodScheduling adds fwk.UpdateNodePreemptionPolicy
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature | fwk.UpdateNodePreemptionPolicy,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1104,7 +1104,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
 				fwk.UnscheduledPod:        fwk.Add,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature | fwk.UpdateNodePreemptionPolicy,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1578,5 +1578,73 @@ informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1
 `
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "informer_queued_items"); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestDeferredResizeQueueingByProfile(t *testing.T) {
+	newProfile := func(name string, plugins ...schedulerapi.Plugin) schedulerapi.KubeSchedulerProfile {
+		return schedulerapi.KubeSchedulerProfile{
+			SchedulerName: name,
+			Plugins: &schedulerapi.Plugins{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: names.PrioritySort}}},
+				Filter:    schedulerapi.PluginSet{Enabled: plugins},
+				Bind:      schedulerapi.PluginSet{Enabled: slices.Concat(plugins, []schedulerapi.Plugin{{Name: names.DefaultBinder}})},
+			},
+		}
+	}
+	filterOnly := newProfile("deferred-pod-scheduling-filter-only")
+	filterOnly.Plugins.Filter.Enabled = []schedulerapi.Plugin{{Name: names.DeferredPodScheduling}}
+
+	tests := []struct {
+		profile       string
+		expectInQueue bool
+	}{
+		{profile: "with-deferred-pod-scheduling", expectInQueue: true},
+		{profile: "without-deferred-pod-scheduling", expectInQueue: false},
+		{profile: "deferred-pod-scheduling-filter-only", expectInQueue: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.profile, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := fake.NewClientset()
+			sched, err := New(ctx, client, informers.NewSharedInformerFactory(client, 0), nil,
+				profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})),
+				WithProfiles(
+					newProfile("with-deferred-pod-scheduling", schedulerapi.Plugin{Name: names.DeferredPodScheduling}),
+					newProfile("without-deferred-pod-scheduling"),
+					filterOnly,
+				),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+
+			pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).Obj()
+			deferredPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+			resizedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(tt.profile).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+			checkQueue := func(step string) {
+				t.Helper()
+				if _, inQueue := sched.SchedulingQueue.GetPod(ctx, pod.Name, pod.Namespace, nil); inQueue != tt.expectInQueue {
+					t.Errorf("%s: got inQueue=%v, want inQueue=%v", step, inQueue, tt.expectInQueue)
+				}
+			}
+
+			sched.addPod(deferredPod)
+			checkQueue("add with deferred resize")
+			// The queue adds a pod it doesn't hold on Update, so an unqueued deferred pod must not get there.
+			sched.updatePod(deferredPod, resizedPod)
+			checkQueue("resize while deferred")
+			sched.deletePod(resizedPod)
+
+			sched.addPod(pod)
+			sched.updatePod(pod, deferredPod)
+			checkQueue("transition to deferred resize")
+		})
 	}
 }

@@ -44,6 +44,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -625,6 +626,27 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 		},
 		{
+			name: "metrics: deferred resize pod preemptor with PDB violations",
+			candidate: &candidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{
+						victim1,
+					},
+					NumPDBViolations: 3,
+				},
+			},
+			preemptor: st.MakePod().Name("preemptor").UID("preemptor").Node(node1Name).SchedulerName(defaultSchedulerName).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			testPods: []*v1.Pod{
+				victim1,
+			},
+			nodeNames:             []string{node1Name},
+			expectedDeletedPod:    []string{"victim1"},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+		},
+		{
 			name: "metrics: podgroup preemptor with PDB violations and disruptions",
 			candidate: newCandidate(&extenderv1.Victims{
 				Pods: []*v1.Pod{
@@ -718,6 +740,7 @@ func TestPrepareCandidate(t *testing.T) {
 					testRegistry := componentmetrics.NewKubeRegistry()
 					testRegistry.MustRegister(metrics.WorkloadPreemptionVictims)
 					testRegistry.MustRegister(metrics.PreemptionVictims)
+					testRegistry.MustRegister(metrics.ResizePreemptionVictims)
 					testRegistry.MustRegister(metrics.PreemptionWorkloadDisruptions)
 					testRegistry.MustRegister(metrics.PreemptionPDBViolations)
 					logger, ctx := ktesting.NewTestContext(t)
@@ -846,9 +869,9 @@ func TestPrepareCandidate(t *testing.T) {
 						pgInfo := &framework.PodGroupInfo{GenericPodGroup: tt.preemptorGenericPodGroup}
 						preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{tt.preemptor}}
 					} else {
-						preemptor = &podExecutorPreemptor{Pod: tt.preemptor}
+						preemptor = &podExecutorPreemptor{Pod: tt.preemptor, isResize: resource.IsPodResizeDeferred(tt.preemptor)}
 					}
-					metricsBefore := capturePreemptionMetricsState(testRegistry, metrics.EntityTypeToLabel(preemptor.Type()))
+					metricsBefore := capturePreemptionMetricsState(testRegistry, preemptor)
 
 					if asyncPreemptionEnabled {
 						executor.prepareCandidateAsync(tt.candidate, preemptor, "test-plugin")
@@ -2055,34 +2078,48 @@ func (c counterState) assertDelta(t *testing.T, before counterState, expectedDif
 type preemptionMetricsState struct {
 	workloadPreemptionVictims histogramState
 	preemptionVictims         histogramState
+	resizePreemptionVictims   histogramState
 	workloadDisruptions       histogramState
 	pdbViolations             counterState
+	otherOpPdbViolations      counterState
 }
 
-func capturePreemptionMetricsState(g componentmetrics.Gatherer, preemptorType string) preemptionMetricsState {
+func capturePreemptionMetricsState(g componentmetrics.Gatherer, preemptor ExecutorPreemptor) preemptionMetricsState {
+	preemptorType := metrics.EntityTypeToLabel(preemptor.Type())
+	operation := metrics.OperationToLabel(preemptor.IsResize())
+	otherOperation := metrics.OperationToLabel(!preemptor.IsResize())
 	return preemptionMetricsState{
 		workloadPreemptionVictims: newHistogramState(g, "scheduler_workload_preemption_victims", map[string]string{"preemptor": preemptorType}),
 		preemptionVictims:         newHistogramState(g, "scheduler_preemption_victims", map[string]string{}),
+		resizePreemptionVictims:   newHistogramState(g, "scheduler_resize_preemption_victims", map[string]string{}),
 		workloadDisruptions:       newHistogramState(g, "scheduler_preemption_workload_disruptions", map[string]string{"preemptor": preemptorType}),
-		pdbViolations:             newCounterState(g, "scheduler_preemption_pdb_violations_total", map[string]string{}, "preemptor", preemptorType),
+		pdbViolations:             newCounterState(g, "scheduler_preemption_pdb_violations_total", map[string]string{"operation": operation}, "preemptor", preemptorType),
+		otherOpPdbViolations:      newCounterState(g, "scheduler_preemption_pdb_violations_total", map[string]string{"operation": otherOperation}, "preemptor", preemptorType),
 	}
 }
 
 func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistry, preemptor ExecutorPreemptor, c fwk.PreemptionCandidate, before preemptionMetricsState) {
 	t.Helper()
 	preemptorType := preemptor.Type()
-	after := capturePreemptionMetricsState(reg, metrics.EntityTypeToLabel(preemptorType))
+	after := capturePreemptionMetricsState(reg, preemptor)
 
 	numVictims := float64(len(c.Victims().Pods))
 	numPDBViolations := float64(c.Victims().NumPDBViolations)
 	workloadDisruptions := float64(c.NumPodGroupDisruptions())
 
 	if preemptorType == fwk.PodKeyType {
-		after.preemptionVictims.assertDelta(t, before.preemptionVictims, 1, numVictims)
+		if preemptor.IsResize() {
+			after.resizePreemptionVictims.assertDelta(t, before.resizePreemptionVictims, 1, numVictims)
+			after.preemptionVictims.assertDelta(t, before.preemptionVictims, 0, 0)
+		} else {
+			after.preemptionVictims.assertDelta(t, before.preemptionVictims, 1, numVictims)
+			after.resizePreemptionVictims.assertDelta(t, before.resizePreemptionVictims, 0, 0)
+		}
 		after.workloadPreemptionVictims.assertDelta(t, before.workloadPreemptionVictims, 0, 0)
 	} else {
 		after.workloadPreemptionVictims.assertDelta(t, before.workloadPreemptionVictims, 1, numVictims)
 		after.preemptionVictims.assertDelta(t, before.preemptionVictims, 0, 0)
+		after.resizePreemptionVictims.assertDelta(t, before.resizePreemptionVictims, 0, 0)
 	}
 
 	expectedDisruptionsObservations := uint64(0)
@@ -2092,6 +2129,7 @@ func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistr
 	after.workloadDisruptions.assertDelta(t, before.workloadDisruptions, expectedDisruptionsObservations, workloadDisruptions)
 
 	after.pdbViolations.assertDelta(t, before.pdbViolations, numPDBViolations)
+	after.otherOpPdbViolations.assertDelta(t, before.otherOpPdbViolations, 0)
 }
 
 func TestPreemptionExecutionDurationMetric(t *testing.T) {
@@ -2102,10 +2140,15 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 
 	preemptors := []struct {
 		name                     string
+		isResize                 bool
 		preemptorGenericPodGroup *fwk.GenericPodGroup
 	}{
 		{
 			name: metrics.Pod,
+		},
+		{
+			name:     "deferred resize pod",
+			isResize: true,
 		},
 		{
 			name:                     metrics.PodGroup,
@@ -2139,6 +2182,7 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 				t.Run(fmt.Sprintf("%s preemptor, %s (async=%v)", p.name, tt.name, async), func(t *testing.T) {
 					testRegistry := componentmetrics.NewKubeRegistry()
 					testRegistry.MustRegister(metrics.PreemptionExecutionDuration)
+					testRegistry.MustRegister(metrics.PreemptionGoroutinesExecutionTotal)
 
 					_, ctx := ktesting.NewTestContext(t)
 					ctx, cancel := context.WithCancel(ctx)
@@ -2182,7 +2226,12 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 						pgInfo := &framework.PodGroupInfo{GenericPodGroup: p.preemptorGenericPodGroup}
 						execPreemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{preemptor}}
 					} else {
-						execPreemptor = &podExecutorPreemptor{Pod: preemptor}
+						preemptorPod := preemptor
+						if p.isResize {
+							preemptorPod = st.MakePod().Name("preemptor").UID("preemptor").Node(nodeName).Priority(highPriority).
+								Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+						}
+						execPreemptor = &podExecutorPreemptor{Pod: preemptorPod, isResize: p.isResize}
 					}
 					candidate := &candidate{
 						name: nodeName,
@@ -2193,7 +2242,12 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 
 					// Capture metrics before
 					preemptorType := execPreemptor.Type()
-					stateBefore := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
+					operation := metrics.OperationToLabel(execPreemptor.IsResize())
+					otherOperation := metrics.OperationToLabel(!execPreemptor.IsResize())
+					stateBefore := captureExecutionDurationMetric(testRegistry, preemptorType, operation, tt.expectedResult)
+					otherStateBefore := captureExecutionDurationMetric(testRegistry, preemptorType, otherOperation, tt.expectedResult)
+					goroutinesBefore := newCounterState(testRegistry, "scheduler_preemption_goroutines_execution_total", map[string]string{"operation": operation}, "result", tt.expectedResult)
+					otherGoroutinesBefore := newCounterState(testRegistry, "scheduler_preemption_goroutines_execution_total", map[string]string{"operation": otherOperation}, "result", tt.expectedResult)
 
 					if async {
 						executor.prepareCandidateAsync(candidate, execPreemptor, "test-plugin")
@@ -2211,11 +2265,21 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 					}
 
 					// Capture metrics after
-					stateAfter := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
+					stateAfter := captureExecutionDurationMetric(testRegistry, preemptorType, operation, tt.expectedResult)
+					otherStateAfter := captureExecutionDurationMetric(testRegistry, preemptorType, otherOperation, tt.expectedResult)
+					goroutinesAfter := newCounterState(testRegistry, "scheduler_preemption_goroutines_execution_total", map[string]string{"operation": operation}, "result", tt.expectedResult)
+					otherGoroutinesAfter := newCounterState(testRegistry, "scheduler_preemption_goroutines_execution_total", map[string]string{"operation": otherOperation}, "result", tt.expectedResult)
 
 					diff := stateAfter.count - stateBefore.count
 					if diff != 1 {
-						t.Errorf("Expected %s count delta for %s preemptor to be 1, got %d", tt.expectedResult, preemptorType, diff)
+						t.Errorf("Expected %s count delta for %s preemptor (operation=%s) to be 1, got %d", tt.expectedResult, preemptorType, operation, diff)
+					}
+					if otherDiff := otherStateAfter.count - otherStateBefore.count; otherDiff != 0 {
+						t.Errorf("Expected %s count delta for %s preemptor (operation=%s) to be 0, got %d", tt.expectedResult, preemptorType, otherOperation, otherDiff)
+					}
+					if async {
+						goroutinesAfter.assertDelta(t, goroutinesBefore, 1)
+						otherGoroutinesAfter.assertDelta(t, otherGoroutinesBefore, 0)
 					}
 				})
 			}
@@ -2227,9 +2291,9 @@ type executionDurationMetricState struct {
 	count uint64
 }
 
-func captureExecutionDurationMetric(g componentmetrics.Gatherer, preemptorType fwk.EntityKeyType, status string) executionDurationMetricState {
+func captureExecutionDurationMetric(g componentmetrics.Gatherer, preemptorType fwk.EntityKeyType, operation, status string) executionDurationMetricState {
 	state := executionDurationMetricState{}
-	if count, _, err := getHistogramFromGatherer(g, "scheduler_preemption_execution_duration_seconds", map[string]string{"preemptor": metrics.EntityTypeToLabel(preemptorType), "result": status}); err == nil {
+	if count, _, err := getHistogramFromGatherer(g, "scheduler_preemption_execution_duration_seconds", map[string]string{"preemptor": metrics.EntityTypeToLabel(preemptorType), "operation": operation, "result": status}); err == nil {
 		state.count = count
 	}
 	return state

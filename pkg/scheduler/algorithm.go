@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -619,6 +620,10 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
 	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, *fwk.Status) {
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(podInfo.Pod) {
+		// A deferred resize pod is already bound, and the cache already counts its resources.
+		return podInfo.DeepCopy(), nil
+	}
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
 	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
@@ -641,6 +646,10 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, state fwk.CycleState,
 	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(assumedPodInfo.Pod) {
+		// AssumeAndReserveInCache neither assumed nor reserved a deferred resize pod.
+		return nil
+	}
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
 	// No nomination restore here: a pod that fails after a cache assume goes back

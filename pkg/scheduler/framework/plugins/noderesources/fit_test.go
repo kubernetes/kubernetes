@@ -1635,6 +1635,39 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 			newObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"queue-on-other-pod-scaled-down-when-target-pod-cpu-from-dra-node-allocatable-claim-status": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1"},
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Containers: []v1.Container{{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+						},
+					}},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "dra-claim", ResourceClaimName: new("dra-claim")},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+					},
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{{
+						ResourceClaimName: "dra-claim",
+						Containers:        []string{"c1"},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("500m")),
+						}},
+					}},
+				},
+			},
+			oldObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			newObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -1642,6 +1675,7 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
 				EnableInPlacePodVerticalScaling:                    true,
+				EnableDRANodeAllocatableResources:                  true,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
 			if err != nil {
@@ -1937,115 +1971,6 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 				t.Fatal(err)
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
-			if tc.expectedErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
-				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func Test_isSchedulableAfterTargetPodScaleUp(t *testing.T) {
-	testcases := map[string]struct {
-		enablePreemptionGate bool
-		pod                  *v1.Pod
-		expectedHint         fwk.QueueingHint
-	}{
-		"skip-queue-on-pod-not-deferred": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"queue-on-deferred-target-pod-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			expectedHint:         fwk.Queue,
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			actualHint, err := p.(*Fit).isSchedulableAfterTargetPodScaleUp(logger, tc.pod, nil, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if actualHint != tc.expectedHint {
-				t.Errorf("unexpected hint: got %v, want %v", actualHint, tc.expectedHint)
-			}
-		})
-	}
-}
-
-func Test_isSchedulableAfterAssignedPodScaleUp(t *testing.T) {
-	testcases := map[string]struct {
-		enablePreemptionGate bool
-		pod                  *v1.Pod
-		oldObj, newObj       interface{}
-		expectedHint         fwk.QueueingHint
-		expectedErr          bool
-	}{
-		"backoff-wrong-old-object": {
-			enablePreemptionGate: true,
-			pod:                  &v1.Pod{},
-			oldObj:               "not-a-pod",
-			expectedHint:         fwk.Queue,
-			expectedErr:          true,
-		},
-		"backoff-wrong-new-object": {
-			enablePreemptionGate: true,
-			pod:                  &v1.Pod{},
-			newObj:               "not-a-pod",
-			expectedHint:         fwk.Queue,
-			expectedErr:          true,
-		},
-		"skip-queue-on-pod-not-deferred": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"skip-queue-on-different-node-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"queue-on-same-node-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expectedHint:         fwk.Queue,
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			actualHint, err := p.(*Fit).isSchedulableAfterAssignedPodScaleUp(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -2962,17 +2887,105 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 	}
 }
 
+func TestDeferredResizeFitAtMaxPodCapacity(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1-uid",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "test-node",
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+
+	nodeInfo := framework.NewNodeInfo(pod)
+	nodeInfo.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(2000, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		},
+	})
+
+	fh, _ := runtime.NewFramework(testCtx, nil, nil)
+	testCtx.Cleanup(func() {
+		runtime.WaitForShutdown(fh)
+	})
+
+	p, err := NewFit(testCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	})
+	testCtx.ExpectNoError(err, "create fit plugin")
+
+	cycleState := framework.NewCycleState()
+	_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(testCtx, cycleState, pod, nil)
+	if !preFilterStatus.IsSuccess() {
+		testCtx.Fatalf("prefilter failed with status: %v", preFilterStatus)
+	}
+
+	if gotStatus := p.(fwk.FilterPlugin).Filter(testCtx, cycleState, pod, nodeInfo); !gotStatus.IsSuccess() {
+		testCtx.Errorf("expected Filter to succeed at max pod capacity for assigned resize pod, got: %v", gotStatus)
+	}
+	if gotInsufficient := Fits(pod, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}); len(gotInsufficient) != 0 {
+		testCtx.Errorf("expected no insufficient resources from Fits at max pod capacity, got: %v", gotInsufficient)
+	}
+
+	// Without the deferred resize, nodeName alone doesn't mark a resize, so the pod counts in full.
+	notDeferred := pod.DeepCopy()
+	notDeferred.Status.Conditions = nil
+	var gotNames []v1.ResourceName
+	for _, r := range Fits(notDeferred, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}) {
+		gotNames = append(gotNames, r.ResourceName)
+	}
+	if diff := cmp.Diff([]v1.ResourceName{v1.ResourcePods, v1.ResourceCPU, v1.ResourceMemory}, gotNames); diff != "" {
+		testCtx.Errorf("Unexpected insufficient resources for a pod without a deferred resize (-want,+got):\n%s", diff)
+	}
+}
+
 func TestDeferredResizeFit(t *testing.T) {
 	testCtx := ktesting.Init(t)
 
 	tests := []struct {
-		name                      string
-		pod                       *v1.Pod
-		existingPods              []*v1.Pod
-		nodeAllocatable           framework.Resource
-		enablePreemptionFeature   bool
-		wantInsufficientResources []InsufficientResource
-		wantStatus                *fwk.Status
+		name                              string
+		pod                               *v1.Pod
+		existingPods                      []*v1.Pod
+		nodeAllocatable                   framework.Resource
+		enablePreemptionFeature           bool
+		enableDRANodeAllocatableResources bool
+		wantInsufficientResources         []InsufficientResource
+		wantStatus                        *fwk.Status
 	}{
 		{
 			name: "deferred pod resize fits, no other workloads",
@@ -3015,8 +3028,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -3030,7 +3043,7 @@ func TestDeferredResizeFit(t *testing.T) {
 		},
 		{
 			// Exactly the same as the previous test case, but the flag is disabled.
-			// In this case, we will have double counting (diff between old and target) and it will fail to fit.
+			// In this case, we will have double counting and it will fail to fit.
 			name: "feature gate is false - double counting causes fit failure",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -3071,8 +3084,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -3124,7 +3137,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI),
 									},
 								},
 							},
@@ -3194,7 +3207,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(1200, resource.DecimalSI),
 									},
 								},
 							},
@@ -3205,6 +3218,91 @@ func TestDeferredResizeFit(t *testing.T) {
 			nodeAllocatable:         framework.Resource{MilliCPU: 1000},
 			enablePreemptionFeature: true,
 			wantStatus:              fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			name: "deferred pod resize with DRA node-allocatable claim status exceeds node capacity in PreFilter/Filter",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI),
+								},
+								Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "dra-claim", ResourceClaimName: new("dra-claim")},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "dra-claim",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{{
+								Name:     v1.ResourceCPU,
+								Quantity: new(resource.MustParse("300m")),
+							}},
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+						UID:  "pod1-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI),
+									},
+									Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+								},
+							},
+						},
+						ResourceClaims: []v1.PodResourceClaim{
+							{Name: "dra-claim", ResourceClaimName: new("dra-claim")},
+						},
+					},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "dra-claim",
+								Containers:        []string{"c1"},
+								Mapping: []v1.NodeAllocatableMappedResources{{
+									Name:     v1.ResourceCPU,
+									Quantity: new(resource.MustParse("300m")),
+								}},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:                   framework.Resource{MilliCPU: 1000},
+			enablePreemptionFeature:           true,
+			enableDRANodeAllocatableResources: true,
+			wantStatus:                        fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU)),
 		},
 		{
 			name: "feature gate is false, pod is not in cache, resize fits",
@@ -3244,6 +3342,7 @@ func TestDeferredResizeFit(t *testing.T) {
 
 	for _, test := range tests {
 		testCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 			nodeInfo := framework.NewNodeInfo()
 			for _, ep := range test.existingPods {
 				nodeInfo.AddPod(ep)
@@ -3270,6 +3369,7 @@ func TestDeferredResizeFit(t *testing.T) {
 
 			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnablePodLevelResources:                            true,
+				EnableDRANodeAllocatableResources:                  test.enableDRANodeAllocatableResources,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: test.enablePreemptionFeature,
 			})
 			tCtx.ExpectNoError(err, "create fit plugin")

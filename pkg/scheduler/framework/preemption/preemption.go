@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -92,19 +93,26 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Fea
 func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (_ fwk.PreemptionCandidate, _ *fwk.PostFilterResult, status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String(), metrics.OperationToLabel(isResize)).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
+	evaluatedUID := pod.UID
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
 	if err != nil {
 		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return nil, nil, fwk.AsStatus(err)
+	}
+	// The queued copy of a deferred resize pod can be stale. Don't preempt for a resize that was
+	// resolved or already evaluated since, or for a recreated pod.
+	if isResize && (pod.UID != evaluatedUID || !resource.IsPodResizeDeferred(pod) || resource.IsPodResizeSchedulerEvaluationCompleted(pod)) {
+		return nil, &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop}}, fwk.NewStatus(fwk.Success, fmt.Sprintf("pod resize on node %v is no longer deferred or already evaluated", pod.Spec.NodeName))
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
@@ -136,13 +144,22 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
-		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+		absentMsg := "Preemption is not helpful for scheduling"
+		if isResize {
+			// A deferred resize pod can only stay on its assigned node, so report on that node alone.
+			fitError.NumAllNodes = 1
+			absentMsg = "Preemption is not helpful for pod resize"
+		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, absentMsg))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return nil, framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
-	candidates, status = ev.callExtenders(logger, pod, candidates)
+	// Extenders sit out a resize, as in the scheduling cycle (see Framework.WithRelevantPlugins).
+	if !isResize {
+		candidates, status = ev.callExtenders(logger, pod, candidates)
+	}
 	if !status.IsSuccess() {
 		return nil, nil, status
 	}
@@ -176,15 +193,29 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	logger := klog.FromContext(ctx)
 
 	bestCandidate, fitErrorResult, status := ev.evaluate(ctx, state, pod, m)
-	if !status.IsSuccess() {
+	if !status.IsSuccess() || bestCandidate == nil {
 		return fitErrorResult, status
 	}
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
+	isDeferredResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
+
+	// SelectVictimsOnNode returns Unschedulable if there are no potential victims or if the pod still
+	// does not fit after removing them (causing ev.evaluate above to return non-Success). Reaching here
+	// with 0 victims means SelectVictimsOnNode returned Success after reprieving every potential victim
+	// using max(allocated, actual), so the deferred resize fits without preempting any pod.
+	if len(bestCandidate.Victims().Pods) == 0 && isDeferredResize {
+		return &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop}}, fwk.NewStatus(fwk.Success, fmt.Sprintf("pod fits on node %v without preemption after reprieve", bestCandidate.Name()))
+	}
+
 	// 5) Actuate the preemption.
 	if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
 		return nil, status
+	}
+
+	if isDeferredResize {
+		return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found potential victims for pod resize on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
 	}
 
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found a potential placement for pod on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
@@ -481,11 +512,14 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, state.Clone(), pod, nodeInfo.Snapshot(), allPossibleVictims, pdbs)
 
 		// In-tree filters may succeed with no victims when only extender-managed
-		// resources are constrained. HTTPExtender.Filter cannot observe simulated
-		// victim removal, so keep the node as a candidate and let ProcessPreemption
-		// add victims. Without a preempt-capable extender, empty victims means
+		// resources are constrained, or when a deferred resize pod fits alongside
+		// candidate victims' allocated/actual resources after reprieve.
+		// HTTPExtender.Filter cannot observe simulated victim removal, so keep the
+		// node as a candidate and let ProcessPreemption add victims. Without a
+		// preempt-capable extender or deferred resize reprieve, empty victims means
 		// preemption cannot help this node (not an error).
-		if status.IsSuccess() && (len(pods) != 0 || ev.hasInterestedPreemptExtender(pod)) {
+		isDeferredResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
+		if status.IsSuccess() && (len(pods) != 0 || ev.hasInterestedPreemptExtender(pod) || isDeferredResize) {
 			victims := extenderv1.Victims{
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),

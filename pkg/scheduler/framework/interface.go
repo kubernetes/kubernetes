@@ -183,6 +183,11 @@ type Framework interface {
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
 	SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature
 
+	// WithRelevantPlugins returns a Framework with plugins filtered for the given pod.
+	// For pods undergoing a deferred in-place resize, plugins that do not implement
+	// RelevancePlugin or return Skip from IsRelevantForPodResize are excluded, and so are extenders.
+	WithRelevantPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) Framework
+
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling
@@ -320,4 +325,11 @@ func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
 			NominatingMode:    fwk.ModeOverride,
 		},
 	}
+}
+
+// IsRelevantForPodResize reports whether the plugin runs for a pod with a deferred resize:
+// only plugins that implement fwk.RelevancePlugin and don't return Skip do.
+func IsRelevantForPodResize(ctx context.Context, state fwk.CycleState, pl fwk.Plugin, pod *v1.Pod) bool {
+	rp, ok := pl.(fwk.RelevancePlugin)
+	return ok && !rp.IsRelevantForPodResize(ctx, state, pod).IsSkip()
 }

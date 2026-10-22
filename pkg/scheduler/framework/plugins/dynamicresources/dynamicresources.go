@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -558,9 +557,6 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
 func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
 	logger := klog.FromContext(ctx)
 
 	// If the pod does not reference any claim, we don't need to do
@@ -916,9 +912,6 @@ func getOrCreatePodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error)
 // For claims that are unbound, it checks whether the claim might get allocated
 // for the node.
 func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -1131,9 +1124,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 // suitable node.
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Unschedulable)
-	}
 
 	state, err := getStateData(cs)
 	if err != nil {

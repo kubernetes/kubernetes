@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -84,6 +85,10 @@ type frameworkImpl struct {
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
+
+	// irrelevantFilterPlugins are the PreFilter and Filter plugins WithRelevantPlugins dropped
+	// for the pod being scheduled.
+	irrelevantFilterPlugins sets.Set[string]
 
 	clientSet                      clientset.Interface
 	kubeConfig                     *restclient.Config
@@ -948,6 +953,55 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignatu
 	return sigBytes
 }
 
+// WithRelevantPlugins returns a Framework that runs only the plugins relevant to the pod.
+// For a pod with a deferred in-place resize, it drops the plugins that don't implement
+// RelevancePlugin or return Skip from IsRelevantForPodResize.
+func (f *frameworkImpl) WithRelevantPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) framework.Framework {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !resource.IsPodResizeDeferred(pod) {
+		return f
+	}
+	irrelevant := sets.New[string]()
+	for name, pl := range f.pluginsMap {
+		if !framework.IsRelevantForPodResize(ctx, state, pl, pod) {
+			irrelevant.Insert(name)
+		}
+	}
+
+	copied := *f
+	copied.irrelevantFilterPlugins = irrelevant.Intersection(pluginNameSet(f.preFilterPlugins).Union(pluginNameSet(f.filterPlugins)))
+	copied.preFilterPlugins = relevantPlugins(f.preFilterPlugins, irrelevant)
+	copied.filterPlugins = relevantPlugins(f.filterPlugins, irrelevant)
+	copied.postFilterPlugins = relevantPlugins(f.postFilterPlugins, irrelevant)
+	copied.preScorePlugins = relevantPlugins(f.preScorePlugins, irrelevant)
+	copied.scorePlugins = relevantPlugins(f.scorePlugins, irrelevant)
+	copied.reservePlugins = relevantPlugins(f.reservePlugins, irrelevant)
+	copied.preBindPlugins = relevantPlugins(f.preBindPlugins, irrelevant)
+	copied.bindPlugins = relevantPlugins(f.bindPlugins, irrelevant)
+	copied.postBindPlugins = relevantPlugins(f.postBindPlugins, irrelevant)
+	copied.permitPlugins = relevantPlugins(f.permitPlugins, irrelevant)
+	// Extenders can't declare relevance, so they sit out a resize like plugins that don't implement RelevancePlugin.
+	copied.extenders = nil
+	return &copied
+}
+
+func relevantPlugins[T fwk.Plugin](plugins []T, irrelevant sets.Set[string]) []T {
+	relevant := make([]T, 0, len(plugins))
+	for _, pl := range plugins {
+		if !irrelevant.Has(pl.Name()) {
+			relevant = append(relevant, pl)
+		}
+	}
+	return relevant
+}
+
+func pluginNameSet[T fwk.Plugin](plugins []T) sets.Set[string] {
+	names := sets.New[string]()
+	for _, pl := range plugins {
+		names.Insert(pl.Name())
+	}
+	return names
+}
+
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success/Skip.
@@ -956,7 +1010,9 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignatu
 // If a non-success status is returned, then the scheduling cycle is aborted.
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) (_ *fwk.PreFilterResult, status *fwk.Status, _ sets.Set[string]) {
 	startTime := time.Now()
-	skipPlugins := sets.New[string]()
+	// Plugins dropped by WithRelevantPlugins count as skipped, so that preemption dry runs,
+	// which filter through the unfiltered framework, skip them too.
+	skipPlugins := f.irrelevantFilterPlugins.Clone()
 	defer func() {
 		state.SetSkipFilterPlugins(skipPlugins)
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -2322,7 +2378,9 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	startTime := time.Now()
 	s := <-waitingPod.s
-	metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !resource.IsPodResizeDeferred(pod) {
+		metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}
 
 	if !s.IsSuccess() {
 		if s.IsRejected() {

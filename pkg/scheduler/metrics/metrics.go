@@ -108,6 +108,20 @@ const (
 	CompositePodGroup = "compositepodgroup"
 )
 
+// Operation label values used to distinguish initial pod placement from deferred in-place pod resize.
+const (
+	OperationInitialPlacement = "initial_placement"
+	OperationPodResize        = "pod_resize"
+)
+
+// OperationToLabel returns the operation metric label value for a scheduling entity or preemption attempt.
+func OperationToLabel(isResize bool) string {
+	if isResize {
+		return OperationPodResize
+	}
+	return OperationInitialPlacement
+}
+
 const (
 	PodPoppedInFlightEvent = "PodPopped"
 )
@@ -161,6 +175,12 @@ var (
 	BatchRescoreDuration         *metrics.HistogramVec
 	GetNodeHintDuration          *metrics.HistogramVec
 	StoreScheduleResultsDuration *metrics.HistogramVec
+
+	// The below are only available when the InPlacePodVerticalScalingSchedulerPreemption feature gate is enabled.
+	PendingResizePods                *metrics.GaugeVec
+	ResizeSchedulingAlgorithmLatency *metrics.Histogram
+	ResizePreemptionVictims          *metrics.Histogram
+	ResizePreemptionAttempts         *metrics.Counter
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
@@ -246,9 +266,21 @@ func Register() {
 				WorkloadPreemptionAttempts,
 				WorkloadPreemptionVictims,
 				PreemptionWorkloadDisruptions,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+			RegisterMetrics(
 				PreemptionEvaluationDuration,
 				PreemptionExecutionDuration,
 				PreemptionPDBViolations,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+			RegisterMetrics(
+				PendingResizePods,
+				ResizeSchedulingAlgorithmLatency,
+				ResizePreemptionAttempts,
+				ResizePreemptionVictims,
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
@@ -326,13 +358,44 @@ func InitMetrics() {
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods; 'pending' means number of pods in pendingPodGroupPods.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	PendingResizePods = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pending_resize_pods",
+			Help:           "Number of pending deferred resize pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to evaluate and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to evaluate because they are gated.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"queue"})
+	ResizeSchedulingAlgorithmLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "resize_scheduling_algorithm_duration_seconds",
+			Help:           "Resize scheduling algorithm latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	ResizePreemptionVictims = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "resize_preemption_victims",
+			Help:           "Number of selected preemption victims for preemption initiated by a deferred resize pod",
+			Buckets:        metrics.ExponentialBuckets(1, 2, 7),
+			StabilityLevel: metrics.ALPHA,
+		})
+	ResizePreemptionAttempts = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "resize_preemption_attempts_total",
+			Help:           "Total preemption attempts initiated by deferred resize pods in the cluster till now",
+			StabilityLevel: metrics.ALPHA,
+		})
 	QueuedEntities = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "queued_entities",
-			Help:           "Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.",
+			Help:           "Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type and operation ('initial_placement' or 'pod_resize'). 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"queue", "entity"})
+		}, []string{"queue", "entity", "operation"})
 	InFlightEvents = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -509,7 +572,7 @@ func InitMetrics() {
 			Help:           "Number of preemption goroutines executed.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"})
+		[]string{"result", "operation"})
 
 	// The below (AsyncAPICallsTotal, AsyncAPICallDuration and AsyncAPIPendingCalls) are only available when the SchedulerAsyncAPICalls feature gate is enabled.
 	AsyncAPICallsTotal = metrics.NewCounterVec(
@@ -653,7 +716,7 @@ func InitMetrics() {
 			// Start with 1ms with the last bucket being [~32.8s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 16),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"preemptor", "result"})
+		}, []string{"preemptor", "result", "operation"})
 	PreemptionExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -662,14 +725,14 @@ func InitMetrics() {
 			// Start with 1ms with the last bucket being [~32.8s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 16),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"preemptor", "result"})
+		}, []string{"preemptor", "result", "operation"})
 	PreemptionPDBViolations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "preemption_pdb_violations_total",
 			Help:           "Total number of pod disruption budget violations caused by preemption.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"preemptor"},
+		}, []string{"preemptor", "operation"},
 	)
 
 	// The below (GeneratedPlacementsTotal, PlacementEvaluations and PlacementEvaluationDuration) are only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
@@ -772,24 +835,44 @@ func PendingPodGroupPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "pending"})
 }
 
-// ActiveEntities returns the queued entities metric with the queue label set to "active" and entity label set to "pod", "podgroup", or "compositepodgroup".
-func ActiveEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "active", "entity": entityType})
+// ActiveResizePods returns the pending resize pods metric with the label active.
+func ActiveResizePods() metrics.GaugeMetric {
+	return PendingResizePods.With(metrics.Labels{"queue": "active"})
 }
 
-// BackoffEntities returns the queued entities metric with the queue label set to "backoff" and entity label set to "pod", "podgroup", or "compositepodgroup".
-func BackoffEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "backoff", "entity": entityType})
+// BackoffResizePods returns the pending resize pods metric with the label backoff.
+func BackoffResizePods() metrics.GaugeMetric {
+	return PendingResizePods.With(metrics.Labels{"queue": "backoff"})
 }
 
-// UnschedulableEntities returns the queued entities metric with the queue label set to "unschedulable" and entity label set to "pod", "podgroup", or "compositepodgroup".
-func UnschedulableEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "unschedulable", "entity": entityType})
+// UnschedulableResizePods returns the pending resize pods metric with the label unschedulable.
+func UnschedulableResizePods() metrics.GaugeMetric {
+	return PendingResizePods.With(metrics.Labels{"queue": "unschedulable"})
 }
 
-// GatedEntities returns the queued entities metric with the queue label set to "gated" and entity label set to "pod", "podgroup", or "compositepodgroup".
-func GatedEntities(entityType string) metrics.GaugeMetric {
-	return QueuedEntities.With(metrics.Labels{"queue": "gated", "entity": entityType})
+// GatedResizePods returns the pending resize pods metric with the label gated.
+func GatedResizePods() metrics.GaugeMetric {
+	return PendingResizePods.With(metrics.Labels{"queue": "gated"})
+}
+
+// ActiveEntities returns the queued entities metric with the queue label set to "active", entity label set to "pod", "podgroup", or "compositepodgroup", and operation label set to "initial_placement" or "pod_resize".
+func ActiveEntities(entityType, operation string) metrics.GaugeMetric {
+	return QueuedEntities.With(metrics.Labels{"queue": "active", "entity": entityType, "operation": operation})
+}
+
+// BackoffEntities returns the queued entities metric with the queue label set to "backoff", entity label set to "pod", "podgroup", or "compositepodgroup", and operation label set to "initial_placement" or "pod_resize".
+func BackoffEntities(entityType, operation string) metrics.GaugeMetric {
+	return QueuedEntities.With(metrics.Labels{"queue": "backoff", "entity": entityType, "operation": operation})
+}
+
+// UnschedulableEntities returns the queued entities metric with the queue label set to "unschedulable", entity label set to "pod", "podgroup", or "compositepodgroup", and operation label set to "initial_placement" or "pod_resize".
+func UnschedulableEntities(entityType, operation string) metrics.GaugeMetric {
+	return QueuedEntities.With(metrics.Labels{"queue": "unschedulable", "entity": entityType, "operation": operation})
+}
+
+// GatedEntities returns the queued entities metric with the queue label set to "gated", entity label set to "pod", "podgroup", or "compositepodgroup", and operation label set to "initial_placement" or "pod_resize".
+func GatedEntities(entityType, operation string) metrics.GaugeMetric {
+	return QueuedEntities.With(metrics.Labels{"queue": "gated", "entity": entityType, "operation": operation})
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

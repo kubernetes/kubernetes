@@ -300,6 +300,9 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 
 	// Update metrics for unschedulable plugins.
 	for pInfo := range entity.ForEachPodInfo() {
+		if pInfo.IsResize() {
+			continue
+		}
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
