@@ -284,8 +284,9 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{
-		EnablePodLevelResources:           f.enablePodLevelResources,
-		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
+		EnablePodLevelResources: f.enablePodLevelResources,
+		// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
 	})
 
 	cycleState.Write(preFilterStateKey, result)

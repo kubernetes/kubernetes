@@ -235,14 +235,14 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
 // the Overhead is added to the result.
-func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
+func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName, useExtraNodeAllocatable bool) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
 		UseStatusResources: r.enableInPlacePodVerticalScaling,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:            !r.enablePodLevelResources,
-		UseExtraNodeAllocatableResources: r.enableDRANodeAllocatableResources,
+		UseExtraNodeAllocatableResources: useExtraNodeAllocatable,
 	}
 
 	if !r.useRequested {
@@ -263,8 +263,10 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 
 func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, resources []config.ResourceSpec) []int64 {
 	podRequests := make([]int64, len(resources))
+	// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+	useExtraNodeAllocatable := r.enableDRANodeAllocatableResources && pod.Spec.NodeName != ""
 	for i := range resources {
-		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name))
+		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name), useExtraNodeAllocatable)
 	}
 	return podRequests
 }
@@ -287,7 +289,11 @@ func (r *resourceAllocationScorer) calculatePodRequestWithExtraNodeAllocatable(c
 	}
 	podCopy := *pod
 	podCopy.Status.ExtraNodeAllocatableResources = extraResources
-	return r.calculatePodResourceRequestList(&podCopy, r.resources)
+	res := make([]int64, len(r.resources))
+	for i := range r.resources {
+		res[i] = r.calculatePodResourceRequest(&podCopy, v1.ResourceName(r.resources[i].Name), r.enableDRANodeAllocatableResources)
+	}
+	return res
 }
 
 func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {

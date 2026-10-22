@@ -51,9 +51,10 @@ import (
 func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 	const oneMi = 1048576
 	tests := []struct {
-		name     string
-		pod      v1.Pod
-		expected map[v1.ResourceName]int64
+		name                    string
+		pod                     v1.Pod
+		useExtraNodeAllocatable bool
+		expected                map[v1.ResourceName]int64
 	}{
 		{
 			name: "overhead only",
@@ -247,13 +248,65 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 				v1.ResourceMemory: 3 + util.DefaultMemoryRequest,
 			},
 		},
+		{
+			name:                    "extra node allocatable resources included when useExtraNodeAllocatable is true",
+			useExtraNodeAllocatable: true,
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "50m"),
+				},
+			},
+			expected: map[v1.ResourceName]int64{
+				v1.ResourceCPU:    150,
+				v1.ResourceMemory: oneMi,
+			},
+		},
+		{
+			name:                    "extra node allocatable resources ignored when useExtraNodeAllocatable is false",
+			useExtraNodeAllocatable: false,
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "50m"),
+				},
+			},
+			expected: map[v1.ResourceName]int64{
+				v1.ResourceCPU:    100,
+				v1.ResourceMemory: oneMi,
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var scorer resourceAllocationScorer
 			for n, exp := range tc.expected {
-				got := scorer.calculatePodResourceRequest(&tc.pod, n)
+				got := scorer.calculatePodResourceRequest(&tc.pod, n, tc.useExtraNodeAllocatable)
 				if got != exp {
 					t.Errorf("expected %s = %d, got %d", n, exp, got)
 				}
