@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -186,6 +187,60 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if !ok || val.(*Element).Object.(*mockObject).val != "30" {
 		t.Fatalf("Unexpected element in snapshot at RV 30")
 	}
+}
+
+// The cache observes every write, so it knows the state at every RV
+// from the compacted one up to the latest one it observed.
+func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	s := NewWatchCacheStorage(&cache.Indexers{})
+	write := func(rv int) {
+		_, err := s.UpdateStore(watch.Added, testStorageElement(fmt.Sprint(rv), "", rv), uint64(rv))
+		require.NoError(t, err)
+	}
+
+	write(10)
+	write(20)
+	s.UpdateResourceVersion(25)
+	assert.Equal(t, "rv=10 keys=[10]", oldestExactSnapshot(t, s))
+
+	t.Log("Compact between writes")
+	assert.Equal(t, "rv=15 keys=[10]", exactSnapshot(t, s, 15))
+	s.Compact(15)
+	// TODO: Expect "rv=15 keys=[10]", same as before compaction.
+	assert.Equal(t, "rv=20 keys=[10 20]", oldestExactSnapshot(t, s))
+
+	t.Log("Compact past last write")
+	assert.Equal(t, "rv=22 keys=[10 20]", exactSnapshot(t, s, 22))
+	s.Compact(22)
+	// TODO: Expect "rv=22 keys=[10 20]", same as before compaction.
+	assert.Equal(t, "none", oldestExactSnapshot(t, s))
+
+	t.Log("Write after compact past last write")
+	write(40)
+	// TODO: Expect "rv=22 keys=[10 20]", a write does not expire older RVs.
+	assert.Equal(t, "rv=40 keys=[10 20 40]", oldestExactSnapshot(t, s))
+}
+
+func oldestExactSnapshot(t *testing.T, s *WatchCacheStorage) string {
+	t.Helper()
+	rv, ok := s.oldestExactRV()
+	if !ok {
+		return "none"
+	}
+	return exactSnapshot(t, s, rv)
+}
+
+func exactSnapshot(t *testing.T, s *WatchCacheStorage, rv uint64) string {
+	t.Helper()
+	snapshot, err := s.GetExactSnapshotLocked(rv)
+	require.NoError(t, err)
+	var keys []string
+	for elem, err := range snapshot.RangePrefix("", "").All() {
+		require.NoError(t, err)
+		keys = append(keys, elem.Key)
+	}
+	return fmt.Sprintf("rv=%d keys=%v", snapshot.ResourceVersion(), keys)
 }
 
 type mockObject struct {

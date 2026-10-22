@@ -373,6 +373,31 @@ func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface
 	return recorder.ListRequestForKey(key)
 }
 
+func TestCompactPastLastWrite(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	forceRequestWatchProgressSupport(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	createObject(t, ctx, cacher)
+	resourceVersionPastLastWrite := fmt.Sprint(increaseRVFunc(server.V3Client.Client)(ctx, t))
+	list := storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersionPastLastWrite,
+		Recursive:            true,
+	}
+
+	t.Log("List before compaction")
+	require.Empty(t, etcdListRequests(t, ctx, cacher, recorder, list))
+
+	t.Log("Same list after compaction to the listed resourceVersion")
+	compactStore(cacher, server.V3Client.Client)(ctx, t, resourceVersionPastLastWrite)
+	// TODO: Expect no requests to etcd, same as before compaction.
+	require.Len(t, etcdListRequests(t, ctx, cacher, recorder, list), 1)
+}
+
 func TestGetListRecursivePrefix(t *testing.T) {
 	ctx, store, terminate := testSetup(t)
 	t.Cleanup(terminate)
