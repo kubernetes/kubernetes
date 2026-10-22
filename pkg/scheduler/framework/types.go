@@ -1091,7 +1091,10 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) 
 	if parent != nil {
 		for i, child := range parent.children {
 			if child.GetKey() == gpg.GetKey() {
-				parent.children = append(parent.children[:i], parent.children[i+1:]...)
+				parent.children = slices.Delete(parent.children, i, i+1)
+				if len(parent.children) == 0 {
+					parent.children = nil
+				}
 				break
 			}
 		}
@@ -1119,7 +1122,7 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 // all encountered PodGroups from the pgqi.queuedPodInfos map.
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
-	removedPods := make([]*QueuedPodInfo, 0)
+	var removedPods []*QueuedPodInfo
 	if curr.GetType() == fwk.PodGroupKeyType {
 		curr.UnscheduledPods = nil
 		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
