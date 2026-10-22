@@ -91,4 +91,5 @@ const (
 	StorageVersionMigratorController                   = "storage-version-migrator-controller"
 	SELinuxWarningController                           = "selinux-warning-controller"
 	EvictionRequestController                          = "evictionrequest-controller"
+	PodCheckpointController                            = "podcheckpoint-controller"
 )

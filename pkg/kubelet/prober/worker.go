@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +38,9 @@ import (
 // stop channel is closed. The worker uses the probe Manager's statusManager to get up-to-date
 // container IDs.
 type worker struct {
+	// probeLock lets checkpoint suspension wait for an in-flight probe to finish.
+	probeLock sync.Mutex
+
 	// Channel for stopping the probe.
 	stopCh chan struct{}
 
@@ -213,11 +217,22 @@ func (w *worker) stop() {
 // doProbe probes the container once and records the result.
 // Returns whether the worker should continue.
 func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
+	w.probeLock.Lock()
+	defer w.probeLock.Unlock()
+
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+
+	// Skip probing while the pod's probes are suspended (e.g. during a
+	// checkpoint, when containers are frozen). Keep the worker alive and leave
+	// the last result untouched so the liveness manager takes no action.
+	if w.probeManager.isSuspended(w.pod.UID) {
+		return true
+	}
+
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.

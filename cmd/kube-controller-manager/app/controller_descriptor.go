@@ -224,6 +224,8 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newStorageVersionMigratorControllerDescriptor())
 	register(newSELinuxWarningControllerDescriptor())
 	register(newEvictionRequestControllerDescriptor())
+	register(newPodCheckpointControllerDescriptor())
+
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))

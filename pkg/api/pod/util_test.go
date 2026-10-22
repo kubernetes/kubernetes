@@ -3962,6 +3962,123 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 	}
 }
 
+func TestGetValidationOptionsRestoreFrom(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldPodSpec  *api.PodSpec
+		gateEnabled bool
+		want        bool
+	}{
+		{name: "gate enabled, no old", gateEnabled: true, want: true},
+		{name: "gate disabled, no old", gateEnabled: false, want: false},
+		{
+			name:        "gate disabled, old set restoreFrom (ratcheting)",
+			oldPodSpec:  &api.PodSpec{RestoreFrom: &api.CheckpointReference{Name: "checkpoint-1"}},
+			gateEnabled: false,
+			want:        true,
+		},
+		{
+			name:        "gate disabled, old had empty restoreFrom (ratcheting)",
+			oldPodSpec:  &api.PodSpec{RestoreFrom: &api.CheckpointReference{}},
+			gateEnabled: false,
+			want:        true,
+		},
+		{
+			name: "gate disabled, old restoreFrom has options without a name (ratcheting)",
+			oldPodSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{
+				Options: map[string]string{"example.runtime/target": "node-local"},
+			}},
+			gateEnabled: false,
+			want:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			assert.Equal(t, tc.want, gotOptions.AllowRestoreFrom, "AllowRestoreFrom")
+		})
+	}
+}
+
+func TestDropDisabledRestoreFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		oldSpec     *api.PodSpec
+		wantDropped bool
+	}{
+		{name: "gate disabled drops new invocation", wantDropped: true},
+		{name: "gate enabled preserves new invocation", gateEnabled: true},
+		{
+			name: "gate disabled preserves invocation already in use",
+			oldSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{
+				Name:    "checkpoint",
+				Options: map[string]string{"example.runtime/target": "old"},
+			}},
+		},
+		{
+			name:    "gate disabled preserves incomplete invocation already in use",
+			oldSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			got := &api.PodSpec{
+				RestoreFrom: &api.CheckpointReference{
+					Name:    "checkpoint",
+					Options: map[string]string{"example.runtime/target": "new"},
+				},
+			}
+			dropDisabledFields(got, nil, tc.oldSpec, nil)
+			if tc.wantDropped {
+				assert.Nil(t, got.RestoreFrom)
+				return
+			}
+			if assert.NotNil(t, got.RestoreFrom) {
+				assert.Equal(t, "checkpoint", got.RestoreFrom.Name)
+				assert.Equal(t, map[string]string{"example.runtime/target": "new"}, got.RestoreFrom.Options)
+			}
+		})
+	}
+}
+
+func TestDropDisabledPodRestoredCondition(t *testing.T) {
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		oldStatus   *api.PodStatus
+		wantDropped bool
+	}{
+		{name: "gate disabled drops new status", wantDropped: true},
+		{name: "gate disabled drops new status on update", oldStatus: &api.PodStatus{}, wantDropped: true},
+		{name: "gate enabled preserves new status", gateEnabled: true},
+		{name: "gate disabled preserves in-progress status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionUnknown}}}},
+		{name: "gate disabled preserves completed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}}},
+		{name: "gate disabled preserves failed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionFalse}}}},
+		{name: "gate disabled preserves legacy status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored}}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			want := &api.PodCondition{Type: api.PodRestored, Status: api.ConditionTrue}
+			got := &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}, *want}}
+			dropDisabledPodStatusFields(got, tc.oldStatus, &api.PodSpec{}, &api.PodSpec{})
+			_, restored := GetPodCondition(got, api.PodRestored)
+			if tc.wantDropped {
+				assert.Nil(t, restored)
+			} else {
+				assert.Equal(t, want, restored)
+			}
+			_, ready := GetPodCondition(got, api.PodReady)
+			assert.NotNil(t, ready)
+		})
+	}
+}
+
 func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 	testCases := []struct {
 		name       string
