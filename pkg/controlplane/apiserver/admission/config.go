@@ -25,6 +25,7 @@ import (
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/server/webhookauth"
 	"k8s.io/apiserver/pkg/util/webhook"
 	externalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/rest"
@@ -41,7 +42,7 @@ type Config struct {
 
 // New sets up the plugins and admission start hooks needed for admission
 func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider) ([]admission.PluginInitializer, error) {
-	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
+	webhookAuthResolverWrapper := webhookauth.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	quotaConfiguration, err := quotainstall.NewQuotaConfigurationForAdmission(c.ExternalInformers, c.APIResourceConfig)
