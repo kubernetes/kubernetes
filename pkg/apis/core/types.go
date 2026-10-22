@@ -7256,6 +7256,73 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile
+	// The ulimits to be applied to the container.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	// +featureGate=ContainerUlimits
+	Ulimits *Ulimits
+}
+
+type Ulimits struct {
+	// nofile configures the "nofile" ulimit, which controls the maximum number
+	// of open file descriptors.
+	// Valid values are -1 or 128 through 1048576. A value of -1 means unlimited;
+	// 0 is not valid. The effective limit is subject to the node's /proc/sys/fs/nr_open.
+	// +optional
+	Nofile *Ulimit
+	// memlock configures the "memlock" ulimit, which controls the maximum bytes
+	// of memory that may be locked into RAM.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 prevents memory locking by processes without CAP_IPC_LOCK.
+	// +optional
+	Memlock *Ulimit
+	// core configures the "core" ulimit, which controls the maximum size of a
+	// core dump file, in bytes.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 means core dumps are disabled.
+	// +optional
+	Core *Ulimit
+	// nice configures the "nice" ulimit, which controls the maximum nice
+	// priority adjustment a process may apply.
+	// Valid values are -1 or 0 through 40. A value of -1 means unlimited;
+	// 0 means the process may not increase its nice priority adjustment.
+	// +optional
+	Nice *Ulimit
+	// rtprio configures the "rtprio" ulimit, which controls the maximum
+	// real-time scheduling priority.
+	// Valid values are -1 or 0 through 99. A value of -1 means unlimited;
+	// 0 means real-time scheduling priority is not allowed.
+	// +optional
+	Rtprio *Ulimit
+	// stack configures the "stack" ulimit, which controls the maximum process
+	// stack size, in bytes.
+	// Valid values are -1 or 131072 through 17179869184. A value of -1 means
+	// unlimited; 0 is not valid.
+	// +optional
+	Stack *Ulimit
+	// msgqueue configures the "msgqueue" ulimit, which controls the maximum
+	// bytes allocated for POSIX message queues for the process's real user ID.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 prevents creating new POSIX message queues.
+	// +optional
+	Msgqueue *Ulimit
+}
+
+type Ulimit struct {
+	// Hard is the hard limit for the ulimit.
+	// The hard limit acts as a ceiling for the soft limit.
+	// A process without CAP_SYS_RESOURCE may only set its soft limit
+	// to a value between 0 and the hard limit, and may only lower (never raise) its hard limit.
+	// This field must be specified when the Ulimit is set.
+	// +required
+	Hard *int64
+
+	// Soft is the soft limit for the ulimit.
+	// The soft limit is the value that the kernel enforces for the corresponding resource.
+	// The soft limit can be increased in the process up to the hard limit value.
+	// This field must be specified when the Ulimit is set.
+	// +required
+	Soft *int64
 }
 
 // ProcMountType defines the type of proc mount
