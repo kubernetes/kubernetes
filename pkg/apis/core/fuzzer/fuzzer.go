@@ -100,6 +100,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				enableServiceLinks := v1.DefaultEnableServiceLinks
 				s.EnableServiceLinks = &enableServiceLinks
 			}
+			// Defaulting sets hostNetwork when defaultNetwork is "Host", so
+			// the two must agree or the object does not round-trip.
+			switch {
+			case s.HostNetwork:
+				s.DefaultNetwork = new(core.PodDefaultNetworkHost)
+			case c.Bool():
+				s.DefaultNetwork = new(core.PodDefaultNetworkPod)
+			default:
+				s.DefaultNetwork = new(core.PodDefaultNetworkNone)
+			}
 		},
 		func(s *core.PodStatus, c randfill.Continue) {
 			c.Fill(&s)

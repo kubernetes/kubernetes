@@ -80,6 +80,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	oldTemplate := old.(*api.PodTemplate)
 
 	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
+	pod.SyncDefaultNetworkOnTemplateUpdate(&newTemplate.Template, &oldTemplate.Template)
 
 	// Any changes to the template increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.

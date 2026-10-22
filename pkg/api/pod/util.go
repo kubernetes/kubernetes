@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // ContainerType signifies container type
@@ -442,6 +443,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
+	opts.AllowPodDefaultNetwork = useAllowPodDefaultNetwork(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
@@ -842,6 +844,14 @@ func dropDisabledFields(
 		podSpec.HostnameOverride = nil
 	}
 
+	// spec.defaultNetwork is not dropped when the NetworkIsolatedPods gate is
+	// disabled; validation rejects new uses instead (see
+	// useAllowPodDefaultNetwork). Dropping "None" would silently attach a pod
+	// that asked for isolation to the pod network. "Pod" and "Host" could be
+	// dropped when they agree with hostNetwork, but that would give the gate
+	// value-dependent semantics for no practical gain, so all values follow
+	// the same rule: rejected on new objects, kept on objects that have them.
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -856,6 +866,78 @@ func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return true
+}
+
+// useAllowPodDefaultNetwork returns true when spec.defaultNetwork may be set:
+// the NetworkIsolatedPods gate is enabled, or the existing object already sets
+// the field so that it stays valid after the gate is disabled.
+func useAllowPodDefaultNetwork(oldPodSpec *api.PodSpec) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) {
+		return true
+	}
+	return oldPodSpec != nil && oldPodSpec.DefaultNetwork != nil
+}
+
+// SyncDefaultNetworkOnUpdate keeps spec.defaultNetwork and the legacy
+// spec.hostNetwork consistent when a client that knows only one of the two
+// fields updates an object. It must be called from PrepareForUpdate, after
+// defaulting, for Pods and for every resource that embeds a PodTemplateSpec.
+//
+// Defaulting alone cannot do this: once "Host" has been mirrored into
+// hostNetwork: true, a later update that sets only defaultNetwork: "Pod"
+// (PATCH, server-side apply) would be indistinguishable from an old client
+// that set only hostNetwork: true. Comparing against the stored object tells
+// the two apart: the field that changed wins and the other one follows.
+// When both changed, validation decides whether they agree. An update from a
+// client that does not know defaultNetwork (the field is unset and hostNetwork
+// did not change) keeps the stored value, so such a client cannot un-isolate a
+// workload or cause a spurious rollout.
+func SyncDefaultNetworkOnUpdate(podSpec, oldPodSpec *api.PodSpec) {
+	if podSpec == nil || oldPodSpec == nil {
+		return
+	}
+	hostNetworkChanged := podSpec.HostNetwork != oldPodSpec.HostNetwork
+	defaultNetworkChanged := !ptr.Equal(podSpec.DefaultNetwork, oldPodSpec.DefaultNetwork)
+
+	switch {
+	case hostNetworkChanged && !defaultNetworkChanged:
+		if podSpec.DefaultNetwork == nil {
+			// Unset follows hostNetwork; nothing to derive.
+			return
+		}
+		// "None" is left alone so that validation rejects the combination
+		// with hostNetwork: true instead of silently un-isolating the pod.
+		switch *podSpec.DefaultNetwork {
+		case api.PodDefaultNetworkPod:
+			if podSpec.HostNetwork {
+				podSpec.DefaultNetwork = new(api.PodDefaultNetworkHost)
+			}
+		case api.PodDefaultNetworkHost:
+			if !podSpec.HostNetwork {
+				podSpec.DefaultNetwork = new(api.PodDefaultNetworkPod)
+			}
+		}
+	case defaultNetworkChanged && !hostNetworkChanged:
+		if podSpec.DefaultNetwork == nil {
+			podSpec.DefaultNetwork = oldPodSpec.DefaultNetwork
+			return
+		}
+		switch *podSpec.DefaultNetwork {
+		case api.PodDefaultNetworkHost:
+			podSpec.HostNetwork = true
+		case api.PodDefaultNetworkPod, api.PodDefaultNetworkNone:
+			podSpec.HostNetwork = false
+		}
+	}
+}
+
+// SyncDefaultNetworkOnTemplateUpdate calls SyncDefaultNetworkOnUpdate on the
+// specs of the given pod templates.
+func SyncDefaultNetworkOnTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplateSpec) {
+	if podTemplate == nil || oldPodTemplate == nil {
+		return
+	}
+	SyncDefaultNetworkOnUpdate(&podTemplate.Spec, &oldPodTemplate.Spec)
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {

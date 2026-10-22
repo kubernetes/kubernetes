@@ -135,6 +135,9 @@ func init() {
 			"spec.jobTemplate.spec.template.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.jobTemplate.spec.template.spec.defaultNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.jobTemplate.spec.template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},

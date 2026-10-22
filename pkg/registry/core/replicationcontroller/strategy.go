@@ -106,6 +106,7 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	newController.Status = oldController.Status
 
 	pod.DropDisabledTemplateFields(newController.Spec.Template, oldController.Spec.Template)
+	pod.SyncDefaultNetworkOnTemplateUpdate(newController.Spec.Template, oldController.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

@@ -66,6 +66,40 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
 	assert.Equal(t, expectedMetadata, podSandboxConfig.Metadata)
 	assert.Equal(t, expectedPortMappings, podSandboxConfig.PortMappings)
+	assert.Equal(t, runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, podSandboxConfig.DefaultNetwork)
+}
+
+func TestGeneratePodSandboxConfigDefaultNetwork(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// "Host" keeps DEFAULT_NETWORK_POD: host networking is still requested
+	// through the network namespace option, as it was before the field.
+	for desc, tc := range map[string]struct {
+		defaultNetwork   *v1.PodDefaultNetwork
+		hostNetwork      bool
+		expected         runtimeapi.PodSandboxDefaultNetwork
+		expectedNetnsOpt runtimeapi.NamespaceMode
+	}{
+		"unset":       {expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+		"hostNetwork": {hostNetwork: true, expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, expectedNetnsOpt: runtimeapi.NamespaceMode_NODE},
+		"Pod":         {defaultNetwork: new(v1.PodDefaultNetworkPod), expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+		"Host":        {defaultNetwork: new(v1.PodDefaultNetworkHost), hostNetwork: true, expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, expectedNetnsOpt: runtimeapi.NamespaceMode_NODE},
+		"None":        {defaultNetwork: new(v1.PodDefaultNetworkNone), expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			pod := newTestPod()
+			pod.Spec.DefaultNetwork = tc.defaultNetwork
+			pod.Spec.HostNetwork = tc.hostNetwork
+			// Namespace options are only generated with a (defaulted) security context.
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, podSandboxConfig.DefaultNetwork)
+			assert.Equal(t, tc.expectedNetnsOpt, podSandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork())
+		})
+	}
 }
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.

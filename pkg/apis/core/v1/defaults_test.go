@@ -3363,6 +3363,146 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	}
 }
 
+func TestSetDefaultPodDefaultNetwork(t *testing.T) {
+	// Every case has a container port without a hostPort: a Pod on the host
+	// network gets hostPort defaulted to containerPort, whichever of the two
+	// fields asked for it.
+	container := v1.Container{Name: "c", Ports: []v1.ContainerPort{{ContainerPort: 8080}}}
+	testCases := []struct {
+		name               string
+		spec               v1.PodSpec
+		wantDefaultNetwork *v1.PodDefaultNetwork
+		wantHostNetwork    bool
+		wantDNSPolicy      v1.DNSPolicy
+		wantServiceLinks   bool
+	}{
+		{
+			name:               "unset stays unset",
+			spec:               v1.PodSpec{},
+			wantDefaultNetwork: nil,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "unset with hostNetwork stays unset",
+			spec:               v1.PodSpec{HostNetwork: true},
+			wantDefaultNetwork: nil,
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "Host mirrors to hostNetwork",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkHost)},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "Host with hostNetwork",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkHost), HostNetwork: true},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkHost),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "Pod stays Pod",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkPod)},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkPod),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			// Invalid combination: validation rejects it and defaulting must not change it.
+			name:               "Pod with hostNetwork is left for validation",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkPod), HostNetwork: true},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkPod),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			name:               "None defaults dnsPolicy and enableServiceLinks",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkNone)},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkNone),
+			wantDNSPolicy:      v1.DNSNone,
+			wantServiceLinks:   false,
+		},
+		{
+			name: "None keeps explicit dnsPolicy and enableServiceLinks",
+			spec: v1.PodSpec{
+				DefaultNetwork:     new(v1.PodDefaultNetworkNone),
+				DNSPolicy:          v1.DNSClusterFirst,
+				EnableServiceLinks: new(true),
+			},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkNone),
+			wantDNSPolicy:      v1.DNSClusterFirst,
+			wantServiceLinks:   true,
+		},
+		{
+			// Invalid combination: validation rejects it and defaulting must not change it.
+			name:               "None with hostNetwork is left for validation",
+			spec:               v1.PodSpec{DefaultNetwork: new(v1.PodDefaultNetworkNone), HostNetwork: true},
+			wantDefaultNetwork: new(v1.PodDefaultNetworkNone),
+			wantHostNetwork:    true,
+			wantDNSPolicy:      v1.DNSNone,
+			wantServiceLinks:   false,
+		},
+	}
+	// Defaulting follows the field whenever it is present; the gate only
+	// controls whether new objects may set it (validation).
+	for _, gateEnabled := range []bool{true, false} {
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("gate=%v/%s", gateEnabled, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, gateEnabled)
+
+				spec := tc.spec.DeepCopy()
+				spec.Containers = []v1.Container{*container.DeepCopy()}
+				pod := &v1.Pod{Spec: *spec.DeepCopy()}
+				got := roundTrip(t, runtime.Object(pod)).(*v1.Pod).Spec
+				if !reflect.DeepEqual(got.DefaultNetwork, tc.wantDefaultNetwork) {
+					t.Errorf("pod: defaultNetwork = %v, want %v", ptr.Deref(got.DefaultNetwork, "<nil>"), ptr.Deref(tc.wantDefaultNetwork, "<nil>"))
+				}
+				if got.HostNetwork != tc.wantHostNetwork {
+					t.Errorf("pod: hostNetwork = %v, want %v", got.HostNetwork, tc.wantHostNetwork)
+				}
+				if got.DNSPolicy != tc.wantDNSPolicy {
+					t.Errorf("pod: dnsPolicy = %q, want %q", got.DNSPolicy, tc.wantDNSPolicy)
+				}
+				if got.EnableServiceLinks == nil || *got.EnableServiceLinks != tc.wantServiceLinks {
+					t.Errorf("pod: enableServiceLinks = %v, want %v", ptr.Deref(got.EnableServiceLinks, false), tc.wantServiceLinks)
+				}
+				wantHostPort := int32(0)
+				if tc.wantHostNetwork {
+					wantHostPort = 8080
+				}
+				if gotHostPort := got.Containers[0].Ports[0].HostPort; gotHostPort != wantHostPort {
+					t.Errorf("pod: hostPort = %d, want %d", gotHostPort, wantHostPort)
+				}
+
+				// Templates get the mirroring and the dnsPolicy default, but
+				// enableServiceLinks is only defaulted on Pods.
+				template := &v1.PodTemplate{Template: v1.PodTemplateSpec{Spec: *spec.DeepCopy()}}
+				gotTemplate := roundTrip(t, runtime.Object(template)).(*v1.PodTemplate).Template.Spec
+				if !reflect.DeepEqual(gotTemplate.DefaultNetwork, tc.wantDefaultNetwork) {
+					t.Errorf("template: defaultNetwork = %v, want %v", ptr.Deref(gotTemplate.DefaultNetwork, "<nil>"), ptr.Deref(tc.wantDefaultNetwork, "<nil>"))
+				}
+				if gotTemplate.HostNetwork != tc.wantHostNetwork {
+					t.Errorf("template: hostNetwork = %v, want %v", gotTemplate.HostNetwork, tc.wantHostNetwork)
+				}
+				if gotTemplate.DNSPolicy != tc.wantDNSPolicy {
+					t.Errorf("template: dnsPolicy = %q, want %q", gotTemplate.DNSPolicy, tc.wantDNSPolicy)
+				}
+				if !reflect.DeepEqual(gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks) {
+					t.Errorf("template: enableServiceLinks = %v, want %v", gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks)
+				}
+			})
+		}
+	}
+}
+
 func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	cluster := v1.ServiceInternalTrafficPolicyCluster
 	local := v1.ServiceInternalTrafficPolicyLocal

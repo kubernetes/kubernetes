@@ -11084,7 +11084,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 				tc.dnsPolicy = &testDNSClusterFirst
 			}
 
-			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
+			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, false, field.NewPath("dnsConfig"), tc.opts)
 			if len(errs) != 0 && !tc.expectedError {
 				t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 			} else if len(errs) == 0 && tc.expectedError {
@@ -11510,6 +11510,308 @@ func TestValidatePodSpec(t *testing.T) {
 				matcher.Test(t, tc.expectedErrors, errs)
 			}
 		})
+	}
+}
+
+func TestValidatePodDefaultNetwork(t *testing.T) {
+	httpProbe := core.Probe{
+		SuccessThreshold: 1,
+		ProbeHandler:     core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP}},
+	}
+	tcpProbe := core.Probe{
+		SuccessThreshold: 1,
+		ProbeHandler:     core.ProbeHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)}},
+	}
+	grpcProbe := core.Probe{
+		SuccessThreshold: 1,
+		ProbeHandler:     core.ProbeHandler{GRPC: &core.GRPCAction{Port: 80}},
+	}
+	execProbe := core.Probe{
+		SuccessThreshold: 1,
+		ProbeHandler:     core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"true"}}},
+	}
+	forbidden := `may not be set when defaultNetwork is "None"`
+
+	testCases := map[string]struct {
+		pod            core.Pod
+		gateDisabled   bool
+		expectedErrors field.ErrorList
+	}{
+		"gate disabled, unset": {
+			pod:          *podtest.MakePod("", podtest.SetHostNetwork(true)),
+			gateDisabled: true,
+		},
+		"gate disabled, None": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+			),
+			gateDisabled: true,
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.defaultNetwork"), "the NetworkIsolatedPods feature gate is disabled"),
+			},
+		},
+		"gate disabled, Host": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkHost),
+				podtest.SetHostNetwork(true),
+			),
+			gateDisabled: true,
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.defaultNetwork"), "the NetworkIsolatedPods feature gate is disabled"),
+			},
+		},
+		"unsupported value": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetwork("Bridge")),
+			),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("spec.defaultNetwork"), core.PodDefaultNetwork("Bridge"), supportedPodDefaultNetworks),
+			},
+		},
+		"unset with hostNetwork and network features": {
+			pod: *podtest.MakePod("",
+				podtest.SetHostNetwork(true),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 80, ContainerPort: 80, Protocol: "TCP"}),
+					podtest.SetContainerLivenessProbe(httpProbe),
+				)),
+			),
+		},
+		"Pod with network features": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkPod),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 80, ContainerPort: 80, Protocol: "TCP"}),
+					podtest.SetContainerLivenessProbe(httpProbe),
+				)),
+			),
+		},
+		"Pod with hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkPod),
+				podtest.SetHostNetwork(true),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.defaultNetwork"), core.PodDefaultNetworkPod, `must be "Host" when hostNetwork is true`),
+			},
+		},
+		"Host with hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkHost),
+				podtest.SetHostNetwork(true),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 80, ContainerPort: 80, Protocol: "TCP"}),
+					podtest.SetContainerLivenessProbe(httpProbe),
+				)),
+			),
+		},
+		"Host without hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkHost),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.defaultNetwork"), core.PodDefaultNetworkHost, `hostNetwork must be true when defaultNetwork is "Host"`),
+			},
+		},
+		"None minimal": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetEnableServiceLinks(new(false)),
+			),
+		},
+		"None with dnsPolicy None and no nameservers": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetDNSConfig(&core.PodDNSConfig{Searches: []string{"example.com"}}),
+			),
+		},
+		"None with dnsPolicy None and loopback nameserver": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetDNSConfig(&core.PodDNSConfig{Nameservers: []string{"127.0.0.53"}}),
+			),
+		},
+		"None with overridden dnsPolicy and enableServiceLinks": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSClusterFirst),
+				podtest.SetEnableServiceLinks(new(true)),
+			),
+		},
+		"None with exec probes and exec/sleep lifecycle handlers": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLivenessProbe(execProbe),
+					podtest.SetContainerReadinessProbe(execProbe),
+					podtest.SetContainerStartupProbe(execProbe),
+					podtest.SetContainerLifecycle(core.Lifecycle{
+						PostStart: &core.LifecycleHandler{Exec: &core.ExecAction{Command: []string{"true"}}},
+						PreStop:   &core.LifecycleHandler{Sleep: &core.SleepAction{Seconds: 5}},
+					}),
+				)),
+			),
+		},
+		"None with container ports without hostPort": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{ContainerPort: 8080, Protocol: "TCP"}),
+				)),
+			),
+		},
+		"None with hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetHostNetwork(true),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.defaultNetwork"), core.PodDefaultNetworkNone, `must not be "None" when hostNetwork is true`),
+			},
+		},
+		"None with network probes": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLivenessProbe(httpProbe),
+					podtest.SetContainerReadinessProbe(tcpProbe),
+					podtest.SetContainerStartupProbe(grpcProbe),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].livenessProbe.httpGet"), forbidden),
+				field.Forbidden(field.NewPath("spec.containers[0].readinessProbe.tcpSocket"), forbidden),
+				field.Forbidden(field.NewPath("spec.containers[0].startupProbe.grpc"), forbidden),
+			},
+		},
+		"None with network probe in init container": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetInitContainers(podtest.MakeContainer("init",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerLivenessProbe(httpProbe),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.initContainers[0].livenessProbe.httpGet"), forbidden),
+			},
+		},
+		"None with network lifecycle handlers": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLifecycle(core.Lifecycle{
+						PostStart: &core.LifecycleHandler{HTTPGet: &core.HTTPGetAction{Path: "/init", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP}},
+						PreStop:   &core.LifecycleHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)}},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].lifecycle.postStart.httpGet"), forbidden),
+				field.Forbidden(field.NewPath("spec.containers[0].lifecycle.preStop.tcpSocket"), forbidden),
+			},
+		},
+		"None with hostPort": {
+			pod: *podtest.MakePod("",
+				podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+				podtest.SetDNSPolicy(core.DNSNone),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].ports[0].hostPort"), forbidden),
+			},
+		},
+	}
+
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			opts := PodValidationOptions{ResourceIsPod: true, AllowPodDefaultNetwork: !tc.gateDisabled}
+			errs := ValidatePodSpec(&tc.pod.Spec, nil, field.NewPath("spec"), opts)
+			if len(tc.expectedErrors) != 0 {
+				matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+				matcher.Test(t, tc.expectedErrors, errs)
+			} else if len(errs) != 0 {
+				t.Errorf("expected success but got errors: %v", errs)
+			}
+		})
+	}
+}
+
+// TestIsolatedPodHandlerCoverage fails when a probe or lifecycle handler type
+// is added without deciding whether it works for defaultNetwork "None" pods.
+// Handlers that the kubelet performs against the pod IP must be rejected in
+// validateIsolatedPodSpec; handlers that run inside the container are allowed.
+// Each handler is built through reflection and run through the validation so
+// that the classification is checked against the code, not only by name.
+func TestIsolatedPodHandlerCoverage(t *testing.T) {
+	allowed := sets.New("Exec", "Sleep")
+	rejected := sets.New("HTTPGet", "TCPSocket", "GRPC")
+
+	// newHandler returns a value of the handler struct type with only the
+	// named pointer field set to a zero value of its element type.
+	newHandler := func(typ reflect.Type, field reflect.StructField) reflect.Value {
+		v := reflect.New(typ).Elem()
+		if field.Type.Kind() != reflect.Pointer {
+			t.Fatalf("%s.%s is not a pointer; update this test", typ.Name(), field.Name)
+		}
+		v.FieldByName(field.Name).Set(reflect.New(field.Type.Elem()))
+		return v
+	}
+
+	probeType := reflect.TypeFor[core.ProbeHandler]()
+	for sf := range probeType.Fields() {
+		switch {
+		case allowed.Has(sf.Name), rejected.Has(sf.Name):
+		default:
+			t.Errorf("%s.%s is not classified for defaultNetwork \"None\" pods; update validateIsolatedPodSpec and this test", probeType.Name(), sf.Name)
+			continue
+		}
+		handler := newHandler(probeType, sf).Interface().(core.ProbeHandler)
+		spec := core.PodSpec{
+			DefaultNetwork: new(core.PodDefaultNetworkNone),
+			Containers:     []core.Container{{Name: "c", LivenessProbe: &core.Probe{ProbeHandler: handler}}},
+		}
+		errs := validateIsolatedPodSpec(&spec, field.NewPath("spec"))
+		if rejected.Has(sf.Name) && len(errs) == 0 {
+			t.Errorf("ProbeHandler.%s is classified as rejected but validateIsolatedPodSpec accepted it", sf.Name)
+		}
+		if allowed.Has(sf.Name) && len(errs) != 0 {
+			t.Errorf("ProbeHandler.%s is classified as allowed but validateIsolatedPodSpec rejected it: %v", sf.Name, errs)
+		}
+	}
+
+	lifecycleType := reflect.TypeFor[core.LifecycleHandler]()
+	for sf := range lifecycleType.Fields() {
+		switch {
+		case allowed.Has(sf.Name), rejected.Has(sf.Name):
+		default:
+			t.Errorf("%s.%s is not classified for defaultNetwork \"None\" pods; update validateIsolatedPodSpec and this test", lifecycleType.Name(), sf.Name)
+			continue
+		}
+		handler := newHandler(lifecycleType, sf).Interface().(core.LifecycleHandler)
+		spec := core.PodSpec{
+			DefaultNetwork: new(core.PodDefaultNetworkNone),
+			Containers:     []core.Container{{Name: "c", Lifecycle: &core.Lifecycle{PostStart: &handler, PreStop: &handler}}},
+		}
+		errs := validateIsolatedPodSpec(&spec, field.NewPath("spec"))
+		if rejected.Has(sf.Name) && len(errs) != 2 {
+			t.Errorf("LifecycleHandler.%s is classified as rejected but validateIsolatedPodSpec returned %d errors, want 2: %v", sf.Name, len(errs), errs)
+		}
+		if allowed.Has(sf.Name) && len(errs) != 0 {
+			t.Errorf("LifecycleHandler.%s is classified as allowed but validateIsolatedPodSpec rejected it: %v", sf.Name, errs)
+		}
 	}
 }
 
@@ -14024,6 +14326,16 @@ func TestValidatePodUpdate(t *testing.T) {
 		opts PodValidationOptions
 	}{
 		{new: *podtest.MakePod(""), old: *podtest.MakePod(""), err: "", test: "nothing"}, {
+			new:  *podtest.MakePod("foo", podtest.SetDefaultNetwork(core.PodDefaultNetworkNone), podtest.SetDNSPolicy(core.DNSNone)),
+			old:  *podtest.MakePod("foo", podtest.SetDefaultNetwork(core.PodDefaultNetworkPod)),
+			err:  "spec: Forbidden: pod updates may not change fields other than",
+			test: "defaultNetwork is immutable",
+		}, {
+			new:  *podtest.MakePod("foo", podtest.SetDefaultNetwork(core.PodDefaultNetworkPod)),
+			old:  *podtest.MakePod("foo"),
+			err:  "spec: Forbidden: pod updates may not change fields other than",
+			test: "defaultNetwork may not be set on update",
+		}, {
 			new:  *podtest.MakePod("foo"),
 			old:  *podtest.MakePod("bar"),
 			err:  "metadata.name",
@@ -15755,6 +16067,29 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old:  *podtest.MakePod("foo"),
 		err:  "status.conditions[0].observedGeneration: Invalid value: -1: must be a non-negative integer",
 		test: "set invalid condition.observedGeneration",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+			podtest.SetDNSPolicy(core.DNSNone),
+			podtest.SetStatus(core.PodStatus{
+				PodIP:  "10.0.0.1",
+				PodIPs: []core.PodIP{{IP: "10.0.0.1"}},
+			}),
+		),
+		old:  *podtest.MakePod("foo", podtest.SetDefaultNetwork(core.PodDefaultNetworkNone), podtest.SetDNSPolicy(core.DNSNone)),
+		err:  `status.podIP: Forbidden: must be unset when spec.defaultNetwork is "None"`,
+		test: "pod IP reported for a defaultNetwork None pod",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetDefaultNetwork(core.PodDefaultNetworkNone),
+			podtest.SetDNSPolicy(core.DNSNone),
+			podtest.SetStatus(core.PodStatus{
+				HostIP:  "192.168.0.1",
+				HostIPs: []core.HostIP{{IP: "192.168.0.1"}},
+			}),
+		),
+		old:  *podtest.MakePod("foo", podtest.SetDefaultNetwork(core.PodDefaultNetworkNone), podtest.SetDNSPolicy(core.DNSNone)),
+		test: "host IP reported for a defaultNetwork None pod",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
@@ -24866,6 +25201,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].TerminationMessagePath",
 		"Containers[*].TerminationMessagePolicy",
 		"Containers[*].WorkingDir",
+		"DefaultNetwork",
 		"DeprecatedServiceAccount",
 		"DNSPolicy",
 		"EnableServiceLinks",
@@ -29324,7 +29660,7 @@ func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{})
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, false, nil, PodValidationOptions{})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

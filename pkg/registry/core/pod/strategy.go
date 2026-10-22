@@ -118,6 +118,9 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	// The field is immutable on Pods; this only lets clients that do not know
+	// it send full updates of pods that set it.
+	podutil.SyncDefaultNetworkOnUpdate(&newPod.Spec, &oldPod.Spec)
 	updatePodGeneration(newPod, oldPod)
 }
 

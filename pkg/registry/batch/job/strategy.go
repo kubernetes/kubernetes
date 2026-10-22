@@ -111,6 +111,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	job.DropDisabledFields(&newJob.Spec, &oldJob.Spec)
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
+	pod.SyncDefaultNetworkOnTemplateUpdate(&newJob.Spec.Template, &oldJob.Spec.Template)
 
 	// Any changes to the spec increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.
