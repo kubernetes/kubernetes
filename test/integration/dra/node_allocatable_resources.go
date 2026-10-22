@@ -1102,10 +1102,10 @@ func testNodeAllocatableResourcesQuota(tCtx ktesting.TContext) {
 	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
 	pod = createPod(tCtx, env.namespace, "", pod, claim)
 
-	// The status patch is charged only the DRA footprint and gets rejected before DynamicResources writes the claim.
+	// The status patch is charged only the DRA footprint and gets rejected by quota admission.
 	expectPodSchedulerError(tCtx, pod, "exceeded quota: cpu, requested: requests.cpu=2,")
-	gomega.NewWithT(tCtx).Expect(must(tCtx, tCtx.Client().ResourceV1().ResourceClaims(env.namespace).Get, claim.Name, metav1.GetOptions{})).
-		To(gomega.HaveField("ResourceVersion", claim.ResourceVersion), "claim should not have been modified")
+	gomega.NewWithT(tCtx).Expect(must(tCtx, tCtx.Client().CoreV1().Pods(env.namespace).Get, pod.Name, metav1.GetOptions{})).
+		To(gomega.HaveField("Status.ExtraNodeAllocatableResources", gomega.BeEmpty()), "extraNodeAllocatableResources should not have been persisted")
 }
 
 func testNodeAllocatableResourcesScoring(tCtx ktesting.TContext) {

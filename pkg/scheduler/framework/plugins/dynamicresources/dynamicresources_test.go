@@ -3452,7 +3452,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				// ExtraNodeAllocatableResources in the cache before PreBind runs.
 				// Because this plugin unit test skips the Assume phase, we must manually
 				// inject the expected status into the mock Pod to satisfy the equality check
-				// in patchExtraNodeAllocatableResources.
+				// in patchPodStatus.
 				tc.pod = tc.pod.DeepCopy()
 				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
@@ -4260,6 +4260,22 @@ func testPlugin(tCtx ktesting.TContext) {
 								Name:     v1.ResourceCPU,
 								Quantity: new(apiresource.MustParse("1")),
 							},
+						},
+					},
+				}
+				var podStatusPatches int
+				tc.reactors = []cgotesting.Reactor{
+					&cgotesting.SimpleReactor{
+						Verb:     "patch",
+						Resource: "pods",
+						Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+							if action.GetSubresource() == "status" {
+								podStatusPatches++
+								if podStatusPatches > 1 {
+									return true, nil, fmt.Errorf("expected a single pod status patch, got %d", podStatusPatches)
+								}
+							}
+							return false, nil, nil
 						},
 					},
 				}

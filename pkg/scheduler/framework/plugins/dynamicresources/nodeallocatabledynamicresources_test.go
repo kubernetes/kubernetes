@@ -1515,7 +1515,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	}
 }
 
-func TestPatchExtraNodeAllocatableResources(t *testing.T) {
+func TestPatchPodStatus(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
 	placeholderStatus := []v1.ExtraNodeAllocatableResource{
 		{
@@ -1528,24 +1528,40 @@ func TestPatchExtraNodeAllocatableResources(t *testing.T) {
 		},
 	}
 	realClaim := &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "real-claim-name"}}
+	extendedStatus := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{ContainerName: "c1", ResourceName: "example.com/gpu", RequestName: "container-0-request-0"},
+		},
+		ResourceClaimName: "real-claim-name",
+	}
 
 	tests := []struct {
 		name                               string
 		assumedPodStatus                   v1.PodStatus
 		finalExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 		extendedClaim                      *resourceapi.ResourceClaim
+		extendedClaimStatus                *v1.PodExtendedResourceClaimStatus
 		wantPatch                          bool
 		wantClaimNameInPatch               string
 		wantClaimNameNotInPatch            string
+		wantExtendedStatusInPatch          bool
 		wantAssumedClaimName               string
-		wantComputedClaimName              string
 		setPatchError                      error
 		wantStatus                         *fwk.Status
 	}{
 		{
-			name:       "no node allocatable resource claims for this pod",
+			name:       "no node allocatable or extended resource claims for this pod",
 			wantPatch:  false,
 			wantStatus: nil,
+		},
+		{
+			name:                      "extended resource claim status only",
+			extendedClaim:             realClaim,
+			extendedClaimStatus:       extendedStatus,
+			wantPatch:                 true,
+			wantClaimNameInPatch:      "real-claim-name",
+			wantExtendedStatusInPatch: true,
+			wantStatus:                nil,
 		},
 		{
 			name: "assumed pod status same as new status",
@@ -1627,18 +1643,19 @@ func TestPatchExtraNodeAllocatableResources(t *testing.T) {
 			},
 			wantPatch:     true,
 			setPatchError: errors.New("inject patch error"),
-			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod ExtraNodeAllocatableResources: %w", errors.New("inject patch error"))),
+			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod status: %w", errors.New("inject patch error"))),
 		},
 		{
-			name:                               "placeholder rewritten after DeepEqual, assumed pod unchanged",
+			name:                               "placeholder rewritten after DeepEqual and patched together with ExtendedResourceClaimStatus in a single patch",
 			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: placeholderStatus},
 			finalExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{*placeholderStatus[0].DeepCopy()},
 			extendedClaim:                      realClaim,
+			extendedClaimStatus:                extendedStatus,
 			wantPatch:                          true,
 			wantClaimNameInPatch:               "real-claim-name",
 			wantClaimNameNotInPatch:            specialClaimInMemName,
+			wantExtendedStatusInPatch:          true,
 			wantAssumedClaimName:               specialClaimInMemName,
-			wantComputedClaimName:              "real-claim-name",
 			wantStatus:                         nil,
 		},
 		{
@@ -1654,11 +1671,11 @@ func TestPatchExtraNodeAllocatableResources(t *testing.T) {
 					}},
 				},
 			},
-			extendedClaim:         realClaim,
-			wantPatch:             false,
-			wantAssumedClaimName:  specialClaimInMemName,
-			wantComputedClaimName: specialClaimInMemName,
-			wantStatus:            statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
+			extendedClaim:        realClaim,
+			extendedClaimStatus:  extendedStatus,
+			wantPatch:            false,
+			wantAssumedClaimName: specialClaimInMemName,
+			wantStatus:           statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
 		},
 	}
 
@@ -1670,41 +1687,59 @@ func TestPatchExtraNodeAllocatableResources(t *testing.T) {
 			podToUpdate.Status = *tt.assumedPodStatus.DeepCopy()
 
 			fakeClient := fake.NewSimpleClientset(podToUpdate)
+			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+			fts.EnableDRANodeAllocatableResources = true
 			pl := &DynamicResources{
 				clientset: fakeClient,
-				fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
+				fts:       fts,
 			}
 			if tt.setPatchError != nil {
 				fakeClient.PrependReactor("patch", "pods", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, tt.setPatchError
 				})
 			}
-			status := pl.patchExtraNodeAllocatableResources(ctx, podToUpdate, tt.finalExtraNodeAllocatableResources, tt.extendedClaim)
+			state := &stateData{
+				claims:                        newClaimStore(nil, tt.extendedClaim, nil),
+				nodeAllocations:               make(map[string]nodeAllocation),
+				extraNodeAllocatableResources: framework.NewExtraNodeAllocatableResourcesState(),
+			}
+			if tt.extendedClaimStatus != nil {
+				state.nodeAllocations["node1"] = nodeAllocation{
+					containerResourceRequestMappings: tt.extendedClaimStatus.RequestMappings,
+				}
+			}
+			if len(tt.finalExtraNodeAllocatableResources) > 0 {
+				state.extraNodeAllocatableResources.Set("node1", Name, tt.finalExtraNodeAllocatableResources)
+			}
+			status := pl.patchPodStatus(ctx, podToUpdate, "node1", state)
 
 			if tt.wantStatus != nil && status != nil {
 				if tt.wantStatus.Code() != status.Code() {
-					t.Errorf("patchExtraNodeAllocatableResources() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
+					t.Errorf("patchPodStatus() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
 				}
 				if tt.wantStatus.AsError().Error() != status.AsError().Error() {
-					t.Errorf("patchExtraNodeAllocatableResources() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
+					t.Errorf("patchPodStatus() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
 				}
 			} else if tt.wantStatus != status {
-				t.Errorf("patchExtraNodeAllocatableResources() status = %v, want %v", status, tt.wantStatus)
+				t.Errorf("patchPodStatus() status = %v, want %v", status, tt.wantStatus)
 			}
 
 			actions := fakeClient.Actions()
-			gotPatch := false
+			patchCount := 0
 			var patchBody string
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
-					gotPatch = true
+					patchCount++
 					patchBody = string(action.(clienttesting.PatchAction).GetPatch())
-					break
 				}
 			}
+			gotPatch := patchCount > 0
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("patchExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+				t.Errorf("patchPodStatus() gotPatch = %v (count=%d), want %v", gotPatch, patchCount, tt.wantPatch)
+			}
+			if tt.wantPatch && patchCount != 1 {
+				t.Errorf("patchPodStatus() patchCount = %d, want 1", patchCount)
 			}
 			if tt.wantClaimNameInPatch != "" && !strings.Contains(patchBody, tt.wantClaimNameInPatch) {
 				t.Errorf("patch %s does not contain claim name %q", patchBody, tt.wantClaimNameInPatch)
@@ -1712,16 +1747,13 @@ func TestPatchExtraNodeAllocatableResources(t *testing.T) {
 			if tt.wantClaimNameNotInPatch != "" && strings.Contains(patchBody, tt.wantClaimNameNotInPatch) {
 				t.Errorf("patch %s still contains claim name %q", patchBody, tt.wantClaimNameNotInPatch)
 			}
+			if tt.wantExtendedStatusInPatch && !strings.Contains(patchBody, "extendedResourceClaimStatus") {
+				t.Errorf("patch %s does not contain extendedResourceClaimStatus", patchBody)
+			}
 			if tt.wantAssumedClaimName != "" {
 				got := podToUpdate.Status.ExtraNodeAllocatableResources[0].Source.Name
 				if got != tt.wantAssumedClaimName {
 					t.Errorf("assumed pod Source.Name = %q, want %q", got, tt.wantAssumedClaimName)
-				}
-			}
-			if tt.wantComputedClaimName != "" {
-				got := tt.finalExtraNodeAllocatableResources[0].Source.Name
-				if got != tt.wantComputedClaimName {
-					t.Errorf("computed Source.Name = %q, want %q", got, tt.wantComputedClaimName)
 				}
 			}
 		})

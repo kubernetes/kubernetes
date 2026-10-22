@@ -1629,7 +1629,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)
 
-	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources.Has(nodeName) {
+	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil && state.extraNodeAllocatableResources.Has(nodeName) {
 		pl.clearExtraNodeAllocatableResources(ctx, pod)
 	}
 }
@@ -1669,12 +1669,8 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		}
 	}
 
-	if pl.fts.EnableDRANodeAllocatableResources {
-		if extraResources := state.extraNodeAllocatableResources.Get(nodeName); len(extraResources) > 0 {
-			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, extraResources, state.claims.extendedResourceClaim()); status != nil {
-				return status
-			}
-		}
+	if status := pl.patchPodStatus(ctx, pod, nodeName, state); status != nil {
+		return status
 	}
 
 	if !pl.fts.EnableDRADeviceBindingConditions || !pl.fts.EnableDRAResourceClaimDeviceStatus {
@@ -1752,6 +1748,54 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	// If we get here, we know that reserving the claim for
 	// the pod worked and we can proceed with binding it.
+	return nil
+}
+
+// patchPodStatus updates the pod's status with ExtendedResourceClaimStatus and/or
+// ExtraNodeAllocatableResources in a single API call.
+func (pl *DynamicResources) patchPodStatus(
+	ctx context.Context,
+	pod *v1.Pod,
+	nodeName string,
+	state *stateData,
+) *fwk.Status {
+	logger := klog.FromContext(ctx)
+	extendedClaimStatus, err := pl.extendedResourceClaimStatus(pod, nodeName, state)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	extraResources, err := pl.extraNodeAllocatableResourcesStatus(ctx, pod, nodeName, state)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	if len(extraResources) == 0 && extendedClaimStatus == nil {
+		return nil
+	}
+
+	baseStatus := pod.Status.DeepCopy()
+	targetStatus := pod.Status.DeepCopy()
+
+	if extendedClaimStatus != nil {
+		baseStatus.ExtendedResourceClaimStatus = nil
+		targetStatus.ExtendedResourceClaimStatus = extendedClaimStatus
+	}
+
+	if len(extraResources) > 0 {
+		// The incoming 'pod' is from the scheduler cache and would have ExtraNodeAllocatableResources
+		// pre-populated in the assume phase without persisting to the API server.
+		// schedutil.PatchPodStatus skips patching if the old and new status are identical.
+		// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
+		baseStatus.ExtraNodeAllocatableResources = nil
+		targetStatus.ExtraNodeAllocatableResources = extraResources
+	}
+
+	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+		return statusError(logger, fmt.Errorf("updating pod %s/%s status: %w", pod.Namespace, pod.Name, err))
+	}
+	if len(extraResources) > 0 {
+		logger.V(5).Info("Patched pod status with ExtraNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.ExtraNodeAllocatableResources)
+	}
+
 	return nil
 }
 
@@ -1928,15 +1972,6 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	}
 
 	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
-
-	// Patch the pod status with the new information about the generated
-	// special resource claim.
-	if isExtendedResourceClaim {
-		err := pl.patchPodExtendedResourceClaimStatus(ctx, pod, claim, nodeName, state)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
 
 	return claim, prebindSuccessCleanup, nil
 }
