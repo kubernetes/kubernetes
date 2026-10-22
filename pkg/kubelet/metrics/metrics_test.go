@@ -18,13 +18,12 @@ package metrics
 
 import (
 	"os"
-	"sort"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -143,51 +142,46 @@ func TestObserveImagePullDurationExemplars(t *testing.T) {
 		t.Fatalf("Gather failed: %v", err)
 	}
 
-	var histMF *dto.MetricFamily
-	for _, mf := range mfs {
+	idx := -1
+	for i, mf := range mfs {
 		if mf.GetName() == imagePullDurationKey {
-			histMF = mf
+			idx = i
 			break
 		}
 	}
-	if histMF == nil {
+	if idx < 0 {
 		t.Fatal("metric family not found")
 	}
-	if histMF.GetType() != dto.MetricType_HISTOGRAM {
-		t.Fatalf("got type %v, want HISTOGRAM", histMF.GetType())
+	histMF := mfs[idx]
+	if got := histMF.GetType().String(); got != "HISTOGRAM" {
+		t.Fatalf("got type %v, want HISTOGRAM", got)
 	}
 
 	m := histMF.GetMetric()[0]
 	buckets := m.GetHistogram().GetBucket()
 
 	// Find the first bucket where the observation landed (le=10 for a 10s observation).
-	var exemplar *dto.Exemplar
+	gotLabels := map[string]string{}
+	foundExemplar := false
 	for _, b := range buckets {
-		if b.GetExemplar() != nil {
-			exemplar = b.GetExemplar()
+		if exemplar := b.GetExemplar(); exemplar != nil {
+			foundExemplar = true
+			for _, l := range exemplar.GetLabel() {
+				gotLabels[l.GetName()] = l.GetValue()
+			}
 			break
 		}
 	}
-	if exemplar == nil {
+	if !foundExemplar {
 		t.Fatal("no exemplar found on any bucket")
 	}
-
-	labels := exemplar.GetLabel()
-	sort.Slice(labels, func(i, j int) bool { return labels[i].GetName() < labels[j].GetName() })
 
 	wantLabels := map[string]string{
 		"image":       "gcr.io/project/app",
 		"pull_policy": "Always",
 	}
-	if len(labels) != len(wantLabels) {
-		t.Fatalf("got %d exemplar labels, want %d", len(labels), len(wantLabels))
-	}
-	for _, l := range labels {
-		if want, ok := wantLabels[l.GetName()]; !ok {
-			t.Errorf("unexpected exemplar label %q", l.GetName())
-		} else if l.GetValue() != want {
-			t.Errorf("exemplar label %q = %q, want %q", l.GetName(), l.GetValue(), want)
-		}
+	if !reflect.DeepEqual(gotLabels, wantLabels) {
+		t.Errorf("exemplar labels = %v, want %v", gotLabels, wantLabels)
 	}
 }
 
@@ -209,12 +203,12 @@ func TestObserveImagePullDurationExemplarLabelLimits(t *testing.T) {
 			name:  "image longer than the exemplar rune budget is truncated, not a panic",
 			image: "registry.example.com/" + strings.Repeat("a", 300) + ":v1",
 			// budget = ExemplarMaxRunes - len("image") - len("pull_policy") - len("Always")
-			wantImage: ("registry.example.com/" + strings.Repeat("a", 300))[:prometheus.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")],
+			wantImage: ("registry.example.com/" + strings.Repeat("a", 300))[:metrics.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")],
 		},
 		{
 			name:      "truncation does not split multi-byte runes",
 			image:     "registry.example.com/" + strings.Repeat("é", 300),
-			wantImage: "registry.example.com/" + strings.Repeat("é", prometheus.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")-len("registry.example.com/")),
+			wantImage: "registry.example.com/" + strings.Repeat("é", metrics.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")-len("registry.example.com/")),
 		},
 		{
 			name:      "invalid UTF-8 is replaced, not a panic",
@@ -247,8 +241,8 @@ func TestObserveImagePullDurationExemplarLabelLimits(t *testing.T) {
 			if gotImage != tt.wantImage {
 				t.Errorf("exemplar image = %q, want %q", gotImage, tt.wantImage)
 			}
-			if n := utf8.RuneCountInString("image" + gotImage + "pull_policy" + "Always"); n > prometheus.ExemplarMaxRunes {
-				t.Errorf("exemplar labels use %d runes, limit is %d", n, prometheus.ExemplarMaxRunes)
+			if n := utf8.RuneCountInString("image" + gotImage + "pull_policy" + "Always"); n > metrics.ExemplarMaxRunes {
+				t.Errorf("exemplar labels use %d runes, limit is %d", n, metrics.ExemplarMaxRunes)
 			}
 		})
 	}

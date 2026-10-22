@@ -22,8 +22,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 
@@ -1681,28 +1679,23 @@ func GetImageNameForMetrics(image string) string {
 // ObserveImagePullDuration records an image pull duration observation with image and pull_policy
 // attached as exemplar labels rather than metric labels, avoiding unbounded cardinality growth.
 func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
-	observer := ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize))
-	if eo, ok := observer.(prometheus.ExemplarObserver); ok {
-		eo.ObserveWithExemplar(duration, imagePullExemplarLabels(image, pullPolicy))
-		return
-	}
-	observer.Observe(duration)
+	metrics.ObserveWithExemplar(ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize)), duration, imagePullExemplarLabels(image, pullPolicy))
 }
 
 // imagePullExemplarLabels builds the exemplar labels for an image pull observation.
 //
 // client_golang panics if the exemplar label names and values together exceed
-// prometheus.ExemplarMaxRunes or contain invalid UTF-8. The image reference comes from the pod
+// metrics.ExemplarMaxRunes or contain invalid UTF-8. The image reference comes from the pod
 // spec and is not bounded, so it is truncated to the remaining rune budget (keeping the registry
 // and the start of the repository path) instead of crashing the pull path. The full reference
 // is still available in the pull event and log.
-func imagePullExemplarLabels(image, pullPolicy string) prometheus.Labels {
+func imagePullExemplarLabels(image, pullPolicy string) map[string]string {
 	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
-	budget := max(prometheus.ExemplarMaxRunes-utf8.RuneCountInString("image"+"pull_policy"+pullPolicy), 0)
+	budget := max(metrics.ExemplarMaxRunes-utf8.RuneCountInString("image"+"pull_policy"+pullPolicy), 0)
 	if utf8.RuneCountInString(image) > budget {
 		image = string([]rune(image)[:budget])
 	}
-	return prometheus.Labels{
+	return map[string]string{
 		"image":       image,
 		"pull_policy": pullPolicy,
 	}
