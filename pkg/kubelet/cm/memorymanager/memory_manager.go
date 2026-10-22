@@ -102,7 +102,7 @@ type Manager interface {
 	GetMemory(logger klog.Logger, podUID, containerName string) []state.Block
 
 	// GetPodMemory returns the memory allocated by a pod from NUMA nodes
-	GetPodMemory(podUID string) []state.Block
+	GetPodMemory(logger klog.Logger, podUID string) []state.Block
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
@@ -510,7 +510,7 @@ func (m *manager) GetMemory(_ klog.Logger, podUID, containerName string) []state
 }
 
 // GetPodMemory returns the memory allocated by a pod from NUMA nodes
-func (m *manager) GetPodMemory(podUID string) []state.Block {
+func (m *manager) GetPodMemory(_ klog.Logger, podUID string) []state.Block {
 	return m.state.GetPodMemoryBlocks(podUID)
 }
 

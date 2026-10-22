@@ -450,7 +450,7 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				assert.NoError(t, sc.SetContainerResources(logger, podUID, "container1", podutil.Containers, v1.ResourceRequirements{Requests: requests}))
 				assert.NoError(t, sc.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: requests}))
 				limit := resource.MustParse(fmt.Sprintf("%dMi", j+1))
-				assert.NoError(t, sc.SetEmptyDirVolumeLimit(podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
+				assert.NoError(t, sc.SetEmptyDirVolumeLimit(logger, podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
 			}
 		})
 		readers.Go(func() {

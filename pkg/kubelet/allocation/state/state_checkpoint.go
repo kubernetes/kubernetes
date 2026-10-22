@@ -179,9 +179,8 @@ func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types
 }
 
 // SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
-func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error {
-	logger := klog.TODO()
-	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, emptyDir)
+func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error {
+	err := sc.cache.SetEmptyDirVolumeLimit(logger, podUID, volumeName, emptyDir)
 	if err != nil {
 		return err
 	}
@@ -250,7 +249,7 @@ func (sc *noopStateCheckpoint) SetPodLevelResources(_ klog.Logger, _ types.UID, 
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ types.UID, _ string, _ *v1.EmptyDirVolumeSource) error {
+func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ klog.Logger, _ types.UID, _ string, _ *v1.EmptyDirVolumeSource) error {
 	return nil
 }
 

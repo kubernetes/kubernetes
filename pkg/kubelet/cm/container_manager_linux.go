@@ -214,7 +214,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	isSwapOn, err := swap.IsSwapOn()
+	isSwapOn, err := swap.IsSwapOn(logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
 	}
@@ -1041,12 +1041,12 @@ func (cm *containerManagerImpl) GetAllocatableMemory(logger klog.Logger) []*podr
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(logger))
 }
 
-func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetPodMemory(logger klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
-	return containerMemoryFromBlock(cm.memoryManager.GetPodMemory(podUID))
+	return containerMemoryFromBlock(cm.memoryManager.GetPodMemory(logger, podUID))
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {

@@ -5210,7 +5210,7 @@ func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeN
 }
 
 func TestComputeVolumeResizeAction(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	for _, tc := range []struct {
 		testName       string
@@ -5320,7 +5320,7 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			}
 
 			if tc.actuatedLimit != nil {
-				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{Medium: tc.volMedium, SizeLimit: tc.actuatedLimit})
+				err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{Medium: tc.volMedium, SizeLimit: tc.actuatedLimit})
 				require.NoError(t, err)
 			}
 
@@ -5361,7 +5361,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 		t.Skip("unsupported OS")
 	}
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 
 	for _, tc := range []struct {
@@ -5446,11 +5446,11 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			}
 
 			// Pre-seed initial state for both volumes so we can observe state changes
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", &v1.EmptyDirVolumeSource{
+			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "down-vol", &v1.EmptyDirVolumeSource{
 				Medium:    v1.StorageMediumMemory,
 				SizeLimit: resource.NewQuantity(300, resource.BinarySI),
 			}))
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", &v1.EmptyDirVolumeSource{
+			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "up-vol", &v1.EmptyDirVolumeSource{
 				Medium:    v1.StorageMediumMemory,
 				SizeLimit: resource.NewQuantity(50, resource.BinarySI),
 			}))
@@ -5521,7 +5521,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 }
 
 func TestIsPodResizeInProgress_Volumes(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	for _, tc := range []struct {
 		testName        string
@@ -5592,7 +5592,7 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 			}
 
 			if tc.statusLimit != nil {
-				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{
+				err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{
 					Medium:    v1.StorageMediumMemory,
 					SizeLimit: tc.statusLimit,
 				})
