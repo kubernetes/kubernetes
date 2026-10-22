@@ -207,19 +207,16 @@ func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
 	t.Log("Compact between writes")
 	assert.Equal(t, "rv=15 keys=[10]", exactSnapshot(t, s, 15))
 	s.Compact(15)
-	// TODO: Expect "rv=15 keys=[10]", same as before compaction.
-	assert.Equal(t, "rv=20 keys=[10 20]", oldestExactSnapshot(t, s))
+	assert.Equal(t, "rv=15 keys=[10]", oldestExactSnapshot(t, s))
 
 	t.Log("Compact past last write")
 	assert.Equal(t, "rv=22 keys=[10 20]", exactSnapshot(t, s, 22))
 	s.Compact(22)
-	// TODO: Expect "rv=22 keys=[10 20]", same as before compaction.
-	assert.Equal(t, "none", oldestExactSnapshot(t, s))
+	assert.Equal(t, "rv=22 keys=[10 20]", oldestExactSnapshot(t, s))
 
 	t.Log("Write after compact past last write")
 	write(40)
-	// TODO: Expect "rv=22 keys=[10 20]", a write does not expire older RVs.
-	assert.Equal(t, "rv=40 keys=[10 20 40]", oldestExactSnapshot(t, s))
+	assert.Equal(t, "rv=22 keys=[10 20]", oldestExactSnapshot(t, s))
 }
 
 func oldestExactSnapshot(t *testing.T, s *WatchCacheStorage) string {

@@ -72,7 +72,7 @@ func (w *WatchCacheStorage) oldestExactRV() (uint64, bool) {
 func (w *WatchCacheStorage) Compact(rev uint64) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	w.snapshots.RemoveLess(rev)
+	w.snapshots.Compact(rev)
 }
 
 func (w *WatchCacheStorage) MarkConsistent(consistent bool) {
