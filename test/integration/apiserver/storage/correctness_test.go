@@ -230,13 +230,26 @@ func TestCorrectness(t *testing.T) {
 		{
 			name: "etcd3",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				return setupStore(tCtx)
+				return setupStore(tCtx, nil)
+			},
+		},
+		{
+			name: "etcd3 with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				return setupStore(tCtx, prefixTransformer{})
 			},
 		},
 		{
 			name: "cacher",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, prefixTransformer{})
 				return setupCacher(tCtx, store), prefix
 			},
 		},
@@ -248,7 +261,7 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
 			name: "cacher with watch-breaking etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -264,7 +277,7 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
 			name: "cacher with watch-delaying etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -279,7 +292,7 @@ func TestCorrectness(t *testing.T) {
 			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
 			name: "cacher with bookmark-dropping etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -300,7 +313,7 @@ func TestCorrectness(t *testing.T) {
 				tCtx.Cleanup(func() {
 					cacher.DefaultEventFreshDuration = origFreshDuration
 				})
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, store), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, _ []correctness.Operation, watches []correctness.WatchOperation) {
