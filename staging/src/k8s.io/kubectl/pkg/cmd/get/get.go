@@ -465,8 +465,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
-		Unstructured().
+	r := o.newBuilder(f).
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
@@ -609,11 +608,25 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 	s.Ready = state
 }
 
+// useStableUnstructured is true when the objects are printed as JSON, YAML etc.
+// instead of a table. Then the order of fields as sent by the server is
+// preserved instead of sorting them by name.
+func (o *GetOptions) useStableUnstructured() bool {
+	return !cmdutil.PreserveFieldOrder.IsDisabled() &&
+		!o.IsHumanReadablePrinter
+}
+
+func (o *GetOptions) newBuilder(f cmdutil.Factory) *resource.Builder {
+	if o.useStableUnstructured() {
+		return f.NewBuilder().StableUnstructured()
+	}
+	return f.NewBuilder().Unstructured()
+}
+
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
 func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
-	r := f.NewBuilder().
-		Unstructured().
+	r := o.newBuilder(f).
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
@@ -763,7 +776,11 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 			return err
 		}
 
-		converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, listData)
+		var scheme runtime.Decoder = unstructured.UnstructuredJSONScheme
+		if o.useStableUnstructured() {
+			scheme = unstructured.StableUnstructuredJSONScheme
+		}
+		converted, err := runtime.Decode(scheme, listData)
 		if err != nil {
 			return err
 		}
@@ -778,6 +795,17 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
+		}
+
+		if o.useStableUnstructured() {
+			list, err := newStableList(obj, items)
+			if err != nil {
+				return err
+			}
+			if err := printer.PrintObj(list, o.Out); err != nil {
+				errs = append(errs, err)
+			}
+			return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 		}
 
 		// take the items and create a new list for display
@@ -808,6 +836,38 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	}
 
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
+}
+
+// newStableList is the equivalent of the unstructured.UnstructuredList that
+// printGeneric builds for display.
+func newStableList(obj runtime.Object, items []runtime.Object) (*unstructured.StableUnstructured, error) {
+	metadata := unstructured.Object{}
+	if listMeta, err := meta.ListAccessor(obj); err == nil {
+		metadata.Set("resourceVersion", listMeta.GetResourceVersion())
+	}
+	stableItems, err := stableItems(items)
+	if err != nil {
+		return nil, err
+	}
+	list := &unstructured.StableUnstructured{Object: unstructured.Object{
+		{Name: "kind", Value: "List"},
+		{Name: "apiVersion", Value: "v1"},
+		{Name: "metadata", Value: metadata},
+	}}
+	list.SetItems(stableItems)
+	return list, nil
+}
+
+func stableItems(objs []runtime.Object) ([]*unstructured.StableUnstructured, error) {
+	items := make([]*unstructured.StableUnstructured, 0, len(objs))
+	for _, obj := range objs {
+		stable, ok := obj.(*unstructured.StableUnstructured)
+		if !ok {
+			return nil, fmt.Errorf("unexpected item type %T", obj)
+		}
+		items = append(items, stable)
+	}
+	return items, nil
 }
 
 func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
