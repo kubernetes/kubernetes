@@ -3340,11 +3340,14 @@ func newNodeAllocatableCycleState(extraResources map[string][]v1.ExtraNodeAlloca
 func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 	testCtx := ktesting.Init(t)
 	nodeName := "node-1"
-	pod := st.MakePod().Name("test-pod").Namespace("test-ns").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	testPod := st.MakePod().Name("test-pod").Namespace("test-ns").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	podWithStaleStatus := testPod.DeepCopy()
+	podWithStaleStatus.Status.ExtraNodeAllocatableResources = makeExtraNodeAllocatableResources("claim1", "2")
 	existingPod := st.MakePod().Name("existing").Namespace("test-ns").Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
 
 	tests := []struct {
 		name                              string
+		pod                               *v1.Pod
 		nodeInfo                          *framework.NodeInfo
 		enableDRANodeAllocatableResources bool
 		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
@@ -3352,11 +3355,13 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 	}{
 		{
 			name:                              "no entries",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(),
 			enableDRANodeAllocatableResources: true,
 		},
 		{
 			name:                              "entries fit",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(),
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3365,6 +3370,7 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 		},
 		{
 			name:                              "entries exceed allocatable",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(),
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3374,6 +3380,7 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 		},
 		{
 			name:                              "entries exceed free resources but not allocatable",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(existingPod),
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3383,6 +3390,7 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 		},
 		{
 			name:                              "entries for another node are ignored",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(),
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3390,7 +3398,14 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 			},
 		},
 		{
+			name:                              "stale status on unbound pod is ignored",
+			pod:                               podWithStaleStatus,
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+		},
+		{
 			name:                              "feature disabled",
+			pod:                               testPod,
 			nodeInfo:                          framework.NewNodeInfo(),
 			enableDRANodeAllocatableResources: false,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3410,12 +3425,12 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 			tCtx.ExpectNoError(err, "create fit plugin")
 
 			cycleState := newNodeAllocatableCycleState(test.extraResources)
-			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, pod, nil)
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, test.pod, nil)
 			if !preFilterStatus.IsSuccess() {
 				tCtx.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
 
-			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, test.nodeInfo)
+			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
@@ -3440,10 +3455,13 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		pod.Status.ExtraNodeAllocatableResources = entries
 		return pod
 	}
-	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+	testPod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+	podWithStaleStatus := testPod.DeepCopy()
+	podWithStaleStatus.Status.ExtraNodeAllocatableResources = makeExtraNodeAllocatableResources("claim1", "2")
 
 	tests := []struct {
 		name                              string
+		pod                               *v1.Pod
 		strategy                          config.ScoringStrategyType
 		existingPods                      []*v1.Pod
 		enableDRANodeAllocatableResources bool
@@ -3454,6 +3472,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		{
 			// CPU: (8 - 1) / 8 = 87. Memory: 90.
 			name:                              "no entries",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			enableDRANodeAllocatableResources: true,
 			runPreScore:                       true,
@@ -3462,6 +3481,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		{
 			// CPU: (8 - 1 - 2) / 8 = 62. Memory: 90.
 			name:                              "entries are added to the pod requests",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3473,6 +3493,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		{
 			// CPU: (1 + 2) / 8 = 37. Memory: 10.
 			name:                              "entries are added to the pod requests with MostAllocated",
+			pod:                               testPod,
 			strategy:                          config.MostAllocated,
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3483,6 +3504,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		},
 		{
 			name:                              "entries are added to the pod requests if PreScore not called",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3492,6 +3514,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		},
 		{
 			name:                              "entries for another node are ignored",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			enableDRANodeAllocatableResources: true,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3501,7 +3524,16 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 			wantScore:   88,
 		},
 		{
+			name:                              "stale status on unbound pod is ignored",
+			pod:                               podWithStaleStatus,
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			runPreScore:                       true,
+			wantScore:                         88,
+		},
+		{
 			name:                              "feature disabled",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			enableDRANodeAllocatableResources: false,
 			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
@@ -3513,6 +3545,7 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 		{
 			// Node: 1 + 2 (claim1, accounted to the existing pod) = 3. CPU: (8 - 3 - 1 - 2) / 8 = 25. Memory: 80.
 			name:                              "claim is accounted to every pod",
+			pod:                               testPod,
 			strategy:                          config.LeastAllocated,
 			existingPods:                      []*v1.Pod{existingPod(mapped(claim))},
 			enableDRANodeAllocatableResources: true,
@@ -3537,12 +3570,12 @@ func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
 
 			cycleState := newNodeAllocatableCycleState(test.extraResources)
 			if test.runPreScore {
-				if status := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+				if status := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, test.pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
 					tCtx.Fatalf("prescore failed with status: %v", status)
 				}
 			}
 
-			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, pod, nodeInfo)
+			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, test.pod, nodeInfo)
 			if !status.IsSuccess() {
 				tCtx.Fatalf("score failed with status: %v", status)
 			}
