@@ -1698,10 +1698,7 @@ func ObserveImagePullDuration(duration float64, image string, pullPolicy string,
 // is still available in the pull event and log.
 func imagePullExemplarLabels(image, pullPolicy string) prometheus.Labels {
 	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
-	budget := prometheus.ExemplarMaxRunes - utf8.RuneCountInString("image"+"pull_policy"+pullPolicy)
-	if budget < 0 {
-		budget = 0
-	}
+	budget := max(prometheus.ExemplarMaxRunes-utf8.RuneCountInString("image"+"pull_policy"+pullPolicy), 0)
 	if utf8.RuneCountInString(image) > budget {
 		image = string([]rune(image)[:budget])
 	}
