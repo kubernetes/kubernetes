@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -534,6 +533,10 @@ func TestStoreList(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
+	podInOtherNamespace := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "bar"},
+		Spec:       example.PodSpec{NodeName: "other-machine"},
+	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	noNamespaceContext := genericapirequest.NewContext()
@@ -570,33 +573,49 @@ func TestStoreList(t *testing.T) {
 			m:   matchPodName("foo", "makeMatchSingleReturnFalse"),
 			out: &example.PodList{Items: []example.Pod{*podB}},
 		},
+		"namespaceIsolation": {
+			in:  &example.PodList{Items: []example.Pod{*podA, *podB, *podInOtherNamespace}},
+			m:   matchEverything(),
+			out: &example.PodList{Items: []example.Pod{*podA, *podB}},
+		},
+		"sameNameAcrossNamespaces": {
+			in:      &example.PodList{Items: []example.Pod{*podA, *podInOtherNamespace}},
+			m:       matchEverything(),
+			out:     &example.PodList{Items: []example.Pod{*podInOtherNamespace, *podA}},
+			context: noNamespaceContext,
+		},
 	}
 
 	for name, item := range table {
-		t.Run(name, func(t *testing.T) {
-			ctx := testContext
-			if item.context != nil {
-				ctx = item.context
-			}
-			destroyFunc, registry := NewTestGenericStoreRegistry(t)
-			defer destroyFunc()
+		for _, cacheEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/cacheEnabled=%t", name, cacheEnabled), func(t *testing.T) {
+				ctx := testContext
+				if item.context != nil {
+					ctx = item.context
+				}
+				destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, cacheEnabled)
+				defer destroyFunc()
 
-			if item.in != nil {
-				if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
+				if item.in != nil {
+					for _, pod := range item.in.Items {
+						createCtx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pod.Namespace)
+						if err := storagetesting.CreateObjList(registry.KeyRootFunc(createCtx), registry.Storage.Storage, []runtime.Object{pod.DeepCopy()}); err != nil {
+							t.Fatalf("Unexpected error %v", err)
+						}
+					}
+				}
+
+				list, err := registry.ListPredicate(ctx, item.m, nil)
+				if err != nil {
 					t.Fatalf("Unexpected error %v", err)
 				}
-			}
 
-			list, err := registry.ListPredicate(ctx, item.m, nil)
-			if err != nil {
-				t.Fatalf("Unexpected error %v", err)
-			}
-
-			// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
-			if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
-				t.Fatalf("%v: Expected %#v, got %#v", name, e, a)
-			}
-		})
+				// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
+				if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
+					t.Fatalf("%v: Expected %#v, got %#v", name, e, a)
+				}
+			})
+		}
 	}
 }
 
@@ -2747,12 +2766,13 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	podPrefix := "/pods/"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	keyFuncs := defaultStoreKeyFuncs(strings.TrimSuffix(podPrefix, "/"), strategy.NamespaceScoped())
 
 	newFunc := func() runtime.Object { return &example.Pod{} }
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, keyFuncs.reverseKeyFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2767,7 +2787,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			GroupResource:       schema.GroupResource{Resource: "pods"},
 			EventsHistoryWindow: cacherstorage.DefaultEventFreshDuration,
 			ResourcePrefix:      podPrefix,
-			KeyFunc:             func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
+			KeyFunc:             keyFuncs.objectKeyFunc,
 			GetAttrsFunc:        getPodAttrs,
 			NewFunc:             newFunc,
 			NewListFunc:         newListFunc,
@@ -2801,16 +2821,10 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		CreateStrategy:            strategy,
 		UpdateStrategy:            strategy,
 		DeleteStrategy:            strategy,
-		KeyRootFunc: func(ctx context.Context) string {
-			return podPrefix
-		},
-		KeyFunc: func(ctx context.Context, id string) (string, error) {
-			if _, ok := genericapirequest.NamespaceFrom(ctx); !ok {
-				return "", fmt.Errorf("namespace is required")
-			}
-			return path.Join(podPrefix, id), nil
-		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
+		KeyRootFunc:               keyFuncs.requestKeyRootFunc,
+		KeyFunc:                   keyFuncs.requestKeyFunc,
+		ReverseKeyFunc:            keyFuncs.reverseKeyFunc,
+		ObjectNameFunc:            func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 			return storage.SelectionPredicate{
 				Label: label,
