@@ -1636,7 +1636,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 
 	w, err := e.Storage.Watch(ctx, key, storageOpts)
 	if err != nil {
-		return nil, err
+		return nil, storeerr.InterpretWatchError(err, e.qualifiedResourceFromContext(ctx), "")
 	}
 	if e.Decorator != nil {
 		return newDecoratedWatcher(ctx, w, e.Decorator), nil
