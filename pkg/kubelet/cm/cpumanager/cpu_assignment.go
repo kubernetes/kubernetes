@@ -1829,7 +1829,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d (of which %d already allocated), available=%d", numCPUs, acc.result.Size(), acc.details.CPUs().Size())
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
@@ -2193,7 +2193,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d (of which %d already allocated), available=%d", numCPUs, currentlyAllocatedCPUs.Size(), availableCPUs.Size())
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d (of which %d already allocated), available=%d", numCPUs, acc.result.Size(), acc.details.CPUs().Size())
 	}
 
 	// Algorithm: topology-aware best-fit

@@ -1666,7 +1666,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			allocatedCPUs: cpuset.New(0),
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       5,
-			expErr:        "not enough cpus available to satisfy request: requested=5 (of which 1 already allocated), available=4",
+			expErr:        "not enough cpus available to satisfy request: requested=5 (of which 1 already allocated), available=3",
 			expResult:     cpuset.New(),
 		},
 		{
@@ -1677,7 +1677,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			allocatedCPUs: cpuset.New(0),
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       256,
-			expErr:        "not enough cpus available to satisfy request: requested=256 (of which 1 already allocated), available=254",
+			expErr:        "not enough cpus available to satisfy request: requested=256 (of which 1 already allocated), available=253",
 			expResult:     cpuset.New(),
 		},
 		{
@@ -2475,7 +2475,7 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       5,
 			cpuGroupSize:  1,
-			expErr:        "not enough cpus available to satisfy request: requested=5, available=4",
+			expErr:        "not enough cpus available to satisfy request: requested=5 (of which 1 already allocated), available=3",
 			expResult:     cpuset.New(),
 		},
 		{
@@ -2486,7 +2486,7 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			baselineCPUs:  mustParseCPUSet(t, "0,2,4"),
 			numCPUs:       10,
 			cpuGroupSize:  1,
-			expErr:        "not enough cpus available to satisfy request: requested=10, available=8",
+			expErr:        "not enough cpus available to satisfy request: requested=10 (of which 3 already allocated), available=5",
 			expResult:     cpuset.New(),
 		},
 		{
@@ -2497,7 +2497,7 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       256,
 			cpuGroupSize:  1,
-			expErr:        "not enough cpus available to satisfy request: requested=256, available=254",
+			expErr:        "not enough cpus available to satisfy request: requested=256 (of which 1 already allocated), available=253",
 			expResult:     cpuset.New(),
 		},
 		{
