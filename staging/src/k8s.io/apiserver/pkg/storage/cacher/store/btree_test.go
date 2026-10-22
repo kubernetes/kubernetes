@@ -231,7 +231,7 @@ func TestStoreSnapshotter(t *testing.T) {
 	_, err = cache.GetSnapshot(300)
 	assert.True(t, errors.IsResourceExpired(err))
 
-	t.Log("Enabling snapshotter clears all RVs")
+	t.Log("Enabling disabled snapshotter starts without any RVs")
 	cache.SetEnabled(true)
 	assert.True(t, cache.Enabled())
 	assert.Equal(t, 0, cache.Len())
@@ -242,11 +242,12 @@ func TestStoreSnapshotter(t *testing.T) {
 	_, err = cache.GetSnapshot(400)
 	assert.True(t, errors.IsResourceExpired(err))
 
+	t.Log("Enabling enabled snapshotter keeps all RVs")
 	cache.Add(&btreeStore{resourceVersion: 500})
 	assert.Equal(t, 1, cache.Len())
 	cache.SetEnabled(true)
-	assert.Equal(t, 0, cache.Len())
-	assert.False(t, cache.HasSnapshot(500))
+	assert.Equal(t, 1, cache.Len())
+	assert.True(t, cache.HasSnapshot(500))
 	_, err = cache.GetSnapshot(500)
-	assert.True(t, errors.IsResourceExpired(err))
+	require.NoError(t, err)
 }
