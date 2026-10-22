@@ -22,6 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -135,6 +139,63 @@ func TestHasResourcesChanged(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := hasResourcesChanged(test.oldPod, test.newPod); got != test.expected {
 				t.Errorf("TestHasResourcesChanged = %v, expected %v", got, test.expected)
+			}
+		})
+	}
+}
+
+func TestDefaultUpdateFilterExtraNodeAllocatableResources(t *testing.T) {
+	extra := []v1.ExtraNodeAllocatableResource{{
+		Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+		Containers: []string{"foo"},
+		Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))}},
+	}}
+	tests := []struct {
+		name                                string
+		draNodeAllocatableResourcesDisabled bool
+		oldExtraNodeAllocatable             []v1.ExtraNodeAllocatableResource
+		newExtraNodeAllocatable             []v1.ExtraNodeAllocatableResource
+		expected                            bool
+	}{
+		{
+			name:                    "set",
+			newExtraNodeAllocatable: extra,
+			expected:                true,
+		},
+		{
+			name:                    "cleared",
+			oldExtraNodeAllocatable: extra,
+			newExtraNodeAllocatable: []v1.ExtraNodeAllocatableResource{},
+			expected:                true,
+		},
+		{
+			name:                                "cleared with the feature disabled",
+			draNodeAllocatableResourcesDisabled: true,
+			oldExtraNodeAllocatable:             extra,
+			newExtraNodeAllocatable:             []v1.ExtraNodeAllocatableResource{},
+			expected:                            true,
+		},
+		{
+			name:                    "unchanged",
+			oldExtraNodeAllocatable: extra,
+			newExtraNodeAllocatable: extra,
+			expected:                false,
+		},
+	}
+	filter := DefaultUpdateFilter()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, !test.draNodeAllocatableResourcesDisabled)
+			oldPod := &v1.Pod{
+				Spec:   v1.PodSpec{Containers: []v1.Container{containerFoo}},
+				Status: v1.PodStatus{Phase: v1.PodPending, ExtraNodeAllocatableResources: test.oldExtraNodeAllocatable},
+			}
+			newPod := &v1.Pod{
+				Spec:   v1.PodSpec{Containers: []v1.Container{containerFoo}},
+				Status: v1.PodStatus{Phase: v1.PodPending, ExtraNodeAllocatableResources: test.newExtraNodeAllocatable},
+			}
+			if got := filter(schema.GroupVersionResource{Version: "v1", Resource: "pods"}, oldPod, newPod); got != test.expected {
+				t.Errorf("DefaultUpdateFilter() = %v, expected %v", got, test.expected)
 			}
 		})
 	}

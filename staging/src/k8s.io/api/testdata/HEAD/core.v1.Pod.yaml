@@ -1425,6 +1425,20 @@ status:
       requestName: requestNameValue
       resourceName: resourceNameValue
     resourceClaimName: resourceClaimNameValue
+  extraNodeAllocatableResources:
+  - containers:
+    - containersValue
+    mapping:
+    - name: nameValue
+      quantity: "0"
+    overhead:
+    - name: nameValue
+      perContainer: "0"
+      perPod: "0"
+    source:
+      apiGroup: apiGroupValue
+      kind: kindValue
+      name: nameValue
   hostIP: hostIPValue
   hostIPs:
   - ip: ipValue
@@ -1496,17 +1510,6 @@ status:
         image:
           imageRef: imageRefValue
   message: messageValue
-  nodeAllocatableResourceClaimStatuses:
-  - containers:
-    - containersValue
-    mapping:
-    - name: nameValue
-      quantity: "0"
-    overhead:
-    - name: nameValue
-      perContainer: "0"
-      perPod: "0"
-    resourceClaimName: resourceClaimNameValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
   phase: phaseValue

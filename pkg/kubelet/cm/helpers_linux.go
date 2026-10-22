@@ -47,8 +47,11 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	opts := resourcehelper.PodResourcesOptions{
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryLimitsDeclared := true
 	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if c.Resources.Limits.Memory().IsZero() {
@@ -183,9 +186,9 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseStatusResources:                       false,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:            !podLevelResourcesEnabled,
+		UseStatusResources:               false,
+		UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
@@ -193,8 +196,8 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:            !podLevelResourcesEnabled,
+		UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
 
 	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {

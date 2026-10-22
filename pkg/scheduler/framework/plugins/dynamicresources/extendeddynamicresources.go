@@ -557,33 +557,28 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 	return createdClaim, nil
 }
 
-// patchPodExtendedResourceClaimStatus updates the pod's status with information about
-// the extended resource claim.
-func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
-	ctx context.Context,
+// extendedResourceClaimStatus builds the PodExtendedResourceClaimStatus for the
+// extended resource claim created during PreBind.
+func (pl *DynamicResources) extendedResourceClaimStatus(
 	pod *v1.Pod,
-	claim *resourceapi.ResourceClaim,
 	nodeName string,
 	state *stateData,
-) error {
+) (*v1.PodExtendedResourceClaimStatus, error) {
+	claim := state.claims.extendedResourceClaim()
+	if claim == nil || isSpecialClaimName(claim.Name) {
+		return nil, nil
+	}
 	var cer []v1.ContainerExtendedResourceRequest
 	if nodeAllocation, ok := state.nodeAllocations[nodeName]; ok {
 		cer = nodeAllocation.containerResourceRequestMappings
 	}
 	if len(cer) == 0 {
-		return fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
+		return nil, fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
 	}
-
-	podStatusCopy := pod.Status.DeepCopy()
-	podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+	return &v1.PodExtendedResourceClaimStatus{
 		RequestMappings:   cer,
 		ResourceClaimName: claim.Name,
-	}
-	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
-	if err != nil {
-		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
-	}
-	return nil
+	}, nil
 }
 
 // unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim

@@ -202,6 +202,19 @@ var (
 		},
 	}
 
+	ephemeralStorageDevices = []resourceapi.Device{
+		{
+			Name: "device-01",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceEphemeralStorage: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("50Mi")),
+					},
+				},
+			},
+		},
+	}
+
 	res100mCPU1GiCg      = &cgroups.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "1Gi", MemLim: "2Gi"}
 	res1CPU1GiCg         = &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}
 	res2CPU2GiCg         = &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"}
@@ -224,6 +237,11 @@ var (
 			Name: "hugepages-claim",
 		},
 	}
+	claimEphemeralStorage = &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ephemeral-storage-claim",
+		},
+	}
 )
 
 func doNodeAllocatableCgroupsTests(f *framework.Framework) {
@@ -239,6 +257,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 		requiresHugepages                 bool
 		expectedPodHugepagesLimit         string
 		expectedContainerHugepagesLimits  []string // per container
+		expectedPodAllocatedResources     v1.ResourceList
 	}{
 		{
 			name:                 "direct mappings",
@@ -583,6 +602,26 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			},
 			expectedContainersScoreMemRequest: []int64{2024, 3024}, // c1: 1024 + 1000Mi = 2024Mi, c2: 1024 + 2000Mi = 3024Mi
 		},
+		{
+			name:                 "ephemeral-storage direct mapping",
+			resourceSliceDevices: ephemeralStorageDevices,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{EphStorLim: "10Mi"}, Claims: []*resourceapi.ResourceClaim{claimEphemeralStorage}},
+			},
+			expectedPodCgroup: cgroups.ContainerResources{
+				CPUReq: "",
+				CPULim: "",
+				MemLim: "",
+			},
+			expectedContainersCgroup: []cgroups.ContainerResources{
+				{CPUReq: "", CPULim: "", MemLim: ""},
+			},
+			expectedContainersScoreMemRequest: []int64{0},
+			expectedPodAllocatedResources: v1.ResourceList{
+				// c1 request (10Mi, defaulted from the limit) + direct mapping (50Mi)
+				v1.ResourceEphemeralStorage: resource.MustParse("60Mi"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -677,6 +716,11 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				}
 				err = cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, fmt.Sprintf("%d", expectedScore))
 				framework.ExpectNoError(err, "verify container OOM score adjustment for Pod %q", pod.Name)
+			}
+
+			if tc.expectedPodAllocatedResources != nil {
+				ginkgo.By("verifying pod status allocated resources")
+				framework.ExpectNoError(verifyPodStatusResourcesWithDRA(pod, tc.expectedPodAllocatedResources, nil), "verify DRA resource allocations in Pod %q", pod.Name)
 			}
 
 			ginkgo.By("deleting pods")
