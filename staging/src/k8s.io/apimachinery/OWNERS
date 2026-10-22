@@ -1,7 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - smarterclayton
   - deads2k
   - sttts
   - liggitt
@@ -10,13 +9,11 @@ approvers:
 reviewers:
   - apelisse
   - thockin
-  - smarterclayton
   - wojtek-t
   - deads2k
   - derekwaynecarr
   - caesarxuchao
   - cheftako
-  - mikedanese
   - liggitt
   - sttts
   - jpbetz

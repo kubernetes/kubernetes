@@ -4,7 +4,6 @@ approvers:
   - sig-api-machinery-approvers
 reviewers:
   - derekwaynecarr
-  - smarterclayton
   - sig-api-machinery-reviewers
 labels:
   - sig/api-machinery

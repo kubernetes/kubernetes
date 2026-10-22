@@ -23,27 +23,22 @@ aliases:
   sig-auth-authenticators-approvers:
     - deads2k
     - liggitt
-    - mikedanese
     - enj
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
     - liggitt
-    - mikedanese
     - sttts
     - wojtek-t
     - aramase
   sig-auth-authorizers-approvers:
     - deads2k
     - liggitt
-    - mikedanese
   sig-auth-authorizers-reviewers:
     - deads2k
     - dims
     - enj
     - liggitt
-    - mikedanese
-    - smarterclayton
     - sttts
     - thockin
     - wojtek-t
@@ -51,16 +46,12 @@ aliases:
   # - ncdc
   sig-auth-certificates-approvers:
     - liggitt
-    - mikedanese
-    - smarterclayton
   sig-auth-certificates-reviewers:
     - deads2k
     - dims
     - enj
     - liggitt
-    - mikedanese
   sig-auth-encryption-at-rest-approvers:
-    - smarterclayton
     - enj
   sig-auth-encryption-at-rest-reviewers:
     - aramase
@@ -68,12 +59,10 @@ aliases:
   sig-auth-node-isolation-approvers:
     - deads2k
     - liggitt
-    - mikedanese
     - tallclair
   sig-auth-node-isolation-reviewers:
     - deads2k
     - liggitt
-    - mikedanese
     - tallclair
   sig-auth-policy-approvers:
     - deads2k
@@ -88,12 +77,10 @@ aliases:
     - deads2k
     - enj
     - liggitt
-    - mikedanese
   sig-auth-serviceaccounts-reviewers:
     - deads2k
     - enj
     - liggitt
-    - mikedanese
   # SIG Release
   release-engineering-approvers:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
@@ -255,7 +242,6 @@ aliases:
   # - vishh
   sig-node-cri-approvers:
     - msau42
-    - smarterclayton
     - thockin
     - saschagrunert
     - haircommander
@@ -318,7 +304,6 @@ aliases:
     - kow3ns
     - janetkuo
     - soltysh
-    - smarterclayton
     - atiratree
   sig-apps-reviewers:
     - atiratree
@@ -327,7 +312,6 @@ aliases:
     - krmayankk
     - mimowo
     - mortent
-    - smarterclayton
     - soltysh
   # sig-apps-emeritus:
   # - tnozicka
@@ -369,7 +353,6 @@ aliases:
   api-approvers:
     - deads2k
     - msau42
-    - smarterclayton
     - thockin
     - liggitt
     - jpbetz
@@ -377,20 +360,16 @@ aliases:
   sig-api-machinery-api-approvers:
     - deads2k
     - liggitt
-    - smarterclayton
     - jpbetz
   sig-apps-api-approvers:
     - deads2k
     - liggitt
-    - smarterclayton
   sig-auth-api-approvers:
     - deads2k
     - liggitt
-    - smarterclayton
   sig-cli-api-approvers:
     - deads2k
     - liggitt
-    - smarterclayton
   sig-cloud-provider-api-approvers:
     - liggitt
     - thockin
@@ -402,13 +381,11 @@ aliases:
   sig-cluster-lifecycle-api-approvers:
     - deads2k
     - liggitt
-    - smarterclayton
   sig-cluster-lifecycle-leads:
     - fabriziopandini
     - justinsb
     - neolit123
   sig-network-api-approvers:
-    - smarterclayton
     - thockin
   sig-network-api-reviewers:
     - aojea
@@ -416,7 +393,6 @@ aliases:
     - thockin
   sig-scheduling-api-approvers:
     - msau42
-    - smarterclayton
     - thockin
   sig-security-approvers:
     - IanColdwater
@@ -429,12 +405,10 @@ aliases:
     - msau42
     - thockin
   sig-windows-api-approvers:
-    - smarterclayton
     - thockin
     - liggitt
   api-reviewers:
     - andrewsykim
-    - smarterclayton
     - thockin
     - liggitt
     - wojtek-t
@@ -442,7 +416,6 @@ aliases:
     - yujuhong
     - derekwaynecarr
     - caesarxuchao
-    - mikedanese
     - sttts
     - dchen1107
     - saad-ali
@@ -473,7 +446,6 @@ aliases:
     - soltysh
   sig-auth-api-reviewers:
     - enj
-    - mikedanese
   sig-cli-api-reviewers:
     - pwittrock
     - soltysh
@@ -614,7 +586,6 @@ aliases:
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
     - BenTheElder
-    - smarterclayton
     - johnbelamaric
     - dims
   # emeritus:
