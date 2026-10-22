@@ -3291,3 +3291,117 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
 	}
 }
+
+func TestSearchInArgs(t *testing.T) {
+	allShorthands := map[string]struct{}{
+		"n": {},
+		"i": {},
+		"o": {},
+		"v": {},
+		"d": {},
+	}
+
+	tests := []struct {
+		name          string
+		flagName      string
+		shorthand     string
+		args          []string
+		expectedFound bool
+	}{
+		{
+			name:          "attached shorthand value containing shorthand letter should not match other shorthand",
+			flagName:      "interactive",
+			shorthand:     "i",
+			args:          []string{"delete", "pod", "foo", "-nmonitoring"},
+			expectedFound: false,
+		},
+		{
+			name:          "attached shorthand value matches target shorthand",
+			flagName:      "namespace",
+			shorthand:     "n",
+			args:          []string{"delete", "pod", "foo", "-nmonitoring"},
+			expectedFound: true,
+		},
+		{
+			name:          "combined boolean shorthands containing target",
+			flagName:      "interactive",
+			shorthand:     "i",
+			args:          []string{"delete", "pod", "foo", "-vi"},
+			expectedFound: true,
+		},
+		{
+			name:          "combined boolean shorthands not containing target",
+			flagName:      "interactive",
+			shorthand:     "i",
+			args:          []string{"delete", "pod", "foo", "-vd"},
+			expectedFound: false,
+		},
+		{
+			name:          "explicit full flag without value",
+			flagName:      "interactive",
+			shorthand:     "i",
+			args:          []string{"delete", "pod", "foo", "--interactive"},
+			expectedFound: true,
+		},
+		{
+			name:          "explicit full flag with value",
+			flagName:      "interactive",
+			shorthand:     "i",
+			args:          []string{"delete", "pod", "foo", "--interactive=true"},
+			expectedFound: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			found := searchInArgs(tt.flagName, tt.shorthand, allShorthands, tt.args)
+			if found != tt.expectedFound {
+				t.Errorf("searchInArgs(%q, %q) = %v; expected %v", tt.flagName, tt.shorthand, found, tt.expectedFound)
+			}
+		})
+	}
+}
+
+func TestApplyOverrideAttachedShorthandDoesNotSuppressDefaults(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "root"}
+	deleteCmd := &cobra.Command{Use: "delete"}
+	deleteCmd.Flags().StringP("namespace", "n", "", "namespace")
+	deleteCmd.Flags().BoolP("interactive", "i", false, "interactive")
+	rootCmd.AddCommand(deleteCmd)
+
+	prefHandler := NewPreferences()
+	prefHandler.AddFlags(rootCmd.PersistentFlags())
+	pref := prefHandler.(*Preferences)
+	pref.getPreferencesFunc = func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+		return &config.Preference{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Preference",
+				APIVersion: "kubectl.config.k8s.io/v1alpha1",
+			},
+			Defaults: []config.CommandDefaults{
+				{
+					Command: "delete",
+					Options: []config.CommandOptionDefault{
+						{
+							Name:    "interactive",
+							Default: "true",
+						},
+					},
+				},
+			},
+		}, nil
+	}
+
+	args := []string{"root", "delete", "pod", "foo", "-nmonitoring"}
+	errWriter := &bytes.Buffer{}
+	opts := genericclioptions.NewConfigFlags(false)
+	_, err := pref.Apply(rootCmd, opts, args, errWriter)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	interactiveFlag := deleteCmd.Flag("interactive")
+	if interactiveFlag.Value.String() != "true" {
+		t.Fatalf("expected interactive flag to be 'true', got '%s'", interactiveFlag.Value.String())
+	}
+}
