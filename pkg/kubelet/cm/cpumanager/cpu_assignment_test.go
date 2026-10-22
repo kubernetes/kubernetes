@@ -1482,6 +1482,141 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	}
 }
 
+func TestTakeByTopologyNUMADistributedForResizeWithMinNUMAHint(t *testing.T) {
+	// Resize variant of TestTakeByTopologyNUMADistributedWithMinNUMAHint:
+	// the NUMA node count of the TopologyManager hint is a lower bound for
+	// the number of NUMA nodes the CPUs are distributed across, in addition
+	// to the NUMA nodes which already hold retained CPUs.
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	// topoDualSocketMultiNumaPerSocketHT: core N = {N, N+40}
+	// | NUMA0 | NUMA1 | NUMA2 | NUMA3 |
+	// |  0- 9 | 10-19 | 20-29 | 30-39 |
+	// | 40-49 | 50-59 | 60-69 | 70-79 |
+	topo := topoDualSocketMultiNumaPerSocketHT
+	allCPUs := topo.CPUDetails.CPUs()
+
+	testCases := []struct {
+		description      string
+		allocatedCPUs    cpuset.CPUSet
+		numCPUs          int
+		cpuGroupSize     int
+		minNUMAsFromHint int
+		expNUMAs         cpuset.CPUSet // expected set of NUMA node IDs in result
+	}{
+		// cpuGroupSize 1: distribute-cpus-across-numa
+		{
+			description:      "scale up without hint, CPUs stay on NUMA node of retained CPUs",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 0,
+			expNUMAs:         cpuset.New(0),
+		},
+		{
+			description:      "scale up with 2-NUMA hint, CPUs distributed across 2 NUMA nodes",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 2,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			description:      "scale up with 4-NUMA hint, CPUs distributed across all 4 NUMA nodes",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			description:      "scale up with hint smaller than NUMA nodes of retained CPUs, NUMA nodes of retained CPUs kept",
+			allocatedCPUs:    cpuset.New(0, 40, 10, 50),
+			numCPUs:          12,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 1,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			description:      "scale up with hint exceeding the feasible NUMA count, hint ignored",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          3,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0),
+		},
+		// cpuGroupSize CPUsPerCore: distribute-cpus-across-numa with full-pcpus-only
+		{
+			description:      "full cores, scale up without hint, CPUs stay on NUMA node of retained CPUs",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     topo.CPUsPerCore(),
+			minNUMAsFromHint: 0,
+			expNUMAs:         cpuset.New(0),
+		},
+		{
+			description:      "full cores, scale up with 2-NUMA hint, CPUs distributed across 2 NUMA nodes",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     topo.CPUsPerCore(),
+			minNUMAsFromHint: 2,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			description:      "full cores, scale up with 4-NUMA hint, CPUs distributed across all 4 NUMA nodes",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          12,
+			cpuGroupSize:     topo.CPUsPerCore(),
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			description:      "full cores, scale up with hint smaller than NUMA nodes of retained CPUs, NUMA nodes of retained CPUs kept",
+			allocatedCPUs:    cpuset.New(0, 40, 10, 50),
+			numCPUs:          12,
+			cpuGroupSize:     topo.CPUsPerCore(),
+			minNUMAsFromHint: 1,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			// 4 CPUs are 2 full cores, so at most 2 NUMA nodes are feasible.
+			description:      "full cores, scale up with hint exceeding the feasible NUMA count, hint ignored",
+			allocatedCPUs:    cpuset.New(0, 40),
+			numCPUs:          4,
+			cpuGroupSize:     topo.CPUsPerCore(),
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			availableCPUs := allCPUs.Difference(tc.allocatedCPUs)
+			result, err := takeByTopologyNUMADistributedForResize(logger, topo, availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false, tc.allocatedCPUs, tc.allocatedCPUs, tc.minNUMAsFromHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.Size() != tc.numCPUs {
+				t.Errorf("expected %d CPUs, got %d (result CPUs: %s)", tc.numCPUs, result.Size(), result)
+			}
+			if !tc.allocatedCPUs.IsSubsetOf(result) {
+				t.Errorf("expected retained CPUs %s to be part of result %s", tc.allocatedCPUs, result)
+			}
+			if numaNodes := topo.CPUDetails.KeepOnly(result).NUMANodes(); !numaNodes.Equals(tc.expNUMAs) {
+				t.Errorf("expected NUMA nodes %s, got %s (result CPUs: %s)", tc.expNUMAs, numaNodes, result)
+			}
+
+			// With a group size of a full core, the result must consist of full cores only.
+			if tc.cpuGroupSize == topo.CPUsPerCore() {
+				if cores := topo.CPUDetails.KeepOnly(result).Cores(); cores.Size()*topo.CPUsPerCore() != result.Size() {
+					t.Errorf("expected full cores only, got %d CPUs on %d cores (result CPUs: %s)", result.Size(), cores.Size(), result)
+				}
+			}
+		})
+	}
+}
+
 func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
 	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
 	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
@@ -3138,7 +3273,7 @@ func TestTakeByTopologyNUMADistributedForResize(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 
-			result, err := takeByTopologyNUMADistributedForResize(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.alignBySocket, tc.allocatedCPUs, tc.baselineCPUs)
+			result, err := takeByTopologyNUMADistributedForResize(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.alignBySocket, tc.allocatedCPUs, tc.baselineCPUs, 0)
 			checkError(t, tc.expErr, err)
 			if !result.Equals(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)

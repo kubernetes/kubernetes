@@ -1803,7 +1803,12 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 //     the same way as the add operation, based on the remaining CPUs of each numa node.
 //  6. Final CPU allocation: Call takeByTopologyNUMAPackedForResize with retained CPUs,
 //     and only take the difference (newly allocated CPUs) to avoid duplicating retained CPUs.
-func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
+//
+// minNUMAsFromHint is the NUMA node count from the TopologyManager's topology
+// hint. When non-zero, it raises the minimum NUMA node count for distribution,
+// ensuring CPU allocation stays aligned with device topology (e.g., GPUs, NICs).
+// Pass 0 to use the default behavior (minimum NUMAs needed to satisfy the request).
+func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet, minNUMAsFromHint int) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -1846,7 +1851,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
-	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, 0, numCPUs)
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, minNUMAsFromHint, numCPUs)
 	// For resize operations, minNUMAs should not be less than the number of
 	// NUMA nodes with retained CPUs, ensuring we consider combinations that
 	// include all NUMA nodes with retained CPUs.
