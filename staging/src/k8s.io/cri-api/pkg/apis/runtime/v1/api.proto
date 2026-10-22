@@ -1929,6 +1929,12 @@ message UInt64Value {
     uint64 value = 1;
 }
 
+// DoubleValue is the wrapper of double.
+message DoubleValue {
+    // The value.
+    double value = 1;
+}
+
 // FilesystemIdentifier uniquely identify the filesystem.
 message FilesystemIdentifier{
     // Mountpoint of a filesystem.
@@ -2353,6 +2359,11 @@ message Metric {
     // If the two slices have different length, the behavior is undefined.
     repeated string label_values = 4;
     UInt64Value value = 5;
+    // double_value carries fractional metric values that cannot be represented
+    // by the integer value field. Producers emitting fractional metrics set
+    // double_value and also populate value for backward compatibility.
+    // Consumers prefer double_value when it is set.
+    DoubleValue double_value = 6;
 }
 
 enum MetricType {
