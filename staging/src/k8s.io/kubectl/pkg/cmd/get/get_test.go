@@ -862,6 +862,88 @@ func TestEmptyResult(t *testing.T) {
 	}
 }
 
+func TestGetPreservesFieldOrder(t *testing.T) {
+	const pod = `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test"},"spec":{"nodeName":"node1","containers":[{"name":"c","image":"i"}]},"status":{"phase":"Running"}}`
+	const podList = `{"kind":"PodList","apiVersion":"v1","metadata":{"resourceVersion":"3"},"items":[` + pod + `]}`
+	const podYAML = `kind: Pod
+apiVersion: v1
+metadata:
+  name: foo
+  namespace: test
+spec:
+  nodeName: node1
+  containers:
+  - name: c
+    image: i
+status:
+  phase: Running
+`
+
+	tests := map[string]struct {
+		response string
+		args     []string
+		output   string
+		want     string
+	}{
+		"single-yaml": {response: pod, args: []string{"pods", "foo"}, output: "yaml", want: podYAML},
+		"list-yaml": {
+			response: podList,
+			args:     []string{"pods"},
+			output:   "yaml",
+			want: `kind: List
+apiVersion: v1
+metadata:
+  resourceVersion: ""
+items:
+- ` + strings.ReplaceAll(strings.TrimSuffix(podYAML, "\n"), "\n", "\n  ") + "\n",
+		},
+		"single-json": {response: pod, args: []string{"pods", "foo"}, output: "json", want: `{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "foo",
+        "namespace": "test"
+    },
+    "spec": {
+        "nodeName": "node1",
+        "containers": [
+            {
+                "name": "c",
+                "image": "i"
+            }
+        ]
+    },
+    "status": {
+        "phase": "Running"
+    }
+}
+`},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.StableUnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader(tc.response))}, nil
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+			streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdGet("kubectl", tf, streams)
+			cmd.Flags().Set("output", tc.output)
+			cmd.Run(cmd, tc.args)
+
+			if diff := cmp.Diff(tc.want, buf.String()); diff != "" {
+				t.Errorf("unexpected output (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestEmptyResultJSON(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 
@@ -1379,19 +1461,19 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := `{
+    "kind": "List",
     "apiVersion": "v1",
+    "metadata": {
+        "resourceVersion": ""
+    },
     "items": [
         {
-            "apiVersion": "v1",
             "kind": "Status",
+            "apiVersion": "v1",
             "metadata": {},
             "status": "Success"
         }
-    ],
-    "kind": "List",
-    "metadata": {
-        "resourceVersion": ""
-    }
+    ]
 }
 `
 	if e, a := expected, buf.String(); e != a {
@@ -1511,7 +1593,11 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `{
+    "kind": "List",
     "apiVersion": "v1",
+    "metadata": {
+        "resourceVersion": ""
+    },
     "items": [
         {
             "apiVersion": "v1",
@@ -1565,11 +1651,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
                 "loadBalancer": {}
             }
         }
-    ],
-    "kind": "List",
-    "metadata": {
-        "resourceVersion": ""
-    }
+    ]
 }
 `
 	if e, a := expected, buf.String(); e != a {
