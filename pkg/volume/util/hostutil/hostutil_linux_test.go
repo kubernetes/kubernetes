@@ -92,6 +92,82 @@ func TestIsSharedSuccess(t *testing.T) {
 	}
 }
 
+func TestIsSharedWithNonstandardMountSource(t *testing.T) {
+	mountInfo := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+7334 62 0:5118 / /tmp/cni-sysfs-sandbox rw,relatime shared:30 - sysfs  rw
+7335 62 0:5119 / /tmp/incomplete rw,relatime shared:31 - sysfs rw
+7336 62 0:5120 / /tmp/no-separator rw,relatime shared:32 sysfs rw
+83 62 0:44 / /var/lib/private rw,relatime - tmpfs tmpfs rw
+`
+	tempDir, filename, err := writeFile(mountInfo)
+	if err != nil {
+		t.Fatalf("cannot create temporary file: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tests := []struct {
+		name       string
+		path       string
+		wantShared bool
+		wantID     int
+		wantErr    bool
+	}{
+		{
+			name:       "unrelated nonstandard source with shared root mount",
+			path:       "/var/lib/kubelet",
+			wantShared: true,
+			wantID:     62,
+		},
+		{
+			name:   "unrelated nonstandard source with private child mount",
+			path:   "/var/lib/private/pods",
+			wantID: 83,
+		},
+		{
+			name:       "selected mount has empty source",
+			path:       "/tmp/cni-sysfs-sandbox",
+			wantShared: true,
+			wantID:     7334,
+		},
+		{
+			name:    "selected mount has incomplete tail",
+			path:    "/tmp/incomplete",
+			wantErr: true,
+		},
+		{
+			name:    "selected mount has no separator",
+			path:    "/tmp/no-separator",
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			shared, err := isShared(test.path, filename)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if shared != test.wantShared {
+				t.Fatalf("expected shared=%v, got %v", test.wantShared, shared)
+			}
+
+			info, err := findMountInfo(test.path, filename)
+			if err != nil {
+				t.Fatalf("targeted mount lookup returned an error: %v", err)
+			}
+			if info.ID != test.wantID {
+				t.Fatalf("expected mount ID %d, got %d", test.wantID, info.ID)
+			}
+		})
+	}
+}
+
 func TestIsSharedFailure(t *testing.T) {
 	errorTests := []struct {
 		name    string
@@ -136,6 +212,8 @@ func TestIsSharedFailure(t *testing.T) {
 func TestGetSELinuxSupport(t *testing.T) {
 	info :=
 		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+7334 62 0:5118 / /tmp/cni-sysfs-sandbox rw,relatime shared:30 - sysfs  rw
+7335 62 0:5119 / /tmp/incomplete rw,relatime shared:31 - sysfs rw
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw
 227 62 253:0 /var/lib/docker/devicemapper /var/lib/docker/devicemapper rw,relatime - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
@@ -207,6 +285,8 @@ func writeFile(content string) (string, string, error) {
 func TestGetSELinuxMountContext(t *testing.T) {
 	info :=
 		`840 60 8:0 / /var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894"
+7334 62 0:5118 / /tmp/cni-sysfs-sandbox rw,relatime shared:30 - sysfs  rw
+7335 62 0:5119 / /tmp/incomplete rw,relatime shared:31 - sysfs rw
 224 62 253:0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
 82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw
 83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw

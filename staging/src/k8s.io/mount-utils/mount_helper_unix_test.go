@@ -36,6 +36,7 @@ func writeFile(t *testing.T, content string) string {
 
 func TestParseMountInfo(t *testing.T) {
 	info := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+7334 62 0:5118 / /tmp/cni-sysfs-sandbox rw,relatime shared:30 - sysfs  rw
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 80 62 0:42 / /var/lib/nfs/rpc_pipefs rw,relatime shared:31 - rpc_pipefs sunrpc rw
 82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw
@@ -99,6 +100,23 @@ func TestParseMountInfo(t *testing.T) {
 				FsType:         "ext4",
 				MountOptions:   []string{"rw", "relatime"},
 				SuperOptions:   []string{"rw", "commit=30", "data=ordered"},
+			},
+		},
+		{
+			"empty mount source",
+			7334,
+			MountInfo{
+				ID:             7334,
+				ParentID:       62,
+				Major:          0,
+				Minor:          5118,
+				Root:           "/",
+				Source:         "",
+				MountPoint:     "/tmp/cni-sysfs-sandbox",
+				OptionalFields: []string{"shared:30"},
+				FsType:         "sysfs",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw"},
 			},
 		},
 		{
@@ -224,6 +242,108 @@ func TestParseMountInfo(t *testing.T) {
 		if !found {
 			t.Errorf("Test case %q: mountPoint %d not found", test.name, test.id)
 		}
+	}
+}
+
+func TestFindMountInfoForPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		info       string
+		path       string
+		wantID     int
+		wantSource string
+		wantErr    bool
+	}{
+		{
+			name: "ignore incomplete tails on unrelated mounts",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+7333 62 0:5117 / /tmp/no-separator rw,relatime shared:29 sysfs rw
+7334 62 0:5118 / /tmp/incomplete rw,relatime shared:30 - sysfs rw
+189 62 8:1 /var/lib/kubelet /var/lib/kubelet rw,relatime shared:30 - ext4 /dev/sda1 rw,commit=30,data=ordered
+`,
+			path:       "/var/lib/kubelet/pods",
+			wantID:     189,
+			wantSource: "/dev/sda1",
+		},
+		{
+			name: "accept empty source on selected mount",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+189 62 0:5118 / /var/lib/kubelet rw,relatime shared:30 - sysfs  rw
+`,
+			path:   "/var/lib/kubelet/pods",
+			wantID: 189,
+		},
+		{
+			name: "fail when selected mount has incomplete tail",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+189 62 0:5118 / /var/lib/kubelet rw,relatime shared:30 - sysfs rw
+`,
+			path:    "/var/lib/kubelet/pods",
+			wantErr: true,
+		},
+		{
+			name: "fail when selected mount has no separator",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+189 62 0:5118 / /var/lib/kubelet rw,relatime shared:30 sysfs rw
+`,
+			path:    "/var/lib/kubelet/pods",
+			wantErr: true,
+		},
+		{
+			name: "preserve extra tail field tolerance",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+189 62 8:1 /var/lib/kubelet /var/lib/kubelet rw,relatime shared:30 - ext4 /dev/sda1 rw extra
+`,
+			path:       "/var/lib/kubelet/pods",
+			wantID:     189,
+			wantSource: "/dev/sda1",
+		},
+		{
+			name: "match escaped spaces in mount point",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+190 62 0:42 / /var/lib/kubelet\040with\040spaces rw,relatime shared:30 - tmpfs tmpfs rw
+`,
+			path:       "/var/lib/kubelet with spaces/pods",
+			wantID:     190,
+			wantSource: "tmpfs",
+		},
+		{
+			name: "fail when an entry prefix is malformed",
+			info: `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+invalid mountinfo entry
+`,
+			path:    "/var/lib/kubelet",
+			wantErr: true,
+		},
+		{
+			name: "fail when no mount contains path",
+			info: `76 62 8:1 / /boot rw,relatime shared:29 - ext4 /dev/sda1 rw,seclabel,data=ordered
+`,
+			path:    "/var/lib/kubelet",
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filename := writeFile(t, test.info)
+			info, err := FindMountInfoForPath(filename, test.path)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got mount info %+v", info)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if info.ID != test.wantID {
+				t.Fatalf("expected mount ID %d, got %d", test.wantID, info.ID)
+			}
+			if info.Source != test.wantSource {
+				t.Fatalf("expected source %q, got %q", test.wantSource, info.Source)
+			}
+		})
 	}
 }
 

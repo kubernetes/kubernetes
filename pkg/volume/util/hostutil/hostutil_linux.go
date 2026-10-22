@@ -165,8 +165,8 @@ func (hu *HostUtil) FindMountInfo(path string) (mount.MountInfo, error) {
 
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
-func isShared(mount string, mountInfoPath string) (bool, error) {
-	info, err := findMountInfo(mount, mountInfoPath)
+func isShared(path string, mountInfoPath string) (bool, error) {
+	info, err := findMountInfo(path, mountInfoPath)
 	if err != nil {
 		return false, err
 	}
@@ -181,24 +181,7 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 }
 
 func findMountInfo(path, mountInfoPath string) (mount.MountInfo, error) {
-	infos, err := mount.ParseMountInfo(mountInfoPath)
-	if err != nil {
-		return mount.MountInfo{}, err
-	}
-
-	// process /proc/xxx/mountinfo in backward order and find the first mount
-	// point that is prefix of 'path' - that's the mount where path resides
-	var info *mount.MountInfo
-	for i := len(infos) - 1; i >= 0; i-- {
-		if mount.PathWithinBase(path, infos[i].MountPoint) {
-			info = &infos[i]
-			break
-		}
-	}
-	if info == nil {
-		return mount.MountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
-	}
-	return *info, nil
+	return mount.FindMountInfoForPath(mountInfoPath, path)
 }
 
 // DoMakeRShared is common implementation of MakeRShared on Linux. It checks if

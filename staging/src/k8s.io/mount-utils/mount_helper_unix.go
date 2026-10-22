@@ -35,8 +35,10 @@ import (
 )
 
 const (
-	// At least number of fields per line in /proc/<pid>/mountinfo.
-	expectedAtLeastNumFieldsPerMountInfo = 10
+	// Number of mandatory fields before the separator in /proc/<pid>/mountinfo.
+	expectedNumFieldsPerMountInfoPrefix = 6
+	// Number of mandatory fields after the separator in /proc/<pid>/mountinfo.
+	expectedNumFieldsPerMountInfoTail = 3
 	// How many times to retry for a consistent read of /proc/mounts.
 	maxListTries = 10
 )
@@ -112,56 +114,139 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 			continue
 		}
 		// See `man proc` for authoritative description of format of the file.
-		fields := strings.Fields(line)
-		if len(fields) < expectedAtLeastNumFieldsPerMountInfo {
-			return nil, fmt.Errorf("wrong number of fields in (expected at least %d, got %d): %s", expectedAtLeastNumFieldsPerMountInfo, len(fields), line)
-		}
-		id, err := strconv.Atoi(fields[0])
+		prefixFields, tail, err := splitMountInfoLine(line)
 		if err != nil {
 			return nil, err
 		}
-		parentID, err := strconv.Atoi(fields[1])
+		info, err := parseMountInfoPrefix(line, prefixFields)
 		if err != nil {
 			return nil, err
 		}
-		mm := strings.Split(fields[2], ":")
-		if len(mm) != 2 {
-			return nil, fmt.Errorf("parsing '%s' failed: unexpected minor:major pair %s", line, mm)
-		}
-		major, err := strconv.Atoi(mm[0])
+		info, err = parseMountInfoTail(line, tail, info)
 		if err != nil {
-			return nil, fmt.Errorf("parsing '%s' failed: unable to parse major device id, err:%v", mm[0], err)
+			return nil, err
 		}
-		minor, err := strconv.Atoi(mm[1])
-		if err != nil {
-			return nil, fmt.Errorf("parsing '%s' failed: unable to parse minor device id, err:%v", mm[1], err)
-		}
-
-		info := MountInfo{
-			ID:           id,
-			ParentID:     parentID,
-			Major:        major,
-			Minor:        minor,
-			Root:         fields[3],
-			MountPoint:   fields[4],
-			MountOptions: splitMountOptions(fields[5]),
-		}
-		// All fields until "-" are "optional fields".
-		i := 6
-		for ; i < len(fields) && fields[i] != "-"; i++ {
-			info.OptionalFields = append(info.OptionalFields, fields[i])
-		}
-		// Parse the rest 3 fields.
-		i++
-		if len(fields)-i < 3 {
-			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
-		}
-		info.FsType = fields[i]
-		info.Source = fields[i+1]
-		info.SuperOptions = splitMountOptions(fields[i+2])
 		infos = append(infos, info)
 	}
 	return infos, nil
+}
+
+// FindMountInfoForPath returns the last mountinfo entry whose mount point is
+// an ancestor of path. It validates the prefix of every entry, but parses the
+// filesystem-specific tail only for the selected entry.
+func FindMountInfoForPath(filename, path string) (MountInfo, error) {
+	content, err := readMountInfo(filename)
+	if err != nil {
+		return MountInfo{}, err
+	}
+
+	var candidateLine string
+	// Mountinfo escapes whitespace and backslashes in path fields.
+	escapedPath := escapeMountInfoPath(path)
+	// Process /proc/xxx/mountinfo in file order and retain the last mount
+	// point that is a prefix of path - that's the mount where path resides.
+	for _, line := range strings.Split(string(content), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < expectedNumFieldsPerMountInfoPrefix {
+			return MountInfo{}, fmt.Errorf("wrong number of fields in mountinfo prefix (expected at least %d, got %d): %s", expectedNumFieldsPerMountInfoPrefix, len(fields), line)
+		}
+		info, err := parseMountInfoPrefix(line, fields[:expectedNumFieldsPerMountInfoPrefix])
+		if err != nil {
+			return MountInfo{}, err
+		}
+		if PathWithinBase(escapedPath, info.MountPoint) {
+			candidateLine = line
+		}
+	}
+	if candidateLine == "" {
+		return MountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+	}
+
+	prefixFields, tail, err := splitMountInfoLine(candidateLine)
+	if err != nil {
+		return MountInfo{}, err
+	}
+	candidate, err := parseMountInfoPrefix(candidateLine, prefixFields)
+	if err != nil {
+		return MountInfo{}, err
+	}
+	return parseMountInfoTail(candidateLine, tail, candidate)
+}
+
+func splitMountInfoLine(line string) ([]string, string, error) {
+	// Split before tokenizing so an empty mount source remains visible in tail.
+	prefix, tail, found := strings.Cut(line, " - ")
+	if !found {
+		return nil, "", fmt.Errorf("missing separator in mountinfo entry: %s", line)
+	}
+	fields := strings.Fields(prefix)
+	if len(fields) < expectedNumFieldsPerMountInfoPrefix {
+		return nil, "", fmt.Errorf("wrong number of fields in mountinfo prefix (expected at least %d, got %d): %s", expectedNumFieldsPerMountInfoPrefix, len(fields), line)
+	}
+	return fields, tail, nil
+}
+
+func parseMountInfoPrefix(line string, fields []string) (MountInfo, error) {
+	id, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return MountInfo{}, err
+	}
+	parentID, err := strconv.Atoi(fields[1])
+	if err != nil {
+		return MountInfo{}, err
+	}
+	mm := strings.Split(fields[2], ":")
+	if len(mm) != 2 {
+		return MountInfo{}, fmt.Errorf("parsing '%s' failed: unexpected minor:major pair %s", line, mm)
+	}
+	major, err := strconv.Atoi(mm[0])
+	if err != nil {
+		return MountInfo{}, fmt.Errorf("parsing '%s' failed: unable to parse major device id, err:%v", mm[0], err)
+	}
+	minor, err := strconv.Atoi(mm[1])
+	if err != nil {
+		return MountInfo{}, fmt.Errorf("parsing '%s' failed: unable to parse minor device id, err:%v", mm[1], err)
+	}
+
+	info := MountInfo{
+		ID:           id,
+		ParentID:     parentID,
+		Major:        major,
+		Minor:        minor,
+		Root:         fields[3],
+		MountPoint:   fields[4],
+		MountOptions: splitMountOptions(fields[5]),
+	}
+	// All fields until "-" are "optional fields".
+	info.OptionalFields = append(info.OptionalFields, fields[expectedNumFieldsPerMountInfoPrefix:]...)
+	return info, nil
+}
+
+func parseMountInfoTail(line, tail string, info MountInfo) (MountInfo, error) {
+	// Parse the rest 3 fields. Split preserves an empty mount source.
+	fields := strings.Split(tail, " ")
+	if len(fields) < expectedNumFieldsPerMountInfoTail {
+		return MountInfo{}, fmt.Errorf("expect %d fields in %s, got %d", expectedNumFieldsPerMountInfoTail, line, len(fields))
+	}
+	if fields[0] == "" || fields[2] == "" {
+		return MountInfo{}, fmt.Errorf("filesystem type and super options must not be empty in mountinfo entry: %s", line)
+	}
+	info.FsType = fields[0]
+	info.Source = fields[1]
+	info.SuperOptions = splitMountOptions(fields[2])
+	return info, nil
+}
+
+func escapeMountInfoPath(path string) string {
+	return strings.NewReplacer(
+		`\`, `\134`,
+		" ", `\040`,
+		"\t", `\011`,
+		"\n", `\012`,
+	).Replace(path)
 }
 
 // splitMountOptions parses comma-separated list of mount options into an array.
