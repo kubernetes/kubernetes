@@ -331,9 +331,7 @@ func (r *REST) defaultOnReadIPFamilies(service *api.Service) {
 func (r *REST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
 	svc := obj.(*api.Service)
 
-	// Normally this defaulting is done automatically, but the hook (Decorator)
-	// is called at the end of this process, and we want the fully-formed
-	// object.
+	// Make sure the object has all fields we expect to be defaulted.
 	r.defaultOnReadService(svc)
 
 	// Only perform the cleanup if this is a non-dryrun deletion
@@ -376,8 +374,7 @@ func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, opti
 	oldSvc := oldObj.(*api.Service)
 
 	// Make sure the existing object has all fields we expect to be defaulted.
-	// This might not be true if the saved object predates these fields (the
-	// Decorator hook is not called on 'old' in the update path.
+	// This might not be true if the saved object predates these fields.
 	r.defaultOnReadService(oldSvc)
 
 	// Fix up allocated values that the client may have not specified (for

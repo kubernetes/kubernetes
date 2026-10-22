@@ -947,7 +947,6 @@ func TestStoreCreateHooks(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		decorator   func(runtime.Object)
 		beginCreate BeginCreateFunc
 		afterCreate AfterCreateFunc
 		// the TTLFunc is an easy hook to force a failure
@@ -957,12 +956,6 @@ func TestStoreCreateHooks(t *testing.T) {
 		expectMilestones []string // to test sequence
 	}{{
 		name: "no hooks",
-	}, {
-		name: "Decorator mutation",
-		decorator: func(obj runtime.Object) {
-			setAnn(obj, "DecoratorWasCalled")
-		},
-		expectAnnotation: "DecoratorWasCalled",
 	}, {
 		name: "AfterCreate mutation",
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
@@ -978,9 +971,6 @@ func TestStoreCreateHooks(t *testing.T) {
 		expectAnnotation: "BeginCreateWasCalled",
 	}, {
 		name: "success ordering",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -990,12 +980,9 @@ func TestStoreCreateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, nil
 		},
-		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate", "Decorator"},
+		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate"},
 	}, {
 		name: "fail ordering",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1014,9 +1001,6 @@ func TestStoreCreateHooks(t *testing.T) {
 	}, {
 		name:        "fail BeginCreate ordering",
 		expectError: true,
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1039,7 +1023,6 @@ func TestStoreCreateHooks(t *testing.T) {
 			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 			destroyFunc, registry := NewTestGenericStoreRegistry(t)
 			defer destroyFunc()
-			registry.Decorator = tc.decorator
 			registry.BeginCreate = tc.beginCreate
 			registry.AfterCreate = tc.afterCreate
 			registry.TTLFunc = tc.ttl
@@ -1254,8 +1237,7 @@ func TestStoreUpdateHooks(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		decorator func(runtime.Object)
+		name string
 		// create-on-update is tested elsewhere, but this proves non-use here
 		beginCreate      BeginCreateFunc
 		afterCreate      AfterCreateFunc
@@ -1266,12 +1248,6 @@ func TestStoreUpdateHooks(t *testing.T) {
 		expectMilestones []string // to test sequence
 	}{{
 		name: "no hooks",
-	}, {
-		name: "Decorator mutation",
-		decorator: func(obj runtime.Object) {
-			setAnn(obj, "DecoratorWasCalled")
-		},
-		expectAnnotation: "DecoratorWasCalled",
 	}, {
 		name: "AfterUpdate mutation",
 		afterUpdate: func(obj runtime.Object, opts *metav1.UpdateOptions) {
@@ -1287,9 +1263,6 @@ func TestStoreUpdateHooks(t *testing.T) {
 		expectAnnotation: "BeginUpdateWasCalled",
 	}, {
 		name: "success ordering",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1308,13 +1281,10 @@ func TestStoreUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishUpdate(%v)", success))
 			}, nil
 		},
-		expectMilestones: []string{"BeginUpdate", "FinishUpdate(true)", "AfterUpdate", "Decorator"},
+		expectMilestones: []string{"BeginUpdate", "FinishUpdate(true)", "AfterUpdate"},
 	}, /* fail ordering is covered in TestStoreUpdateHooksInnerRetry */ {
 		name:        "fail BeginUpdate ordering",
 		expectError: true,
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterUpdate: func(obj runtime.Object, opts *metav1.UpdateOptions) {
 			mile("AfterUpdate")
 		},
@@ -1347,7 +1317,6 @@ func TestStoreUpdateHooks(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			milestones = nil
-			registry.Decorator = tc.decorator
 			obj, _, err := registry.Update(testContext, pod.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 			if err != nil && !tc.expectError {
 				t.Fatalf("Unexpected error: %v", err)
@@ -1385,7 +1354,6 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		decorator   func(runtime.Object)
 		beginCreate BeginCreateFunc
 		afterCreate AfterCreateFunc
 		beginUpdate BeginUpdateFunc
@@ -1398,9 +1366,6 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 		name: "no hooks",
 	}, {
 		name: "success ordering",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1419,12 +1384,9 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishUpdate(%v)", success))
 			}, nil
 		},
-		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate", "Decorator"},
+		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate"},
 	}, {
 		name: "fail ordering",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1452,9 +1414,6 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 	}, {
 		name:        "fail BeginCreate ordering",
 		expectError: true,
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterCreate: func(obj runtime.Object, opts *metav1.CreateOptions) {
 			mile("AfterCreate")
 		},
@@ -1486,7 +1445,6 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 			destroyFunc, registry := NewTestGenericStoreRegistry(t)
 			defer destroyFunc()
-			registry.Decorator = tc.decorator
 			registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
 			registry.BeginUpdate = tc.beginUpdate
 			registry.AfterUpdate = tc.afterUpdate
@@ -1539,7 +1497,6 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		decorator   func(runtime.Object)
 		beginUpdate func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
 		afterUpdate AfterUpdateFunc
 		// the TTLFunc is an easy hook to force an inner-loop retry
@@ -1548,9 +1505,6 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 		expectMilestones []string // to test sequence
 	}{{
 		name: "inner retry success",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterUpdate: func(obj runtime.Object, opts *metav1.UpdateOptions) {
 			mile("AfterUpdate")
 		},
@@ -1561,12 +1515,9 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 			}, nil
 		},
 		ttl:              ttlFailOnce,
-		expectMilestones: []string{"BeginUpdate", "TTLError", "FinishUpdate(false)", "BeginUpdate", "TTL", "FinishUpdate(true)", "AfterUpdate", "Decorator"},
+		expectMilestones: []string{"BeginUpdate", "TTLError", "FinishUpdate(false)", "BeginUpdate", "TTL", "FinishUpdate(true)", "AfterUpdate"},
 	}, {
 		name: "inner retry fail",
-		decorator: func(obj runtime.Object) {
-			mile("Decorator")
-		},
 		afterUpdate: func(obj runtime.Object, opts *metav1.UpdateOptions) {
 			mile("AfterUpdate")
 		},
@@ -1599,7 +1550,6 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			milestones = nil
-			registry.Decorator = tc.decorator
 			ttlFailDone = false
 			registry.TTLFunc = tc.ttl
 			// force storage to use a cached object with a non-matching resourceVersion to guarantee a live lookup + retry
