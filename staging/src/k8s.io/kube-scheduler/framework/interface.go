@@ -878,6 +878,9 @@ type PlacementProgress struct {
 	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
 	// or assumed in the current PodGroup scheduling cycle.
 	Scheduled int
+	// Unschedulable is the number of children evaluated as unschedulable so far in the current pod group scheduling cycle
+	// for a particular (composite) pod group and placement.
+	Unschedulable int
 }
 
 // Handle provides data and some tools that plugins can use. It is

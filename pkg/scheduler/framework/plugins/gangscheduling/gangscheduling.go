@@ -257,15 +257,16 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 	minCount := podGroupInfo.GetMinCount()
 	remaining := args.Remaining
 	scheduled := args.Scheduled
+	unschedulable := args.Unschedulable
 
 	if remaining+scheduled < minCount {
 		// minCount can't be satisfied because there are not enough remaining pods.
-		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("scheduling policy's minimum threshold (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("scheduling policy's minimum threshold (%d) cannot be satisfied: %d scheduled, %d unschedulable, %d not-evaluated", minCount, scheduled, unschedulable, remaining))
 	}
 
 	if scheduled < minCount {
 		// minCount might be satisfied once more remaining pods are evaluated.
-		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("scheduling policy's minimum threshold (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("scheduling policy's minimum threshold (%d) is not yet satisfied: %d scheduled, %d unschedulable, %d not-evaluated", minCount, scheduled, unschedulable, remaining))
 	}
 
 	// minCount is satisfied.

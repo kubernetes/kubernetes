@@ -1143,43 +1143,53 @@ func TestPlacementFeasible(t *testing.T) {
 		childrenCount         int
 		unscheduledPods       []*v1.Pod
 		podStatuses           []fwk.Code
-		wantCodes             []fwk.Code
+		wantStatuses          []*fwk.Status
 		initialScheduledCount int
 	}{
 		{
-			name:                  "All pods succeed, minCount met at end",
-			minCount:              2,
-			childrenCount:         2,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
-			podStatuses:           []fwk.Code{fwk.Success, fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success},
+			name:            "All pods succeed, minCount met at end",
+			minCount:        2,
+			childrenCount:   2,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:     []fwk.Code{fwk.Success, fwk.Success},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 1 scheduled, 0 unschedulable, 1 not-evaluated"),
+				nil,
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "First pod fails, minCount not satisfiable",
-			minCount:              3,
-			childrenCount:         3,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
-			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Unschedulable},
+			name:            "First pod fails, minCount not satisfiable",
+			minCount:        3,
+			childrenCount:   3,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
+			podStatuses:     []fwk.Code{fwk.Unschedulable},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 1 unschedulable, 2 not-evaluated"),
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "Second pod fails, minCount not satisfiable",
-			minCount:              2,
-			childrenCount:         2,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
-			podStatuses:           []fwk.Code{fwk.Success, fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Unschedulable},
+			name:            "Second pod fails, minCount not satisfiable",
+			minCount:        2,
+			childrenCount:   2,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:     []fwk.Code{fwk.Success, fwk.Unschedulable},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 1 scheduled, 0 unschedulable, 1 not-evaluated"),
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 1 unschedulable, 0 not-evaluated"),
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "Non-gang pod group with 0 scheduled pods fails",
-			minCount:              0,
-			childrenCount:         1,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
-			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Unschedulable},
+			name:            "Non-gang pod group with 0 scheduled pods fails",
+			minCount:        0,
+			childrenCount:   1,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj()},
+			podStatuses:     []fwk.Code{fwk.Unschedulable},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (1) cannot be satisfied: 0 scheduled, 1 unschedulable, 0 not-evaluated"),
+			},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1188,7 +1198,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Success},
+			wantStatuses:          []*fwk.Status{nil},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1197,43 +1207,57 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Success},
+			wantStatuses:          []*fwk.Status{nil},
 			initialScheduledCount: 1,
 		},
 		{
-			name:                  "More than minCount pods, all succeed",
-			minCount:              2,
-			childrenCount:         3,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
-			podStatuses:           []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success, fwk.Success},
+			name:            "More than minCount pods, all succeed",
+			minCount:        2,
+			childrenCount:   3,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
+			podStatuses:     []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 1 scheduled, 0 unschedulable, 2 not-evaluated"),
+				nil,
+				nil,
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "More than minCount pods, first fails",
-			minCount:              2,
-			childrenCount:         3,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
-			podStatuses:           []fwk.Code{fwk.Unschedulable, fwk.Success, fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Wait, fwk.Success},
+			name:            "More than minCount pods, first fails",
+			minCount:        2,
+			childrenCount:   3,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
+			podStatuses:     []fwk.Code{fwk.Unschedulable, fwk.Success, fwk.Success},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 0 scheduled, 1 unschedulable, 2 not-evaluated"),
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 1 scheduled, 1 unschedulable, 1 not-evaluated"),
+				nil,
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "More than minCount pods, minCount not satisfiable",
-			minCount:              2,
-			childrenCount:         3,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
-			podStatuses:           []fwk.Code{fwk.Unschedulable, fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Unschedulable},
+			name:            "More than minCount pods, minCount not satisfiable",
+			minCount:        2,
+			childrenCount:   3,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
+			podStatuses:     []fwk.Code{fwk.Unschedulable, fwk.Unschedulable},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (2) is not yet satisfied: 0 scheduled, 1 unschedulable, 2 not-evaluated"),
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 2 unschedulable, 1 not-evaluated"),
+			},
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "1 pod scheduled, 2 unscheduled pods succeed, minCount 3 met",
-			minCount:              3,
-			childrenCount:         2,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
-			podStatuses:           []fwk.Code{fwk.Success, fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success},
+			name:            "1 pod scheduled, 2 unscheduled pods succeed, minCount 3 met",
+			minCount:        3,
+			childrenCount:   2,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:     []fwk.Code{fwk.Success, fwk.Success},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Wait, "scheduling policy's minimum threshold (3) is not yet satisfied: 2 scheduled, 0 unschedulable, 1 not-evaluated"),
+				nil,
+			},
 			initialScheduledCount: 1,
 		},
 		{
@@ -1242,25 +1266,29 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Success},
+			wantStatuses:          []*fwk.Status{nil},
 			initialScheduledCount: 2,
 		},
 		{
-			name:                  "1 pod scheduled, minCount 3, first unscheduled fails, not enough remaining",
-			minCount:              3,
-			childrenCount:         2,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
-			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			wantCodes:             []fwk.Code{fwk.Unschedulable},
+			name:            "1 pod scheduled, minCount 3, first unscheduled fails, not enough remaining",
+			minCount:        3,
+			childrenCount:   2,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:     []fwk.Code{fwk.Unschedulable},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (3) cannot be satisfied: 1 scheduled, 1 unschedulable, 1 not-evaluated"),
+			},
 			initialScheduledCount: 1,
 		},
 		{
-			name:                  "1 pod scheduled, minCount 4, first unscheduled succeeds, not enough remaining",
-			minCount:              4,
-			childrenCount:         2,
-			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
-			podStatuses:           []fwk.Code{fwk.Success},
-			wantCodes:             []fwk.Code{fwk.Unschedulable},
+			name:            "1 pod scheduled, minCount 4, first unscheduled succeeds, not enough remaining",
+			minCount:        4,
+			childrenCount:   2,
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:     []fwk.Code{fwk.Success},
+			wantStatuses: []*fwk.Status{
+				fwk.NewStatus(fwk.Unschedulable, "scheduling policy's minimum threshold (4) cannot be satisfied: 2 scheduled, 0 unschedulable, 1 not-evaluated"),
+			},
 			initialScheduledCount: 1,
 		},
 	}
@@ -1320,19 +1348,23 @@ func TestPlacementFeasible(t *testing.T) {
 
 					pl := p.(*GangScheduling)
 					scheduled := tc.initialScheduledCount
+					unschedulable := 0
 					for i, code := range tc.podStatuses {
 						if code == fwk.Success {
 							scheduled++
+						} else {
+							unschedulable++
 						}
 
 						args := fwk.PlacementProgress{
-							Remaining: tc.childrenCount - (i + 1),
-							Scheduled: scheduled,
+							Remaining:     tc.childrenCount - (i + 1),
+							Scheduled:     scheduled,
+							Unschedulable: unschedulable,
 						}
 						gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo, args)
 
-						if gotCode := gotStatus.Code(); gotCode != tc.wantCodes[i] {
-							t.Errorf("Step %d: expected status code %v, got %v", i, tc.wantCodes[i], gotCode)
+						if diff := cmp.Diff(tc.wantStatuses[i], gotStatus); diff != "" {
+							t.Errorf("Step %d: unexpected status (-want,+got):\n%s", i, diff)
 						}
 					}
 				})

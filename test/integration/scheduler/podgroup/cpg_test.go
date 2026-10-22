@@ -1409,10 +1409,10 @@ func TestCPGScheduling(t *testing.T) {
 			//	[Feasible, blocked by sub1]  [Fails: cpu]                        [Skipped]            [Skipped]
 			//
 			// Diagnostics (condition message fragments):
-			//   - cpg-root: scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining
-			//   - cpg-sub1: scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - cpg-root: scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 unschedulable, 1 not-evaluated
+			//   - cpg-sub1: scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 1 unschedulable, 0 not-evaluated
 			//   - pg1: ancestor composite pod group "cpg-sub1" is unschedulable
-			//   - pg2: scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining
+			//   - pg2: scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 1 unschedulable, 2 not-evaluated
 			//   - cpg-sub2: ancestor composite pod group "cpg-root" is unschedulable
 			//   - pg3: ancestor composite pod group "cpg-root" is unschedulable
 			//   - pg4: ancestor composite pod group "cpg-root" is unschedulable
@@ -1487,11 +1487,11 @@ func TestCPGScheduling(t *testing.T) {
 						CompositePodGroups: []string{"cpg-root", "cpg-sub1", "cpg-sub2"},
 						PodGroups:          []string{"pg1", "pg2", "pg3", "pg4"},
 						Messages: map[string]string{
-							"cpg-root": "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining",
-							"cpg-sub1": "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining",
+							"cpg-root": "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 unschedulable, 1 not-evaluated",
+							"cpg-sub1": "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 1 unschedulable, 0 not-evaluated",
 							"cpg-sub2": "ancestor composite pod group \"cpg-root\" is unschedulable",
 							"pg1":      "ancestor composite pod group \"cpg-sub1\" is unschedulable",
-							"pg2":      "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining",
+							"pg2":      "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 1 unschedulable, 2 not-evaluated",
 							"pg3":      "ancestor composite pod group \"cpg-root\" is unschedulable",
 							"pg4":      "ancestor composite pod group \"cpg-root\" is unschedulable",
 						},
