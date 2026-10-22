@@ -57,17 +57,23 @@ const (
 )
 
 type testClients struct {
-	metrics         *metricsclientset.Clientset
+	resourceMetrics metricsclient.VersionedPodMetricsGetter
 	externalMetrics *emfake.FakeExternalMetricsClient
 	scale           scale.ScalesGetter
 }
 
-// createClients creates clients connecting to API server, custom metrics API,...
-//
-// Creates an external metrics server to connect to, and returns a pointer to the
-// metric value it's serving.
+// createClients creates the resource metrics, external metrics, and scale
+// clients used by the HPA integration tests. The returned value controls the
+// metric served by the fake external metrics client.
 func createClients(tCtx ktesting.TContext) (testClients, *atomic.Value) {
 	metrics := metricsclientset.NewForConfigOrDie(tCtx.RESTConfig())
+
+	resourceMetrics := metricsclient.NewVersionedPodMetricsGetter(
+		metrics.MetricsV1(),
+		metrics.MetricsV1beta1(),
+		metrics.DiscoveryClient,
+	)
+
 	externalMetrics, externalMetricValue := setupFakeExternalMetrics()
 
 	discoveryClient := memory.NewMemCacheClient(tCtx.Client().Discovery())
@@ -79,7 +85,7 @@ func createClients(tCtx ktesting.TContext) (testClients, *atomic.Value) {
 	}
 
 	return testClients{
-		metrics,
+		resourceMetrics,
 		externalMetrics,
 		scaleClient,
 	}, externalMetricValue
@@ -165,7 +171,9 @@ func createHPA(tCtx ktesting.TContext, deployment *appsv1.Deployment, metricSpec
 func startHPAControllerAndWaitForCaches(tCtx ktesting.TContext, clients testClients) {
 	tCtx.Helper()
 
-	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1(), nil, clients.externalMetrics)
+	metricsClient := metricsclient.NewRESTMetricsClient(clients.resourceMetrics, nil, clients.externalMetrics)
+
+	go metricsclient.PeriodicallyInvalidate(tCtx, clients.resourceMetrics, hpaControllerResyncPeriod)
 
 	informerSet := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	controller := podautoscaler.NewHorizontalController(
