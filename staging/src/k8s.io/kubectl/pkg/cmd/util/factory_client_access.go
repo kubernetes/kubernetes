@@ -154,10 +154,11 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 		return validation.NullSchema{}, nil
 	}
 
-	schema := validation.ConjunctiveSchema{
-		validation.NewSchemaValidation(f),
-		validation.NoDoubleKeySchema{},
-	}
+	// Client-side validation is limited to checks that need no schema. The
+	// server validates the fields; if it cannot (fieldValidation unsupported),
+	// the ParamVerifyingSchema below warns or runs this schema instead of the
+	// former OpenAPI v2 schema validation.
+	schema := validation.NoDoubleKeySchema{}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
