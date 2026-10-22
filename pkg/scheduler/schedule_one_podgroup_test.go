@@ -1516,7 +1516,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 		t.Errorf("Expected FailureHandler to be called for 3 pods, but got called for %d", len(handledPods))
 	}
 
-	expectedGroupErrMsg := `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter error for p2`
+	expectedGroupErrMsg := `parent pod group "pg" encountered an error`
 	expectedP2ErrMsg := `running "FakePodGroupPlugin" filter plugin: filter error for p2`
 
 	if status, ok := handledPods["p1"]; !ok {
@@ -7423,7 +7423,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7435,7 +7435,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7469,7 +7469,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7481,7 +7481,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7515,7 +7515,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7527,7 +7527,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7561,7 +7561,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7573,7 +7573,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7640,7 +7640,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7652,7 +7652,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
+					Message: `parent pod group "pg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7686,7 +7686,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
@@ -7698,7 +7698,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `failed to schedule other pod from a pod group: running "FakePodGroupPlugin" filter plugin: filter internal error`,
+					Message: `parent pod group "pg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7732,19 +7732,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7778,19 +7778,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+					Message: `parent pod group "pg" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7821,19 +7821,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7864,19 +7864,19 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p2": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 				"p3": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: "parent pod group is unschedulable: injected placementFeasible status",
+					Message: `parent pod group "pg" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -7974,7 +7974,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
+					Message: `parent pod group "pg3" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8012,7 +8012,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
+					Message: `parent pod group "pg3" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8076,7 +8076,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg2" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
@@ -8114,7 +8114,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg2" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
@@ -8152,13 +8152,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg2" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg3" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8190,13 +8190,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg2" encountered an error`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonSchedulerError,
-					Message: `ancestor composite pod group "cpg" encountered an error`,
+					Message: `parent pod group "pg3" encountered an error`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
@@ -8226,13 +8226,13 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
+					Message: `parent pod group "pg2" is unschedulable`,
 				},
 				"p5": {
 					Type:    v1.PodScheduled,
 					Status:  v1.ConditionFalse,
 					Reason:  v1.PodReasonUnschedulable,
-					Message: `parent pod group is unschedulable: ancestor composite pod group "cpg" is unschedulable`,
+					Message: `parent pod group "pg3" is unschedulable`,
 				},
 			},
 			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
