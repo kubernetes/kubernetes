@@ -5102,7 +5102,7 @@ func TestAllocatorSelection(t *testing.T) {
 		// The most conservative implementation: only used when explicitly asking
 		// for the most stable Kubernetes (no alpha or beta features).
 		"only-GA": {
-			features:             "AllAlpha=false,AllBeta=false",
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=false,DRAFractionalCapacityRange=false",
 			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
@@ -5126,7 +5126,7 @@ func TestAllocatorSelection(t *testing.T) {
 		// Let's also determine which allocator is picked for each of the
 		// individual features which influence that decision.
 		"AdminAccess": {
-			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true",
+			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true,DRAConsumableCapacity=false,DRAFractionalCapacityRange=false",
 			expectImplementation: "stable",
 		},
 		"CompatibilityGroups": {
@@ -5144,7 +5144,7 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "incubating",
 		},
 		"DeviceTaints": {
-			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",
+			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true,DRAConsumableCapacity=false,DRAFractionalCapacityRange=false",
 			expectImplementation: "stable",
 		},
 		"ListTypeAttributes": {
@@ -5156,7 +5156,7 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "experimental",
 		},
 		"PartitionableDevices": {
-			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
+			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true,DRAConsumableCapacity=false,DRAFractionalCapacityRange=false",
 			expectImplementation: "stable",
 		},
 		"FractionalCapacityRange": {
@@ -5164,7 +5164,7 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "incubating",
 		},
 		"PrioritizedList": {
-			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
+			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true,DRAConsumableCapacity=false,DRAFractionalCapacityRange=false",
 			expectImplementation: "stable",
 		},
 		"DerivedAttributes": {
