@@ -1364,3 +1364,17 @@ func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntN
 
 	return true
 }
+
+func (m *ManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	// CanAllocateExclusively reports a capability, not a reflection of runtime state.
+	// If there are device plugin for resources at all, then these resource can, if
+	// other runtime conditions are met, be exclusively allocated, the reason being
+	// device-plugins-backed resources cannot be shared.
+	// The capability is however a function of configuration, in this case
+	// device plugins being deployed on the node, not on their runtime state
+	// which maps to healthy/unhealthy state
+	_, ok := m.allDevices[string(res)]
+	return ok
+}
