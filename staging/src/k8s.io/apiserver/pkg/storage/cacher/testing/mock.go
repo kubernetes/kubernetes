@@ -33,6 +33,7 @@ type MockStorage struct {
 	sync.RWMutex
 	GetListErr         error
 	WatchErr           error
+	GetFn              func(_ context.Context, _ string, _ storage.GetOptions, objPtr runtime.Object) error
 	GetListFn          func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
 	GetRVFn            func(_ context.Context) (uint64, error)
 	WatchFn            func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
@@ -102,7 +103,10 @@ func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOp
 
 	return NewMockWatch(), d.WatchErr
 }
-func (d *MockStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+func (d *MockStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if d.GetFn != nil {
+		return d.GetFn(ctx, key, opts, objPtr)
+	}
 	d.RLock()
 	defer d.RUnlock()
 	return d.GetListErr

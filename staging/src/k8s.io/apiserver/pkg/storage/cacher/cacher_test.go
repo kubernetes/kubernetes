@@ -116,9 +116,14 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGet(ctx, t, cacher)
+	for _, consistentGetFromCache := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
+			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			storagetesting.RunTestGet(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
+		})
+	}
 }
 
 func TestUnconditionalDelete(t *testing.T) {
@@ -852,7 +857,12 @@ func BenchmarkStoreStats(b *testing.B) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
+	for _, consistentGetFromCache := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
+			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
+		})
+	}
 }
