@@ -1664,8 +1664,8 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 // This reduces cardinality while keeping registry/repo:tag information.
 // Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app:v1"
 func GetImageNameForMetrics(image string) string {
-	if before, _, found := strings.Cut(image, "@"); found {
-		return before
+	if idx := strings.Index(image, "@"); idx != -1 {
+		return image[:idx]
 	}
 	return image
 }
