@@ -44,6 +44,12 @@ type StreamTranslatorHandler struct {
 	Transport http.RoundTripper
 	// MaxBytesPerSec throttles stream Reader/Writer if necessary
 	MaxBytesPerSec int64
+	// FinishTimeout is a hard upper bound on how long the handler waits for
+	// the client to close the WebSocket connection after the command's status
+	// has been sent, so that output still in flight reaches a client that
+	// reads slowly (#142376); a client that has not closed by then is cut
+	// off. Zero or less means DefaultFinishTimeout.
+	FinishTimeout time.Duration
 	// Options define the requested streams (e.g. stdin, stdout).
 	Options Options
 }
@@ -57,6 +63,16 @@ func NewStreamTranslatorHandler(location *url.URL, transport http.RoundTripper, 
 		MaxBytesPerSec: maxBytesPerSec,
 		Options:        opts,
 	}
+}
+
+// finishTimeout returns the bound on the wait for the client to close the
+// connection after the command's status has been sent: the handler's
+// FinishTimeout, or DefaultFinishTimeout if unset.
+func (h *StreamTranslatorHandler) finishTimeout() time.Duration {
+	if h.FinishTimeout > 0 {
+		return h.FinishTimeout
+	}
+	return DefaultFinishTimeout
 }
 
 func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -75,7 +91,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	spdyRoundTripper, err := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{UpgradeTransport: h.Transport, PingPeriod: 5 * time.Second})
 	if err != nil {
 		metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck
+		websocketStreams.finish(req.Context(), h.finishTimeout(), apierrors.NewInternalError(err))
 		return
 	}
 	spdyExecutor, err := remotecommand.NewSPDYExecutorRejectRedirects(
@@ -86,7 +102,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	)
 	if err != nil {
 		metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck
+		websocketStreams.finish(req.Context(), h.finishTimeout(), apierrors.NewInternalError(err))
 		return
 	}
 
@@ -125,27 +141,25 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	// through the websocket error stream.
 	err = spdyExecutor.StreamWithContext(req.Context(), opts)
 	if err != nil {
-		//nolint:errcheck   // Ignore writeStatus returned error
 		if statusErr, ok := err.(*apierrors.StatusError); ok {
 			// Increment status code returned within status error.
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(int(statusErr.Status().Code)))
-			websocketStreams.writeStatus(statusErr)
+			websocketStreams.finish(req.Context(), h.finishTimeout(), statusErr)
 		} else if exitErr, ok := err.(exec.CodeExitError); ok && exitErr.Exited() {
 			// Returned an exit code from the container, so not an error in
 			// stream translator--add StatusOK to metrics.
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusOK))
-			websocketStreams.writeStatus(codeExitToStatusError(exitErr))
+			websocketStreams.finish(req.Context(), h.finishTimeout(), codeExitToStatusError(exitErr))
 		} else {
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-			websocketStreams.writeStatus(apierrors.NewInternalError(err))
+			websocketStreams.finish(req.Context(), h.finishTimeout(), apierrors.NewInternalError(err))
 		}
 		return
 	}
 
 	metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusOK))
-	// Write the success status back to the WebSocket client.
-	//nolint:errcheck
-	websocketStreams.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+	// Report success to the WebSocket client and let it close the connection.
+	websocketStreams.finish(req.Context(), h.finishTimeout(), &apierrors.StatusError{ErrStatus: metav1.Status{
 		Status: metav1.StatusSuccess,
 	}})
 }
