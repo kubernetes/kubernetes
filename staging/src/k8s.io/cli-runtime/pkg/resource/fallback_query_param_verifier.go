@@ -33,6 +33,8 @@ var _ Verifier = &fallbackQueryParamVerifier{}
 // NewFallbackQueryParamVerifier returns a new Verifier which will invoke the
 // initial/primary Verifier. If the primary Verifier is "NotFound", then the
 // secondary Verifier is invoked as a fallback.
+//
+// Deprecated: OpenAPI V3 is always used for query parameter verification; use NewQueryParamVerifierV3 directly.
 func NewFallbackQueryParamVerifier(primary Verifier, secondary Verifier) Verifier {
 	return &fallbackQueryParamVerifier{
 		primary:   primary,

@@ -28,6 +28,9 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// NewQueryParamVerifier returns a new QueryParamVerifier that checks OpenAPI V2.
+//
+// Deprecated: Use NewQueryParamVerifierV3 instead.
 func NewQueryParamVerifier(dynamicClient dynamic.Interface, openAPIGetter discovery.OpenAPISchemaInterface, queryParam VerifiableQueryParam) *QueryParamVerifier {
 	return &QueryParamVerifier{
 		finder:        NewCRDFinder(CRDFromDynamic(dynamicClient)),
@@ -51,6 +54,8 @@ func NewQueryParamVerifier(dynamicClient dynamic.Interface, openAPIGetter discov
 // support as "namespaces", and non-CRDs will not be supported. We
 // delay the check for CRDs as much as possible though, since it
 // requires an extra round-trip to the server.
+//
+// Deprecated: Use NewQueryParamVerifierV3 instead.
 type QueryParamVerifier struct {
 	finder        CRDFinder
 	openAPIGetter discovery.OpenAPISchemaInterface
