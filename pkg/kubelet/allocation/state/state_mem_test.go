@@ -79,6 +79,14 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	qty2, exists2 := state.GetEmptyDirVolumeLimit(podUID, anotherVolName)
 	assert.True(t, exists2)
 	assert.True(t, anotherLimit.Equal(*qty2))
+
+	// Setting a volume limit to nil (removing size limit) should return (nil, true)
+	err = state.SetEmptyDirVolumeLimit(podUID, volName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil})
+	require.NoError(t, err)
+
+	nilQty, nilExists := state.GetEmptyDirVolumeLimit(podUID, volName)
+	assert.True(t, nilExists)
+	assert.Nil(t, nilQty)
 }
 
 func TestStateMemory_ResourceIsolation(t *testing.T) {

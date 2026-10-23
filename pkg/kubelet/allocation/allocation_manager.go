@@ -604,19 +604,7 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 			}
 		}
 	}
-	for _, vol := range desired.Spec.Volumes {
-		for _, allocVol := range allocated.Spec.Volumes {
-			if allocVol.Name != vol.Name {
-				continue
-			}
-			hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(&allocVol)
-			if hasLimit != hasAllocLimit || (hasLimit && vol.EmptyDir.SizeLimit.Cmp(*allocVol.EmptyDir.SizeLimit) != 0) {
-				return true
-			}
-			break
-		}
-	}
-	return false
+	return IsMemoryBackedVolumeResizeRequested(desired, allocated)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
@@ -675,6 +663,10 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	}
 }
 
+func VolHasMemoryBackedEmptyDir(vol *v1.Volume) bool {
+	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory
+}
+
 func VolHasMemoryBackedEmptyDirSizeLimit(vol *v1.Volume) bool {
-	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
+	return VolHasMemoryBackedEmptyDir(vol) && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
 }

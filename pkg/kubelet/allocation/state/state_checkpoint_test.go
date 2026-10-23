@@ -159,6 +159,16 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 				args: args{podMap: PodMap{"pod1": newTestPod("pod1", qStr, false, true)}},
 			})
 
+			// Test case 3b: Container resources and volume limits populated with nil limit
+			podWithNilVolLimit := newTestPod("pod1", qStr, false, false)
+			podWithNilVolLimit.Spec.Volumes = []v1.Volume{
+				{Name: "volume1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil}}},
+			}
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and nil volume limits", qStr),
+				args: args{podMap: PodMap{"pod1": podWithNilVolLimit}},
+			})
+
 			// Test case 4: Container resources and pod level resources populated (volume limits is nil)
 			tests = append(tests, testCase{
 				name: fmt.Sprintf("resource - %s - container and pod-level", qStr),

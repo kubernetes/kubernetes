@@ -38,6 +38,6 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 }
 
 // ResizeEphemeralVolume resizes the volume on the node.
-func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod, newSize *resource.Quantity) error {
+func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod) error {
 	return fmt.Errorf("in-place resize of memory-backed volumes is only supported on Linux")
 }
