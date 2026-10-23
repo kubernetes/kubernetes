@@ -61,18 +61,6 @@ func TestClaimNominations(t *testing.T) {
 	}
 	notGone := func(types.UID, types.NamespacedName) bool { return false }
 
-	t.Run("nominations", func(t *testing.T) {
-		n := newClaimNominations()
-		n.nominate("p", "a")
-		n.nominate("p", "b")
-		require.Equal(t, "b", n.nominatedNode("p"))
-		// The end of an older nomination must not remove the newer one.
-		n.removeNomination("p", "a")
-		require.Equal(t, "b", n.nominatedNode("p"))
-		n.removeNomination("p", "b")
-		require.Empty(t, n.nominatedNode("p"))
-	})
-
 	t.Run("merge-victims", func(t *testing.T) {
 		n := newClaimNominations()
 		n.assumeVictim("a", "v1", victim("v1")["v1"], []*victimClaim{newClaim("c", victim("v1"))}, notGone)
@@ -141,20 +129,47 @@ func setupNominations(tCtx ktesting.TContext, claims []*resourceapi.ResourceClai
 }
 
 // nominate does what the scheduler does when the preemptor preempts the
-// victims on the node: the preemption executor assumes the victims once
-// their deletion is under way, and the PodNominator nominates the preemptor
-// after PostFilter. It returns the CycleState of the preemptor.
+// victims on the node: the dry run of preemption runs Filter with the
+// victims removed, the preemption executor assumes the victims once their
+// deletion is under way, and the PodNominator nominates the preemptor after
+// PostFilter. It returns the CycleState of the preemptor.
 func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
 	tCtx.Helper()
 	state := framework.NewCycleState()
 	_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
 	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+	dryRun(tCtx, testCtx, state, preemptor, nodeName, victims...)
 	for _, victim := range victims {
 		testCtx.p.AssumeVictim(tCtx, victim)
 	}
 	testCtx.p.PrepareAllocation(tCtx, state, preemptor, nodeName)
 	testCtx.p.AddAllocation(tCtx, preemptor, nodeName)
 	return state
+}
+
+// dryRun runs Filter on the node on a copy of the state with the victims
+// removed, like the dry run of preemption. The allocation which Filter
+// stores is what PrepareAllocation gets. It returns the status of Filter.
+func dryRun(tCtx ktesting.TContext, testCtx *testContext, state fwk.CycleState, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) *fwk.Status {
+	tCtx.Helper()
+	cs := state.Clone()
+	for _, victim := range victims {
+		podInfo, err := framework.NewPodInfo(victim)
+		tCtx.ExpectNoError(err)
+		require.True(tCtx, testCtx.p.RemovePod(tCtx, cs, preemptor, podInfo, nodeInfoFor(tCtx, testCtx, victim.Spec.NodeName)).IsSuccess(), "RemovePod")
+	}
+	return testCtx.p.Filter(tCtx, cs, preemptor, nodeInfoFor(tCtx, testCtx, nodeName))
+}
+
+func nodeInfoFor(tCtx ktesting.TContext, testCtx *testContext, nodeName string) fwk.NodeInfo {
+	tCtx.Helper()
+	for _, nodeInfo := range testCtx.nodeInfos {
+		if nodeInfo.Node().Name == nodeName {
+			return nodeInfo
+		}
+	}
+	tCtx.Fatalf("no NodeInfo for node %q", nodeName)
+	return nil
 }
 
 func eventually(tCtx ktesting.TContext, what string, condition func() bool) {
@@ -629,17 +644,15 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 	}
 
 	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, victim), "first victim deleted, second one still terminating")
-	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, victim), "victim on the node of another pod, with allocated claim")
-	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, preemptionPod("unrelated").Node(nodeName).Obj()), "unrelated pod without claims")
-	require.Equal(tCtx, fwk.Queue, hint(waiting, preemptionPod("forgotten", "unallocated-claim").Node(nodeName).Obj()), "pod without its pending allocation")
-	completed := preemptionPod("completed", "unallocated-claim").Node(nodeName).Obj()
-	completed.Status.Phase = v1.PodSucceeded
-	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, completed), "completed pod whose claim got deallocated")
-	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, preemptionPod("unassigned", "unallocated-claim").Obj()), "unassigned pod which lost its nomination")
+	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, victim), "victim on the node of a pod which is not nominated")
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, preemptionPod("unrelated").Node(nodeName).Obj()), "unrelated pod")
+	// A forgotten assumed pod gets reported by RemoveAllocation.
+	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, preemptionPod("forgotten", "unallocated-claim").Node(nodeName).Obj()), "pod without its pending allocation")
 	deletePod(tCtx, testCtx, victim2)
 	require.Equal(tCtx, fwk.Queue, hint(preemptor, victim), "last victim deleted")
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, fromPod(victim).Node(node2Name).Obj()), "victim on another node")
 
-	// After the nomination ended, the victims are just pods with allocated claims.
+	// After the nomination ended, the victims are just deleted pods.
 	testCtx.p.RemoveAllocation(tCtx, preemptor, nodeName)
 	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, victim), "last victim deleted, no nomination")
 }

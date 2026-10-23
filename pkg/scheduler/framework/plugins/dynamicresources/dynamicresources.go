@@ -191,6 +191,9 @@ type nodeAllocation struct {
 	// nodeAllocatableResourceClaimStatuses stores the calculated node allocatable resource allocations through DRA.
 	// This is populated during Filter stage and passed to PreBind.
 	nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
+	// released are the UIDs of the claims which the preemption simulation
+	// released when the allocation was made, nil without DRAPreemption.
+	released sets.Set[types.UID]
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -319,7 +322,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
 	if pl.fts.EnableDRAPreemption {
-		// Victims of preemption are gone, or a deleted pod lost a pending allocation.
+		// Victims of preemption are gone.
 		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted})
 	}
 
@@ -1000,6 +1003,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 
 	var unavailableClaims []int
+	// numDeallocating counts the unavailable claims which are claims of
+	// preempted pods, for a more helpful reason.
+	numDeallocating := 0
+	// Looked up once, so that the checks of the claims and the allocator
+	// agree although nominations may change concurrently.
+	holds := pl.holdsOnNode(logger, state.preemption, node.Name)
 	for index, claim := range state.claims.all() {
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 
@@ -1007,6 +1016,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if nodeSelector := state.informationsForClaim[index].availableOnNodes; nodeSelector != nil && !nodeSelector.Match(node) {
 			logger.V(5).Info("allocation's node selector does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 			unavailableClaims = append(unavailableClaims, index)
+			continue
+		}
+
+		// Using a claim of preempted pods would keep it allocated, while a
+		// nominated preemptor waits for it to get deallocated. Recording
+		// it as unavailable lets PostFilter deallocate it when unused.
+		if holds.deallocating(claim.UID) {
+			logger.V(5).Info("claim of preempted pods is being deallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			unavailableClaims = append(unavailableClaims, index)
+			numDeallocating++
 			continue
 		}
 
@@ -1091,7 +1110,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
 		}
-		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, node.Name)
+		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, node.Name, holds)
 		if err != nil {
 			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
 		}
@@ -1177,6 +1196,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			state.unavailableClaims.Insert(index)
 		}
 
+		if numDeallocating == len(unavailableClaims) {
+			return statusUnschedulable(logger, "resourceclaim of preempted pods is being deallocated", "pod", klog.KObj(pod))
+		}
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
@@ -1186,6 +1208,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			extendedResourceClaim:                nodeExtendedResourceClaim,
 			containerResourceRequestMappings:     containerResourceRequestMappings,
 			nodeAllocatableResourceClaimStatuses: nodeAllocatableClaimStatus,
+			released:                             state.preemption.releasedClaims(),
 		}
 	}
 

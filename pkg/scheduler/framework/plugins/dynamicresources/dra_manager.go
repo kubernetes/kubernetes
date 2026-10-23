@@ -78,6 +78,9 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		manager.nominations = newClaimNominations()
 		manager.resourceClaimTracker.cache.AddEventHandler(manager.nominations.handlers(logger))
+		if _, err := informerFactory.Core().V1().Pods().Informer().AddEventHandler(manager.nominations.podHandlers(logger)); err != nil {
+			logger.Error(err, "Failed to add pod event handler for DRA preemption")
+		}
 	}
 
 	// Reacting to events is more efficient than iterating over the list

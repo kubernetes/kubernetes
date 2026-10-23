@@ -241,47 +241,35 @@ func (pl *DynamicResources) deallocateVictimClaims(ctx context.Context, pod *v1.
 // which rejected the pod.
 //
 // The pod gets queued when the last pod which got preempted on its
-// nominated node is gone, or when the deleted pod lost a pending
-// allocation: that happens without a claim event when a pod in Permit or
-// PreBind gets preempted or its binding fails.
+// nominated node is gone. Devices which an assumed pod allocated come with
+// a claim event from RemoveAllocation when the pod gets forgotten.
 func (pl *DynamicResources) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterAssignedPodDeleted: %w", err)
 	}
-	if pl.nominations != nil {
-		if nodeName := pl.nominations.nominatedNode(pod.UID); nodeName != "" && deletedPod.Spec.NodeName == nodeName {
-			victims := pl.nominations.victimsOnNode(nodeName)
-			if _, ok := victims[deletedPod.UID]; ok {
-				for uid, name := range victims {
-					if uid == deletedPod.UID {
-						continue
-					}
-					// Victims which are not being deleted on the node got
-					// preempted in memory and are not going to be gone.
-					if victim, err := pl.podLister.Pods(name.Namespace).Get(name.Name); err == nil && victim.UID == uid && victim.Spec.NodeName == nodeName && victim.DeletionTimestamp != nil {
-						logger.V(5).Info("preempted pod got deleted, others on the nominated node remain", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "remainingPod", klog.KObj(victim))
-						return fwk.QueueSkip, nil
-					}
-				}
-				logger.V(5).Info("last preempted pod on the nominated node got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
-				return fwk.Queue, nil
-			}
-		}
-	}
-	// The claim controller deallocates the claims of completed pods before
-	// they get deleted, and that update already gave waiting pods another
-	// chance. Pods in Permit or PreBind come as assumed pods with a node
-	// name. Without one, the event is about a pod which lost its nomination
-	// and has no pending allocation.
-	if deletedPod.Spec.NodeName == "" || deletedPod.Status.Phase == v1.PodSucceeded || deletedPod.Status.Phase == v1.PodFailed {
+	if pl.nominations == nil {
 		return fwk.QueueSkip, nil
 	}
-	for _, claim := range pl.claimsOfPod(deletedPod) {
-		if claim.Status.Allocation == nil && pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID) == nil {
-			logger.V(5).Info("deleted pod lost a pending allocation", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "resourceclaim", klog.KObj(claim))
-			return fwk.Queue, nil
+	nodeName := pl.nominations.nominatedNode(pod.UID)
+	if nodeName == "" || deletedPod.Spec.NodeName != nodeName {
+		return fwk.QueueSkip, nil
+	}
+	victims := pl.nominations.victimsOnNode(nodeName)
+	if _, ok := victims[deletedPod.UID]; !ok {
+		return fwk.QueueSkip, nil
+	}
+	for uid, name := range victims {
+		if uid == deletedPod.UID {
+			continue
+		}
+		// Victims which are not being deleted on the node got preempted in
+		// memory and are not going to be gone.
+		if victim, err := pl.podLister.Pods(name.Namespace).Get(name.Name); err == nil && victim.UID == uid && victim.Spec.NodeName == nodeName && victim.DeletionTimestamp != nil {
+			logger.V(5).Info("preempted pod got deleted, others on the nominated node remain", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "remainingPod", klog.KObj(victim))
+			return fwk.QueueSkip, nil
 		}
 	}
-	return fwk.QueueSkip, nil
+	logger.V(5).Info("last preempted pod on the nominated node got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return fwk.Queue, nil
 }
