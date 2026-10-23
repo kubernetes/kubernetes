@@ -30,7 +30,7 @@ import (
 //   - VAR='value' - Values must be enclosed in single quotes
 //   - Content within single quotes is preserved literally (no escape sequences or expansions)
 //   - Multi-line values are supported (newlines within single quotes are preserved)
-//   - Inline comments after the closing quote are supported (e.g., VAR='value' # comment)
+//   - Inline comments after the closing quote require a separating space or tab (e.g., VAR='value' # comment)
 //   - Leading whitespace before the variable name is ignored
 //   - Blank lines (including those with only whitespace) are ignored when not within quotes
 //   - Lines starting with '#' are treated as comments and ignored
@@ -110,8 +110,12 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 			closingIdx := strings.Index(rest, "'")
 			if closingIdx != -1 {
 				valueBuilder.WriteString(rest[:closingIdx])
-				afterQuote := strings.TrimLeft(rest[closingIdx+1:], " \t")
-				if afterQuote != "" && !strings.HasPrefix(afterQuote, "#") {
+				afterQuote := rest[closingIdx+1:]
+				trimmedAfterQuote := strings.TrimLeft(afterQuote, " \t")
+				// Without separating whitespace, '#' is part of the shell value, not a comment.
+				blankAfterQuote := trimmedAfterQuote != afterQuote
+				isComment := blankAfterQuote && strings.HasPrefix(trimmedAfterQuote, "#")
+				if trimmedAfterQuote != "" && !isComment {
 					return "", false, fmt.Errorf("invalid environment variable format at line %d: unexpected content after closing quote", lineNum)
 				}
 

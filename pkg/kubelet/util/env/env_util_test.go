@@ -245,6 +245,53 @@ KEY2='bar' # comment
 			wantValue: `bar`,
 		},
 		{
+			name:       "tab before comment after closing quote",
+			envContent: "KEY1='foo'\t# comment\n",
+			key:        "KEY1",
+			wantValue:  "foo",
+		},
+		{
+			name:       "comment after empty quoted value",
+			envContent: "KEY1='' # comment\n",
+			key:        "KEY1",
+			wantValue:  "",
+		},
+		{
+			name:       "comment after multi-line quoted value",
+			envContent: "KEY1='foo\nbar' # comment\n",
+			key:        "KEY1",
+			wantValue:  "foo\nbar",
+		},
+		{
+			// Without whitespace, bash treats '#suffix' as part of the value.
+			name:        "hash directly after closing quote triggers error",
+			envContent:  "KEY1='foo'#suffix\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after empty quoted value triggers error",
+			envContent:  "KEY1=''#\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after multi-line closing quote triggers error",
+			envContent:  "KEY1='foo\nbar'#suffix\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 2: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after closing quote on another key triggers error",
+			envContent:  "KEY1='foo'#suffix\nKEY2='bar'\n",
+			key:         "KEY2",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
+		},
+		{
 			name: "missing key triggers error with line number",
 			envContent: `='foo'
 KEY2='bar'`,
