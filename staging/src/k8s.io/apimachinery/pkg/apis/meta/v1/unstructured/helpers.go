@@ -500,6 +500,9 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 
 	list.Items = make([]Unstructured, 0, len(dList.Items))
 	for _, obj := range dList.Items {
+		if obj == nil { // a null item
+			obj = map[string]interface{}{}
+		}
 		unstruct := Unstructured{Object: obj}
 		// This is hacky. Set the item's Kind and APIVersion to those inferred
 		// from the List.

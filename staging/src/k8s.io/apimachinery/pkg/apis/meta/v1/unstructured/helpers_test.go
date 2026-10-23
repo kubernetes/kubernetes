@@ -468,6 +468,15 @@ func TestDecodeList(t *testing.T) {
 			},
 		},
 		{
+			// The kind and apiVersion inferred for a null item are empty.
+			name: "null item in a list without a kind or apiVersion",
+			data: `{"kind":"List","items":[null]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "List"},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "", "apiVersion": ""}}},
+			},
+		},
+		{
 			name: "numbers",
 			data: `{"kind":"FooList","apiVersion":"g/v1","items":[{"i":1,"f":1.5,"big":9223372036854775808}]}`,
 			want: &UnstructuredList{
