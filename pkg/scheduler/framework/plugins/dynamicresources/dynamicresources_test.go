@@ -1322,6 +1322,8 @@ type testPluginCase struct {
 
 	prepare prepare
 	want    want
+	// wantWithPreemption, if set, adjusts want for TestPluginWithPreemption.
+	wantWithPreemption func(*want)
 
 	// Invoke Filter with a canceled context.
 	cancelFilter bool
@@ -1335,7 +1337,20 @@ type testPluginCase struct {
 }
 
 func TestPlugin(t *testing.T) {
-	testPlugin(ktesting.Init(t))
+	testPlugin(ktesting.Init(t), false)
+}
+
+// TestPluginWithPreemption re-runs TestPlugin cases with DRAPreemption enabled,
+// verifying behavior stays identical apart from preemption-related status codes.
+func TestPluginWithPreemption(t *testing.T) {
+	testPlugin(ktesting.Init(t), true)
+}
+
+// postFilterStopsPreemption updates expected PostFilter status for cases that
+// deallocate or delete a claim, which return UnschedulableAndUnresolvable under
+// DRAPreemption to skip preemption for that cycle.
+func postFilterStopsPreemption(w *want) {
+	w.postfilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, w.postfilter.status.Reasons()...)
 }
 
 func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
@@ -1587,7 +1602,7 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
 }
 
-func testPlugin(tCtx ktesting.TContext) {
+func testPlugin(tCtx ktesting.TContext, preemption bool) {
 	testcases := map[string]testPluginCase{
 		"empty-with-extended-resources-disabled": {
 			emulatedVersion:  "1.36",
@@ -2290,6 +2305,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"good-topology": {
 			pod:    podWithClaimName,
@@ -2327,6 +2343,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"allocated-skip-node-operations-with-feature": {
 			nodes:  []*v1.Node{workerNodeWithOptionalNodeOperations},
@@ -2865,6 +2882,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					removed: []metav1.Object{extendedResourceClaim},
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
@@ -2886,6 +2904,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					removed: []metav1.Object{extendedResourceClaimNode2},
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
@@ -3312,6 +3331,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"bound-claim-with-timed-out-binding": {
 			pod: podWithClaimName,
@@ -3347,6 +3367,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"prebind-fail-with-binding-timeout": {
 			patchTestCase: func(tc *testPluginCase) {
@@ -3472,6 +3493,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"bound-claim-without-binding-conditions": {
 			// This test ensures that when DRADeviceBindingConditions is enabled,
@@ -3544,6 +3566,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
+			wantWithPreemption: postFilterStopsPreemption,
 		},
 		"single-claim-prioritized-list-scoring": {
 			pod:     podWithClaimName,
@@ -4382,15 +4405,25 @@ func testPlugin(tCtx ktesting.TContext) {
 			if tc.patchTestCase != nil {
 				tc.patchTestCase(&tc)
 			}
+			if preemption && tc.wantWithPreemption != nil {
+				tc.wantWithPreemption(&tc.want)
+			}
 
 			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
+			if preemption && tc.emulatedVersion != "" {
+				// DRAPreemption was introduced in 1.38 and cannot be enabled at older emulated versions.
+				tCtx.Skipf("DRAPreemption needs version 1.38, the test case emulates %s", tc.emulatedVersion)
+			}
 			if tc.emulatedVersion != "" {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+			if preemption {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			}
 			feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.podGroups, tc.objs, feats, tc.failPatch, tc.reactors)
 			for _, pod := range tc.existingPods {

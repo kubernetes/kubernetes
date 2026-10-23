@@ -1067,7 +1067,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// In a preemption dry run, RemovePod may have released victim claims on
 		// this node in cs, so build or reuse an allocator reflecting that state.
-		allocator, err := pl.allocatorForNode(ctx, state, getSimulationState(cs), node.Name)
+		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, getSimulationState(cs), node.Name)
 		if err != nil {
 			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
 		}
@@ -1084,7 +1084,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		case errors.Is(err, structured.ErrFailedAllocationOnNode):
 			// Not a fatal error, allocation on other nodes may proceed.
 			// The error is only surfaced if allocation fails on all nodes.
-			return statusUnschedulableAndUnresolvable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			//
+			// Allocate returns this error whenever allocation fails and any
+			// pool on the node (even from an unrelated driver) is invalid or
+			// incomplete, so preempting a victim in a healthy pool may still
+			// let the pod fit.
+			status := statusUnschedulableAndUnresolvable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
+			}
+			return status
 		case ctx.Err() != nil:
 			return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		case err != nil:
@@ -1102,7 +1111,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
-			return statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			status := statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
+			}
+			return status
 		}
 
 		// Reserve uses this information.
@@ -1174,7 +1187,14 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	_, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	if foundClaim && status.Code() == fwk.Unschedulable && state.preemption != nil {
+		// Return UnschedulableAndUnresolvable to short-circuit later PostFilter
+		// plugins (DefaultPreemption) for this cycle: CycleState still reflects
+		// the claim's stale allocation, and once the claim update triggers a new
+		// cycle the pod may fit elsewhere without preemption.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, status.Reasons()...)
+	}
 	return nil, status
 }
 
