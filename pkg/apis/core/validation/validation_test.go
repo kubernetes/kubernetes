@@ -24934,6 +24934,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].VolumeMounts[*]",
 		"NodeName",
 		"NodeSelector",
+		"PodNetwork",
 		"PreemptionPolicy",
 		"Priority",
 		"PriorityClassName",

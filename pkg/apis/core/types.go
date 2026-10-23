@@ -3584,6 +3584,24 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodNetwork selects whether a pod is attached to the pod network.
+type PodNetwork string
+
+const (
+	// PodNetworkDefault attaches the pod to the pod network (the network that
+	// Kubernetes connects every pod to unless the pod opts out). The container
+	// runtime performs its configured network plumbing and the pod is assigned
+	// pod IPs. This is the historical behavior.
+	PodNetworkDefault PodNetwork = "Default"
+
+	// PodNetworkNone does not attach the pod to the pod network. The pod gets
+	// an isolated network namespace with only the loopback interface
+	// configured. The pod's podIPs are left unset. The pod is never selected
+	// into Services and, by default, receives no cluster DNS configuration or
+	// service environment variables.
+	PodNetworkNone PodNetwork = "None"
+)
+
 // NodeSelector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
@@ -3964,11 +3982,14 @@ type PodSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64
 	// Set DNS policy for the pod.
-	// Defaults to "ClusterFirst".
+	// Defaults to "ClusterFirst", or to "None" when PodNetwork is "None".
 	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
+	// 'None' requires DNSConfig with at least one nameserver, except when
+	// PodNetwork is "None", where it may be left out to get an empty
+	// resolver configuration.
 	// +optional
 	DNSPolicy DNSPolicy
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -3997,6 +4018,8 @@ type PodSpec struct {
 	// Use the host's network namespace.  If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false
+	// When true, PodNetwork may not be set: the pod has no network namespace
+	// of its own.
 	// +optional
 	HostNetwork bool
 	// Use the host's pid namespace.
@@ -4082,7 +4105,9 @@ type PodSpec struct {
 	RuntimeClassName *string
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
-	// If not specified, the default is true.
+	// If not specified, the default is true, or false when PodNetwork is "None".
+	// For pods with PodNetwork "None", false also leaves out the
+	// KUBERNETES_* variables of the kubernetes service.
 	// +optional
 	EnableServiceLinks *bool
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
@@ -4241,6 +4266,26 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+
+	// PodNetwork selects whether the pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network, as always. "None" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network and with no automatic
+	// network plumbing.
+	// When unset, the pod is attached to the pod network.
+	// This field is about the pod's own network namespace and may not be set
+	// when hostNetwork is true. When "None" is selected, dnsPolicy defaults
+	// to "None" and enableServiceLinks defaults to false (both can be
+	// overridden), and features that need to reach the pod from the node
+	// (hostPort, and httpGet, tcpSocket and grpc probes and lifecycle
+	// handlers) are forbidden.
+	// To attach a workload template that is set to "None" to the pod network
+	// again, set this field to "Default"; an update that leaves the field
+	// out keeps the stored value.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	PodNetwork *PodNetwork
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
