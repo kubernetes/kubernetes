@@ -383,8 +383,10 @@ aliases:
     - liggitt
   sig-cluster-lifecycle-leads:
     - fabriziopandini
+    - hakman
     - justinsb
     - neolit123
+    - sbueringer
   sig-network-api-approvers:
     - thockin
   sig-network-api-reviewers:
