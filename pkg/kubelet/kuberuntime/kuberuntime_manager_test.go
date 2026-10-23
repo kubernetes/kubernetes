@@ -134,6 +134,7 @@ type sandboxTemplate struct {
 type containerTemplate struct {
 	pod            *v1.Pod
 	container      *v1.Container
+	containerType  podutil.ContainerType
 	sandboxAttempt uint32
 	attempt        int
 	createdAt      int64
@@ -152,16 +153,17 @@ func makeAndSetFakePod(tCtx ktesting.TContext, m *kubeGenericRuntimeManager, fak
 	})
 
 	var containers []*apitest.FakeContainer
-	newTemplate := func(c *v1.Container) containerTemplate {
+	newTemplate := func(c *v1.Container, containerType podutil.ContainerType) containerTemplate {
 		return containerTemplate{
-			pod:       pod,
-			container: c,
-			createdAt: fakeCreatedAt,
-			state:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+			pod:           pod,
+			container:     c,
+			containerType: containerType,
+			createdAt:     fakeCreatedAt,
+			state:         runtimeapi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
-		containers = append(containers, makeFakeContainer(tCtx, m, newTemplate(c)))
+		containers = append(containers, makeFakeContainer(tCtx, m, newTemplate(c, containerType)))
 		return true
 	})
 
@@ -219,7 +221,7 @@ func makeFakeContainer(tCtx ktesting.TContext, m *kubeGenericRuntimeManager, tem
 	sandboxConfig, err := m.generatePodSandboxConfig(tCtx, template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, _, err := m.generateContainerConfig(tCtx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
+	containerConfig, _, err := m.generateContainerConfig(tCtx, template.container, template.containerType, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)

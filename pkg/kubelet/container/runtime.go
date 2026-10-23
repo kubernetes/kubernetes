@@ -35,6 +35,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -379,6 +380,9 @@ type Status struct {
 	ID ContainerID
 	// Name of the container.
 	Name string
+	// Type of the container. Zero means unknown, e.g. the container was
+	// created by a kubelet that didn't record the type.
+	Type podutil.ContainerType
 	// Status of the container.
 	State State
 	// Creation time of the container.

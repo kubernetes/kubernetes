@@ -40,6 +40,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -72,7 +73,7 @@ func makeExpectedConfig(_ *testing.T, tCtx context.Context, m *kubeGenericRuntim
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(tCtx, container, pod, restartCount, opts),
+		Annotations: newContainerAnnotations(tCtx, container, podutil.Containers, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
@@ -121,7 +122,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	enforceMemoryQoS := utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) && isCgroup2UnifiedMode()
 	expectedConfig := makeExpectedConfig(t, tCtx, m, pod, 0, enforceMemoryQoS)
-	containerConfig, _, err := m.generateContainerConfig(tCtx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
+	containerConfig, _, err := m.generateContainerConfig(tCtx, &pod.Spec.Containers[0], podutil.Containers, pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -152,7 +153,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
+	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podutil.Containers, podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(tCtx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
@@ -164,7 +165,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
+	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podutil.Containers, podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
