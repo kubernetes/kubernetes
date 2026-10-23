@@ -22,7 +22,9 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	"k8s.io/klog/v2"
 )
 
 // cacheIntervalSource provides the iteration logic for a watchCacheInterval.
@@ -68,16 +70,17 @@ type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
 func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, resourceVersion uint64, locker sync.Locker) *watchCacheInterval {
+	source := &historyCacheIntervalSource{
+		startIndex:     startIndex,
+		endIndex:       endIndex,
+		indexer:        indexer,
+		indexValidator: indexValidator,
+		buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
+		lock:           locker,
+	}
 	return &watchCacheInterval{
-		source: &historyCacheIntervalSource{
-			startIndex:     startIndex,
-			endIndex:       endIndex,
-			indexer:        indexer,
-			indexValidator: indexValidator,
-			buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
-			lock:           locker,
-		},
-		resourceVersion: resourceVersion,
+		source:          source,
+		resourceVersion: max(resourceVersion, source.maxResourceVersion()),
 	}
 }
 
@@ -201,6 +204,17 @@ type historyCacheIntervalSource struct {
 	// Given that indexer and indexValidator only read state, if
 	// possible, Locker obtained through RLocker() is provided.
 	lock sync.Locker
+
+	// lastResourceVersion tracks the resourceVersion of the last event read from
+	// the underlying source to assert that events are ordered by resourceVersion.
+	lastResourceVersion uint64
+}
+
+func (s *historyCacheIntervalSource) maxResourceVersion() uint64 {
+	if s.endIndex <= s.startIndex {
+		return 0
+	}
+	return s.indexer(s.endIndex - 1).ResourceVersion
 }
 
 // next returns the next event from the watchCache circular buffer.
@@ -257,6 +271,13 @@ func (s *historyCacheIntervalSource) fillBuffer() {
 		if event == nil {
 			break
 		}
+		if event.ResourceVersion <= s.lastResourceVersion {
+			klog.ErrorS(nil, "Watch cache history interval event resourceVersion must be greater than previous event resourceVersion", "eventResourceVersion", event.ResourceVersion, "lastResourceVersion", s.lastResourceVersion)
+			if consistency.PanicOnCacheInconsistency {
+				panic(fmt.Sprintf("Watch cache history interval event resourceVersion (%d) must be greater than previous event resourceVersion (%d)", event.ResourceVersion, s.lastResourceVersion))
+			}
+		}
+		s.lastResourceVersion = event.ResourceVersion
 		s.buffer.buffer[s.buffer.endIndex] = event
 		s.buffer.endIndex++
 		s.startIndex++

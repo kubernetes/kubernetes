@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/key"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -604,6 +605,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		// rather than a directly returned error.
 		return newErrWatcher(err), nil
 	}
+	if cacheInterval.resourceVersion < requiredResourceVersion {
+		klog.ErrorS(nil, "Watch cache interval resourceVersion must be greater than or equal to required resourceVersion", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "intervalResourceVersion", cacheInterval.resourceVersion, "requiredResourceVersion", requiredResourceVersion)
+		if consistency.PanicOnCacheInconsistency {
+			panic(fmt.Sprintf("Watch cache interval resourceVersion (%d) must be greater than or equal to required resourceVersion (%d), group: %q, resource: %q", cacheInterval.resourceVersion, requiredResourceVersion, c.groupResource.Group, c.groupResource.Resource))
+		}
+	}
 
 	var bookmarkAfterResourceVersion uint64
 	if isListWatchRequest(opts) {
@@ -654,7 +661,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	go watcher.process(ctx, cacheInterval, requiredResourceVersion)
+	go watcher.process(ctx, cacheInterval)
 	return watcher, nil
 }
 
