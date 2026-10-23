@@ -558,8 +558,8 @@ go.etcd.io/bbolt
 go.etcd.io/bbolt/errors
 go.etcd.io/bbolt/internal/common
 go.etcd.io/bbolt/internal/freelist
-# go.etcd.io/etcd/api/v3 v3.7.2
-## explicit; go 1.26
+# go.etcd.io/etcd/api/v3 v3.7.3
+## explicit; go 1.26.0
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
 go.etcd.io/etcd/api/v3/etcdserverpb/gw
@@ -568,8 +568,8 @@ go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
 go.etcd.io/etcd/api/v3/versionpb
-# go.etcd.io/etcd/client/pkg/v3 v3.7.2
-## explicit; go 1.26
+# go.etcd.io/etcd/client/pkg/v3 v3.7.3
+## explicit; go 1.26.0
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
 go.etcd.io/etcd/client/pkg/v3/srv
@@ -578,16 +578,16 @@ go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
 go.etcd.io/etcd/client/pkg/v3/verify
-# go.etcd.io/etcd/client/v3 v3.7.2
-## explicit; go 1.26
+# go.etcd.io/etcd/client/v3 v3.7.3
+## explicit; go 1.26.0
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
 go.etcd.io/etcd/client/v3/credentials
 go.etcd.io/etcd/client/v3/internal/endpoint
 go.etcd.io/etcd/client/v3/internal/resolver
 go.etcd.io/etcd/client/v3/kubernetes
-# go.etcd.io/etcd/pkg/v3 v3.7.2
-## explicit; go 1.26
+# go.etcd.io/etcd/pkg/v3 v3.7.3
+## explicit; go 1.26.0
 go.etcd.io/etcd/pkg/v3/adt
 go.etcd.io/etcd/pkg/v3/contention
 go.etcd.io/etcd/pkg/v3/cpuutil
@@ -605,8 +605,8 @@ go.etcd.io/etcd/pkg/v3/runtime
 go.etcd.io/etcd/pkg/v3/schedule
 go.etcd.io/etcd/pkg/v3/traceutil
 go.etcd.io/etcd/pkg/v3/wait
-# go.etcd.io/etcd/server/v3 v3.7.2
-## explicit; go 1.26
+# go.etcd.io/etcd/server/v3 v3.7.3
+## explicit; go 1.26.0
 go.etcd.io/etcd/server/v3/auth
 go.etcd.io/etcd/server/v3/config
 go.etcd.io/etcd/server/v3/embed
@@ -769,7 +769,7 @@ go.yaml.in/yaml/v2
 # go.yaml.in/yaml/v3 v3.0.5
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
-# golang.org/x/crypto v0.57.0
+# golang.org/x/crypto v0.58.0
 ## explicit; go 1.26.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -792,7 +792,7 @@ golang.org/x/exp/slices
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.59.0
+# golang.org/x/net v0.61.0
 ## explicit; go 1.26.0
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -815,11 +815,11 @@ golang.org/x/net/websocket
 ## explicit; go 1.26.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.23.0
+# golang.org/x/sync v0.24.0
 ## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.48.0
+# golang.org/x/sys v0.49.0
 ## explicit; go 1.26.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
@@ -828,10 +828,10 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.46.0
+# golang.org/x/term v0.47.0
 ## explicit; go 1.26.0
 golang.org/x/term
-# golang.org/x/text v0.42.0
+# golang.org/x/text v0.43.0
 ## explicit; go 1.26.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
@@ -865,7 +865,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.16.0
 ## explicit; go 1.26.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.50.0
+# golang.org/x/tools v0.51.0
 ## explicit; go 1.26.0
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
@@ -877,7 +877,6 @@ golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath
 golang.org/x/tools/imports
-golang.org/x/tools/internal/aliases
 golang.org/x/tools/internal/event
 golang.org/x/tools/internal/event/core
 golang.org/x/tools/internal/event/keys

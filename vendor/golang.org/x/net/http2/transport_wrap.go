@@ -119,33 +119,27 @@ type http2TransportContextKey struct{}
 
 // DialFromContext dials a new connection using the http2.Transport's DialTLS/DialTLSContext.
 func (t transportConfig) DialFromContext(ctx context.Context, network, address string) (net.Conn, error) {
-	if ctx.Value(http2TransportContextKey{}) == nil {
+	dial, _ := ctx.Value(http2TransportContextKey{}).(*transportRoundTripState)
+	if dial == nil {
 		// We're being called from a RoundTrip that did not start with an http2.Transport.
 		// Use the http.Transport's dialer.
 		return nil, errors.ErrUnsupported
 	}
-
-	tlsConf := t.t.TLSClientConfig
-	if tlsConf == nil {
-		tlsConf = &tls.Config{}
-	} else {
-		tlsConf = tlsConf.Clone()
-	}
-	if !slices.Contains(tlsConf.NextProtos, "h2") {
-		tlsConf.NextProtos = append([]string{"h2"}, tlsConf.NextProtos...)
-	}
-	if tlsConf.ServerName == "" {
-		host, _, err := net.SplitHostPort(address)
-		if err == nil {
-			tlsConf.ServerName = host
-		}
-	}
-	return t.t.dialTLS(ctx, network, address, tlsConf)
+	return t.t.dialForRoundTrip(ctx, dial, network, address)
 }
 
 type transportInternal struct {
 	initOnce sync.Once
 	lazyt1   *http.Transport
+
+	dialMu sync.Mutex
+	dials  map[string]*transportDialState
+}
+
+type transportDialState struct {
+	dialc   chan struct{} // close when dial returns
+	dialErr error         // dial result, set before dialc is closed
+	rtdonec chan struct{} // closed when RoundTrip initiating the dial returns
 }
 
 func (t *Transport) init() *http.Transport {
@@ -164,6 +158,52 @@ func (t *Transport) configure(t1 *http.Transport) {
 	// tr2.lazyt1 is set by transportConfig.Registered.
 	if t.lazyt1 != t1 {
 		panic("http2: net/http does not support this version of x/net/http2")
+	}
+}
+
+// transportRoundTripState is the state of the dial for an http2.Transport.RoundTrip.
+type transportRoundTripState struct {
+	mu       sync.Mutex
+	rtdone   bool          // set when RoundTrip returns
+	rtdonec  chan struct{} // closed when RoundTrip returns
+	gotconnc chan struct{} // closed when GotConn hook is called
+}
+
+// startDial is called when a dial starts.
+//
+// It returns done=true if the RoundTrip has already returned,
+// in which case we should skip dialing.
+func (dial *transportRoundTripState) startDial() (gotconnc chan struct{}, done bool) {
+	dial.mu.Lock()
+	defer dial.mu.Unlock()
+	if dial.rtdone {
+		return nil, true
+	}
+	if dial.rtdonec == nil {
+		dial.rtdonec = make(chan struct{})
+	}
+	dial.gotconnc = make(chan struct{})
+	return dial.gotconnc, false
+}
+
+// gotConn is called when RoundTrip gets a connection.
+// This may happen multiple times per RoundTrip, if a request is retried.
+func (dial *transportRoundTripState) gotConn() {
+	dial.mu.Lock()
+	defer dial.mu.Unlock()
+	if dial.gotconnc != nil {
+		close(dial.gotconnc)
+		dial.gotconnc = nil
+	}
+}
+
+// roundTripDone is called when RoundTrip returns.
+func (dial *transportRoundTripState) roundTripDone() {
+	dial.mu.Lock()
+	defer dial.mu.Unlock()
+	dial.rtdone = true
+	if dial.rtdonec != nil {
+		close(dial.rtdonec)
 	}
 }
 
@@ -186,10 +226,144 @@ func (t *Transport) roundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 	// Both http.Transport and http2.Transport allow the user to provide a custom
 	// dial function, and historically you only get the dial function from the
 	// Transport you're calling RoundTrip on.
-	ctx := context.WithValue(req.Context(), http2TransportContextKey{}, t)
+	//
+	// In addition, http2.Transport coalesces dials, which http.Transport historically
+	// has not.
+	dial := &transportRoundTripState{}
+	defer dial.roundTripDone()
+	ctx := context.WithValue(req.Context(), http2TransportContextKey{}, dial)
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) {
+			// Tell dialForRoundTrip that we have received a connection.
+			dial.gotConn()
+		},
+	})
 	req = req.WithContext(ctx)
-
 	return t1.RoundTrip(req)
+}
+
+var errCoalescedDialAbandoned = errors.New("http2: abandoned coalesced dial")
+
+const coalescedDialRetryTimeout = 50 * time.Millisecond
+
+// dialForRoundTrip is called (indirectly) by net/http when dialing a new connection
+// for a request call which originated as an http2.Transport.RoundTrip call.
+//
+// It uses the http2.Transport's Dial hooks and coalesces dials.
+func (t *Transport) dialForRoundTrip(ctx context.Context, dial *transportRoundTripState, network, address string) (net.Conn, error) {
+	gotconnc, rtdone := dial.startDial()
+	if rtdone {
+		// RoundTrip returned, no need for this dial to proceed.
+		return nil, errCoalescedDialAbandoned
+	}
+
+	var state *transportDialState
+	for {
+		// The first dial to an address registers itself with t.dials.
+		// When the dial finishes, it records the outcome and removes itself from t.dials
+		// so future dials will start a new round of coalescing.
+		//
+		// Subsequent dials observe that a dial is in progress, and skip dialing.
+		t.dialMu.Lock()
+		if t.dials == nil {
+			t.dials = make(map[string]*transportDialState)
+		}
+		leader := t.dials[address]
+		if leader == nil {
+			// No entry in t.dials to coalesce with. Add ourselves as leader.
+			state = &transportDialState{
+				dialc:   make(chan struct{}),
+				rtdonec: dial.rtdonec,
+			}
+			t.dials[address] = state
+		}
+		t.dialMu.Unlock()
+		if leader == nil {
+			// We are the leader, so we should dial for real.
+			break
+		}
+
+		// Coalesce with a previous dial.
+		var (
+			done          = false
+			leaderdialc   = leader.dialc
+			leaderrtdonec = leader.rtdonec
+			timerc        <-chan time.Time
+		)
+		for !done {
+			if leaderdialc == nil && leaderrtdonec == nil && timerc == nil {
+				// The leader finished dialing, and its RoundTrip finished.
+				//
+				// There are several possibilities, which reduce to:
+				//   - The RoundTrip we are dialing for is about to receive
+				//     a connection (possibly the one the leader just dialed),
+				//     but we haven't observed it yet.
+				//   - There's something wrong with the leader's connection,
+				//     such as a TLS handshake failure.
+				//
+				// We have no good way to distinguish between these cases.
+				//
+				// Wait a short time for the leader's connection (or some
+				// other usable connection) to be delivered to our RoundTrip.
+				// If it is not, start a dial of our own.
+				timerc = time.After(coalescedDialRetryTimeout)
+			}
+			select {
+			case <-leaderdialc:
+				// The leader's dial completed.
+				if leader.dialErr != nil {
+					return nil, leader.dialErr
+				}
+				leaderdialc = nil
+			case <-leaderrtdonec:
+				// The leader's RoundTrip completed.
+				leaderrtdonec = nil
+			case <-timerc:
+				// The leader's dial and RoundTrip completed, and some time
+				// has passed. Assume we're not getting a connection and
+				// restart the dial process.
+				done = true
+			case <-dial.rtdonec:
+				// Our RoundTrip returned.
+				return nil, errCoalescedDialAbandoned
+			case <-gotconnc:
+				// Our RoundTrip got a connection.
+				return nil, errCoalescedDialAbandoned
+			case <-ctx.Done():
+				// net/http abandoned the dial.
+				return nil, ctx.Err()
+			}
+		}
+	}
+
+	// Dial for real.
+	tlsConf := t.TLSClientConfig
+	if tlsConf == nil {
+		tlsConf = &tls.Config{}
+	} else {
+		tlsConf = tlsConf.Clone()
+	}
+	if !slices.Contains(tlsConf.NextProtos, "h2") {
+		tlsConf.NextProtos = append([]string{"h2"}, tlsConf.NextProtos...)
+	}
+	if tlsConf.ServerName == "" {
+		host, _, err := net.SplitHostPort(address)
+		if err == nil {
+			tlsConf.ServerName = host
+		}
+	}
+	nc, err := t.dialTLS(ctx, network, address, tlsConf)
+
+	// Remove this dial from t.dials, so future dial attempts will not coalesce with it.
+	t.dialMu.Lock()
+	delete(t.dials, address)
+	t.dialMu.Unlock()
+
+	// Notify any dial coalesced with this one that we are done.
+	state.dialErr = err
+	close(state.dialc)
+
+	return nc, err
 }
 
 func (t *Transport) closeIdleConnections() {
