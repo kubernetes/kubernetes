@@ -240,8 +240,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:               "Verify that low prio pods are removed",
-					WaitForPodsRemoved: []string{"existing1", "existing2"},
+					Name: "Verify that one low prio pod is removed",
+					WaitForAnyPodsRemoved: &stepsframework.WaitForAnyPodsRemoved{
+						Pods:       []string{"existing1", "existing2"},
+						NumRemoved: 1,
+					},
 				},
 			},
 		},
