@@ -648,6 +648,87 @@ func TestListMembers(t *testing.T) {
 	}
 }
 
+func TestListMembersRetriesOnError(t *testing.T) {
+	member := &pb.Member{
+		ID:   1,
+		Name: "member1",
+		PeerURLs: []string{
+			"https://member1:2380",
+		},
+	}
+	etcdError := errors.New("etcdserver: request timed out")
+
+	tests := []struct {
+		name string
+		// failures is the number of MemberList calls that fail before one
+		// succeeds; a negative value fails every call.
+		failures  int
+		timeout   time.Duration
+		wantErr   error
+		wantCalls int
+		minCalls  int
+	}{
+		{
+			name:     "a transient error is retried",
+			failures: 2,
+			// The poll returns as soon as a call succeeds, so a long timeout
+			// does not slow the test down; it only keeps a loaded machine from
+			// running out of time before the third call.
+			timeout:   10 * time.Second,
+			wantCalls: 3,
+		},
+		{
+			name:     "a persistent error is retried until the timeout and returns the etcd error",
+			failures: -1,
+			// Here the timeout is the running time. Three seconds leaves room
+			// for the second call at the 500ms retry interval even on a loaded
+			// machine, and two calls are enough to prove the retry.
+			timeout:  3 * time.Second,
+			wantErr:  etcdError,
+			minCalls: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			c := &Client{
+				Endpoints: []string{},
+				newEtcdClient: func(_ []string) (etcdClient, error) {
+					return &fakeEtcdClient{
+						memberListFunc: func(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+							calls++
+							if tt.failures < 0 || calls <= tt.failures {
+								return nil, etcdError
+							}
+							return &clientv3.MemberListResponse{Members: []*pb.Member{member}}, nil
+						},
+					}, nil
+				},
+			}
+
+			resp, err := c.listMembers(tt.timeout)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("listMembers() error = %v, want %v", err, tt.wantErr)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("listMembers() error = %v, want nil", err)
+				}
+				if len(resp.Members) != 1 {
+					t.Errorf("listMembers() returned %d members, want 1", len(resp.Members))
+				}
+			}
+			if tt.wantCalls > 0 && calls != tt.wantCalls {
+				t.Errorf("MemberList was called %d times, want %d", calls, tt.wantCalls)
+			}
+			if tt.minCalls > 0 && calls < tt.minCalls {
+				t.Errorf("MemberList was called %d times, want at least %d", calls, tt.minCalls)
+			}
+		})
+	}
+}
+
 func TestGetMemberStatus(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
