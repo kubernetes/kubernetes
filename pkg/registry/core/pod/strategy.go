@@ -489,6 +489,48 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 	}
 }
 
+// podDynamicStrategy is the strategy for the pods/dynamic subresource, which
+// allows an expanded set of mutations.
+type podDynamicStrategy struct {
+	podStrategy
+}
+
+// DynamicStrategy wraps and exports the used podStrategy for the storage package.
+var DynamicStrategy = podDynamicStrategy{Strategy}
+
+func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+
+	// Pod-level resources are defaulted the same way as for a resize.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+		if newPod.Spec.Resources != nil {
+			podutil.DefaultPodLevelResources(newPod)
+		}
+	}
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
+}
+
+func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)

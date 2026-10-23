@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
@@ -5542,6 +5543,156 @@ func TestWarningsOnUpdate(t *testing.T) {
 			}
 			if !ok {
 				t.Errorf("Expected warnings for %v, got %v", test.warnings, warnings)
+			}
+		})
+	}
+}
+
+func TestPodDynamicStrategy(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	mkPod := func(ctrs ...string) *api.Pod {
+		var containers []api.Container
+		var statuses []api.ContainerStatus
+		for _, name := range ctrs {
+			containers = append(containers, podtest.MakeContainer(name,
+				podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": "100m"}, nil))))
+			statuses = append(statuses, api.ContainerStatus{Name: name, State: api.ContainerState{Running: &api.ContainerStateRunning{}}})
+		}
+		return podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetGeneration(1),
+			podtest.SetContainers(containers...),
+			podtest.SetNodeName("node"),
+			podtest.SetStatus(api.PodStatus{
+				Phase:             api.PodRunning,
+				QOSClass:          api.PodQOSBurstable,
+				Conditions:        []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+				ContainerStatuses: statuses,
+			}),
+		)
+	}
+
+	tests := []struct {
+		name    string
+		oldCtrs []string
+		newCtrs []string
+	}{
+		{name: "add container", oldCtrs: []string{"c1"}, newCtrs: []string{"c1", "c2"}},
+		{name: "remove container", oldCtrs: []string{"c1", "c2"}, newCtrs: []string{"c2"}},
+		{name: "replace container", oldCtrs: []string{"c1"}, newCtrs: []string{"c2"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := mkPod(tc.oldCtrs...)
+
+			for name, strategy := range map[string]rest.RESTUpdateStrategy{"pods": Strategy, "pods/resize": ResizeStrategy} {
+				newPod := mkPod(tc.newCtrs...)
+				strategy.PrepareForUpdate(ctx, newPod, oldPod)
+				if errs := strategy.ValidateUpdate(ctx, newPod, oldPod); len(errs) == 0 {
+					t.Errorf("%s: expected container change to be rejected", name)
+				}
+			}
+
+			newPod := mkPod(tc.newCtrs...)
+			newPod.Status = api.PodStatus{}
+			DynamicStrategy.PrepareForUpdate(ctx, newPod, oldPod)
+			if errs := DynamicStrategy.ValidateUpdate(ctx, newPod, oldPod); len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+			var gotCtrs []string
+			for _, c := range newPod.Spec.Containers {
+				gotCtrs = append(gotCtrs, c.Name)
+			}
+			if diff := cmp.Diff(tc.newCtrs, gotCtrs); diff != "" {
+				t.Errorf("unexpected containers (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(oldPod.Status, newPod.Status); diff != "" {
+				t.Errorf("status should not be modified (-want, +got):\n%s", diff)
+			}
+			if newPod.Generation != oldPod.Generation+1 {
+				t.Errorf("expected generation %d, got %d", oldPod.Generation+1, newPod.Generation)
+			}
+		})
+	}
+}
+
+func TestPodDynamicStrategyPodLevelResourcesDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	ctx := genericapirequest.NewDefaultContext()
+
+	ctr := func(name string, requests, limits api.ResourceList) api.Container {
+		return podtest.MakeContainer(name, podtest.SetContainerResources(getResourceRequirements(requests, limits)))
+	}
+	mkPod := func(resources *api.ResourceRequirements, ctrs ...api.Container) *api.Pod {
+		var statuses []api.ContainerStatus
+		for _, c := range ctrs {
+			statuses = append(statuses, api.ContainerStatus{Name: c.Name, State: api.ContainerState{Running: &api.ContainerStateRunning{}}})
+		}
+		return podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetContainers(ctrs...),
+			podtest.SetPodResources(resources),
+			podtest.SetNodeName("node"),
+			podtest.SetStatus(api.PodStatus{
+				Phase:             api.PodRunning,
+				Conditions:        []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+				ContainerStatuses: statuses,
+			}),
+		)
+	}
+	unbounded := ctr("c2", getResourceList("100m", "128Mi"), nil)
+
+	tests := []struct {
+		name       string
+		oldPod     *api.Pod
+		newPod     *api.Pod
+		wantLimits api.ResourceList
+		wantErr    string
+	}{{
+		// Pod-level limits are defaulted to the pod-level requests, making the pod Guaranteed.
+		name: "removing the last unbounded container changes QoS",
+		oldPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("500m", "512Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")), unbounded),
+		newPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("500m", "512Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi"))),
+		wantLimits: getResourceList("500m", "512Mi"),
+		wantErr:    "Pod QOS Class may not change",
+	}, {
+		name: "removing the last unbounded container keeps QoS",
+		oldPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("300m", "300Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("400m", "512Mi")), unbounded),
+		newPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("300m", "300Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("400m", "512Mi"))),
+		wantLimits: getResourceList("400m", "512Mi"),
+	}, {
+		name: "pod-level resize",
+		oldPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("500m", "512Mi"), Limits: getResourceList("500m", "512Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi"))),
+		newPod: mkPod(&api.ResourceRequirements{Requests: getResourceList("600m", "512Mi")},
+			ctr("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi"))),
+		wantLimits: getResourceList("600m", "512Mi"),
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resized := tc.newPod.DeepCopy()
+			ResizeStrategy.PrepareForUpdate(ctx, resized, tc.oldPod)
+			DynamicStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
+			if diff := cmp.Diff(resized.Spec.Resources, tc.newPod.Spec.Resources); diff != "" {
+				t.Errorf("pod-level resources differ from a resize (-resize, +dynamic):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantLimits, tc.newPod.Spec.Resources.Limits); diff != "" {
+				t.Errorf("unexpected pod-level limits (-want, +got):\n%s", diff)
+			}
+
+			errs := DynamicStrategy.ValidateUpdate(ctx, tc.newPod, tc.oldPod)
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("unexpected errors: %v", errs)
+				}
+			} else if len(errs) != 1 || !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+				t.Errorf("expected error containing %q, got: %v", tc.wantErr, errs)
 			}
 		})
 	}

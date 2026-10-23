@@ -23,6 +23,7 @@ import "k8s.io/apimachinery/pkg/util/sets"
 func DisableablePodSubresources() sets.Set[string] {
 	return sets.New(
 		"attach",
+		"dynamic",
 		"ephemeralcontainers",
 		"eviction",
 		"exec",

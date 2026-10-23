@@ -1509,3 +1509,66 @@ func TestBindingValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestEtcdUpdateDynamic(t *testing.T) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	defer server.Terminate(t)
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: 3,
+		ResourcePrefix:          "pods",
+	}
+	podStorage, err := NewStorage(restOptions, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	defer podStorage.Pod.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault)
+	// The subresource matters: declarative validation dispatches on it.
+	dynamicCtx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault, "dynamic")
+
+	podStart := validNewPod()
+	podStart.Spec.NodeName = "machine"
+	podStart.Status = api.PodStatus{
+		Phase:             api.PodRunning,
+		Conditions:        []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+		ContainerStatuses: []api.ContainerStatus{{Name: "foo", State: api.ContainerState{Running: &api.ContainerStateRunning{}}}},
+	}
+	key, _ := podStorage.Pod.KeyFunc(ctx, podStart.Name)
+	if err := podStorage.Pod.Storage.Create(ctx, key, podStart, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := podStorage.Dynamic.Get(dynamicCtx, podStart.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	added := obj.(*api.Pod).DeepCopy()
+	added.Spec.Containers = append(added.Spec.Containers, added.Spec.Containers[0])
+	added.Spec.Containers[1].Name = "bar"
+
+	if _, _, err := podStorage.Dynamic.Update(dynamicCtx, added.Name, rest.DefaultUpdatedObjectInfo(added), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error adding a container: %v", err)
+	}
+	obj, err = podStorage.Pod.Get(ctx, podStart.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var names []string
+	for _, c := range obj.(*api.Pod).Spec.Containers {
+		names = append(names, c.Name)
+	}
+	if diff := cmp.Diff([]string{"foo", "bar"}, names); diff != "" {
+		t.Errorf("unexpected containers (-want, +got):\n%s", diff)
+	}
+
+	removed := obj.(*api.Pod).DeepCopy()
+	removed.Spec.Containers = removed.Spec.Containers[1:]
+	if _, _, err := podStorage.Pod.Update(ctx, removed.Name, rest.DefaultUpdatedObjectInfo(removed), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err == nil {
+		t.Error("expected the pods resource to reject removing a container")
+	}
+	if _, _, err := podStorage.Dynamic.Update(dynamicCtx, removed.Name, rest.DefaultUpdatedObjectInfo(removed), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Errorf("unexpected error removing a container: %v", err)
+	}
+}
