@@ -26,5 +26,7 @@ import (
 func CopyDir(src string, dst string) ([]byte, error) {
 	// /E Copies directories and subdirectories, including empty ones.
 	// /H Copies hidden and system files also.
-	return exec.Command("xcopy", "/E", "/H", src, dst).CombinedOutput()
+	// /I Treats a non-existent dst as a directory instead of prompting.
+	// /Y Overwrites existing files without prompting.
+	return exec.Command("xcopy", "/E", "/H", "/I", "/Y", src, dst).CombinedOutput()
 }
