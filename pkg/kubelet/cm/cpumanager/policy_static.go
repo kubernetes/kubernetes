@@ -2169,7 +2169,7 @@ func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.Sta
 			} else {
 				// Generate hints.
 				baselineCPUs, _ := s.GetBaselineCPUSet(string(pod.UID), container.Name)
-				cpuHints := p.generateCPUTopologyHintsForResize(allocated, baselineCPUs, requested)
+				cpuHints := p.generateCPUTopologyHintsForResize(allocated.Difference(baselineCPUs), baselineCPUs, requested)
 				logger.Info("TopologyHints generated", "pod", klog.KObj(pod), "containerName", container.Name, "cpuHints", cpuHints)
 
 				return map[string][]topologymanager.TopologyHint{
