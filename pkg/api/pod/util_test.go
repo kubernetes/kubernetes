@@ -3971,6 +3971,79 @@ func TestDropPodNetworkDefault(t *testing.T) {
 	}
 }
 
+func TestSyncPodNetworkOnUpdate(t *testing.T) {
+	spec := func(podNetwork *api.PodNetwork, hostNetwork bool) *api.PodSpec {
+		return &api.PodSpec{PodNetwork: podNetwork, HostNetwork: hostNetwork}
+	}
+	def := new(api.PodNetworkDefault)
+	isolated := new(api.PodNetworkIsolated)
+
+	for _, tc := range []struct {
+		name     string
+		old, new *api.PodSpec
+		want     *api.PodSpec
+	}{
+		// Nothing changed.
+		{name: "unchanged unset", old: spec(nil, false), new: spec(nil, false), want: spec(nil, false)},
+		{name: "unchanged Default", old: spec(def, false), new: spec(def, false), want: spec(def, false)},
+		{name: "unchanged Isolated", old: spec(isolated, false), new: spec(isolated, false), want: spec(isolated, false)},
+		{name: "unset to Isolated", old: spec(nil, false), new: spec(isolated, false), want: spec(isolated, false)},
+
+		// A client that does not know the field sends the object back
+		// without it: the stored value is kept.
+		{name: "Isolated cleared by old client is kept", old: spec(isolated, false), new: spec(nil, false), want: spec(isolated, false)},
+		{name: "Default cleared by old client is kept", old: spec(def, false), new: spec(nil, false), want: spec(def, false)},
+
+		// The same kind of client turns hostNetwork on: the stored value gives
+		// way, whether the request omitted the field (PUT) or carried the
+		// stored value through (PATCH).
+		{name: "old client PUT turns hostNetwork on, Isolated", old: spec(isolated, false), new: spec(nil, true), want: spec(nil, true)},
+		{name: "old client PATCH turns hostNetwork on, Isolated", old: spec(isolated, false), new: spec(isolated, true), want: spec(nil, true)},
+		{name: "old client PUT turns hostNetwork on, Default", old: spec(def, false), new: spec(nil, true), want: spec(nil, true)},
+		{name: "old client PATCH turns hostNetwork on, Default", old: spec(def, false), new: spec(def, true), want: spec(nil, true)},
+
+		// A value set in the same request as hostNetwork: true, on an object
+		// that did not have that value: left for validation.
+		{name: "Isolated set while turning hostNetwork on", old: spec(nil, false), new: spec(isolated, true), want: spec(isolated, true)},
+		{name: "Isolated set on a hostNetwork object", old: spec(nil, true), new: spec(isolated, true), want: spec(isolated, true)},
+		{name: "Default to Isolated while turning hostNetwork on", old: spec(def, false), new: spec(isolated, true), want: spec(isolated, true)},
+		{name: "Isolated to Default while turning hostNetwork on", old: spec(isolated, false), new: spec(def, true), want: spec(def, true)},
+
+		// hostNetwork already on, or turned off: nothing to reconcile.
+		{name: "hostNetwork stays on, field omitted", old: spec(isolated, true), new: spec(nil, true), want: spec(isolated, true)},
+		{name: "hostNetwork turned off, field omitted", old: spec(isolated, true), new: spec(nil, false), want: spec(isolated, false)},
+
+		// Isolation is turned off with "Default".
+		{name: "Isolated to Default", old: spec(isolated, false), new: spec(def, false), want: spec(def, false)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oldCopy := tc.old.DeepCopy()
+			got := tc.new.DeepCopy()
+			SyncPodNetworkOnUpdate(got, tc.old)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("unexpected spec (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(oldCopy, tc.old); diff != "" {
+				t.Errorf("old spec changed (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("nil specs", func(t *testing.T) {
+		SyncPodNetworkOnUpdate(nil, spec(isolated, false))
+		SyncPodNetworkOnUpdate(spec(isolated, false), nil)
+		SyncPodNetworkOnTemplateUpdate(nil, nil)
+	})
+
+	t.Run("template", func(t *testing.T) {
+		newTemplate := &api.PodTemplateSpec{Spec: *spec(nil, true)}
+		SyncPodNetworkOnTemplateUpdate(newTemplate, &api.PodTemplateSpec{Spec: *spec(isolated, false)})
+		if diff := cmp.Diff(spec(nil, true), &newTemplate.Spec); diff != "" {
+			t.Errorf("unexpected template spec (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 
