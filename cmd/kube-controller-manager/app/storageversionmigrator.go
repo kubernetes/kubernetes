@@ -20,12 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientgofeaturegate "k8s.io/client-go/features"
-	"k8s.io/client-go/metadata"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 	"k8s.io/kubernetes/pkg/features"
@@ -54,15 +50,6 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 		return nil, err
 	}
 
-	// svm controller can make a lot of requests during migration, keep it fast
-	config, err := controllerContext.NewClientConfig(controllerName)
-	if err != nil {
-		return nil, err
-	}
-
-	config.QPS *= 20
-	config.Burst *= 100
-
 	client, err := controllerContext.NewClient(controllerName)
 	if err != nil {
 		return nil, err
@@ -70,22 +57,26 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 
 	informer := controllerContext.InformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
-	crdClientset, err := apiextensionsclientset.NewForConfig(config)
+	// svm controller can make a lot of requests during migration, keep it fast
+	clientConnection := controllerContext.ComponentConfig.Generic.ClientConnection
+	svmClientBuilder := controllerContext.ClientBuilder.WithRateLimits(clientConnection.QPS*20, int(clientConnection.Burst)*100)
+
+	crdClientset, err := controllerContext.NewApiextensionsClient(controllerName, svmClientBuilder)
 	if err != nil {
 		return nil, err
 	}
 
-	dynamicClient, err := dynamic.NewForConfig(config)
+	dynamicClient, err := svmClientBuilder.DynamicClient(controllerName)
 	if err != nil {
 		return nil, err
 	}
 
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	discoveryClient, err := svmClientBuilder.DiscoveryClient(controllerName)
 	if err != nil {
 		return nil, err
 	}
 
-	metaClient, err := metadata.NewForConfig(config)
+	metaClient, err := svmClientBuilder.MetadataClient(controllerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metadata client for %s: %w", controllerName, err)
 	}

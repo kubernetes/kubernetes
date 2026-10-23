@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -25,10 +26,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/metadata"
+	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
+	fakescale "k8s.io/client-go/scale/fake"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
@@ -38,11 +46,16 @@ type TestClientBuilder struct {
 	clientset clientset.Interface
 }
 
-func (TestClientBuilder) Config(name string) (*restclient.Config, error) {
-	return &restclient.Config{}, nil
+func (m TestClientBuilder) Config(name string) (*restclient.Config, error) {
+	return nil, fmt.Errorf("TestClientBuilder does not provide client configs")
 }
-func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
-	return &restclient.Config{}
+func (m TestClientBuilder) ConfigOrDie(name string) *restclient.Config { panic("not supported") }
+func (m TestClientBuilder) WithRateLimits(qps float32, burst int) clientbuilder.TypedClientBuilder {
+	return m
+}
+
+func (m TestClientBuilder) WithDropManagedFields() clientbuilder.TypedClientBuilder {
+	return m
 }
 
 func (m TestClientBuilder) Client(name string) (clientset.Interface, error) { return m.clientset, nil }
@@ -59,6 +72,28 @@ func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.Discovery
 		panic(err)
 	}
 	return ret
+}
+
+func (m TestClientBuilder) MetadataClient(name string) (metadata.Interface, error) {
+	return fakemetadataclient.NewSimpleMetadataClient(scheme.Scheme), nil
+}
+func (m TestClientBuilder) MetadataClientOrDie(name string) metadata.Interface {
+	ret, err := m.MetadataClient(name)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+func (m TestClientBuilder) DynamicClient(name string) (dynamic.Interface, error) {
+	return nil, nil
+}
+func (m TestClientBuilder) DynamicClientOrDie(name string) dynamic.Interface {
+	return nil
+}
+
+func (m TestClientBuilder) ScaleClient(name string, mapper scale.PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver scale.ScaleKindResolver) (scale.ScalesGetter, error) {
+	return &fakescale.FakeScaleClient{}, nil
 }
 
 // FakeDiscoveryWithError inherits DiscoveryInterface(via FakeDiscovery) with some methods accepting testing data.
@@ -158,9 +193,8 @@ func TestController_DiscoveryError(t *testing.T) {
 				}
 			}
 
-			namespaceController, err := newModifiedNamespaceController(
-				ctx, controllerContext, names.NamespaceController,
-				testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			namespaceController, err := newNamespaceController(
+				ctx, controllerContext, names.NamespaceController)
 			if err != nil {
 				t.Fatal(err)
 			}

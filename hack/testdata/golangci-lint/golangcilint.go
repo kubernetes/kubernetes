@@ -36,9 +36,12 @@ package golangcilint
 import (
 	"context"
 	"crypto/md5"
+
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/client-go/rest"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"net/http"
 	"os"
 	"strings"
@@ -110,6 +113,10 @@ func Ineffassign() int {
 
 func Forbidigo() [16]byte {
 	return md5.Sum(nil) // forbidigo issue: md5 is oudated, insecure
+}
+
+func ForbidigoClientBuilderConfig(builder clientbuilder.ControllerClientBuilder) *rest.Config {
+	return builder.ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
 }
 
 func Modernize(a, b int) int {
