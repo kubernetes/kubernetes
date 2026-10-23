@@ -59,6 +59,12 @@ const (
 	// deprecated feature.
 	AllowServiceExternalIPs featuregate.Feature = "AllowServiceExternalIPs"
 
+	// owner: @JulesDT
+	// kep: https://kep.k8s.io/2763
+	//
+	// Enables explicit ambient Linux capability requests for containers; disabled by default.
+	AmbientCapabilities featuregate.Feature = "AmbientCapabilities"
+
 	// owner: @gavinkflam
 	// kep: https://kep.k8s.io/5936
 	//
@@ -1306,6 +1312,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 	},
 
+	AmbientCapabilities: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	AtomicWriteVolumeUserFields: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
@@ -2449,6 +2459,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AllowInsecureKubeletCertificateSigningRequests: {},
 
 	AllowServiceExternalIPs: {},
+
+	AmbientCapabilities: {},
 
 	AtomicWriteVolumeUserFields: {},
 

@@ -31,6 +31,9 @@ import (
 // determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
 func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username string) (*runtimeapi.LinuxContainerSecurityContext, error) {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+	if effectiveSc.Capabilities != nil && len(effectiveSc.Capabilities.Ambient) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.AmbientCapabilities) {
+		return nil, fmt.Errorf("container %q requests ambient capabilities but the AmbientCapabilities feature gate is disabled", container.Name)
+	}
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
 		synthesized = &runtimeapi.LinuxContainerSecurityContext{
@@ -173,14 +176,18 @@ func convertToRuntimeCapabilities(opts *v1.Capabilities) *runtimeapi.Capability 
 	}
 
 	capabilities := &runtimeapi.Capability{
-		AddCapabilities:  make([]string, len(opts.Add)),
-		DropCapabilities: make([]string, len(opts.Drop)),
+		AddCapabilities:        make([]string, len(opts.Add)),
+		DropCapabilities:       make([]string, len(opts.Drop)),
+		AddAmbientCapabilities: make([]string, len(opts.Ambient)),
 	}
 	for index, value := range opts.Add {
 		capabilities.AddCapabilities[index] = string(value)
 	}
 	for index, value := range opts.Drop {
 		capabilities.DropCapabilities[index] = string(value)
+	}
+	for index, value := range opts.Ambient {
+		capabilities.AddAmbientCapabilities[index] = string(value)
 	}
 
 	return capabilities

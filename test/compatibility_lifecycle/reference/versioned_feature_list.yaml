@@ -49,6 +49,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: AmbientCapabilities
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: APIResponseCompression
   versionedSpecs:
   - default: false

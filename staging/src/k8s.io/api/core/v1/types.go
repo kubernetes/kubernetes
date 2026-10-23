@@ -3171,6 +3171,15 @@ type Capabilities struct {
 	// +optional
 	// +listType=atomic
 	Drop []Capability `json:"drop,omitempty" protobuf:"bytes,2,rep,name=drop,casttype=Capability"`
+	// Ambient capabilities to add to the ambient, inheritable, permitted,
+	// effective and bounding sets. Uses the same capability names and add/drop
+	// semantics as Add: ALL selects all capabilities, Drop ALL resets defaults
+	// before individual additions, and individual drops take precedence.
+	// Requires the AmbientCapabilities feature gate and a supporting runtime.
+	// +featureGate=AmbientCapabilities
+	// +optional
+	// +listType=atomic
+	Ambient []Capability `json:"ambient,omitempty" protobuf:"bytes,3,rep,name=ambient,casttype=Capability"`
 }
 
 // ResourceRequirements describes the compute resource requirements.

@@ -20658,6 +20658,25 @@ func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback) common.
 							},
 						},
 					},
+					"ambient": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Ambient capabilities to add to the ambient, inheritable, permitted, effective and bounding sets. Uses the same capability names and add/drop semantics as Add: ALL selects all capabilities, Drop ALL resets defaults before individual additions, and individual drops take precedence. Requires the AmbientCapabilities feature gate and a supporting runtime.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

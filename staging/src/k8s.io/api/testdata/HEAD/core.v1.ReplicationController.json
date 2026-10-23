@@ -804,6 +804,9 @@
                 ],
                 "drop": [
                   "dropValue"
+                ],
+                "ambient": [
+                  "ambientValue"
                 ]
               },
               "privileged": true,
@@ -1139,6 +1142,9 @@
                 ],
                 "drop": [
                   "dropValue"
+                ],
+                "ambient": [
+                  "ambientValue"
                 ]
               },
               "privileged": true,
@@ -1474,6 +1480,9 @@
                 ],
                 "drop": [
                   "dropValue"
+                ],
+                "ambient": [
+                  "ambientValue"
                 ]
               },
               "privileged": true,

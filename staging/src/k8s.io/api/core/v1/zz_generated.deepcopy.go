@@ -333,6 +333,11 @@ func (in *Capabilities) DeepCopyInto(out *Capabilities) {
 		*out = make([]Capability, len(*in))
 		copy(*out, *in)
 	}
+	if in.Ambient != nil {
+		in, out := &in.Ambient, &out.Ambient
+		*out = make([]Capability, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

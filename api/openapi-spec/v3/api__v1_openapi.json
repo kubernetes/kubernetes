@@ -566,6 +566,15 @@
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
+          "ambient": {
+            "description": "Ambient capabilities to add to the ambient, inheritable, permitted, effective and bounding sets. Uses the same capability names and add/drop semantics as Add: ALL selects all capabilities, Drop ALL resets defaults before individual additions, and individual drops take precedence. Requires the AmbientCapabilities feature gate and a supporting runtime.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "drop": {
             "description": "drop lists the capabilities to remove from the container.",
             "items": {

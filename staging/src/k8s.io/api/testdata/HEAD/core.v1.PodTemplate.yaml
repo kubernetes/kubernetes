@@ -359,6 +359,8 @@ template:
         capabilities:
           add:
           - addValue
+          ambient:
+          - ambientValue
           drop:
           - dropValue
         cgroupOptions:
@@ -604,6 +606,8 @@ template:
         capabilities:
           add:
           - addValue
+          ambient:
+          - ambientValue
           drop:
           - dropValue
         cgroupOptions:
@@ -855,6 +859,8 @@ template:
         capabilities:
           add:
           - addValue
+          ambient:
+          - ambientValue
           drop:
           - dropValue
         cgroupOptions:

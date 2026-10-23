@@ -9095,6 +9095,29 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	return allErrs
 }
 
+// hasAmbientCapability reports whether the requested ambient set grants capability.
+// Names are case-insensitive. Drop ALL clears wildcard additions but preserves
+// explicit additions; individual drops take precedence over both.
+func hasAmbientCapability(caps *core.Capabilities, capability core.Capability) bool {
+	var explicit, all bool
+	for _, c := range caps.Ambient {
+		if strings.EqualFold(string(c), "ALL") {
+			all = true
+		} else if strings.EqualFold(string(c), string(capability)) {
+			explicit = true
+		}
+	}
+	for _, c := range caps.Drop {
+		if strings.EqualFold(string(c), string(capability)) {
+			return false
+		}
+		if strings.EqualFold(string(c), "ALL") {
+			all = false
+		}
+	}
+	return explicit || all
+}
+
 // ValidateSecurityContext ensures the security context contains valid settings
 func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers, allowSysAdminWhenPrivilegeEscalationFalse, allowSecurityProfileOCI bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -9141,6 +9164,14 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 				if string(cap) == "CAP_SYS_ADMIN" {
 					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
 				}
+			}
+		}
+	}
+
+	if sc.Capabilities != nil {
+		for _, capability := range []core.Capability{"SYS_ADMIN", "DAC_OVERRIDE"} {
+			if hasAmbientCapability(sc.Capabilities, capability) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("capabilities", "ambient"), sc.Capabilities.Ambient, fmt.Sprintf("cannot grant %s as an ambient capability", capability)))
 			}
 		}
 	}
