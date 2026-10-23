@@ -71,7 +71,7 @@ func TestStrategy(t *testing.T) {
 	}
 }
 
-// Users cannot set the status, neither on create nor through the main resource.
+// Status is ignored outside the status subresource.
 func TestStrategyIgnoresStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
@@ -109,7 +109,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"first write": {
 			update: func(r *resource.ResourcePoolStatusRequest) { r.Status = testStatus() },
 		},
-		// The spec and metadata other than the status are reset to the old object.
+		// Only the status changes.
 		"spec and metadata changes are dropped": {
 			update: func(r *resource.ResourcePoolStatusRequest) {
 				r.Status = testStatus()
@@ -126,7 +126,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 			wantErr: "field is immutable",
 		},
-		// The status is write-once: a completed request is never recalculated.
+		// The status is write-once.
 		"rewrite of a written status is rejected": {
 			oldStatus: testStatus(),
 			update:    func(r *resource.ResourcePoolStatusRequest) { r.Status.PoolCount = ptr.To[int32](1) },

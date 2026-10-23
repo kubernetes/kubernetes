@@ -58,7 +58,7 @@ func validNewRequest(name string) *resource.ResourcePoolStatusRequest {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: resource.ResourcePoolStatusRequestSpec{
 			Driver: "gpu.example.com",
-			// Defaulted in the versioned API, required in the internal one.
+			// Defaulted only in the versioned API.
 			Limit: ptr.To[int32](100),
 		},
 	}
@@ -180,7 +180,7 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-// Status is ignored on create and on updates through the main resource.
+// Status is ignored outside the status subresource.
 func TestCreateAndUpdateIgnoreStatus(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
@@ -209,7 +209,7 @@ func TestCreateAndUpdateIgnoreStatus(t *testing.T) {
 	}
 }
 
-// The status is written once by the controller and is immutable afterwards.
+// The status is write-once.
 func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
@@ -248,4 +248,20 @@ func TestUpdateStatus(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "field is immutable") {
 		t.Errorf("Expected immutable error when rewriting a written status, got %v", err)
 	}
+}
+
+func TestShortNames(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"rpsr"}
+	registrytest.AssertShortNames(t, storage, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"dra"}
+	registrytest.AssertCategories(t, storage, expected)
 }

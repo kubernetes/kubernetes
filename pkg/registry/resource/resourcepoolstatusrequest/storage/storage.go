@@ -66,6 +66,20 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements rest.ShortNamesProvider.
+func (r *REST) ShortNames() []string {
+	return []string{"rpsr"}
+}
+
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements rest.CategoriesProvider.
+func (r *REST) Categories() []string {
+	return []string{"dra"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a ResourcePoolStatusRequest.
 type StatusREST struct {
 	store *genericregistry.Store
