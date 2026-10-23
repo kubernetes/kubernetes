@@ -89,6 +89,9 @@ type RuntimeFeatures struct {
 	// CgroupMountMode indicates if the runtime supports the cgroup_mount_mode
 	// field of LinuxContainerSecurityContext.
 	CgroupMountMode bool
+	// PodNetworkIsolated indicates if the runtime supports sandboxes that are not
+	// attached to the pod network (PodSandboxConfig.pod_network = POD_NETWORK_ISOLATED).
+	PodNetworkIsolated bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
