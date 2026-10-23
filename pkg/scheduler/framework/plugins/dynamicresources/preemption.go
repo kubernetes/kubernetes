@@ -55,6 +55,10 @@ type preemptionState struct {
 // preemptionRoot holds what the simulation needs from PreFilter. Apart from
 // the lazily computed indexes, it does not change after PreFilter.
 type preemptionRoot struct {
+	// podUID and priority select the devices held for nominated pods which
+	// the pod must not get: those of other pods with at least its priority.
+	podUID   types.UID
+	priority int32
 	// canRelease is true if devices of removed pods may become available
 	// for the pod. Pods in a PodGroup are handled by workload-aware
 	// preemption, DRA extended resources are not supported, and pods which
@@ -125,6 +129,8 @@ func (p *preemptionState) clone() *preemptionState {
 // resourceSlices are nil if the pod has no claim to allocate.
 func (pl *DynamicResources) newPreemptionState(pod *v1.Pod, claims *claimStore, allocatedState *structured.AllocatedState, resourceSlices []*draapi.ResourceSlice) *preemptionState {
 	root := &preemptionRoot{
+		podUID:         pod.UID,
+		priority:       corev1helpers.PodPriority(pod),
 		podClaims:      sets.New[types.UID](),
 		allocatedState: allocatedState,
 		slices:         resourceSlices,
@@ -208,7 +214,10 @@ func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, po
 	}
 }
 
-// AddPod reverts RemovePod. Pods which were not removed are ignored.
+// AddPod reverts RemovePod. Pods which were not removed are ignored, like the
+// nominated pods which RunFilterPluginsWithNominatedPods adds in its first
+// pass: Filter takes the devices held for them from the claim nominations,
+// so that its second pass sees them as well.
 func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getStateData(cs)
 	if err != nil {
@@ -417,12 +426,14 @@ func (s *simulation) changesNode(nodeName string) bool {
 
 // allocatorForNode returns the allocator which Filter must use for the node
 // and, if DRAPreemption is enabled, the allocated state it is based on.
-func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, nodeName string) (structured.Allocator, *structured.AllocatedState, error) {
+// holds are the devices held on the node which the pod must not get, nil if
+// there are none.
+func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, nodeName string, holds *nodeHolds) (structured.Allocator, *structured.AllocatedState, error) {
 	p := state.preemption
 	if p == nil {
 		return state.allocator, nil, nil
 	}
-	if !p.sim.changesNode(nodeName) {
+	if holds == nil && !p.sim.changesNode(nodeName) {
 		return state.allocator, p.root.allocatedState, nil
 	}
 	// The PreFilter allocator cannot be reused because allocators cache
@@ -432,6 +443,11 @@ func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateDa
 	nodeSlices := p.root.slicesForNode(nodeName)
 	allocatedState := p.root.allocatedStateForSlices(nodeSlices)
 	p.sim.applyTo(allocatedState, pl.fts.EnableDRAConsumableCapacity, p.root.sharesOfDevices)
+	if holds != nil {
+		// Only after releasing devices: a held device may be one of
+		// those which a removed victim released.
+		holds.applyTo(allocatedState, p.sim.released)
+	}
 	allocator, err := structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), nodeSlices, pl.celCache)
 	if err != nil {
 		return nil, nil, err

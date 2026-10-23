@@ -4912,7 +4912,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	for _, podGroup := range podGroups {
 		tc.podGroupManager.AddGenericPodGroup(fwk.NewGenericPodGroup(podGroup))
 	}
-	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups, nil)
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nodes, podGroups, nil)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),

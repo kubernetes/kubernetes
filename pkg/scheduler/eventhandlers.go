@@ -23,8 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -407,6 +409,12 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	return func(entity framework.QueuedEntityInfo) bool {
 		return entity.GetPriority() <= priority
 	}
+}
+
+// nominationReleaseHandlerSetter is implemented by the DRA manager of the
+// DynamicResources plugin.
+type nominationReleaseHandlerSetter interface {
+	SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32))
 }
 
 // removeNomination notifies plugins which implement
@@ -836,6 +844,17 @@ func addAllEventHandlers(
 				buildEvtResHandler(at, fwk.ResourceClaim),
 			)
 			handlers = append(handlers, handlerRegistration)
+			if setter, ok := draManager.(nominationReleaseHandlerSetter); ok && utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+				setter.SetNominationReleaseHandler(func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32) {
+					deallocated := claim.DeepCopy()
+					deallocated.Status.Allocation = nil
+					// Only other pods with lower or equal priority had to respect the held devices.
+					differentUID, lePriority := getDifferentUIDPreCheck(holderUID), getLEPriorityPreCheck(priority)
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventResourceClaimHoldReleased, claim, deallocated, func(entity framework.QueuedEntityInfo) bool {
+						return differentUID(entity) && lePriority(entity)
+					})
+				})
+			}
 		case fwk.ResourceSlice:
 			if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
 				buildEvtResHandler(at, fwk.ResourceSlice),

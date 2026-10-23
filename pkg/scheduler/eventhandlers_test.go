@@ -33,6 +33,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -289,6 +290,90 @@ func TestEventHandlers_RemoveNomination(t *testing.T) {
 				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// releaseHandlerRecorder is a DRA manager which only records the handler for
+// devices that stopped being held for a preemptor.
+type releaseHandlerRecorder struct {
+	fwk.SharedDRAManager
+	handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)
+}
+
+func (r *releaseHandlerRecorder) SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)) {
+	r.handler = handler
+}
+
+// TestEventHandlers_NominationReleased checks that devices which stopped
+// being held for a preemptor give other pods with lower or equal priority
+// which wait for devices another chance.
+func TestEventHandlers_NominationReleased(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	newPod := func(name string, priority int32) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").UID(name).Priority(priority).SchedulerName(testSchedulerName).Obj()
+	}
+	holder := newPod("holder", midPriority)
+	pods := []*v1.Pod{holder, newPod("lower", lowPriority), newPod("equal", midPriority), newPod("higher", highPriority)}
+	const pluginName = "DynamicResources"
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			framework.EventResourceClaimHoldReleased: {{
+				PluginName: pluginName,
+				QueueingHintFn: func(klog.Logger, *v1.Pod, interface{}, interface{}) (fwk.QueueingHint, error) {
+					return fwk.Queue, nil
+				},
+			}},
+		},
+	}
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var objs []runtime.Object
+	for _, pod := range pods {
+		objs = append(objs, pod)
+	}
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
+	queue := internalqueue.NewPriorityQueue(
+		newDefaultQueueSort(),
+		informerFactory,
+		internalqueue.WithMetricsRecorder(metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+		internalqueue.WithPodInitialBackoffDuration(0),
+		internalqueue.WithPodMaxBackoffDuration(0))
+	for _, pod := range pods {
+		queue.Add(ctx, pod)
+		entity, err := queue.Pop(logger)
+		if err != nil {
+			t.Fatalf("Pop failed: %v", err)
+		}
+		poppedPod := entity.(*framework.QueuedPodInfo)
+		poppedPod.UnschedulablePlugins = sets.New(pluginName)
+		if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+			t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+		}
+	}
+
+	sched := &Scheduler{StopEverything: ctx.Done(), SchedulingQueue: queue, logger: logger}
+	resourceClaimCache := assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "ResourceClaim", "", nil)
+	draManager := &releaseHandlerRecorder{}
+	if err := addAllEventHandlers(sched, informerFactory, nil, resourceClaimCache, nil, draManager, map[fwk.EventResource]fwk.ActionType{fwk.ResourceClaim: fwk.Update}); err != nil {
+		t.Fatalf("Add event handlers failed: %v", err)
+	}
+	if draManager.handler == nil {
+		t.Fatal("No handler for released devices installed.")
+	}
+
+	claim := st.MakeResourceClaim().Name("holder-claim").Namespace("ns").Obj()
+	claim.Status.Allocation = &resourceapi.AllocationResult{}
+	draManager.handler(claim, holder.UID, midPriority)
+	var requeued []string
+	for _, pod := range append(queue.PodsInActiveQ(), queue.PodsInBackoffQ()...) {
+		requeued = append(requeued, pod.Name)
+	}
+	slices.Sort(requeued)
+	if diff := cmp.Diff([]string{"equal", "lower"}, requeued); diff != "" {
+		t.Errorf("Unexpected requeued pods (-want, +got):\n%s", diff)
 	}
 }
 

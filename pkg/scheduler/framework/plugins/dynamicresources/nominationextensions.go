@@ -23,10 +23,12 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -43,8 +45,10 @@ var _ framework.NominationExtensions = &DynamicResources{}
 // maxClaimsInReason limits how many claims PodEligibleToPreempt names.
 const maxClaimsInReason = 3
 
-// AddNominatedPod remembers the victims of the pod and which of their
-// claims get deallocated once they are gone.
+// AddNominatedPod remembers the victims of the pod, which of their claims get
+// deallocated once they are gone, and which devices the pod is going to get
+// on the node, so that pods with lower or equal priority don't get them
+// first.
 func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
 	if pl.nominations == nil {
 		return
@@ -58,12 +62,14 @@ func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleSta
 	p := state.preemption.clone()
 	nomination := &podNomination{
 		nodeName: nodeName,
+		priority: corev1helpers.PodPriority(pod),
 		victims:  make(map[types.UID]types.NamespacedName, len(victims)),
 	}
 	for _, victim := range victims {
 		nomination.victims[victim.UID] = types.NamespacedName{Namespace: victim.Namespace, Name: victim.Name}
 		pl.removePod(logger, p, victim, victim.Spec.NodeName)
 	}
+	nomination.holds = pl.computeHold(ctx, state, p, nodeName)
 	claims := make(map[string][]*victimClaim)
 	for _, released := range p.sim.released {
 		claim := &victimClaim{
@@ -77,24 +83,79 @@ func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleSta
 		}
 		claims[released.nodeName] = append(claims[released.nodeName], claim)
 	}
-	pl.nominations.add(pod.UID, nomination, claims)
-	logger.V(5).Info("Recorded nomination", "pod", klog.KObj(pod), "node", nodeName, "numVictimClaims", len(p.sim.released))
+	replaced := pl.nominations.add(pod.UID, nomination, claims)
+	logger.V(5).Info("Recorded nomination", "pod", klog.KObj(pod), "node", nodeName, "numVictimClaims", len(p.sim.released), "numHeldClaims", len(nomination.holds))
+	if replaced != nil && !sameHolds(replaced.holds, nomination.holds) {
+		pl.nominations.released(pod.UID, replaced)
+	}
 
 	// If the pod got deleted before its nomination was recorded, then
 	// RemoveNominatedPod was called too early.
 	if current, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name); err != nil || current.UID != pod.UID {
-		pl.nominations.remove(pod.UID, nodeName, false)
+		pl.RemoveNominatedPod(ctx, pod, nodeName, false)
 	}
 }
 
 // RemoveNominatedPod forgets the nomination of the pod. Claims of its
 // victims stay tracked until they are deallocated, because other pods
 // nominated to the same node also have to wait for them.
+//
+// The devices held for the pod may be free, so pods waiting for devices get
+// another chance, unless the pod got assumed with exactly those devices.
 func (pl *DynamicResources) RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
 	if pl.nominations == nil {
 		return
 	}
-	pl.nominations.remove(pod.UID, nodeName, preemptionFailed)
+	nomination := pl.nominations.remove(pod.UID, nodeName, preemptionFailed)
+	if nomination == nil || len(nomination.holds) == 0 {
+		return
+	}
+	if pod.Spec.NodeName == nomination.nodeName && pl.allocatedAsHeld(nomination) {
+		return
+	}
+	klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName)
+	pl.nominations.released(pod.UID, nomination)
+}
+
+func sameHolds(a, b map[types.UID]heldClaim) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for uid, heldA := range a {
+		heldB, ok := b[uid]
+		if !ok || !sameDevices(heldA.allocation.Devices.Results, heldB.allocation.Devices.Results) {
+			return false
+		}
+	}
+	return true
+}
+
+// sameDevices compares allocation results without their ShareIDs, which
+// are new for each allocation of a device with consumable capacity.
+func sameDevices(a, b []resourceapi.DeviceRequestAllocationResult) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		resultA, resultB := a[i], b[i]
+		resultA.ShareID, resultB.ShareID = nil, nil
+		if !apiequality.Semantic.DeepEqual(resultA, resultB) {
+			return false
+		}
+	}
+	return true
+}
+
+// allocatedAsHeld returns true if the pending allocations of all held claims
+// have the held devices.
+func (pl *DynamicResources) allocatedAsHeld(nomination *podNomination) bool {
+	for uid, held := range nomination.holds {
+		pending := pl.draManager.ResourceClaims().GetPendingAllocation(uid)
+		if pending == nil || !sameDevices(pending.Devices.Results, held.allocation.Devices.Results) {
+			return false
+		}
+	}
+	return true
 }
 
 // PodEligibleToPreempt returns false while claims of preempted pods on the

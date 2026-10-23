@@ -99,6 +99,18 @@ func (s *DefaultDRAManager) nominationStore() *claimNominations {
 	return s.nominations
 }
 
+// SetNominationReleaseHandler installs the function which gets called with
+// a deallocated claim when devices held for a preemptor become available
+// again without a real claim event. The handler must make pods other than the
+// preemptor with the given priority or lower that wait for devices try
+// again. Must be called before scheduling starts. It does nothing if the
+// DRAPreemption feature is disabled.
+func (s *DefaultDRAManager) SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)) {
+	if s.nominations != nil {
+		s.nominations.releaseHandler = handler
+	}
+}
+
 func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
 	return s.resourceClaimTracker
 }
