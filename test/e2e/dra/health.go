@@ -36,6 +36,7 @@ import (
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -205,6 +206,96 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			f.It("must reflect device health changes in the pod status", f.WithKubeletMinVersion(minKubeletVersionForHealthV1), func(ctx context.Context) {
 				testHealthTransitions(ctx, b)
 			})
+		})
+
+		// During a rolling update the kubelet hands the health stream over
+		// from the old to the new driver instance. The pod must keep the
+		// device health reported before the handover, without a transient
+		// "Unknown", and pick up reports from the new instance afterwards.
+		// The handover fix was added in Kubernetes 1.38.
+		f.It("must keep device health across a rolling update of the driver", f.WithKubeletMinVersion("1.38"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodeName := nodes.NodeNames[0]
+
+			oldDriver := drautils.NewDriverInstance(tCtx)
+			oldDriver.InstanceSuffix = "-old"
+			oldDriver.RollingUpdate = true
+			oldDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+			// Build behaves the same for both driver instances.
+			b := drautils.NewBuilderNow(tCtx, oldDriver)
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+
+			allocatedClaim, err := b.ClientV1(tCtx).ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get allocated claim")
+			gomega.Expect(allocatedClaim.Status.Allocation).ToNot(gomega.BeNil(), "claim allocation")
+			result := allocatedClaim.Status.Allocation.Devices.Results[0]
+
+			claimRef := pod.Spec.Containers[0].Resources.Claims[0]
+			statusName := v1.ResourceName("claim:" + claimRef.Name)
+			if claimRef.Request != "" {
+				statusName += v1.ResourceName("/" + claimRef.Request)
+			}
+			setHealth := func(driver *drautils.Driver, health string) {
+				plugin, ok := driver.Nodes[nodeName]
+				if !ok {
+					framework.Failf("no test driver plugin for node %s", nodeName)
+				}
+				plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+					PoolName:   result.Pool,
+					DeviceName: result.Device,
+					Health:     health,
+				}
+			}
+			getHealth := func(ctx context.Context) (string, error) {
+				return getDeviceHealth(ctx, f.ClientSet, pod.Namespace, pod.Name, statusName, oldDriver.Name)
+			}
+
+			ginkgo.By("Reporting Healthy through the old driver instance")
+			setHealth(oldDriver, "Healthy")
+			gomega.Eventually(ctx, getHealth).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "device health should be Healthy before the rolling update")
+
+			ginkgo.By("Starting the new driver instance")
+			// Same driver name, different socket paths because of rolling update.
+			newDriver := drautils.NewDriverInstance(tCtx)
+			newDriver.InstanceSuffix = "-new"
+			newDriver.RollingUpdate = true
+			newDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+			// A new instance starts without health information. Queue the
+			// report before the kubelet subscribes, otherwise the device
+			// would legitimately expire to "Unknown" after the health timeout.
+			setHealth(newDriver, "Healthy")
+
+			newMethod := expectedHealthMethod(ctx, newDriver, nodeName)
+			gomega.Eventually(ctx, func() int64 {
+				return newDriver.CallCount(drautils.MethodInstance{NodeName: nodeName, FullMethod: newMethod})
+			}).WithTimeout(60*time.Second).WithPolling(100*time.Millisecond).Should(gomega.BeNumerically(">", 0), "expected health stream on the new driver instance")
+
+			ginkgo.By("Stopping the old driver instance")
+			oldDriver.TearDown(tCtx)
+			// The old instance's prepared-claims state is stale after the
+			// handover: the kubelet unprepares the claim through the new
+			// instance. Let the builder cleanup use the new instance, the
+			// actual check is waiting for the pod to be deleted below.
+			b.Driver = newDriver
+
+			ginkgo.By("Verifying that device health stays Healthy across the handover")
+			// Longer than the kubelet's default health timeout (30s), so that
+			// both a flap during the handover and an expiry of the handed
+			// over state would be detected.
+			gomega.Consistently(ctx, getHealth).WithTimeout(40*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "device health should stay Healthy during the rolling update")
+
+			ginkgo.By("Reporting Unhealthy through the new driver instance")
+			setHealth(newDriver, "Unhealthy")
+			gomega.Eventually(ctx, getHealth).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"), "device health should follow the new driver instance")
+
+			// We need to clean up explicitly because the normal
+			// cleanup doesn't work (driver shuts down first).
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 		})
 	})
 })
