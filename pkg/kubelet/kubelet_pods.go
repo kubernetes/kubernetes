@@ -2713,8 +2713,21 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
-		if _, ok := statuses[cName]; !ok {
-			// This would also ignore the infra container.
+		cType := cStatus.Type
+		if cType == 0 {
+			// Fallback to spec lookup if the container type is missing.
+			for c, t := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+				if c.Name == cName {
+					cType = t
+					break
+				}
+			}
+			if cType == 0 && containerType == podutil.Containers {
+				logger.V(3).Info("Container type unknown for missing container; assuming regular", "pod", klog.KObj(pod), "containerName", cName)
+				cType = podutil.Containers
+			}
+		}
+		if cType != containerType {
 			continue
 		}
 		if containerSeen[cName] >= 2 {
@@ -2761,6 +2774,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if containerSeen[cName] == 0 {
+			// This also creates the entry for a container removed from the spec.
+			// TODO(KEP-5972): revisit removed-container status GC and ContainerStateUnknown handling.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State
