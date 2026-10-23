@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -2686,6 +2687,44 @@ func TestGetAllocatedPods(t *testing.T) {
 				assert.Equal(t, tt.expectedPod.Name, pod.Name)
 				assert.Equal(t, tt.expectedPod.Spec, pod.Spec)
 				assert.Empty(t, pod.Status)
+			}
+		})
+	}
+}
+
+func TestContentionProfilingEnablesMutexProfile(t *testing.T) {
+	tests := []struct {
+		name                      string
+		enableProfilingHandler    bool
+		enableContentionProfiling bool
+		wantMutexProfileFraction  int
+	}{
+		{name: "profiling and contention profiling enabled", enableProfilingHandler: true, enableContentionProfiling: true, wantMutexProfileFraction: 1},
+		{name: "contention profiling disabled", enableProfilingHandler: true, enableContentionProfiling: false, wantMutexProfileFraction: 0},
+		{name: "profiling disabled", enableProfilingHandler: false, enableContentionProfiling: true, wantMutexProfileFraction: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The profile rates are process-global, so reset them around each case.
+			prev := goruntime.SetMutexProfileFraction(0)
+			t.Cleanup(func() {
+				goruntime.SetMutexProfileFraction(prev)
+				goruntime.SetBlockProfileRate(0)
+			})
+
+			tCtx := ktesting.Init(t)
+			// NewServer calls InstallProfilingHandler; calling it a second time would
+			// register /debug/pprof/ twice.
+			fw := newServerTestWithDebuggingHandlers(tCtx, &kubeletconfiginternal.KubeletConfiguration{
+				EnableDebuggingHandlers:   true,
+				EnableProfilingHandler:    tt.enableProfilingHandler,
+				EnableContentionProfiling: tt.enableContentionProfiling,
+			}, nil)
+			defer fw.testHTTPServer.Close()
+
+			// A negative value reads the current fraction without changing it.
+			if got := goruntime.SetMutexProfileFraction(-1); got != tt.wantMutexProfileFraction {
+				t.Errorf("mutex profile fraction = %d, want %d", got, tt.wantMutexProfileFraction)
 			}
 		})
 	}
