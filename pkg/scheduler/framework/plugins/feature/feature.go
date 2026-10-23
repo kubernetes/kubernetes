@@ -39,6 +39,7 @@ type Features struct {
 	EnableDRANodeAllocatableResources                  bool
 	EnableDRAOptionalNodeOperations                    bool
 	EnableDRAPartitionableDevices                      bool
+	EnableDRAPreemption                                bool
 	EnableDRAResourceClaimDeviceStatus                 bool
 	EnableDRASchedulerFilterTimeout                    bool
 	EnableDRAWorkloadResourceClaims                    bool
@@ -85,6 +86,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableAsyncPreemption:                              featureGate.Enabled(features.SchedulerAsyncPreemption),
 		EnablePodLevelResources:                            featureGate.Enabled(features.PodLevelResources),
 		EnableDRAPartitionableDevices:                      featureGate.Enabled(features.DRAPartitionableDevices),
+		EnableDRAPreemption:                                featureGate.Enabled(features.DRAPreemption),
 		EnableStorageCapacityScoring:                       featureGate.Enabled(features.StorageCapacityScoring),
 		EnableNodeDeclaredFeatures:                         featureGate.Enabled(features.NodeDeclaredFeatures),
 		EnableGenericWorkload:                              featureGate.Enabled(features.GenericWorkload),
