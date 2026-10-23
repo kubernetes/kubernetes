@@ -18,21 +18,54 @@ package clientbuilder
 
 import (
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
 	"k8s.io/klog/v2"
 )
 
-// ControllerClientBuilder allows you to get clients and configs for controllers
-// Please note a copy also exists in staging/src/k8s.io/cloud-provider/cloud.go
+// ControllerClientBuilder allows you to get clients for controllers.
+// Please note a subset copy also exists in staging/src/k8s.io/cloud-provider/cloud.go
 // TODO: Extract this into a separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
+	// Config returns a client config for the named controller.
+	//
+	// Deprecated: build clients through the builder (see TypedClientBuilder)
+	// so that they inherit the controller manager's client configuration and
+	// transport wrappers; a client built from a raw config bypasses them.
 	Config(name string) (*restclient.Config, error)
+	// ConfigOrDie is Config, exiting the process on error.
+	//
+	// Deprecated: see Config.
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
+	// DiscoveryClient returns a discovery client with at least the rate
+	// limits discovery's bursts of requests need; a builder configured with
+	// higher limits keeps them.
 	DiscoveryClient(name string) (discovery.DiscoveryInterface, error)
 	DiscoveryClientOrDie(name string) discovery.DiscoveryInterface
+}
+
+// TypedClientBuilder is a ControllerClientBuilder that also constructs the
+// other clients controllers commonly need, so that controllers never handle a
+// rest.Config themselves. Both builders in this package implement it and the
+// controller managers hand it to their controllers.
+type TypedClientBuilder interface {
+	ControllerClientBuilder
+	MetadataClient(name string) (metadata.Interface, error)
+	DynamicClient(name string) (dynamic.Interface, error)
+	ScaleClient(name string, mapper scale.PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver scale.ScaleKindResolver) (scale.ScalesGetter, error)
+	// WithRateLimits returns a builder whose clients use the given QPS and
+	// burst instead of the configured defaults. Any RateLimiter set on the
+	// underlying config is dropped, since it would take precedence over QPS
+	// and burst.
+	WithRateLimits(qps float32, burst int) TypedClientBuilder
+	// WithDropManagedFields returns a builder whose clients ask the server to
+	// omit metadata.managedFields from responses.
+	WithDropManagedFields() TypedClientBuilder
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -42,6 +75,8 @@ type SimpleControllerClientBuilder struct {
 }
 
 // Config returns a client config for a fixed client
+//
+// Deprecated: see ControllerClientBuilder.Config.
 func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
 	return restclient.AddUserAgent(&clientConfig, name), nil
@@ -49,12 +84,34 @@ func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, 
 
 // ConfigOrDie returns a client config if no error from previous config func.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
+//
+// Deprecated: see ControllerClientBuilder.Config.
 func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		klog.Fatal(err)
 	}
 	return clientConfig
+}
+
+// WithRateLimits returns a TypedClientBuilder whose clients use the given QPS and burst.
+func (b SimpleControllerClientBuilder) WithRateLimits(qps float32, burst int) TypedClientBuilder {
+	clientConfig := *b.ClientConfig
+	clientConfig.QPS = qps
+	clientConfig.Burst = burst
+	clientConfig.RateLimiter = nil
+	return SimpleControllerClientBuilder{
+		ClientConfig: &clientConfig,
+	}
+}
+
+// WithDropManagedFields returns a TypedClientBuilder whose clients ask the server to omit managedFields.
+func (b SimpleControllerClientBuilder) WithDropManagedFields() TypedClientBuilder {
+	clientConfig := *b.ClientConfig
+	clientConfig.DropManagedFields = true
+	return SimpleControllerClientBuilder{
+		ClientConfig: &clientConfig,
+	}
 }
 
 // Client returns a clientset.Interface built from the ClientBuilder
@@ -84,9 +141,9 @@ func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.D
 		return nil, err
 	}
 	// Discovery makes a lot of requests infrequently.  This allows the burst to succeed and refill to happen
-	// in just a few seconds.
-	clientConfig.Burst = 200
-	clientConfig.QPS = 20
+	// in just a few seconds, unless the builder is already configured with higher limits.
+	clientConfig.Burst = max(clientConfig.Burst, 200)
+	clientConfig.QPS = max(clientConfig.QPS, 20)
 	return clientset.NewForConfig(clientConfig)
 }
 
@@ -99,4 +156,31 @@ func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(name string) discove
 		klog.Fatal(err)
 	}
 	return client
+}
+
+// MetadataClient returns a metadata.Interface built from the ClientBuilder.
+func (b SimpleControllerClientBuilder) MetadataClient(name string) (metadata.Interface, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return metadata.NewForConfig(clientConfig)
+}
+
+// DynamicClient returns a dynamic.Interface built from the ClientBuilder.
+func (b SimpleControllerClientBuilder) DynamicClient(name string) (dynamic.Interface, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return dynamic.NewForConfig(clientConfig)
+}
+
+// ScaleClient returns a scale.ScalesGetter built from the ClientBuilder.
+func (b SimpleControllerClientBuilder) ScaleClient(name string, mapper scale.PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver scale.ScaleKindResolver) (scale.ScalesGetter, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return scale.NewForConfig(clientConfig, mapper, resolver, scaleKindResolver)
 }

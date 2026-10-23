@@ -30,7 +30,7 @@ import (
 
 // serviceAccountTokenController is special because it must run first to set up permissions for other controllers.
 // It cannot use the "normal" client builder, so it tracks its own.
-func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *ControllerDescriptor {
+func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.TypedClientBuilder) *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:    names.ServiceAccountTokenController,
 		aliases: []string{"serviceaccount-token"},
@@ -44,7 +44,7 @@ func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.
 
 func newServiceAccountTokenController(
 	ctx context.Context, controllerContext ControllerContext, controllerName string,
-	rootClientBuilder clientbuilder.ControllerClientBuilder,
+	rootClientBuilder clientbuilder.TypedClientBuilder,
 ) (Controller, error) {
 	if len(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 		klog.FromContext(ctx).Info("Controller is disabled because there is no private key", "controller", controllerName)
@@ -56,17 +56,9 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("error reading key for service account token controller: %w", err)
 	}
 
-	var rootCA []byte
-	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
-		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
-		}
-	} else {
-		config, err := rootClientBuilder.Config("tokens-controller")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Kubernetes client config for %q: %w", "tokens-controller", err)
-		}
-		rootCA = config.CAData
+	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := rootClientBuilder.Client("tokens-controller")
