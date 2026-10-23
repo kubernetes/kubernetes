@@ -66,6 +66,39 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
 	assert.Equal(t, expectedMetadata, podSandboxConfig.Metadata)
 	assert.Equal(t, expectedPortMappings, podSandboxConfig.PortMappings)
+	assert.Equal(t, runtimeapi.PodNetwork_POD_NETWORK_DEFAULT, podSandboxConfig.PodNetwork)
+}
+
+func TestGeneratePodSandboxConfigPodNetwork(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Host networking is requested through the network namespace option, as
+	// before the field; pod_network only applies to POD network namespaces.
+	for desc, tc := range map[string]struct {
+		podNetwork       *v1.PodNetwork
+		hostNetwork      bool
+		expected         runtimeapi.PodNetwork
+		expectedNetnsOpt runtimeapi.NamespaceMode
+	}{
+		"unset":       {expected: runtimeapi.PodNetwork_POD_NETWORK_DEFAULT, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+		"hostNetwork": {hostNetwork: true, expected: runtimeapi.PodNetwork_POD_NETWORK_DEFAULT, expectedNetnsOpt: runtimeapi.NamespaceMode_NODE},
+		"Default":     {podNetwork: new(v1.PodNetworkDefault), expected: runtimeapi.PodNetwork_POD_NETWORK_DEFAULT, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+		"None":        {podNetwork: new(v1.PodNetworkNone), expected: runtimeapi.PodNetwork_POD_NETWORK_NONE, expectedNetnsOpt: runtimeapi.NamespaceMode_POD},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			pod := newTestPod()
+			pod.Spec.PodNetwork = tc.podNetwork
+			pod.Spec.HostNetwork = tc.hostNetwork
+			// Namespace options are only generated with a (defaulted) security context.
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, podSandboxConfig.PodNetwork)
+			assert.Equal(t, tc.expectedNetnsOpt, podSandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork())
+		})
+	}
 }
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.

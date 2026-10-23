@@ -341,6 +341,14 @@ func IsHostNetworkPod(pod *v1.Pod) bool {
 	return pod.Spec.HostNetwork
 }
 
+// IsNetworkIsolatedPod returns whether the given Pod opted out of the default
+// pod network (spec.podNetwork "None"). Pod must not be nil.
+// Validation rejects the combination with hostNetwork; a host network pod has
+// no sandbox network namespace, so hostNetwork wins should it get through.
+func IsNetworkIsolatedPod(pod *v1.Pod) bool {
+	return !pod.Spec.HostNetwork && pod.Spec.PodNetwork != nil && *pod.Spec.PodNetwork == v1.PodNetworkNone
+}
+
 // ConvertPodStatusToRunningPod returns Pod given PodStatus and container runtime string.
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {

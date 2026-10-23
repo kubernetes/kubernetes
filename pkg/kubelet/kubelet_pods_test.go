@@ -426,6 +426,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		nilLister          bool                   // whether the lister should be nil
 		staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
 		unsyncedServices   bool                   // whether the services should NOT be synced
+		networkIsolated    bool                   // whether the pod has podNetwork None
 		configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
 		secret             *v1.Secret             // an optional Secret to pull from
 		podIPs             []string               // the pod IPs
@@ -452,6 +453,49 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			nilLister:          false,
 			staticPod:          true,
 			unsyncedServices:   true,
+		},
+		{
+			name:               "network isolated pod without service links gets no service env vars and does not wait for services",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			networkIsolated:    true,
+			unsyncedServices:   true,
+			container: &v1.Container{
+				Env: []v1.EnvVar{{Name: "FOO", Value: "BAR"}},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{{Name: "FOO", Value: "BAR"}},
+		},
+		{
+			name:               "network isolated pod with service links gets the standard service env vars",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
+			networkIsolated:    true,
+			container:          &v1.Container{Env: []v1.EnvVar{}},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
+				{Name: "TEST_SERVICE_PORT", Value: "8083"},
+				{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
+				{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
+				{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
+				{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
+				{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
+		},
+		{
+			name:               "network isolated pod with service links waits for services",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
+			networkIsolated:    true,
+			unsyncedServices:   true,
+			container:          &v1.Container{Env: []v1.EnvVar{}},
+			expectedError:      true,
 		},
 		{
 			name:               "api server = Y, kubelet = Y",
@@ -2033,6 +2077,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					NodeName:           "node-name",
 					EnableServiceLinks: tc.enableServiceLinks,
 				},
+			}
+			if tc.networkIsolated {
+				testPod.Spec.PodNetwork = new(v1.PodNetworkNone)
 			}
 			podIP := ""
 			if len(tc.podIPs) > 0 {

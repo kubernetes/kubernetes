@@ -166,6 +166,29 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedSandboxID: "sandboxID1",
 			expectedReason:    "",
 		},
+		"Network isolated pod with ready sandbox status and no IP": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					PodNetwork: new(v1.PodNetworkNone),
+				},
+			},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Id: "sandboxID1",
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expectedChanged:   false,
+			expectedAttempt:   0,
+			expectedSandboxID: "sandboxID1",
+			expectedReason:    "",
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			changed, attempt, id, reason := PodSandboxChanged(logger, test.pod, test.status)
