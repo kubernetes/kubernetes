@@ -17,6 +17,8 @@ limitations under the License.
 package queue
 
 import (
+	"slices"
+
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -120,21 +122,22 @@ func (wf *workloadForest) getRootLookupInfo(logger klog.Logger, gpg *fwk.Generic
 			},
 		}, true
 	}
-	return wf.getRootLookupInfoForParentCPG(logger, *storedGPG.GetParentCompositePodGroupName(), storedGPG.GetNamespace())
+	return wf.getRootLookupInfoForParentCPG(logger, storedGPG.GetKey(), *storedGPG.GetParentCompositePodGroupName(), storedGPG.GetNamespace())
 }
 
 // getRootLookupInfoForParentCPG is a helper to traverse up the parent chain and return the lookup info of the root CompositePodGroup.
 // It should be called only when the CompositePodGroup feature gate is enabled.
-func (wf *workloadForest) getRootLookupInfoForParentCPG(logger klog.Logger, parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
+func (wf *workloadForest) getRootLookupInfoForParentCPG(logger klog.Logger, startKey fwk.EntityKey, parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
 	currParentName := parentName
-	visited := sets.New[fwk.EntityKey]()
+	visited := []fwk.EntityKey{startKey}
 	for {
 		cpgKey := fwk.CompositePodGroupKey(namespace, currParentName)
-		if visited.Has(cpgKey) {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting root info", "parentName", parentName, "namespace", namespace)
+		if slices.Contains(visited, cpgKey) {
+			visited = append(visited, cpgKey)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting root info", "parentName", parentName, "namespace", namespace, "cycle", visited)
 			return nil, false
 		}
-		visited.Insert(cpgKey)
+		visited = append(visited, cpgKey)
 
 		cpg, exists := wf.podGroups[cpgKey]
 		if !exists {

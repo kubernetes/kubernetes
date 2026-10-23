@@ -21,8 +21,6 @@ import (
 	"iter"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
-	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -39,18 +37,15 @@ func MatchingSchedulingGroup(pod1, pod2 *v1.Pod) bool {
 // If rootEntityKey is a PodGroupKeyType, it yields its PodGroupState.
 func GetPodGroupStates(sharedLister fwk.SharedLister, rootEntityKey fwk.EntityKey) iter.Seq2[fwk.PodGroupState, error] {
 	return func(yield func(fwk.PodGroupState, error) bool) {
-		var walk func(entityKey fwk.EntityKey, depth int) bool
-		walk = func(entityKey fwk.EntityKey, depth int) bool {
-			if depth >= schedulingapi.WorkloadMaxTreeDepth {
-				return yield(nil, fmt.Errorf("exceeded maximum hierarchy depth at %v", entityKey))
-			}
+		var walk func(entityKey fwk.EntityKey) bool
+		walk = func(entityKey fwk.EntityKey) bool {
 			if entityKey.GetType() == fwk.CompositePodGroupKeyType {
 				cpgState, err := sharedLister.CompositePodGroupStates().Get(entityKey.GetNamespace(), entityKey.GetName())
 				if err != nil {
 					return yield(nil, err)
 				}
 				for _, childEntityKey := range cpgState.GetChildren() {
-					if !walk(childEntityKey, depth+1) {
+					if !walk(childEntityKey) {
 						return false
 					}
 				}
@@ -62,31 +57,19 @@ func GetPodGroupStates(sharedLister fwk.SharedLister, rootEntityKey fwk.EntityKe
 			}
 			return yield(pgState, nil)
 		}
-		walk(rootEntityKey, 0)
+		walk(rootEntityKey)
 	}
 }
 
 // TraverseHierarchyUp returns an iterator over the groups on the path from startKey to the root of its
 // PodGroup/CompositePodGroup hierarchy, starting with startKey itself.
-// The traversal ends by yielding an error when a group cannot be resolved, the key type is unsupported,
-// a cycle is detected, or the path exceeds WorkloadMaxTreeDepth.
+// The traversal ends by yielding an error when a group cannot be resolved or the key type is unsupported.
 // Feature gating is left to the listers: when GenericWorkload or CompositePodGroup is disabled,
 // the corresponding lister rejects lookups, so the traversal ends there just like for a missing group.
 func TraverseHierarchyUp(snapshot fwk.SharedLister, startKey fwk.EntityKey) iter.Seq2[*fwk.GenericPodGroup, error] {
 	return func(yield func(*fwk.GenericPodGroup, error) bool) {
 		currentKey := startKey
-		visited := sets.New[fwk.EntityKey]()
 		for {
-			if visited.Has(currentKey) {
-				yield(nil, fmt.Errorf("cycle detected in the hierarchy at %v", currentKey))
-				return
-			}
-			if visited.Len() >= schedulingapi.WorkloadMaxTreeDepth {
-				yield(nil, fmt.Errorf("exceeded maximum hierarchy depth %d at %v", schedulingapi.WorkloadMaxTreeDepth, currentKey))
-				return
-			}
-			visited.Insert(currentKey)
-
 			var gpg *fwk.GenericPodGroup
 			switch currentKey.GetType() {
 			case fwk.PodGroupKeyType:
