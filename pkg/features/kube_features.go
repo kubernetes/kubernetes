@@ -414,13 +414,6 @@ const (
 	// This can be used by a set of requesters and responders to coordinate graceful eviction of pods.
 	EvictionRequestAPI featuregate.Feature = "EvictionRequestAPI"
 
-	// owner: @andrewsykim @SergeyKanzhelev
-	//
-	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
-	// may depend on old behavior where exec probe timeouts were ignored.
-	// Locked to default, will remove in v1.38. Progress is reflected in KEP #1972 update
-	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
-
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1510,11 +1503,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	ExecProbeTimeout: {
-		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.38
-	},
-
 	ExtendWebSocketsToKubelet: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
@@ -2490,8 +2478,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	EventedPLEG: {PLEGOnDemandRelist},
 
 	EvictionRequestAPI: {},
-
-	ExecProbeTimeout: {},
 
 	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
 
