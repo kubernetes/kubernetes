@@ -221,6 +221,77 @@ func newDefaultQueueSort() fwk.LessFunc {
 	return sort.Less
 }
 
+// TestEventHandlers_RemoveNomination checks which pod events end a nomination
+// for plugins with framework.NominationExtensions.
+func TestEventHandlers_RemoveNomination(t *testing.T) {
+	nominatedPod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).NominatedNodeName("node1").Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		pod := nominatedPod.DeepCopy()
+		pod.Status.NominatedNodeName = nodeName
+		pod.ResourceVersion = "2"
+		return pod
+	}
+
+	for name, tc := range map[string]struct {
+		disabled  bool
+		event     func(s *Scheduler)
+		wantCalls []string
+	}{
+		"nominated-node-changed": {
+			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("node2")) },
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+		},
+		"nominated-node-cleared": {
+			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("")) },
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+		},
+		"nominated-node-added": {
+			event: func(s *Scheduler) { s.updatePodInSchedulingQueue(withNomination(""), nominatedPod) },
+		},
+		"other-update": {
+			event: func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("node1")) },
+		},
+		"deleted": {
+			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, false) },
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+		},
+		"bound-by-other": {
+			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, true) },
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+		},
+		"disabled": {
+			disabled: true,
+			event:    func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, false) },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, !tc.disabled)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := fake.NewClientset(nominatedPod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			queue := internalqueue.NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+			schedulerCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+			queue.Add(ctx, nominatedPod)
+
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			s, _, err := initScheduler(ctx, schedulerCache, queue, nil, client, informerFactory,
+				tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)))
+			if err != nil {
+				t.Fatalf("Failed to initialize test scheduler: %v", err)
+			}
+			s.logger = logger
+
+			tc.event(s)
+			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestUpdateAssignedPodInCache(t *testing.T) {
 	nodeName := "node"
 

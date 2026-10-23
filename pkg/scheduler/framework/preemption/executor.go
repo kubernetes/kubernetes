@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -215,6 +216,9 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
 	preemptedLastVictimInMemory := false
+	// evictionFailed is not set for failures to clear lower priority nominations,
+	// because those do not affect the preemptor's own nomination.
+	evictionFailed := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -276,6 +280,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			if err := errCh.Receive(); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 				result = metrics.GoroutineResultError
+				evictionFailed = true
 				preemptLastVictim = false
 			}
 		}
@@ -293,9 +298,16 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
+				evictionFailed = true
 			} else if preemptedInMemory {
 				preemptedLastVictimInMemory = true
 			}
+		}
+		if evictionFailed {
+			// Before PreEnqueue lets the preemptor through: it can then preempt
+			// again instead of waiting for victims which are not going away,
+			// and a new nomination must not get removed instead of this one.
+			e.removeNomination(ctx, preemptor, c.Name())
 		}
 		e.mu.Lock()
 		e.preempting.Delete(preemptor.UID())
@@ -352,6 +364,19 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	}
 
 	return nil
+}
+
+// removeNomination notifies plugins which implement framework.NominationExtensions
+// that the nomination of a pod preemptor ended because victims could not be
+// preempted. Pod group preemptors never notify them.
+func (e *Executor) removeNomination(ctx context.Context, preemptor ExecutorPreemptor, nodeName string) {
+	podPreemptor, ok := preemptor.(*podExecutorPreemptor)
+	if !ok {
+		return
+	}
+	if runner, ok := e.fh.(framework.NominationExtensionsRunner); ok {
+		runner.RunNominationExtensionsRemoveNominatedPod(ctx, podPreemptor.Pod, nodeName, true)
+	}
 }
 
 func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandidate) {
