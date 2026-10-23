@@ -17,9 +17,14 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -81,17 +86,37 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 	}
 }
 
+// consumedCapacityError checks the consumed capacity of each allocation result.
+// Checking only the aggregated capacity would not be enough, because a positive
+// value from another claim for the same device can hide a negative value.
+// The stored names get checked, because NewDeviceConsumedCapacity drops an
+// unqualified name when the qualified name is also set.
+func consumedCapacityError(claim *resourceapi.ResourceClaim) error {
+	if claim.Status.Allocation == nil {
+		return nil
+	}
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		for _, name := range slices.Sorted(maps.Keys(result.ConsumedCapacity)) {
+			if quantity := result.ConsumedCapacity[name]; quantity.Sign() < 0 {
+				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+				return fmt.Errorf("claim %s, device %s: consumed capacity %q must not be negative, got %s", klog.KObj(claim), deviceID, name, quantity.String())
+			}
+		}
+	}
+	return nil
+}
+
 // allocatedDevices reacts to events in a cache and maintains a set of all allocated devices.
 // This is cheaper than repeatedly calling List, making strings unique, and building the set
 // each time PreFilter is called.
 //
 // To simplify detecting concurrent changes, each modification bumps a revision counter,
-// similar to ResourceVersion in the apiserver. Get and Capacities include the
+// similar to ResourceVersion in the apiserver. get and getCapacities include the
 // current value in their result. A caller than can compare againt the current value
 // to determine whether some prior results are still up-to-date, without having to get
 // and compare them.
 //
-// All methods are thread-safe. Get returns a cloned set.
+// All methods are thread-safe. get returns a cloned set.
 type allocatedDevices struct {
 	logger klog.Logger
 
@@ -100,6 +125,7 @@ type allocatedDevices struct {
 	ids                       sets.Set[structured.DeviceID]
 	shareIDs                  sets.Set[structured.SharedDeviceID]
 	capacities                structured.ConsumedCapacityCollection
+	invalidCapacities         map[types.UID]error
 	enabledConsumableCapacity bool
 }
 
@@ -109,18 +135,19 @@ func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 		ids:                       sets.New[structured.DeviceID](),
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
 		capacities:                structured.NewConsumedCapacityCollection(),
+		invalidCapacities:         make(map[types.UID]error),
 		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 	}
 }
 
-func (a *allocatedDevices) Get() (sets.Set[structured.DeviceID], int64) {
+func (a *allocatedDevices) get() (sets.Set[structured.DeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
 	return a.ids.Clone(), a.revision
 }
 
-func (a *allocatedDevices) GetSharedDeviceIDs() (sets.Set[structured.DeviceID], int64) {
+func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.DeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
@@ -131,14 +158,26 @@ func (a *allocatedDevices) GetSharedDeviceIDs() (sets.Set[structured.DeviceID], 
 	return result, a.revision
 }
 
-func (a *allocatedDevices) Capacities() (structured.ConsumedCapacityCollection, int64) {
+// getCapacities returns an error instead of the capacities if some allocated claim
+// has a negative consumed capacity, because the aggregated capacities then
+// under-count what is in use. The error remains until all such claims are removed.
+func (a *allocatedDevices) getCapacities() (structured.ConsumedCapacityCollection, int64, error) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	return a.capacities.Clone(), a.revision
+	if len(a.invalidCapacities) > 0 {
+		errs := slices.SortedFunc(maps.Values(a.invalidCapacities), func(x, y error) int {
+			return strings.Compare(x.Error(), y.Error())
+		})
+		if len(errs) > 1 {
+			return nil, a.revision, fmt.Errorf("%w (and %d more claims with invalid consumed capacity)", errs[0], len(errs)-1)
+		}
+		return nil, a.revision, errs[0]
+	}
+	return a.capacities.Clone(), a.revision, nil
 }
 
-func (a *allocatedDevices) Revision() int64 {
+func (a *allocatedDevices) getRevision() int64 {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
@@ -205,9 +244,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	deviceIDs := make([]structured.DeviceID, 0, 20)
 	var shareIDs []structured.SharedDeviceID
 	var deviceCapacities []structured.DeviceConsumedCapacity
+	var capacityErr error
 	if a.enabledConsumableCapacity {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
+		capacityErr = consumedCapacityError(claim)
 	}
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
@@ -221,11 +262,15 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		},
 		func(capacity structured.DeviceConsumedCapacity) {
 			a.logger.V(6).Info("Observed consumed capacity", "device", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
-			deviceCapacities = append(deviceCapacities, capacity)
+			// A negative value can bring the aggregated capacity of a device to zero
+			// while valid claims still consume it, and Remove then deletes the entry.
+			if capacityErr == nil {
+				deviceCapacities = append(deviceCapacities, capacity)
+			}
 		},
 	)
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
 
@@ -241,6 +286,9 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	for _, capacity := range deviceCapacities {
 		a.capacities.Insert(capacity)
 	}
+	if capacityErr != nil {
+		a.invalidCapacities[claim.UID] = capacityErr
+	}
 }
 
 func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
@@ -253,9 +301,11 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	deviceIDs := make([]structured.DeviceID, 0, 20)
 	var shareIDs []structured.SharedDeviceID
 	var deviceCapacities []structured.DeviceConsumedCapacity
+	var capacityErr error
 	if a.enabledConsumableCapacity {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
+		capacityErr = consumedCapacityError(claim)
 	}
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
@@ -269,10 +319,13 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		},
 		func(capacity structured.DeviceConsumedCapacity) {
 			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
-			deviceCapacities = append(deviceCapacities, capacity)
+			// addDevices did not insert the capacities of an invalid claim.
+			if capacityErr == nil {
+				deviceCapacities = append(deviceCapacities, capacity)
+			}
 		})
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
 
@@ -288,4 +341,5 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	for _, capacity := range deviceCapacities {
 		a.capacities.Remove(capacity)
 	}
+	delete(a.invalidCapacities, claim.UID)
 }

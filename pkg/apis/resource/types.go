@@ -1015,6 +1015,9 @@ const (
 	DeviceConstraintsMaxSize       = 32
 	DeviceConfigMaxSize            = 32
 	DeviceDerivedAttributesMaxSize = 32
+	// MaxCapacityRequirements is the maximum number of entries allowed in
+	// CapacityRequirements.Requests.
+	MaxCapacityRequirements = 32
 )
 
 // DRAAdminNamespaceLabelKey is a label key used to grant administrative access
@@ -1381,7 +1384,9 @@ type CapacityRequirements struct {
 	// If the device allows multiple allocation,
 	// the aggregated amount across all requests must not exceed the capacity value.
 	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	// is recorded in the resource claim's status.devices[*].consumedCapacity field.
+	//
+	// Requests may have at most 32 entries. The values must not be negative.
 	//
 	// +optional
 	Requests map[QualifiedName]resource.Quantity
@@ -1991,6 +1996,8 @@ type DeviceRequestAllocationResult struct {
 	// All capacity entries are included, even if the consumed amount is zero.
 	// The domain prefix in the capacity name may be omitted if it is
 	// the same as the driver name.
+	//
+	// ConsumedCapacity may have at most 32 entries. The values must not be negative.
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity

@@ -218,6 +218,9 @@ func addDeviceMapping(
 			return fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResources for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 		}
 		if consumed, exists := draapi.LookupByQualifiedName(result.ConsumedCapacity, capacityKey, result.Driver); exists {
+			if consumed.Sign() < 0 {
+				return fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity for capacity key '%s' must not be negative, got %s", key.Namespace, key.Name, result.Device, capacityKey, consumed.String())
+			}
 			// If !exists - the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
 			consumedQuantity := consumed.DeepCopy()
 			quantityOne := resource.MustParse("1")
@@ -226,6 +229,9 @@ func addDeviceMapping(
 				qDec := consumedQuantity.AsDec()
 				qDec.Mul(qDec, multiplier.AsDec())
 				consumedQuantity = *resource.NewDecimalQuantity(*qDec, consumedQuantity.Format)
+			}
+			if consumedQuantity.Sign() < 0 {
+				return fmt.Errorf("claim %s/%s, device %s: computed node-allocatable footprint for resource %s must not be negative, got %s", key.Namespace, key.Name, result.Device, resourceName, consumedQuantity.String())
 			}
 			current := totalResources[resourceName]
 			current.Add(consumedQuantity)
