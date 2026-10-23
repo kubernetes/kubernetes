@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -2540,7 +2541,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	}
 }
 
-func TestUpdatePodGroupCondition(t *testing.T) {
+func TestUpdatePodGroupInitiallyScheduledCondition(t *testing.T) {
 	now := metav1.Now().Rfc3339Copy()
 
 	tests := []struct {
@@ -2871,7 +2872,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			podGroupInfo := &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: gpg},
 			}
-			sched.updatePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
+			sched.updatePodGroupInitiallyScheduledCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
 
 			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -2885,6 +2886,143 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 
 			if tt.expectLastTransitionTimeUnchanged && !cond.LastTransitionTime.Equal(&existingLTT) {
 				t.Errorf("Expected LastTransitionTime to be preserved as %v, got %v", existingLTT, cond.LastTransitionTime)
+			}
+		})
+	}
+}
+
+// TestUpdatePodGroupInitiallyScheduledConditionStaleCache sets the condition several times,
+// without the cache observing any of the updates in between.
+func TestUpdatePodGroupInitiallyScheduledConditionStaleCache(t *testing.T) {
+	scheduled := metav1.Condition{
+		Type:    schedulingapi.PodGroupInitiallyScheduled,
+		Status:  metav1.ConditionTrue,
+		Reason:  schedulingapi.PodGroupReasonScheduled,
+		Message: "All pods scheduled",
+	}
+	unschedulable := metav1.Condition{
+		Type:    schedulingapi.PodGroupInitiallyScheduled,
+		Status:  metav1.ConditionFalse,
+		Reason:  schedulingapi.PodGroupReasonUnschedulable,
+		Message: "extra pods could not be placed",
+	}
+	podGroup := st.MakePodGroup().Name("pg").Namespace("ns").UID("pg").Obj()
+	recreatedPodGroup := st.MakePodGroup().Name("pg").Namespace("ns").UID("recreated-pg").Obj()
+
+	tests := []struct {
+		name string
+		// deleted removes the PodGroup from the API server, but not from the cache.
+		deleted bool
+		// recreated replaces the PodGroup in the API server and in the cache before the last update.
+		recreated bool
+		// failedStatusPatch, if set, is the number of the status patch that fails.
+		failedStatusPatch int
+		updates           []metav1.Condition
+		// expectCondition is nil when the PodGroup is not in the API server.
+		expectCondition         *metav1.Condition
+		expectAssumed           bool
+		expectStatusUpdateError bool
+	}{
+		{
+			name:            "True is not regressed",
+			updates:         []metav1.Condition{scheduled, unschedulable},
+			expectCondition: &scheduled,
+			expectAssumed:   true,
+		},
+		{
+			name:                    "True that failed to be set does not block False",
+			failedStatusPatch:       1,
+			updates:                 []metav1.Condition{scheduled, unschedulable},
+			expectCondition:         &unschedulable,
+			expectStatusUpdateError: true,
+		},
+		{
+			name:                    "True that failed to be set again is not regressed",
+			failedStatusPatch:       2,
+			updates:                 []metav1.Condition{scheduled, scheduled, unschedulable},
+			expectCondition:         &scheduled,
+			expectAssumed:           true,
+			expectStatusUpdateError: true,
+		},
+		{
+			name:            "True set for a deleted PodGroup does not block False for a recreated one",
+			recreated:       true,
+			updates:         []metav1.Condition{scheduled, unschedulable},
+			expectCondition: &unschedulable,
+		},
+		{
+			name:    "True for a deleted PodGroup is forgotten and not reported as an error",
+			deleted: true,
+			updates: []metav1.Condition{scheduled},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			ctx := klog.NewContext(context.Background(), logger)
+
+			var objects []runtime.Object
+			if !tt.deleted {
+				objects = append(objects, podGroup)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			statusPatches := 0
+			client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "status" {
+					return false, nil, nil
+				}
+				statusPatches++
+				if statusPatches != tt.failedStatusPatch {
+					return false, nil, nil
+				}
+				return true, nil, fmt.Errorf("injected error")
+			})
+			// The cache is not updated with the scheduler's own writes,
+			// as if their watch events were not delivered yet.
+			cache := internalcache.New(ctx, nil, true, true)
+			// A member pod keeps the pod group state in the cache when the PodGroup is deleted.
+			cache.AddPodGroupMember(st.MakePod().Name("p").Namespace("ns").UID("p").PodGroupName("pg").Obj())
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(podGroup))
+			sched := &Scheduler{client: client, Cache: cache}
+
+			current := podGroup
+			for i, update := range tt.updates {
+				if tt.recreated && i == len(tt.updates)-1 {
+					if err := client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Delete(ctx, podGroup.Name, metav1.DeleteOptions{}); err != nil {
+						t.Fatalf("Failed to delete PodGroup: %v", err)
+					}
+					if _, err := client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(ctx, recreatedPodGroup, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create PodGroup: %v", err)
+					}
+					cache.RemoveGenericPodGroup(logger, fwk.NewGenericPodGroup(podGroup))
+					cache.AddGenericPodGroup(fwk.NewGenericPodGroup(recreatedPodGroup))
+					current = recreatedPodGroup
+				}
+				condition := update
+				sched.updatePodGroupInitiallyScheduledCondition(ctx, &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(current)}, &condition)
+			}
+
+			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Get(ctx, podGroup.Name, metav1.GetOptions{})
+			if tt.expectCondition == nil {
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected PodGroup not to be found, got error: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Failed to get PodGroup: %v", err)
+				}
+				cond := apimeta.FindStatusCondition(updatedPodGroup.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled)
+				if diff := cmp.Diff(tt.expectCondition, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected PodGroupInitiallyScheduled condition (-want +got):\n%s", diff)
+				}
+			}
+			if assumed := cache.IsGroupInitiallyScheduledAssumed(fwk.PodGroupKey(current.Namespace, current.Name), current.UID); assumed != tt.expectAssumed {
+				t.Errorf("Expected IsGroupInitiallyScheduledAssumed to return %v, got %v", tt.expectAssumed, assumed)
+			}
+			logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+			if reported := strings.Contains(logs, "Failed to update PodGroup status"); reported != tt.expectStatusUpdateError {
+				t.Errorf("Expected a reported status update error: %v, got logs:\n%s", tt.expectStatusUpdateError, logs)
 			}
 		})
 	}
@@ -8373,7 +8511,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 		}
 	}
 }
-func TestUpdateCompositePodGroupCondition(t *testing.T) {
+func TestUpdateCompositePodGroupInitiallyScheduledCondition(t *testing.T) {
 	now := metav1.Now().Rfc3339Copy()
 
 	tests := []struct {
@@ -8667,7 +8805,7 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 					GenericPodGroup: fwk.NewGenericCompositePodGroup(tt.existingPodGroup),
 				},
 			}
-			sched.updateCompositePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
+			sched.updateCompositePodGroupInitiallyScheduledCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
 
 			updatedPodGroup, err := client.SchedulingV1alpha3().CompositePodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -8681,6 +8819,143 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 
 			if tt.expectLastTransitionTimeUnchanged && !cond.LastTransitionTime.Equal(&existingLTT) {
 				t.Errorf("Expected LastTransitionTime to be preserved as %v, got %v", existingLTT, cond.LastTransitionTime)
+			}
+		})
+	}
+}
+
+// TestUpdateCompositePodGroupInitiallyScheduledConditionStaleCache sets the condition several times,
+// without the cache observing any of the updates in between.
+func TestUpdateCompositePodGroupInitiallyScheduledConditionStaleCache(t *testing.T) {
+	scheduled := metav1.Condition{
+		Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+		Status:  metav1.ConditionTrue,
+		Reason:  schedulingapi.CompositePodGroupReasonScheduled,
+		Message: "All child groups scheduled",
+	}
+	unschedulable := metav1.Condition{
+		Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+		Status:  metav1.ConditionFalse,
+		Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+		Message: "no pods were schedulable",
+	}
+	compositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("ns").UID("cpg").Obj()
+	recreatedCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("ns").UID("recreated-cpg").Obj()
+
+	tests := []struct {
+		name string
+		// deleted removes the CompositePodGroup from the API server, but not from the cache.
+		deleted bool
+		// recreated replaces the CompositePodGroup in the API server and in the cache before the last update.
+		recreated bool
+		// failedStatusPatch, if set, is the number of the status patch that fails.
+		failedStatusPatch int
+		updates           []metav1.Condition
+		// expectCondition is nil when the CompositePodGroup is not in the API server.
+		expectCondition         *metav1.Condition
+		expectAssumed           bool
+		expectStatusUpdateError bool
+	}{
+		{
+			name:            "True is not regressed",
+			updates:         []metav1.Condition{scheduled, unschedulable},
+			expectCondition: &scheduled,
+			expectAssumed:   true,
+		},
+		{
+			name:                    "True that failed to be set does not block False",
+			failedStatusPatch:       1,
+			updates:                 []metav1.Condition{scheduled, unschedulable},
+			expectCondition:         &unschedulable,
+			expectStatusUpdateError: true,
+		},
+		{
+			name:                    "True that failed to be set again is not regressed",
+			failedStatusPatch:       2,
+			updates:                 []metav1.Condition{scheduled, scheduled, unschedulable},
+			expectCondition:         &scheduled,
+			expectAssumed:           true,
+			expectStatusUpdateError: true,
+		},
+		{
+			name:            "True set for a deleted CompositePodGroup does not block False for a recreated one",
+			recreated:       true,
+			updates:         []metav1.Condition{scheduled, unschedulable},
+			expectCondition: &unschedulable,
+		},
+		{
+			name:    "True for a deleted CompositePodGroup is forgotten and not reported as an error",
+			deleted: true,
+			updates: []metav1.Condition{scheduled},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			ctx := klog.NewContext(context.Background(), logger)
+
+			var objects []runtime.Object
+			if !tt.deleted {
+				objects = append(objects, compositePodGroup)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			statusPatches := 0
+			client.PrependReactor("patch", "compositepodgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "status" {
+					return false, nil, nil
+				}
+				statusPatches++
+				if statusPatches != tt.failedStatusPatch {
+					return false, nil, nil
+				}
+				return true, nil, fmt.Errorf("injected error")
+			})
+			// The cache is not updated with the scheduler's own writes,
+			// as if their watch events were not delivered yet.
+			cache := internalcache.New(ctx, nil, true, true)
+			// A child group keeps the composite pod group state in the cache when the CompositePodGroup is deleted.
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg").Namespace("ns").UID("pg").ParentCompositePodGroup("cpg").Obj()))
+			cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(compositePodGroup))
+			sched := &Scheduler{client: client, Cache: cache}
+
+			current := compositePodGroup
+			for i, update := range tt.updates {
+				if tt.recreated && i == len(tt.updates)-1 {
+					if err := client.SchedulingV1alpha3().CompositePodGroups(compositePodGroup.Namespace).Delete(ctx, compositePodGroup.Name, metav1.DeleteOptions{}); err != nil {
+						t.Fatalf("Failed to delete CompositePodGroup: %v", err)
+					}
+					if _, err := client.SchedulingV1alpha3().CompositePodGroups(compositePodGroup.Namespace).Create(ctx, recreatedCompositePodGroup, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create CompositePodGroup: %v", err)
+					}
+					cache.RemoveGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(compositePodGroup))
+					cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(recreatedCompositePodGroup))
+					current = recreatedCompositePodGroup
+				}
+				condition := update
+				sched.updateCompositePodGroupInitiallyScheduledCondition(ctx, &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(current)}, &condition)
+			}
+
+			updatedCompositePodGroup, err := client.SchedulingV1alpha3().CompositePodGroups(compositePodGroup.Namespace).Get(ctx, compositePodGroup.Name, metav1.GetOptions{})
+			if tt.expectCondition == nil {
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected CompositePodGroup not to be found, got error: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Failed to get CompositePodGroup: %v", err)
+				}
+				cond := apimeta.FindStatusCondition(updatedCompositePodGroup.Status.Conditions, schedulingapi.CompositePodGroupInitiallyScheduled)
+				if diff := cmp.Diff(tt.expectCondition, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected CompositePodGroupInitiallyScheduled condition (-want +got):\n%s", diff)
+				}
+			}
+			if assumed := cache.IsGroupInitiallyScheduledAssumed(fwk.CompositePodGroupKey(current.Namespace, current.Name), current.UID); assumed != tt.expectAssumed {
+				t.Errorf("Expected IsGroupInitiallyScheduledAssumed to return %v, got %v", tt.expectAssumed, assumed)
+			}
+			logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+			if reported := strings.Contains(logs, "Failed to update CompositePodGroup status"); reported != tt.expectStatusUpdateError {
+				t.Errorf("Expected a reported status update error: %v, got logs:\n%s", tt.expectStatusUpdateError, logs)
 			}
 		})
 	}
