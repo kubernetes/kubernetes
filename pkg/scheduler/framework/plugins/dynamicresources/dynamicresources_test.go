@@ -6445,7 +6445,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 
 			for _, pod := range tc.unscheduledPods {
 				// Initialize the stateData of the pod with unavailable claims
-				s := &stateData{}
+				s := &stateData{filterResults: &filterResults{}}
 				userClaims, err := testCtx.p.podResourceClaims(pod)
 				require.NoError(tCtx, err)
 				extendedResourceClaim := findExtendedResourceClaim(pod, testClaims)

@@ -39,11 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -96,6 +98,26 @@ type stateData struct {
 	// Allocator handles claims with structured parameters, which is all of them nowadays.
 	allocator structured.Allocator
 
+	// filterResults is shared with all copies of the state, so later
+	// phases see what Filter stored, regardless of the copy it ran on.
+	*filterResults
+
+	// informationsForClaim has one entry for each claim in claims.
+	informationsForClaim []informationForClaim
+
+	// claimHasNodeAllocatableMappedDevice stores whether a claim's allocation is mapped.
+	// A claim is mapped if it is allocated a device that models a node-allocatable
+	// resource (like cpu, memory) via the NodeAllocatableResources.Mapping field in the
+	// Device spec inside the ResourceSlice.
+	// This map is used in the Filter phase to prevent sharing these mapped claims across pods.
+	// Populated in PreFilter and read in Filter.
+	claimHasNodeAllocatableMappedDevice map[types.UID]bool
+
+	// preemption is only set if the DRAPreemption feature is enabled.
+	preemption *preemptionState
+}
+
+type filterResults struct {
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -107,23 +129,19 @@ type stateData struct {
 	// protected by the mutex. Used by PostFilter.
 	unavailableClaims sets.Set[int]
 
-	// informationsForClaim has one entry for each claim in claims.
-	informationsForClaim []informationForClaim
-
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
-
-	// claimHasNodeAllocatableMappedDevice stores whether a claim's allocation is mapped.
-	// A claim is mapped if it is allocated a device that models a node-allocatable
-	// resource (like cpu, memory) via the NodeAllocatableResources.Mapping field in the
-	// Device spec inside the ResourceSlice.
-	// This map is used in the Filter phase to prevent sharing these mapped claims across pods.
-	// Populated in PreFilter and read in Filter.
-	claimHasNodeAllocatableMappedDevice map[types.UID]bool
 }
 
+// Clone returns the state itself unless preemption must be simulated. Then
+// each copy needs its own simulation.
 func (d *stateData) Clone() fwk.StateData {
-	return d
+	if d.preemption == nil {
+		return d
+	}
+	clone := *d
+	clone.preemption = d.preemption.clone()
+	return &clone
 }
 
 // This state is persisted in the PodGroup CycleState. Because we save the
@@ -185,6 +203,7 @@ type DynamicResources struct {
 	celCache       *cel.Cache
 	draManager     fwk.SharedDRAManager
 	podIndexer     cache.Indexer
+	podLister      corelisters.PodLister
 }
 
 const (
@@ -239,6 +258,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		}
 		pl.podIndexer = podInformer.GetIndexer()
 	}
+	pl.podLister = fh.SharedInformerFactory().Core().V1().Pods().Lister()
 
 	return pl, nil
 }
@@ -586,7 +606,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	// observation for the other functions. This gets updated below
 	// if we get that far.
 	s := &stateData{
-		nodeAllocations: make(map[string]nodeAllocation),
+		filterResults: &filterResults{
+			nodeAllocations: make(map[string]nodeAllocation),
+		},
 	}
 	state.Write(stateKey, s)
 
@@ -756,6 +778,8 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
+	var allocatedState *structured.AllocatedState
+	var resourceSlices []*draapi.ResourceSlice
 	if numClaimsToAllocate > 0 {
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, claims.len())
@@ -780,7 +804,6 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		//
 		// This might have to be retried in the unlikely case that some concurrent modification made
 		// the result invalid.
-		var allocatedState *structured.AllocatedState
 		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
 			if pl.fts.EnableDRAConsumableCapacity {
 				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
@@ -817,18 +840,21 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		if err != nil {
 			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
-		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
+		resourceSlices, err = pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		features := AllocatorFeatures(pl.fts)
-		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), resourceSlices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
 	}
 	s.claims = claims
+	if pl.fts.EnableDRAPreemption {
+		s.preemption = pl.newPreemptionState(pod, &s.claims, allocatedState, resourceSlices)
+	}
 	return nil, nil
 }
 
@@ -862,11 +888,6 @@ func (pl *DynamicResources) validateDeviceClass(logger klog.Logger, deviceClassN
 			return statusUnschedulable(logger, fmt.Sprintf("request %s: device class %s does not exist", requestName, deviceClassName))
 		}
 	}
-	return nil
-}
-
-// PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -1058,7 +1079,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
 		}
-		allocationResult, err := state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		allocator, err := pl.allocatorForNode(ctx, state, node.Name)
+		if err != nil {
+			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
+		}
+		allocationResult, err := allocator.Allocate(allocCtx, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
