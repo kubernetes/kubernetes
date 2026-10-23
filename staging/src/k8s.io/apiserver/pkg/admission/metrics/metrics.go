@@ -117,7 +117,9 @@ type AdmissionMetrics struct {
 	step                            *metricSet
 	controller                      *metricSet
 	webhook                         *metricSet
+	webhookRejectionDeprecated      *metrics.CounterVec
 	webhookRejection                *metrics.CounterVec
+	webhookFailOpenDeprecated       *metrics.CounterVec
 	webhookFailOpen                 *metrics.CounterVec
 	webhookRequest                  *metrics.CounterVec
 	matchConditionEvalErrors        *metrics.CounterVec
@@ -192,23 +194,45 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		latenciesSummary: nil,
 	}
 
+	webhookRejectionDeprecated := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "webhook_rejection_count",
+			Help:              "Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded. Use apiserver_admission_webhook_rejection_total instead.",
+			StabilityLevel:    metrics.BETA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"name", "type", "operation", "error_type", "rejection_code"})
+
 	webhookRejection := metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "webhook_rejection_count",
-			Help:           "Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
-			StabilityLevel: metrics.ALPHA,
+			Name:           "webhook_rejection_total",
+			Help:           "Total number of admission webhook rejections, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"name", "type", "operation", "error_type", "rejection_code"})
+
+	webhookFailOpenDeprecated := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "webhook_fail_open_count",
+			Help:              "Admission webhook fail open count, identified by name and broken out for each admission type (validating or admit). Use apiserver_admission_webhook_fail_open_total instead.",
+			StabilityLevel:    metrics.BETA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"name", "type"})
 
 	webhookFailOpen := metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "webhook_fail_open_count",
-			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or admit).",
-			StabilityLevel: metrics.ALPHA,
+			Name:           "webhook_fail_open_total",
+			Help:           "Total number of admission webhook calls that failed open, identified by name and broken out for each admission type (validating or admit).",
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"name", "type"})
 
@@ -261,12 +285,14 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	controller.mustRegister()
 	webhook.mustRegister()
 	matchConditionEvaluationSeconds.mustRegister()
+	legacyregistry.MustRegister(webhookRejectionDeprecated)
 	legacyregistry.MustRegister(webhookRejection)
+	legacyregistry.MustRegister(webhookFailOpenDeprecated)
 	legacyregistry.MustRegister(webhookFailOpen)
 	legacyregistry.MustRegister(webhookRequest)
 	legacyregistry.MustRegister(matchConditionEvalError)
 	legacyregistry.MustRegister(matchConditionExclusions)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds}
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejectionDeprecated: webhookRejectionDeprecated, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookFailOpenDeprecated: webhookFailOpenDeprecated, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -302,6 +328,7 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, st
 	if rejectionCode > 600 {
 		rejectionCode = 600
 	}
+	m.webhookRejectionDeprecated.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
 	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
 }
 
@@ -312,6 +339,7 @@ func (m *AdmissionMetrics) WebhookRejectionGathererForTest() *metrics.CounterVec
 
 // ObserveWebhookFailOpen records validating or mutating webhook that fail open.
 func (m *AdmissionMetrics) ObserveWebhookFailOpen(ctx context.Context, name, stepType string) {
+	m.webhookFailOpenDeprecated.WithContext(ctx).WithLabelValues(name, stepType).Inc()
 	m.webhookFailOpen.WithContext(ctx).WithLabelValues(name, stepType).Inc()
 }
 
