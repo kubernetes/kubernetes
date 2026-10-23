@@ -881,8 +881,10 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		// if the feature was enabled and then later disabled, MaxUnavailable may have a value
 		// more than 1. Ignore the passed in value and Use maxUnavailable as 1 to enforce
 		// expected behavior when feature gate is not enabled.
+		// Percent MaxUnavailable is scaled from the update range (Replicas - Partition), not
+		// from all replicas — matching the partition-scoped budget below.
 		var err error
-		maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
+		maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, max(0, replicaCount-updateMin))
 		if err != nil {
 			return &status, err
 		}
@@ -1006,7 +1008,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 		var err error
 		maxUnavailable := 1
 		if set.Spec.UpdateStrategy.RollingUpdate != nil {
-			maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
+			updateMin := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
+			maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, max(0, replicaCount-updateMin))
 			if err != nil {
 				return err
 			}
