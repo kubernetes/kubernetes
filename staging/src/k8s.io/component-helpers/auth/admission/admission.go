@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package admission verifies API-server authentication tokens for admission webhooks.
-package admission // import "k8s.io/component-helpers/auth/admission"
+package admission
 
 import (
 	"bytes"
@@ -599,7 +599,7 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 		return "", false
 	}
 	parts := strings.SplitN(auth, " ", 3)
-	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
+	if len(parts) < 2 || !strings.EqualFold(parts[0], "bearer") {
 		return "", false
 	}
 	token = parts[1]
