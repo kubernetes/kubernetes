@@ -1131,15 +1131,6 @@ const (
 	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
 	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
 
-	// owner: @zhifei92
-	//
-	// Enables the systemd watchdog for the kubelet. When enabled, the kubelet will
-	// periodically notify the systemd watchdog to indicate that it is still alive.
-	// This can help prevent the system from restarting the kubelet if it becomes
-	// unresponsive. The feature gate is enabled by default, but should only be used
-	// if the system supports the systemd watchdog feature and has it configured properly.
-	SystemdWatchdog = featuregate.Feature("SystemdWatchdog")
-
 	// owner: @helayoty
 	// kep: https://kep.k8s.io/5471
 	//
@@ -2067,11 +2058,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
 	},
 
-	SystemdWatchdog: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remov in 1.37
-	},
-
 	TaintTolerationComparisonOperators: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2713,8 +2699,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	StrictIPCIDRValidation: {},
 
 	SupplementalGroupsPolicy: {},
-
-	SystemdWatchdog: {},
 
 	TaintTolerationComparisonOperators: {},
 
