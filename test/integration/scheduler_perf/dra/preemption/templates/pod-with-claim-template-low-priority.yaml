@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: low-priority-
+spec:
+  # Preempted pods are gone immediately, there is no kubelet.
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      claims:
+      - name: resource
+  resourceClaims:
+  - name: resource
+    resourceClaimTemplateName: test-claim-template

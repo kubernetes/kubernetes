@@ -1,0 +1,181 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+
+# Preemption measures how quickly pods with claims get scheduled when they
+# have to preempt pods with claims (DRAPreemption). Each node has 10 devices,
+# all of them used by low-priority pods. Each measured pod has higher priority
+# and needs one device, so it preempts one pod and waits until the
+# ResourceClaim controller has deallocated the claim of that pod.
+- name: Preemption
+  featureGates:
+    DRAPreemption: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    # one ResourceSlice with 10 devices
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template-low-priority.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template-high-priority.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      initPods: 10
+      measurePods: 2
+  - name: 100nodes
+    labels: [performance, short]
+    params:
+      nodesWithDRA: 100
+      initPods: 1000
+      measurePods: 200
+  - name: 500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      initPods: 5000
+      measurePods: 1000
+
+# PreemptionPartitionable is a variant of Preemption with partitionable
+# devices. Each node has two halves and one whole device which consume the
+# same counters. Low-priority pods use the halves, each measured pod needs the
+# whole device and therefore preempts both pods on a node. Simulating that
+# preemption has to free the counters of the halves.
+- name: PreemptionPartitionable
+  featureGates:
+    DRAPreemption: true
+    DRAPartitionableDevices: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-partitionable-countersets.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: templates/resourceslice-partitionable-devices.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: init
+    templateParams:
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].size == "half"
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template-low-priority.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+    templateParams:
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].size == "whole"
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template-high-priority.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      initPods: 2
+      measurePods: 1
+  - name: 100nodes
+    labels: [performance, short]
+    params:
+      nodesWithDRA: 100
+      initPods: 200
+      measurePods: 100
+  - name: 500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      initPods: 1000
+      measurePods: 500
+
+# PreemptionNotPossible measures scheduling attempts of pods with claims which
+# cannot preempt anything: all devices are used by pods of the same priority.
+# No node is a candidate for preemption, so DefaultPreemption must not run
+# its dry run for these pods.
+- name: PreemptionNotPossible
+  featureGates:
+    DRAPreemption: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    # one ResourceSlice with 10 devices
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template-low-priority.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: startCollectingMetrics
+    name: unschedulable
+    namespaces: [test]
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template-low-priority.yaml
+    skipWaitToCompletion: true
+  - opcode: barrier
+    namespaces: [test]
+    stageRequirement: Attempted
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      initPods: 10
+      measurePods: 2
+  - name: 100nodes
+    labels: [performance, short]
+    params:
+      nodesWithDRA: 100
+      initPods: 1000
+      measurePods: 200
+  - name: 500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      initPods: 5000
+      measurePods: 1000

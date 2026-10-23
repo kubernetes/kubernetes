@@ -266,6 +266,18 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 			},
 		},
+		// Preemption depends on how claims get deallocated, so these tests
+		// control that themselves and don't share the configuration with
+		// tests that use the ResourceClaim controller.
+		"preemption": {
+			apis: map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				features.DRAPreemption: true,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "Preemption", testPreemption)
+			},
+		},
 		"all": {
 			apis: map[schema.GroupVersion]bool{
 				resourcev1beta2.SchemeGroupVersion:  true,
@@ -285,6 +297,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAListTypeAttributes:        true,
 				features.DRAOptionalNodeOperations:    true,
 				features.DRAPartitionableDevices:      true,
+				features.DRAPreemption:                true,
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
@@ -440,45 +453,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 func createNodes(tCtx ktesting.TContext) []*v1.Node {
 	var createdNodes []*v1.Node
 	for i := range numNodes {
-		nodeName := fmt.Sprintf("worker-%d", i)
-		// Create node.
-		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeName,
-				Labels: map[string]string{
-					"kubernetes.io/hostname": nodeName,
-				},
-			},
-		}
-		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{FieldValidation: "Strict"})
-		tCtx.ExpectNoError(err, fmt.Sprintf("creating node #%d", i))
-
-		// Make the node ready.
-		node.Status = v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse(nodeCPUCapacity),
-				v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
-				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
-			},
-			// Required for tests in test/integration/dra/node_allocatable_resources.go.
-			// DeclaredFeatures must include DRANodeAllocatableResources to pass node feature validation during admission.
-			DeclaredFeatures: []string{"DRANodeAllocatableResources"},
-			Phase:            v1.NodeRunning,
-			Conditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-		}
-		node, err = tCtx.Client().CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
-		tCtx.ExpectNoError(err, fmt.Sprintf("setting status of node #%d", i))
-
-		// Remove taint added by TaintNodesByCondition admission check.
-		node.Spec.Taints = nil
-		node, err = tCtx.Client().CoreV1().Nodes().Update(tCtx, node, metav1.UpdateOptions{})
-		tCtx.ExpectNoError(err, fmt.Sprintf("removing node taint from #%d", i))
-		createdNodes = append(createdNodes, node)
+		createdNodes = append(createdNodes, createNode(tCtx, fmt.Sprintf("worker-%d", i)))
 	}
 
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
@@ -495,6 +470,49 @@ func createNodes(tCtx ktesting.TContext) []*v1.Node {
 		}
 	})
 	return createdNodes
+}
+
+// createNode creates a node which is ready for pods.
+func createNode(tCtx ktesting.TContext, nodeName string) *v1.Node {
+	tCtx.Helper()
+	// Create node.
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			Labels: map[string]string{
+				"kubernetes.io/hostname": nodeName,
+			},
+		},
+	}
+	node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{FieldValidation: "Strict"})
+	tCtx.ExpectNoError(err, "creating node "+nodeName)
+
+	// Make the node ready.
+	node.Status = v1.NodeStatus{
+		Capacity: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse(nodeCPUCapacity),
+			v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
+			v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
+		},
+		// Required for tests in test/integration/dra/node_allocatable_resources.go.
+		// DeclaredFeatures must include DRANodeAllocatableResources to pass node feature validation during admission.
+		DeclaredFeatures: []string{"DRANodeAllocatableResources"},
+		Phase:            v1.NodeRunning,
+		Conditions: []v1.NodeCondition{
+			{
+				Type:   v1.NodeReady,
+				Status: v1.ConditionTrue,
+			},
+		},
+	}
+	node, err = tCtx.Client().CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "setting status of node "+nodeName)
+
+	// Remove taint added by TaintNodesByCondition admission check.
+	node.Spec.Taints = nil
+	node, err = tCtx.Client().CoreV1().Nodes().Update(tCtx, node, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "removing node taint from "+nodeName)
+	return node
 }
 
 // runSubTest re-initializes the client inside the sub-test to ensure that the
