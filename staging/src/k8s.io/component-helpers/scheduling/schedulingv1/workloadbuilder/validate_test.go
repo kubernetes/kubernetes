@@ -17,6 +17,7 @@ limitations under the License.
 package workloadbuilder
 
 import (
+	"strings"
 	"testing"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -55,6 +56,7 @@ func TestBuilderValidate(t *testing.T) {
 		wantErrs         int
 		wantType         field.ErrorType
 		wantErrFieldPath string
+		wantErrDetail    string
 	}{
 		{
 			name:          "nil tree fails to compile",
@@ -78,6 +80,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "workload item name cannot be empty",
 		},
 		{
 			name:          "basic forbidden when not allow-listed",
@@ -114,6 +117,22 @@ func TestBuilderValidate(t *testing.T) {
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: singleDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    []DisruptionModeOption{SingleMode},
+		},
+		{
+			name:          "single disruption forbidden when not allow-listed",
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: singleDisruption()}},
+			allowPolicies: allPolicies,
+			allowModes:    []DisruptionModeOption{AllMode},
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
+		},
+		{
+			name:          "unset disruption (defaulting to single) forbidden when single not allow-listed",
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
+			allowPolicies: allPolicies,
+			allowModes:    []DisruptionModeOption{AllMode},
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
 		},
 		{
 			name:          "all disruption forbidden when not allow-listed",
@@ -273,6 +292,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: policy",
 		},
 		{
 			name: "composite policy set with a leaf disruptionMode fails the input union",
@@ -288,6 +308,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: disruptionMode",
 		},
 		{
 			name: "input union is enforced even when declarative validation is disabled",
@@ -302,6 +323,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: policy",
 		},
 		{
 			name: "invalid leaf child in a composite tree is validated recursively",
@@ -329,6 +351,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "does not match new root name",
 		},
 		{
 			name:          "update clearing policy skips declarative validation for the new nil policy",
@@ -405,6 +428,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "exceeds maximum allowed tree depth",
 		},
 		{
 			name: "composite item exceeding max allowed leaf children is rejected",
@@ -425,6 +449,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "leaf children, exceeding maximum allowed",
 		},
 		{
 			name: "composite item exceeding max allowed composite children is rejected",
@@ -445,6 +470,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "composite children, exceeding maximum allowed",
 		},
 		{
 			name: "composite basic parent with basic and gang children is valid",
@@ -524,10 +550,7 @@ func TestBuilderValidate(t *testing.T) {
 			root: newWorkloadItem("root", withPath(schedulingPath),
 				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeAllDisruption()}),
 				withChildren(newWorkloadItem("child", withPath(field.NewPath("spec", "childScheduling")),
-					withGang(2), withLeafDisruption(DisruptionModeInput{
-						PathElements: []string{"disruptionMode"},
-						PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}},
-					})))),
+					withGang(2), withLeafDisruption(singleDisruption())))),
 			allowPolicies:    allPolicies,
 			allowModes:       allModes,
 			wantErrs:         1,
@@ -607,6 +630,9 @@ func TestBuilderValidate(t *testing.T) {
 			}
 			if tt.wantErrFieldPath != "" && errs[0].Field != tt.wantErrFieldPath {
 				t.Errorf("expected error field %q, got %q", tt.wantErrFieldPath, errs[0].Field)
+			}
+			if tt.wantErrDetail != "" && !strings.Contains(errs[0].Detail, tt.wantErrDetail) {
+				t.Errorf("expected error detail containing %q, got %q", tt.wantErrDetail, errs[0].Detail)
 			}
 		})
 	}
