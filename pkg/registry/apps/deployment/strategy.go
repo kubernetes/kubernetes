@@ -77,6 +77,7 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
+	dropDisabledSchedulingFields(&deployment.Spec, nil)
 	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
@@ -85,6 +86,14 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	deployment := obj.(*apps.Deployment)
 	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
 	return appsvalidation.ValidateDeployment(deployment, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (deploymentStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithDeployment): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment),
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -113,6 +122,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
+	dropDisabledSchedulingFields(&newDeployment.Spec, &oldDeployment.Spec)
 	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
@@ -148,6 +158,17 @@ func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 
 func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
+}
+
+// dropDisabledSchedulingFields clears spec.scheduling when the
+// WorkloadWithDeployment gate is off, unless the old object already had it
+// (so we don't break round-trips for existing objects).
+func dropDisabledSchedulingFields(spec *apps.DeploymentSpec, oldSpec *apps.DeploymentSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) ||
+		(oldSpec != nil && oldSpec.Scheduling != nil) {
+		return
+	}
+	spec.Scheduling = nil
 }
 
 type deploymentStatusStrategy struct {

@@ -122,6 +122,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// TODO: remove "update" once
 			// https://github.com/kubernetes/kubernetes/issues/36897 is resolved.
 			rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "patch").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -366,6 +367,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("update").Groups(appsGroup, extensionsGroup).Resources("replicasets/status").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(appsGroup, extensionsGroup).Resources("replicasets/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "patch", "delete").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
 			eventsRule(),
 		},
 	})
