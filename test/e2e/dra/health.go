@@ -19,7 +19,9 @@ package dra
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -27,8 +29,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -36,6 +42,7 @@ import (
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -206,10 +213,169 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				testHealthTransitions(ctx, b)
 			})
 		})
+
+		// During a rolling update the kubelet hands the health stream over
+		// from the old to the new driver instance. The pod must switch
+		// directly to the device health reported by the new instance,
+		// without a transient "Unknown", and reports from the old instance
+		// must not overwrite it.
+		// The handover fix was added in Kubernetes 1.38.
+		f.It("must keep device health across a rolling update of the driver", f.WithKubeletMinVersion("1.38"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodeName := nodes.NodeNames[0]
+
+			oldDriver := drautils.NewDriverInstance(tCtx)
+			oldDriver.InstanceSuffix = "-old"
+			oldDriver.RollingUpdate = true
+			oldDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+			// Build behaves the same for both driver instances.
+			b := drautils.NewBuilderNow(tCtx, oldDriver)
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+
+			allocatedClaim, err := b.ClientV1(tCtx).ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get allocated claim")
+			gomega.Expect(allocatedClaim.Status.Allocation).ToNot(gomega.BeNil(), "claim allocation")
+			result := allocatedClaim.Status.Allocation.Devices.Results[0]
+
+			claimRef := pod.Spec.Containers[0].Resources.Claims[0]
+			statusName := v1.ResourceName("claim:" + claimRef.Name)
+			if claimRef.Request != "" {
+				statusName += v1.ResourceName("/" + claimRef.Request)
+			}
+			setHealth := func(driver *drautils.Driver, health string) {
+				plugin, ok := driver.Nodes[nodeName]
+				if !ok {
+					framework.Failf("no test driver plugin for node %s", nodeName)
+				}
+				plugin.HealthControlChan <- testdriverapp.DeviceHealthUpdate{
+					PoolName:   result.Pool,
+					DeviceName: result.Device,
+					Health:     health,
+				}
+			}
+			getHealth := func(ctx context.Context) (string, error) {
+				return getDeviceHealth(ctx, f.ClientSet, pod.Namespace, pod.Name, statusName, oldDriver.Name)
+			}
+
+			ginkgo.By("Reporting Healthy through the old driver instance")
+			setHealth(oldDriver, "Healthy")
+			gomega.Eventually(ctx, getHealth).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "device health should be Healthy before the rolling update")
+
+			// Polling could miss a short flap, therefore record every change.
+			healthHistory := watchDeviceHealth(ctx, f.ClientSet, pod.Namespace, pod.Name, statusName, oldDriver.Name)
+
+			ginkgo.By("Starting the new driver instance")
+			// Same driver name, different socket paths because of rolling update.
+			newDriver := drautils.NewDriverInstance(tCtx)
+			newDriver.InstanceSuffix = "-new"
+			newDriver.RollingUpdate = true
+			newDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+			// The new instance reports a different health than the old one,
+			// so that a report from the old instance overwriting the new one
+			// is detected. Queue the report before the kubelet subscribes,
+			// otherwise the device would legitimately expire to "Unknown"
+			// after the health timeout.
+			setHealth(newDriver, "Unhealthy")
+
+			newMethod := expectedHealthMethod(ctx, newDriver, nodeName)
+			gomega.Eventually(ctx, func() int64 {
+				return newDriver.CallCount(drautils.MethodInstance{NodeName: nodeName, FullMethod: newMethod})
+			}).WithTimeout(60*time.Second).WithPolling(100*time.Millisecond).Should(gomega.BeNumerically(">", 0), "expected health stream on the new driver instance")
+
+			ginkgo.By("Verifying that device health follows the new driver instance")
+			gomega.Eventually(ctx, healthHistory).WithTimeout(60*time.Second).WithPolling(time.Second).Should(gomega.ContainElement("Unhealthy"), "device health should follow the new driver instance")
+			gomega.Expect(healthHistory()).To(gomega.Equal([]string{"Healthy", "Unhealthy"}), "device health should change directly to the health reported by the new driver instance")
+
+			ginkgo.By("Verifying that the old driver instance cannot overwrite device health")
+			// The old instance is still running and resends its "Healthy"
+			// report every 2s while its stream is open.
+			gomega.Consistently(ctx, healthHistory).WithTimeout(10*time.Second).WithPolling(time.Second).Should(gomega.Equal([]string{"Healthy", "Unhealthy"}), "device health should not be overwritten by the old driver instance")
+
+			ginkgo.By("Stopping the old driver instance")
+			oldDriver.TearDown(tCtx)
+			// The old instance's prepared-claims state is stale after the
+			// handover: the kubelet unprepares the claim through the new
+			// instance. Let the builder cleanup use the new instance, the
+			// actual check is waiting for the pod to be deleted below.
+			b.Driver = newDriver
+
+			ginkgo.By("Verifying that device health does not change after stopping the old driver instance")
+			// Longer than the kubelet's default health timeout (30s), so that
+			// an expiry of the state reported by the new instance would be
+			// detected, too.
+			gomega.Consistently(ctx, healthHistory).WithTimeout(40*time.Second).WithPolling(time.Second).Should(gomega.Equal([]string{"Healthy", "Unhealthy"}), "device health should not change after stopping the old driver instance")
+
+			ginkgo.By("Reporting Healthy through the new driver instance")
+			setHealth(newDriver, "Healthy")
+			gomega.Eventually(ctx, healthHistory).WithTimeout(60*time.Second).WithPolling(time.Second).Should(gomega.Equal([]string{"Healthy", "Unhealthy", "Healthy"}), "device health should keep following the new driver instance")
+
+			// We need to clean up explicitly because the normal
+			// cleanup doesn't work (driver shuts down first).
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+		})
 	})
 })
 
-// getDeviceHealth returns the health of the device of the given driver as
+// getDeviceHealth retrieves the pod and returns the health of the device of
+// the given driver, see podDeviceHealth.
+func getDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namespace, podName string, statusName v1.ResourceName, driverName string) (string, error) {
+	pod, err := clientSet.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("get pod %s/%s: %w", namespace, podName, err)
+	}
+	return podDeviceHealth(pod, statusName, driverName), nil
+}
+
+// watchDeviceHealth records every change of the health of the device of the
+// given driver, starting with the current value. Unlike polling, it also
+// catches a change which gets reverted between two polls. The returned
+// function returns the values recorded so far. Unexpected watch events, for
+// example errors, are recorded too, so that they fail comparisons.
+func watchDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namespace, podName string, statusName v1.ResourceName, driverName string) func() []string {
+	pod, err := clientSet.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get pod %s/%s", namespace, podName)
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
+	watcher, err := watchtools.NewRetryWatcherWithContext(ctx, pod.ResourceVersion, &cache.ListWatch{
+		WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return clientSet.CoreV1().Pods(namespace).Watch(ctx, options)
+		},
+	})
+	framework.ExpectNoError(err, "watch pod %s/%s", namespace, podName)
+	ginkgo.DeferCleanup(watcher.Stop)
+
+	var mutex sync.Mutex
+	history := []string{podDeviceHealth(pod, statusName, driverName)}
+	go func() {
+		for event := range watcher.ResultChan() {
+			var health string
+			if pod, ok := event.Object.(*v1.Pod); ok {
+				health = podDeviceHealth(pod, statusName, driverName)
+			} else {
+				health = fmt.Sprintf("%s: %v", event.Type, event.Object)
+			}
+			mutex.Lock()
+			if history[len(history)-1] != health {
+				history = append(history, health)
+			}
+			mutex.Unlock()
+		}
+	}()
+
+	return func() []string {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return slices.Clone(history)
+	}
+}
+
+// podDeviceHealth returns the health of the device of the given driver as
 // published in the pod's AllocatedResourcesStatus under the given resource
 // status name, or "NotFound" if there is no entry for it.
 //
@@ -220,12 +386,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 // generates CDI device IDs of the form "<driver>/test=...", so in both cases
 // the ID starts with the driver name, which is sufficient to identify the
 // device because the claims used in these tests allocate exactly one.
-func getDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namespace, podName string, statusName v1.ResourceName, driverName string) (string, error) {
-	pod, err := clientSet.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("get pod %s/%s: %w", namespace, podName, err)
-	}
-
+func podDeviceHealth(pod *v1.Pod, statusName v1.ResourceName, driverName string) string {
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		for _, resourceStatus := range containerStatus.AllocatedResourcesStatus {
 			if resourceStatus.Name != statusName {
@@ -233,11 +394,11 @@ func getDeviceHealth(ctx context.Context, clientSet kubernetes.Interface, namesp
 			}
 			for _, resourceHealth := range resourceStatus.Resources {
 				if strings.HasPrefix(string(resourceHealth.ResourceID), driverName+"/") {
-					return string(resourceHealth.Health), nil
+					return string(resourceHealth.Health)
 				}
 			}
 		}
 	}
 
-	return "NotFound", nil
+	return "NotFound"
 }
