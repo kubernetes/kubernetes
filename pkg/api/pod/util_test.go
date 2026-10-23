@@ -4621,6 +4621,65 @@ func TestDropHostnameOverride(t *testing.T) {
 	}
 }
 
+func TestUseAllowPodNetwork(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		enabled    bool
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{name: "gate enabled, no old spec", enabled: true, want: true},
+		{name: "gate enabled, old spec without field", enabled: true, oldPodSpec: &api.PodSpec{}, want: true},
+		{name: "gate disabled, no old spec", enabled: false, want: false},
+		{name: "gate disabled, old spec without field", enabled: false, oldPodSpec: &api.PodSpec{}, want: false},
+		{name: "gate disabled, old spec with Default", enabled: false, oldPodSpec: &api.PodSpec{PodNetwork: new(api.PodNetworkDefault)}, want: false},
+		{name: "gate disabled, old spec with Isolated", enabled: false, oldPodSpec: &api.PodSpec{PodNetwork: new(api.PodNetworkIsolated)}, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, tc.enabled)
+			if got := useAllowPodNetwork(tc.oldPodSpec); got != tc.want {
+				t.Errorf("useAllowPodNetwork() = %v, want %v", got, tc.want)
+			}
+			opts := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if opts.AllowPodNetwork != tc.want {
+				t.Errorf("AllowPodNetwork = %v, want %v", opts.AllowPodNetwork, tc.want)
+			}
+		})
+	}
+}
+
+func TestDropPodNetworkDefault(t *testing.T) {
+	def := new(api.PodNetworkDefault)
+	isolated := new(api.PodNetworkIsolated)
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		in, old *api.PodNetwork
+		want    *api.PodNetwork
+	}{
+		{name: "gate enabled, Default kept", enabled: true, in: def, want: def},
+		{name: "gate enabled, Isolated kept", enabled: true, in: isolated, want: isolated},
+		{name: "gate disabled, Default dropped", enabled: false, in: def, want: nil},
+		{name: "gate disabled, Default dropped on update of a Default object", enabled: false, in: def, old: def, want: nil},
+		{name: "gate disabled, Default kept on update of an Isolated object", enabled: false, in: def, old: isolated, want: def},
+		{name: "gate disabled, Isolated kept for validation", enabled: false, in: isolated, want: isolated},
+		{name: "gate disabled, unset", enabled: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, tc.enabled)
+			pod := &api.Pod{Spec: api.PodSpec{PodNetwork: tc.in}}
+			var oldPod *api.Pod
+			if tc.old != nil {
+				oldPod = &api.Pod{Spec: api.PodSpec{PodNetwork: tc.old}}
+			}
+			DropDisabledPodFields(pod, oldPod)
+			if diff := cmp.Diff(tc.want, pod.Spec.PodNetwork); diff != "" {
+				t.Errorf("unexpected podNetwork (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 

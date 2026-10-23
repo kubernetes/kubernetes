@@ -443,6 +443,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
+	opts.AllowPodNetwork = useAllowPodNetwork(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
@@ -837,6 +838,19 @@ func dropDisabledFields(
 		podSpec.HostnameOverride = nil
 	}
 
+	// spec.podNetwork "Isolated" is not dropped when the NetworkIsolatedPods gate
+	// is disabled; validation rejects new uses instead (see
+	// useAllowPodNetwork). Dropping it would silently attach a pod that asked
+	// for isolation to the pod network. "Default" means the same as unset and
+	// is dropped like any other disabled field, except on an object stored
+	// with "Isolated": there it is the way to move the workload back to the pod
+	// network, and dropping it would let SyncPodNetworkOnUpdate restore the
+	// stored "Isolated".
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) && !podNetworkIsolatedInUse(oldPodSpec) &&
+		podSpec.PodNetwork != nil && *podSpec.PodNetwork == api.PodNetworkDefault {
+		podSpec.PodNetwork = nil
+	}
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -851,6 +865,18 @@ func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return true
+}
+
+// useAllowPodNetwork returns true when spec.podNetwork "Isolated" may be set: the
+// NetworkIsolatedPods gate is enabled, or the existing object already has it
+// so that it stays valid after the gate is disabled.
+func useAllowPodNetwork(oldPodSpec *api.PodSpec) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) || podNetworkIsolatedInUse(oldPodSpec)
+}
+
+// podNetworkIsolatedInUse returns true if the pod spec has podNetwork "Isolated".
+func podNetworkIsolatedInUse(podSpec *api.PodSpec) bool {
+	return podSpec != nil && podSpec.PodNetwork != nil && *podSpec.PodNetwork == api.PodNetworkIsolated
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {
