@@ -22,6 +22,7 @@ import (
 	"slices"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -81,11 +82,8 @@ func (b *Builder) Validate(ctx context.Context, input ValidationInput) field.Err
 		op = operation.Operation{Type: operation.Update}
 	}
 
-	allErrs, priorityMismatch := b.validateItem(ctx, op, b.root, input.OldRoot, nil)
-	if priorityMismatch {
-		allErrs = append(allErrs, field.Invalid(
-			rootPath, field.OmitValueType{}, "all priorityClassName values must be identical, detected multiple values"))
-	}
+	allErrs := b.validateItem(ctx, op, b.root, input.OldRoot, nil)
+	allErrs = append(allErrs, b.validatePriorityClassName(b.root)...)
 	return allErrs
 }
 
@@ -106,8 +104,8 @@ func validateWorkloadItemTree(root *WorkloadItem) error {
 		}
 		seen[item.Name] = struct{}{}
 
-		if depth > schedulingv1alpha3.WorkloadMaxTreeDepth {
-			return fmt.Errorf("workload item %q at depth %d exceeds maximum allowed tree depth of %d", item.Name, depth, schedulingv1alpha3.WorkloadMaxTreeDepth)
+		if depth > schedulingv1beta1.WorkloadMaxTreeDepth {
+			return fmt.Errorf("workload item %q at depth %d exceeds maximum allowed tree depth of %d", item.Name, depth, schedulingv1beta1.WorkloadMaxTreeDepth)
 		}
 
 		if err := validateItemInputUnion(item); err != nil {
@@ -125,11 +123,11 @@ func validateWorkloadItemTree(root *WorkloadItem) error {
 				leafChildren++
 			}
 		}
-		if leafChildren > schedulingv1alpha3.WorkloadMaxPodGroupTemplates {
-			return fmt.Errorf("workload item %q has %d leaf children, exceeding maximum allowed of %d", item.Name, leafChildren, schedulingv1alpha3.WorkloadMaxPodGroupTemplates)
+		if leafChildren > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
+			return fmt.Errorf("workload item %q has %d leaf children, exceeding maximum allowed of %d", item.Name, leafChildren, schedulingv1beta1.WorkloadMaxPodGroupTemplates)
 		}
-		if compositeChildren > schedulingv1alpha3.WorkloadMaxPodGroupTemplates {
-			return fmt.Errorf("workload item %q has %d composite children, exceeding maximum allowed of %d", item.Name, compositeChildren, schedulingv1alpha3.WorkloadMaxPodGroupTemplates)
+		if compositeChildren > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
+			return fmt.Errorf("workload item %q has %d composite children, exceeding maximum allowed of %d", item.Name, compositeChildren, schedulingv1beta1.WorkloadMaxPodGroupTemplates)
 		}
 		return nil
 	}
@@ -175,10 +173,8 @@ func validateItemInputUnion(item *WorkloadItem) error {
 // validateItem runs declarative and controller-policy validation on a single
 // WorkloadItem and recurses into its children. Each node reports its
 // building-block errors relative to its own Path, and controllers map the errors
-// onto their own API fields. It also reports whether any child's resolved
-// PriorityClassName diverges from its parent's so Validate can emit a single
-// tree-level error.
-func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, parentResolvedConfig *SchedulingConfig) (field.ErrorList, bool) {
+// onto their own API fields.
+func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, parentResolvedConfig *SchedulingConfig) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if !b.opts.DisableDeclarativeValidation {
@@ -191,9 +187,6 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 	allErrs = append(allErrs, b.validateDisruptionModeCompatibleWithSchedulingPolicy(item, resolvedConfig)...)
 	allErrs = append(allErrs, b.validateParentChildSchedulingPolicy(item, resolvedConfig, parentResolvedConfig)...)
 	allErrs = append(allErrs, b.validateParentChildDisruptionMode(item, resolvedConfig, parentResolvedConfig)...)
-
-	priorityMismatch := parentResolvedConfig != nil &&
-		resolvedConfig.PriorityClassName != parentResolvedConfig.PriorityClassName
 
 	// oldItem is the previous counterpart of item (or nil for a create or a node
 	// that is new in this update). Children are correlated with their previous
@@ -208,11 +201,29 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 	}
 
 	for _, child := range item.Children {
-		childErrs, childPriorityMismatch := b.validateItem(ctx, op, child, oldChildrenByName[child.Name], resolvedConfig)
-		allErrs = append(allErrs, childErrs...)
-		priorityMismatch = priorityMismatch || childPriorityMismatch
+		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name], resolvedConfig)...)
 	}
-	return allErrs, priorityMismatch
+	return allErrs
+}
+
+// validatePriorityClassName ensures all items in the tree resolve to the same
+// PriorityClassName, reporting a single error at the root path if any diverge.
+func (b *Builder) validatePriorityClassName(root *WorkloadItem) field.ErrorList {
+	rootPriority := resolveSchedulingConfig(root).PriorityClassName
+
+	var hasMismatch func(item *WorkloadItem) bool
+	hasMismatch = func(item *WorkloadItem) bool {
+		if resolveSchedulingConfig(item).PriorityClassName != rootPriority {
+			return true
+		}
+		return slices.ContainsFunc(item.Children, hasMismatch)
+	}
+
+	if slices.ContainsFunc(root.Children, hasMismatch) {
+		return field.ErrorList{field.Invalid(
+			root.Path, field.OmitValueType{}, "all priorityClassName values must be identical, detected multiple values")}
+	}
+	return nil
 }
 
 // appendPathElements returns rootPath with the given elements appended as
@@ -338,10 +349,6 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 // outside the controller's allow-list, reporting at the policy block's path.
 // An unset policy compiles to Basic, so it is checked against BasicPolicy.
 func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil {
-		return nil
-	}
-
 	path := appendPathElements(item.Path, item.Input.Policy.PathElements)
 
 	var allErrs field.ErrorList
@@ -358,20 +365,16 @@ func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolved
 
 // validateAllowedDisruptionModes rejects a resolved disruption mode that is
 // outside the controller's allow-list, reporting at the disruptionMode block's path.
+// An unset mode defaults to Single, so it is checked against SingleMode.
 func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil || resolvedConfig.DisruptionMode == nil {
-		return nil
-	}
-
 	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 
 	var allErrs field.ErrorList
-	dm := resolvedConfig.DisruptionMode
-	if dm.Single != nil && !slices.Contains(b.opts.AllowedDisruptionModes, SingleMode) {
+	if hasSingleDisruptionMode(resolvedConfig) && !slices.Contains(b.opts.AllowedDisruptionModes, SingleMode) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "the disruptionMode `single` is not supported by this controller"))
 	}
-	if dm.All != nil && !slices.Contains(b.opts.AllowedDisruptionModes, AllMode) {
+	if hasAllDisruptionMode(resolvedConfig) && !slices.Contains(b.opts.AllowedDisruptionModes, AllMode) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "the disruptionMode `all` is not supported by this controller"))
 	}
@@ -383,8 +386,7 @@ func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedCon
 // policy, which compiles to Basic) is scheduled independently, so
 // all-or-nothing disruption is meaningless for it.
 func (b *Builder) validateDisruptionModeCompatibleWithSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil || !hasBasicPolicy(resolvedConfig) ||
-		resolvedConfig.DisruptionMode == nil || resolvedConfig.DisruptionMode.All == nil {
+	if !hasBasicPolicy(resolvedConfig) || !hasAllDisruptionMode(resolvedConfig) {
 		return nil
 	}
 
@@ -406,6 +408,8 @@ func (b *Builder) validateParentChildSchedulingPolicy(item *WorkloadItem, resolv
 		path, field.OmitValueType{}, "must have `gang` scheduling policy when parent group has `gang` scheduling policy")}
 }
 
+// hasGangPolicy reports whether the config resolves to the Gang scheduling
+// policy.
 func hasGangPolicy(cfg *SchedulingConfig) bool {
 	return cfg != nil && cfg.Policy != nil && cfg.Policy.Gang != nil
 }
@@ -423,14 +427,26 @@ func hasBasicPolicy(cfg *SchedulingConfig) bool {
 // non-All disruption mode (including an unset mode, which defaults to Single)
 // when its parent composite group uses the All disruption mode.
 func (b *Builder) validateParentChildDisruptionMode(item *WorkloadItem, resolvedConfig, parentResolvedConfig *SchedulingConfig) field.ErrorList {
-	if parentResolvedConfig == nil || parentResolvedConfig.DisruptionMode == nil || parentResolvedConfig.DisruptionMode.All == nil {
-		return nil
-	}
-	if resolvedConfig != nil && resolvedConfig.DisruptionMode != nil && resolvedConfig.DisruptionMode.All != nil {
+	if !hasAllDisruptionMode(parentResolvedConfig) || hasAllDisruptionMode(resolvedConfig) {
 		return nil
 	}
 
 	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 	return field.ErrorList{field.Invalid(
 		path, field.OmitValueType{}, "must have `all` disruption mode when parent group has `all` disruption mode")}
+}
+
+// hasAllDisruptionMode reports whether the config resolves to the All
+// disruption mode.
+func hasAllDisruptionMode(cfg *SchedulingConfig) bool {
+	return cfg != nil && cfg.DisruptionMode != nil && cfg.DisruptionMode.All != nil
+}
+
+// hasSingleDisruptionMode reports whether the config resolves to the Single
+// disruption mode, either explicitly or by defaulting when no mode is set.
+func hasSingleDisruptionMode(cfg *SchedulingConfig) bool {
+	if cfg == nil || cfg.DisruptionMode == nil || *cfg.DisruptionMode == (DisruptionMode{}) {
+		return true
+	}
+	return cfg.DisruptionMode.Single != nil
 }
