@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -34,11 +36,11 @@ import (
 )
 
 type REST struct {
-	authorizer authorizer.UnconditionalAuthorizer
+	authorizer authorizer.Authorizer
 	scheme     *runtime.Scheme
 }
 
-func NewREST(authorizer authorizer.UnconditionalAuthorizer, scheme *runtime.Scheme) *REST {
+func NewREST(authorizer authorizer.Authorizer, scheme *runtime.Scheme) *REST {
 	return &REST{authorizer, scheme}
 }
 
@@ -65,7 +67,7 @@ func (r *REST) GetSingularName() string {
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocalSubjectAccessReview: %#v", obj))
 	}
 
 	// Clear status so it's not taken into account during input validation.
@@ -97,14 +99,29 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	}
 
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(localSubjectAccessReview.Spec)
-	decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
-	localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: (decision == authorizer.DecisionAllow),
-		Denied:  (decision == authorizer.DecisionDeny),
-		Reason:  reason,
+	versionedAO, supportsConditionalAuthorization, supportsUnconditionalAuthorization, err := authorizationutil.ResolveAuthorizationOptions(localSubjectAccessReview.Spec.AuthorizationOptions)
+	if err != nil {
+		return nil, err
 	}
-	localSubjectAccessReview.Status.EvaluationError = authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes)
+
+	switch {
+	case supportsConditionalAuthorization:
+		conditionsAwareDecision := r.authorizer.ConditionsAwareAuthorize(ctx, authorizationAttributes)
+		localSubjectAccessReview.Status = authorizationutil.ConditionsAwareDecisionToSARStatus(ctx, authorizationAttributes, conditionsAwareDecision)
+	case supportsUnconditionalAuthorization:
+		// conditions-unaware flow, feature gate is off or client does not support conditions
+		decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
+		localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         decision == authorizer.DecisionAllow,
+			Denied:          decision == authorizer.DecisionDeny,
+			Reason:          reason,
+			EvaluationError: authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes),
+		}
+	default:
+		// the HandledDecisionTypes was neither [Allow, ConditionsMap, Deny, NoOpinion, Union] or [Allow, Deny, NoOpinion], reject it.
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("unsupported client-handled decision types: %v", sets.List(authorizationv1.GetHandledDecisionTypes(versionedAO))))
+	}
 
 	return localSubjectAccessReview, nil
 }
