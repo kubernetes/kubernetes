@@ -2083,8 +2083,16 @@ func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("active health stream did not stop")
 	}
+	// The driver may be gone, so its health is no longer known. Ownership is
+	// kept so that the retry can resume reporting.
+	expectPodUpdate()
+	require.Equal(t, state.DeviceHealthStatusUnknown, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+
+	close(newResponses)
+	newResponses, newDone = startStream(2)
+	newResponses <- response(drahealthv1.HealthStatus_UNHEALTHY)
+	expectPodUpdate()
 	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
-	require.Empty(t, manager.update, "retryable stream exit triggered an unexpected pod update")
 
 	manager.ActivateHealthStream(tCtx, driverName, 1)
 	staleResponses, staleDone := startStream(1)
@@ -2105,6 +2113,14 @@ func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
 	close(oldResponses)
 	close(newResponses)
 	close(staleResponses)
+	// The deactivated stream ends without touching the cleared state.
+	select {
+	case err := <-newDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("retried health stream did not stop")
+	}
+	require.Empty(t, manager.update, "deactivated health stream triggered an unexpected pod update")
 }
 
 // TestHandleWatchResourcesStream verifies the manager's ability to process health updates

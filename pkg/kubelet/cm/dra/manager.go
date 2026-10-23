@@ -1102,6 +1102,28 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 	}
 	m.healthStreamMutex.Unlock()
 
+	// If the active stream ends on its own, for example because the driver
+	// crashed and left its registration socket behind, the device health is
+	// no longer known. Clear it, but keep ownership so that the retry can
+	// resume reporting. A canceled context means handover or shutdown, and a
+	// superseded generation must not touch the new stream's data.
+	defer func() {
+		if ctx.Err() != nil {
+			return
+		}
+		m.healthStreamMutex.Lock()
+		defer m.healthStreamMutex.Unlock()
+		if m.activeHealthStreams[pluginName] != generation {
+			return
+		}
+		logger.V(4).Info("Clearing health cache for driver after health stream ended")
+		changedDevices, err := m.healthInfoCache.clearDriver(logger, pluginName)
+		if err != nil {
+			logger.Error(err, "Failed to clear health info cache for driver")
+		}
+		m.notifyPodsForHealthChanges(logger, pluginName, changedDevices)
+	}()
+
 	for {
 		resp, err := stream.Recv()
 		if err != nil {
@@ -1161,8 +1183,9 @@ func (m *Manager) ActivateHealthStream(_ context.Context, pluginName string, gen
 	m.activeHealthStreams[pluginName] = generation
 }
 
-// DeactivateHealthStream clears health only when the authoritative endpoint
-// is permanently lost. A retryable stream exit does not call this method.
+// DeactivateHealthStream releases ownership and clears health when the
+// authoritative endpoint is permanently lost. A retryable stream exit clears
+// health in HandleWatchResourcesStream but keeps ownership.
 func (m *Manager) DeactivateHealthStream(ctx context.Context, pluginName string, generation uint64) {
 	logger := klog.FromContext(ctx).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "generation", generation)

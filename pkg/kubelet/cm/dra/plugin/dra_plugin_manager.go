@@ -622,8 +622,8 @@ func (pm *DRAPluginManager) runHealthStream(ctx context.Context, plugin *monitor
 }
 
 // healthStreamTerminated permanently stops a stream only when the health RPC
-// is unsupported. Retryable failures retain the last reported health until the
-// retry succeeds or the health timeout expires.
+// is unsupported. After a retryable failure the stream keeps ownership and is
+// retried; its health was already cleared when the stream ended.
 func (pm *DRAPluginManager) healthStreamTerminated(ctx context.Context, plugin *monitoredPlugin, generation uint64, streamErr error) bool {
 	if status.Code(streamErr) != codes.Unimplemented {
 		return false
