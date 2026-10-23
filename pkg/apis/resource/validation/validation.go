@@ -61,12 +61,12 @@ import (
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
 		// ResourceClaim
-		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes|capacity)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
 		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
-		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes|capacity)`),
 		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
 	},
 	{
@@ -118,7 +118,7 @@ func validateUID(uid string, fldPath *field.Path) field.ErrorList {
 // ValidateResourceClaim validates a ResourceClaim.
 func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"), false)...)
+	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, nil, field.NewPath("spec"), false)...)
 	return allErrs
 }
 
@@ -141,9 +141,12 @@ func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.Resourc
 	return allErrs
 }
 
-func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
+// validateResourceClaimSpec gets oldSpec only when a ResourceClaimTemplate is updated.
+// Checks which were added after the spec could be stored must accept unchanged old
+// values, because the spec is immutable and the user cannot fix them.
+func validateResourceClaimSpec(spec, oldSpec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateDeviceClaim(&spec.Devices, fldPath.Child("devices"), stored)...)
+	allErrs = append(allErrs, validateDeviceClaim(&spec.Devices, oldSpec, fldPath.Child("devices"), stored)...)
 	return allErrs
 }
 
@@ -204,7 +207,7 @@ func gatherConstraintAttributes(constraints []resource.DeviceConstraint) map[str
 	return attrs
 }
 
-func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceClaim(deviceClaim *resource.DeviceClaim, oldSpec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	requestNames := gatherRequestNames(deviceClaim)
 
@@ -216,7 +219,7 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 	}
 	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
 		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
-			return validateDeviceRequest(request, fldPath, opts)
+			return validateDeviceRequest(request, findDeviceRequest(oldSpec, request.Name), fldPath, opts)
 		},
 		func(request resource.DeviceRequest) string {
 			return request.Name
@@ -235,6 +238,37 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 	}
 
 	return allErrs
+}
+
+func findDeviceRequest(spec *resource.ResourceClaimSpec, name string) *resource.DeviceRequest {
+	if spec == nil {
+		return nil
+	}
+	for i := range spec.Devices.Requests {
+		if spec.Devices.Requests[i].Name == name {
+			return &spec.Devices.Requests[i]
+		}
+	}
+	return nil
+}
+
+func exactCapacity(request *resource.DeviceRequest) *resource.CapacityRequirements {
+	if request == nil || request.Exactly == nil {
+		return nil
+	}
+	return request.Exactly.Capacity
+}
+
+func subRequestCapacity(request *resource.DeviceRequest, name string) *resource.CapacityRequirements {
+	if request == nil {
+		return nil
+	}
+	for i := range request.FirstAvailable {
+		if request.FirstAvailable[i].Name == name {
+			return request.FirstAvailable[i].Capacity
+		}
+	}
+	return nil
 }
 
 type requestNames map[string]sets.Set[string]
@@ -287,7 +321,7 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 	return allocatedDevices
 }
 
-func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
+func validateDeviceRequest(request resource.DeviceRequest, oldRequest *resource.DeviceRequest, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
 	numDeviceRequestType := 0
 
@@ -309,19 +343,19 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	case hasFirstAvailable:
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
-				return validateDeviceSubRequest(subRequest, fldPath, opts, request.Name)
+				return validateDeviceSubRequest(subRequest, subRequestCapacity(oldRequest, subRequest.Name), fldPath, opts, request.Name)
 			},
 			func(subRequest resource.DeviceSubRequest) string {
 				return subRequest.Name
 			},
 			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
 	case hasExactly:
-		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), opts, request.Name)...)
+		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, exactCapacity(oldRequest), fldPath.Child("exactly"), opts, request.Name)...)
 	}
 	return allErrs
 }
 
-func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, opts deviceValidationOptions, parentRequestName string) field.ErrorList {
+func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, oldCapacity *resource.CapacityRequirements, fldPath *field.Path, opts deviceValidationOptions, parentRequestName string) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), opts)...)
@@ -330,10 +364,11 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
+	allErrs = append(allErrs, validateCapacityRequirements(subRequest.Capacity, oldCapacity, fldPath.Child("capacity"))...)
 	return allErrs
 }
 
-func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
+func validateExactDeviceRequest(request resource.ExactDeviceRequest, oldCapacity *resource.CapacityRequirements, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), opts)...)
@@ -342,7 +377,27 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
+	allErrs = append(allErrs, validateCapacityRequirements(request.Capacity, oldCapacity, fldPath.Child("capacity"))...)
 	return allErrs
+}
+
+func validateCapacityRequirements(capacity, oldCapacity *resource.CapacityRequirements, fldPath *field.Path) field.ErrorList {
+	if capacity == nil {
+		return nil
+	}
+	// Capacity request names were not validated before, so stored names
+	// which did not change remain valid.
+	if oldCapacity != nil && apiequality.Semantic.DeepEqual(capacity.Requests, oldCapacity.Requests) {
+		return nil
+	}
+	return validateCapacityNames(capacity.Requests, fldPath.Child("requests"))
+}
+
+// validateCapacityNames only checks the keys. The map size and the values are
+// validated declaratively.
+func validateCapacityNames(capacities map[resource.QualifiedName]apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	return validateMap(capacities, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName,
+		func(apiresource.Quantity, *field.Path) field.ErrorList { return nil }, fldPath)
 }
 
 func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocationMode, count int64, allocModeFldPath, countFldPath *field.Path) field.ErrorList {
@@ -670,6 +725,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	allErrs = append(allErrs, validateSkipNodeOperations(result.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
+	allErrs = append(allErrs, validateCapacityNames(result.ConsumedCapacity, fldPath.Child("consumedCapacity"))...)
 	return allErrs
 }
 
@@ -757,23 +813,27 @@ func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, 
 
 // ValidateResourceClaimTemplate validates a ResourceClaimTemplate.
 func ValidateResourceClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
+	return validateResourceClaimTemplate(template, nil)
+}
+
+func validateResourceClaimTemplate(template *resource.ResourceClaimTemplate, oldSpec *resource.ResourceClaimSpec) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, corevalidation.ValidateResourceClaimTemplateName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"), false)...)
+	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, oldSpec, field.NewPath("spec"), false)...)
 	return allErrs
 }
 
-func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec, fldPath *field.Path, stored bool) field.ErrorList {
+func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec, oldSpec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := corevalidation.ValidateTemplateObjectMeta(&spec.ObjectMeta, fldPath.Child("metadata"))
-	allErrs = append(allErrs, validateResourceClaimSpec(&spec.Spec, fldPath.Child("spec"), stored)...)
+	allErrs = append(allErrs, validateResourceClaimSpec(&spec.Spec, oldSpec, fldPath.Child("spec"), stored)...)
 	return allErrs
 }
 
 // ValidateResourceClaimTemplateUpdate tests if an update to template is valid.
 func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTemplate) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
-	// The spec is immutable. On update, we only check for immutability.
-	// Re-validating other fields is skipped because the user cannot change them;
-	// the only actionable error is for the immutability violation.
+	// Unlike for ResourceClaim, the spec gets validated again. Checks which were
+	// added later must accept the old values, so the old spec is passed down.
+	allErrs := validateResourceClaimTemplate(template, &oldTemplate.Spec.Spec)
+	allErrs = append(allErrs, corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
 	return allErrs
 }

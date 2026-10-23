@@ -318,9 +318,14 @@ message CapacityRequirements {
   // If the device allows multiple allocation,
   // the aggregated amount across all requests must not exceed the capacity value.
   // The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-  // is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+  // is recorded in the resource claim's status.devices[*].consumedCapacity field.
+  //
+  // Requests may have at most 32 entries. The values must not be negative.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxProperties=32
+  // +k8s:eachVal=+k8s:minimum=0
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 1;
 }
 
@@ -1175,8 +1180,13 @@ message DeviceRequestAllocationResult {
   // The domain prefix in the capacity name may be omitted if it is
   // the same as the driver name.
   //
+  // ConsumedCapacity may have at most 32 entries. The values must not be negative.
+  //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:maxProperties=32
+  // +k8s:eachVal=+k8s:minimum=0
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
 
   // skipNodeOperations lists node-local resource operations (gRPC calls)
@@ -1316,6 +1326,7 @@ message DeviceSubRequest {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
   optional CapacityRequirements capacity = 7;
 
   // derivedAttributes defines a set of virtual attributes computed via CEL expressions
@@ -1662,6 +1673,7 @@ message ExactDeviceRequest {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
   optional CapacityRequirements capacity = 7;
 
   // derivedAttributes defines a set of virtual attributes computed via CEL expressions

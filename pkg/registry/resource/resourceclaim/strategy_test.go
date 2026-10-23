@@ -419,7 +419,7 @@ var objWithCapacityRequests = &resource.ResourceClaim{
 						AllocationMode:  resource.DeviceAllocationModeAll,
 						Capacity: &resource.CapacityRequirements{
 							Requests: map[resource.QualifiedName]apiresource.Quantity{
-								resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+								resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 							},
 						},
 					},
@@ -536,7 +536,7 @@ var (
 )
 
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
-	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+	resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 }
 
 func TestStrategy(t *testing.T) {

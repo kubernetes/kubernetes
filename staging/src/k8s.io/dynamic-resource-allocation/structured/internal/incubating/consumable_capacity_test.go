@@ -379,9 +379,40 @@ func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 		fractionalCapacityRange bool
 		expectResult            resource.Quantity
 		expectErr               bool
+		expectErrIs             error // errCapacityRequestNotRepresentable if nil
 		expectErrMessage        string
 	}{
 		"empty": {requestedVal: nil, capacityValue: one, requestPolicy: &resourceapi.CapacityRequestPolicy{}, expectResult: one},
+		"negative-request-without-policy-is-rejected": {
+			requestedVal:  &negativeOne,
+			capacityValue: one,
+			expectErr:     true,
+			expectErrIs:   errNegativeCapacity,
+		},
+		// Rounding up to Min would turn the negative request into a valid one.
+		"negative-request-below-range-min-is-rejected": {
+			requestedVal:  &negativeOne,
+			capacityValue: two,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one}},
+			expectErr:     true,
+			expectErrIs:   errNegativeCapacity,
+		},
+		"negative-request-below-fractional-range-min-is-rejected": {
+			requestedVal:            &negativeOne,
+			capacityValue:           one,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &pointTwo, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &pointTwo, Max: &one, Step: &pointOne}},
+			fractionalCapacityRange: true,
+			expectErr:               true,
+			expectErrIs:             errNegativeCapacity,
+		},
+		// Rounding up to the first valid value would turn the negative request into a valid one.
+		"negative-request-below-valid-values-is-rejected": {
+			requestedVal:  &negativeOne,
+			capacityValue: two,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidValues: []resource.Quantity{one, two}},
+			expectErr:     true,
+			expectErrIs:   errNegativeCapacity,
+		},
 		// A request above MaxInt64 cannot be read with Value() without wrapping, so
 		// calculateConsumedCapacity returns a fatal error rather than acting on a
 		// wrapped read (#140441).
@@ -619,7 +650,11 @@ func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 			}
 			consumedCapacity, err := calculateConsumedCapacity(tc.requestedVal, capacity, tc.fractionalCapacityRange)
 			if tc.expectErr {
-				tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
+				expectErrIs := tc.expectErrIs
+				if expectErrIs == nil {
+					expectErrIs = errCapacityRequestNotRepresentable
+				}
+				tCtx.Require(err).To(g.MatchError(expectErrIs))
 				if tc.expectErrMessage != "" {
 					tCtx.Require(err).To(g.MatchError(g.ContainSubstring(tc.expectErrMessage)))
 				}

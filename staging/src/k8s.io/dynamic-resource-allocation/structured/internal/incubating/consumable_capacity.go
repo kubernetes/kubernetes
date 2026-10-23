@@ -35,7 +35,7 @@ import (
 // request is rejected outright instead of driving a device-by-device retry.
 var errCapacityRequestNotRepresentable = errors.New("capacity request cannot be represented in the device's range arithmetic")
 
-// errNegativeCapacity signals that a resolved consumed capacity is negative. A negative
+// errNegativeCapacity signals that a capacity request or a resolved consumed capacity is negative. A negative
 // value is not valid capacity and would under-count the device and over-allocate it. It
 // can reach the allocator from a stored ResourceSlice or ResourceClaim created before
 // stricter validation, which admission does not re-check, so the allocator rejects it
@@ -112,7 +112,7 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 		}
 		consumedCapacity, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
 		if err != nil {
-			// The request is not representable in this capacity's range arithmetic.
+			// The request is negative or not representable in this capacity's range arithmetic.
 			// Surface a fatal error so the allocator aborts instead of retrying other
 			// devices, which a user-controlled out-of-range request could abuse.
 			return nil, false, fmt.Errorf("capacity %q: %w", name, err)
@@ -269,6 +269,11 @@ func resolveCapacityName(requestName resourceapi.QualifiedName, driver draapi.Un
 func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourceapi.DeviceCapacity, fractionalCapacityRange bool) (resource.Quantity, error) {
 	if requestedVal == nil {
 		return fillEmptyRequest(capacity), nil
+	}
+	// Must be checked before rounding: the request policy can round a negative
+	// request up to a valid value, which would hide it from the caller's check.
+	if requestedVal.Sign() < 0 {
+		return resource.Quantity{}, fmt.Errorf("%w: request %s", errNegativeCapacity, requestedVal.String())
 	}
 	if capacity.RequestPolicy == nil {
 		return *requestedVal, nil
