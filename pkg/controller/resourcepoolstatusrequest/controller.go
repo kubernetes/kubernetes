@@ -60,16 +60,10 @@ const (
 	// maxRetries is the number of times a request will be retried before it is dropped.
 	maxRetries = 5
 
-	// retryBaseDelay and retryMaxDelay bound the per-request exponential backoff.
-	// Incomplete pools are retried to give the driver time to publish the rest of
-	// its slices; with 5 retries this waits 15.5s in total, which keeps a request
-	// with an incomplete pool within the 30s completion SLO.
-	retryBaseDelay = 500 * time.Millisecond
-	retryMaxDelay  = 8 * time.Second
-
-	// conflictRetryDelay gives the informer time to catch up with the object
-	// that caused a status update conflict.
-	conflictRetryDelay = 100 * time.Millisecond
+	// Incomplete pools get until this long after creation to finish, within
+	// the 30s SLO.
+	incompleteWaitWindow      = 15 * time.Second
+	incompleteRecheckInterval = time.Second
 
 	// Event reasons for requests that end in a degraded state.
 	eventReasonPoolIncomplete    = "PoolIncomplete"
@@ -77,6 +71,10 @@ const (
 
 	// cleanupPollingInterval is how often the controller checks for expired requests.
 	cleanupPollingInterval = 10 * time.Minute
+
+	// Pace the TTL sweep to leave client QPS (KCM default 20) for status writes.
+	cleanupDeleteQPS   = 10
+	cleanupDeleteBurst = 10
 
 	// completedRequestTTL is how long a completed request (with Complete or Failed condition)
 	// is retained before being automatically deleted.
@@ -87,14 +85,10 @@ const (
 	pendingRequestTTL = 24 * time.Hour
 )
 
-// errIncompletePool is returned by syncRequest to requeue a request whose
-// pools are still being published. It is expected, so it is not logged as an
-// error.
+// errIncompletePool requeues a request whose pools are still being published.
 var errIncompletePool = errors.New("incomplete pools detected, requeueing")
 
-// errStatusConflict wraps a conflict on the status update, which happens when
-// the request was modified concurrently, for example a label change. It
-// resolves on its own once the informer has the new version.
+// errStatusConflict marks a status update conflict, which resolves on retry.
 var errStatusConflict = errors.New("status update conflict")
 
 // Controller manages ResourcePoolStatusRequest processing.
@@ -129,19 +123,11 @@ type Controller struct {
 	// workqueue is a rate limited work queue for processing ResourcePoolStatusRequests
 	workqueue workqueue.TypedRateLimitingInterface[string]
 
-	// recorder is set by Run. It stays nil in unit tests that call syncRequest
-	// directly, in which case no events are emitted.
+	// recorder is set by Run; nil in unit tests.
 	recorder record.EventRecorder
-}
 
-// newRateLimiter is DefaultTypedControllerRateLimiter with a longer per-item
-// backoff. The default 5ms base exhausts all retries in about 155ms, before a
-// driver has any realistic chance to finish publishing a pool.
-func newRateLimiter() workqueue.TypedRateLimiter[string] {
-	return workqueue.NewTypedMaxOfRateLimiter(
-		workqueue.NewTypedItemExponentialFailureRateLimiter[string](retryBaseDelay, retryMaxDelay),
-		&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-	)
+	// cleanupLimiter paces the deletes issued by the TTL sweep.
+	cleanupLimiter *rate.Limiter
 }
 
 // NewController creates a new ResourcePoolStatusRequest controller.
@@ -164,12 +150,13 @@ func NewController(
 		sliceSynced:   sliceInformer.Informer().HasSynced,
 		claimSynced:   claimInformer.Informer().HasSynced,
 		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			newRateLimiter(),
+			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Logger: &logger,
 				Name:   "resourcepoolstatusrequest",
 			},
 		),
+		cleanupLimiter: rate.NewLimiter(rate.Limit(cleanupDeleteQPS), cleanupDeleteBurst),
 	}
 
 	// Only consume the DeviceTaintRule informer when the gate is enabled, so
@@ -190,6 +177,7 @@ func NewController(
 		UpdateFunc: func(old, new interface{}) {
 			c.enqueueRequest(logger, new)
 		},
+		DeleteFunc: c.forgetRequest,
 	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add request event handler: %w", err)
@@ -206,7 +194,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ResourcePoolStatusRequest controller")
 
-	// Constructed here rather than in NewController because it spawns goroutines.
+	// Created here because it spawns goroutines.
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	c.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName}).WithLogger(logger)
 	eventBroadcaster.StartStructuredLogging(3)
@@ -270,17 +258,16 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	// Retried without counting against maxRetries: on the last attempt for an
-	// incomplete pool, dropping the request would leave it without status.
-	if errors.Is(err, errStatusConflict) {
-		logger.V(4).Info("Status update conflicted, retrying", "request", key, "err", err)
-		c.workqueue.AddAfter(key, conflictRetryDelay)
+	// Bounded by incompleteWaitWindow, so not counted against maxRetries.
+	if errors.Is(err, errIncompletePool) {
+		logger.V(4).Info("Pools still incomplete, requeuing", "request", key)
+		c.workqueue.AddAfter(key, incompleteRecheckInterval)
 		return true
 	}
 
 	if c.workqueue.NumRequeues(key) < maxRetries {
-		if errors.Is(err, errIncompletePool) {
-			logger.V(4).Info("Pools still incomplete, requeuing", "request", key)
+		if errors.Is(err, errStatusConflict) {
+			logger.V(4).Info("Status update conflicted, retrying", "request", key, "err", err)
 		} else {
 			logger.Error(err, "Error syncing request, requeuing", "request", key)
 		}
@@ -311,18 +298,15 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		logger.V(4).Info("Request already processed, skipping", "request", key)
 		return nil
 	}
-	startTime := time.Now()
+	age := time.Since(request.CreationTimestamp.Time)
+	start := time.Now()
 
 	logger.V(2).Info("Processing ResourcePoolStatusRequest", "request", key, "driver", request.Spec.Driver)
 
 	// Calculate the pool status on-demand from listers
 	status := c.calculatePoolStatus(ctx, request)
 
-	// Requeue only for incomplete pools (driver still publishing slices), giving
-	// drivers time before we finalize. Structural view errors are permanent and
-	// are written to status as-is. Once retries are exhausted the partial status
-	// is written anyway: otherwise the request would be dropped with no status
-	// at all, leaving the user nothing to diagnose until the pending TTL fires.
+	// Give incomplete pools time to finish, then write the partial status.
 	hasIncomplete := false
 	for _, p := range status.Pools {
 		if p.ValidationError != nil && strings.HasPrefix(*p.ValidationError, prefixPoolIncomplete) {
@@ -330,7 +314,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 			break
 		}
 	}
-	if hasIncomplete && c.workqueue.NumRequeues(key) < maxRetries {
+	if hasIncomplete && age < incompleteWaitWindow {
 		return errIncompletePool
 	}
 
@@ -344,7 +328,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	if apierrors.IsConflict(err) {
 		return fmt.Errorf("%w for request %s: %w", errStatusConflict, key, err)
 	}
-	metrics.RequestProcessingDuration.WithLabelValues(driverName).Observe(time.Since(startTime).Seconds())
+	metrics.RequestProcessingDuration.WithLabelValues(driverName).Observe(time.Since(start).Seconds())
 	if err != nil {
 		metrics.RequestProcessingErrors.WithLabelValues(driverName).Inc()
 		metrics.RequestsProcessed.WithLabelValues(driverName, metrics.ResultError).Inc()
@@ -357,8 +341,8 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		c.warn(request, eventReasonCalculationFailed, failed.Message)
 	} else if hasIncomplete {
 		result = metrics.ResultIncomplete
-		logger.V(2).Info("Wrote partial status, pools still incomplete after max retries", "request", key, "retries", maxRetries)
-		c.warn(request, eventReasonPoolIncomplete, fmt.Sprintf("Some pools were still incomplete after %d retries; see status.pools[].validationError", maxRetries))
+		logger.V(2).Info("Wrote partial status, pools still incomplete", "request", key, "waited", incompleteWaitWindow)
+		c.warn(request, eventReasonPoolIncomplete, fmt.Sprintf("Some pools were still incomplete %v after creation; see status.pools[].validationError", incompleteWaitWindow))
 	}
 	metrics.RequestsProcessed.WithLabelValues(driverName, result).Inc()
 	logger.V(2).Info("Successfully processed ResourcePoolStatusRequest", "request", key, "poolCount", len(status.Pools))
@@ -378,6 +362,17 @@ func (c *Controller) metricDriver(driver string) string {
 		}
 	}
 	return metrics.UnknownDriver
+}
+
+// forgetRequest resets the retry count, so a request recreated with the same
+// name starts fresh.
+func (c *Controller) forgetRequest(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	if request, ok := obj.(*resourcev1alpha3.ResourcePoolStatusRequest); ok {
+		c.workqueue.Forget(request.Name)
+	}
 }
 
 func (c *Controller) warn(request *resourcev1alpha3.ResourcePoolStatusRequest, reason, message string) {
@@ -457,7 +452,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		nodeName           string
 		nodeNameMixed      bool // true when slices have different NodeNames
 		totalDevices       int32
-		taintedDevices     map[string]struct{} // names, so allocated ones can be excluded later
+		taintedDevices     map[string]struct{} // by name
 		sliceCount         int32
 		expectedSliceCount int64
 		generation         int64
@@ -628,18 +623,20 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.ValidationError = &errMsg
 		} else {
 			// Complete pool: populate device counts and slice count
-			// A claim can still reference a device the driver has since stopped
-			// publishing. Count only devices in the pool, so allocatedDevices
-			// never exceeds totalDevices.
+			// Count each published device once; ignore unpublished ones.
 			inUse := allocatedDevices[key]
 			var allocDeviceCount int32
+			seen := make(map[string]struct{}, len(info.devices))
 			for _, d := range info.devices {
+				if _, dup := seen[d.name]; dup {
+					continue
+				}
+				seen[d.name] = struct{}{}
 				if _, allocated := inUse[d.name]; allocated {
 					allocDeviceCount++
 				}
 			}
-			// An allocated device that is also tainted is reported as allocated
-			// only. Counting it twice would undercount availableDevices.
+			// Allocated and tainted counts as allocated only.
 			var unavailDevices int32
 			for name := range info.taintedDevices {
 				if _, allocated := inUse[name]; !allocated {
@@ -701,8 +698,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		pools = pools[:limit]
 	}
 
-	// Incomplete pools are transient (the driver may still be publishing) while
-	// other validation errors are permanent, so report them separately.
+	// Incomplete pools can resolve; other validation errors cannot.
 	incompletePoolCount, invalidPoolCount := 0, 0
 	for _, p := range pools {
 		switch {
@@ -798,6 +794,11 @@ func (c *Controller) cleanupExpiredRequests(ctx context.Context) {
 	var deletedCount int
 	for _, request := range requests {
 		if c.shouldDeleteRequest(request) {
+			if err := c.cleanupLimiter.Wait(ctx); err != nil {
+				// Shutting down.
+				logger.V(2).Info("Cleanup interrupted", "deletedCount", deletedCount, "err", err)
+				return
+			}
 			if err := c.client.ResourceV1alpha3().ResourcePoolStatusRequests().Delete(ctx, request.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &request.UID}}); err != nil {
 				// Ignore NotFound errors - the request may have been deleted by another process
 				if !apierrors.IsNotFound(err) {
