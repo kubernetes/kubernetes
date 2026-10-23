@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -8480,6 +8481,39 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 					t.Errorf("%s: got (%d, %d), want (%d, %d)", tc.name, gotFirstID, gotRangeLen, tc.wantFirstID, tc.wantRangeLen)
 				}
 			}
+		})
+	}
+}
+
+func TestDefaultKubeletMappings(t *testing.T) {
+	tests := []struct {
+		name         string
+		idsPerPod    uint32
+		wantFirstID  uint32
+		wantRangeLen uint32
+	}{
+		{
+			name:         "default idsPerPod",
+			idsPerPod:    65536,
+			wantFirstID:  65536,
+			wantRangeLen: (1 << 32) - 2*65536,
+		},
+		{
+			name:         "custom idsPerPod",
+			idsPerPod:    65536 * 16,
+			wantFirstID:  65536 * 16,
+			wantRangeLen: (1 << 32) - 2*65536*16,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotFirstID, gotRangeLen := defaultKubeletMappings(tc.idsPerPod)
+			assert.Equal(t, tc.wantFirstID, gotFirstID)
+			assert.Equal(t, tc.wantRangeLen, gotRangeLen)
+			// The last ID of the range must stay below 2^32-1, which the kernel
+			// treats as an invalid ID.
+			assert.Less(t, uint64(gotFirstID)+uint64(gotRangeLen)-1, uint64(math.MaxUint32))
 		})
 	}
 }
