@@ -633,8 +633,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	if s.NodeManager != nil {
 		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
 		nodeConfig.RegisterEventHandler(s.NodeManager)
-		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
+		config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration, s.Proxier)
 
 		go nodeConfig.Run(wait.NeverStop)
 	}
