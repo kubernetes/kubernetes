@@ -148,6 +148,7 @@ var args = []string{
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=leases",
 	"--leader-elect-retry-period=5s",
+	"--leader-elect-recovery-deadline=90s",
 	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
@@ -210,7 +211,8 @@ func TestAddFlags(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
 				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
@@ -606,7 +608,8 @@ func TestApplyTo(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,

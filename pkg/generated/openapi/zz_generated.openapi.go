@@ -71230,6 +71230,12 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 							Ref:         ref(componentbaseconfigv1alpha1.LeaderElectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
+					"LeaderElectionRecoveryDeadline": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LeaderElectionRecoveryDeadline limits how long a leader keeps trying to renew its lease after LeaderElection.RenewDeadline has expired without a successful renewal, before it gives up and exits. The deadline starts when the renew deadline expires. The zero value, which is the default, means no limit. Any other value must be at least one second. Requires the LeaderElectionRecovery feature gate.",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"Controllers": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Controllers is the list of controllers to enable or disable '*' means \"all enabled by default controllers\" 'foo' means \"enable 'foo'\" '-foo' means \"disable 'foo'\" first item for a particular name wins",
@@ -71267,7 +71273,7 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 						},
 					},
 				},
-				Required: []string{"Port", "Address", "MinResyncPeriod", "ClientConnection", "ControllerStartInterval", "LeaderElection", "Controllers", "Debugging", "LeaderMigrationEnabled", "LeaderMigration"},
+				Required: []string{"Port", "Address", "MinResyncPeriod", "ClientConnection", "ControllerStartInterval", "LeaderElection", "LeaderElectionRecoveryDeadline", "Controllers", "Debugging", "LeaderMigrationEnabled", "LeaderMigration"},
 			},
 		},
 		Dependencies: []string{

@@ -200,6 +200,7 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -240,7 +241,8 @@ func TestAddFlags(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
 				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
@@ -385,6 +387,7 @@ func TestCreateConfig(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -424,7 +427,8 @@ func TestCreateConfig(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
@@ -532,6 +536,7 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -573,7 +578,8 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
