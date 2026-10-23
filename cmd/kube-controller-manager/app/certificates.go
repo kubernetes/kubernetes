@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
+	"k8s.io/kubernetes/pkg/controller/certificates/podcertssigner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -388,4 +389,89 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 	}
 	return rootCA, nil
+}
+
+func newKubeServiceServingSignerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                 names.ServiceServingSigner,
+		constructor:          newKubeServiceCASignerControllers,
+		requiredFeatureGates: []featuregate.Feature{features.KubeServingCertificatesSigner},
+	}
+}
+
+type signerControllers struct {
+	controllerName       string
+	publisher            ctbpublisher.PublisherRunner
+	signer               *podcertssigner.PodCertsSignerController
+	dynamicCATrustBundle *dynamiccertificates.DynamicFileCAContent
+}
+
+func (cs *signerControllers) Name() string {
+	return cs.controllerName
+}
+
+func (cs *signerControllers) Run(ctx context.Context) {
+	go cs.dynamicCATrustBundle.Run(ctx, 1)
+	go cs.publisher.Run(ctx)
+	go cs.signer.Run(ctx)
+	<-ctx.Done()
+}
+
+func newKubeServiceCASignerControllers(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	caCertPath := controllerContext.ComponentConfig.ServiceServingSigner.CACertPath
+	caKeyPath := controllerContext.ComponentConfig.ServiceServingSigner.CAKeyPath
+	if len(caCertPath) == 0 || len(caKeyPath) == 0 {
+		return nil, fmt.Errorf("path to Service Serving Signer cert/key files unset")
+	}
+
+	client, err := controllerContext.NewClient("kube-service-serving-signer")
+	if err != nil {
+		return nil, err
+	}
+
+	const signerName = "kubernetes.io/service-serving"
+	signer, err := podcertssigner.NewPodCertificatesSigner(
+		ctx,
+		signerName,
+		caCertPath,
+		caKeyPath,
+		podcertssigner.NewKubeServiceCATemplateMapper(
+			client.CoreV1(),
+			controllerContext.InformerFactory.Core().V1().Services().Informer(),
+			controllerContext.InformerFactory.Core().V1().Services().Lister(),
+			controllerContext.ComponentConfig.ServiceServingSigner.ClusterServiceDomain,
+		),
+		client,
+		controllerContext.InformerFactory.Core().V1().Pods(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	caBundlePath := caCertPath
+	if configBundlePath := controllerContext.ComponentConfig.ServiceServingSigner.CABundlePath; len(configBundlePath) != 0 {
+		caBundlePath = configBundlePath
+	}
+	serviceCATrustBundle, err := dynamiccertificates.NewDynamicCAContentFromFile("kube-service-serving-ca", caBundlePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+	}
+
+	logger := klog.FromContext(ctx)
+	publisher, err := ctbpublisher.NewGAClusterTrustBundlePublisher(
+		logger,
+		signerName,
+		serviceCATrustBundle,
+		client,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &signerControllers{
+		controllerName:       controllerName,
+		publisher:            publisher,
+		signer:               signer,
+		dynamicCATrustBundle: serviceCATrustBundle,
+	}, nil
 }

@@ -21,6 +21,7 @@ import (
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	podcertssignerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config/v1alpha1"
 	csrsigningconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
@@ -118,6 +119,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	replicationconfigv1alpha1.RecommendedDefaultReplicationControllerConfiguration(&obj.ReplicationController)
 	// Use the default RecommendedDefaultResourceQuotaControllerConfiguration options
 	resourcequotaconfigv1alpha1.RecommendedDefaultResourceQuotaControllerConfiguration(&obj.ResourceQuotaController)
+	// Use the default RecommendedDefaultServiceServingSignerConfiguration options
+	podcertssignerconfigv1alpha1.RecommendedDefaultPodCertsSignerConfiguration(&obj.ServiceServingSigner)
 	// Use the default RecommendedDefaultServiceControllerConfiguration options
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
 	// Use the default RecommendedDefaultLegacySATokenCleanerConfiguration options
