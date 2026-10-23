@@ -343,24 +343,23 @@ func TestParseQuantityString(t *testing.T) {
 	table := []struct {
 		input              string
 		positive           bool
-		value              string
 		num, denom, suffix string
 	}{
-		{"0.025Ti", true, "0.025", "0", "025", "Ti"},
-		{"1.025Ti", true, "1.025", "1", "025", "Ti"},
-		{"-1.025Ti", false, "-1.025", "1", "025", "Ti"},
-		{".", true, ".", "0", "", ""},
-		{"-.", false, "-.", "0", "", ""},
-		{"1E-3", true, "1", "1", "", "E-3"},
+		{"0.025Ti", true, "0", "025", "Ti"},
+		{"1.025Ti", true, "1", "025", "Ti"},
+		{"-1.025Ti", false, "1", "025", "Ti"},
+		{".", true, "0", "", ""},
+		{"-.", false, "0", "", ""},
+		{"1E-3", true, "1", "", "E-3"},
 	}
 	for _, test := range table {
-		positive, value, num, denom, suffix, err := parseQuantityString(test.input)
+		positive, num, denom, suffix, err := parseQuantityString(test.input)
 		if err != nil {
 			t.Errorf("%s: error: %v", test.input, err)
 			continue
 		}
-		if positive != test.positive || value != test.value || num != test.num || denom != test.denom || suffix != test.suffix {
-			t.Errorf("%s: unmatched: %t %q %q %q %q", test.input, positive, value, num, denom, suffix)
+		if positive != test.positive || num != test.num || denom != test.denom || suffix != test.suffix {
+			t.Errorf("%s: unmatched: %t %q %q %q", test.input, positive, num, denom, suffix)
 		}
 	}
 }
@@ -388,6 +387,9 @@ func quantityTestcases() []parseQuantityTestcase {
 		{"0G", decQuantity(0, 0, DecimalSI), "0"},
 		{"0Ti", decQuantity(0, 0, BinarySI), "0"},
 		{"0T", decQuantity(0, 0, DecimalSI), "0"},
+
+		// a number with no digits is 0
+		{".e-10", decQuantity(0, 0, DecimalExponent), "0"}, // finer than nano, so it skips the int64 fast path
 
 		// Quantity less numbers are allowed
 		{"1", decQuantity(1, 0, DecimalSI), "1"},
@@ -609,7 +611,7 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			// verify that we can decompose the input and get the same result by building up from the base.
-			positive, _, num, denom, suffix, err := parseQuantityString(item.input)
+			positive, num, denom, suffix, err := parseQuantityString(item.input)
 			if err != nil {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
@@ -699,6 +701,9 @@ func TestQuantityParse(t *testing.T) {
 		// an exponent that narrows to a scale of math.MinInt32 is rejected,
 		// because negating that scale overflows int32
 		"1e2147483648",
+
+		// digits dropped past maxSignificantDigits raise the exponent past math.MaxInt32
+		"1" + strings.Repeat("0", 29) + "e2147483647",
 
 		// trailing whitespace is forbidden
 		" 1",
@@ -5354,7 +5359,7 @@ func TestParseQuantity(t *testing.T) {
 
 		// too large for the E suffix
 		{input: "10000000000000000000E", wantAsInt64: nil, wantAsDec: ptrDec("10000000000000000000000000000000000000"), canonical: "10e36", want: Quantity{d: scaledDec("10000000000000000000", -18), Format: DecimalSI}},
-		{input: "12345678901234567890123456789000000000000000000000", wantAsInt64: nil, wantAsDec: ptrDec("12345678901234567890123456789000000000000000000000"), canonical: "12345678901234567890123456789e21", want: Quantity{d: scaledDec("12345678901234567890123456789000000000000000000000", 0), Format: DecimalSI}},
+		{input: "12345678901234567890123456789000000000000000000000", wantAsInt64: nil, wantAsDec: ptrDec("12345678901234567890123456789000000000000000000000"), canonical: "12345678901234567890123456789e21", want: Quantity{d: scaledDec("12345678901234567890123456789", -21), Format: DecimalSI}},
 		{input: "1000E", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000000000"), canonical: "1e21", want: Quantity{i: int64Amount{value: 1000, scale: 18}, Format: DecimalSI}}, // written in exponent notation
 		{input: "1500E", wantAsInt64: nil, wantAsDec: ptrDec("1500000000000000000000"), want: Quantity{i: int64Amount{value: 1500, scale: 18}, Format: DecimalSI}},                    // keeps the E suffix
 
@@ -5380,26 +5385,27 @@ func TestParseQuantity(t *testing.T) {
 
 		// 29 or more significant digits
 		{input: "1" + strings.Repeat("0", 27) + "1", wantAsInt64: nil, wantAsDec: ptrDec("10000000000000000000000000001"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"1", 0), Format: DecimalSI}},                                                                                   // 29 significant digits
-		{input: "1" + strings.Repeat("0", 28) + "1", wantAsInt64: nil, wantAsDec: ptrDec("100000000000000000000000000001"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 28)+"1", 0), Format: DecimalSI}},                                                                                  // 30 significant digits, the last one nonzero
-		{input: "1" + strings.Repeat("0", 27) + "10", wantAsInt64: nil, wantAsDec: ptrDec("100000000000000000000000000010"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"10", 0), Format: DecimalSI}},                                                                                // 30 significant digits, the last one zero
-		{input: "1" + strings.Repeat("0", 28) + "01", wantAsInt64: nil, wantAsDec: ptrDec("1" + strings.Repeat("0", 29) + "1"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 29)+"1", 0), Format: DecimalSI}},                                                                              // 31 significant digits
-		{input: "-1" + strings.Repeat("0", 28) + "1", wantAsInt64: nil, wantAsDec: ptrDec("-1" + strings.Repeat("0", 28) + "1"), want: Quantity{d: scaledDec("-1"+strings.Repeat("0", 28)+"1", 0), Format: DecimalSI}},                                                                            // 30 significant digits, negative
+		{input: "1" + strings.Repeat("0", 28) + "1", wantAsInt64: nil, wantAsDec: ptrDec("100000000000000000000000000010"), canonical: "100000000000000000000000000010", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"1", -1), Format: DecimalSI}},                                    // 30 significant digits, the last one nonzero
+		{input: "1" + strings.Repeat("0", 27) + "10", wantAsInt64: nil, wantAsDec: ptrDec("100000000000000000000000000010"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"1", -1), Format: DecimalSI}},                                                                                // 30 significant digits, the last one zero
+		{input: "1" + strings.Repeat("0", 28) + "01", wantAsInt64: nil, wantAsDec: ptrDec("1" + strings.Repeat("0", 27) + "100"), canonical: "1" + strings.Repeat("0", 27) + "100", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"1", -2), Format: DecimalSI}},                         // 31 significant digits
+		{input: "-1" + strings.Repeat("0", 28) + "1", wantAsInt64: nil, wantAsDec: ptrDec("-1" + strings.Repeat("0", 27) + "10"), canonical: "-1" + strings.Repeat("0", 27) + "10", want: Quantity{d: scaledDec("-1"+strings.Repeat("0", 27)+"1", -1), Format: DecimalSI}},                        // 30 significant digits, negative
+		{input: strings.Repeat("9", 30), wantAsInt64: nil, wantAsDec: ptrDec("1" + strings.Repeat("0", 30)), canonical: "1e30", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 29), -1), Format: DecimalSI}},                                                                                 // 30 nines round up to 1e30
+		{input: "1" + strings.Repeat("0", 10000) + "1", wantAsInt64: nil, wantAsDec: new(scaledDec("1"+strings.Repeat("0", 27)+"1", -9973)), canonical: "1" + strings.Repeat("0", 27) + "10e9972", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 27)+"1", -9973), Format: DecimalSI}},       // 10002 significant digits
 		{input: "0.01" + strings.Repeat("0", 28) + "1e21", wantAsInt64: nil, wantAsDec: ptrDec("10000000000000000000.000000001"), canonical: "1" + strings.Repeat("0", 27) + "1e-9", want: Quantity{d: scaledDec("10000000000000000000000000001", 9), Format: DecimalExponent}},                   // leading zeros in the fraction, then 30 significant digits
 		{input: strings.Repeat("9", 100) + "Ki", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775807"), canonical: "9223372036854775807", want: Quantity{d: scaledDec("9223372036854775807", 0), Format: BinarySI}},                                                                          // 100 significant digits with a binary suffix
 		{input: "3.999999999999999999999999999132638262011596452794037759304046630859375Ei", wantAsInt64: nil, wantAsDec: ptrDec("4611686018427387903.999999999"), canonical: "4611686018427387903999999999n", want: Quantity{d: scaledDec("4611686018427387903999999999", 9), Format: BinarySI}}, // 70 significant digits, exactly 2^62-1n
 
 		// Large exponent edge cases
-		{input: "1.7976931348623157e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157", -292)), canonical: "179769313486231570e291", want: Quantity{i: int64Amount{value: 17976931348623157, scale: 292}, Format: DecimalExponent}},                                                                                                              // the largest float64
-		{input: "1.7976931348623156999999999999e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623156999999999999", -280)), canonical: "179769313486231569999999999990e279", want: Quantity{d: scaledDec("17976931348623156999999999999", -280), Format: DecimalExponent}},                                                                           // just below the largest float64
-		{input: "1.7976931348623157000000000001e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157000000000001", -280)), canonical: "17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 11)+"1", -280), Format: DecimalExponent}},                                       // just above the largest float64
-		{input: "1.79769313486231569999999999999e308", wantAsInt64: nil, wantAsDec: new(scaledDec("179769313486231569999999999999", -279)), canonical: "179769313486231569999999999999e279", want: Quantity{d: scaledDec("179769313486231569999999999999", -279), Format: DecimalExponent}},                                                                        // 30 significant digits, just below the largest float64
-		{input: "-1.7976931348623157000000000001e308", wantAsInt64: nil, wantAsDec: new(scaledDec("-17976931348623157000000000001", -280)), canonical: "-17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("-17976931348623157"+strings.Repeat("0", 11)+"1", -280), Format: DecimalExponent}},                                   // negative, and just above the largest float64 in magnitude
-		{input: "17976931348623157" + strings.Repeat("0", 292), wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157", -292)), canonical: "179769313486231570e291", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 292), 0), Format: DecimalSI}},                                                                                     // the largest float64, written out
-		{input: "17976931348623157000000000001" + strings.Repeat("0", 280), wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157000000000001", -280)), canonical: "17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 11)+"1"+strings.Repeat("0", 280), 0), Format: DecimalSI}}, // just above the largest float64, written out
-		{input: "1.8e308", wantAsInt64: nil, wantAsDec: new(scaledDec("18", -307)), canonical: "180e306", want: Quantity{i: int64Amount{value: 18, scale: 307}, Format: DecimalExponent}},                                                                                                                                                                          // above the largest float64
+		{input: "1.7976931348623157e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157", -292)), canonical: "179769313486231570e291", want: Quantity{i: int64Amount{value: 17976931348623157, scale: 292}, Format: DecimalExponent}},                                                                                        // the largest float64
+		{input: "1.7976931348623156999999999999e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623156999999999999", -280)), canonical: "179769313486231569999999999990e279", want: Quantity{d: scaledDec("17976931348623156999999999999", -280), Format: DecimalExponent}},                                                     // just below the largest float64
+		{input: "1.7976931348623157000000000001e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157000000000001", -280)), canonical: "17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 11)+"1", -280), Format: DecimalExponent}},                 // just above the largest float64
+		{input: "1.79769313486231569999999999999e308", wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157", -292)), canonical: "179769313486231570e291", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 12), -280), Format: DecimalExponent}},                                                                // 30 significant digits, just below the largest float64
+		{input: "-1.7976931348623157000000000001e308", wantAsInt64: nil, wantAsDec: new(scaledDec("-17976931348623157000000000001", -280)), canonical: "-17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("-17976931348623157"+strings.Repeat("0", 11)+"1", -280), Format: DecimalExponent}},             // negative, and just above the largest float64 in magnitude
+		{input: "17976931348623157" + strings.Repeat("0", 292), wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157", -292)), canonical: "179769313486231570e291", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 12), -280), Format: DecimalSI}},                                                             // the largest float64, written out
+		{input: "17976931348623157000000000001" + strings.Repeat("0", 280), wantAsInt64: nil, wantAsDec: new(scaledDec("17976931348623157000000000001", -280)), canonical: "17976931348623157" + strings.Repeat("0", 11) + "10e279", want: Quantity{d: scaledDec("17976931348623157"+strings.Repeat("0", 11)+"1", -280), Format: DecimalSI}}, // just above the largest float64, written out
+		{input: "1.8e308", wantAsInt64: nil, wantAsDec: new(scaledDec("18", -307)), canonical: "180e306", want: Quantity{i: int64Amount{value: 18, scale: 307}, Format: DecimalExponent}},                                                                                                                                                    // above the largest float64
 		{input: "1e10000", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -10000)), canonical: "10e9999", want: Quantity{i: int64Amount{value: 1, scale: 10000}, Format: DecimalExponent}},
-		{input: "1" + strings.Repeat("0", 10000), wantAsInt64: nil, wantAsDec: new(scaledDec("1", -10000)), canonical: "10e9999", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 10000), 0), Format: DecimalSI}},                                                // exponent from digits alone
-		{input: "1" + strings.Repeat("0", 10000) + "1", wantAsInt64: nil, wantAsDec: ptrDec("1" + strings.Repeat("0", 10000) + "1"), want: Quantity{d: scaledDec("1"+strings.Repeat("0", 10000)+"1", 0), Format: DecimalSI}},                                         // every digit is kept and written back
+		{input: "1" + strings.Repeat("0", 10000), wantAsInt64: nil, wantAsDec: new(scaledDec("1", -10000)), canonical: "10e9999", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 28), -9972), Format: DecimalSI}},                                               // exponent from digits alone
 		{input: "1000e9999", wantAsInt64: nil, wantAsDec: new(scaledDec("1000", -9999)), canonical: "1e10002", want: Quantity{i: int64Amount{value: 1000, scale: 9999}, Format: DecimalExponent}},                                                                    // canonical exponent is larger than the input exponent
 		{input: "123456789012345678e999999", wantAsInt64: nil, wantAsDec: new(scaledDec("123456789012345678", -999999)), want: Quantity{i: int64Amount{value: 123456789012345678, scale: 999999}, Format: DecimalExponent}},                                          // 18 digits; the exponent is already a multiple of 3
 		{input: "1234567890123456e1000001", wantAsInt64: nil, wantAsDec: new(scaledDec("1234567890123456", -1000001)), canonical: "123456789012345600e999999", want: Quantity{i: int64Amount{value: 1234567890123456, scale: 1000001}, Format: DecimalExponent}},     // the canonical exponent is a multiple of 3, which adds 2 digits: 16 become 18
