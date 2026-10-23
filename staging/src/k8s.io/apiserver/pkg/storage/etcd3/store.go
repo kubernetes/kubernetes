@@ -416,6 +416,9 @@ func (s *store) Delete(
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
 		expectTransformOrDecodeError = opts.ExpectTransformOrDecodeError
 	}
+	if expectTransformOrDecodeError {
+		cachedExistingObject = nil
+	}
 	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, expectTransformOrDecodeError)
 }
 
@@ -426,7 +429,7 @@ func (s *store) conditionalDelete(
 
 	var origState *objState
 	var err error
-	if cachedExistingObject != nil && !expectTransformOrDecodeError {
+	if cachedExistingObject != nil {
 		origState, err = s.getStateFromObject(cachedExistingObject, false)
 	} else {
 		origState, err = getCurrentState()
@@ -533,7 +536,7 @@ func (s *store) GuaranteedUpdate(
 			continue
 		}
 
-		ret, ttl, err := s.updateState(origState, tryUpdate)
+		ret, ttl, err := updateState(origState, tryUpdate)
 		if err != nil {
 			origState, err = refreshOnError(origState, err, getCurrentState)
 			if err != nil {
@@ -543,7 +546,7 @@ func (s *store) GuaranteedUpdate(
 		}
 
 		var success bool
-		origState, success, err = s.updateOnce(ctx, span, preparedKey, destination, origState, ret, ttl, v, ignoreNotFound, getCurrentState)
+		origState, success, err = s.updateOnce(ctx, preparedKey, destination, origState, ret, ttl, v, ignoreNotFound, getCurrentState)
 		if err != nil {
 			return err
 		}
@@ -553,7 +556,12 @@ func (s *store) GuaranteedUpdate(
 	}
 }
 
-func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey string, destination runtime.Object, origState *objState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound bool, getCurrentState func() (*objState, error)) (state *objState, success bool, err error) {
+func (s *store) updateOnce(ctx context.Context, preparedKey string, destination runtime.Object, origState *objState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound bool, getCurrentState func() (*objState, error)) (state *objState, success bool, err error) {
+	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
+		return origState, false, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+	}
+
+	span := tracing.SpanFromContext(ctx)
 	span.AddEvent("About to Encode")
 	data, err := runtime.Encode(s.codec, ret)
 	if err != nil {
@@ -1266,14 +1274,10 @@ func (s *store) getStateFromObject(obj runtime.Object, current bool) (*objState,
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
+func updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
 	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
-		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
 	var ttl uint64
 	if ttlPtr != nil {
