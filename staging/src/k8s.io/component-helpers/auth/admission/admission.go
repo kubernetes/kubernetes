@@ -531,6 +531,10 @@ func (v *Verifier) authenticateToken(ctx context.Context, rawToken string) ([]st
 	if ctx.Err() != nil {
 		return nil, errVerificationFailed
 	}
+	if strings.HasPrefix(strings.TrimSpace(rawToken), "{") {
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token is not compact JWT")
+		return nil, errVerificationFailed
+	}
 	token, err := v.verifier.Verify(ctx, rawToken)
 	if err != nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token authentication failed", "detail", err.Error())

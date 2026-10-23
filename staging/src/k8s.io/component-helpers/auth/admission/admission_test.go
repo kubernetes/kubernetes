@@ -822,6 +822,48 @@ func TestAuthenticationBeforeBodyRead(t *testing.T) {
 	}
 }
 
+func TestVerifierRequiresCompactJWT(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	compact := ts.sign(t, ts.baseClaims())
+	parts := strings.Split(compact, ".")
+	if len(parts) != 3 {
+		t.Fatalf("fixture is not a compact JWT: %d parts", len(parts))
+	}
+	for _, tc := range []struct {
+		name          string
+		serialization map[string]any
+	}{
+		{name: "flattened JWS", serialization: map[string]any{"protected": parts[0], "payload": parts[1], "signature": parts[2]}},
+		{name: "general JWS", serialization: map[string]any{"payload": parts[1], "signatures": []map[string]any{{"protected": parts[0], "signature": parts[2]}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.serialization)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, token := range []string{string(raw), " \n" + string(raw)} {
+				if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil || err.Error() != "webhook token verification failed" {
+					t.Fatalf("non-compact JWT: Verify = %v, want generic denial", err)
+				}
+			}
+			spy := newSpyHandler()
+			h := admission.NewHandlerForTest(v, spy.serve)
+			body := &observedBody{reader: bytes.NewReader(admissionReviewBody(t, testGroup))}
+			req := newRequest(t, nil, string(raw))
+			req.Body = body
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusUnauthorized || rec.Body.String() != "webhook token verification failed\n" || body.reads != 0 || spy.wasReached() {
+				t.Fatalf("non-compact HTTP token: status=%d body=%q reads=%d callback=%t", rec.Code, rec.Body.String(), body.reads, spy.wasReached())
+			}
+		})
+	}
+	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, compact); err != nil {
+		t.Fatalf("compact JWT denied: %v", err)
+	}
+}
+
 func TestAuthenticatedBodyBoundaries(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
