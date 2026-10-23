@@ -661,7 +661,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	go watcher.process(ctx, cacheInterval)
+	watcher.input <- watcherInput{interval: cacheInterval}
+	go watcher.process(ctx)
 	return watcher, nil
 }
 
