@@ -6923,3 +6923,40 @@ func TestCollectSecurityProfiles(t *testing.T) {
 		})
 	}
 }
+
+func TestAllocatedStatusPodManager(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+	logger, _ := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	allocatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-uid", Name: "pod", Namespace: "default"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "a", Image: "image"}}},
+	}
+	require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, allocatedPod))
+	desiredPod := allocatedPod.DeepCopy()
+	desiredPod.Spec.Containers = append(desiredPod.Spec.Containers, v1.Container{Name: "added", Image: "image"})
+	unallocatedPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "unallocated-uid", Name: "unallocated", Namespace: "default"}}
+	kl.podManager.SetPods([]*v1.Pod{desiredPod, unallocatedPod})
+
+	spm := &allocatedStatusPodManager{PodManager: kl.podManager, kl: kl}
+
+	gotPod, found := spm.GetPodByUID(desiredPod.UID)
+	require.True(t, found)
+	assert.Equal(t, allocatedPod.Spec.Containers, gotPod.Spec.Containers, "should return the allocated containers")
+
+	gotPod, found = spm.GetPodByUID(unallocatedPod.UID)
+	require.True(t, found)
+	assert.Same(t, unallocatedPod, gotPod, "pod without an allocation should be returned as-is")
+
+	_, found = spm.GetPodByUID("unknown-uid")
+	assert.False(t, found)
+
+	// The status manager is constructed before the allocation manager.
+	spm.kl = &Kubelet{}
+	gotPod, found = spm.GetPodByUID(desiredPod.UID)
+	require.True(t, found)
+	assert.Same(t, desiredPod, gotPod)
+}

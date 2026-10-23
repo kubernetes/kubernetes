@@ -746,7 +746,13 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	var statusPodManager status.PodManager = klet.podManager
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		// The status manager must see the allocated containers, which can differ from the spec
+		// while dynamic container changes are pending.
+		statusPodManager = &allocatedStatusPodManager{PodManager: klet.podManager, kl: klet}
+	}
+	klet.statusManager = status.NewManager(klet.kubeClient, statusPodManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	broadcaster := pods.NewBroadcaster(ctx)
 	klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager, klet.sourcesReady)
@@ -3328,7 +3334,12 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// TODO: this should be unnecessary today - determine what is the cause for this to
 		// be different than Sync, or if there is a better place for it. For instance, we have
 		// needsReconcile in kubelet/config, here, and in status_manager.
-		if status.NeedToReconcilePodReadiness(pod) {
+		readinessPod := pod
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+			// Readiness is computed from the allocated containers.
+			readinessPod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+		}
+		if status.NeedToReconcilePodReadiness(readinessPod) {
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3794,4 +3805,22 @@ func (a *allocatedPodManager) GetPods() []*v1.Pod {
 		}
 	}
 	return allocatedPods
+}
+
+// allocatedStatusPodManager returns allocated pods to the status manager.
+// TODO(KEP-5972): Move the allocated pod lookup out of the allocation manager, so the status
+// manager can read it directly instead of through a wrapper that references the kubelet.
+type allocatedStatusPodManager struct {
+	status.PodManager
+	// kl provides the allocation manager, which is constructed after the status manager.
+	kl *Kubelet
+}
+
+func (a *allocatedStatusPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+	pod, found := a.PodManager.GetPodByUID(uid)
+	if !found || a.kl.allocationManager == nil {
+		return pod, found
+	}
+	pod, _ = a.kl.allocationManager.UpdatePodFromAllocation(pod)
+	return pod, true
 }

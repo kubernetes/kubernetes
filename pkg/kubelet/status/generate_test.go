@@ -214,6 +214,70 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 	}
 }
 
+func TestGeneratePodReadyConditionUnallocatedContainers(t *testing.T) {
+	unallocated := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: kubecontainer.ContainerReasonUnallocated}},
+		}
+	}
+	waiting := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}},
+		}
+	}
+	// The spec is the one from the API, which has the containers that aren't allocated yet.
+	spec := v1.PodSpec{Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}}}
+
+	tests := []struct {
+		name              string
+		dynamicContainers bool
+		statuses          []v1.ContainerStatus
+		expectReady       v1.ConditionStatus
+		expectMessage     string
+	}{{
+		name:              "unallocated container is ignored",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionTrue,
+	}, {
+		name:              "unallocated container counts with the gate disabled",
+		dynamicContainers: false,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c2]",
+	}, {
+		name:              "allocated container that is waiting counts",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), waiting("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c2]",
+	}, {
+		name:              "other containers still count",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getNotReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c1]",
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.dynamicContainers {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, test.dynamicContainers)
+			pod := &v1.Pod{Spec: spec}
+
+			containersReady := GenerateContainersReadyCondition(pod, &v1.PodStatus{}, test.statuses, v1.PodRunning)
+			assert.Equal(t, test.expectReady, containersReady.Status, "ContainersReady")
+			assert.Equal(t, test.expectMessage, containersReady.Message, "ContainersReady message")
+
+			ready := GeneratePodReadyCondition(pod, &v1.PodStatus{}, nil, test.statuses, v1.PodRunning)
+			assert.Equal(t, test.expectReady, ready.Status, "Ready")
+		})
+	}
+}
+
 func TestGeneratePodReadyCondition(t *testing.T) {
 	tests := []struct {
 		spec              v1.PodSpec

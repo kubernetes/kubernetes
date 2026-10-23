@@ -2202,6 +2202,10 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		podutil.Containers,
 		podRestarting,
 	)
+	if unallocated := kl.unallocatedContainerStatuses(pod); len(unallocated) > 0 {
+		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, unallocated...)
+		sort.Sort(kubetypes.SortedContainerStatuses(apiPodStatus.ContainerStatuses))
+	}
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		ctx,
 		pod, podStatus,
@@ -2240,6 +2244,38 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return &apiPodStatus
+}
+
+// unallocatedContainerStatuses returns a Waiting status for each main container that was added to
+// the pod but isn't allocated yet, i.e. isn't in allocatedPod. The kubelet doesn't run these
+// containers until they are allocated.
+func (kl *Kubelet) unallocatedContainerStatuses(allocatedPod *v1.Pod) []v1.ContainerStatus {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return nil
+	}
+	apiPod, ok := kl.podManager.GetPodByUID(allocatedPod.UID)
+	if !ok {
+		return nil
+	}
+	// No other status can have the name of an unallocated container: validation rejects adding a
+	// container whose name is still in the pod's statuses, and a removed container's status goes
+	// away only together with its runtime container.
+	var statuses []v1.ContainerStatus
+	for pair := range podutil.ContainerPairs(apiPod, allocatedPod, podutil.Containers) {
+		if pair.Old != nil {
+			continue
+		}
+		c := pair.New
+		statuses = append(statuses, v1.ContainerStatus{
+			Name:  c.Name,
+			Image: c.Image,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonUnallocated,
+				Message: "The container has not been allocated by the kubelet yet",
+			}},
+		})
+	}
+	return statuses
 }
 
 func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {

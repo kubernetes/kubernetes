@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -7507,6 +7508,95 @@ func TestConvertToAPIContainerStatusesRemovedContainerResources(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, tc.wantResources, removed.Resources)
 			assert.Nil(t, removed.AllocatedResources)
+		})
+	}
+}
+
+func TestGenerateAPIPodStatusUnallocatedContainers(t *testing.T) {
+	unallocated := func(name, image string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			Image: image,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonUnallocated,
+				Message: "The container has not been allocated by the kubelet yet",
+			}},
+		}
+	}
+	tests := []struct {
+		name              string
+		dynamicContainers bool
+		// apiContainers are the main containers of the pod in the API. The allocated pod only has c1.
+		apiContainers []v1.Container
+		// expectedUnallocated are the statuses expected besides the one of c1.
+		expectedUnallocated []v1.ContainerStatus
+	}{{
+		name:                "container added",
+		dynamicContainers:   true,
+		apiContainers:       []v1.Container{{Name: "c1", Image: "i1"}, {Name: "c0", Image: "i0"}, {Name: "c2", Image: "i2"}},
+		expectedUnallocated: []v1.ContainerStatus{unallocated("c0", "i0"), unallocated("c2", "i2")},
+	}, {
+		name:                "container added while another is removed",
+		dynamicContainers:   true,
+		apiContainers:       []v1.Container{{Name: "c2", Image: "i2"}},
+		expectedUnallocated: []v1.ContainerStatus{unallocated("c2", "i2")},
+	}, {
+		name:              "container added with the gate disabled",
+		dynamicContainers: false,
+		apiContainers:     []v1.Container{{Name: "c1", Image: "i1"}, {Name: "c2", Image: "i2"}},
+	}, {
+		name:              "nothing pending",
+		dynamicContainers: true,
+		apiContainers:     []v1.Container{{Name: "c1", Image: "i1"}},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.dynamicContainers {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, test.dynamicContainers)
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			allocatedPod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+			allocatedPod.Spec = v1.PodSpec{
+				Containers:    []v1.Container{{Name: "c1", Image: "i1"}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			}
+			apiPod := allocatedPod.DeepCopy()
+			apiPod.Spec.Containers = test.apiContainers
+			kl.podManager.SetPods([]*v1.Pod{apiPod})
+
+			podStatus := &kubecontainer.PodStatus{
+				ID:        allocatedPod.UID,
+				Name:      allocatedPod.Name,
+				Namespace: allocatedPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "c1",
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "c1-id"},
+					State: kubecontainer.ContainerStateRunning,
+					Image: "i1",
+				}},
+			}
+			status := kl.generateAPIPodStatus(tCtx, allocatedPod, podStatus, SyncPod)
+
+			var names []string
+			var unallocatedStatuses []v1.ContainerStatus
+			for _, s := range status.ContainerStatuses {
+				names = append(names, s.Name)
+				if s.Name == "c1" {
+					assert.NotNil(t, s.State.Running, "c1 is running")
+					continue
+				}
+				s.Ready = false // The fake prober marks every container ready.
+				unallocatedStatuses = append(unallocatedStatuses, s)
+			}
+			assert.True(t, slices.IsSorted(names), "statuses are sorted: %v", names)
+			assert.Equal(t, test.expectedUnallocated, unallocatedStatuses)
+			assert.Equal(t, v1.PodRunning, status.Phase)
 		})
 	}
 }
