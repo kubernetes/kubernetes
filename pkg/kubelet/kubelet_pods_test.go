@@ -53,6 +53,7 @@ import (
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -4250,6 +4251,10 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
+			containerType := podutil.Containers
+			if test.isInitContainer {
+				containerType = podutil.InitContainers
+			}
 			containerStatuses := kl.convertToAPIContainerStatuses(
 				tCtx,
 				test.pod,
@@ -4258,7 +4263,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.containers,
 				nil,
 				test.hasInitContainers,
-				test.isInitContainer,
+				containerType,
 				test.podRestarting,
 			)
 			for i, status := range containerStatuses {
@@ -4445,7 +4450,7 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 				test.pod.Spec.Containers,
 				sets.New(imageVolumeName),
 				false,
-				false,
+				podutil.Containers,
 				false,
 			)
 			for i, status := range containerStatuses {
@@ -7014,7 +7019,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, false, false)
+			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, podutil.Containers, false)
 		}()
 	}
 }
@@ -7579,7 +7584,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				hasExclusiveCPUs := kubelet.containerManager.ContainerHasExclusiveCPUs(logger, tPod, &tPod.Spec.Containers[0])
 				assert.Equal(t, tc.MockHasExclusiveCPUs, hasExclusiveCPUs)
 			}
-			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false, false)
+			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
 			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
@@ -7679,7 +7684,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
 
-		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false, false)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}
