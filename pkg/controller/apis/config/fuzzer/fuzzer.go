@@ -43,6 +43,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CSRSigningController.ClusterSigningKeyFile = fmt.Sprintf("/%s", c.String(0))
 			obj.PersistentVolumeBinderController.VolumeConfiguration.FlexVolumePluginDir = fmt.Sprintf("/%s", c.String(0))
 			obj.TTLAfterFinishedController.ConcurrentTTLSyncs = c.Int31()
+			if len(obj.ServiceServingSigner.ClusterServiceDomain) == 0 {
+				obj.ServiceServingSigner.ClusterServiceDomain = "cluster.local"
+			}
 		},
 	}
 }
