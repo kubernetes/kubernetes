@@ -100,6 +100,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				enableServiceLinks := v1.DefaultEnableServiceLinks
 				s.EnableServiceLinks = &enableServiceLinks
 			}
+			// podNetwork may not be set on a host network pod.
+			switch {
+			case s.HostNetwork || c.Bool():
+				s.PodNetwork = nil
+			case c.Bool():
+				s.PodNetwork = new(core.PodNetworkDefault)
+			default:
+				s.PodNetwork = new(core.PodNetworkNone)
+			}
 		},
 		func(s *core.PodStatus, c randfill.Continue) {
 			c.Fill(&s)
