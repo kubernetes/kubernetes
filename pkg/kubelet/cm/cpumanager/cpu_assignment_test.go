@@ -17,6 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
+	"fmt"
+	"math/rand"
 	"reflect"
 	"sort"
 	"testing"
@@ -1547,5 +1549,465 @@ func checkError(t *testing.T, expErr string, err error) {
 		t.Errorf("expected error [%v] but got nil", expErr)
 	case err != nil && err.Error() != expErr:
 		t.Errorf("expected error to be [%v] but it was [%v]", expErr, err)
+	}
+}
+
+// newUncoreLayersTopology builds one socket, one NUMA node and numCPUs non-SMT CPUs.
+// groupSizes are the CPUs per cache group at each layer, outermost first: the first
+// is the uncore cache, the others are nested layers. Nested ids are not contiguous.
+func newUncoreLayersTopology(numCPUs int, groupSizes ...int) *topology.CPUTopology {
+	topo := &topology.CPUTopology{
+		NumCPUs:        numCPUs,
+		NumCores:       numCPUs,
+		NumSockets:     1,
+		NumNUMANodes:   1,
+		NumUncoreCache: numCPUs / groupSizes[0],
+		CPUDetails:     topology.CPUDetails{},
+	}
+	for cpu := range numCPUs {
+		info := topology.CPUInfo{CoreID: cpu, UncoreCacheID: cpu / groupSizes[0]}
+		for layer, size := range groupSizes[1:] {
+			info.NestedUncoreCacheIDs = append(info.NestedUncoreCacheIDs, 100*(layer+1)+3*(cpu/size))
+		}
+		topo.CPUDetails[cpu] = info
+	}
+	return topo
+}
+
+// TestTakeByTopologyNestedUncoreCacheAlignment allocates a sequence of requests from
+// what is left and checks where each lands: wholly free groups for the bulk of a
+// request, the rest where it fits most cleanly, at every nested layer.
+func TestTakeByTopologyNestedUncoreCacheAlignment(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	type step struct {
+		cpus int
+		want string
+	}
+	testCases := map[string]struct {
+		topo               *topology.CPUTopology
+		reserved           string
+		preferAlignByCache bool
+		steps              []step
+	}{
+		"one-then-two-cpus-the-pair-gets-a-cluster-of-its-own": {
+			// clusters of 2 cores, L3 groups of 8 CPUs. CPUs 0-1 reserved.
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-1", preferAlignByCache: true,
+			steps: []step{{1, "2"}, {2, "4-5"}, {1, "3"}, {2, "6-7"}},
+		},
+		"odd-request-then-a-pair-then-a-single-cpu-filling-the-hole": {
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-1", preferAlignByCache: true,
+			steps: []step{{3, "2-4"}, {2, "6-7"}, {1, "5"}},
+		},
+		"even-requests-never-share-a-cluster-and-spill-to-the-next-l3-group": {
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-1", preferAlignByCache: true,
+			steps: []step{{2, "2-3"}, {4, "4-7"}, {2, "8-9"}},
+		},
+		"remainder-of-a-request-spanning-l3-groups-takes-a-whole-cluster": {
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-2", preferAlignByCache: true,
+			steps: []step{{10, "8-15,4-5"}},
+		},
+		"clusters-of-4-remainders-fill-partially-used-clusters": {
+			// Xeon 6 with E-cores shape: clusters of 4 cores inside one L3 group of 16.
+			topo: newUncoreLayersTopology(16, 16, 4), reserved: "", preferAlignByCache: true,
+			steps: []step{{3, "0-2"}, {2, "4-5"}, {1, "3"}, {2, "6-7"}},
+		},
+		"several-nested-layers-fill-free-groups-then-holes": {
+			// three nested layers inside one uncore cache of 16 CPUs: groups of 8, 4 and 2
+			topo: newUncoreLayersTopology(16, 16, 8, 4, 2), reserved: "", preferAlignByCache: true,
+			steps: []step{{1, "0"}, {2, "2-3"}, {1, "1"}, {4, "4-7"}, {8, "8-15"}},
+		},
+		"request-that-fits-in-one-l3-group-stays-in-it-in-whole-l2-groups": {
+			// L2 per 2 cores, L3 per 8 cores, one level 4 cache for all 64 cores
+			topo: newUncoreLayersTopology(64, 64, 8, 2), reserved: "", preferAlignByCache: true,
+			steps: []step{{2, "0-1"}, {6, "2-7"}, {6, "8-13"}, {4, "16-19"}},
+		},
+		"request-that-fits-no-partly-used-l3-group-goes-to-a-free-one": {
+			topo: newUncoreLayersTopology(64, 64, 8, 2), reserved: "0-2,8-10", preferAlignByCache: true,
+			steps: []step{{6, "16-21"}},
+		},
+		"request-that-fits-no-group-uses-two-groups-and-whole-l2-groups": {
+			// L3 groups of 8 CPUs with 1, 4 and 5 free CPUs, none with room for 6: two groups
+			// are enough, and 8-11,16-17 are whole L2 groups where 7,16-20 would share two
+			topo: newUncoreLayersTopology(24, 24, 8, 2), reserved: "0-6,12-15,21-23", preferAlignByCache: true,
+			steps: []step{{6, "8-11,16-17"}},
+		},
+		"remainder-goes-to-the-l3-group-with-a-whole-l2-group-for-it": {
+			// L3 group 0 takes 8. For the other 2, L3 group 1 is the tightest, but its free
+			// CPUs 9 and 11 are holes in two L2 groups; L3 group 2 has a free L2 group
+			topo: newUncoreLayersTopology(32, 32, 8, 2), reserved: "8,10,12-15", preferAlignByCache: true,
+			steps: []step{{10, "0-7,16-17"}},
+		},
+		"uncore-cache-group-is-chosen-by-how-cleanly-the-request-fits": {
+			// uncore group 0 is the tightest, but its free CPUs 5 and 6 are holes in two L2
+			// groups; uncore group 1 has a free pair
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-4,7-11", preferAlignByCache: true,
+			steps: []step{{2, "12-13"}},
+		},
+		"free-nested-group-beats-an-uncore-cache-group-with-only-holes": {
+			// uncore group 1 has exactly 4 free CPUs, all holes; uncore group 0 has a free
+			// L3 group
+			topo: newUncoreLayersTopology(32, 16, 4, 2), reserved: "12-16,18-20,22-27,29,31", preferAlignByCache: true,
+			steps: []step{{4, "0-3"}},
+		},
+		"spanning-request-leaves-holes-unused-and-takes-whole-l2-groups": {
+			// free CPUs in L3 groups of 4: 22-23 and 29-31. Using up the larger group would
+			// take the hole 29 and break the pair 22-23
+			topo: newUncoreLayersTopology(32, 16, 4, 2), reserved: "0-6,8-21,24-28", preferAlignByCache: true,
+			steps: []step{{4, "22-23,30-31"}},
+		},
+		"spanning-request-touches-as-few-l2-groups-as-it-can": {
+			// CPU 3 is a hole, 48-52 has the hole 52 next to the free pairs 48-51, 62-63 is a
+			// free pair
+			topo: newUncoreLayersTopology(64, 64, 8, 2), reserved: "0-2,4-47,53-61", preferAlignByCache: true,
+			steps: []step{{6, "48-51,62-63"}},
+		},
+		"without-the-option-the-lowest-cpus-are-taken": {
+			topo: newUncoreLayersTopology(16, 8, 2), reserved: "0-1", preferAlignByCache: false,
+			steps: []step{{1, "2"}, {2, "3-4"}},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			available := tc.topo.CPUDetails.CPUs()
+			if tc.reserved != "" {
+				available = available.Difference(mustParseCPUSet(t, tc.reserved))
+			}
+			for i, s := range tc.steps {
+				got, err := takeByTopologyNUMAPacked(logger, tc.topo, available, s.cpus, CPUSortingStrategyPacked, tc.preferAlignByCache)
+				if err != nil {
+					t.Fatalf("step %d (%d CPUs): unexpected error: %v", i+1, s.cpus, err)
+				}
+				want := cpuset.New()
+				if s.want != "" {
+					want = mustParseCPUSet(t, s.want)
+				}
+				if !got.Equals(want) {
+					t.Errorf("step %d (%d CPUs): got [%s], want [%s]", i+1, s.cpus, got, want)
+				}
+				available = available.Difference(got)
+			}
+		})
+	}
+}
+
+// With SMT, nested uncore cache ids must not change which CPUs are picked.
+func TestTakeByTopologyNestedUncoreCachesIgnoredWithSMT(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	withNested := &topology.CPUTopology{
+		NumCPUs:        topoUncoreSingleSocketSMT.NumCPUs,
+		NumSockets:     topoUncoreSingleSocketSMT.NumSockets,
+		NumCores:       topoUncoreSingleSocketSMT.NumCores,
+		NumUncoreCache: topoUncoreSingleSocketSMT.NumUncoreCache,
+		CPUDetails:     topology.CPUDetails{},
+	}
+	for cpu, info := range topoUncoreSingleSocketSMT.CPUDetails {
+		info.NestedUncoreCacheIDs = []int{100 + info.CoreID}
+		withNested.CPUDetails[cpu] = info
+	}
+
+	available := mustParseCPUSet(t, "2-3,10-11,4-7,12-15")
+	want, err := takeByTopologyNUMAPacked(logger, topoUncoreSingleSocketSMT, available, 6, CPUSortingStrategyPacked, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := takeByTopologyNUMAPacked(logger, withNested, available, 6, CPUSortingStrategyPacked, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Equals(want) {
+		t.Errorf("with nested uncore cache ids got [%s], want [%s] as without", got, want)
+	}
+}
+
+// A request is satisfied even when one free CPU is all each group has.
+func TestTakeByTopologyNestedUncoreCachesRemainderWithoutRoomInOneGroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	topo := newUncoreLayersTopology(16, 16, 4) // clusters 0-3, 4-7, 8-11, 12-15
+	// one free CPU in every cluster: 3, 7, 11, 15
+	available := mustParseCPUSet(t, "3,7,11,15")
+	got, err := takeByTopologyNUMAPacked(logger, topo, available, 3, CPUSortingStrategyPacked, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := mustParseCPUSet(t, "3,7,11"); !got.Equals(want) {
+		t.Errorf("got [%s], want [%s]", got, want)
+	}
+}
+
+// On a hybrid CPU (SMT cores next to cores sharing an L2) nested uncore caches are
+// not used, so the core based selection stays in charge.
+func TestTakeByTopologyNestedUncoreCachesIgnoredOnHybridTopology(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	// two SMT cores (threads 0-1, 2-3), four cores without SMT (threads 4-7) sharing an L2
+	hybrid := &topology.CPUTopology{
+		NumCPUs:        8,
+		NumSockets:     1,
+		NumCores:       6,
+		NumNUMANodes:   1,
+		NumUncoreCache: 1,
+		CPUDetails: topology.CPUDetails{
+			0: {CoreID: 0, UncoreCacheID: 0},
+			1: {CoreID: 0, UncoreCacheID: 0},
+			2: {CoreID: 2, UncoreCacheID: 0},
+			3: {CoreID: 2, UncoreCacheID: 0},
+			4: {CoreID: 4, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+			5: {CoreID: 5, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+			6: {CoreID: 6, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+			7: {CoreID: 7, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+		},
+	}
+	// Picking the lowest three CPUs would split the SMT core 2-3; the core based
+	// selection takes CPU 4 and the SMT core 0-1.
+	available := mustParseCPUSet(t, "0-4")
+	got, err := takeByTopologyNUMAPacked(logger, hybrid, available, 3, CPUSortingStrategyPacked, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := mustParseCPUSet(t, "0-1,4"); !got.Equals(want) {
+		t.Errorf("got [%s], want [%s]: SMT cores stay whole", got, want)
+	}
+}
+
+// nestedAllocStats sums how the picks of a simulation sit in the nested uncore
+// cache layers (index 0 is the outermost).
+type nestedAllocStats struct {
+	allocations int
+	// touched is the number of groups the picks touch
+	touched []int
+	// shared is the number of touched groups a pick does not cover
+	shared []int
+	// excess is touched minus the fewest groups that could hold the request, for
+	// requests that fit in one uncore cache group
+	excess []int
+	// spanning counts the requests that fit in no uncore cache group, with their excess
+	spanning       int
+	spanningExcess []int
+	// worst describes the pick with the largest excess in each layer
+	worst       []string
+	worstExcess []int
+	// violations are broken invariants, with the seed and step
+	violations []string
+}
+
+// leastGroups is the fewest groups, with the given free CPU counts, that hold n CPUs.
+func leastGroups(n int, free []int) int {
+	sort.Sort(sort.Reverse(sort.IntSlice(free)))
+	for i, f := range free {
+		n -= f
+		if n <= 0 {
+			return i + 1
+		}
+	}
+	return len(free) + 1
+}
+
+// simulateNestedAllocations runs a seeded random sequence of allocations and releases
+// and records how every pick sits in the nested layers of topo. With align false the
+// nested layers are ignored, as a baseline.
+func simulateNestedAllocations(t *testing.T, topo *topology.CPUTopology, seed int64, steps int, align bool) nestedAllocStats {
+	logger, _ := ktesting.NewTestContext(t)
+	layers := topo.CPUDetails.NestedUncoreCacheLayers()
+	stats := nestedAllocStats{touched: make([]int, layers), shared: make([]int, layers), excess: make([]int, layers), spanningExcess: make([]int, layers),
+		worst: make([]string, layers), worstExcess: make([]int, layers)}
+
+	pickTopo := topo
+	if !align {
+		flat := *topo
+		flat.CPUDetails = topology.CPUDetails{}
+		for cpu, info := range topo.CPUDetails {
+			info.NestedUncoreCacheIDs = nil
+			flat.CPUDetails[cpu] = info
+		}
+		pickTopo = &flat
+	}
+
+	groups := make([]map[int]cpuset.CPUSet, layers)
+	for l := range groups {
+		groups[l] = topo.CPUDetails.NestedUncoreCacheGroups(l)
+	}
+
+	rng := rand.New(rand.NewSource(seed))
+	sizes := []int{1, 1, 1, 2, 2, 2, 3, 4, 4, 5, 6, 8, 10, 12, 16}
+	free := topo.CPUDetails.CPUs()
+	var live []cpuset.CPUSet
+	for step := range steps {
+		if len(live) > 0 && rng.Intn(100) < 45 {
+			i := rng.Intn(len(live))
+			free = free.Union(live[i])
+			live = append(live[:i], live[i+1:]...)
+			continue
+		}
+		n := sizes[rng.Intn(len(sizes))]
+		if n > free.Size() {
+			continue
+		}
+		pick, err := takeByTopologyNUMAPacked(logger, pickTopo, free, n, CPUSortingStrategyPacked, true)
+		where := fmt.Sprintf("seed %d step %d: %d CPUs from free [%s]", seed, step, n, free)
+		switch {
+		case err != nil:
+			stats.violations = append(stats.violations, where+": error "+err.Error())
+			continue
+		case pick.Size() != n:
+			stats.violations = append(stats.violations, fmt.Sprintf("%s: got %d CPUs [%s]", where, pick.Size(), pick))
+			continue
+		case !pick.IsSubsetOf(free):
+			stats.violations = append(stats.violations, fmt.Sprintf("%s: got [%s], not all free", where, pick))
+			continue
+		}
+
+		stats.allocations++
+		fitsOneUncore := false
+		for _, id := range topo.CPUDetails.UncoreCaches().List() {
+			if topo.CPUDetails.CPUsInUncoreCaches(id).Intersection(free).Size() >= n {
+				fitsOneUncore = true
+			}
+		}
+		if !fitsOneUncore {
+			stats.spanning++
+		}
+		for l := range layers {
+			// the fewest groups that could hold the request, inside one uncore cache group
+			// if it fits in one
+			least := -1
+			if fitsOneUncore {
+				for _, id := range topo.CPUDetails.UncoreCaches().List() {
+					uncore := topo.CPUDetails.CPUsInUncoreCaches(id)
+					if uncore.Intersection(free).Size() < n {
+						continue
+					}
+					var freeCounts []int
+					for _, g := range groups[l] {
+						if g.IsSubsetOf(uncore) {
+							freeCounts = append(freeCounts, g.Intersection(free).Size())
+						}
+					}
+					if k := leastGroups(n, freeCounts); least < 0 || k < least {
+						least = k
+					}
+				}
+			} else {
+				var freeCounts []int
+				for _, g := range groups[l] {
+					freeCounts = append(freeCounts, g.Intersection(free).Size())
+				}
+				least = leastGroups(n, freeCounts)
+			}
+			touched, shared := 0, 0
+			for _, g := range groups[l] {
+				if !g.Intersection(pick).IsEmpty() {
+					touched++
+					if !g.IsSubsetOf(pick) {
+						shared++
+					}
+				}
+			}
+			excess := touched - least
+			stats.touched[l] += touched
+			stats.shared[l] += shared
+			if !fitsOneUncore {
+				stats.spanningExcess[l] += excess
+				continue
+			}
+			stats.excess[l] += excess
+			if excess > stats.worstExcess[l] {
+				stats.worstExcess[l] = excess
+				stats.worst[l] = fmt.Sprintf("%s: got [%s], touches %d groups, %d would do", where, pick, touched, touched-excess)
+			}
+		}
+		free = free.Difference(pick)
+		live = append(live, pick)
+	}
+	return stats
+}
+
+// TestNestedUncoreCacheAllocationFuzz runs containers of different sizes that come
+// and go, which leaves holes, and looks for picks that touch more groups than needed
+// or leave groups shared. Runs are seeded; a failure names the seed and step.
+func TestNestedUncoreCacheAllocationFuzz(t *testing.T) {
+	topologies := map[string]struct {
+		numCPUs    int
+		groupSizes []int
+	}{
+		"l3-of-8-and-l2-of-2-in-16-cpus":                  {16, []int{8, 2}},
+		"l4-of-16-l3-of-4-and-l2-of-2-in-32-cpus":         {32, []int{16, 4, 2}},
+		"l4-of-64-l3-of-8-and-l2-of-2-in-64-cpus":         {64, []int{64, 8, 2}},
+		"l3-of-18-and-l2-of-2-in-72-cpus":                 {72, []int{72, 18, 2}},
+		"l4-of-24-l3-of-8-l2-of-4-and-l1-of-2-in-48-cpus": {48, []int{24, 8, 4, 2}},
+	}
+	const runs, steps = 20, 250
+
+	for name, tc := range topologies {
+		t.Run(name, func(t *testing.T) {
+			topo := newUncoreLayersTopology(tc.numCPUs, tc.groupSizes...)
+			var nested, flat nestedAllocStats
+			for seed := int64(1); seed <= runs; seed++ {
+				n := simulateNestedAllocations(t, topo, seed, steps, true)
+				f := simulateNestedAllocations(t, topo, seed, steps, false)
+				if nested.touched == nil {
+					layers := len(n.touched)
+					nested.touched, nested.shared, nested.excess, nested.spanningExcess = make([]int, layers), make([]int, layers), make([]int, layers), make([]int, layers)
+					flat.touched, flat.shared, flat.excess, flat.spanningExcess = make([]int, layers), make([]int, layers), make([]int, layers), make([]int, layers)
+				}
+				nested.allocations += n.allocations
+				flat.allocations += f.allocations
+				nested.spanning += n.spanning
+				flat.spanning += f.spanning
+				for l := range n.touched {
+					nested.touched[l] += n.touched[l]
+					nested.shared[l] += n.shared[l]
+					nested.excess[l] += n.excess[l]
+					flat.touched[l] += f.touched[l]
+					flat.shared[l] += f.shared[l]
+					flat.excess[l] += f.excess[l]
+					nested.spanningExcess[l] += n.spanningExcess[l]
+					flat.spanningExcess[l] += f.spanningExcess[l]
+				}
+				nested.violations = append(nested.violations, n.violations...)
+				if nested.worst == nil {
+					nested.worst, nested.worstExcess = make([]string, len(n.worst)), make([]int, len(n.worst))
+				}
+				for l := range n.worst {
+					if n.worstExcess[l] > nested.worstExcess[l] {
+						nested.worstExcess[l], nested.worst[l] = n.worstExcess[l], n.worst[l]
+					}
+				}
+			}
+			for _, v := range nested.violations {
+				t.Error(v)
+			}
+			t.Logf("%d allocations, %d of them fit in no single uncore cache group (without nested layers: %d, %d)",
+				nested.allocations, nested.spanning, flat.allocations, flat.spanning)
+			for l := range nested.touched {
+				t.Logf("layer %d: groups touched %d (without nesting %d), shared %d (%d); over the least possible: %d (%d), spanning requests %d (%d)",
+					l, nested.touched[l], flat.touched[l], nested.shared[l], flat.shared[l],
+					nested.excess[l], flat.excess[l], nested.spanningExcess[l], flat.spanningExcess[l])
+			}
+			for l, w := range nested.worst {
+				if w != "" {
+					t.Logf("worst in layer %d: %s", l, w)
+				}
+			}
+
+			for l := range nested.touched {
+				if nested.touched[l] > flat.touched[l] || nested.shared[l] > flat.shared[l] {
+					t.Errorf("layer %d: nested layers touch %d groups and share %d, more than without them (%d, %d)",
+						l, nested.touched[l], nested.shared[l], flat.touched[l], flat.shared[l])
+				}
+			}
+			// the outermost nested layer uses the fewest groups, the layers below only rarely more
+			if nested.excess[0] != 0 {
+				t.Errorf("layer 0: %d groups touched over the fewest possible, want 0; worst: %s", nested.excess[0], nested.worst[0])
+			}
+			for l := 1; l < len(nested.excess); l++ {
+				if nested.excess[l]*100 > nested.allocations {
+					t.Errorf("layer %d: %d groups touched over the fewest possible in %d allocations, more than 1%%; worst: %s",
+						l, nested.excess[l], nested.allocations, nested.worst[l])
+				}
+			}
+		})
 	}
 }
