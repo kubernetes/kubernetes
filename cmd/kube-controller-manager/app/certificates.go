@@ -425,8 +425,11 @@ func (cs *signerControllers) Run(ctx context.Context) {
 func newKubeServiceCASignerControllers(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	caCertPath := controllerContext.ComponentConfig.ServiceServingSigner.CACertPath
 	caKeyPath := controllerContext.ComponentConfig.ServiceServingSigner.CAKeyPath
-	if len(caCertPath) == 0 || len(caKeyPath) == 0 {
-		return nil, fmt.Errorf("path to Service Serving Signer cert/key files unset")
+
+	// validation should prevent only one being set, just make sure they are both set early
+	if len(caCertPath) == 0 && len(caKeyPath) == 0 {
+		klog.FromContext(ctx).Info("Skipping Service Serving Signer controller because it's missing cert/key pair files", "controller", "kubernetes.io/service-serving")
+		return nil, nil
 	}
 
 	client, err := controllerContext.NewClient("kube-service-serving-signer")
