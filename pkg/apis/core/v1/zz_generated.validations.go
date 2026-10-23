@@ -167,7 +167,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		(*corev1.Pod)(nil),
 		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 			switch op.Request.SubresourcePath() {
-			case "/", "/ephemeralcontainers", "/eviction", "/resize", "/status":
+			case "/", "/dynamic", "/ephemeralcontainers", "/eviction", "/resize", "/status":
 				return Validate_Pod(
 					ctx, op, nil, /* fldPath */
 					obj.(*corev1.Pod),

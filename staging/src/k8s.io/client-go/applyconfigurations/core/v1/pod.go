@@ -94,6 +94,12 @@ func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, e
 	return ExtractPodFrom(pod, fieldManager, "")
 }
 
+// ExtractPodDynamic extracts the applied configuration owned by fieldManager from
+// pod for the dynamic subresource.
+func ExtractPodDynamic(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "dynamic")
+}
+
 // ExtractPodEphemeralcontainers extracts the applied configuration owned by fieldManager from
 // pod for the ephemeralcontainers subresource.
 func ExtractPodEphemeralcontainers(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
