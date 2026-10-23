@@ -4823,6 +4823,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PodNetwork != nil {
+		in, out := &in.PodNetwork, &out.PodNetwork
+		*out = new(PodNetwork)
+		**out = **in
+	}
 	return
 }
 

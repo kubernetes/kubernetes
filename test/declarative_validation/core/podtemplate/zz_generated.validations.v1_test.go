@@ -148,6 +148,9 @@ func init() {
 			"template.spec.initContainers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.podNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

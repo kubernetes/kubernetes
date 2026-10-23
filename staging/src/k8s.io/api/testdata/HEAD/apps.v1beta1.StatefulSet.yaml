@@ -954,6 +954,7 @@ spec:
         name: nameValue
       overhead:
         overheadKey: "0"
+      podNetwork: podNetworkValue
       preemptionPolicy: preemptionPolicyValue
       priority: 25
       priorityClassName: priorityClassNameValue
