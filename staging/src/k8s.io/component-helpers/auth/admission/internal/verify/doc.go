@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package verify checks Kubernetes webhook token claims and API-group attestations.
-package verify // import "k8s.io/component-helpers/auth/admission/internal/verify"
+package verify

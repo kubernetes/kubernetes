@@ -1929,7 +1929,6 @@ type closeOnceBody struct {
 	r        *bytes.Reader
 	closes   int
 	closed   bool
-	readErr  error
 	readAfor bool // a read occurred after Close
 }
 
