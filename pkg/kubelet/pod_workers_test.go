@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1678,6 +1679,167 @@ func TestStaticPodExclusion(t *testing.T) {
 		"8-static": {State: SyncPod, HasConfig: true, Static: true},
 	}, state; !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected actual restartable: %s", cmp.Diff(e, a))
+	}
+}
+
+// TestStaticPodReplacementNotBlockedByTerminatedPodCleanup verifies that a replacement
+// static pod (same fullname, new UID) can start as soon as the previous instance has
+// stopped all of its containers, even if SyncTerminatedPod for the previous instance
+// keeps failing. In practice that failure is WaitForUnmount timing out, which can last
+// for minutes when the volume manager is starved; for a stacked etcd being upgraded by
+// kubeadm, gating the new etcd on that cleanup leaves the control plane down.
+func TestStaticPodReplacementNotBlockedByTerminatedPodCleanup(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	podWorkers, _, processed := createPodWorkers(logger)
+
+	const (
+		oldUID   = types.UID("1-static")
+		newUID   = types.UID("2-static")
+		fullname = "etcd_kube-system"
+	)
+	newEtcd := func(uid types.UID) *v1.Pod {
+		return newNamedPod(string(uid), "kube-system", "etcd", true)
+	}
+
+	var unmountStalled atomic.Bool
+	syncer := podWorkers.podSyncer.(*podSyncerFuncs)
+	origSyncTerminatedPod := syncer.syncTerminatedPod
+	syncer.syncTerminatedPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+		if pod.UID == oldUID && unmountStalled.Load() {
+			return errors.New("unmounted volumes=[etcd-certs etcd-data]: context deadline exceeded")
+		}
+		return origSyncTerminatedPod(ctx, pod, podStatus)
+	}
+
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(oldUID), UpdateType: kubetypes.SyncPodCreate})
+	drainAllWorkers(podWorkers)
+	if e, a := map[string]types.UID{fullname: oldUID}, podWorkers.startedStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("unexpected started static pods: %s", cmp.Diff(e, a))
+	}
+
+	// Manifest swap: the new pod is added and the old one is killed, and the old pod's
+	// volume teardown never completes.
+	unmountStalled.Store(true)
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(newUID), UpdateType: kubetypes.SyncPodCreate})
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(oldUID), UpdateType: kubetypes.SyncPodKill})
+	drainAllWorkers(podWorkers)
+
+	oldStatus := podWorkers.podSyncStatuses[oldUID]
+	if !oldStatus.IsTerminated() || oldStatus.IsFinished() {
+		t.Fatalf("expected old pod to be terminated but not finished, got %#v", oldStatus)
+	}
+
+	// Periodic resync for the waiting replacement.
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(newUID), UpdateType: kubetypes.SyncPodUpdate})
+	drainAllWorkers(podWorkers)
+
+	if e, a := map[string]types.UID{fullname: newUID}, podWorkers.startedStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("replacement static pod was not started while the old pod's cleanup was pending: %s", cmp.Diff(e, a))
+	}
+	if len(processed[newUID]) == 0 {
+		t.Fatalf("replacement static pod was never synced")
+	}
+	if oldStatus := podWorkers.podSyncStatuses[oldUID]; oldStatus.IsFinished() {
+		t.Fatalf("old pod should still be pending cleanup, got %#v", oldStatus)
+	}
+
+	// With the old manifest gone, housekeeping (HandlePodCleanups -> SyncKnownPods) is
+	// the only thing that retries the old pod's cleanup.
+	unmountStalled.Store(false)
+	podWorkers.SyncKnownPods(logger, []*v1.Pod{newEtcd(newUID)})
+	drainAllWorkers(podWorkers)
+	if oldStatus := podWorkers.podSyncStatuses[oldUID]; !oldStatus.IsFinished() {
+		t.Fatalf("expected old pod to be finished, got %#v", oldStatus)
+	}
+
+	// The next housekeeping pass forgets the finished worker, which must not evict
+	// the replacement from the fullname it now owns.
+	podWorkers.SyncKnownPods(logger, []*v1.Pod{newEtcd(newUID)})
+	if _, ok := podWorkers.podSyncStatuses[oldUID]; ok {
+		t.Fatalf("expected old pod worker to be removed")
+	}
+	if e, a := map[string]types.UID{fullname: newUID}, podWorkers.startedStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("removing the old pod worker evicted the replacement: %s", cmp.Diff(e, a))
+	}
+}
+
+// TestStaticPodReplacementWaitsForTerminatingPod is the lower bound for
+// TestStaticPodReplacementNotBlockedByTerminatedPodCleanup: the fullname must not be
+// released before SyncTerminatingPod succeeds, because until then the old instance's
+// containers may still be running.
+func TestStaticPodReplacementWaitsForTerminatingPod(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	podWorkers, _, processed := createPodWorkers(logger)
+
+	const (
+		oldUID   = types.UID("1-static")
+		newUID   = types.UID("2-static")
+		fullname = "etcd_kube-system"
+	)
+	newEtcd := func(uid types.UID) *v1.Pod {
+		return newNamedPod(string(uid), "kube-system", "etcd", true)
+	}
+
+	var killFailing atomic.Bool
+	var failedKills atomic.Int32
+	syncer := podWorkers.podSyncer.(*podSyncerFuncs)
+	origSyncTerminatingPod := syncer.syncTerminatingPod
+	syncer.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+		if pod.UID == oldUID && killFailing.Load() {
+			failedKills.Add(1)
+			return errors.New("failed to \"KillContainer\" for \"etcd\": rpc error: code = DeadlineExceeded")
+		}
+		return origSyncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
+	}
+
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(oldUID), UpdateType: kubetypes.SyncPodCreate})
+	drainAllWorkers(podWorkers)
+
+	killFailing.Store(true)
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(newUID), UpdateType: kubetypes.SyncPodCreate})
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(oldUID), UpdateType: kubetypes.SyncPodKill})
+	drainAllWorkers(podWorkers)
+
+	// With the old manifest gone, housekeeping (HandlePodCleanups -> SyncKnownPods) is
+	// the only thing that retries the kill. Neither those retries nor resyncs of the
+	// replacement may get it past the gate while the old containers may still be running.
+	for range 3 {
+		podWorkers.SyncKnownPods(logger, []*v1.Pod{newEtcd(newUID)})
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(newUID), UpdateType: kubetypes.SyncPodUpdate})
+		drainAllWorkers(podWorkers)
+	}
+
+	// Guard against a vacuous pass: the failure path must actually have been exercised.
+	if n := failedKills.Load(); n < 2 {
+		t.Fatalf("expected repeated SyncTerminatingPod failures for the old pod, got %d", n)
+	}
+	oldStatus := podWorkers.podSyncStatuses[oldUID]
+	if !oldStatus.IsTerminationStarted() || oldStatus.IsTerminated() {
+		t.Fatalf("expected old pod to be terminating but not terminated, got %#v", oldStatus)
+	}
+	if e, a := map[string]types.UID{fullname: oldUID}, podWorkers.startedStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("static pod fullname released before the old pod finished terminating: %s", cmp.Diff(e, a))
+	}
+	if e, a := map[string][]types.UID{fullname: {newUID}}, podWorkers.waitingToStartStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("expected replacement to be waiting to start: %s", cmp.Diff(e, a))
+	}
+	if records := processed[newUID]; len(records) != 0 {
+		t.Fatalf("replacement static pod was synced while the old pod was still terminating: %#v", records)
+	}
+
+	// Once the kill succeeds the gate opens; confirms the replacement was held back by
+	// the gate and not by something else in the test setup.
+	killFailing.Store(false)
+	podWorkers.SyncKnownPods(logger, []*v1.Pod{newEtcd(newUID)})
+	drainAllWorkers(podWorkers)
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{Pod: newEtcd(newUID), UpdateType: kubetypes.SyncPodUpdate})
+	drainAllWorkers(podWorkers)
+
+	if e, a := map[string]types.UID{fullname: newUID}, podWorkers.startedStaticPodsByFullname; !reflect.DeepEqual(e, a) {
+		t.Fatalf("replacement static pod was not started after the old pod terminated: %s", cmp.Diff(e, a))
+	}
+	if len(processed[newUID]) == 0 {
+		t.Fatalf("replacement static pod was never synced")
 	}
 }
 
