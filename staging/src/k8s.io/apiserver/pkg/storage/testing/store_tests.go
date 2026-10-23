@@ -711,7 +711,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 }
 
 func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
-	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
+	initialRV, compactRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, t, store, compact)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -737,7 +737,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	// Compact and increase RV to test consistent List.
-	compact(ctx, t, createdPods[0].ResourceVersion)
+	compact(ctx, t, compactRV)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -807,9 +807,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[0]},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -817,7 +817,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/first/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 					},
 				}
 			},
@@ -827,9 +827,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/second/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -837,7 +837,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/second/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 					},
 				}
 			},
@@ -1133,9 +1133,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut:    []example.Pod{},
 			expectContinue: false,
-			rv:             createdPods[0].ResourceVersion,
+			rv:             compactRV,
 			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       createdPods[0].ResourceVersion,
+			expectRV:       compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -1143,7 +1143,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/second/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 						Limit:    1,
 					},
 				}
@@ -1609,13 +1609,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRVTooOld: true,
 		},
 		{
-			name:        "test List with resource version of first write, match=Exact",
+			name:           "test List with compacted resource version of first write, match=Exact",
+			prefix:         "/pods/",
+			pred:           storage.Everything,
+			rv:             createdPods[0].ResourceVersion,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
+		},
+		{
+			name:        "test List with compacted resource version between first and second write, match=Exact",
 			prefix:      "/pods/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[0]},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -1623,7 +1631,32 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 2,
+						Revision: mustParseResourceVersion(t, compactRV),
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with compacted resource version between first and second write and limit, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut: []example.Pod{*createdPods[0]},
+			rv:          compactRV,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    compactRV,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, compactRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -1643,7 +1676,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 3,
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
 					},
 				}
 			},
@@ -1663,7 +1696,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 4,
+						Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion),
 					},
 				}
 			},
@@ -1683,7 +1716,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 5,
+						Revision: mustParseResourceVersion(t, createdPods[3].ResourceVersion),
 					},
 				}
 			},
@@ -1703,7 +1736,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 6,
+						Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion),
 					},
 				}
 			},
@@ -1723,7 +1756,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 7,
+						Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion),
 					},
 				}
 			},
@@ -1743,7 +1776,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 8,
+						Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion),
 					},
 				}
 			},
@@ -2051,16 +2084,39 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 		},
 		{
-			name:   "test List with continue, resource version of first write",
+			name:   "test List with continue, compacted resource version of first write",
 			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
 				Limit:    1,
-				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[0].ResourceVersion))),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", mustParseResourceVersion(t, createdPods[0].ResourceVersion)),
+			},
+			expectContinueTooOld: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Limit:    4,
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with continue, compacted resource version between first and second write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", mustParseResourceVersion(t, compactRV)),
 			},
 			expectedOut: []example.Pod{},
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -2068,7 +2124,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/first/bar\x00",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 						Limit:    1,
 					},
 				}
@@ -2677,7 +2733,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 
 // seedMultiLevelData creates a set of keys with a multi-level structure, returning a resourceVersion
 // from before any were created along with the full set of objects that were persisted
-func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV string, created []*example.Pod, updated *example.Pod, err error) {
+func seedMultiLevelData(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction) (initialRV, compactRV string, created []*example.Pod, updated *example.Pod, err error) {
 	// Setup storage with the following structure:
 	//  /
 	//   - first/
@@ -2732,7 +2788,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV = initialList.ResourceVersion
 
@@ -2740,7 +2796,12 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to create object: %w", err)
+			return "", "", nil, nil, fmt.Errorf("failed to create object: %w", err)
+		}
+		if i == 0 {
+			// Advance revision before creating the second object so there is a non-pod revision strictly between createdPods[0] and createdPods[1].
+			compact(ctx, t, initialRV)
+			compactRV = fmt.Sprintf("%d", mustParseResourceVersion(t, preset[0].storedObj.ResourceVersion)+1)
 		}
 	}
 
@@ -2755,7 +2816,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 			pod.Spec.NodeName = "fakeNode"
 			return pod, nil, nil
 		}, nil); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to update object: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to update object: %w", err)
 	}
 
 	// We now delete bazSecond provided it has been created first. We do this to enable
@@ -2763,13 +2824,13 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	// would be reflected in responses of different calls.
 	storedObj := &example.Pod{}
 	if err := store.Delete(ctx, computePodKey(bazSecond), storedObj, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to delete object: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to delete object: %w", err)
 	}
 
 	for _, item := range preset {
 		created = append(created, item.storedObj)
 	}
-	return initialRV, created, updated, nil
+	return initialRV, compactRV, created, updated, nil
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
@@ -5775,7 +5836,9 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		t.Errorf("Unexpected error: %v", err)
 	}
 	increaseRV(ctx, t)
-	expectCompactedRV := currentRV + 1
+	increaseRV(ctx, t)
+	compactedFutureRV := currentRV + 1
+	expectCompactedRV := currentRV + 2
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
@@ -5785,17 +5848,25 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
 		t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
 	}
-	// Call twice: the first syncs watchCache to expectCompactedRV via bookmark (falling back after waiting),
+	// Call twice: the first syncs watchCache to compactedFutureRV via bookmark (falling back after waiting),
 	// and the second exercises upfront delegation once watchCache is already fresh.
 	for range 2 {
 		if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 			Predicate:            storage.Everything,
 			Recursive:            true,
-			ResourceVersion:      fmt.Sprintf("%d", expectCompactedRV),
+			ResourceVersion:      fmt.Sprintf("%d", compactedFutureRV),
 			ResourceVersionMatch: metav1.ResourceVersionMatchExact,
-		}, listOut); err != nil {
-			t.Errorf("Unexpected error listing at compacted RV %d: %v", expectCompactedRV, err)
+		}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+			t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
 		}
+	}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      fmt.Sprintf("%d", expectCompactedRV),
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error listing at compacted RV %d: %v", expectCompactedRV, err)
 	}
 	compactedRV = store.CompactRevision()
 	if compactedRV != int64(expectCompactedRV) {

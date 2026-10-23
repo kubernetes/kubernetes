@@ -407,8 +407,7 @@ func TestCompactPastLastWrite(t *testing.T) {
 
 	t.Log("Same list after compaction to the listed resourceVersion")
 	compactStore(cacher, server.V3Client.Client)(ctx, t, resourceVersionPastLastWrite)
-	// TODO: Expect no requests to etcd, same as before compaction.
-	require.Len(t, etcdListRequests(t, ctx, cacher, recorder, list), 1)
+	require.Empty(t, etcdListRequests(t, ctx, cacher, recorder, list))
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {

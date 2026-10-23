@@ -74,6 +74,7 @@ func newSnapshotter(enabled bool) snapshotter {
 type snapshotter struct {
 	snapshots       *btree.BTree[*btreeStore]
 	resourceVersion uint64
+	compactRevision uint64
 	enabled         bool
 }
 
@@ -92,6 +93,7 @@ func (s *snapshotter) SetEnabled(enabled bool) {
 func (s *snapshotter) reset() {
 	s.snapshots.Clear(false)
 	s.resourceVersion = 0
+	s.compactRevision = 0
 }
 
 func (s *snapshotter) HasSnapshot(rv uint64) bool {
@@ -107,11 +109,11 @@ func (s *snapshotter) OldestResourceVersion() (uint64, bool) {
 	if !ok {
 		return 0, false
 	}
-	return oldest.resourceVersion, true
+	return max(oldest.resourceVersion, s.compactRevision), true
 }
 
 func (s *snapshotter) GetSnapshot(rv uint64) (*btreeStore, error) {
-	if !s.enabled || s.resourceVersion == 0 {
+	if !s.enabled || s.resourceVersion == 0 || rv < s.compactRevision {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", rv))
 	}
 	if rv > s.resourceVersion {
@@ -121,16 +123,12 @@ func (s *snapshotter) GetSnapshot(rv uint64) (*btreeStore, error) {
 		klog.ErrorS(nil, "Snapshotter got future resourceVersion that it doesn't properly handle as it depends on caller ensuring consistency", "requestResourceVersion", rv, "currentResourceVersion", s.resourceVersion)
 		return nil, storage.NewTooLargeResourceVersionError(rv, s.resourceVersion, 0)
 	}
-	var result *btreeStore
-	s.snapshots.DescendLessOrEqual(&btreeStore{resourceVersion: rv}, func(snap *btreeStore) bool {
-		result = snap
-		return false
-	})
-	if result == nil {
+	snapshot := s.getSnapshot(rv)
+	if snapshot == nil {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", rv))
 	}
 	return &btreeStore{
-		tree:            result.tree,
+		tree:            snapshot.tree,
 		resourceVersion: rv,
 	}, nil
 }
@@ -155,6 +153,9 @@ func (s *snapshotter) Add(snapshot *btreeStore) {
 	}
 	s.snapshots.ReplaceOrInsert(snapshot)
 	s.resourceVersion = max(s.resourceVersion, snapshot.resourceVersion)
+	if snapshot.resourceVersion <= s.compactRevision {
+		s.compact()
+	}
 }
 
 func (s *snapshotter) UpdateResourceVersion(rv uint64) {
@@ -170,20 +171,37 @@ func (s *snapshotter) UpdateResourceVersion(rv uint64) {
 	s.resourceVersion = max(s.resourceVersion, rv)
 }
 
-func (s *snapshotter) RemoveLess(rv uint64) {
+func (s *snapshotter) Compact(rv uint64) {
 	if !s.enabled {
+		return
+	}
+	s.compactRevision = max(s.compactRevision, rv)
+	s.compact()
+}
+
+func (s *snapshotter) compact() {
+	// Keep the last snapshot at or before compactRevision so requests for
+	// RVs in [compactRevision, nextSnapshotRV) can still be served.
+	lastSnapshotBeforeCompaction := s.getSnapshot(s.compactRevision)
+	if lastSnapshotBeforeCompaction == nil {
 		return
 	}
 	for s.snapshots.Len() > 0 {
 		oldest, ok := s.snapshots.Min()
-		if !ok {
-			break
-		}
-		if rv <= oldest.resourceVersion {
+		if !ok || oldest.resourceVersion >= lastSnapshotBeforeCompaction.resourceVersion {
 			break
 		}
 		s.snapshots.DeleteMin()
 	}
+}
+
+func (s *snapshotter) getSnapshot(rv uint64) *btreeStore {
+	var firstSnapBeforeRV *btreeStore
+	s.snapshots.DescendLessOrEqual(&btreeStore{resourceVersion: rv}, func(snap *btreeStore) bool {
+		firstSnapBeforeRV = snap
+		return false
+	})
+	return firstSnapBeforeRV
 }
 
 func (s *snapshotter) Len() int {

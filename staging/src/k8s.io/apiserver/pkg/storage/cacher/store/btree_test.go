@@ -174,8 +174,22 @@ func TestStoreSnapshotter(t *testing.T) {
 	assert.Equal(t, uint64(100), snapshot.ResourceVersion())
 	assert.Same(t, snap40.tree, snapshot.tree)
 
+	t.Log("Remove snapshot less than 25 keeps snapshot 20 for [25, 30)")
+	cache.Compact(25)
+
+	assert.Equal(t, 3, cache.Len())
+	assert.False(t, cache.HasSnapshot(24))
+	_, err = cache.GetSnapshot(24)
+	assert.True(t, errors.IsResourceExpired(err))
+
+	assert.True(t, cache.HasSnapshot(25))
+	snapshot, err = cache.GetSnapshot(25)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(25), snapshot.ResourceVersion())
+	assert.Same(t, snap20.tree, snapshot.tree)
+
 	t.Log("Remove snapshot less than 30")
-	cache.RemoveLess(30)
+	cache.Compact(30)
 
 	assert.Equal(t, 2, cache.Len())
 	assert.False(t, cache.HasSnapshot(10))
@@ -186,11 +200,29 @@ func TestStoreSnapshotter(t *testing.T) {
 	_, err = cache.GetSnapshot(20)
 	assert.True(t, errors.IsResourceExpired(err))
 
+	assert.False(t, cache.HasSnapshot(25))
+	_, err = cache.GetSnapshot(25)
+	assert.True(t, errors.IsResourceExpired(err))
+
 	assert.True(t, cache.HasSnapshot(30))
 	snapshot, err = cache.GetSnapshot(30)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(30), snapshot.ResourceVersion())
 	assert.Same(t, snap30.tree, snapshot.tree)
+
+	t.Log("Remove snapshot past last write keeps snapshot 40 for [50, 100]")
+	cache.Compact(50)
+
+	assert.Equal(t, 1, cache.Len())
+	assert.False(t, cache.HasSnapshot(49))
+	_, err = cache.GetSnapshot(49)
+	assert.True(t, errors.IsResourceExpired(err))
+
+	assert.True(t, cache.HasSnapshot(50))
+	snapshot, err = cache.GetSnapshot(50)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(50), snapshot.ResourceVersion())
+	assert.Same(t, snap40.tree, snapshot.tree)
 
 	t.Log("Replace resets old RVs and adds the new snapshot")
 	cache.Replace(&btreeStore{resourceVersion: 200})
