@@ -5122,6 +5122,42 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 			},
 		},
 		{
+			name: "container removed",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}, {
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("90")},
+					},
+				}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["remove_container"]++
+			},
+		},
+		{
+			name: "container added",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}, {
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("90")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("90")},
+					},
+				}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["add_container"]++
+				e.cpuLimitsCounter["add_container"]++
+			},
+		},
+		{
 			name: "no resize request",
 			initialAllocation: &v1.Pod{
 				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
@@ -5156,12 +5192,16 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 			tc.updateExpectedFunc(&expectedMetrics)
 
 			expectedFormat := `
-				# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+				# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase', 'decrease', 'add_container' or 'remove_container'.
 				# TYPE kubelet_container_requested_resizes_total counter
 				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="memory"} %d
 				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="cpu"} %d
 				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="memory"} %d
 				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="add_container",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add_container",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="add_container",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add_container",requirement="limits",resource="cpu"} %d
 				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="memory"} %d
 				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="cpu"} %d
 				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="memory"} %d
@@ -5174,6 +5214,10 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="cpu"} %d
 				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="memory"} %d
 				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove_container",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove_container",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove_container",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove_container",requirement="limits",resource="cpu"} %d
 			`
 
 			expected := fmt.Sprintf(expectedFormat,
@@ -5181,6 +5225,11 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 				expectedMetrics.cpuRequestsCounter["add"],
 				expectedMetrics.memoryLimitsCounter["add"],
 				expectedMetrics.cpuLimitsCounter["add"],
+
+				expectedMetrics.memoryRequestsCounter["add_container"],
+				expectedMetrics.cpuRequestsCounter["add_container"],
+				expectedMetrics.memoryLimitsCounter["add_container"],
+				expectedMetrics.cpuLimitsCounter["add_container"],
 
 				expectedMetrics.memoryRequestsCounter["decrease"],
 				expectedMetrics.cpuRequestsCounter["decrease"],
@@ -5196,6 +5245,11 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 				expectedMetrics.cpuRequestsCounter["remove"],
 				expectedMetrics.memoryLimitsCounter["remove"],
 				expectedMetrics.cpuLimitsCounter["remove"],
+
+				expectedMetrics.memoryRequestsCounter["remove_container"],
+				expectedMetrics.cpuRequestsCounter["remove_container"],
+				expectedMetrics.memoryLimitsCounter["remove_container"],
+				expectedMetrics.cpuLimitsCounter["remove_container"],
 			)
 
 			// Omit lines from the expected metrics string where the count is "0"
@@ -5814,6 +5868,93 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 				default:
 					// No event received, which is correct.
 				}
+			}
+		})
+	}
+}
+
+// TestHandlePodUpdatesDynamicContainers checks that a pod update that adds and removes containers
+// and updates an image is allocated atomically, along with the resize it implies.
+func TestHandlePodUpdatesDynamicContainers(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	tests := []struct {
+		name string
+		// addedCPU is the CPU request of the added container.
+		addedCPU          string
+		expectAllocated   bool
+		expectedCondition v1.PodConditionType
+	}{{
+		name:              "fits",
+		addedCPU:          "1",
+		expectAllocated:   true,
+		expectedCondition: v1.PodResizeInProgress,
+	}, {
+		name:              "deferred",
+		addedCPU:          "10",
+		expectedCondition: v1.PodResizePending,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			testKubelet := newTestKubeletWithImageList(t, nil, false /*controllerAttachDetachEnabled*/, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludeAdmitHandlers*/, true /*enableResizing*/)
+			t.Cleanup(testKubelet.Cleanup)
+			kl := testKubelet.kubelet
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{{
+				ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("4"),
+						v1.ResourceMemory: resource.MustParse("4Gi"),
+						v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+					},
+				},
+			}}}
+			kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus) (bool, func(), error) {
+				return false, nil, nil
+			}
+
+			initialPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "ns", UID: "12345", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Image: "i1", Resources: cpu("1")},
+						{Name: "c2", Image: "i2", Resources: cpu("1")},
+					},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			kl.podManager.AddPod(initialPod)
+			require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, initialPod))
+
+			updatedPod := initialPod.DeepCopy()
+			updatedPod.Generation = 2
+			updatedPod.Spec.Containers = []v1.Container{
+				{Name: "c1", Image: "new", Resources: cpu("1")},
+				{Name: "c3", Image: "i3", Resources: cpu(tc.addedCPU)},
+			}
+			kl.HandlePodUpdates(tCtx, []*v1.Pod{updatedPod})
+
+			allocatedPod, pending := kl.allocationManager.UpdatePodFromAllocation(updatedPod)
+			assert.Equal(t, !tc.expectAllocated, pending, "pending")
+			if tc.expectAllocated {
+				assert.Equal(t, updatedPod.Spec, allocatedPod.Spec)
+			} else {
+				// None of the changes are allocated, including the image update.
+				assert.Equal(t, initialPod.Spec, allocatedPod.Spec)
+			}
+			assert.Equal(t, !tc.expectAllocated, kl.allocationManager.HasPendingResizes(), "pending resizes")
+			conditions := kl.statusManager.GetPodResizeConditions(updatedPod.UID)
+			if assert.Len(t, conditions, 1) {
+				assert.Equal(t, tc.expectedCondition, conditions[0].Type)
 			}
 		})
 	}

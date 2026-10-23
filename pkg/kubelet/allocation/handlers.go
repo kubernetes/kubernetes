@@ -61,6 +61,11 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) && !isResizeRequested(pod, allocatedPod) {
+		// Changes that don't touch resources (e.g. image updates, or containers added without
+		// resources) aren't subject to the in-place resize limitations.
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()

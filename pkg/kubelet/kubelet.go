@@ -3076,37 +3076,42 @@ func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
 // recordContainerResizeOperations records the resizes that an update of a pod requests for its
 // containers.
 func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
-	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(oldContainer, containerType) {
-			continue
-		}
-
-		var newContainer *v1.Container
-		for new, newType := range podutil.ContainerIter(&newPod.Spec, podutil.InitContainers|podutil.Containers) {
-			if !allocation.IsResizableContainer(new, newType) {
-				continue
+	for pair, containerType := range podutil.ContainerPairs(newPod, oldPod, podutil.InitContainers|podutil.Containers) {
+		switch {
+		case pair.Old == nil:
+			if allocation.IsResizableContainer(pair.New, containerType) {
+				// The container was added, which DynamicContainers allows.
+				recordContainerResourceOperations(pair.New.Resources, v1.ResourceRequirements{}, "add_container")
 			}
-			if new.Name == oldContainer.Name && containerType == newType {
-				newContainer = new
+		case pair.New == nil:
+			if allocation.IsResizableContainer(pair.Old, containerType) {
+				// The container was removed, which DynamicContainers allows.
+				recordContainerResourceOperations(v1.ResourceRequirements{}, pair.Old.Resources, "remove_container")
 			}
-		}
-
-		newResources := newContainer.Resources
-		oldResources := oldContainer.Resources
-
-		if op := resizeOperationForResources(newResources.Requests.Memory(), oldResources.Requests.Memory()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("memory", "requests", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Limits.Memory(), oldResources.Limits.Memory()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("memory", "limits", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Requests.Cpu(), oldResources.Requests.Cpu()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "requests", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Limits.Cpu(), oldResources.Limits.Cpu()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "limits", op).Inc()
+		case allocation.IsResizableContainer(pair.Old, containerType) && allocation.IsResizableContainer(pair.New, containerType):
+			recordContainerResourceOperations(pair.New.Resources, pair.Old.Resources, "")
 		}
 	}
+}
+
+// recordContainerResourceOperations records the resize of each resource of a container. A
+// non-empty containerOp replaces the operation of every changed resource, for containers that
+// were added or removed as a whole.
+func recordContainerResourceOperations(newResources, oldResources v1.ResourceRequirements, containerOp string) {
+	record := func(resourceName, requirement string, new, old *resource.Quantity) {
+		op := resizeOperationForResources(new, old)
+		if op == "" {
+			return
+		}
+		if containerOp != "" {
+			op = containerOp
+		}
+		metrics.ContainerRequestedResizes.WithLabelValues(resourceName, requirement, op).Inc()
+	}
+	record("memory", "requests", newResources.Requests.Memory(), oldResources.Requests.Memory())
+	record("memory", "limits", newResources.Limits.Memory(), oldResources.Limits.Memory())
+	record("cpu", "requests", newResources.Requests.Cpu(), oldResources.Requests.Cpu())
+	record("cpu", "limits", newResources.Limits.Cpu(), oldResources.Limits.Cpu())
 }
 
 // recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized.
