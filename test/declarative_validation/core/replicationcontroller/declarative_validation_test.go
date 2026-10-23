@@ -227,6 +227,15 @@ func TestDeclarativeValidate(t *testing.T) {
 				field.Invalid(field.NewPath("spec.template.spec.activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 			},
 		},
+		// spec.template.spec.restartPolicy
+		"restartPolicy: not Always": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {

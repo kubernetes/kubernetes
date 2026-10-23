@@ -273,6 +273,7 @@ type StatefulSetSpec struct {
 	// "web" with index number "3" would be named "web-3".
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
 	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -757,6 +758,7 @@ type DaemonSetSpec struct {
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// updateStrategy to replace existing DaemonSet pods with new pods.

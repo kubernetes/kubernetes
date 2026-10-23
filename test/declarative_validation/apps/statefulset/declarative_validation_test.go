@@ -129,6 +129,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
 			},
 		},
+		"restartPolicy not Always": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				ss.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
