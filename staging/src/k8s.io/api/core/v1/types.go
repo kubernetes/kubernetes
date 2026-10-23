@@ -6015,6 +6015,7 @@ type PodStatus struct {
 // +genclient
 // +genclient:method=UpdateEphemeralContainers,verb=update,subresource=ephemeralcontainers
 // +genclient:method=UpdateResize,verb=update,subresource=resize
+// +genclient:method=UpdateDynamic,verb=update,subresource=dynamic
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
@@ -6023,6 +6024,7 @@ type PodStatus struct {
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
 // +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/dynamic"
 // +k8s:supportsSubresource="/eviction"
 type Pod struct {
 	metav1.TypeMeta `json:""`

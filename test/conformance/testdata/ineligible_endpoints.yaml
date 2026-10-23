@@ -310,3 +310,12 @@
 - endpoint: replaceStorageV1CSINodeStatus
   reason: CSINode status subresource is behind the alpha CSIVolumeHealth feature gate
   link: https://github.com/kubernetes/enhancements/issues/1432
+- endpoint: readCoreV1NamespacedPodDynamic
+  reason: Pod dynamic subresource is behind the alpha DynamicContainers feature gate
+  link: https://github.com/kubernetes/enhancements/issues/5972
+- endpoint: patchCoreV1NamespacedPodDynamic
+  reason: Pod dynamic subresource is behind the alpha DynamicContainers feature gate
+  link: https://github.com/kubernetes/enhancements/issues/5972
+- endpoint: replaceCoreV1NamespacedPodDynamic
+  reason: Pod dynamic subresource is behind the alpha DynamicContainers feature gate
+  link: https://github.com/kubernetes/enhancements/issues/5972
