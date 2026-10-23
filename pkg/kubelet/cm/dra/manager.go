@@ -17,6 +17,7 @@ limitations under the License.
 package dra
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -947,6 +948,14 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 				finalStatuses = append(finalStatuses, *rs)
 			}
 		}
+		for i := range finalStatuses {
+			slices.SortFunc(finalStatuses[i].Resources, func(a, b v1.ResourceHealth) int {
+				return cmp.Compare(a.ResourceID, b.ResourceID)
+			})
+		}
+		slices.SortFunc(finalStatuses, func(a, b v1.ResourceStatus) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
 		containerStatus.AllocatedResourcesStatus = finalStatuses
 	}
 }
