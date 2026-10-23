@@ -168,6 +168,9 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController serviceconfigv1alpha1.ServiceControllerConfiguration
+	// ServiceServingSigner holds configuration for ServiceServingSigner related
+	// features.
+	ServiceServingSigner ServiceServingSignerConfiguration
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
@@ -498,6 +501,15 @@ type SAControllerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
+}
+
+// ServiceServingSignerConfiguration contains configuration knobs for a generic PodCertsSigner
+// controller.
+type ServiceServingSignerConfiguration struct {
+	CACertPath           string
+	CAKeyPath            string
+	CABundlePath         string
+	ClusterServiceDomain string
 }
 
 // TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.

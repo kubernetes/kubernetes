@@ -79,6 +79,7 @@ const (
 	PodGroupProtectionController                       = "podgroup-protection-controller"
 	TTLAfterFinishedController                         = "ttl-after-finished-controller"
 	RootCACertificatePublisherController               = "root-ca-certificate-publisher-controller"
+	ServiceServingSigner                               = "service-serving-signer-controller"
 	KubeAPIServerClusterTrustBundlePublisherController = "kube-apiserver-serving-clustertrustbundle-publisher-controller"
 	EphemeralVolumeController                          = "ephemeral-volume-controller"
 	StorageVersionGarbageCollectorController           = "storageversion-garbage-collector-controller"
