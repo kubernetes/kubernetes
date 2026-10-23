@@ -72,7 +72,7 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				// test/integration/auth/. The test API server uses AlwaysAllow authorizer.
 			},
 		},
-		// DRAPartitionableDevicesType depends on DRAResourcePoolStatus, so both are off.
+		// DRAPartitionableDevicesType requires DRAResourcePoolStatus.
 		"feature-disabled": {
 			features: map[featuregate.Feature]bool{
 				features.DRAResourcePoolStatus:       false,
@@ -442,9 +442,7 @@ func testShareableSummary(tCtx ktesting.TContext) {
 	}
 }
 
-// testAdminAccessNotCounted checks that AdminAccess allocations are invisible
-// in every part of the pool status, while a regular allocation in the same
-// pool is counted.
+// testAdminAccessNotCounted checks that AdminAccess allocations are not counted.
 func testAdminAccessNotCounted(tCtx ktesting.TContext) {
 	startResourcePoolStatusRequestController(tCtx)
 
@@ -531,9 +529,7 @@ func testAdminAccessNotCounted(tCtx ktesting.TContext) {
 	}
 }
 
-// testIncompletePoolTerminalStatus verifies that a pool which never receives all
-// of its slices still gets a status once the controller gives up retrying, with
-// a PoolIncomplete validationError instead of device counts.
+// testIncompletePoolTerminalStatus checks the partial status for a pool that never completes.
 func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 	startResourcePoolStatusRequestController(tCtx)
 
@@ -583,8 +579,7 @@ func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 		tCtx.Errorf("expected Complete=True condition, got %+v", request.Status.Conditions)
 	}
 
-	// The status alone is easy to miss, so a Warning event is emitted as well.
-	// Events for cluster-scoped objects are recorded in the default namespace.
+	// Events for cluster-scoped objects go to the default namespace.
 	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Event, error) {
 		events, err := tCtx.Client().CoreV1().Events(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{
 			FieldSelector: "involvedObject.name=" + request.Name + ",reason=PoolIncomplete",
@@ -908,10 +903,8 @@ func testValidationErrors(tCtx ktesting.TContext) {
 
 const rpsrControllerRole = "system:controller:resourcepoolstatusrequest-controller"
 
-// testFeatureDisabled pins the apiserver behavior with DRAResourcePoolStatus
-// off. The storage stays registered while resource.k8s.io/v1alpha3 is enabled,
-// so leftover requests can still be listed and deleted, but the gated field is
-// dropped and the controller's ClusterRole is not installed.
+// testFeatureDisabled checks the gate off: the API stays served for cleanup,
+// the gated field is dropped and the controller role is absent.
 func testFeatureDisabled(tCtx ktesting.TContext) {
 	requests := tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests()
 	request := &resourcev1alpha3.ResourcePoolStatusRequest{
@@ -939,9 +932,7 @@ func testFeatureDisabled(tCtx ktesting.TContext) {
 	}
 }
 
-// testPartitionTypeFieldsDropped covers DRAResourcePoolStatus on with
-// DRAPartitionableDevicesType off: both partition type fields are dropped on
-// create.
+// testPartitionTypeFieldsDropped checks that both partition type fields are dropped.
 func testPartitionTypeFieldsDropped(tCtx ktesting.TContext) {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{Name: "partition-type-off-slice"},

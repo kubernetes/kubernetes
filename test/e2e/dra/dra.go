@@ -302,10 +302,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 					StrategicMergePatchSpec: `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
 
-					// The status is write-once and is written by
-					// kube-controller-manager, which would race with a
-					// status update from TestResource. The status
-					// subresource is covered by the next test instead.
+					// The controller writes the write-once status; see the next test.
 				},
 			)
 		})
@@ -314,8 +311,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			requests := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
 			request := &resourcealphaapi.ResourcePoolStatusRequest{
 				ObjectMeta: metav1.ObjectMeta{GenerateName: f.UniqueName + "-"},
-				// No driver publishes slices under this name, so the result is
-				// an empty but complete status.
+				// No slices exist for this driver.
 				Spec: resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: f.UniqueName + ".example.com"},
 			}
 			request, err := requests.Create(ctx, request, metav1.CreateOptions{})
