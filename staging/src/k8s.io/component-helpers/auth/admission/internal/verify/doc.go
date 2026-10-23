@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package verify checks signed admissionReviewAPIGroups against a resource's
-// API group without calling TokenReview. A TokenAuthenticator validates the
-// signature and standard claims; denials expose one generic error.
+// Package verify checks Kubernetes webhook token claims and API-group attestations.
 package verify // import "k8s.io/component-helpers/auth/admission/internal/verify"

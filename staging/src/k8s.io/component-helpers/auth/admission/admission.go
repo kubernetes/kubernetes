@@ -15,9 +15,6 @@ limitations under the License.
 */
 
 // Package admission verifies API-server authentication tokens for admission webhooks.
-// It provides an HTTP handler and a verifier for already-decoded requests. Both
-// require the webhook's configured audience; failed verification never reaches
-// the downstream admission handler.
 package admission // import "k8s.io/component-helpers/auth/admission"
 
 import (
@@ -27,7 +24,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
+
+	"github.com/coreos/go-oidc/v3/oidc"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/component-helpers/auth/admission/internal/oidc"
+	"k8s.io/client-go/rest"
 	"k8s.io/component-helpers/auth/admission/internal/verify"
 	"k8s.io/klog/v2"
 )
@@ -49,57 +52,53 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
-const defaultMaxBodyBytes int64 = 8 << 20 // 8 MiB
+// Match controller-runtime's admission request limit:
+// https://github.com/kubernetes-sigs/controller-runtime/blob/2e312096f4555f330939cfd5e30a0ae2436829c0/pkg/webhook/admission/http.go#L37-L55
+const defaultMaxBodyBytes int64 = 7 << 20
 
-// Keep denial messages generic to avoid exposing token or claim details.
-const genericDenyMessage = "webhook token verification failed"
+const (
+	verificationTimeout = 10 * time.Second
+	localJWKSPath       = "/openid/v1/jwks"
+	genericDenyMessage  = "webhook token verification failed"
+)
 
-var errVerificationFailed = errors.New(genericDenyMessage)
+var (
+	errVerificationFailed = errors.New(genericDenyMessage)
+	errInvalidReview      = errors.New("request body is not a decodable AdmissionReview")
+	errBodyTooLarge       = errors.New("request body exceeds the configured limit")
 
-// AdmissionHandler decides an already-verified admission request. The HTTP
-// adapter copies the response and sets its UID before writing it.
+	// Keep in sync with pkg/serviceaccount; staging cannot import k8s.io/kubernetes.
+	// https://github.com/kubernetes/kubernetes/blob/9b965ac43f05d304180c7b8b9611264530788948/pkg/serviceaccount/jwt.go#L340-L351
+	serviceAccountSigningAlgs = []jose.SignatureAlgorithm{
+		jose.ES256, jose.ES384, jose.ES512, jose.RS256,
+	}
+)
+
+// AdmissionHandler decides an authenticated admission request.
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
 // Option configures [WithTokenVerification] or [NewVerifier].
 type Option func(*builder)
 
-// remoteSet prevents an injected HTTP client from selecting remote mode.
 type builder struct {
+	// remoteSet prevents incomplete remote options from selecting local mode.
 	remoteSet  bool
 	issuer     string
 	audience   string
 	httpClient *http.Client
 
 	explicitAudience bool
-
-	// Tests can override discovery without selecting remote mode.
-	inClusterURL    string
-	inClusterClient *http.Client
-
-	maxBody int64
 }
 
-// newBuilder returns a builder seeded with the handler defaults, ready for
-// options to mutate.
 func newBuilder() *builder {
-	return &builder{maxBody: defaultMaxBodyBytes}
+	return &builder{}
 }
 
-// withMaxBodyBytes lets tests cover the body limit without exposing another
-// configuration knob on the public webhook API.
-func withMaxBodyBytes(n int64) Option {
-	return func(b *builder) {
-		if n > 0 {
-			b.maxBody = n
-		}
-	}
-}
-
-// WithRemoteIssuer selects remote OIDC verification. Both issuer and audience
-// are required; an incomplete pair never falls back to in-cluster discovery.
-// client is used for discovery and JWKS requests; use one without credentials
-// because the advertised JWKS URI may have a different origin. A nil client
-// uses the default transport.
+// WithRemoteIssuer uses the issuer URL for OIDC discovery and as the expected
+// token issuer. issuer and audience are required. client is used for discovery
+// and signing-key requests and must not carry credentials: the discovered
+// signing-key endpoint may be on another host. A nil client uses the default
+// HTTP transport.
 func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
 	return func(b *builder) {
 		b.remoteSet = true
@@ -109,11 +108,10 @@ func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
 	}
 }
 
-// WithAudience sets the expected audience for in-cluster verification. Use the
-// webhook's exact configured URL, including any trailing slash, or
-// https://<name>.<namespace>.svc:<port><path> for a Service reference (default
-// port 443, path "/"). Never derive it from the request or token. Empty values
-// or combining this option with [WithRemoteIssuer] fail at construction.
+// WithAudience sets the in-cluster webhook's expected audience. Use its configured
+// URL verbatim, or https://<name>.<namespace>.svc:<port><path> for a Service
+// reference, with default port 443 and path "/". It cannot be combined with
+// [WithRemoteIssuer]. The audience must come from trusted webhook configuration.
 func WithAudience(audience string) Option {
 	return func(b *builder) {
 		b.explicitAudience = true
@@ -121,48 +119,31 @@ func WithAudience(audience string) Option {
 	}
 }
 
-// withInClusterEndpoint replaces in-cluster discovery for tests without changing modes.
-func withInClusterEndpoint(apiServerURL string, client *http.Client) Option {
-	return func(b *builder) {
-		b.inClusterURL = apiServerURL
-		b.inClusterClient = client
-	}
-}
-
-// Handler serves verified admission requests and exposes HealthCheck for readiness.
+// Handler authenticates and serves v1 AdmissionReviews.
 type Handler struct {
 	verifier *Verifier
 	next     AdmissionHandler
 	maxBody  int64
 }
 
-// WithTokenVerification wraps next with verification of v1 AdmissionReviews.
-// Configure admissionReviewVersions as ["v1"]. Supply [WithAudience] for
-// in-cluster use or [WithRemoteIssuer] for other issuers.
-// Missing credentials or undecodable requests return HTTP 401; decoded reviews
-// with invalid tokens return HTTP 200/Allowed:false so failurePolicy: Ignore
-// cannot override the denial. Use failurePolicy: Fail if missing credentials
-// or an unavailable webhook must block admission. A nil next panics.
+// WithTokenVerification authenticates requests before decoding their bodies and
+// calling next. Register admissionReviewVersions as ["v1"]. Use [WithAudience]
+// in-cluster or [WithRemoteIssuer] for another issuer. Failed authentication
+// returns HTTP 401; authenticated admission-policy denials return an AdmissionReview
+// with Allowed:false. Use failurePolicy: Fail when authentication or transport
+// failures must block admission. A nil next returns an error.
 func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...Option) (*Handler, error) {
 	if next == nil {
-		panic("admission: next AdmissionHandler must not be nil")
+		return nil, errors.New("admission: next AdmissionHandler must not be nil")
 	}
-
-	b := newBuilder()
-	for _, opt := range opts {
-		opt(b)
-	}
-
-	v, err := b.buildVerifier(ctx)
+	v, err := NewVerifier(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return newHandler(v, next, b.maxBody), nil
+	return newHandler(v, next, defaultMaxBodyBytes), nil
 }
 
-// buildVerifier validates the expected audience before doing discovery. An
-// inbound request and its bearer token cannot establish the webhook's identity.
-func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, error) {
+func (b *builder) buildVerifier(ctx context.Context) (*Verifier, error) {
 	if b.remoteSet && b.explicitAudience {
 		return nil, errors.New("admission: WithAudience cannot be combined with WithRemoteIssuer")
 	}
@@ -170,52 +151,151 @@ func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, error) {
 		if b.issuer == "" || b.audience == "" {
 			return nil, errors.New("admission: remote verification requires both an issuer and an audience")
 		}
-		return oidc.NewRemoteVerifier(ctx, b.issuer, b.audience, b.httpClient)
+		return b.remoteVerifier(ctx)
 	}
 	if !b.explicitAudience || b.audience == "" {
 		return nil, errors.New("admission: in-cluster verification requires WithAudience set to the webhook's configured URL or Service audience")
 	}
-	return oidc.NewLocalKeySetVerifier(ctx, b.inClusterURL, b.audience, b.inClusterClient)
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("admission: loading in-cluster configuration: %w", err)
+	}
+	return newLocalVerifier(ctx, config, b.audience)
 }
 
-func newHandler(v *verify.Verifier, next AdmissionHandler, maxBody int64) *Handler {
-	return &Handler{verifier: &Verifier{verifier: v}, next: next, maxBody: maxBody}
+func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
+	issuerURL, err := url.Parse(b.issuer)
+	if err != nil || issuerURL.Scheme != "https" || issuerURL.Host == "" || issuerURL.User != nil || issuerURL.RawQuery != "" || issuerURL.Fragment != "" {
+		return nil, errors.New("admission: remote issuer must be an HTTPS URL without credentials, query, or fragment")
+	}
+	client := b.httpClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	clientCopy := *client
+	// RemoteKeySet fetches outlive the verification request's context.
+	if clientCopy.Timeout <= 0 || clientCopy.Timeout > verificationTimeout {
+		clientCopy.Timeout = verificationTimeout
+	}
+	previousRedirectPolicy := clientCopy.CheckRedirect
+	clientCopy.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" {
+			return errors.New("admission: signing-key and discovery redirects must use HTTPS")
+		}
+		if previousRedirectPolicy != nil {
+			return previousRedirectPolicy(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("admission: stopped after 10 redirects")
+		}
+		return nil
+	}
+	client = &clientCopy
+	ctx = oidc.ClientContext(ctx, client)
+	provider, err := oidc.NewProvider(ctx, b.issuer)
+	if err != nil {
+		return nil, fmt.Errorf("admission: discovering issuer: %w", err)
+	}
+	var metadata struct {
+		JWKSURI string `json:"jwks_uri"`
+	}
+	if err := provider.Claims(&metadata); err != nil {
+		return nil, fmt.Errorf("admission: reading issuer metadata: %w", err)
+	}
+	jwksURL, err := url.Parse(metadata.JWKSURI)
+	if err != nil || jwksURL.Scheme != "https" || jwksURL.Host == "" || jwksURL.User != nil || jwksURL.Fragment != "" {
+		return nil, errors.New("admission: signing-key endpoint must be an HTTPS URL without credentials or fragment")
+	}
+	v := &Verifier{
+		verifier: provider.VerifierContext(ctx, &oidc.Config{ClientID: b.audience}),
+		client:   client,
+		jwksURL:  metadata.JWKSURI,
+	}
+	if err := v.healthCheck(ctx); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+	token, err := jwt.ParseSigned(strings.TrimSpace(config.BearerToken), serviceAccountSigningAlgs)
+	if err != nil {
+		return nil, fmt.Errorf("admission: parsing projected ServiceAccount token: %w", err)
+	}
+	var claims jwt.Claims
+	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return nil, fmt.Errorf("admission: reading projected ServiceAccount issuer: %w", err)
+	}
+	if claims.Issuer == "" {
+		return nil, errors.New("admission: projected ServiceAccount token has no issuer")
+	}
+	config = rest.CopyConfig(config)
+	if config.Timeout <= 0 || config.Timeout > verificationTimeout {
+		config.Timeout = verificationTimeout
+	}
+	client, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, fmt.Errorf("admission: creating in-cluster HTTP client: %w", err)
+	}
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return errors.New("admission: local signing-key requests must not redirect")
+	}
+	jwksURL := strings.TrimRight(config.Host, "/") + localJWKSPath
+	verifierConfig := &oidc.Config{ClientID: audience}
+	for _, algorithm := range serviceAccountSigningAlgs {
+		verifierConfig.SupportedSigningAlgs = append(verifierConfig.SupportedSigningAlgs, string(algorithm))
+	}
+	v := &Verifier{
+		verifier: oidc.NewVerifier(claims.Issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
+		client:   client,
+		jwksURL:  jwksURL,
+	}
+	if err := v.healthCheck(ctx); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func newHandler(v *Verifier, next AdmissionHandler, maxBody int64) *Handler {
+	return &Handler{verifier: v, next: next, maxBody: maxBody}
 }
 
 // ServeHTTP implements http.Handler.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	// No request UID is available to echo before decoding the body.
 	token, ok := BearerToken(r)
 	if !ok {
 		denyPreDecode(ctx, w, "no bearer token presented")
 		return
 	}
-
-	review, reason, ok := h.decodeReview(r)
-	if !ok {
-		denyPreDecode(ctx, w, reason)
+	groups, err := h.verifier.authenticateToken(ctx, token)
+	if err != nil {
+		http.Error(w, genericDenyMessage, http.StatusUnauthorized)
+		return
+	}
+	review, err := h.decodeReview(r)
+	if err != nil {
+		if errors.Is(err, errBodyTooLarge) {
+			http.Error(w, errBodyTooLarge.Error(), http.StatusRequestEntityTooLarge)
+		} else {
+			denyPreDecode(ctx, w, err.Error())
+		}
 		return
 	}
 	req := review.Request
-
-	if err := h.verifier.Verify(ctx, req, token); err != nil {
+	if err := h.verifier.checkDecodedRequest(ctx, req, groups); err != nil {
 		writeResponse(w, req, deniedResponse())
 		return
 	}
-
 	klog.FromContext(ctx).V(4).Info("Admission webhook token verified")
 	writeResponse(w, req, h.next(ctx, req))
 }
 
-// denyPreDecode returns a generic 401 when there is no request UID to echo.
 func denyPreDecode(ctx context.Context, w http.ResponseWriter, reason string) {
 	klog.FromContext(ctx).V(2).Info("Admission webhook token verification denied", "reason", reason)
 	http.Error(w, genericDenyMessage, http.StatusUnauthorized)
 }
 
-// deniedResponse returns an explicit denial that failurePolicy: Ignore cannot override.
 func deniedResponse() *admissionv1.AdmissionResponse {
 	return &admissionv1.AdmissionResponse{
 		Allowed: false,
@@ -227,64 +307,52 @@ func deniedResponse() *admissionv1.AdmissionResponse {
 	}
 }
 
-// writeResponse wraps the downstream response in a v1 AdmissionReview and
-// writes it as HTTP 200 JSON. A nil response fails closed as a denial.
 func writeResponse(w http.ResponseWriter, req *admissionv1.AdmissionRequest, resp *admissionv1.AdmissionResponse) {
 	if resp == nil {
 		resp = deniedResponse()
 	}
-	// A downstream may reuse a response across concurrent requests.
 	response := *resp
 	response.UID = req.UID
-	out := &admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: admissionv1.SchemeGroupVersion.String(),
-			Kind:       "AdmissionReview",
-		},
-		Response: &response,
+	out := &admissionv1.AdmissionReview{Response: &response}
+	data, err := runtime.Encode(codecs.LegacyCodec(admissionv1.SchemeGroupVersion), out)
+	if err != nil {
+		http.Error(w, "failed to encode admission response", http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(out)
+	_, _ = w.Write(data)
 }
 
-// decodeReview limits the body and returns a non-sensitive reason for invalid reviews.
-func (h *Handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionReview, reason string, ok bool) {
+func (h *Handler) decodeReview(r *http.Request) (*admissionv1.AdmissionReview, error) {
 	if r.Body == nil {
-		return nil, "request body is not a decodable AdmissionReview", false
+		return nil, errInvalidReview
 	}
-	// Read one byte past the limit so an over-limit body is rejected rather than
-	// silently decoding truncated bytes.
 	buf, err := io.ReadAll(io.LimitReader(r.Body, h.maxBody+1))
 	_ = r.Body.Close()
 	if err != nil {
-		return nil, "request body is not a decodable AdmissionReview", false
+		return nil, errInvalidReview
 	}
 	if int64(len(buf)) > h.maxBody {
-		return nil, "request body exceeds the configured limit", false
+		return nil, errBodyTooLarge
 	}
 	obj, _, err := codecs.UniversalDeserializer().Decode(buf, nil, &admissionv1.AdmissionReview{})
 	if err != nil {
-		return nil, "request body is not a decodable AdmissionReview", false
+		return nil, errInvalidReview
 	}
-	ar, ok := obj.(*admissionv1.AdmissionReview)
-	if !ok || ar.Request == nil {
-		return nil, "request body is not a decodable AdmissionReview", false
+	review, ok := obj.(*admissionv1.AdmissionReview)
+	if !ok || review.Request == nil {
+		return nil, errInvalidReview
 	}
-	return ar, "", true
+	return review, nil
 }
 
-// checkObjectGroup ensures both embedded objects agree with the admitted Kind.
-// The signed token authorizes req.Resource.Group. Only known subresources may
-// switch object groups (for example Deployment /scale carries autoscaling Scale,
-// and Pod /eviction carries policy Eviction). An arbitrary SubResource is not a
-// group authorization.
+// checkObjectGroup binds the objects to the admitted Kind, allowing only known
+// subresources to carry an object outside the attested resource group.
 func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
 	if req == nil {
 		return errors.New("admission request is nil")
 	}
 	group, version, kind := req.Resource.Group, "", ""
-	// Kind is optional on the wire for ordinary resources; subresources cannot
-	// safely fall back to Resource.Group because their object group may differ.
 	kindSpecified := req.Kind.Group != "" || req.Kind.Version != "" || req.Kind.Kind != ""
 	if req.SubResource != "" && !kindSpecified {
 		return errors.New("subresource admission request has no kind")
@@ -294,9 +362,6 @@ func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
 			return errors.New("admission request kind is incomplete")
 		}
 		if req.Kind.Group != req.Resource.Group {
-			// Kubernetes has a few subresources whose request object belongs to a
-			// different API group. An arbitrary SubResource or Kind must not grant
-			// access to a group outside the token's resource-group attestation.
 			switch {
 			case req.SubResource == "scale" && req.Kind.Group == "autoscaling" && req.Kind.Version == "v1" && req.Kind.Kind == "Scale":
 			case req.Resource.Group == "" && req.Resource.Resource == "pods" && req.SubResource == "eviction" && req.Kind.Group == "policy" && req.Kind.Version == "v1" && req.Kind.Kind == "Eviction":
@@ -325,8 +390,6 @@ func checkExtensionObjectGroup(name string, extension runtime.RawExtension, grou
 	return checkRawObjectGroup(name, raw, group, version, kind)
 }
 
-// checkRawObjectGroup checks TypeMeta of each nonempty admitted object without
-// interpreting the resource's subresource-specific wire shape.
 func checkRawObjectGroup(name string, raw []byte, group, version, kind string) error {
 	if len(raw) == 0 {
 		return nil
@@ -354,67 +417,93 @@ func checkRawObjectGroup(name string, raw []byte, group, version, kind string) e
 	return nil
 }
 
-// Verifier verifies bearer tokens for already-decoded admission requests — the
-// entry point for consumers (for example controller-runtime) that decode the
-// AdmissionReview themselves. Obtain one from [NewVerifier]. It wraps the
-// internal policy verifier so no internal package appears in this module's public
-// surface.
+// Verifier authenticates tokens and authorizes already-decoded admission requests.
 type Verifier struct {
-	verifier *verify.Verifier
+	verifier *oidc.IDTokenVerifier
+	client   *http.Client
+	jwksURL  string
 }
 
-// NewVerifier builds a Verifier for an already-decoded AdmissionRequest.
-// [WithAudience] selects automatic in-cluster issuer/key discovery bound to the
-// webhook's configured audience. [WithRemoteIssuer] supplies an issuer and
-// audience for out-of-cluster use. A decoded request has no trusted endpoint
-// identity, so supplying neither option fails at construction.
+// NewVerifier constructs a verifier using [WithAudience] for local issuer/keys or
+// [WithRemoteIssuer] for remote discovery. Configuration and endpoint availability
+// are checked during construction; signing keys are loaded lazily by coreos.
 func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
 	b := newBuilder()
 	for _, opt := range opts {
 		opt(b)
 	}
-	v, err := b.buildVerifier(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Verifier{verifier: v}, nil
+	return b.buildVerifier(ctx)
 }
 
-// Verify checks token against the KEP-6060 contract for an already-decoded
-// AdmissionRequest.
-//
-// It returns nil on success and the same generic error for every denial,
-// including a nil request. The specific reason is logged, not returned.
+// Verify authenticates token and checks the request's API group and object kinds.
+// Any denial, including a nil request, returns the same generic error.
 func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
-		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "request body is not a decodable AdmissionReview")
 		return errVerificationFailed
 	}
-	if err := v.verifier.Verify(ctx, token, req.Resource.Group); err != nil {
+	groups, err := v.authenticateToken(ctx, token)
+	if err != nil {
+		return err
+	}
+	return v.checkDecodedRequest(ctx, req, groups)
+}
+
+func (v *Verifier) authenticateToken(ctx context.Context, rawToken string) ([]string, error) {
+	if ctx.Err() != nil {
+		return nil, errVerificationFailed
+	}
+	token, err := v.verifier.Verify(ctx, rawToken)
+	if err != nil {
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token authentication failed", "detail", err.Error())
+		return nil, errVerificationFailed
+	}
+	groups, err := verify.TokenGroups(token)
+	if err != nil {
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "invalid Kubernetes token claims", "detail", err.Error())
+		return nil, errVerificationFailed
+	}
+	return groups, nil
+}
+
+func (v *Verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.AdmissionRequest, groups []string) error {
+	if ctx.Err() != nil || req == nil {
 		return errVerificationFailed
 	}
-	// The attestation covers the resource group, but known subresources may carry
-	// an object from another group. Bind both objects to the reviewed Kind.
+	if !verify.AllowsAPIGroup(groups, req.Resource.Group) {
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token admissionReviewAPIGroups does not authorize the review's API group")
+		return errVerificationFailed
+	}
 	if err := checkObjectGroup(req); err != nil {
-		klog.FromContext(ctx).V(2).Info("Webhook token verification denied",
-			"reason", "admitted object does not match AdmissionReview kind", "detail", err.Error())
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "admitted object does not match AdmissionReview kind", "detail", err.Error())
 		return errVerificationFailed
 	}
 	return nil
 }
 
-// HealthCheck probes whether trusted issuer signing keys remain available.
-// Construction already required a receiver-owned audience; readiness never
-// grants permission to accept tokens for an unknown audience.
+// HealthCheck checks signing-key endpoint availability, not key usability or
+// freshness. It neither populates nor invalidates the verifier's key cache.
 func (v *Verifier) HealthCheck() error {
-	return v.verifier.HealthCheck()
+	return v.healthCheck(context.Background())
 }
 
-// BearerToken extracts the token from an "Authorization: Bearer <token>" header,
-// mirroring k8s.io/apiserver/pkg/authentication/request/bearertoken so this
-// adapter does not drift from the apiserver's parsing. ok is false for a missing
-// header, a non-Bearer scheme, or an empty token. It is exported so a caller that
-// decodes the review itself can obtain the token for [Verifier.Verify].
+func (v *Verifier) healthCheck(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.jwksURL, nil)
+	if err != nil {
+		return fmt.Errorf("admission: creating signing-key availability request: %w", err)
+	}
+	resp, err := v.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("admission: signing-key endpoint is unavailable: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("admission: signing-key endpoint returned %s", resp.Status)
+	}
+	return nil
+}
+
+// BearerToken extracts a bearer using the apiserver's header parsing rules.
+// Callers that decode AdmissionReviews themselves can pass it to [Verifier.Verify].
 func BearerToken(r *http.Request) (token string, ok bool) {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if auth == "" {
@@ -431,8 +520,7 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 	return token, true
 }
 
-// HealthCheck reports whether the trusted issuer key set is ready. The
-// expected audience was bound to the webhook configuration at construction.
+// HealthCheck checks signing-key endpoint availability, not key usability or freshness.
 func (h *Handler) HealthCheck() error {
 	return h.verifier.HealthCheck()
 }
