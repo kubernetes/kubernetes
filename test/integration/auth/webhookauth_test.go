@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -41,6 +42,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -86,6 +88,66 @@ func webhookAuthRequest(t *testing.T, kind metav1.GroupVersionKind, resource met
 		req.OldObject.Raw = raw
 	}
 	return req
+}
+
+func verifyDiscoveredWebhookKinds(ctx context.Context, t *testing.T, cs clientset.Interface, verifier *admissionauth.Verifier, token, namespace string) {
+	t.Helper()
+	_, resources, err := cs.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatalf("discover enabled REST APIs: %v", err)
+	}
+	tested := 0
+	for _, list := range resources {
+		gv, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, resource := range list.APIResources {
+			kind := metav1.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: resource.Kind}
+			if resource.Group != "" {
+				kind.Group = resource.Group
+			}
+			if resource.Version != "" {
+				kind.Version = resource.Version
+			}
+			if kind.Group == gv.Group {
+				continue
+			}
+			parent, subresource, _ := strings.Cut(resource.Name, "/")
+			gvr := metav1.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: parent}
+			var operation admissionv1.Operation
+			switch {
+			case slices.Contains(resource.Verbs, "create"):
+				operation = admissionv1.Create
+			case slices.Contains(resource.Verbs, "update") || slices.Contains(resource.Verbs, "patch"):
+				operation = admissionv1.Update
+			case slices.Contains(resource.Verbs, "delete"):
+				operation = admissionv1.Delete
+			default:
+				t.Fatalf("cross-group resource %s/%s has no classified admission operation: %v", list.GroupVersion, resource.Name, resource.Verbs)
+			}
+			tested++
+			t.Run(list.GroupVersion+"/"+resource.Name, func(t *testing.T) {
+				req := webhookAuthRequest(t, kind, gvr, subresource, operation)
+				if resource.Namespaced {
+					req.Namespace = namespace
+				}
+				if err := verifier.Verify(ctx, req, token); err != nil {
+					t.Fatalf("discovered %s/%s with admitted kind %+v is unhandled: %v", list.GroupVersion, resource.Name, kind, err)
+				}
+				badKind := metav1.GroupVersionKind{Group: "unexpected.example.com", Version: "v1", Kind: "Thing"}
+				invalid := webhookAuthRequest(t, badKind, gvr, subresource, operation)
+				invalid.Namespace = req.Namespace
+				if err := verifier.Verify(ctx, invalid, token); err == nil || err.Error() != "webhook token verification failed" {
+					t.Fatalf("arbitrary cross-group kind accepted: %v", err)
+				}
+			})
+		}
+	}
+	if tested == 0 {
+		t.Fatal("discovery returned no cross-group admission kinds")
+	}
+	t.Logf("checked %d discovered cross-group admission kinds", tested)
 }
 
 func TestWebhookAuthIssuedToken(t *testing.T) {
@@ -354,6 +416,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			issuer = "https://" + opts.SecureServing.Listener.Addr().String()
 			signingKeyFile = opts.ServiceAccountSigningKeyFile
+			opts.APIEnablement.RuntimeConfig["api/all"] = "true"
 			opts.Authentication.ServiceAccounts.Issuers = []string{issuer}
 			opts.Authentication.ServiceAccounts.JWKSURI = issuer + "/openid/v1/jwks"
 			opts.Authentication.APIAudiences = authenticator.Audiences{"api"}
@@ -738,4 +801,45 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	if deleted == nil || deleted.Operation != admissionv1.Delete || len(deleted.Object.Raw) != 0 || deleted.Object.Object != nil || len(deleted.OldObject.Raw) == 0 {
 		t.Fatalf("DELETE admission shape: %+v", deleted)
 	}
+
+	t.Run("discovered cross-group admission kinds", func(t *testing.T) {
+		authutil.GrantServiceAccountAuthorization(t, ctx, cs, sa.Name, ns.Name, rbacv1.PolicyRule{
+			Verbs: []string{"attest"}, APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{authenticationv1.AttestationAdmissionReviewAPIGroups}, ResourceNames: []string{"*"},
+		})
+		wildcardToken, err := cs.CoreV1().ServiceAccounts(ns.Name).CreateToken(ctx, sa.Name, &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{webhookURL},
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind: "ValidatingWebhookConfiguration", APIVersion: "admissionregistration.k8s.io/v1", Name: vwc.Name, UID: vwc.UID,
+				},
+				Attestations: map[string]authenticationv1.AttestationValue{authenticationv1.AttestationAdmissionReviewAPIGroups: {"*"}},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("issue discovery test token: %v", err)
+		}
+		verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithRemoteIssuer(issuer, webhookURL, discoveryClient))
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyDiscoveredWebhookKinds(ctx, t, cs, verifier, wildcardToken.Status.Token, ns.Name)
+	})
+
+	t.Run("Ignore skips early authentication failure", func(t *testing.T) {
+		activeToken.Store(ordinarySAToken.Status.Token)
+		defer activeToken.Store(issuedToken.Status.Token)
+		lastWebhookStatus.Store(0)
+		before := admittedCount.Load()
+		_, err := cs.BatchV1().Jobs(ns.Name).Create(ctx, &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: "ignored-authentication-job", Namespace: ns.Name},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyNever,
+				Containers:    []corev1.Container{{Name: "job", Image: "busybox"}},
+			}}},
+		}, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err != nil || lastWebhookStatus.Load() != http.StatusUnauthorized || admittedCount.Load() != before {
+			t.Fatalf("Ignore authentication failure: error=%v status=%d admissions=%d, want skipped401 without callback", err, lastWebhookStatus.Load(), admittedCount.Load())
+		}
+	})
 }
