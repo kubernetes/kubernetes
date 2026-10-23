@@ -577,7 +577,88 @@ func Validate_StorageHealth(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1beta1.StorageHealth.HealthConditions has no validation
+	{ // field storagev1beta1.StorageHealth.HealthConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []storagev1beta1.StorageHealthCondition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageHealthCondition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.StorageHealth) []storagev1beta1.StorageHealthCondition {
+				return oldObj.HealthConditions
+			})
+		errs = append(errs, fn(fldPath.Child("healthConditions"), obj.HealthConditions, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_StorageHealthCondition validates an instance of StorageHealthCondition according
+// to declarative validation rules in the API schema.
+func Validate_StorageHealthCondition(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.StorageHealthCondition) (errs field.ErrorList) {
+
+	// field storagev1beta1.StorageHealthCondition.Status has no validation
+
+	{ // field storagev1beta1.StorageHealthCondition.Reason
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.ConditionReason(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.StorageHealthCondition) *string {
+				return &oldObj.Reason
+			})
+		errs = append(errs, fn(fldPath.Child("reason"), &obj.Reason, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.StorageHealthCondition.Message has no validation
+	// field storagev1beta1.StorageHealthCondition.AccessMode has no validation
+	// field storagev1beta1.StorageHealthCondition.VolumeMode has no validation
+	// field storagev1beta1.StorageHealthCondition.LastTransitionTime has no validation
 	return errs
 }
 

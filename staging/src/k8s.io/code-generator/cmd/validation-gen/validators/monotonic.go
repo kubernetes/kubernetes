@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -56,7 +57,7 @@ func (v *monotonicTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	result := Validations{}
-	result.AddFunction(Function(monotonicTagName, DefaultFlags, monotonicValidator))
+	result.AddFunction(Function(monotonicTagName, DefaultFlags, monotonicValidator).WithEmits(Emission{field.ErrorTypeInvalid, "monotonic", ""}))
 	return result, nil
 }
 

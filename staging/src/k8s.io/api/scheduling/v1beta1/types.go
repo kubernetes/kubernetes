@@ -284,7 +284,6 @@ type PodGroupTemplate struct {
 	//
 	// +optional
 	// +k8s:optional
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
@@ -355,7 +354,6 @@ type CompositePodGroupTemplate struct {
 	//
 	// +optional
 	// +k8s:optional
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,6,opt,name=priority"`
 
@@ -701,7 +699,6 @@ type PodGroupSpec struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,8,opt,name=priority"`
 
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
@@ -859,6 +856,8 @@ type TopologyConstraint struct {
 	// key specifies the key of the node label representing the topology domain.
 	// All pods within the PodGroup must be colocated within the same domain instance.
 	// Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate.
+	// Nodes where this label is missing or has an empty value do not belong to any domain instance,
+	// so pods within the PodGroup cannot be scheduled onto them.
 	// Examples: "topology.kubernetes.io/rack"
 	//
 	// +required

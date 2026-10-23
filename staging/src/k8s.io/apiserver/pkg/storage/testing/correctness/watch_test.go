@@ -348,6 +348,23 @@ func TestValidateWatch(t *testing.T) {
 			},
 		},
 		{
+			name: "bookmark older than previous event",
+			requests: []WatchRequest{
+				watchEverything("", ""),
+				watchEverything("", metav1.ResourceVersionMatchNotOlderThan),
+				watchEverything("0", ""),
+				watchEverything("0", metav1.ResourceVersionMatchNotOlderThan),
+				watchEverything("2", ""),
+				watchEverything("2", metav1.ResourceVersionMatchExact),
+				watchEverything("2", metav1.ResourceVersionMatchNotOlderThan),
+			},
+			events: []watch.Event{
+				addPod2RV3,
+				newBookmark("2"),
+			},
+			expectError: true,
+		},
+		{
 			name: "label selector color=blue",
 			requests: []WatchRequest{
 				watchBlue("", ""),
@@ -627,6 +644,20 @@ func TestValidateWatch(t *testing.T) {
 				watchEverything("1", metav1.ResourceVersionMatchNotOlderThan),
 			},
 			events:      []watch.Event{addPod1RV2, {Type: watch.Error, Object: withRV(pod2, "3")}},
+			expectError: true,
+		},
+		{
+			name: "error event with non-failure status",
+			requests: []WatchRequest{
+				watchEverything("", ""),
+				watchEverything("", metav1.ResourceVersionMatchNotOlderThan),
+				watchEverything("0", ""),
+				watchEverything("0", metav1.ResourceVersionMatchNotOlderThan),
+				watchEverything("1", ""),
+				watchEverything("1", metav1.ResourceVersionMatchExact),
+				watchEverything("1", metav1.ResourceVersionMatchNotOlderThan),
+			},
+			events:      []watch.Event{addPod1RV2, {Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusSuccess}}},
 			expectError: true,
 		},
 		{

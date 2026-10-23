@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 func TestPodTopologyLabels(t *testing.T) {
@@ -887,7 +888,7 @@ func TestPodResizeRBAC(t *testing.T) {
 
 	testcases := []struct {
 		name               string
-		serviceAccountFn   func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+		serviceAccountFn   func(t testutils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
 		serviceAccountRBAC rbacv1.PolicyRule
 		allowResize        bool
 		allowUpdate        bool

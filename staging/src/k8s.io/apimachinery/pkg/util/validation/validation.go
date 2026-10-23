@@ -32,6 +32,7 @@ import (
 // "qualified name".  This is a format used in various places throughout the
 // system.  If the value is not valid, a list of error strings is returned.
 // Otherwise an empty list (or nil) is returned.
+//
 // Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.IsQualifiedName instead.
 var IsQualifiedName = content.IsLabelKey
 
@@ -143,12 +144,14 @@ func IsDomainPrefixedKey(fldPath *field.Path, key string) field.ErrorList {
 }
 
 // LabelValueMaxLength is a label's max length
+//
 // Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.LabelValueMaxLength instead.
 const LabelValueMaxLength int = content.LabelValueMaxLength
 
 // IsValidLabelValue tests whether the value passed is a valid label value.  If
 // the value is not valid, a list of error strings is returned.  Otherwise an
 // empty list (or nil) is returned.
+//
 // Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.IsLabelValue instead.
 var IsValidLabelValue = content.IsLabelValue
 
@@ -264,6 +267,7 @@ func IsWildcardDNS1123Subdomain(value string) []string {
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.
+//
 // Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.IsCIdentifier instead.
 var IsCIdentifier = content.IsCIdentifier
 

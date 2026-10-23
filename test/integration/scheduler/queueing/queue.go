@@ -37,6 +37,7 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/ktesting"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -2570,7 +2570,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
-func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
+func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) { //nolint:forbidigo // calls ndftesting.NewMockFeature/ktesting.NewTestContext, which require *testing.T
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {

@@ -1052,7 +1052,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// AddSubtree adds a subtree to the queued pod group info hierarchy and maintains its order.
 // It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
 func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	parentKey, ok := subtree.GetParentKey()
@@ -1062,12 +1062,13 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 
 	parent, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, parentKey)
 	if parent != nil {
-		for _, child := range parent.Children {
+		for _, child := range parent.children {
 			if child.GetKey() == subtree.GetKey() {
 				return
 			}
 		}
-		parent.Children = append(parent.Children, subtree)
+		parent.children = append(parent.children, subtree)
+		parent.sortChildren()
 	}
 }
 
@@ -1088,9 +1089,12 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) 
 	}
 
 	if parent != nil {
-		for i, child := range parent.Children {
+		for i, child := range parent.children {
 			if child.GetKey() == gpg.GetKey() {
-				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+				parent.children = slices.Delete(parent.children, i, i+1)
+				if len(parent.children) == 0 {
+					parent.children = nil
+				}
 				break
 			}
 		}
@@ -1106,7 +1110,7 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 	if curr.GetKey() == key {
 		return curr, parent
 	}
-	for _, child := range curr.Children {
+	for _, child := range curr.children {
 		if n, p := findTreeNodeAndParent(child, curr, key); n != nil {
 			return n, p
 		}
@@ -1118,7 +1122,7 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 // all encountered PodGroups from the pgqi.queuedPodInfos map.
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
-	removedPods := make([]*QueuedPodInfo, 0)
+	var removedPods []*QueuedPodInfo
 	if curr.GetType() == fwk.PodGroupKeyType {
 		curr.UnscheduledPods = nil
 		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
@@ -1134,7 +1138,7 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 		}
 		return removedPods
 	}
-	for _, child := range curr.Children {
+	for _, child := range curr.children {
 		removedPods = append(removedPods, pgqi.deleteSubtreePods(child)...)
 	}
 	return removedPods
@@ -1152,8 +1156,18 @@ type PodGroupInfo struct {
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
-	// Children are the child pod groups of this pod group. Only composite pod groups have children.
-	Children []*PodGroupInfo
+	// children are the child pod groups of this pod group. Only composite pod groups have children.
+	// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
+	// To read children, use Children() or GetChildren().
+	children []*PodGroupInfo
+}
+
+// NewPodGroupInfo returns a PodGroupInfo for GenericPodGroup and given children, ordered by creation timestamp, name, and entity type.
+// Callers must not retain or mutate the children slice, since NewPodGroupInfo doesn't create a copy but takes ownership of it.
+func NewPodGroupInfo(gpg *fwk.GenericPodGroup, children ...*PodGroupInfo) *PodGroupInfo {
+	pgi := &PodGroupInfo{GenericPodGroup: gpg, children: children}
+	pgi.sortChildren()
+	return pgi
 }
 
 // GetAllUnscheduledPods returns the unscheduled pods for this pod group.
@@ -1164,33 +1178,40 @@ func (pgi *PodGroupInfo) GetAllUnscheduledPods() []*v1.Pod {
 		return pgi.UnscheduledPods
 	}
 	var pods []*v1.Pod
-	for _, child := range pgi.Children {
+	for _, child := range pgi.children {
 		pods = append(pods, child.GetAllUnscheduledPods()...)
 	}
 	return pods
 }
 
+// Children returns the child pod groups of this pod group, ordered by creation timestamp, name, and entity type.
+//
+// The returned slice aliases the internal storage and must be treated as read-only.
+// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
+func (pgi *PodGroupInfo) Children() []*PodGroupInfo {
+	return pgi.children
+}
+
+// GetChildren returns the child pod groups of this pod group, ordered by creation timestamp, name, and entity type.
+//
+// The returned slice is a copy of the children, typed as fwk.PodGroupInfo and must be treated as read-only.
+// children must be initialized or mutated via dedicated methods (e.g. NewPodGroupInfo).
 func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
-	if len(pgi.Children) == 0 {
+	if len(pgi.children) == 0 {
 		return nil
 	}
-	children := make([]fwk.PodGroupInfo, len(pgi.Children))
-	for i, child := range pgi.GetChildGroups() {
+	children := make([]fwk.PodGroupInfo, len(pgi.children))
+	for i, child := range pgi.children {
 		children[i] = child
 	}
 	return children
 }
 
-func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
-	if pgi.CompositePodGroup == nil {
-		// Only CompositePodGroups have children groups.
-		return nil
-	}
-	result := make([]*PodGroupInfo, len(pgi.Children))
-	copy(result, pgi.Children)
-	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
-	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
-	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
+// sortChildren sorts the children of this composite pod group in-place by creation
+// timestamp, then name, then entity type to have a tie-breaker that enforces deterministic order.
+// Leaf pod groups have no children, so this is a no-op for them.
+func (pgi *PodGroupInfo) sortChildren() {
+	slices.SortFunc(pgi.children, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
 		if aTime.Before(bTime) {
@@ -1211,7 +1232,6 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		}
 		return 0
 	})
-	return result
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to

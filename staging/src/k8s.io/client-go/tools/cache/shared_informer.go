@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/sharding"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -253,6 +254,12 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
+	// SetShardSelector configures a shard selector on the informer's underlying
+	// ListerWatcher via NewShardedListWatch.
+	//
+	// Must be set before starting the informer.
+	SetShardSelector(selector sharding.Selector) error
+
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
@@ -458,6 +465,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		identifier:                      options.Identifier,
 		informerMetricsProvider:         options.InformerMetricsProvider,
 		keyFunc:                         DeletionHandlingMetaNamespaceKeyFunc,
+		shardSelector:                   options.ShardSelector,
 	}
 }
 
@@ -481,6 +489,9 @@ type SharedIndexInformerOptions struct {
 	// InformerMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
 	InformerMetricsProvider InformerMetricsProvider
+
+	// ShardSelector optionally restricts the informer to a shard subset via NewShardedListWatch.
+	ShardSelector sharding.Selector
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -747,7 +758,8 @@ type sharedIndexInformer struct {
 	// Called whenever the ListAndWatch drops the connection with an error.
 	watchErrorHandler WatchErrorHandlerWithContext
 
-	transform TransformFunc
+	transform     TransformFunc
+	shardSelector sharding.Selector
 
 	// identifier is used to identify this informer for metrics and logging purposes.
 	identifier InformerNameAndResource
@@ -834,6 +846,18 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetShardSelector(selector sharding.Selector) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	s.shardSelector = selector
+	return nil
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	s.RunWithContext(wait.ContextForChannel(stopCh))
 }
@@ -855,7 +879,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 		cfg := &Config{
 			Queue:             fifo,
-			ListerWatcher:     s.listerWatcher,
+			ListerWatcher:     NewShardedListWatch(s.listerWatcher, s.shardSelector),
 			ObjectType:        s.objectType,
 			ObjectDescription: s.objectDescription,
 			FullResyncPeriod:  s.resyncCheckPeriod,

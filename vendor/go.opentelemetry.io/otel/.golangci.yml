@@ -230,13 +230,6 @@ linters:
           - revive
         path: schema/v.*/types/.*
         text: avoid meaningless package names
-      # TODO: Having appropriate comments for exported objects helps development,
-      # even for objects in internal packages. Appropriate comments for all
-      # exported objects should be added and this exclusion removed.
-      - linters:
-          - revive
-        path: .*internal/.*
-        text: exported (method|function|type|const) (.+) should have comment or be unexported
       # Yes, they are, but it's okay in a test.
       - linters:
           - revive
@@ -272,7 +265,10 @@ formatters:
     - golines
   settings:
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
+        clothe-returns: true
+        balance-calls: true
     goimports:
       local-prefixes:
         - go.opentelemetry.io/otel

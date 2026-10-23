@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -51,7 +52,6 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var zero = int64(0)

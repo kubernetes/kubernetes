@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Originally, this USER_HZ value was dynamically retrieved via a sysconf call
@@ -134,7 +134,7 @@ func (p Proc) NewStat() (ProcStat, error) {
 
 // Stat returns the current status information of the process.
 func (p Proc) Stat() (ProcStat, error) {
-	data, err := util.ReadFileNoStat(p.path("stat"))
+	data, err := parsers.ReadFileNoStat(p.path("stat"))
 	if err != nil {
 		return ProcStat{}, err
 	}

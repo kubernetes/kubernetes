@@ -35,7 +35,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -47,6 +46,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/flagz"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -64,12 +64,13 @@ import (
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/e2e/invariants/metrics"
 	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -100,6 +101,13 @@ type TestServerInstanceOptions struct {
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
 	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
+	// Wrap the RESTOptionsGetter for the kube-apiserver's own resources, before
+	// any storage is constructed. Does not cover apiextensions (CRDs) or the
+	// aggregator, which build their storage from their own getters.
+	RESTOptionsGetterWrapFunc func(generic.RESTOptionsGetter) generic.RESTOptionsGetter
+	// Wrap the OpenAPI v2 GetDefinitions callback shared across the server chain
+	// (apiextensions-apiserver, kube-apiserver, and kube-aggregator).
+	OpenAPIGetDefinitionsWrapFunc func(openapicommon.GetOpenAPIDefinitions) openapicommon.GetOpenAPIDefinitions
 	// CA file used for requestheader authn during communication between:
 	// 1. kube-apiserver and peer when the local apiserver is not able to serve the request due
 	// to version skew
@@ -213,7 +221,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+				klog.FromContext(tCtx).Error(err, "Failed to shutdown test server cleanly")
 			}
 		}
 		os.RemoveAll(result.TmpDir)
@@ -467,6 +475,14 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if err != nil {
 		return result, err
 	}
+	if instanceOptions.RESTOptionsGetterWrapFunc != nil {
+		config.KubeAPIs.ControlPlane.Generic.RESTOptionsGetter =
+			instanceOptions.RESTOptionsGetterWrapFunc(config.KubeAPIs.ControlPlane.Generic.RESTOptionsGetter)
+	}
+	if instanceOptions.OpenAPIGetDefinitionsWrapFunc != nil && config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig != nil {
+		config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig.GetDefinitions =
+			instanceOptions.OpenAPIGetDefinitionsWrapFunc(config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig.GetDefinitions)
+	}
 	completed, err := config.Complete()
 	if err != nil {
 		return result, err
@@ -635,7 +651,7 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t testing.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+func StartTestServerOrDie(t ktesting.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
 	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
 	if err == nil {
 		return &result

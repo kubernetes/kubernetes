@@ -172,10 +172,8 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	// the discovery client.
 	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
 	queryParam := resource.QueryParamFieldValidation
-	primary := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
-	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
-	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
-	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
+	verifier := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
+	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about

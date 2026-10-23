@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	sharding "k8s.io/apimachinery/pkg/sharding"
 	wait "k8s.io/apimachinery/pkg/util/wait"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
@@ -45,6 +46,7 @@ type sharedInformerFactory struct {
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
 	transform        cache.TransformFunc
+	shardSelector    sharding.Selector
 	informerName     *cache.InformerName
 
 	informers map[reflect.Type]cache.SharedIndexInformer
@@ -88,6 +90,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector sharding.Selector) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -239,6 +249,9 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	informer = newFunc(f.client, resyncPeriod)
 	if f.transform != nil {
 		informer.SetTransform(f.transform)
+	}
+	if f.shardSelector != nil {
+		informer.SetShardSelector(f.shardSelector)
 	}
 	f.informers[informerType] = informer
 

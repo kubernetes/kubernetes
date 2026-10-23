@@ -31,6 +31,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -38,7 +39,6 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMakeMounts(t *testing.T) {

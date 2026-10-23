@@ -55,7 +55,8 @@ type Interface interface {
 	// disable calls to the Zones interface. Also returns true if the interface is supported, false otherwise.
 	InstancesV2() (InstancesV2, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
-	// DEPRECATED: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
+	//
+	// Deprecated: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
 	// This interface will not be called if InstancesV2 is enabled.
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
@@ -64,7 +65,12 @@ type Interface interface {
 	Routes() (Routes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
-	// HasClusterID returns true if a ClusterID is required and set
+	// HasClusterID returns true if the cluster has a ClusterID set. The
+	// cloud-controller-manager checks this during cloud initialization at startup
+	// and exits on false unless the deprecated --allow-untagged-cloud flag is set.
+	// The framework only reads this boolean and never reads the ID itself, so how a
+	// provider stores and verifies it (for example, that instances carry the cluster
+	// tag) is up to the provider.
 	HasClusterID() bool
 }
 
@@ -269,7 +275,8 @@ type Zone struct {
 }
 
 // Zones is an abstract, pluggable interface for zone enumeration.
-// DEPRECATED: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
+//
+// Deprecated: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
 // This interface will not be called if InstancesV2 is enabled.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
@@ -290,7 +297,8 @@ type Zones interface {
 }
 
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
-// DEPRECATED: PVLabeler is deprecated in favor of CSI topology feature.
+//
+// Deprecated: PVLabeler is deprecated in favor of CSI topology feature.
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }

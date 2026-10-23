@@ -176,42 +176,34 @@ type Store struct {
 	// are issued in parallel.
 	DeleteCollectionWorkers int
 
-	// Decorator is an optional exit hook on an object returned from the
-	// underlying storage. The returned object could be an individual object
-	// (e.g. Pod) or a list type (e.g. PodList). Decorator is intended for
-	// integrations that are above storage and should only be used for
-	// specific cases where storage of the value is not appropriate, since
-	// they cannot be watched.
-	Decorator func(runtime.Object)
-
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
 	// BeginCreate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
-	// but before AfterCreate and Decorator, indicating via the argument
+	// but before AfterCreate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
 	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
-	// created and before it is decorated, optional.
+	// created, optional.
 	AfterCreate AfterCreateFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
 	// BeginUpdate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
-	// but before AfterUpdate and Decorator, indicating via the argument
+	// but before AfterUpdate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
 	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
-	// updated and before it is decorated, optional.
+	// updated, optional.
 	AfterUpdate AfterUpdateFunc
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
-	// deleted and before it is decorated, optional.
+	// deleted, optional.
 	AfterDelete AfterDeleteFunc
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
@@ -500,9 +492,6 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if err != nil {
 		return nil, err
 	}
-	if e.Decorator != nil {
-		e.Decorator(out)
-	}
 	return out, nil
 }
 
@@ -518,7 +507,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 		sel, err := sharding.Parse(options.ShardSelector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid shard selector: %w", err)
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 		}
 		p.ShardSelector = sel
 	}
@@ -679,9 +668,6 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 
 	if e.AfterCreate != nil {
 		e.AfterCreate(out, options)
-	}
-	if e.Decorator != nil {
-		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -974,9 +960,6 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			e.AfterUpdate(out, options)
 		}
 	}
-	if e.Decorator != nil {
-		e.Decorator(out)
-	}
 	return out, creating, nil
 }
 
@@ -1011,9 +994,6 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 	}
 	if err := e.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: options.ResourceVersion}, obj); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
-	}
-	if e.Decorator != nil {
-		e.Decorator(obj)
 	}
 	return obj, nil
 }
@@ -1547,15 +1527,12 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 }
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
-// returns the decorated deleted object if appropriate.
+// returns the deleted object if appropriate.
 func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool, options *metav1.DeleteOptions) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		e.AfterDelete(obj, options)
 	}
 	if e.ReturnDeletedObject {
-		if e.Decorator != nil {
-			e.Decorator(obj)
-		}
 		return obj, nil
 	}
 	// Return information about the deleted object, which enables clients to
@@ -1598,7 +1575,7 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 			sel, err := sharding.Parse(options.ShardSelector)
 			if err != nil {
-				return nil, fmt.Errorf("invalid shard selector: %w", err)
+				return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 			}
 			predicate.ShardSelector = sel
 		}
@@ -1634,14 +1611,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		// optimization is skipped
 	}
 
-	w, err := e.Storage.Watch(ctx, key, storageOpts)
-	if err != nil {
-		return nil, err
-	}
-	if e.Decorator != nil {
-		return newDecoratedWatcher(ctx, w, e.Decorator), nil
-	}
-	return w, nil
+	return e.Storage.Watch(ctx, key, storageOpts)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or
@@ -1772,10 +1742,20 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	if e.Storage.Storage == nil {
-		e.Storage.Codec = opts.StorageConfig.Codec
+		storageConfig := opts.StorageConfig
+
+		if options.DecodeDecorator != nil {
+			// make a shallow copy of the storageConfig and wrap the codec to decorate on Decode
+			storageConfigCopy := *storageConfig
+			storageConfigCopy.Codec = &decoratedDecoder{Encoder: storageConfig.Codec, decoder: storageConfig.Codec, decorator: options.DecodeDecorator}
+			storageConfig = &storageConfigCopy
+		}
+
+		e.Storage.Codec = storageConfig.Codec
+
 		var err error
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
-			opts.StorageConfig,
+			storageConfig,
 			prefix,
 			keyFuncs.objectKeyFunc,
 			keyFuncs.reverseKeyFunc,

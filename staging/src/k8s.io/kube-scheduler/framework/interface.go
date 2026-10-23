@@ -807,6 +807,17 @@ type PlacementGeneratePlugin interface {
 
 	// GeneratePlacements generates a list of potential Placements for the given PodGroup within the parent placement.
 	// Each Placement represents a candidate set of resources, e.g., nodes matching a selector.
+	// The scheduler may shuffle and evaluate only a subset of the returned Placements, so plugins
+	// must not rely on their order.
+	//
+	// A plugin can attach per-placement data by calling state.PlacementState(placement).Write
+	// and returning that same placement pointer. When multiple PlacementGenerate plugins
+	// constrain the input, the framework intersects their placements and combines the attached
+	// state. Returning parentPlacement unchanged as the only placement imposes no constraints,
+	// and state attached through PlacementState(parentPlacement) is ignored. Use PodGroupCycleState
+	// for group-wide data instead. During placement evaluation, pod scheduling reads the combined
+	// state from CycleState.GetPlacementCycleState, and PlacementFeasible and ScorePlacement
+	// receive it directly.
 	GeneratePlacements(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, parentPlacement *Placement) (*GeneratePlacementsResult, *Status)
 }
 
@@ -961,6 +972,9 @@ type Handle interface {
 	// PodGroupManager provides an interface for runtime information about pod groups from scheduler's cache.
 	PodGroupManager() PodGroupManager
 
+	// SharedPodGroupHierarchyTracker returns the PodGroupHierarchyTracker of the framework.
+	SharedPodGroupHierarchyTracker() PodGroupHierarchyTracker
+
 	// SignPod creates a PodSignature for a pod.
 	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
 
@@ -1040,6 +1054,10 @@ type PreemptionCandidate interface {
 	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
 	// This value is used for metrics and doesn't impact victim actuation.
 	NumPodGroupDisruptions() int
+	// Nodes returns a list of nodes where the preemptor pods get nominated to run.
+	// For a single pod preemption it's equal Name but for pod group preemption
+	// it contains a set of nodes for all preemptor pods.
+	Nodes() []string
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

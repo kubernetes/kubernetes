@@ -276,6 +276,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// This means that there is no status update so the counters for
 		// failedPods and succeededPods cannot be incremented.
 		podControllerError        error
+		podDeleteError            error
 		pendingPods               int
 		activePods                int
 		readyPods                 int
@@ -560,6 +561,19 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches:  1,
 			expectedReady:       ptr.To[int32](2),
 			expectedTerminating: ptr.To[int32](1),
+		},
+		"count ready pods when too many active pods, with delete error": {
+			parallelism:         2,
+			completions:         5,
+			backoffLimit:        6,
+			podDeleteError:      fmt.Errorf("fake delete error"),
+			activePods:          3,
+			readyPods:           3,
+			expectedDeletions:   1,
+			expectedActive:      3,
+			expectedPodPatches:  1,
+			expectedReady:       ptr.To[int32](3),
+			expectedTerminating: ptr.To[int32](0),
 		},
 		"failed + succeed pods: reset backoff delay": {
 			parallelism:         2,
@@ -944,6 +958,21 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedReady:       ptr.To[int32](0),
 			expectedDeletions:   2,
 			expectedTerminating: ptr.To[int32](2),
+		},
+		"count ready pods when job fails, with delete error": {
+			parallelism:         2,
+			completions:         3,
+			backoffLimit:        0,
+			podDeleteError:      fmt.Errorf("fake delete error"),
+			activePods:          2,
+			readyPods:           2,
+			failedPods:          1,
+			expectedFailed:      1,
+			expectedPodPatches:  1,
+			expectedReady:       ptr.To[int32](2),
+			expectedDeletions:   2,
+			expectedActive:      2,
+			expectedTerminating: ptr.To[int32](0),
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
@@ -1333,7 +1362,7 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 
 			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
-			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, DeleteErr: tc.podDeleteError, CreateLimit: tc.podLimit}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
@@ -1391,7 +1420,7 @@ func TestControllerSyncJob(t *testing.T) {
 			// run
 			err = manager.syncJob(ctx, testutil.GetKey(job, t))
 			// We need requeue syncJob task if podController error
-			if tc.podControllerError != nil {
+			if tc.podControllerError != nil || tc.podDeleteError != nil {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
@@ -1483,6 +1512,70 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 			if p := len(fakePodControl.Patches); p != tc.expectedPodPatches {
 				t.Errorf("Got %d pod patches, want %d", p, tc.expectedPodPatches)
+			}
+		})
+	}
+}
+
+func TestJobPodsCreationTotal(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	testCases := map[string]struct {
+		podControllerError error
+		wantSucceeded      float64
+		wantFailed         float64
+		wantSyncErr        bool
+	}{
+		"create succeeded": {
+			wantSucceeded: 1,
+			wantFailed:    0,
+		},
+		"create failed": {
+			podControllerError: errors.New("fake pod create error"),
+			wantSucceeded:      0,
+			wantFailed:         1,
+			wantSyncErr:        true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			metrics.JobPodsCreationTotal.Reset()
+
+			job := newJob(1, 1, 6, batch.NonIndexedCompletion)
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				return job, nil
+			}
+
+			err := manager.syncJob(ctx, testutil.GetKey(job, t))
+			if tc.wantSyncErr {
+				if err == nil {
+					t.Fatal("Expected syncJob to return an error on pod create failure")
+				}
+			} else if err != nil {
+				t.Fatalf("Unexpected syncJob error: %v", err)
+			}
+
+			gotSucceeded, err := metricstestutil.GetCounterMetricValue(metrics.JobPodsCreationTotal.WithLabelValues(metrics.PodCreateNew, metrics.Succeeded))
+			if err != nil {
+				t.Fatalf("Obtaining succeeded job_pods_creation_total: %v", err)
+			}
+			if gotSucceeded != tc.wantSucceeded {
+				t.Errorf("Metric reports %.0f succeeded pod creations, want %.0f", gotSucceeded, tc.wantSucceeded)
+			}
+			gotFailed, err := metricstestutil.GetCounterMetricValue(metrics.JobPodsCreationTotal.WithLabelValues(metrics.PodCreateNew, metrics.Failed))
+			if err != nil {
+				t.Fatalf("Obtaining failed job_pods_creation_total: %v", err)
+			}
+			if gotFailed != tc.wantFailed {
+				t.Errorf("Metric reports %.0f failed pod creations, want %.0f", gotFailed, tc.wantFailed)
 			}
 		})
 	}
@@ -7474,7 +7567,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 
 	gangJob := newGangSchedulingJob("test-job", 4)
 	gangJob.Spec.BackoffLimit = ptr.To[int32](6)
-	templateName := fmt.Sprintf("%s-pgt-%d", gangJob.Name, 0)
+	templateName := podGroupTemplateName(gangJob)
 
 	makeWorkload := func(job *batch.Job) *schedulingv1beta1.Workload {
 		return &schedulingv1beta1.Workload{

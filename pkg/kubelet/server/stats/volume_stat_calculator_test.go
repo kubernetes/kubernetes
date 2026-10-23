@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/ktesting"
 	kubestats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (

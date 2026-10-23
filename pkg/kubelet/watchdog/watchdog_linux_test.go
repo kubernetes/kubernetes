@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 )
 
 // Some of these tests capture log output. Don't reduce the verbosity or they will fail!

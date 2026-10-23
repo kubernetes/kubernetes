@@ -44,7 +44,9 @@ func NewStorage(initialState *Model) *ModelStorage {
 }
 
 func (s *ModelStorage) Versioner() storage.Versioner {
-	panic("not implemented")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state.Versioner
 }
 
 func (s *ModelStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
@@ -63,9 +65,13 @@ func (s *ModelStorage) Delete(ctx context.Context, key string, out runtime.Objec
 		panic("not implemented")
 	}
 	return s.execute(Request{
-		Op:     OpDelete,
-		Key:    key,
-		Delete: DeleteRequest{Preconditions: preconditions},
+		Op:  OpDelete,
+		Key: key,
+		Delete: DeleteRequest{
+			Preconditions:        preconditions,
+			ValidateDeletion:     validateDeletion,
+			CachedExistingObject: cachedExistingObject,
+		},
 	}, out)
 }
 
@@ -98,6 +104,13 @@ func (s *ModelStorage) GetList(ctx context.Context, key string, opts storage.Lis
 	}, listObj)
 }
 
+func (s *ModelStorage) Compact(resourceVersion string) error {
+	return s.execute(Request{
+		Op:      OpCompact,
+		Compact: CompactRequest{ResourceVersion: resourceVersion},
+	}, nil)
+}
+
 func (s *ModelStorage) execute(req Request, out runtime.Object) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -106,7 +119,9 @@ func (s *ModelStorage) execute(req Request, out runtime.Object) error {
 	if resp.Err != nil {
 		return resp.Err
 	}
-	reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp.Object.DeepCopyObject()).Elem())
+	if out != nil {
+		reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp.Object.DeepCopyObject()).Elem())
+	}
 	return nil
 }
 
@@ -135,5 +150,7 @@ func (s *ModelStorage) EnableResourceSizeEstimation(storage.KeysFunc) error {
 }
 
 func (s *ModelStorage) CompactRevision() int64 {
-	panic("not implemented")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return int64(s.state.CompactResourceVersion)
 }

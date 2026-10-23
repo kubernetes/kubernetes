@@ -216,6 +216,18 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: subdomainNameError,
 		},
+		"system-node-critical priority": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+		},
 		"drop preemptionPolicy with PodGroupPreemptionPolicy disabled": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
@@ -1484,5 +1496,112 @@ func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
 				t.Errorf("new Workload changed (- want, + got): %s", diff)
 			}
 		})
+	}
+}
+
+func TestCompositePodGroupTemplatesEnablement(t *testing.T) {
+	var (
+		ctx = ctxWithRequestInfo()
+		w   = func() *scheduling.Workload {
+			w := workload.DeepCopy()
+			w.Spec.PodGroupTemplates = nil
+			w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+				{
+					Name: "cpg-template",
+					SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+						Gang: &scheduling.CompositeGangSchedulingPolicy{
+							MinGroupCount: 5,
+						},
+					},
+					CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+						{
+							Name: "child-cpg-template",
+							SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+								Gang: &scheduling.CompositeGangSchedulingPolicy{
+									MinGroupCount: 2,
+								},
+							},
+							PodGroupTemplates: []scheduling.PodGroupTemplate{
+								{
+									Name: "child-pg-template",
+									SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+										Gang: &scheduling.GangSchedulingPolicy{
+											MinCount: 3,
+										},
+									},
+								},
+							},
+						},
+					},
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
+						{
+							Name: "pg-template",
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			}
+			return w
+		}()
+	)
+
+	// Enable the CompositePodGroup feature gate during Workload creation.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	createdWorkload := w.DeepCopy()
+	Strategy.PrepareForCreate(ctx, createdWorkload)
+
+	errs := Strategy.Validate(ctx, createdWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, createdWorkload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, createdWorkload, nil))
+	if len(errs) != 0 {
+		t.Fatalf("create with CompositePodGroup enabled: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, createdWorkload.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("create with CompositePodGroup enabled: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
+	}
+
+	// Disable the CompositePodGroup feature gate and check that the CompositePodGroupTemplates field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, false)
+
+	updatedWorkload := createdWorkload.DeepCopy()
+	updatedWorkload.Labels = map[string]string{"foo": "bar"}
+	updatedWorkload.ResourceVersion = "2"
+	Strategy.PrepareForUpdate(ctx, updatedWorkload, createdWorkload)
+
+	errs = Strategy.ValidateUpdate(ctx, updatedWorkload, createdWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, updatedWorkload, createdWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, updatedWorkload, createdWorkload))
+	if len(errs) != 0 {
+		t.Fatalf("update with CompositePodGroup disabled: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, updatedWorkload.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("update with CompositePodGroup disabled: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
+	}
+
+	// Re-enable the CompositePodGroup feature gate to verify that the CompositePodGroupTemplates field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	updatedWorkload2 := updatedWorkload.DeepCopy()
+	updatedWorkload2.Labels = map[string]string{"foo": "baz"}
+	updatedWorkload2.ResourceVersion = "3"
+	Strategy.PrepareForUpdate(ctx, updatedWorkload2, updatedWorkload)
+
+	errs = Strategy.ValidateUpdate(ctx, updatedWorkload2, updatedWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, updatedWorkload2, updatedWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, updatedWorkload2, updatedWorkload))
+	if len(errs) != 0 {
+		t.Fatalf("update after re-enabling CompositePodGroup: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, updatedWorkload2.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("update after re-enabling CompositePodGroup: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
 	}
 }

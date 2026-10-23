@@ -1,0 +1,21 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+index d2f388d1fb4..7e6a3210b19 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+@@ -398,13 +398,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event
+ 	case curObjPasses && oldObjPasses:
+ 		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
+ 	case !curObjPasses && oldObjPasses:
+-		// return a delete event with the previous object content, but with the event's resource version
++		// BUG REVERT (#58545): deliberately omit stamping the event's resource version
++		// onto the deleted object, so the Deleted event carries the object's last
++		// create/update RV instead of the deletion RV.
+ 		oldObj := getMutableObject(event.PrevObject)
+-		// We know that if oldObj is cachingObject (which can only be set via
+-		// setCachingObjects), its resourceVersion is already set correctly and
+-		// we don't need to update it. However, since cachingObject efficiently
+-		// handles noop updates, we avoid this microoptimization here.
+-		updateResourceVersion(oldObj, c.versioner, event.ResourceVersion)
+ 		return &watch.Event{Type: watch.Deleted, Object: oldObj}
+ 	}
+ 

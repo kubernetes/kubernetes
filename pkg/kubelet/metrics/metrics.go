@@ -86,6 +86,7 @@ const (
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
+	DevicePluginDevicesKey            = "device_plugin_devices"
 	// Metrics keys of pod resources operations
 	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
 	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
@@ -585,6 +586,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource_name"},
+	)
+	// DevicePluginDevices is a Gauge that tracks the number of devices the device manager
+	// currently knows about, broken down by resource name and health state.
+	DevicePluginDevices = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DevicePluginDevicesKey,
+			Help:           "Number of devices currently known to the device manager. Broken down by resource name and health state.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource_name", "health_state"},
 	)
 
 	// PodResourcesEndpointRequestsTotalCount is a Counter that tracks the cumulative number of requests to the PodResource endpoints.
@@ -1481,6 +1493,7 @@ func Register() {
 		legacyregistry.MustRegister(Preemptions)
 		legacyregistry.MustRegister(DevicePluginRegistrationCount)
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
+		legacyregistry.MustRegister(DevicePluginDevices)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
 		legacyregistry.MustRegister(DesiredPodCount)

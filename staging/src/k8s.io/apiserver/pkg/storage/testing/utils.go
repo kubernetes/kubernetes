@@ -153,9 +153,17 @@ func testCheckEventType(t *testing.T, w watch.Interface, expectEventType watch.E
 	}
 }
 
-func testCheckResult(t *testing.T, w watch.Interface, expectEvent watch.Event) {
+func testCheckResult(t *testing.T, w watch.Interface, expectEvent *watch.Event) {
+	if expectEvent == nil {
+		select {
+		case res := <-w.ResultChan():
+			t.Errorf("Unexpected: %#v event received, expected no events", res)
+		case <-time.After(100 * time.Millisecond):
+		}
+		return
+	}
 	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
-		expectNoDiff(t, "incorrect event", expectEvent, actualEvent)
+		expectNoDiff(t, "incorrect event", *expectEvent, actualEvent)
 	})
 }
 
@@ -228,7 +236,7 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 
 func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
 	for _, expectedEvent := range expectedEvents {
-		testCheckResult(t, w, expectedEvent)
+		testCheckResult(t, w, &expectedEvent)
 	}
 }
 

@@ -45,7 +45,6 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/mount-utils"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -863,7 +862,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
-	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager)
+	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
@@ -2463,6 +2462,18 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// information about the container end states (including exit codes) - when
 	// SyncTerminatedPod is called the containers may already be removed.
 	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, true)
+	// Re-apply the caller's status override to the status generated after the
+	// containers have stopped: this is the update the status manager is
+	// allowed to publish as terminal, so the override must be part of it.
+	// The application before the kill above is still required. Some callers,
+	// such as the node shutdown manager, only set Failed when the status is
+	// not already Succeeded. If a container handles SIGTERM by exiting 0 the
+	// status generated here computes Succeeded, which such a callback leaves
+	// alone; the earlier application recorded Failed in the status manager
+	// cache, and the phase merge in generateAPIPodStatus preserves it.
+	if podStatusFn != nil {
+		podStatusFn(&apiPodStatus)
+	}
 	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
@@ -2999,18 +3010,17 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			if recordResizeOperations(oldPod, pod) {
-				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-				if updatedFromAllocation {
-					kl.allocationManager.PushPendingResize(logger, pod.UID)
-					// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
-					// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-					kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
-				} else {
-					// We can hit this case if a pending resize has been reverted,
-					// so we need to clear the pending resize condition.
-					kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-				}
+			recordResizeOperations(oldPod, pod)
+			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			if updatedFromAllocation {
+				kl.allocationManager.PushPendingResize(logger, pod.UID)
+				// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+				kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
+			} else {
+				// We can hit this case if a pending resize has been reverted,
+				// so we need to clear the pending resize condition.
+				kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 			}
 		}
 
@@ -3044,37 +3054,30 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 	}
 }
 
-// recordResizeOperations records if any of the pod level resources or
-// containers need to be resized, and returns true if so
-func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
+// recordResizeOperations records the resizes that an update of a pod requests.
+func recordResizeOperations(oldPod, newPod *v1.Pod) {
 	if oldPod == nil {
 		// This should never happen.
-		return true
+		return
 	}
 
-	hasContainerResize := recordContainerResizeOperations(oldPod, newPod)
-	hasPodLevelResourceResize := recordPodLevelResourceResizeOperations(oldPod, newPod)
-	hasVolumeResize := recordVolumeResizeOperations(oldPod, newPod)
-	return hasContainerResize || hasPodLevelResourceResize || hasVolumeResize
+	recordContainerResizeOperations(oldPod, newPod)
+	recordPodLevelResourceResizeOperations(oldPod, newPod)
+	recordVolumeResizeOperations(oldPod, newPod)
 }
 
-// recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
-// true if so
-func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) bool {
+// recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized.
+func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return false
+		return
 	}
 
 	// TODO(ndixita): add metrics for pod-level resources resize.
-
-	return !apiequality.Semantic.DeepEqual(oldPod.Spec.Resources, newPod.Spec.Resources)
 }
 
-// recordContainerResizeOperations records if any of the pod's containers needs to be resized, and returns
-// true if so
-func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
-	hasResize := false
-
+// recordContainerResizeOperations records the resizes that an update of a pod requests for its
+// containers.
+func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
 	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
 		if !allocation.IsResizableContainer(oldContainer, containerType) {
 			continue
@@ -3094,32 +3097,27 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 		oldResources := oldContainer.Resources
 
 		if op := resizeOperationForResources(newResources.Requests.Memory(), oldResources.Requests.Memory()); op != "" {
-			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("memory", "requests", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Limits.Memory(), oldResources.Limits.Memory()); op != "" {
-			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("memory", "limits", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Requests.Cpu(), oldResources.Requests.Cpu()); op != "" {
-			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "requests", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Limits.Cpu(), oldResources.Limits.Cpu()); op != "" {
-			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "limits", op).Inc()
 		}
 	}
-
-	return hasResize
 }
 
-// recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized, and returns true if so
-func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) bool {
+// recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized.
+func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
-		return false
+		return
 	}
-	return allocation.IsMemoryBackedVolumeResizeRequested(oldPod, newPod)
+
+	// TODO(natasha41575): Add metrics for volume resizes.
 }
 
 func resizeOperationForResources(new, old *resource.Quantity) string {

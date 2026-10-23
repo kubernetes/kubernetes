@@ -38,13 +38,14 @@ type Operation struct {
 
 // Request represents an input invocation to the storage interface.
 type Request struct {
-	Op     OpType
-	Key    string
-	Create CreateRequest
-	Get    GetRequest
-	List   ListRequest
-	Delete DeleteRequest
-	Update UpdateRequest
+	Op      OpType
+	Key     string
+	Create  CreateRequest
+	Get     GetRequest
+	List    ListRequest
+	Delete  DeleteRequest
+	Update  UpdateRequest
+	Compact CompactRequest
 }
 
 // CreateRequest contains parameters specific to Create operations.
@@ -64,7 +65,9 @@ type ListRequest struct {
 
 // DeleteRequest contains parameters specific to Delete operations.
 type DeleteRequest struct {
-	Preconditions *storage.Preconditions
+	Preconditions        *storage.Preconditions
+	ValidateDeletion     storage.ValidateObjectFunc
+	CachedExistingObject runtime.Object
 }
 
 // UpdateRequest contains parameters specific to Update / GuaranteedUpdate operations.
@@ -73,6 +76,11 @@ type UpdateRequest struct {
 	IgnoreNotFound       bool
 	Preconditions        *storage.Preconditions
 	CachedExistingObject runtime.Object
+}
+
+// CompactRequest contains parameters specific to Compact operations.
+type CompactRequest struct {
+	ResourceVersion string
 }
 
 // Describe formats the operation for debugging and visualization.
@@ -104,6 +112,9 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
 	}
+	if r.Op == OpCompact {
+		return fmt.Sprintf("%s(RV=%s) -> OK", r.Op, r.Compact.ResourceVersion)
+	}
 	if r.Op == OpList {
 		accessor, err := meta.ListAccessor(output.Object)
 		if err != nil {
@@ -132,6 +143,9 @@ func (r Request) Describe(output Response) string {
 		}
 		return fmt.Sprintf("%s(%s) -> Deleted", r.Op, r.Key)
 	case OpGet:
+		if r.Get.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s) -> RV: %s, UID: %s", r.Op, r.Key, r.Get.Options.ResourceVersion, accessor.GetResourceVersion(), accessor.GetUID())
+		}
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	case OpUpdate:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
@@ -144,11 +158,12 @@ func (r Request) Describe(output Response) string {
 type OpType string
 
 const (
-	OpCreate OpType = "Create"
-	OpDelete OpType = "Delete"
-	OpGet    OpType = "Get"
-	OpList   OpType = "List"
-	OpUpdate OpType = "Update"
+	OpCreate  OpType = "Create"
+	OpDelete  OpType = "Delete"
+	OpGet     OpType = "Get"
+	OpList    OpType = "List"
+	OpUpdate  OpType = "Update"
+	OpCompact OpType = "Compact"
 )
 
 // Response represents the output/result from the storage interface invocation.

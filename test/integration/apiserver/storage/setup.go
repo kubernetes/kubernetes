@@ -17,15 +17,16 @@ limitations under the License.
 package storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/options"
@@ -33,15 +34,38 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
+
+type prefixTransformer struct{}
+
+func (prefixTransformer) TransformToStorage(_ context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	if dataCtx == nil {
+		return nil, errors.New("missing value.Context in TransformToStorage")
+	}
+	prefix := append(append([]byte{}, dataCtx.AuthenticatedData()...), ':')
+	return append(prefix, data...), nil
+}
+
+func (prefixTransformer) TransformFromStorage(_ context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if dataCtx == nil {
+		return nil, false, errors.New("missing value.Context in TransformFromStorage")
+	}
+	expectedPrefix := append(append([]byte{}, dataCtx.AuthenticatedData()...), ':')
+	if !bytes.HasPrefix(data, expectedPrefix) {
+		return nil, false, fmt.Errorf("authenticated data mismatch: expected prefix %q", string(expectedPrefix))
+	}
+	return bytes.TrimPrefix(data, expectedPrefix), false, nil
+}
 
 func cacheKeyFunc(obj runtime.Object) (string, error) {
 	pod, ok := obj.(*api.Pod)
@@ -54,7 +78,7 @@ func cacheKeyFunc(obj runtime.Object) (string, error) {
 	return "/pods/" + pod.Namespace + "/" + pod.Name, nil
 }
 
-func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
+func newEtcdStorageForResource(t testutils.TB, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
 	t.Helper()
 
 	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options.NewEtcdOptions(etcdConfig))
@@ -70,44 +94,61 @@ func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, 
 	return resourceConfig
 }
 
-func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Interface, string) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
-	etcdURL, stop, err := framework.RunCustomEtcd(klog.FromContext(t.Context()), "storage_correctness_etcd", nil)
+func setupStore(tCtx ktesting.TContext, transformer value.Transformer) (storage.Interface, string) {
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	etcdURL, stop, err := framework.RunCustomEtcd(tCtx.Logger(), "storage_correctness_etcd", nil)
 	if err != nil {
-		t.Fatalf("failed to start dedicated etcd: %v", err)
+		tCtx.Fatalf("failed to start dedicated etcd: %v", err)
 	}
-	t.Cleanup(stop)
+	tCtx.Cleanup(stop)
 
 	etcdConfig := storagebackend.NewDefaultConfig("registry", nil)
 	etcdConfig.Transport.ServerList = []string{etcdURL}
+	if transformer != nil {
+		etcdConfig.Transformer = transformer
+	}
 
-	storageConfig := newEtcdStorageForResource(t, etcdConfig, schema.GroupResource{Resource: "pods"})
-	storageConfig.EventsHistoryWindow = cacher.DefaultEventFreshDuration
-
-	store, destroyFunc, err := decorator(
+	storageConfig := newEtcdStorageForResource(tCtx, etcdConfig, schema.GroupResource{Resource: "pods"})
+	store, destroyFunc, err := generic.NewRawStorage(
 		storageConfig,
-		"/pods",
-		cacheKeyFunc,
-		nil,
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
-		registrypod.GetAttrs,
-		map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
-		registrypod.Indexers(),
+		nil,
+		"/pods",
 	)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		tCtx.Fatalf("failed to create storage: %v", err)
 	}
-	t.Cleanup(destroyFunc)
-
-	if rc, ok := store.(interface{ ReadinessCheck() error }); ok {
-		err := wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-			return rc.ReadinessCheck() == nil, nil
-		})
-		if err != nil {
-			t.Fatalf("storage failed to become ready: %v", err)
-		}
-	}
+	tCtx.Cleanup(destroyFunc)
 
 	return store, "/" + etcdConfig.Prefix
+}
+
+func setupCacher(tCtx ktesting.TContext, s storage.Interface) storage.Interface {
+	storageConfig := newEtcdStorageForResource(tCtx, storagebackend.NewDefaultConfig("registry", nil), schema.GroupResource{Resource: "pods"})
+	cacherConfig := cacher.Config{
+		Storage:             s,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       storageConfig.GroupResource,
+		EventsHistoryWindow: cacher.DefaultEventFreshDuration,
+		ResourcePrefix:      "/pods",
+		KeyFunc:             cacheKeyFunc,
+		NewFunc:             func() runtime.Object { return &api.Pod{} },
+		NewListFunc:         func() runtime.Object { return &api.PodList{} },
+		GetAttrsFunc:        registrypod.GetAttrs,
+		IndexerFuncs:        map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
+		Indexers:            registrypod.Indexers(),
+		Codec:               storageConfig.Codec,
+	}
+	c, err := cacher.NewCacherFromConfig(cacherConfig)
+	if err != nil {
+		tCtx.Fatalf("failed to create cacher: %v", err)
+	}
+	delegator := cacher.NewCacheDelegator(c, s)
+	tCtx.Cleanup(func() {
+		delegator.Stop()
+		c.Stop()
+	})
+	tCtx.Eventually(delegator.ReadinessCheck).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.Succeed(), "storage ready")
+	return delegator
 }

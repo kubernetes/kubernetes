@@ -1,0 +1,24 @@
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: pg-{{.Index}}
+spec:
+  parentCompositePodGroupName: cpg-l{{.parentLevel}}-{{DivideInt .Index .childrenPodGroupsPerCPG}}
+  workloadRef:
+    workloadName: cpg-workload
+    templateName: pg-template
+  {{- with .priority }}
+  priority: {{ . }}
+  {{- end }}
+  schedulingPolicy:
+  {{- if .minCount }}
+    gang:
+      minCount: {{.minCount}}
+  {{- else }}
+    basic: {}
+  {{- end }}
+  {{- with .topologyKey }}
+  schedulingConstraints:
+    topology:
+    - key: {{ . }}
+  {{- end }}

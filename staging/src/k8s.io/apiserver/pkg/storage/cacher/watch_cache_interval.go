@@ -81,16 +81,11 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-type intervalStore interface {
-	GetByKey(key string) (item interface{}, exists bool, err error)
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
-}
-
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, s intervalStore, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, s store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	var err error
@@ -127,11 +122,13 @@ func newCacheIntervalFromStore(resourceVersion uint64, s intervalStore, key stri
 
 // newCacheIntervalFromLazySnapshot captures a snapshot under the watch cache
 // lock and traverses it incrementally after the lock is released.
-func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
+func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, key string, recursive bool) *watchCacheInterval {
 	return &watchCacheInterval{
 		source: &lazySnapshotCacheIntervalSource{
 			snapshot:        snap,
 			resourceVersion: resourceVersion,
+			key:             key,
+			recursive:       recursive,
 		},
 		resourceVersion: resourceVersion,
 	}
@@ -291,18 +288,41 @@ type lazySnapshotCacheIntervalSource struct {
 	snapshot store.Snapshot
 	// resourceVersion is assigned to every watchCacheEvent produced by this source.
 	resourceVersion uint64
+	key             string
+	recursive       bool
 }
 
 func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
 	return func(yield func(*watchCacheEvent, error) bool) {
-		for elem, err := range s.snapshot.RangePrefix("", "").All() {
-			if err != nil {
-				yield(nil, err)
-				return
+		// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix.
+		// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
+		if s.recursive {
+			for elem, err := range s.snapshot.RangePrefix(s.key, "").All() {
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+					return
+				}
 			}
-			if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
-				return
-			}
+			return
+		}
+		// Non-recursive expects key to be an exact match.
+		obj, exists, err := s.snapshot.GetByKey(s.key)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		if !exists {
+			return
+		}
+		elem, ok := obj.(*store.Element)
+		if !ok {
+			return
+		}
+		if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+			return
 		}
 	}
 }

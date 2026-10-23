@@ -1242,8 +1242,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
 				utilruntime.HandleError(err)
-			}
-			if podutil.IsPodReady(pod) {
+			} else if podutil.IsPodReady(pod) {
 				atomic.AddInt32(&deletedReady, 1)
 			}
 		}(pods[i])
@@ -1295,10 +1294,11 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 					return
 				}
 			}
-			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil {
+			err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job)
+			if err != nil {
 				failDelete(pod, err)
 			}
-			if podutil.IsPodReady(pod) {
+			if podutil.IsPodReady(pod) && (err == nil || apierrors.IsNotFound(err)) {
 				atomic.AddInt32(&deletedReady, 1)
 			}
 		}(pods[i])
@@ -1935,8 +1935,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 							// this error since all subsequent creations will fail.
 							return
 						}
-					}
-					if err != nil {
+
 						defer utilruntime.HandleError(err)
 						// Decrement the expected number of creates because the informer won't observe this pod
 						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
@@ -1944,8 +1943,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						atomic.AddInt32(&active, -1)
 						errCh <- err
 						atomic.AddInt32(&creationsFailed, 1)
+					} else {
+						atomic.AddInt32(&creationsSucceeded, 1)
 					}
-					atomic.AddInt32(&creationsSucceeded, 1)
 				}()
 			}
 			wait.Wait()

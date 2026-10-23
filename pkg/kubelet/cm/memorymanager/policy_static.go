@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -437,6 +438,11 @@ func memoryBlocksToString(blocks []state.Block) string {
 	return "[" + repr + "]"
 }
 
+// CanAllocateExclusively reports whether the policy supports exclusive memory assignment.
+func (p *staticPolicy) CanAllocateExclusively() bool {
+	return true
+}
+
 // Allocate call is idempotent
 func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	// allocate the memory only for guaranteed pods
@@ -689,7 +695,11 @@ func (p *staticPolicy) releaseMemory(s state.State, blocks []state.Block) {
 	s.SetMachineState(machineState)
 }
 
-func regenerateHints(logger klog.Logger, pod *v1.Pod, blocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+// regenerateHints rebuilds the hints for a container that already holds an
+// allocation, which happens after a kubelet restart. The affinity comes from the
+// stored blocks, but the Score describes the node and so is read off the machine
+// state exactly as calculateHints does.
+func regenerateHints(logger klog.Logger, machineState state.NUMANodeMap, pod *v1.Pod, blocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
 	hints := map[string][]topologymanager.TopologyHint{}
 	for resourceName := range reqRsrc {
 		hints[string(resourceName)] = []topologymanager.TopologyHint{}
@@ -700,7 +710,11 @@ func regenerateHints(logger klog.Logger, pod *v1.Pod, blocks []state.Block, reqR
 		return nil
 	}
 
-	for _, b := range blocks {
+	// Validate every block before building any hint. One bad block discards the
+	// whole result, so scoring an earlier block first would be wasted work, and
+	// it would log a regenerated hint for an allocation we go on to reject.
+	numaAffinities := make([]bitmask.BitMask, len(blocks))
+	for i, b := range blocks {
 		if _, ok := reqRsrc[b.Type]; !ok {
 			logger.Info("Requested resources do not include the allocated memory block type", "type", b.Type)
 			return nil
@@ -716,11 +730,24 @@ func regenerateHints(logger klog.Logger, pod *v1.Pod, blocks []state.Block, reqR
 			logger.Error(err, "Failed to generate NUMA bitmask", "type", b.Type)
 			return nil
 		}
+		numaAffinities[i] = numaAffinity
+	}
 
+	for i, b := range blocks {
 		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID)
+		// The container's own blocks are reserved in the machine state already,
+		// so they count as assigned here. A hint spanning several NUMA nodes
+		// scores the span as a whole.
+		var allocatable, free int64
+		for _, nodeID := range b.NUMAAffinity {
+			allocatable += int64(machineState[nodeID].MemoryMap[b.Type].Allocatable)
+			free += int64(machineState[nodeID].MemoryMap[b.Type].Free)
+		}
+		assigned := allocatable - free
 		hints[string(b.Type)] = append(hints[string(b.Type)], topologymanager.TopologyHint{
-			NUMANodeAffinity: numaAffinity,
+			NUMANodeAffinity: numaAffinities[i],
 			Preferred:        true,
+			Score:            topologymanager.UtilizationScore(allocatable, assigned),
 		})
 	}
 	return hints
@@ -788,7 +815,17 @@ func getPodRequestedResources(logger klog.Logger, pod *v1.Pod) (map[v1.ResourceN
 	}
 
 	reqRsrcs := make(map[v1.ResourceName]uint64)
+	resourceNames := sets.New[v1.ResourceName]()
 	for rsrcName := range reqRsrcsByAppCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range reqRsrcsByRestartableInitCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range reqRsrcsByInitCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range resourceNames {
 		// Total resources requested by long-running containers.
 		reqRsrcsByLongRunningCtrs := reqRsrcsByAppCtrs[rsrcName] + reqRsrcsByRestartableInitCtrs[rsrcName]
 		reqRsrcs[rsrcName] = reqRsrcsByLongRunningCtrs
@@ -848,7 +885,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		podBlocks := s.GetPodMemoryBlocks(string(pod.UID))
 		if podBlocks != nil {
-			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "pod"), pod, podBlocks, reqRsrcs)
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "pod"), s.GetMachineState(), pod, podBlocks, reqRsrcs)
 		}
 	}
 
@@ -863,7 +900,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 				logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", ctn.Name)
 				return nil
 			}
-			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), pod, containerBlocks, containerRequestedResources)
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), s.GetMachineState(), pod, containerBlocks, containerRequestedResources)
 		}
 	}
 
@@ -906,7 +943,7 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	// memory allocated for the container. This might happen after a
 	// kubelet restart, for example.
 	if containerBlocks != nil {
-		return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", container.Name), pod, containerBlocks, requestedResources)
+		return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", container.Name), s.GetMachineState(), pod, containerBlocks, requestedResources)
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
@@ -1013,9 +1050,22 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 			if _, ok := hints[string(resourceName)]; !ok {
 				hints[string(resourceName)] = []topologymanager.TopologyHint{}
 			}
+			// Score is a snapshot of node state, so memory this pod's init
+			// containers still hold counts as assigned even though the app
+			// containers will reuse it: it is Reserved, not Free. The
+			// getPodReusableMemory() call above decides whether the request
+			// fits on this mask; it does not change how full the mask is.
+			//
+			// Convert before subtracting: a free total larger than the
+			// allocatable one means the accounting is already wrong, and in
+			// uint64 that underflows into a plausible looking score.
+			allocatable := int64(totalAllocatableSize[resourceName])
+			free := int64(totalFreeSize[resourceName])
+			assigned := allocatable - free
 			hints[string(resourceName)] = append(hints[string(resourceName)], topologymanager.TopologyHint{
 				NUMANodeAffinity: mask,
 				Preferred:        false,
+				Score:            topologymanager.UtilizationScore(allocatable, assigned),
 			})
 		}
 	})

@@ -297,6 +297,17 @@ func TestAccept(t *testing.T) {
 			method:        "POST",
 			expectAccept:  true,
 		},
+		{
+			name:          "test25",
+			acceptPaths:   DefaultPathAcceptRE,
+			rejectPaths:   DefaultPathRejectRE,
+			acceptHosts:   DefaultHostAcceptRE,
+			rejectMethods: DefaultMethodRejectRE,
+			path:          "/api/v1/nodes/somenode/proxy/run/somenamespace/somepod/somecontainer?cmd=id",
+			host:          "localhost",
+			method:        "POST",
+			expectAccept:  false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

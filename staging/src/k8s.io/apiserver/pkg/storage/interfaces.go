@@ -269,6 +269,7 @@ type Interface interface {
 	// https://github.com/kubernetes/kubernetes/blob/9325a57125e8502941d1b0c7379c4bb80a678d5c/vendor/go.etcd.io/etcd/client/v3/watch.go#L1037-L1042
 	//
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
+	//
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
 

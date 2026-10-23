@@ -50,7 +50,7 @@ type PolicyRule struct {
 	// verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
 	// +listType=atomic
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
@@ -116,7 +116,6 @@ type RoleRef struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
 type Role struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -126,7 +125,7 @@ type Role struct {
 	// rules holds all the PolicyRules for this Role
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
@@ -136,7 +135,6 @@ type Role struct {
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleBinding, and will no longer be served in v1.22.
 type RoleBinding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -159,7 +157,6 @@ type RoleBinding struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleBindingList is a collection of RoleBindings
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleBindingList, and will no longer be served in v1.22.
 type RoleBindingList struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -173,7 +170,6 @@ type RoleBindingList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleList is a collection of Roles.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleList, and will no longer be served in v1.22.
 type RoleList struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -189,7 +185,6 @@ type RoleList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRole, and will no longer be served in v1.22.
 type ClusterRole struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -199,7 +194,7 @@ type ClusterRole struct {
 	// rules holds all the PolicyRules for this ClusterRole
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 
 	// aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
@@ -224,7 +219,6 @@ type AggregationRule struct {
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBinding, and will no longer be served in v1.22.
 type ClusterRoleBinding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -247,7 +241,6 @@ type ClusterRoleBinding struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBindings, and will no longer be served in v1.22.
 type ClusterRoleBindingList struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -261,7 +254,6 @@ type ClusterRoleBindingList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRoleList is a collection of ClusterRoles.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoles, and will no longer be served in v1.22.
 type ClusterRoleList struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.

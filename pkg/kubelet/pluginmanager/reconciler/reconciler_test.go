@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/ktesting"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (

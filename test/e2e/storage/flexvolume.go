@@ -18,14 +18,16 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
-
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,14 +42,11 @@ import (
 )
 
 const (
-	driverDir              = "test/e2e/testing-manifests/flexvolume/"
-	defaultVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
-	// TODO: change this and config-test.sh when default flex volume install path is changed for GCI
-	// On gci, root is read-only and controller-manager containerized. Assume
-	// controller-manager has started with --flex-volume-plugin-dir equal to this
-	// (see cluster/gce/config-test.sh)
-	gciVolumePluginDir = "/home/kubernetes/flexvolume"
-	detachTimeout      = 10 * time.Second
+	driverDir = "test/e2e/testing-manifests/flexvolume/"
+	// kube-controller-manager's default for --flex-volume-plugin-dir.
+	defaultVolumePluginDir  = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
+	flexVolumePluginDirFlag = "--flex-volume-plugin-dir="
+	detachTimeout           = 10 * time.Second
 )
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
@@ -72,7 +71,7 @@ func testFlexVolume(ctx context.Context, driver string, config e2evolume.TestCon
 // kubelet if 'restart' is true. If node is nil, installs on the master, and restarts
 // controller-manager if 'restart' is true.
 func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver, filePath string) {
-	flexDir := getFlexDir(c, node, vendor, driver)
+	flexDir := getFlexDir(ctx, c, node, vendor, driver)
 	flexFile := path.Join(flexDir, driver)
 
 	host := ""
@@ -105,7 +104,7 @@ func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vend
 }
 
 func uninstallFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver string) {
-	flexDir := getFlexDir(c, node, vendor, driver)
+	flexDir := getFlexDir(ctx, c, node, vendor, driver)
 
 	host := ""
 	var err error
@@ -128,13 +127,64 @@ func uninstallFlex(ctx context.Context, c clientset.Interface, node *v1.Node, ve
 	sshAndLog(ctx, cmd, host, false /*failOnError*/)
 }
 
-func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
-	volumePluginDir := defaultVolumePluginDir
-	if framework.ProviderIs("gce") {
-		volumePluginDir = gciVolumePluginDir
+// getFlexDir returns the flexvolume install dir used by the node's kubelet, or by
+// kube-controller-manager if node is nil. Skips the test if it cannot be determined.
+func getFlexDir(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver string) string {
+	var volumePluginDir string
+	var err error
+	if node != nil {
+		volumePluginDir, err = kubeletVolumePluginDir(ctx, c, node.Name)
+	} else {
+		volumePluginDir, err = controllerManagerVolumePluginDir(ctx, c)
 	}
-	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
-	return flexDir
+	if err != nil {
+		e2eskipper.Skipf("Unable to determine flexvolume plugin dir: %v", err)
+	}
+	return path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
+}
+
+func kubeletVolumePluginDir(ctx context.Context, c clientset.Interface, nodeName string) (string, error) {
+	raw, err := c.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz").DoRaw(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading kubelet configz from node %s: %w", nodeName, err)
+	}
+	var configz struct {
+		KubeletConfig struct {
+			VolumePluginDir string `json:"volumePluginDir"`
+		} `json:"kubeletconfig"`
+	}
+	if err := json.Unmarshal(raw, &configz); err != nil {
+		return "", fmt.Errorf("decoding kubelet configz from node %s: %w", nodeName, err)
+	}
+	if configz.KubeletConfig.VolumePluginDir == "" {
+		return "", fmt.Errorf("kubelet configz from node %s has no volumePluginDir", nodeName)
+	}
+	return configz.KubeletConfig.VolumePluginDir, nil
+}
+
+// controllerManagerVolumePluginDir reads --flex-volume-plugin-dir from the kube-controller-manager pod spec.
+func controllerManagerVolumePluginDir(ctx context.Context, c clientset.Interface) (string, error) {
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing %s pods: %w", metav1.NamespaceSystem, err)
+	}
+	for _, pod := range pods.Items {
+		if !strings.HasPrefix(pod.Name, "kube-controller-manager") {
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			// Flags may be embedded in a single shell command string, so scan each field by token.
+			for _, arg := range append(container.Command, container.Args...) {
+				for token := range strings.FieldsSeq(arg) {
+					if dir, ok := strings.CutPrefix(token, flexVolumePluginDirFlag); ok {
+						return strings.Trim(dir, `"'`), nil
+					}
+				}
+			}
+		}
+		return defaultVolumePluginDir, nil
+	}
+	return "", fmt.Errorf("no kube-controller-manager pod found in %s", metav1.NamespaceSystem)
 }
 
 func sshAndLog(ctx context.Context, cmd, host string, failOnError bool) {
@@ -157,7 +207,7 @@ func getHostFromHostPort(hostPort string) string {
 	return host
 }
 
-var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"), func() {
+var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

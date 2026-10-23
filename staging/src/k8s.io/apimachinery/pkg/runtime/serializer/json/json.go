@@ -34,6 +34,7 @@ import (
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
 // is not nil, the object has the group, version, and kind fields set.
+//
 // Deprecated: use NewSerializerWithOptions instead.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
 	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false, false})
@@ -42,6 +43,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
+//
 // Deprecated: use NewSerializerWithOptions instead.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
 	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false, false})

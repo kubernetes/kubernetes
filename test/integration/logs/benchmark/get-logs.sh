@@ -26,14 +26,14 @@ set -x
 cd "$(dirname "$0")"
 
 latest_job () {
-    gsutil cat gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/latest-build.txt
+    gcloud storage cat gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/latest-build.txt
 }
 
 job=${1:-$(latest_job)}
 
 rm -rf ci-kubernetes-kind-e2e-json-logging
 mkdir ci-kubernetes-kind-e2e-json-logging
-gsutil -m cp -R "gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/${job}/*" ci-kubernetes-kind-e2e-json-logging/
+gcloud storage cp -r "gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/${job}/*" ci-kubernetes-kind-e2e-json-logging/
 
 for i in kube-apiserver kube-controller-manager kube-scheduler; do
     # Before (container runtime log dump (?)):

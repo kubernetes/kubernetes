@@ -54,10 +54,22 @@ linters:
     # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
 
+      # hack/testdata/golangci-lint contains test cases which intentionally
+      # trigger linter issues. Ignored during normal linting, checked during
+      # `go test ./test/integration/golangci-lint`.
+      - path: hack/testdata/golangci-lint/
+        text: .
+
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
       - linters:
           - gocritic
         text: "ifElseChain: rewrite if-else to switch statement"
+
+      # The CRD "deprecated" field documents itself; gocritic reads "deprecated in..." as a malformed notice.
+      - linters:
+          - gocritic
+        text: "deprecatedComment:"
+        source: "// deprecated indicates this version of the custom resource API is deprecated"
 
       # Only packages listed here opt into the strict "exported symbols must be documented".
       #
@@ -79,6 +91,19 @@ linters:
           - forbidigo
         text: should not use Add, use AddVersioned instead
         path: _test.go$
+
+      # Tests can and have to use testing.T.
+      #
+      # Test helper packages like ktesting are also exempt:
+      # this is rather broad because there are several normal
+      # packages which implement tests via t.Run. We need to
+      # be careful here to not exclude the top-level test directory
+      # because test helper code should not depend on testing.T
+      # unnecessarily (limits usability).
+      - linters:
+          - forbidigo
+        text: should not depend on the testing package
+        path: /([^/]*testing|[^/]*test|test[^/]*)/|test/declarative_validation/|_test.go$
 
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
@@ -118,6 +143,13 @@ linters:
         linters:
           - gocritic
 
+      - linters:
+          - govet
+        # This could be fixed automatically via `go fix`, but isn't worth a tree-wide PR.
+        # The check remains enabled for other future inline opportunities where that decision
+        # might turn out differently.
+        text: "Call of \\(resource.Quantity\\).DeepCopy should be inlined"
+
       # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
 
       - linters:
@@ -150,7 +182,7 @@ linters:
         path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
 
   default: {{if .Base -}} none {{- else -}} standard {{- end}}
-  enable: # please keep this alphabetized
+  enable: # Please keep this alphabetized. Add positive and (where appropriate) negative test cases to hack/testdata/golangci-lint/golangcilint.go
     - depguard
     - forbidigo
     - ginkgolinter
@@ -204,18 +236,30 @@ linters:
           deny:
             - pkg: "k8s.io/utils/pointer"
               desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
-        go-cmp:
+        test-only-dependencies:
           files:
+            # Apply deny list to all files except for _test.go files.
             - $all
             - "!$test"
+            # Some normal packages are meant to be used only in tests and thus
+            # are also exempt.
             - "!**/test/**"
-            - "!**/testing/**"
-            - "!**/apitesting/**"
+            - "!**/*testing/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
             - pkg: "html/template"
               desc: "template is allowed only in test files as it disables dead code elimination"
+            - pkg: "k8s.io/ktesting"
+              desc: "ktesting is allowed only in test files"
+            - pkg: "k8s.io/client-go/ktesting"
+              desc: "ktesting is allowed only in test files"
+            # Normal packages exempted above also must not be used in production code.
+            # depguard wants a prefix here, so we would need to list packages explicitly
+            # instead of using wildcards as above.
+            #
+            # This only covers one level of indirection, though.
+            # A better solution might be transitive deny (https://github.com/OpenPeeDeeP/depguard/issues/68).
     forbidigo:
       analyze-types: true
       forbid:
@@ -238,6 +282,11 @@ linters:
           pkg: ^github\.com/onsi/ginkgo/v2$
           msg: usage is restricted to code under control of SIG Testing
           # Exceptions are listed above under rules.
+        - pattern: \.(T|TB)$
+          pkg: ^testing$
+          msg: Production code should not depend on the testing package. Helper packages should be more flexible and support other implementations like ktesting.TContext. Replace with a locally-defined interface or some pre-defined one like test/utils.TB or ktesting.TB. Choose based on the context and which dependencies are acceptable.
+          # Exceptions are listed above under rules.
+          # testing.B is not checked because there are some (rare) valid usages and it's less common anyway, so we don't need to enforce anything.
       {{- if .Hints}}
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
@@ -256,7 +305,6 @@ linters:
         - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
         - captLocal
         - commentFormatting
-        - deprecatedComment
         - elseif
         # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
         - exitAfterDefer
@@ -364,7 +412,7 @@ linters:
         # Replace context.WithCancel with t.Context in tests.
         #
         # Disabled because in Kubernetes,
-        # test/utils/ktesting handles
+        # k8s.io/ktesting handles
         # context cancellation and also
         # addresses other pain points.
         - testingcontext

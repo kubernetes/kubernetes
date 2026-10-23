@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 // testInformer is a minimal fake informer for unit tests.

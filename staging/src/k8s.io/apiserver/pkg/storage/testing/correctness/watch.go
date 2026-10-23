@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +55,9 @@ func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchRespon
 		return nil
 	}
 	if response.Err != nil {
+		if apierrors.IsTooManyRequests(response.Err) {
+			return nil
+		}
 		return fmt.Errorf("watch %+v: unexpected error: %w", request, response.Err)
 	}
 	events := response.Events
@@ -164,8 +168,12 @@ func validateMaybeLastEventError(events []watch.Event) error {
 		if ev.Type != watch.Error {
 			continue
 		}
-		if _, ok := ev.Object.(*metav1.Status); !ok {
+		status, ok := ev.Object.(*metav1.Status)
+		if !ok {
 			return fmt.Errorf("expected *metav1.Status in watch.Error event, got %T", ev.Object)
+		}
+		if status.Status != metav1.StatusFailure {
+			return fmt.Errorf("expected watch.Error status %q, got %q", metav1.StatusFailure, status.Status)
 		}
 		if i != len(events)-1 {
 			return fmt.Errorf("watch.Error at index %d is not the last event (total %d)", i, len(events))
@@ -218,6 +226,7 @@ func (v WatchValidator) compareEvents(expected, got []watch.Event) error {
 
 func (v WatchValidator) validateBookmarks(events []watch.Event) error {
 	lastBookmarkRV := uint64(0)
+	lastEventRV := uint64(0)
 	initialEventBookmarkFound := false
 	for _, ev := range events {
 		if ev.Type == watch.Error {
@@ -230,6 +239,9 @@ func (v WatchValidator) validateBookmarks(events []watch.Event) error {
 		if ev.Type == watch.Bookmark {
 			if rv < lastBookmarkRV {
 				return fmt.Errorf("bookmark revision %d is not greater than last bookmark revision %d", rv, lastBookmarkRV)
+			}
+			if rv < lastEventRV {
+				return fmt.Errorf("bookmark revision %d is less than last event revision %d", rv, lastEventRV)
 			}
 			lastBookmarkRV = rv
 			initialEventsEnd, err := storage.HasInitialEventsEndBookmarkAnnotation(ev.Object)
@@ -246,6 +258,9 @@ func (v WatchValidator) validateBookmarks(events []watch.Event) error {
 		}
 		if rv <= lastBookmarkRV {
 			return fmt.Errorf("event revision %d is not greater than last bookmark revision %d", rv, lastBookmarkRV)
+		}
+		if rv > lastEventRV {
+			lastEventRV = rv
 		}
 	}
 	return nil

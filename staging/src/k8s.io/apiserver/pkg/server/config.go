@@ -66,6 +66,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/loadmetrics"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/routine"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
@@ -281,6 +282,9 @@ type Config struct {
 	// in the storage per resource, so we can estimate width of incoming requests.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 
+	// LoadReporter samples process CPU utilization and request rate for ORCA endpoint load metrics.
+	LoadReporter *loadmetrics.Reporter
+
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
 	// for non longrunning requests in flight to be drained and then initiate a
@@ -400,6 +404,15 @@ type AuthorizationInfo struct {
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
+
+// DefaultMaxPooledEncodeBufferSize is the largest encode buffer capacity, in
+// bytes, retained by the process-wide protobuf serialization pool
+// (runtime.AllocatorPool) when the AllocatorPoolBufferCap feature gate is
+// enabled: large enough to keep pooling typical single-object and
+// streamed-list item responses, small enough that a burst of near-limit
+// objects (the etcd object limit is 1.5MiB) cannot pin many megabytes of
+// encode buffers for the life of the process.
+const DefaultMaxPooledEncodeBufferSize = 256 * 1024
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
@@ -788,6 +801,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
+	// The encode buffer pool is process-wide; every server in a delegation
+	// chain shares the same gate, so applying it per server is idempotent.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllocatorPoolBufferCap) {
+		runtime.SetMaxPooledBufferCapacity(DefaultMaxPooledEncodeBufferSize)
+	}
 	allowedMediaTypes := defaultAllowedMediaTypes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
 		allowedMediaTypes = append(allowedMediaTypes, runtime.ContentTypeCBOR)
@@ -992,6 +1010,18 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
+	if c.LoadReporter != nil {
+		const endpointLoadMetricsHookName = "endpoint-load-metrics-reporter"
+		if !s.isPostStartHookRegistered(endpointLoadMetricsHookName) {
+			if err := s.AddPostStartHook(endpointLoadMetricsHookName, func(hookContext PostStartHookContext) error {
+				go c.LoadReporter.Run(hookContext.Done())
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
 		skip := false
 		for _, existingCheck := range c.HealthzChecks {
@@ -1109,6 +1139,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
+	if c.LoadReporter != nil {
+		handler = loadmetrics.WithEndpointLoadMetrics(handler, c.LoadReporter)
+	}
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithAuditInit(handler)

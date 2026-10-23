@@ -43,7 +43,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -56,10 +59,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -371,6 +373,63 @@ func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) error {
 		return err
 	}
 	return m.Stop(logger)
+}
+
+func TestGetCapacityDevicePluginDevicesMetric(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
+	testManager, err := newManagerImpl(logger, socketName, nil, topologymanager.NewFakeManager(logger))
+	require.NoError(t, err)
+	require.NotNil(t, testManager)
+
+	metrics.Register()
+	metrics.DevicePluginDevices.Reset()
+	t.Cleanup(metrics.DevicePluginDevices.Reset)
+
+	const metricName = metrics.KubeletSubsystem + "_" + metrics.DevicePluginDevicesKey
+	const header = `# HELP kubelet_device_plugin_devices [ALPHA] Number of devices currently known to the device manager. Broken down by resource name and health state.
+# TYPE kubelet_device_plugin_devices gauge
+`
+
+	resourceName := "domain1.com/resource1"
+	e := &endpointImpl{}
+	testManager.endpoints[resourceName] = endpointInfo{e: e, opts: nil}
+
+	// Two healthy devices and one unhealthy one are reported as two series.
+	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Healthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	})
+	testManager.GetCapacity(logger)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(header+
+		`kubelet_device_plugin_devices{health_state="healthy",resource_name="domain1.com/resource1"} 2
+kubelet_device_plugin_devices{health_state="unhealthy",resource_name="domain1.com/resource1"} 1
+`), metricName))
+
+	// A healthy device turning unhealthy moves between the two series without
+	// changing the node's capacity, which is what makes this metric worth having.
+	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Unhealthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	})
+	testManager.GetCapacity(logger)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(header+
+		`kubelet_device_plugin_devices{health_state="healthy",resource_name="domain1.com/resource1"} 1
+kubelet_device_plugin_devices{health_state="unhealthy",resource_name="domain1.com/resource1"} 2
+`), metricName))
+
+	// Once the endpoint's grace period expires the resource is garbage collected,
+	// and its series must go with it rather than reporting the last counts forever.
+	e.setStopTime(time.Now().Add(-1*endpointStopGracePeriod - 10*time.Second))
+	_, _, removed := testManager.GetCapacity(logger)
+	require.Equal(t, []string{resourceName}, removed)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(""), metricName))
 }
 
 func TestUpdateCapacityAllocatable(t *testing.T) {

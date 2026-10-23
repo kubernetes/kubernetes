@@ -7,7 +7,7 @@
 package attrnorm
 
 import (
-	"slices"
+	"reflect"
 	"strings"
 	"unicode/utf8"
 
@@ -26,43 +26,24 @@ func Truncate(limit int, attr attribute.KeyValue) attribute.KeyValue {
 	if limit < 0 {
 		return attr
 	}
+
+	// Keep scalar cases in this wrapper. Routing them through the recursive,
+	// multi-result transform adds measurable overhead to the dominant simple
+	// attribute path.
 	switch attr.Value.Type() {
 	case attribute.STRING:
-		v := attr.Value.AsString()
-		return attr.Key.String(truncate(limit, v))
-	case attribute.STRINGSLICE:
-		v := attr.Value.AsStringSlice()
-		for i := range v {
-			v[i] = truncate(limit, v[i])
-		}
-		return attr.Key.StringSlice(v)
+		attr.Value = attribute.StringValue(truncate(limit, attr.Value.AsString()))
 	case attribute.BYTESLICE:
-		v := attr.Value.AsString()
-		if len(v) > limit {
-			return attr.Key.ByteSlice([]byte(v[:limit]))
+		s := attr.Value.AsString()
+		if len(s) > limit {
+			attr.Value = attribute.ByteSliceValue([]byte(s[:limit]))
 		}
-		return attr
+	case attribute.STRINGSLICE:
+		attr.Value, _ = truncateStringSliceValue(limit, attr.Value)
 	case attribute.SLICE:
-		v := attr.Value.AsSlice()
-		if !slices.ContainsFunc(v, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
-			return attr
-		}
-		newV := make([]attribute.Value, len(v))
-		for i, elem := range v {
-			newV[i] = TruncateValue(limit, elem)
-		}
-		return attr.Key.Slice(newV...)
+		attr.Value, _ = truncateSliceValue(limit, attr.Value)
 	case attribute.MAP:
-		v := attr.Value.AsMap()
-		if !slices.ContainsFunc(v, func(kv attribute.KeyValue) bool { return needsTruncation(limit, kv.Value) }) {
-			return attr
-		}
-		newV := make([]attribute.KeyValue, len(v))
-		for i, elem := range v {
-			elem.Value = TruncateValue(limit, elem.Value)
-			newV[i] = elem
-		}
-		return attr.Key.Map(newV...)
+		attr.Value, _ = truncateMapValue(limit, attr.Value)
 	}
 	return attr
 }
@@ -76,84 +57,274 @@ func TruncateValue(limit int, v attribute.Value) attribute.Value {
 		return v
 	}
 
+	// Match Truncate's direct scalar path to avoid paying for the recursive,
+	// multi-result transform when no composite traversal is needed.
 	switch v.Type() {
 	case attribute.STRING:
 		return attribute.StringValue(truncate(limit, v.AsString()))
-	case attribute.STRINGSLICE:
-		ss := v.AsStringSlice()
-		for i := range ss {
-			ss[i] = truncate(limit, ss[i])
-		}
-		return attribute.StringSliceValue(ss)
 	case attribute.BYTESLICE:
-		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
-		// avoids allocating the full slice before truncation.
 		s := v.AsString()
-		if limit >= 0 && len(s) > limit {
+		if len(s) > limit {
 			return attribute.ByteSliceValue([]byte(s[:limit]))
 		}
+	case attribute.STRINGSLICE:
+		v, _ = truncateStringSliceValue(limit, v)
 	case attribute.SLICE:
-		sl := v.AsSlice()
-		if !slices.ContainsFunc(sl, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
-			return v
-		}
-		newSl := make([]attribute.Value, len(sl))
-		for i, elem := range sl {
-			newSl[i] = TruncateValue(limit, elem)
-		}
-		return attribute.SliceValue(newSl...)
+		v, _ = truncateSliceValue(limit, v)
 	case attribute.MAP:
-		m := v.AsMap()
-		if !slices.ContainsFunc(m, func(kv attribute.KeyValue) bool { return needsTruncation(limit, kv.Value) }) {
-			return v
-		}
-		newM := make([]attribute.KeyValue, len(m))
-		for i, elem := range m {
-			elem.Value = TruncateValue(limit, elem.Value)
-			newM[i] = elem
-		}
-		return attribute.MapValue(newM...)
+		v, _ = truncateMapValue(limit, v)
 	}
 	return v
 }
 
-// stringNeedsTruncation reports whether s would be modified by truncate for the
-// given limit.
-func stringNeedsTruncation(limit int, s string) bool {
-	if limit < 0 || len(s) <= limit {
-		return false
-	}
-	return utf8.RuneCountInString(s) > limit || !utf8.ValidString(s)
-}
-
-// needsTruncation reports whether v would be modified by TruncateValue for the
-// given limit.
-func needsTruncation(limit int, v attribute.Value) bool {
+// truncateValue traverses composite values once and rebuilds them lazily on
+// the first changed child. Recursion provides O(depth) temporary stack space
+// without forcing a heap allocation on the common no-op path.
+func truncateValue(limit int, v attribute.Value) (attribute.Value, bool) {
 	switch v.Type() {
 	case attribute.STRING:
-		return stringNeedsTruncation(limit, v.AsString())
-	case attribute.BYTESLICE:
-		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
-		// avoids memory allocation.
-		if limit >= 0 && len(v.AsString()) > limit {
-			return true
+		s := v.AsString()
+		truncated := truncate(limit, s)
+		if truncated != s {
+			return attribute.StringValue(truncated), true
 		}
 	case attribute.STRINGSLICE:
-		for _, s := range v.AsStringSlice() {
-			if stringNeedsTruncation(limit, s) {
-				return true
-			}
+		return truncateStringSliceValue(limit, v)
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids allocating the full slice before truncation.
+		s := v.AsString()
+		if len(s) > limit {
+			return attribute.ByteSliceValue([]byte(s[:limit])), true
 		}
 	case attribute.SLICE:
-		return slices.ContainsFunc(v.AsSlice(), func(e attribute.Value) bool { return needsTruncation(limit, e) })
+		return truncateSliceValue(limit, v)
 	case attribute.MAP:
-		return slices.ContainsFunc(
-			v.AsMap(),
-			func(kv attribute.KeyValue) bool { return needsTruncation(limit, kv.Value) },
-		)
+		return truncateMapValue(limit, v)
 	}
-	return false
+	return v, false
 }
+
+func truncateStringSliceValue(limit int, value attribute.Value) (attribute.Value, bool) {
+	storage := valueStorage(value)
+	switch values := storage.(type) {
+	case [0]string:
+		return value, false
+	case [1]string:
+		return truncateStrings(limit, value, values[:])
+	case [2]string:
+		return truncateStrings(limit, value, values[:])
+	case [3]string:
+		return truncateStrings(limit, value, values[:])
+	default:
+		array := reflect.ValueOf(storage)
+		if array.Kind() != reflect.Array || array.Type().Elem() != stringType {
+			return value, false
+		}
+		return truncateStringArray(limit, value, array)
+	}
+}
+
+func truncateStrings(limit int, value attribute.Value, values []string) (attribute.Value, bool) {
+	var truncated []string
+	for i, s := range values {
+		newS := truncate(limit, s)
+		if truncated != nil {
+			truncated[i] = newS
+			continue
+		}
+		if newS == s {
+			continue
+		}
+
+		truncated = make([]string, len(values))
+		copy(truncated, values[:i])
+		truncated[i] = newS
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.StringSliceValue(truncated), true
+}
+
+func truncateStringArray(limit int, value attribute.Value, values reflect.Value) (attribute.Value, bool) {
+	var truncated []string
+	for i := range values.Len() {
+		s := values.Index(i).String()
+		newS := truncate(limit, s)
+		if truncated != nil {
+			truncated[i] = newS
+			continue
+		}
+		if newS == s {
+			continue
+		}
+
+		truncated = make([]string, values.Len())
+		for j := range i {
+			truncated[j] = values.Index(j).String()
+		}
+		truncated[i] = newS
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.StringSliceValue(truncated), true
+}
+
+func truncateSliceValue(limit int, value attribute.Value) (attribute.Value, bool) {
+	storage := valueStorage(value)
+	switch values := storage.(type) {
+	case [0]attribute.Value:
+		return value, false
+	case [1]attribute.Value:
+		return truncateValueSlice(limit, value, values[:])
+	case [2]attribute.Value:
+		return truncateValueSlice(limit, value, values[:])
+	case [3]attribute.Value:
+		return truncateValueSlice(limit, value, values[:])
+	case [4]attribute.Value:
+		return truncateValueSlice(limit, value, values[:])
+	case [5]attribute.Value:
+		return truncateValueSlice(limit, value, values[:])
+	default:
+		array := reflect.ValueOf(storage)
+		if array.Kind() != reflect.Array || array.Type().Elem() != valueType {
+			return value, false
+		}
+		return truncateValueArray(limit, value, array)
+	}
+}
+
+func truncateValueSlice(limit int, value attribute.Value, values []attribute.Value) (attribute.Value, bool) {
+	var truncated []attribute.Value
+	for i, elem := range values {
+		newElem, changed := truncateValue(limit, elem)
+		if truncated != nil {
+			truncated[i] = newElem
+			continue
+		}
+		if !changed {
+			continue
+		}
+
+		truncated = make([]attribute.Value, len(values))
+		copy(truncated, values[:i])
+		truncated[i] = newElem
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.SliceValue(truncated...), true
+}
+
+func truncateValueArray(limit int, value attribute.Value, values reflect.Value) (attribute.Value, bool) {
+	var truncated []attribute.Value
+	for i := range values.Len() {
+		elem := values.Index(i).Interface().(attribute.Value)
+		newElem, changed := truncateValue(limit, elem)
+		if truncated != nil {
+			truncated[i] = newElem
+			continue
+		}
+		if !changed {
+			continue
+		}
+
+		truncated = make([]attribute.Value, values.Len())
+		for j := range i {
+			truncated[j] = values.Index(j).Interface().(attribute.Value)
+		}
+		truncated[i] = newElem
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.SliceValue(truncated...), true
+}
+
+func truncateMapValue(limit int, value attribute.Value) (attribute.Value, bool) {
+	storage := valueStorage(value)
+	switch keyValues := storage.(type) {
+	case [0]attribute.KeyValue:
+		return value, false
+	case [1]attribute.KeyValue:
+		return truncateKeyValueSlice(limit, value, keyValues[:])
+	case [2]attribute.KeyValue:
+		return truncateKeyValueSlice(limit, value, keyValues[:])
+	case [3]attribute.KeyValue:
+		return truncateKeyValueSlice(limit, value, keyValues[:])
+	case [4]attribute.KeyValue:
+		return truncateKeyValueSlice(limit, value, keyValues[:])
+	case [5]attribute.KeyValue:
+		return truncateKeyValueSlice(limit, value, keyValues[:])
+	default:
+		array := reflect.ValueOf(storage)
+		if array.Kind() != reflect.Array || array.Type().Elem() != keyValueType {
+			return value, false
+		}
+		return truncateKeyValueArray(limit, value, array)
+	}
+}
+
+func truncateKeyValueSlice(
+	limit int,
+	value attribute.Value,
+	keyValues []attribute.KeyValue,
+) (attribute.Value, bool) {
+	var truncated []attribute.KeyValue
+	for i, kv := range keyValues {
+		newValue, changed := truncateValue(limit, kv.Value)
+		if changed {
+			kv.Value = newValue
+		}
+		if truncated != nil {
+			truncated[i] = kv
+			continue
+		}
+		if !changed {
+			continue
+		}
+
+		truncated = make([]attribute.KeyValue, len(keyValues))
+		copy(truncated, keyValues[:i])
+		truncated[i] = kv
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.MapValue(truncated...), true
+}
+
+func truncateKeyValueArray(limit int, value attribute.Value, keyValues reflect.Value) (attribute.Value, bool) {
+	var truncated []attribute.KeyValue
+	for i := range keyValues.Len() {
+		kv := keyValues.Index(i).Interface().(attribute.KeyValue)
+		newValue, changed := truncateValue(limit, kv.Value)
+		if changed {
+			kv.Value = newValue
+		}
+		if truncated != nil {
+			truncated[i] = kv
+			continue
+		}
+		if !changed {
+			continue
+		}
+
+		truncated = make([]attribute.KeyValue, keyValues.Len())
+		for j := range i {
+			truncated[j] = keyValues.Index(j).Interface().(attribute.KeyValue)
+		}
+		truncated[i] = kv
+	}
+	if truncated == nil {
+		return value, false
+	}
+	return attribute.MapValue(truncated...), true
+}
+
+var stringType = reflect.TypeFor[string]()
 
 // truncate returns a version of s truncated according to limit.
 //
@@ -168,7 +339,7 @@ func truncate(limit int, s string) string {
 	// This prioritizes performance in the following order based on the most
 	// common expected use cases.
 	//
-	//  - Values shorter than the default limit (128).
+	//  - Values whose byte length does not exceed the limit.
 	//  - Strings with valid encodings that exceed the limit.
 	//  - No limit.
 	//  - Strings with invalid encodings that exceed the limit.
@@ -188,13 +359,26 @@ func truncate(limit int, s string) string {
 			continue
 		}
 
+		// A zero limit also truncates a leading invalid byte or U+FFFD.
+		if limit == 0 {
+			return ""
+		}
+		// Range reports RuneError for both an invalid byte and a valid U+FFFD.
+		// Only a size-1 decoding indicates invalid UTF-8.
 		_, size := utf8.DecodeRuneInString(s[i:])
 		if size == 1 {
-			// Invalid encoding.
+			// Removing this byte makes len(s)-1 an upper bound for a rebuilt
+			// result. Keep the valid prefix before rescanning s[i:].
 			b.Grow(len(s) - 1)
 			_, _ = b.WriteString(s[:i])
 			s = s[i:]
 			break
+		}
+
+		// A valid U+FFFD still consumes one character of the limit.
+		count++
+		if count > limit {
+			return s[:i]
 		}
 	}
 
@@ -203,7 +387,9 @@ func truncate(limit int, s string) string {
 		return s
 	}
 
-	// Truncate while validating UTF-8.
+	// The builder holds the valid prefix before the first invalid byte, and
+	// count includes its runes. Skip malformed bytes without counting them
+	// while copying the remaining valid runes up to the limit.
 	for i := 0; i < len(s) && count < limit; {
 		c := s[i]
 		if c < utf8.RuneSelf {

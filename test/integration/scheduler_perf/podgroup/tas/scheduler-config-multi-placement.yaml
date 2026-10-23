@@ -1,0 +1,10 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    # TopologyPlacement is added automatically under the TAS feature gate; enabling a second
+    # PlacementGenerate plugin exercises the framework's multi-plugin merge path.
+    placementGenerate:
+      enabled:
+      - name: NodePoolPlacement

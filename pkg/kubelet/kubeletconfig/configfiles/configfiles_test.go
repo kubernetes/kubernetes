@@ -25,12 +25,12 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/ktesting"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 

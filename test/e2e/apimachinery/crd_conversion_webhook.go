@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/ktesting/format"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 

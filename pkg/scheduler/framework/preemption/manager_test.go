@@ -50,23 +50,23 @@ import (
 )
 
 func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
-	pgi := &framework.PodGroupInfo{
-		GenericPodGroup: &fwk.GenericPodGroup{
-			PodGroup:          pg,
-			CompositePodGroup: cpg,
-		},
+	gpg := &fwk.GenericPodGroup{
+		PodGroup:          pg,
+		CompositePodGroup: cpg,
 	}
 	if pg != nil {
-		pgi.UnscheduledPods = pods
-	} else if cpg != nil && len(pods) > 0 {
-		pgi.Children = []*framework.PodGroupInfo{
-			{
-				GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("child-pg").Obj()),
-				UnscheduledPods: pods,
-			},
+		return &framework.PodGroupInfo{
+			GenericPodGroup: gpg,
+			UnscheduledPods: pods,
 		}
 	}
-	return pgi
+	if cpg != nil && len(pods) > 0 {
+		return framework.NewPodGroupInfo(gpg, &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("child-pg").Obj()),
+			UnscheduledPods: pods,
+		})
+	}
+	return framework.NewPodGroupInfo(gpg)
 }
 
 type wantVictim struct {
@@ -264,9 +264,9 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			},
 		},
 		{
-			name: "ordering by priority: group hierarchy root priority overrides individual pod priority",
+			name: "ordering by priority: pod group members are ordered by their own priority, which matches their group's",
 			initPods: []*v1.Pod{
-				makeGroupPod("low-pod-in-mid-pg", lowPriority, "pg-mid"),
+				makeGroupPod("mid-pod-in-mid-pg", midPriority, "pg-mid"),
 				makePod("standalone-low", lowPriority),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
@@ -275,25 +275,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			preemptor: makePreemptor(highPriority),
 			wantVictims: []wantVictim{
 				wantVic("standalone-low"),
-				wantVic("low-pod-in-mid-pg"),
-			},
-		},
-		{
-			name: "ordering by priority: CompositePodGroup root priority overrides child PodGroup and pod priority",
-			initPods: []*v1.Pod{
-				makeGroupPod("pod-in-cpg", lowPriority, "pg-low"),
-				makePod("standalone-low", lowPriority),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				makePG("pg-low", lowPriority, false, "cpg-mid"),
-			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				makeCPG("cpg-mid", midPriority, false),
-			},
-			preemptor: makePreemptor(highPriority),
-			wantVictims: []wantVictim{
-				wantVic("standalone-low"),
-				wantVic("pod-in-cpg"),
+				wantVic("mid-pod-in-mid-pg"),
 			},
 		},
 		{
@@ -346,7 +328,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			},
 		},
 		{
-			name: "feature gates: CompositePodGroup disabled ignores parent CompositePodGroup disruption mode and priority",
+			name: "feature gates: CompositePodGroup disabled ignores parent CompositePodGroup disruption mode",
 			featureGates: featuregatetesting.FeatureOverrides{
 				features.CompositePodGroup: false,
 			},
@@ -355,13 +337,12 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				makeGroupPod("p2", lowPriority, "pg-child"),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
-				// pg-child has lowPriority (eligible for preemption) and DisruptionModeSingle (individual victims).
+				// pg-child has DisruptionModeSingle, so its pods are individual victims.
 				makePG("pg-child", lowPriority, false, "cpg-root"),
 			},
 			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				// If enabled, cpg-root's highPriority would protect p1/p2 from highPriority preemptor,
-				// and DisruptionModeAll would group them together.
-				makeCPG("cpg-root", highPriority, true),
+				// If enabled, cpg-root's DisruptionModeAll would group p1/p2 into one atomic victim.
+				makeCPG("cpg-root", lowPriority, true),
 			},
 			preemptor: makePreemptor(highPriority),
 			wantVictims: []wantVictim{

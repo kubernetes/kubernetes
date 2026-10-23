@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -62,5 +63,60 @@ func GetPodGroupStates(sharedLister fwk.SharedLister, rootEntityKey fwk.EntityKe
 			return yield(pgState, nil)
 		}
 		walk(rootEntityKey, 0)
+	}
+}
+
+// TraverseHierarchyUp returns an iterator over the groups on the path from startKey to the root of its
+// PodGroup/CompositePodGroup hierarchy, starting with startKey itself.
+// The traversal ends by yielding an error when a group cannot be resolved, the key type is unsupported,
+// a cycle is detected, or the path exceeds WorkloadMaxTreeDepth.
+// Feature gating is left to the listers: when GenericWorkload or CompositePodGroup is disabled,
+// the corresponding lister rejects lookups, so the traversal ends there just like for a missing group.
+func TraverseHierarchyUp(snapshot fwk.SharedLister, startKey fwk.EntityKey) iter.Seq2[*fwk.GenericPodGroup, error] {
+	return func(yield func(*fwk.GenericPodGroup, error) bool) {
+		currentKey := startKey
+		visited := sets.New[fwk.EntityKey]()
+		for {
+			if visited.Has(currentKey) {
+				yield(nil, fmt.Errorf("cycle detected in the hierarchy at %v", currentKey))
+				return
+			}
+			if visited.Len() >= schedulingapi.WorkloadMaxTreeDepth {
+				yield(nil, fmt.Errorf("exceeded maximum hierarchy depth %d at %v", schedulingapi.WorkloadMaxTreeDepth, currentKey))
+				return
+			}
+			visited.Insert(currentKey)
+
+			var gpg *fwk.GenericPodGroup
+			switch currentKey.GetType() {
+			case fwk.PodGroupKeyType:
+				pg, err := snapshot.PodGroups().Get(currentKey.GetNamespace(), currentKey.GetName())
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				gpg = fwk.NewGenericPodGroup(pg)
+			case fwk.CompositePodGroupKeyType:
+				cpg, err := snapshot.CompositePodGroups().Get(currentKey.GetNamespace(), currentKey.GetName())
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				gpg = fwk.NewGenericCompositePodGroup(cpg)
+			default:
+				yield(nil, fmt.Errorf("unsupported key type %q for %v", currentKey.GetType(), currentKey))
+				return
+			}
+
+			if !yield(gpg, nil) {
+				return
+			}
+
+			parentKey, hasParent := gpg.GetParentKey()
+			if !hasParent {
+				return
+			}
+			currentKey = parentKey
+		}
 	}
 }

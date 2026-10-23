@@ -83,6 +83,7 @@ var supportedVersionedFormats = []versionedFormats{
 
 // StripUnsupportedFormatsPostProcess sets unsupported formats to empty string.
 // Only supports formats supported by all known version of Kubernetes.
+//
 // Deprecated: Use StripUnsupportedFormatsPostProcessorForVersion instead.
 func StripUnsupportedFormatsPostProcess(s *spec.Schema) error {
 	return legacyPostProcessor(s)

@@ -32,7 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 

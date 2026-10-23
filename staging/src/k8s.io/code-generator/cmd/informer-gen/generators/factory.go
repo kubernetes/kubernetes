@@ -94,6 +94,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"reflectType":                    c.Universe.Type(reflectType),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
+		"shardingSelector":               c.Universe.Type(shardingSelector),
 		"stringsBuilder":                 c.Universe.Type(stringsBuilder),
 		"syncMutex":                      c.Universe.Type(syncMutex),
 		"timeDuration":                   c.Universe.Type(timeDuration),
@@ -120,6 +121,7 @@ type sharedInformerFactory struct {
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
 	transform {{.cacheTransformFunc|raw}}
+	shardSelector {{.shardingSelector|raw}}
 	informerName *{{.cacheInformerName|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
@@ -163,6 +165,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector {{.shardingSelector|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -315,6 +325,9 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   informer = newFunc(f.client, resyncPeriod)
   if f.transform != nil {
     informer.SetTransform(f.transform)
+  }
+  if f.shardSelector != nil {
+    informer.SetShardSelector(f.shardSelector)
   }
   f.informers[informerType] = informer
 

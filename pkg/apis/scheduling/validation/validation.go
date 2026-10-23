@@ -108,13 +108,15 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 // - Depth of the CompositePodGroupTemplates tree is not higher than 4.
 // - All templates in the hierarchy share the same priority and PriorityClassName.
 // - All composite pod group templates in the hierarchy have at least one child.
+// - CompositePodGroupTemplates with "gang" scheduling policy must have all their child templates with "gang" scheduling policy as well.
+// - CompositePodGroupTemplates with "all" disruption mode must have all their child templates with "all" disruption mode as well.
 func ValidateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateWorkloadTemplateNamesUniqueness(spec, fldPath)...)
 	allErrs = append(allErrs, validateWorkloadTemplatesDepth(spec, fldPath.Child("compositePodGroupTemplates"))...)
 	allErrs = append(allErrs, validateWorkloadPriority(spec, fldPath)...)
 	for i, cpgt := range spec.CompositePodGroupTemplates {
-		allErrs = append(allErrs, validateCompositePodGroupTemplateHasAtLeastOneChild(&cpgt, fldPath.Child("compositePodGroupTemplates").Index(i))...)
+		allErrs = append(allErrs, validateCompositePodGroupTemplate(&cpgt, fldPath.Child("compositePodGroupTemplates").Index(i))...)
 	}
 	return allErrs
 }
@@ -254,15 +256,47 @@ func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path
 	return nil
 }
 
-// validateCompositePodGroupTemplateHasAtLeastOneChild validates that each CompositePodGroupTemplate has at least one child PodGroupTemplate or CompositePodGroupTemplate.
-func validateCompositePodGroupTemplateHasAtLeastOneChild(cpgt *scheduling.CompositePodGroupTemplate, fldPath *field.Path) field.ErrorList {
+// validateCompositePodGroupTemplate recursively verifies that:
+// - each CompositePodGroupTemplate specifies at least one child PodGroupTemplate or CompositePodGroupTemplate.
+// - each CompositePodGroupTemplate with "gang" scheduling policy specifies child templates with the "gang" scheduling policy only.
+// - each CompositePodGroupTemplate with "all" disruption mode specifies child templates with the "all" disruption mode only.
+func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplate, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(cpgt.PodGroupTemplates) == 0 && len(cpgt.CompositePodGroupTemplates) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, cpgt.Name, "must have at least one child PodGroupTemplate or CompositePodGroupTemplate"))
 	}
-	for i, child := range cpgt.CompositePodGroupTemplates {
-		allErrs = append(allErrs, validateCompositePodGroupTemplateHasAtLeastOneChild(&child, fldPath.Child("compositePodGroupTemplates").Index(i))...)
+
+	parentIsGang := cpgt.SchedulingPolicy.Gang != nil
+	parentIsAll := cpgt.DisruptionMode != nil && cpgt.DisruptionMode.All != nil
+
+	validateChild := func(childIsGang, childIsAll bool, childPath *field.Path) field.ErrorList {
+		var errs field.ErrorList
+		if parentIsGang && !childIsGang {
+			errs = append(errs, field.Invalid(childPath.Child("schedulingPolicy"), field.OmitValueType{}, `must have "gang" scheduling policy when parent compositePodGroupTemplate has "gang" scheduling policy`))
+		}
+		if parentIsAll && !childIsAll {
+			errs = append(errs, field.Invalid(childPath.Child("disruptionMode"), field.OmitValueType{}, `must have "all" disruption mode when parent compositePodGroupTemplate has "all" disruption mode`))
+		}
+		return errs
 	}
+
+	for i := range cpgt.CompositePodGroupTemplates {
+		child := &cpgt.CompositePodGroupTemplates[i]
+		childPath := fldPath.Child("compositePodGroupTemplates").Index(i)
+		childIsGang := child.SchedulingPolicy.Gang != nil
+		childIsAll := child.DisruptionMode != nil && child.DisruptionMode.All != nil
+		allErrs = append(allErrs, validateChild(childIsGang, childIsAll, childPath)...)
+		allErrs = append(allErrs, validateCompositePodGroupTemplate(child, childPath)...)
+	}
+
+	for i := range cpgt.PodGroupTemplates {
+		child := &cpgt.PodGroupTemplates[i]
+		childPath := fldPath.Child("podGroupTemplates").Index(i)
+		childIsGang := child.SchedulingPolicy.Gang != nil
+		childIsAll := child.DisruptionMode != nil && child.DisruptionMode.All != nil
+		allErrs = append(allErrs, validateChild(childIsGang, childIsAll, childPath)...)
+	}
+
 	return allErrs
 }
 

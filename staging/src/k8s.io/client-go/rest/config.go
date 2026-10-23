@@ -318,6 +318,12 @@ type ContentConfig struct {
 	// TODO: NegotiatedSerializer will be phased out as internal clients are removed
 	//   from Kubernetes.
 	NegotiatedSerializer runtime.NegotiatedSerializer
+	// DropManagedFields asks the server to omit metadata.managedFields from responses,
+	// and strips it from decoded objects when the server returns it anyway.
+	// Leave it unset for clients that read managedFields, such as callers of the Extract
+	// functions of apply configurations. It has no effect unless the
+	// ManagedFieldsOptOutClient feature gate is enabled.
+	DropManagedFields bool
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
@@ -394,6 +400,7 @@ func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RES
 		ContentType:        config.ContentType,
 		GroupVersion:       gv,
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+		DropManagedFields:  config.DropManagedFields,
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
@@ -476,6 +483,7 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 		ContentType:        config.ContentType,
 		GroupVersion:       gv,
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+		DropManagedFields:  config.DropManagedFields,
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)

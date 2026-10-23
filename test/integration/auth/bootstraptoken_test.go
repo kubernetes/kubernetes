@@ -31,12 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/client-go/rest"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type bootstrapSecrets []*corev1.Secret

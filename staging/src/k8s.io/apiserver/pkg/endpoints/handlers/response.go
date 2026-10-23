@@ -473,6 +473,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
 		list.RemainingItemCount = li.GetRemainingItemCount()
+		if sharded, ok := result.(metav1.ShardedListInterface); ok {
+			list.ShardInfo = sharded.GetShardInfo()
+		}
 		return list, nil
 
 	case groupVersion == metav1.SchemeGroupVersion:
@@ -493,6 +496,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
 		list.RemainingItemCount = li.GetRemainingItemCount()
+		if sharded, ok := result.(metav1.ShardedListInterface); ok {
+			list.ShardInfo = sharded.GetShardInfo()
+		}
 		return list, nil
 
 	default:

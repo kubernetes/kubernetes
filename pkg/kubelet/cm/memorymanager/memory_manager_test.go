@@ -35,12 +35,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -123,6 +123,10 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (p *mockPolicy) GetAllocatableMemory(state.State) []state.Block {
 	return []state.Block{}
+}
+
+func (p *mockPolicy) CanAllocateExclusively() bool {
+	return false
 }
 
 type mockRuntimeService struct {
@@ -2145,28 +2149,34 @@ func TestGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				string(hugepages1Gi): {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},

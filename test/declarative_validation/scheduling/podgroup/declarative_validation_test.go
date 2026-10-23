@@ -202,11 +202,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid negative priority": {
 			input: mkValidPodGroup(setPriority(-2147483648)),
 		},
-		"too high priority": {
+		"valid priority above user-defined maximum": {
 			input: mkValidPodGroup(setPriority(scheduling.HighestUserDefinablePriority + 1)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("maximum"),
-			},
+		},
+		"valid system-cluster-critical priority": {
+			input: mkValidPodGroup(setPriority(scheduling.SystemCriticalPriority)),
+		},
+		"valid system-node-critical priority": {
+			input: mkValidPodGroup(setPriority(scheduling.SystemCriticalPriority + 1000)),
 		},
 		"preemption policy set, pod group preemptionPolicy disabled": {
 			input:        mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),

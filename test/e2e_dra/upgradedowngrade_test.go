@@ -37,13 +37,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/ktesting"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 )
 

@@ -32,11 +32,11 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestMigrateServiceCIDR validates the steps necessary to migrate a cluster default ServiceCIDR

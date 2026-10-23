@@ -37,6 +37,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type PayloadStruct
+	scheme.AddValidationFunc(
+		(*PayloadStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_PayloadStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*PayloadStruct),
+					safe.Cast[*PayloadStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Struct
 	scheme.AddValidationFunc(
 		(*Struct)(nil),
@@ -89,6 +104,156 @@ func Validate_OtherStruct(
 
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct"); len(e) != 0 {
 		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_PayloadStruct validates an instance of PayloadStruct according
+// to declarative validation rules in the API schema.
+func Validate_PayloadStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *PayloadStruct) (errs field.ErrorList) {
+
+	// field PayloadStruct.TypeMeta has no validation
+
+	{ // field PayloadStruct.StringField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj, "custom string msg").MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PayloadStruct) *string {
+				return &oldObj.StringField
+			})
+		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field PayloadStruct.StringPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj, "custom pointer msg").MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PayloadStruct) *string {
+				return oldObj.StringPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field PayloadStruct.SliceField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj, "custom slice msg").MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PayloadStruct) []string {
+				return oldObj.SliceField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field PayloadStruct.MapField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj, "custom map msg").MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PayloadStruct) map[string]string {
+				return oldObj.MapField
+			})
+		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field PayloadStruct.OtherStructField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *OtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// +k8s:required on non-pointer struct fields is purely documentation
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PayloadStruct) *OtherStruct {
+				return &oldObj.OtherStructField
+			})
+		errs = append(errs, fn(fldPath.Child("otherStructField"), &obj.OtherStructField, oldVal, oldObj != nil)...)
 	}
 
 	return errs

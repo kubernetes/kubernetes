@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -820,6 +821,7 @@ func TestWatchCacheBypass(t *testing.T) {
 	_, err = delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
@@ -828,6 +830,7 @@ func TestWatchCacheBypass(t *testing.T) {
 	_, err = delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Errorf("Watch without RV=0 should be served from cache: %v", err)
@@ -890,6 +893,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 			opts := storage.ListOptions{
 				ResourceVersion: strconv.Itoa(int(tt.resourceVersion)),
 				Predicate:       storage.Everything,
+				Recursive:       true,
 			}
 			watcher, err := cacher.Watch(context.Background(), "/pods/test-ns", opts)
 			if err != nil {
@@ -947,7 +951,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Watch hangs waiting on watchcache being initialized.
 	// Ensure that it terminates when its context is cancelled
 	// (e.g. the request is terminated for whatever reason).
-	_, err = cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0"})
+	_, err = cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Recursive: true})
 	if err == nil || !strings.Contains(err.Error(), "storage is (re)initializing") {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -983,6 +987,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "999",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
@@ -1005,7 +1010,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	}
 
 	// Create fast watcher and ensure it will get each object exactly once.
-	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1044,7 +1049,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	delegator := NewCacheDelegator(cacher, backingStorage)
 	defer delegator.Stop()
 
-	w, err := delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	w, err := delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1064,7 +1069,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 
 	cacher.Stop()
 
-	_, err = delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	_, err = delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything, Recursive: true})
 	if err == nil {
 		t.Fatalf("Success to create Watch: %v", err)
 	}
@@ -1171,7 +1176,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			w, err := cacher.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
+			w, err := cacher.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true})
 			if err != nil {
 				// Watch failed to initialize (this most probably means that cacher
 				// already moved back to Pending state before watch initialized.
@@ -1234,7 +1239,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 			default:
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+				w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred, Recursive: true})
 				if err != nil {
 					watchErr = fmt.Errorf("Failed to create watch: %v", err)
 					return
@@ -1294,7 +1299,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1460,7 +1465,7 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 					pred.AllowWatchBookmarks = scenario.allowWatchBookmarks
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 					defer cancel()
-					w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", SendInitialEvents: scenario.sendInitialEvents, Predicate: pred})
+					w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", SendInitialEvents: scenario.sendInitialEvents, Predicate: pred, Recursive: true})
 					if err != nil {
 						t.Fatalf("Failed to create watch: %v", err)
 					}
@@ -1504,7 +1509,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: pred})
+	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: pred, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1569,7 +1574,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		pred.AllowWatchBookmarks = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
+		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -1642,6 +1647,7 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "1000",
 		Predicate:       pred,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
@@ -1802,14 +1808,14 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	totalPods := 50
 
 	// Create watcher that will be blocked.
-	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
 	defer w1.Stop()
 
 	// Create fast watcher and ensure it will get all objects.
-	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1918,7 +1924,7 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 
 	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
-		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
+		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -1993,7 +1999,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 
 	watchers := make([]watch.Interface, 0, watchersCount)
 	for i := 0; i < watchersCount; i++ {
-		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything})
+		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -2126,6 +2132,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{
 		ResourceVersion: "999",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
@@ -2170,6 +2177,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				}(),
 				SendInitialEvents: ptr.To(true),
 				ResourceVersion:   "105",
+				Recursive:         true,
 			},
 			verifyBackingStore: func(t *testing.T, s *cachertesting.MockStorage) {
 				require.NotEqual(t, 0, s.GetRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
@@ -2185,6 +2193,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					return p
 				}(),
 				SendInitialEvents: ptr.To(true),
+				Recursive:         true,
 			},
 			backingStorage: func() *cachertesting.MockStorage {
 				hasBeenPrimed := false
@@ -2229,6 +2238,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					return p
 				}(),
 				SendInitialEvents: ptr.To(true),
+				Recursive:         true,
 			},
 			backingStorage: func() *cachertesting.MockStorage {
 				hasBeenPrimed := false
@@ -2473,6 +2483,7 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	opts := storage.ListOptions{
 		Predicate:         pred,
 		SendInitialEvents: ptr.To(true),
+		Recursive:         true,
 	}
 	w, err := cacher.Watch(context.Background(), "/pods/ns", opts)
 	require.NoError(t, err, "failed to create watch: %v")
@@ -2488,6 +2499,177 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	}, true)
 }
 
+func TestStartDispatchingSelectsWatchers(t *testing.T) {
+	nodeNameTrigger := &indexedTriggerFunc{
+		indexName:   "spec.nodeName",
+		indexerFunc: func(obj runtime.Object) string { return obj.(*example.Pod).Spec.NodeName },
+	}
+	podOnNode := func(nodeName string) *example.Pod {
+		return &example.Pod{Spec: example.PodSpec{NodeName: nodeName}}
+	}
+
+	scenarios := []struct {
+		name           string
+		indexedTrigger *indexedTriggerFunc
+		event          *watchCacheEvent
+		expected       []string
+	}{
+		{
+			name:           "namespaced object, trigger value unchanged",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:       watch.Modified,
+				Object:     podOnNode("node-a"),
+				PrevObject: podOnNode("node-a"),
+				ObjFields:  fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a"},
+		},
+		{
+			name:           "namespaced object, trigger value changed",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:       watch.Modified,
+				Object:     podOnNode("node-a"),
+				PrevObject: podOnNode("node-b"),
+				ObjFields:  fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a", "node-b"},
+		},
+		{
+			name:           "cluster-scoped object",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-c"),
+				ObjFields: fields.Set{"metadata.name": "pod"},
+			},
+			expected: []string{"/pod", "/", "node-c"},
+		},
+		{
+			name:           "no name field",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-without-watcher"),
+				ObjFields: fields.Set{"metadata.namespace": "ns"},
+			},
+			expected: []string{"ns/", "/"},
+		},
+		{
+			name: "trigger not supported",
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-a"),
+				ObjFields: fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a", "node-b", "node-c"},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			cacher := &Cacher{
+				indexedTrigger: scenario.indexedTrigger,
+				watchers: indexedWatchers{
+					scopeWatchers: map[namespacedName]watchersMap{},
+					indexWatchers: map[string]watchersMap{},
+				},
+			}
+			// Two watchers per key, so the test catches a key that yields only one of its watchers.
+			number := 0
+			for _, scope := range []namespacedName{
+				{namespace: "ns", name: "pod"}, {namespace: "ns"}, {name: "pod"}, {},
+				{namespace: "other-ns", name: "pod"}, {namespace: "ns", name: "other-pod"}, {namespace: "other-ns"}, {name: "other-pod"},
+			} {
+				for range 2 {
+					cacher.watchers.addWatcher(&cacheWatcher{identifier: scope.namespace + "/" + scope.name}, number, watchSelector{scope: scope})
+					number++
+				}
+			}
+			for _, value := range []string{"node-a", "node-b", "node-c"} {
+				for range 2 {
+					cacher.watchers.addWatcher(&cacheWatcher{identifier: value}, number, watchSelector{indexValue: &value})
+					number++
+				}
+			}
+
+			cacher.startDispatching(scenario.event)
+			defer cacher.finishDispatching()
+
+			var selected []string
+			for _, w := range cacher.watchersBuffer {
+				selected = append(selected, w.identifier)
+			}
+			require.ElementsMatch(t, slices.Concat(scenario.expected, scenario.expected), selected)
+		})
+	}
+}
+
+func TestForEachSelectionKey(t *testing.T) {
+	scenarios := []struct {
+		name             string
+		namespace        string
+		objName          string
+		triggerValues    []string
+		triggerSupported bool
+		expected         []string
+	}{
+		{
+			name:             "namespace and name",
+			namespace:        "ns",
+			objName:          "pod",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "index value node-a"},
+		},
+		{
+			name:             "namespace only",
+			namespace:        "ns",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/", "scope /", "index value node-a"},
+		},
+		{
+			name:             "name only",
+			objName:          "pod",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope /pod", "scope /", "index value node-a"},
+		},
+		{
+			name:             "neither namespace nor name",
+			triggerSupported: true,
+			expected:         []string{"scope /"},
+		},
+		{
+			name:             "trigger value changed",
+			namespace:        "ns",
+			objName:          "pod",
+			triggerValues:    []string{"node-a", "node-b"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "index value node-a", "index value node-b"},
+		},
+		{
+			// The fan-out ignores trigger values, if any.
+			name:          "trigger not supported",
+			namespace:     "ns",
+			objName:       "pod",
+			triggerValues: []string{"node-a"},
+			expected:      []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "all index values"},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			var calls []string
+			forEachSelectionKey(scenario.namespace, scenario.objName, scenario.triggerValues, scenario.triggerSupported,
+				func(scope namespacedName) { calls = append(calls, "scope "+scope.namespace+"/"+scope.name) },
+				func(indexValue string) { calls = append(calls, "index value "+indexValue) },
+				func() { calls = append(calls, "all index values") })
+			require.Equal(t, scenario.expected, calls)
+		})
+	}
+}
+
 func TestForgetWatcher(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -2498,8 +2680,8 @@ func TestForgetWatcher(t *testing.T) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		require.Len(t, cacher.watchers.allWatchers, expectedWatchersCounter)
-		require.Len(t, cacher.watchers.valueWatchers, expectedValueWatchersCounter)
+		require.Len(t, cacher.watchers.scopeWatchers, expectedWatchersCounter)
+		require.Len(t, cacher.watchers.indexWatchers, expectedValueWatchersCounter)
 	}
 	assertCacherInternalState(0, 0)
 
@@ -2511,7 +2693,7 @@ func TestForgetWatcher(t *testing.T) {
 	}
 	w := newCacheWatcher(
 		0,
-		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
+		filterAny,
 		nil,
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
@@ -2521,12 +2703,12 @@ func TestForgetWatcher(t *testing.T) {
 		testingclock.NewFakeClock(time.Now()),
 		"1",
 	)
-	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
+	forgetWatcherFn = forgetWatcher(cacher, w, 0, watchSelector{})
 	addWatcher := func(w *cacheWatcher) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		cacher.watchers.addWatcher(w, 0, namespacedName{}, "", false)
+		cacher.watchers.addWatcher(w, 0, watchSelector{})
 	}
 
 	addWatcher(w)
@@ -2702,26 +2884,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 	}
 }
 
-// TestGetBookmarkAfterResourceVersionLockedFunc test the following cases:
-//
-// +-----------------+---------------------+-----------------------+
-// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-// +=================+=====================+=======================+
-// | Unset           | true/false          | nil/true/false        |
-// | 0               | true/false          | nil/true/false        |
-// | 95             | true/false          | nil/true/false         |
-// +-----------------+---------------------+-----------------------+
-// where:
-// - false indicates the value of the param was set to "false" by a test case
-// - true  indicates the value of the param was set to "true" by a test case
-func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
-	listOptions := func(allowBookmarks bool, sendInitialEvents *bool, rv string) storage.ListOptions {
+func TestGetBookmarkAfterResourceVersionLocked(t *testing.T) {
+	listOptions := func(rv string) storage.ListOptions {
 		p := storage.Everything
-		p.AllowWatchBookmarks = allowBookmarks
 
 		opts := storage.ListOptions{}
 		opts.Predicate = p
-		opts.SendInitialEvents = sendInitialEvents
 		opts.ResourceVersion = rv
 		return opts
 	}
@@ -2734,146 +2902,26 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 
 		expectedBookmarkResourceVersion int
 	}{
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | Unset           | true/false          | nil/true/false        |
-		// +-----------------+---------------------+-----------------------+
 		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), ""),
+			name:                            "RV=unset",
+			opts:                            listOptions(""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 100,
 		},
 		{
-			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), ""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | 0               | true/false          | nil/true/false        |
-		// +-----------------+---------------------+-----------------------+
-		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), "0"),
+			name:                            "RV=0",
+			opts:                            listOptions("0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 99,
 		},
 		{
-			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), "0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		// +-----------------+---------------------+-----------------------+
-		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
-		// +=================+=====================+=======================+
-		// | 95             | true/false          | nil/true/false         |
-		// +-----------------+---------------------+-----------------------+
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                            listOptions(true, nil, "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, ptr.To(true), "95"),
+			name:                            "RV=95",
+			opts:                            listOptions("95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 95,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, ptr.To(false), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                            listOptions(false, nil, "95"),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, ptr.To(true), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
-		},
-		{
-			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, ptr.To(false), "95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 0,
 		},
 	}
 	for _, scenario := range scenarios {
@@ -2891,11 +2939,9 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getBookMarkFn, err := cacher.getBookmarkAfterResourceVersionLockedFunc(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
-			require.NoError(t, err)
 			cacher.watchCache.RLock()
 			defer cacher.watchCache.RUnlock()
-			getBookMarkResourceVersion := getBookMarkFn()
+			getBookMarkResourceVersion := cacher.getBookmarkAfterResourceVersionLocked(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
 			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
@@ -2982,6 +3028,7 @@ func TestListIndexer(t *testing.T) {
 	t.Cleanup(terminate)
 	tests := []struct {
 		name               string
+		requestedName      string
 		requestedNamespace string
 		recursive          bool
 		fieldSelector      fields.Selector
@@ -3027,7 +3074,7 @@ func TestListIndexer(t *testing.T) {
 			name:               "request with namespace, field selector with non-matched metadata.namespace",
 			requestedNamespace: "namespace",
 			recursive:          true,
-			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
 		},
 		{
 			name:               "request with namespace, field selector with spec.nodename",
@@ -3079,19 +3126,129 @@ func TestListIndexer(t *testing.T) {
 		{
 			name:               "request with namespace, with field selector metadata.name",
 			requestedNamespace: "namespace",
+			recursive:          true,
 			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
 		},
 		{
 			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
 			requestedNamespace: "namespace",
+			recursive:          true,
 			fieldSelector: fields.SelectorFromSet(fields.Set{
 				"metadata.name":      "name",
 				"metadata.namespace": "namespace",
 			}),
 		},
 		{
+			name:               "request with namespace, with field selector metadata.name and non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
 			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
 			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+				"spec.nodeName":      "node",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=node"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "name", "metadata.namespace": "namespace"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, without field selector",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, field selector with matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, field selector with non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=other"),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector non-matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "non-recursive, request with name, request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          false,
 			fieldSelector: fields.SelectorFromSet(fields.Set{
 				"metadata.name":      "name",
 				"metadata.namespace": "namespace",
@@ -3100,19 +3257,168 @@ func TestListIndexer(t *testing.T) {
 			indexFields: []string{"spec.nodeName"},
 		},
 		{
-			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			name:               "non-recursive, request with name, request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedName:      "name",
 			requestedNamespace: "namespace",
+			recursive:          false,
 			fieldSelector: fields.AndSelectors(
 				fields.ParseSelectorOrDie("spec.nodeName!=node"),
 				fields.SelectorFromSet(fields.Set{"metadata.name": "name", "metadata.namespace": "namespace"}),
 			),
 			indexFields: []string{"spec.nodeName"},
 		},
+		{
+			name:               "recursive, request with name, request with namespace, without field selector",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, field selector with matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, field selector with non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=other"),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name and matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "recursive, request with name, request with namespace, with field selector non-matched metadata.name and non-matched metadata.namespace",
+			requestedName:      "name",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "other",
+				"metadata.namespace": "other",
+			}),
+		},
+		{
+			name:          "non-recursive, request without namespace, without field selector",
+			recursive:     false,
+			fieldSelector: fields.Everything(),
+		},
+		{
+			name:          "non-recursive, request without namespace, field selector with metadata.namespace",
+			recursive:     false,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:          "non-recursive, request without namespace, field selector with metadata.name",
+			recursive:     false,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:      "non-recursive, request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with namespace, without field selector",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "non-recursive, request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "non-recursive, request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=other"),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name and matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "non-recursive, request with namespace, with field selector metadata.name and non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          false,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "other",
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
-			_, usedIndex, err := cacher.cacher.watchCache.WaitUntilFreshAndGetList(ctx, "/pods/"+tt.requestedNamespace, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
+			path := "/pods/"
+			if tt.requestedNamespace != "" {
+				path += tt.requestedNamespace
+				if tt.requestedName != "" {
+					path += "/" + tt.requestedName
+				}
+			}
+			_, usedIndex, err := cacher.cacher.watchCache.WaitUntilFreshAndGetList(ctx, path, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -3243,9 +3549,9 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchAndLabels(t *testing.T) {
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if !filter("/pods/default/pod1", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod1", "metadata.namespace": "default"}, pod) {
+	if !filter.filterWithAttrsAndPrefix("/pods/default/pod1", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod1", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: shard matches and labels match")
 	}
 }
@@ -3262,29 +3568,48 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if filter("/pods/default/pod2", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod2", "metadata.namespace": "default"}, pod) {
+	if filter.filterWithAttrsAndPrefix("/pods/default/pod2", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod2", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard matches but labels don't")
 	}
 }
 
 func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	registry := k8smetrics.NewKubeRegistry()
+	metrics.WatchFilteredEventsTotal.Reset()
+	require.NoError(t, registry.Register(metrics.WatchFilteredEventsTotal))
+
 	uid := "test-uid-3"
 	pod := makeExamplePod("pod3", "default", uid, map[string]string{"app": "web"})
 	gr := schema.GroupResource{Resource: "pods"}
 
 	pred := storage.SelectionPredicate{
-		Label:         labels.Everything(),
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
 		Field:         fields.Everything(),
 		ShardSelector: selectorExcludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+	if filter.filterWithAttrsAndPrefix("/pods/default/pod3", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: neither labels nor shard match")
+	}
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(""), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("expected no shard-filtered metric when label selector rejects first: %v", err)
+	}
+
+	if filter.filterWithAttrsAndPrefix("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard does not match")
+	}
+	expectedMetric := `
+# HELP apiserver_watch_filtered_events_total [ALPHA] Counter of events filtered out by shard selector during watch dispatch, broken by resource type.
+# TYPE apiserver_watch_filtered_events_total counter
+apiserver_watch_filtered_events_total{group="",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetric), "apiserver_watch_filtered_events_total"); err != nil {
+		t.Errorf("unexpected metric error: %v", err)
 	}
 }
 
@@ -3298,9 +3623,9 @@ func TestFilterWithAttrsAndPrefixFunction_NilShardSelector(t *testing.T) {
 		Field:    fields.Everything(),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if !filter("/pods/default/pod4", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod4", "metadata.namespace": "default"}, pod) {
+	if !filter.filterWithAttrsAndPrefix("/pods/default/pod4", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod4", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: nil ShardSelector should pass everything through")
 	}
 }
@@ -3315,9 +3640,9 @@ func TestFilterWithAttrsAndPrefixFunction_EverythingSelector(t *testing.T) {
 		ShardSelector: sharding.Everything(),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if !filter("/pods/default/pod5", labels.Set{}, fields.Set{"metadata.name": "pod5", "metadata.namespace": "default"}, pod) {
+	if !filter.filterWithAttrsAndPrefix("/pods/default/pod5", labels.Set{}, fields.Set{"metadata.name": "pod5", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: Everything() selector should pass all objects")
 	}
 }
@@ -3333,9 +3658,9 @@ func TestFilterWithAttrsAndPrefixFunction_WrongPrefix(t *testing.T) {
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if filter("/configmaps/default/cm1", nil, nil, pod) {
+	if filter.filterWithAttrsAndPrefix("/configmaps/default/cm1", nil, nil, pod) {
 		t.Error("expected filter to reject: key prefix doesn't match")
 	}
 }
@@ -3355,9 +3680,9 @@ func TestFilterWithAttrsAndPrefixFunction_ShardErrorDropsEvent(t *testing.T) {
 		}),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if filter("/pods/default/pod-err", nil, nil, obj) {
+	if filter.filterWithAttrsAndPrefix("/pods/default/pod-err", nil, nil, obj) {
 		t.Error("expected filter to reject: shard matching should fail on unstructured object")
 	}
 }
@@ -3381,9 +3706,9 @@ func TestFilterWithAttrsAndPrefixFunction_NamespaceSharding(t *testing.T) {
 		ShardSelector: sel,
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if !filter("/pods/my-namespace/pod-ns", labels.Set{}, fields.Set{"metadata.name": "pod-ns", "metadata.namespace": ns}, pod) {
+	if !filter.filterWithAttrsAndPrefix("/pods/my-namespace/pod-ns", labels.Set{}, fields.Set{"metadata.name": "pod-ns", "metadata.namespace": ns}, pod) {
 		t.Error("expected filter to match: namespace-based shard selector should match")
 	}
 }
@@ -3407,9 +3732,9 @@ func TestFilterWithAttrsAndPrefixFunction_NamespaceShardingMismatch(t *testing.T
 		ShardSelector: sel,
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := newWatchEventFilter("/pods/", storage.ListOptions{Predicate: pred, Recursive: true}, gr)
 
-	if filter("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
+	if filter.filterWithAttrsAndPrefix("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
 		t.Error("expected filter to reject: namespace hash doesn't fall in shard range")
 	}
 }
@@ -3504,6 +3829,115 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 			} else if result.ShardInfo != nil {
 				t.Errorf("expected no ShardInfo on the list, got %+v", result.ShardInfo)
 			}
+		})
+	}
+}
+
+func TestOptimisticConcurrency(t *testing.T) {
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	require.NoError(t, err)
+	defer cacher.Stop()
+	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
+
+	cachedPod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "ns",
+			Name:            "pod-1",
+			UID:             "uid-1",
+			ResourceVersion: "101",
+		},
+	}
+	require.NoError(t, cacher.watchCache.Add(cachedPod))
+
+	uidMatch := types.UID("uid-1")
+	uidMismatch := types.UID("uid-2")
+	rvMatch := "101"
+	rvMismatch := "99"
+
+	testCases := []struct {
+		name               string
+		key                string
+		preconditions      *storage.Preconditions
+		expectCachedObject runtime.Object
+	}{
+		{
+			name:               "nil preconditions passes cached object",
+			key:                "/pods/ns/pod-1",
+			preconditions:      nil,
+			expectCachedObject: cachedPod,
+		},
+		{
+			name: "matching UID and ResourceVersion passes cached object",
+			key:  "/pods/ns/pod-1",
+			preconditions: &storage.Preconditions{
+				UID:             &uidMatch,
+				ResourceVersion: &rvMatch,
+			},
+			expectCachedObject: cachedPod,
+		},
+		{
+			name: "mismatched UID drops cached object suggestion",
+			key:  "/pods/ns/pod-1",
+			preconditions: &storage.Preconditions{
+				UID: &uidMismatch,
+			},
+			expectCachedObject: nil,
+		},
+		{
+			name: "mismatched ResourceVersion drops cached object suggestion",
+			key:  "/pods/ns/pod-1",
+			preconditions: &storage.Preconditions{
+				ResourceVersion: &rvMismatch,
+			},
+			expectCachedObject: nil,
+		},
+		{
+			name: "missing key in cache passes nil suggestion",
+			key:  "/pods/ns/missing",
+			preconditions: &storage.Preconditions{
+				UID: &uidMatch,
+			},
+			expectCachedObject: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("Delete", func(t *testing.T) {
+				var gotDeleteCached runtime.Object
+				deleteCalled := false
+				backingStorage.DeleteFn = func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, cachedExistingObject runtime.Object, _ storage.DeleteOptions) error {
+					deleteCalled = true
+					gotDeleteCached = cachedExistingObject
+					return nil
+				}
+				err := delegator.Delete(context.Background(), tc.key, &example.Pod{}, tc.preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+				require.NoError(t, err)
+				require.True(t, deleteCalled)
+				require.Equal(t, tc.expectCachedObject, gotDeleteCached)
+				if gotDeleteCached != nil {
+					require.NotSame(t, cachedPod, gotDeleteCached)
+				}
+			})
+
+			t.Run("GuaranteedUpdate", func(t *testing.T) {
+				var gotUpdateCached runtime.Object
+				updateCalled := false
+				backingStorage.GuaranteedUpdateFn = func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+					updateCalled = true
+					gotUpdateCached = cachedExistingObject
+					return nil
+				}
+				err := delegator.GuaranteedUpdate(context.Background(), tc.key, &example.Pod{}, false, tc.preconditions, nil, nil)
+				require.NoError(t, err)
+				require.True(t, updateCalled)
+				require.Equal(t, tc.expectCachedObject, gotUpdateCached)
+				if gotUpdateCached != nil {
+					require.NotSame(t, cachedPod, gotUpdateCached)
+				}
+			})
 		})
 	}
 }

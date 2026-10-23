@@ -184,7 +184,7 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 	if oldRc.Generation != newRc.Generation {
-		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), oldRc.Spec.Template, newRc.Spec.Template)
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), newRc.Spec.Template, oldRc.Spec.Template)
 	}
 	return warnings
 }

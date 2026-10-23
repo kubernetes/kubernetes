@@ -18,11 +18,13 @@ package queue
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -801,7 +803,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{}, framework.PodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -918,7 +920,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{}, framework.PodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -983,7 +985,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.QueuedPodGroupInfo{}, framework.PodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -1105,7 +1107,6 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
 				GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: true,
 		},
@@ -1115,7 +1116,6 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
 				GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
 		},
@@ -1132,7 +1132,7 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			visited := sets.New[fwk.EntityKey]()
 			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg), visited)
 
-			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmp.AllowUnexported(framework.PodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -1140,42 +1140,47 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 }
 
 func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
-	pg1WithParent := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").MinCount(2).ParentCompositePodGroup("cpg1").Obj()
-	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").MinGroupCount(1).Obj()
+	now := metav1.Now()
+	rootCPG := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").MinGroupCount(1).Obj()
+	childPG1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").MinCount(2).ParentCompositePodGroup("cpg1").CreationTimestamp(now).Obj()
+	childPG2 := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("uid2").MinCount(2).ParentCompositePodGroup("cpg1").CreationTimestamp(metav1.NewTime(now.Add(-time.Minute))).Obj()
+	childCPG1WithSameName := st.MakeCompositePodGroup().Name("pg1").Namespace("ns1").MinGroupCount(1).ParentCompositePodGroup("cpg1").CreationTimestamp(now).Obj()
 
 	tests := []struct {
 		name                       string
 		initialPodGroups           []*schedulingv1beta1.PodGroup
 		initialCPGs                []*schedulingv1alpha3.CompositePodGroup
 		cpg                        *schedulingv1alpha3.CompositePodGroup
-		wantInfo                   *framework.PodGroupInfo
+		wantChildren               []*framework.PodGroupInfo
 		isCompositePodGroupEnabled bool
 	}{
 		{
 			name:             "build info for cpg with child pg",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			cpg:              cpg1,
-			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				Children: []*framework.PodGroupInfo{
-					{
-						GenericPodGroup: fwk.NewGenericPodGroup(pg1WithParent),
-						Children:        []*framework.PodGroupInfo{},
-					},
-				},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{childPG1},
+			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{rootCPG},
+			cpg:              rootCPG,
+			wantChildren: []*framework.PodGroupInfo{
+				{GenericPodGroup: fwk.NewGenericPodGroup(childPG1)},
 			},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "build info for cpg with child pg (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			cpg:              cpg1,
-			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				Children:        []*framework.PodGroupInfo{},
+			name:             "build info for cpg with multiple children sorted by timestamp, name, and entity type",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{childPG1, childPG2},
+			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{rootCPG, childCPG1WithSameName},
+			cpg:              rootCPG,
+			wantChildren: []*framework.PodGroupInfo{
+				{GenericPodGroup: fwk.NewGenericPodGroup(childPG2)},
+				{GenericPodGroup: fwk.NewGenericCompositePodGroup(childCPG1WithSameName)},
+				{GenericPodGroup: fwk.NewGenericPodGroup(childPG1)},
 			},
+			isCompositePodGroupEnabled: true,
+		},
+		{
+			name:                       "build info for cpg with child pg (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{childPG1},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{rootCPG},
+			cpg:                        rootCPG,
 			isCompositePodGroupEnabled: false,
 		},
 	}
@@ -1194,9 +1199,12 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			visited := sets.New[fwk.EntityKey]()
 			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), visited)
 
-			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
-			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
-				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
+			if diff := cmp.Diff(fwk.NewGenericCompositePodGroup(tt.cpg), gotInfo.GenericPodGroup); diff != "" {
+				t.Errorf("Unexpected GenericPodGroup (-want,+got)\n%s", diff)
+			}
+			// Note: Children are sorted in NewPodGroupInfo, so it is deterministic.
+			if diff := cmp.Diff(tt.wantChildren, gotInfo.Children(), cmp.AllowUnexported(framework.PodGroupInfo{})); diff != "" {
+				t.Errorf("Unexpected children (-want,+got)\n%s", diff)
 			}
 		})
 	}

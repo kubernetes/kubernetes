@@ -4,4 +4,4 @@
 package otelgrpc
 
 // Version is the current release version of the gRPC instrumentation.
-const Version = "0.71.0"
+const Version = "0.72.0"

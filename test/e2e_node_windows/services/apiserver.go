@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
 
@@ -63,7 +62,7 @@ func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
 // Start starts the apiserver, returns when apiserver is ready.
 // The background goroutine runs until the context is canceled
 // or Stop is called, whether happens first.
-func (a *APIServer) Start(ctx context.Context) error {
+func (a *APIServer) Start(ctx context.Context) (finalErr error) {
 	const tokenFilePath = "known_tokens.csv"
 
 	o := options.NewServerRunOptions()
@@ -93,7 +92,7 @@ func (a *APIServer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create temp file failed: %w", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, saSigningKeyFile)
+	defer utiltesting.CloseAndRemove(utiltesting.FatalToError(&finalErr), saSigningKeyFile)
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		return fmt.Errorf("write file %s failed: %w", saSigningKeyFile.Name(), err)
 	}

@@ -27,6 +27,7 @@ import (
 	time "time"
 
 	operation "k8s.io/apimachinery/pkg/api/operation"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
@@ -395,6 +396,54 @@ func Validate_BasicStruct(
 				return oldObj.DurationPtrField
 			})
 		errs = append(errs, fn(fldPath.Child("durationPtrField"), obj.DurationPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field BasicStruct.QuantityField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.MinimumQuantity(ctx, op, fldPath, obj, oldObj, resource.MustParse("1")); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *BasicStruct) *resource.Quantity {
+				return &oldObj.QuantityField
+			})
+		errs = append(errs, fn(fldPath.Child("quantityField"), &obj.QuantityField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field BasicStruct.QuantityPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.MinimumQuantity(ctx, op, fldPath, obj, oldObj, resource.MustParse("1Gi")); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *BasicStruct) *resource.Quantity {
+				return oldObj.QuantityPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("quantityPtrField"), obj.QuantityPtrField, oldVal, oldObj != nil)...)
 	}
 
 	{ // field BasicStruct.TypedefField

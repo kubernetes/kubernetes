@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 
@@ -48,10 +49,10 @@ func NewPodGroupEvaluator(fh fwk.Handle) *PodGroupEvaluator {
 }
 
 // evaluate determines the victims for preemption, without actuation.
-func (ev *PodGroupEvaluator) evaluate(ctx context.Context, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
+func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptorType fwk.EntityKeyType, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptorType), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	return ev.selectVictimsOnDomain(ctx, potentialVictims, podGroupSchedulingFunc)
@@ -85,15 +86,15 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 		return nil, fwk.NewStatus(fwk.Unschedulable, "No preemption victims found for incoming preemptor")
 	}
 
-	res, status := ev.evaluate(ctx, victims, podGroupSchedulingFunc)
+	res, status := ev.evaluate(ctx, pgInfo.GetType(), victims, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}
-	candidate := &candidate{
-		victims:                res.victims,
-		numPodGroupDisruptions: res.numPodGroupDisruptions,
-		name:                   "cluster",
+	preemptorNodes := sets.New[string]()
+	for _, ni := range res.nominatedNodeNames {
+		preemptorNodes.Insert(ni.NominatedNodeName)
 	}
+	candidate := newCandidate(res.victims, "cluster", res.numPodGroupDisruptions, preemptorNodes.UnsortedList()...)
 	status = preemptionManager.Executor().ActuatePodGroupPreemption(ctx, candidate, pgInfo, names.DefaultPreemption)
 	if status.IsSuccess() {
 		status = fwk.NewStatus(fwk.Success, fmt.Sprintf("found a placement for podgroup, preempting %d victims", len(res.victims.Pods)))

@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
@@ -35,7 +38,8 @@ import (
 )
 
 // BenchmarkSlowWatcherTax measures event delivery latency through the cacher's
-// dispatch path to a healthy watcher. It needs wall-clock time; run it with:
+// dispatch path to a healthy watcher, alone and next to a companion watcher.
+// It needs wall-clock time; run it with:
 //
 //	go test ./staging/src/k8s.io/apiserver/pkg/storage/cacher/ -run xxx -bench BenchmarkSlowWatcherTax -benchtime 1x -v
 func BenchmarkSlowWatcherTax(b *testing.B) {
@@ -49,6 +53,11 @@ func BenchmarkSlowWatcherTax(b *testing.B) {
 
 	scenarios := []slowWatcherScenario{
 		{name: "baseline", eventsPerSecond: 100},
+		{name: "draining-companion", eventsPerSecond: 100, companion: true, companionDrainsChannel: true, companionReconnects: true},
+		{name: "stalled-once", eventsPerSecond: 100, companion: true},
+		{name: "stalled-reconnecting", eventsPerSecond: 100, companion: true, companionReconnects: true},
+		{name: "baseline-1000", eventsPerSecond: 1000},
+		{name: "stalled-reconnecting-1000", eventsPerSecond: 1000, companion: true, companionReconnects: true},
 	}
 	for _, scenario := range scenarios {
 		b.Run(scenario.name, func(b *testing.B) {
@@ -71,13 +80,22 @@ const (
 	// slowWatcherScenarioDuration gives 1000 samples at 100 events/s, enough
 	// to place p99 on a real sample rather than on the max.
 	slowWatcherScenarioDuration = 10 * time.Second
+	// slowWatcherReconnectEvery gives each stalled companion time to fill its
+	// channels and block the dispatcher: up to 460 ms at 100 events/s.
+	slowWatcherReconnectEvery = 500 * time.Millisecond
+	// slowWatcherBaseRV is the resourceVersion of the initial list; injected
+	// events follow it.
+	slowWatcherBaseRV = 100
 	// slowDispatchGate is a bucket boundary of DispatchStageDuration.
 	slowDispatchGate = 5 * time.Millisecond
 )
 
 type slowWatcherScenario struct {
-	name            string
-	eventsPerSecond int
+	name                   string
+	eventsPerSecond        int
+	companion              bool // a second watcher exists
+	companionDrainsChannel bool
+	companionReconnects    bool // a new companion replaces it every slowWatcherReconnectEvery
 }
 
 type slowWatcherResult struct {
@@ -97,6 +115,13 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 	// Sized so that injection never blocks and skews the injection timestamps.
 	fw := watch.NewFakeWithChanSize(totalEvents+10, false)
 	backing := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			listObj.(*example.PodList).ListMeta = metav1.ListMeta{ResourceVersion: fmt.Sprintf("%d", slowWatcherBaseRV)}
+			return nil
+		},
+		GetRVFn: func(context.Context) (uint64, error) {
+			return slowWatcherBaseRV, nil
+		},
 		WatchFn: func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
@@ -107,16 +132,46 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 	}
 	defer cacher.Stop()
 
+	// watchFromLatestRV reads latestRV on every call, so each watch it opens,
+	// every companion reconnect included, starts at the newest event.
+	var latestRV atomic.Int64
+	latestRV.Store(slowWatcherBaseRV)
+	watchFromLatestRV := func() (watch.Interface, error) {
+		return cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+			ResourceVersion: fmt.Sprintf("%d", latestRV.Load()),
+			Predicate:       storage.Everything,
+			Recursive:       true,
+		})
+	}
+
+	// The dispatch loop starts up to 10 ms after the cacher is ready; one
+	// event delivered to a throwaway watcher proves that it runs.
+	warmUp, err := watchFromLatestRV()
+	if err != nil {
+		b.Fatal(err)
+	}
+	fw.Add(&example.Pod{Name: "warm-up", Namespace: "ns", ResourceVersion: fmt.Sprintf("%d", slowWatcherBaseRV+1)})
+	<-warmUp.ResultChan()
+	warmUp.Stop()
+	for range warmUp.ResultChan() {
+	}
+	latestRV.Store(slowWatcherBaseRV + 1)
+
+	// The budget starts empty; a long-lived cacher has a full one when a client stalls.
+	cacher.dispatchTimeoutBudget.returnUnused(maxBudget)
 	before := snapshotSlowWatcherMetrics(b, registry)
 
-	healthy, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
-		ResourceVersion: "100",
-		Predicate:       storage.Everything,
-	})
+	healthy, err := watchFromLatestRV()
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer healthy.Stop()
+
+	stopCompanion := func() {}
+	if scenario.companion {
+		stopCompanion = sync.OnceFunc(openCompanionWatcher(b, scenario, watchFromLatestRV))
+	}
+	defer stopCompanion()
 
 	injected := make([]time.Time, totalEvents)
 	stopInjector := make(chan struct{})
@@ -140,8 +195,9 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 			fw.Add(&example.Pod{
 				Name:            fmt.Sprintf("pod-%06d", i),
 				Namespace:       "ns",
-				ResourceVersion: fmt.Sprintf("%d", 101+i),
+				ResourceVersion: fmt.Sprintf("%d", slowWatcherBaseRV+2+i),
 			})
+			latestRV.Store(int64(slowWatcherBaseRV + 2 + i))
 		}
 	})
 	// Runs before cacher.Stop (defers are LIFO): the reflector closes the
@@ -177,14 +233,90 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 	slices.Sort(latencies)
 
 	injector.Wait()
+	// A force close of a blocked companion happens inside the dispatch of an
+	// event, so once the dispatcher is idle, every force close of this scenario
+	// is counted.
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+		cacher.RLock()
+		defer cacher.RUnlock()
+		return !cacher.dispatching && len(cacher.incoming) == 0, nil
+	}); err != nil {
+		b.Fatalf("%s: the dispatcher did not become idle: %v", scenario.name, err)
+	}
+	// Before cacher.Stop, so that a failed reconnect is a real failure and no
+	// "Terminating all watchers" log line splits the benchmark output.
+	stopCompanion()
+	healthy.Stop()
+	// The watcher goroutine records its last histogram observation before it exits.
+	for range healthy.ResultChan() {
+	}
 	cacher.Stop()
 	// Deltas over this scenario only: the vectors are global and shared with other tests.
 	after := snapshotSlowWatcherMetrics(b, registry)
+	terminated := after.terminated - before.terminated
+	if scenario.companion && !scenario.companionDrainsChannel && terminated == 0 {
+		b.Fatalf("%s: no companion was force closed, so none blocked the dispatcher and the scenario measured nothing", scenario.name)
+	}
 	return slowWatcherResult{
 		sortedLatencies: latencies,
 		slowDispatches:  after.slowDispatches - before.slowDispatches,
-		terminated:      after.terminated - before.terminated,
+		terminated:      terminated,
 		incomingHWM:     atomic.LoadInt64((*int64)(&cacher.incomingHWM)),
+	}
+}
+
+// openCompanionWatcher opens the companion watcher and returns the func that stops it.
+func openCompanionWatcher(b *testing.B, scenario slowWatcherScenario, newWatch func() (watch.Interface, error)) (stop func()) {
+	var drained atomic.Int64
+	var drainers sync.WaitGroup
+	maybeDrain := func(w watch.Interface) {
+		if !scenario.companionDrainsChannel {
+			return
+		}
+		drainers.Go(func() {
+			for range w.ResultChan() {
+				drained.Add(1)
+			}
+		})
+	}
+
+	companion, err := newWatch()
+	if err != nil {
+		b.Fatal(err)
+	}
+	maybeDrain(companion)
+
+	done := make(chan struct{})
+	var reconnector sync.WaitGroup
+	if scenario.companionReconnects {
+		reconnector.Go(func() {
+			next := time.Now()
+			for {
+				next = next.Add(slowWatcherReconnectEvery)
+				select {
+				case <-done:
+					return
+				case <-time.After(time.Until(next)):
+				}
+				companion.Stop()
+				w, err := newWatch()
+				if err != nil {
+					b.Errorf("%s: the companion failed to reconnect: %v", scenario.name, err)
+					return
+				}
+				companion = w
+				maybeDrain(w)
+			}
+		})
+	}
+	return func() {
+		close(done)
+		reconnector.Wait()
+		companion.Stop()
+		drainers.Wait()
+		if scenario.companionDrainsChannel && drained.Load() == 0 {
+			b.Errorf("%s: the companion drained no events", scenario.name)
+		}
 	}
 }
 

@@ -44,8 +44,8 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {

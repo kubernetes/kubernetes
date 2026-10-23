@@ -1180,8 +1180,11 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 			}
 		}
 		logger.Info("Regenerating TopologyHints for CPUs already allocated")
+		// The already allocated CPUs stand in for the usable set so that the same
+		// hints come back out, but the Score still has to be read off the real
+		// free pool.
 		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), requested),
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), p.GetAvailableCPUs(s), requested),
 		}
 	}
 
@@ -1192,8 +1195,9 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	// It should be an empty CPUSet for a newly created pod.
 	reusable := p.cpusToReuse[string(pod.UID)]
 
-	// Generate hints.
-	cpuHints := p.generateCPUTopologyHints(available, reusable, requested)
+	// Generate hints. Outside of regeneration the usable CPUs are exactly the
+	// free ones, so the same set drives both feasibility and the Score.
+	cpuHints := p.generateCPUTopologyHints(available, reusable, available, requested)
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
@@ -1262,8 +1266,11 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 					}
 				}
 				logger.V(2).Info("Regenerating TopologyHints for pod-level CPUs already allocated")
+				// As in the container-level path: the allocated CPUs stand in
+				// for the usable set, but the Score is read off the real free
+				// pool.
 				return map[string][]topologymanager.TopologyHint{
-					string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), requested),
+					string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), p.GetAvailableCPUs(s), requested),
 				}
 			}
 			// The pod-level CPU set is stale: allocatePodForAdd will release it
@@ -1320,8 +1327,10 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 		}
 		if assignedCPUs.Size() == requested {
 			logger.Info("Regenerating TopologyHints for CPUs already allocated")
+			// As in the container-level path: the assigned CPUs stand in for the
+			// usable set, but the Score is read off the real free pool.
 			return map[string][]topologymanager.TopologyHint{
-				string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.New(), requested),
+				string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.New(), p.GetAvailableCPUs(s), requested),
 			}
 		}
 	}
@@ -1346,8 +1355,9 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 	// Ensure any CPUs already assigned to containers in this pod are included as part of the hint generation.
 	reusable = reusable.Union(assignedCPUs)
 
-	// Generate hints.
-	cpuHints := p.generateCPUTopologyHints(available, reusable, requested)
+	// Generate hints. Outside of regeneration the usable CPUs are exactly the
+	// free ones, so the same set drives both feasibility and the Score.
+	cpuHints := p.generateCPUTopologyHints(available, reusable, available, requested)
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
@@ -1356,12 +1366,18 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 }
 
 // generateCPUTopologyHints generates a set of TopologyHints given the set of
-// available CPUs and the number of CPUs being requested.
+// CPUs usable for this request and the number of CPUs being requested.
+//
+// usableCPUs and reusableCPUs decide which NUMA node combinations can satisfy the
+// request. freeCPUs is the set of CPUs actually unassigned on the node and feeds
+// the utilization Score only. The two differ on the hint regeneration path, where
+// the usable set is the allocation the container already holds: those CPUs are not
+// free, and scoring them as such would report the node as emptier than it is.
 //
 // It follows the convention of marking all hints that have the same number of
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
-func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+func (p *staticPolicy) generateCPUTopologyHints(usableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, freeCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
 	minAffinitySize := len(p.numaNodes)
 
@@ -1369,7 +1385,8 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(p.numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
-		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
+		cpusInMaskSet := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...)
+		cpusInMask := cpusInMaskSet.Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
 		}
@@ -1387,7 +1404,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 		// Finally, check to see if enough available CPUs remain on the current
 		// NUMA node combination to satisfy the CPU request.
-		for _, c := range availableCPUs.List() {
+		for _, c := range usableCPUs.List() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
@@ -1398,12 +1415,31 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 			return
 		}
 
+		// Compute the utilization score for this NUMA combination. Score is a
+		// snapshot of node state, so everything outside the free pool counts as
+		// assigned: CPUs this pod's init containers still hold and will hand
+		// over (reusableCPUs), and on the regeneration path the container's own
+		// allocation. Both are genuinely in use, and both raise the score of the
+		// NUMA node the pod is already tied to, which is where a packing policy
+		// should want it. It follows that the score must not depend on
+		// usableCPUs, which on the regeneration path describes the caller
+		// rather than the node.
+		//
+		// A hint spanning several NUMA nodes scores the span as a whole:
+		// everything assigned across those nodes over everything allocatable
+		// across them. That is not the mean of the per-node scores once the
+		// nodes differ in size.
+		allocatable := cpusInMaskSet.Difference(p.reservedCPUs).Size()
+		free := freeCPUs.Intersection(cpusInMaskSet).Size()
+		score := topologymanager.UtilizationScore(int64(allocatable), int64(allocatable-free))
+
 		// Otherwise, create a new hint from the numa node bitmask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
 			NUMANodeAffinity: mask,
 			Preferred:        false,
+			Score:            score,
 		})
 	})
 
@@ -1528,4 +1564,8 @@ func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopolog
 	for _, numaNode := range numaNodes {
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(numaCount[numaNode]))
 	}
+}
+
+func (p *staticPolicy) CanAllocateExclusively() bool {
+	return true
 }

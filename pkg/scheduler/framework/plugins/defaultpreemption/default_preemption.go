@@ -75,8 +75,6 @@ type DefaultPreemption struct {
 	Executor          fwk.PreemptionExecutor
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
-	pgSnapshotLister  fwk.PodGroupLister
-	cpgSnapshotLister fwk.CompositePodGroupLister
 	podGroupEvaluator podGroupEvaluator
 
 	// IsEligiblePod returns whether a victim (individual pod/pod group) is allowed to be preempted by a preemptor pod.
@@ -124,12 +122,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
-		pl.pgSnapshotLister = fh.SnapshotSharedLister().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh)
-	}
-
-	if pl.fts.EnableCompositePodGroup {
-		pl.cpgSnapshotLister = fh.SnapshotSharedLister().CompositePodGroups()
 	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim
@@ -177,31 +170,14 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 			}
 			rootUID = pg.GetUID()
 		} else {
-			snapshot, err := pl.fh.PodGroupManager().BuildHierarchySnapshotFromPod(p)
 			// If the root group cannot be resolved, do not block the pod. It's not a default preemption responsibility
 			// to block pods from a pod group whose root group is missing from entering the queue.
-			if err != nil {
-				return nil
-			}
 			podGroupKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-			rootKey, ok, err := snapshot.GetRootKeyForGroup(podGroupKey)
-			if !ok || err != nil {
+			root, err := pl.fh.PodGroupManager().FindRootGroup(podGroupKey)
+			if err != nil || root == nil {
 				return nil
 			}
-			switch rootKey.Type {
-			case fwk.PodGroupKeyType:
-				pg, err := snapshot.PodGroups().Get(rootKey.Namespace, rootKey.Name)
-				if err != nil {
-					return nil
-				}
-				rootUID = pg.GetUID()
-			case fwk.CompositePodGroupKeyType:
-				cpg, err := snapshot.CompositePodGroups().Get(rootKey.Namespace, rootKey.Name)
-				if err != nil {
-					return nil
-				}
-				rootUID = cpg.GetUID()
-			}
+			rootUID = root.GetUID()
 		}
 		if pl.Executor.IsPodGroupRunningPreemption(rootUID) {
 			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished")
@@ -464,7 +440,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
-				victim := preemption.NewPodVictim(p, pl.pgSnapshotLister, pl.cpgSnapshotLister)
+				victim := preemption.NewPodVictim(p)
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
@@ -504,7 +480,7 @@ func (pl *DefaultPreemption) isPreemptionAllowedAcrossAllVictimNodes(victim *pre
 // PodGroupPostFilter runs a default preemption for the pod group.
 func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
 	defer func() {
-		metrics.WorkloadPreemptionAttempts.WithLabelValues(status.Code().String()).Inc()
+		metrics.WorkloadPreemptionAttempts.WithLabelValues(metrics.EntityTypeToLabel(pgInfo.GetType()), status.Code().String()).Inc()
 	}()
 
 	mutableLister := pl.fh.MutableSnapshotSharedLister()

@@ -25,6 +25,8 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -105,9 +107,11 @@ func (pr *ConditionalProgressRequester) Run(stopCh <-chan struct{}) {
 				continue
 			}
 			timer.Reset(progressRequestPeriod)
-			err := pr.requestWatchProgress(ctx)
-			if err != nil {
-				klog.V(4).InfoS("Error requesting bookmark", "err", err)
+			if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
+				err := pr.requestWatchProgress(ctx)
+				if err != nil {
+					klog.V(4).InfoS("Error requesting bookmark", "err", err)
+				}
 			}
 		case <-stopCh:
 			return

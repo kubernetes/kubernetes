@@ -23,12 +23,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestDefaultBinder tests the binding process in the scheduler.

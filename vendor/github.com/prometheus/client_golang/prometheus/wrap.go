@@ -20,7 +20,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
-	"google.golang.org/protobuf/proto"
 )
 
 // WrapRegistererWith returns a Registerer wrapping the provided
@@ -212,8 +211,8 @@ func (m *wrappingMetric) Write(out *dto.Metric) error {
 	}
 	for ln, lv := range m.labels {
 		out.Label = append(out.Label, &dto.LabelPair{
-			Name:  proto.String(ln),
-			Value: proto.String(lv),
+			Name:  new(ln),
+			Value: new(lv),
 		})
 	}
 	sort.Sort(internal.LabelPairSorter(out.Label))

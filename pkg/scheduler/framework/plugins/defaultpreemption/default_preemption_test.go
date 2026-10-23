@@ -2480,6 +2480,22 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "pod terminating by preemption on the nominated node with higher priority than the preemptor",
+			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(veryHighPriority).Node("node1").Terminating().
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
+			nodes:    []string{"node1"},
+			expected: true,
+		},
+		{
+			name: "pod terminating by preemption on the nominated node with the same priority as the preemptor",
+			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(highPriority).Node("node1").Terminating().
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
+			nodes:    []string{"node1"},
+			expected: true,
+		},
+		{
 			name:     "non-victim Pods terminating",
 			pod:      st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			pods:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
@@ -2487,10 +2503,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by PodGroup in victim namespace",
+			name: "Preemptor with SchedulingGroup, terminating victim is judged by its own priority, which matches its PodGroup's",
 			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
+				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(lowPriority).PodGroupName("pg1").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
 			podGroups: []*v1beta1.PodGroup{
@@ -2498,66 +2514,6 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			},
 			nodes:    []string{"node1"},
 			features: feature.Features{EnableGenericWorkload: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by CompositePodGroup in victim namespace",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace("ns2").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, CompositePodGroup not found in victim namespace, fallback to PodGroup priority",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, PodGroup not found in victim namespace, fallback to pod priority when CompositePodGroup is enabled",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: true,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by root CompositePodGroup in multi-level CPG hierarchy",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("leaf-pg").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("leaf-pg").UID("leaf-pg").Namespace("ns2").ParentCompositePodGroup("child-cpg").Priority(veryHighPriority).Obj(),
-			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("child-cpg").UID("child-cpg").Namespace("ns2").ParentCompositePodGroup("root-cpg").Priority(veryHighPriority).Obj(),
-				st.MakeCompositePodGroup().Name("root-cpg").UID("root-cpg").Namespace("ns2").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			expected: false,
 		},
 	}
@@ -4270,20 +4226,46 @@ func (m *mockHandle) MutableSnapshotSharedLister() fwk.MutableSnapshotSharedList
 
 func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *testing.T) {
 	tests := []struct {
-		name   string
-		status *fwk.Status
+		name          string
+		status        *fwk.Status
+		isCPG         bool
+		wantPreemptor string
 	}{
 		{
-			name:   "preemption success",
-			status: fwk.NewStatus(fwk.Success),
+			name:          "podgroup preemption success",
+			status:        fwk.NewStatus(fwk.Success),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
 		},
 		{
-			name:   "preemption unschedulable",
-			status: fwk.NewStatus(fwk.Unschedulable),
+			name:          "compositepodgroup preemption success",
+			status:        fwk.NewStatus(fwk.Success),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
 		},
 		{
-			name:   "preemption error",
-			status: fwk.NewStatus(fwk.Error),
+			name:          "podgroup preemption unschedulable",
+			status:        fwk.NewStatus(fwk.Unschedulable),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
+		},
+		{
+			name:          "compositepodgroup preemption unschedulable",
+			status:        fwk.NewStatus(fwk.Unschedulable),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
+		},
+		{
+			name:          "podgroup preemption error",
+			status:        fwk.NewStatus(fwk.Error),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
+		},
+		{
+			name:          "compositepodgroup preemption error",
+			status:        fwk.NewStatus(fwk.Error),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
 		},
 	}
 
@@ -4299,16 +4281,21 @@ func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *test
 			}
 
 			expectedStatus := tt.status.Code().String()
-			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus, tt.wantPreemptor)
 
-			pgInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Obj())}
+			var pgInfo *framework.PodGroupInfo
+			if tt.isCPG {
+				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Obj())}
+			} else {
+				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Obj())}
+			}
 			pl.PodGroupPostFilter(ctx, nil, pgInfo, nil)
 
-			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus, tt.wantPreemptor)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {
-				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+				t.Errorf("Expected %s count delta for %s to be 1, got %d", expectedStatus, tt.wantPreemptor, diff)
 			}
 		})
 	}
@@ -4318,16 +4305,16 @@ type workloadPreemptionAttemptsState struct {
 	count uint64
 }
 
-func captureWorkloadPreemptionAttempts(g componentmetrics.Gatherer, status string) workloadPreemptionAttemptsState {
+func captureWorkloadPreemptionAttempts(g componentmetrics.Gatherer, status, preemptorType string) workloadPreemptionAttemptsState {
 	state := workloadPreemptionAttemptsState{}
-	if count, err := getCounterFromGatherer(g, "scheduler_workload_preemption_attempts_total", status); err == nil {
+	if count, err := getCounterFromGatherer(g, "scheduler_workload_preemption_attempts_total", status, preemptorType); err == nil {
 		state.count = count
 	}
 	return state
 }
 
-func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabelValue string) (uint64, error) {
-	vals, err := testutil.GetCounterValuesFromGatherer(g, name, nil, "result")
+func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabelValue, preemptorType string) (uint64, error) {
+	vals, err := testutil.GetCounterValuesFromGatherer(g, name, map[string]string{"preemptor": preemptorType}, "result")
 	if err != nil {
 		return 0, err
 	}
@@ -4343,11 +4330,9 @@ func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 
 // newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
 func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-		UnscheduledPods: pods,
-		Children:        children,
-	}
+	pgi := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
+	pgi.UnscheduledPods = pods
+	return pgi
 }
 
 // extractGroups is an auxiliary method to extract all PodGroups and CompositePodGroups
@@ -4367,7 +4352,7 @@ func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1beta1.PodGroup, []*v1al
 		if info.CompositePodGroup != nil {
 			cpgs = append(cpgs, info.CompositePodGroup)
 		}
-		for _, child := range info.Children {
+		for _, child := range info.Children() {
 			traverse(child)
 		}
 	}

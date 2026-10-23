@@ -9,6 +9,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 )
 
+// InstrumentationScope transforms il into an OTLP InstrumentationScope,
+// returning nil if il is the zero value.
 func InstrumentationScope(il instrumentation.Scope) *commonpb.InstrumentationScope {
 	if il == (instrumentation.Scope{}) {
 		return nil

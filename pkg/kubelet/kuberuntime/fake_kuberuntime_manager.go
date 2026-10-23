@@ -116,7 +116,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logReduction:                logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:                  logs.NewStubContainerLogManager(),
 		podLogsDirectory:            fakePodLogsDirectory,
-		actuatedState:               state.NewStateMemory(logger, nil),
+		actuatedState:               state.NewStateMemory(logger, nil, keepOnlyResourceValues),
 		createContainerFailureCache: lru.New(maxContainerStartFailureCacheEntries),
 	}
 

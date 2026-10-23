@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -151,6 +151,30 @@ func TestGeneratePlacements(t *testing.T) {
 				st.MakeNode().Name("node3").Label("topology", "d1").Obj(),
 			},
 			wantStatus: fwk.Error,
+		},
+		"with pods already scheduled in the empty string domain, returns error": {
+			podGroupInfo: makePodGroup("topology"),
+			scheduledPodGroupPods: []scheduledPod{
+				{assignedNode: "node2"},
+			},
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d1").Obj(),
+			},
+			otherNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Label("topology", "").Obj(),
+			},
+			wantStatus: fwk.Error,
+		},
+		"with nodes labeled with the empty string, skips those nodes": {
+			podGroupInfo: makePodGroup("topology"),
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d1").Obj(),
+				st.MakeNode().Name("node1").Label("topology", "").Obj(),
+			},
+			wantPlacementNodes: map[string][]string{
+				"d1": {"node0"},
+			},
+			wantStatus: fwk.Success,
 		},
 		"with already scheduled pod on node outside of snapshot, returns error": {
 			podGroupInfo: makePodGroup("topology"),
@@ -471,6 +495,51 @@ func TestGeneratePlacements(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestGetScheduledPodsTopologyDomainEmptyValue(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("empty-domain-node").Label("topology", "").Obj(),
+		st.MakeNode().Name("non-empty-domain-node").Label("topology", "d1").Obj(),
+	}
+	snapshot := cache.NewSnapshot(nil, nodes)
+	fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+	pl, err := New(tCtx, nil, fh, feature.Features{})
+	if err != nil {
+		t.Fatalf("failed when creating plugin: %v", err)
+	}
+
+	tests := map[string]struct {
+		pods []*v1.Pod
+	}{
+		"single empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+			},
+		},
+		"empty domain followed by non-empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Node("non-empty-domain-node").Obj(),
+			},
+		},
+		"non-empty domain followed by empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("non-empty-domain-node").Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Node("empty-domain-node").Obj(),
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got, err := pl.getScheduledPodsTopologyDomain("topology", tt.pods); err == nil {
+				t.Fatalf("expected error, got domain %q", got)
+			}
+		})
 	}
 }
 

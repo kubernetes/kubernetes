@@ -147,7 +147,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		}
 
 		c.cacher.watchCache.RLock()
-		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), false, rv)
+		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), rv)
 		c.cacher.watchCache.RUnlock()
 		if err != nil {
 			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
@@ -161,7 +161,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
 		}
 
-		if len(c.cacher.watchers.allWatchers) > 0 || len(c.cacher.watchers.valueWatchers) > 0 {
+		if len(c.cacher.watchers.scopeWatchers) > 0 || len(c.cacher.watchers.indexWatchers) > 0 {
 			// We could consider terminating those watchers, but given
 			// watchcache doesn't really support compaction and we don't
 			// exercise it in tests, we just throw an error here.
@@ -176,7 +176,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 
 			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.storage.UpdateListResourceVersion(rv)
+		c.cacher.watchCache.history.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}
@@ -184,19 +184,23 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 }
 
 func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+	var currentVersion int64
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var currentVersion int64
-		currentVersion, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
-		if err != nil {
-			_, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		var compactRev int64
+		currentVersion, _, compactRev, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		if err == nil && compactRev != int64(rv) {
+			currentVersion, _, compactRev, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
 		}
 		if err != nil {
 			t.Fatal(err)
+		}
+		if compactRev != int64(rv) {
+			t.Fatalf("expected compact revision %d, got %d", rv, compactRev)
 		}
 		// Wait for compaction to be observed.
 		if c.cacher.compactor != nil {

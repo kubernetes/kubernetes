@@ -40,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -197,6 +197,10 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 
 func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) CanAllocateExclusively() bool {
+	return false
 }
 
 type mockRuntimeService struct {

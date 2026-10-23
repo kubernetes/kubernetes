@@ -267,7 +267,7 @@ func TestLists(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
 			t.Run("List", func(t *testing.T) {
 				t.Parallel()
-				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withNodeNameAndNamespaceIndex)
 				t.Cleanup(terminate)
 				storagetesting.RunTestList(ctx, t, cacher, compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
 			})
@@ -292,6 +292,7 @@ func TestLists(t *testing.T) {
 func TestCompactRevision(t *testing.T) {
 	// Test requires store to observe extenal changes to compaction revision, requiring dedicated watch on compact key which is enabled by ListFromCacheSnapshot.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	forceRequestWatchProgressSupport(t)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
@@ -306,6 +307,18 @@ func TestMarkConsistent(t *testing.T) {
 	t.Log("New cache collects snapshots, list skips etcd")
 	resourceVersion1 := createObject(t, ctx, cacher)
 	etcdRequests := etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+
+	t.Log("Consistent cache marked consistent again keeps snapshots, list skips etcd")
+	cacher.cacher.MarkConsistent(true)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
 		Predicate:            storage.Everything,
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 		ResourceVersion:      resourceVersion1,
@@ -371,6 +384,31 @@ func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	return recorder.ListRequestForKey(key)
+}
+
+func TestCompactPastLastWrite(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	forceRequestWatchProgressSupport(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	createObject(t, ctx, cacher)
+	resourceVersionPastLastWrite := fmt.Sprint(increaseRVFunc(server.V3Client.Client)(ctx, t))
+	list := storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersionPastLastWrite,
+		Recursive:            true,
+	}
+
+	t.Log("List before compaction")
+	require.Empty(t, etcdListRequests(t, ctx, cacher, recorder, list))
+
+	t.Log("Same list after compaction to the listed resourceVersion")
+	compactStore(cacher, server.V3Client.Client)(ctx, t, resourceVersionPastLastWrite)
+	// TODO: Expect no requests to etcd, same as before compaction.
+	require.Len(t, etcdListRequests(t, ctx, cacher, recorder, list), 1)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -852,7 +890,8 @@ func BenchmarkStoreStats(b *testing.B) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	forceRequestWatchProgressSupport(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc)
+	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
 }

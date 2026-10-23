@@ -23,13 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func TestMain(m *testing.M) {

@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
-	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
@@ -42,10 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -241,6 +236,9 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.Cache.AddPodGroupMember(pod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.AddPod(logger, pod)
+	}
 	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
@@ -297,6 +295,10 @@ func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
 		}
 	}
 
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
+	}
+
 	// The removal of this assumed pod may have freed up resources. We trigger the AssignedPodDelete event
 	// to move other unscheduled pods, giving them a chance to be scheduled.
 	// If the forgotten pod reserved some resources in memory,
@@ -328,6 +330,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	}
 
 	sched.Cache.UpdatePodGroupMember(logger, oldPod, newPod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.UpdatePod(logger, oldPod, newPod)
+	}
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
@@ -382,6 +387,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	}
 	// If the pod is not assumed, we must clean pod group state explicitly here.
 	sched.Cache.RemovePodGroupMember(pod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
+	}
 	if pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
@@ -407,6 +415,9 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.AddPod(logger, pod)
+	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodAdd, nil, pod, nil)
 }
@@ -426,6 +437,9 @@ func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
+	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.UpdatePod(logger, oldPod, newPod)
 	}
 
 	// This pod is assigned, so it cannot be a target pod.
@@ -450,6 +464,9 @@ func (sched *Scheduler) deleteAssignedPodFromCache(pod *v1.Pod) {
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
+	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
 	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
@@ -478,13 +495,14 @@ func (sched *Scheduler) addPodGroup(obj any) {
 	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
 	gpg := fwk.NewGenericPodGroup(pg)
 	sched.Cache.AddGenericPodGroup(gpg)
+	sched.podGroupHierarchyTracker.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, pg, nil)
 }
 
 func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
@@ -497,13 +515,21 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 		return
 	}
 
+	if oldPG.UID != newPG.UID {
+		sched.deletePodGroup(oldPG)
+		sched.addPodGroup(newPG)
+		return
+	}
 	if oldPG.ResourceVersion == newPG.ResourceVersion {
 		return
 	}
 
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
+
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	gpg := fwk.NewGenericPodGroup(newPG)
 	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPG, newPG, nil)
 }
@@ -532,6 +558,7 @@ func (sched *Scheduler) deletePodGroup(obj any) {
 	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
 	gpg := fwk.NewGenericPodGroup(pg)
 	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, pg, nil, nil)
 }
@@ -549,13 +576,14 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	gpg := fwk.NewGenericCompositePodGroup(cpg)
 	sched.Cache.AddGenericPodGroup(gpg)
+	sched.podGroupHierarchyTracker.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, cpg, nil)
 }
 
 func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldCPG, ok := oldObj.(*schedulingv1alpha3.CompositePodGroup)
 	if !ok {
@@ -568,13 +596,21 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 		return
 	}
 
+	if oldCPG.UID != newCPG.UID {
+		sched.deleteCompositePodGroup(oldCPG)
+		sched.addCompositePodGroup(newCPG)
+		return
+	}
 	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
 		return
 	}
 
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
+
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	gpg := fwk.NewGenericCompositePodGroup(newCPG)
 	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldCPG, newCPG, nil)
 }
@@ -603,6 +639,7 @@ func (sched *Scheduler) deleteCompositePodGroup(obj any) {
 	logger.V(3).Info("Delete event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	gpg := fwk.NewGenericCompositePodGroup(cpg)
 	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, cpg, nil, nil)
 }
@@ -848,53 +885,4 @@ func addAllEventHandlers(
 	}
 	sched.registeredHandlers = handlers
 	return nil
-}
-
-// AdmissionCheck calls the filtering logic of noderesources/nodeport/nodeAffinity/nodename
-// and returns the failure reasons. It's used in kubelet(pkg/kubelet/lifecycle/predicate.go) and scheduler.
-// It returns the first failure if `includeAllFailures` is set to false; otherwise
-// returns all failures.
-func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
-	var admissionResults []AdmissionResult
-	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
-		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
-		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-	})
-	if len(insufficientResources) != 0 {
-		for i := range insufficientResources {
-			admissionResults = append(admissionResults, AdmissionResult{InsufficientResource: &insufficientResources[i]})
-		}
-		if !includeAllFailures {
-			return admissionResults
-		}
-	}
-
-	if matches, _ := corev1nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node()); !matches {
-		admissionResults = append(admissionResults, AdmissionResult{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod})
-		if !includeAllFailures {
-			return admissionResults
-		}
-	}
-	if !nodename.Fits(pod, nodeInfo) {
-		admissionResults = append(admissionResults, AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason})
-		if !includeAllFailures {
-			return admissionResults
-		}
-	}
-	if !nodeports.Fits(pod, nodeInfo) {
-		admissionResults = append(admissionResults, AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason})
-		if !includeAllFailures {
-			return admissionResults
-		}
-	}
-	return admissionResults
-}
-
-// AdmissionResult describes the reason why Scheduler can't admit the pod.
-// If the reason is a resource fit one, then AdmissionResult.InsufficientResource includes the details.
-type AdmissionResult struct {
-	Name                 string
-	Reason               string
-	InsufficientResource *noderesources.InsufficientResource
 }

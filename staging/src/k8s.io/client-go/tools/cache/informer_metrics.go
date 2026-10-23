@@ -23,9 +23,7 @@ limitations under the License.
 // pods).
 package cache
 
-import (
-	"sync"
-)
+import "sync"
 
 var (
 	globalInformerMetricsProvider  InformerMetricsProvider = noopInformerMetricsProvider{}
@@ -103,10 +101,29 @@ func newStoreMetrics(id InformerNameAndResource, metricsProvider InformerMetrics
 	}
 
 	if id.Reserved() {
-		metrics.storeResourceVersion = metricsProvider.NewStoreResourceVersionMetric(id)
+		metrics.storeResourceVersion = &lazyStoreResourceVersionMetric{
+			id:              id,
+			metricsProvider: metricsProvider,
+		}
 	}
 
 	return metrics
+}
+
+// lazyStoreResourceVersionMetric avoids publishing a 0 series before initial sync.
+type lazyStoreResourceVersionMetric struct {
+	id              InformerNameAndResource
+	metricsProvider InformerMetricsProvider
+
+	once   sync.Once
+	metric GaugeMetric
+}
+
+func (m *lazyStoreResourceVersionMetric) Set(value float64) {
+	m.once.Do(func() {
+		m.metric = m.metricsProvider.NewStoreResourceVersionMetric(m.id)
+	})
+	m.metric.Set(value)
 }
 
 func (noopInformerMetricsProvider) NewQueuedItemMetric(InformerNameAndResource) GaugeMetric {

@@ -32,7 +32,8 @@ func NewBuildInfoCollector() Collector {
 			"Build information about the main Go module.",
 			nil, Labels{"path": path, "version": version, "checksum": sum},
 		),
-		GaugeValue, 1)}
+		GaugeValue, 1,
+	)}
 	c.init(c.self)
 	return c
 }

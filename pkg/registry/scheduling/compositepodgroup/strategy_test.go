@@ -61,7 +61,6 @@ var (
 	notAllowedToUnsetError          = "field cannot be cleared once set"
 	minCountError                   = "must be greater than or equal to 1"
 	subdomainNameError              = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	maximumError                    = "must be less than or equal to"
 	oneOfError                      = "must specify one of: `basic`, `gang`"
 	multipleSchedulingPoliciesError = "must specify exactly one of: `basic`, `gang`"
 	multipleDisruptionModesError    = "must specify exactly one of: `single`, `all`"
@@ -208,13 +207,17 @@ func TestStrategyCreate(t *testing.T) {
 				return cpg
 			}(),
 		},
-		"too high priority": {
+		"system-node-critical priority": {
 			obj: func() *scheduling.CompositePodGroup {
 				cpg := cpg.DeepCopy()
-				cpg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return cpg
 			}(),
-			expectValidationError: maximumError,
+			expectObj: func() *scheduling.CompositePodGroup {
+				cpg := cpg.DeepCopy()
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return cpg
+			}(),
 		},
 		"multiple topology constraints": {
 			obj:                   compositePodGroupWithSchedulingConstraints("foo", "bar"),

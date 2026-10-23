@@ -22,19 +22,25 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
 type KeyScope string
@@ -43,6 +49,14 @@ const (
 	ScopeCluster   KeyScope = "Cluster"
 	ScopeNamespace KeyScope = "Namespace"
 	ScopeObject    KeyScope = "Object"
+)
+
+type KeyTarget string
+
+const (
+	KeyExisting          KeyTarget = "Existing"
+	KeyNonExistingNS     KeyTarget = "NonExistingNamespace"
+	KeyNonExistingObject KeyTarget = "NonExistingObject"
 )
 
 type RVType string
@@ -57,6 +71,43 @@ const (
 	RVFuture  RVType = "Future"
 )
 
+type FieldSelector string
+
+const (
+	FieldEverything  FieldSelector = "Everything"
+	FieldByName      FieldSelector = "ByName"
+	FieldByNamespace FieldSelector = "ByNamespace"
+	FieldByNode      FieldSelector = "ByNode"
+	FieldByEmptyNode FieldSelector = "ByEmptyNode"
+	FieldCombined    FieldSelector = "Combined"
+)
+
+type LabelSelector string
+
+const (
+	LabelEverything LabelSelector = "Everything"
+	LabelByApp      LabelSelector = "ByApp"
+)
+
+type WatcherBehavior string
+
+const (
+	WatcherFast    WatcherBehavior = "Fast"
+	WatcherSlow    WatcherBehavior = "Slow"
+	WatcherHiccup  WatcherBehavior = "Hiccup"
+	WatcherStalled WatcherBehavior = "Stalled"
+)
+
+var (
+	nodeNames     = []string{"", "node-1", "node-2"}
+	nonEmptyNodes = []string{"node-1", "node-2"}
+	appLabels     = []string{"", "app-a", "app-b"}
+	nonEmptyApps  = []string{"app-a", "app-b"}
+
+	errDeleteRejected = errors.New("delete rejected by validateDeletion")
+	errUpdateRejected = errors.New("update rejected by tryUpdate")
+)
+
 type RequestDistribution struct {
 	Op     []ChoiceWeight[correctness.OpType]
 	Get    GetDistribution
@@ -66,13 +117,18 @@ type RequestDistribution struct {
 }
 
 type GetDistribution struct {
-	IgnoreNotFound []ChoiceWeight[bool]
+	IgnoreNotFound  []ChoiceWeight[bool]
+	ResourceVersion []ChoiceWeight[RVType]
 }
 
 type ListDistribution struct {
 	Scope                []ChoiceWeight[KeyScope]
+	Recursive            []ChoiceWeight[bool]
+	FieldSelector        []ChoiceWeight[FieldSelector]
+	LabelSelector        []ChoiceWeight[LabelSelector]
 	ResourceVersion      []ChoiceWeight[RVType]
 	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
+	Limit                []ChoiceWeight[int64]
 }
 
 type UpdateDistribution struct {
@@ -80,10 +136,13 @@ type UpdateDistribution struct {
 	NoOp           []ChoiceWeight[bool]
 	CachedObject   []ChoiceWeight[bool]
 	IgnoreNotFound []ChoiceWeight[bool]
+	ValidateUpdate []ChoiceWeight[bool]
 }
 
 type DeleteDistribution struct {
-	Preconditions PreconditionsDistribution
+	Preconditions    PreconditionsDistribution
+	CachedObject     []ChoiceWeight[bool]
+	ValidateDeletion []ChoiceWeight[bool]
 }
 
 type PreconditionsDistribution struct {
@@ -92,52 +151,55 @@ type PreconditionsDistribution struct {
 }
 
 type WatchDistribution struct {
-	SendInitialEvents []ChoiceWeight[bool]
-	ResourceVersion   []ChoiceWeight[RVType]
+	KeyTarget           []ChoiceWeight[KeyTarget]
+	Scope               []ChoiceWeight[KeyScope]
+	Recursive           []ChoiceWeight[bool]
+	FieldSelector       []ChoiceWeight[FieldSelector]
+	LabelSelector       []ChoiceWeight[LabelSelector]
+	SendInitialEvents   []ChoiceWeight[bool]
+	AllowWatchBookmarks []ChoiceWeight[bool]
+	ResourceVersion     []ChoiceWeight[RVType]
+	WatcherBehavior     []ChoiceWeight[WatcherBehavior]
 }
 
 type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
-	Namespaces          int
-	Objects             int
 	RequestDistribution RequestDistribution
 }
 
 type WatchConfig struct {
 	Concurrency         int
 	Duration            time.Duration
+	SlowDelay           time.Duration
+	HiccupDuration      time.Duration
 	MaxEvents           int
 	RequestDistribution WatchDistribution
 }
 
-func generateKeys(cfg UnaryConfig) []types.NamespacedName {
-	numNamespaces := cfg.Namespaces
-	if numNamespaces <= 0 {
-		numNamespaces = 1
+func pickKeyTarget(key types.NamespacedName, dist []ChoiceWeight[KeyTarget]) types.NamespacedName {
+	if len(dist) == 0 {
+		return key
 	}
-	keys := make([]types.NamespacedName, 0, cfg.Objects)
-	for i := 0; i < cfg.Objects; i++ {
-		ns := fmt.Sprintf("ns-%d", (i%numNamespaces)+1)
-		name := fmt.Sprintf("pod-%d", (i/numNamespaces)+1)
-		keys = append(keys, types.NamespacedName{
-			Namespace: ns,
-			Name:      name,
-		})
+	switch target := PickRandom(dist); target {
+	case KeyExisting:
+		return key
+	case KeyNonExistingNS:
+		return types.NamespacedName{Namespace: "ns-nonexistent", Name: key.Name}
+	case KeyNonExistingObject:
+		return types.NamespacedName{Namespace: key.Namespace, Name: "pod-nonexistent"}
+	default:
+		panic(fmt.Sprintf("%v: unknown key target", target))
 	}
-	return keys
 }
 
 // RunUnaryTraffic drives concurrent storage operations and records all invocations.
-func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConfig) ([]correctness.Operation, error) {
+func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg UnaryConfig) ([]correctness.Operation, error) {
 	if cfg.Concurrency <= 0 {
 		return nil, fmt.Errorf("concurrency must be positive")
 	}
-	if cfg.Objects <= 0 {
-		return nil, fmt.Errorf("objects must be positive")
-	}
-	if cfg.Namespaces <= 0 {
-		return nil, fmt.Errorf("namespaces must be positive")
+	if len(objects) == 0 {
+		return nil, fmt.Errorf("objects must be non-empty")
 	}
 	if len(cfg.RequestDistribution.Op) == 0 {
 		return nil, fmt.Errorf("operations must be non-empty")
@@ -146,7 +208,6 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 		return nil, fmt.Errorf("MaxOperations must be positive")
 	}
 
-	keys := generateKeys(cfg)
 	var requestCounter atomic.Int64
 	var mu sync.Mutex
 	var operations []correctness.Operation
@@ -163,7 +224,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 					return
 				default:
 				}
-				request := randomRequest(keys, cfg.RequestDistribution, cachedObj)
+				request := randomRequest(ctx, store, objects, cfg.RequestDistribution, cachedObj)
 				if request == nil {
 					continue
 				}
@@ -200,12 +261,13 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 // RunWatchTraffic keeps cfg.Concurrency watches open until stop is closed and
 // records what each of them received. Watches still open at that point run to
 // their own deadline, so the events they already collected are not discarded.
-func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
+func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
 	var mu sync.Mutex
 	var watches []correctness.WatchOperation
 	var wg sync.WaitGroup
 	for range cfg.Concurrency {
 		wg.Go(func() {
+			var cachedObj runtime.Object
 			for {
 				select {
 				case <-ctx.Done():
@@ -214,12 +276,33 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConf
 					return
 				default:
 				}
-				request := randomWatchRequest(ctx, store, cfg.RequestDistribution)
-				response := runWatch(ctx, store, request, cfg)
+				request := randomWatchRequest(ctx, store, objects, cfg.RequestDistribution, cachedObj)
+				if request == nil {
+					continue
+				}
+				mode := WatcherFast
+				if len(cfg.RequestDistribution.WatcherBehavior) > 0 {
+					mode = PickRandom(cfg.RequestDistribution.WatcherBehavior)
+				}
+				start := time.Now()
+				response := runWatch(ctx, store, *request, mode, cfg)
+				if ev := lastNonErrorEvent(response.Events); ev != nil {
+					cachedObj = ev.Object
+				}
 
 				mu.Lock()
-				watches = append(watches, correctness.WatchOperation{Request: request, Response: response})
+				watches = append(watches, correctness.WatchOperation{Request: *request, Response: response})
 				mu.Unlock()
+
+				if elapsed := time.Since(start); elapsed < cfg.HiccupDuration {
+					select {
+					case <-ctx.Done():
+						return
+					case <-stop:
+						return
+					case <-time.After(cfg.HiccupDuration - elapsed):
+					}
+				}
 			}
 		})
 	}
@@ -227,7 +310,16 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConf
 	return watches
 }
 
-func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached runtime.Object) *correctness.Request {
+func lastNonErrorEvent(events []watch.Event) *watch.Event {
+	for i := len(events) - 1; i >= 0; i-- {
+		if ev := events[i]; ev.Type != watch.Error && ev.Object != nil {
+			return &ev
+		}
+	}
+	return nil
+}
+
+func randomRequest(ctx context.Context, store storage.Interface, keys []types.NamespacedName, dist RequestDistribution, cached runtime.Object) *correctness.Request {
 	key := keys[rand.Intn(len(keys))]
 
 	switch selectedOp := PickRandom(dist.Op); selectedOp {
@@ -246,23 +338,52 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 		if !ok {
 			return nil
 		}
+		useCached := PickRandom(dist.Delete.CachedObject)
+		if useCached && cached == nil {
+			return nil
+		}
+		var cachedExisting runtime.Object
+		if useCached {
+			cachedExisting = cached.DeepCopyObject()
+		}
+		var validateDeletion storage.ValidateObjectFunc
+		if PickRandom(dist.Delete.ValidateDeletion) {
+			rejectedNode := nodeNames[rand.Intn(len(nodeNames))]
+			validateDeletion = func(ctx context.Context, obj runtime.Object) error {
+				if obj.(*api.Pod).Spec.NodeName == rejectedNode {
+					return errDeleteRejected
+				}
+				return nil
+			}
+		}
 		return &correctness.Request{
 			Op:  correctness.OpDelete,
 			Key: storageKey(key),
 			Delete: correctness.DeleteRequest{
-				Preconditions: preconditions,
+				Preconditions:        preconditions,
+				ValidateDeletion:     validateDeletion,
+				CachedExistingObject: cachedExisting,
 			},
 		}
 	case correctness.OpGet:
+		rv, ok := resolveResourceVersion(ctx, store, PickRandom(dist.Get.ResourceVersion), cached)
+		if !ok {
+			return nil
+		}
 		return &correctness.Request{
 			Op:  correctness.OpGet,
 			Key: storageKey(key),
 			Get: correctness.GetRequest{
-				Options: storage.GetOptions{IgnoreNotFound: PickRandom(dist.Get.IgnoreNotFound)},
+				Options: storage.GetOptions{
+					IgnoreNotFound:  PickRandom(dist.Get.IgnoreNotFound),
+					ResourceVersion: rv,
+				},
 			},
 		}
 	case correctness.OpList:
-		opts := storage.ListOptions{Predicate: storage.Everything}
+		opts := storage.ListOptions{
+			Predicate: pickPredicate(key, dist.List.FieldSelector, dist.List.LabelSelector),
+		}
 		var listKey string
 		switch scope := PickRandom(dist.List.Scope); scope {
 		case ScopeCluster:
@@ -274,26 +395,22 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 		default:
 			panic(fmt.Sprintf("%v: unknown list scope", scope))
 		}
-		switch rvType := PickRandom(dist.List.ResourceVersion); rvType {
-		case RVEmpty:
-		case RVZero:
-			opts.ResourceVersion = "0"
+		if len(dist.List.Recursive) > 0 {
+			opts.Recursive = PickRandom(dist.List.Recursive)
+		}
+		rv, ok := resolveResourceVersion(ctx, store, PickRandom(dist.List.ResourceVersion), cached)
+		if !ok {
+			return nil
+		}
+		opts.ResourceVersion = rv
+		if rv != "" {
 			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
-			if opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
+			if rv == "0" && opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 				return nil
 			}
-		case RVCached:
-			if cached == nil {
-				return nil
-			}
-			accessor, err := meta.Accessor(cached)
-			if err != nil {
-				panic(err)
-			}
-			opts.ResourceVersion = accessor.GetResourceVersion()
-			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
-		default:
-			panic(fmt.Sprintf("%v: unknown list RVType", rvType))
+		}
+		if len(dist.List.Limit) > 0 && rv != "0" {
+			opts.Predicate.Limit = PickRandom(dist.List.Limit)
 		}
 		return &correctness.Request{
 			Op:   correctness.OpList,
@@ -318,12 +435,7 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 		if useCached {
 			cachedExisting = cached.DeepCopyObject()
 		}
-		updateFn := randomUpdate(key)
-		if noOp {
-			updateFn = storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-				return obj.(*api.Pod).DeepCopy(), nil
-			})
-		}
+		validateUpdate := PickRandom(dist.Update.ValidateUpdate)
 		return &correctness.Request{
 			Op:  correctness.OpUpdate,
 			Key: storageKey(key),
@@ -331,11 +443,39 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 				IgnoreNotFound:       ignoreNotFound,
 				Preconditions:        preconditions,
 				CachedExistingObject: cachedExisting,
-				UpdateFunc:           updateFn,
+				UpdateFunc:           randomUpdate(key, noOp, validateUpdate),
 			},
 		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
+	}
+}
+
+func resolveResourceVersion(ctx context.Context, store storage.Interface, rvType RVType, cached runtime.Object) (string, bool) {
+	switch rvType {
+	case RVEmpty:
+		return "", true
+	case RVZero:
+		return "0", true
+	case RVOne:
+		return "1", true
+	case RVCached:
+		if cached == nil {
+			return "", false
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return accessor.GetResourceVersion(), true
+	case RVCurrent:
+		return relativeRV(ctx, store, 0), true
+	case RVPast:
+		return relativeRV(ctx, store, -int64(1+rand.Intn(200))), true
+	case RVFuture:
+		return relativeRV(ctx, store, int64(1+rand.Intn(200))), true
+	default:
+		panic(fmt.Sprintf("%v: unknown RVType", rvType))
 	}
 }
 
@@ -368,10 +508,19 @@ func storageKey(key types.NamespacedName) string {
 	return "/pods/" + key.String()
 }
 
-func randomUpdate(key types.NamespacedName) storage.UpdateFunc {
+func randomUpdate(key types.NamespacedName, noOp, validateUpdate bool) storage.UpdateFunc {
 	version := strconv.Itoa(rand.Intn(10000))
+	nodeName := nodeNames[rand.Intn(len(nodeNames))]
+	appLabel := appLabels[rand.Intn(len(appLabels))]
+	rejectedNode := nodeNames[rand.Intn(len(nodeNames))]
 	return func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		pod := obj.(*api.Pod).DeepCopy()
+		if validateUpdate && pod.Spec.NodeName == rejectedNode {
+			return nil, nil, errUpdateRejected
+		}
+		if noOp {
+			return pod, nil, nil
+		}
 		if pod.Name == "" {
 			pod = validPod(key.Namespace, key.Name)
 		}
@@ -379,6 +528,12 @@ func randomUpdate(key types.NamespacedName) storage.UpdateFunc {
 			pod.Annotations = make(map[string]string)
 		}
 		pod.Annotations["version"] = version
+		pod.Spec.NodeName = nodeName
+		if appLabel == "" {
+			pod.Labels = nil
+		} else {
+			pod.Labels = map[string]string{"app": appLabel}
+		}
 		return pod, nil, nil
 	}
 }
@@ -391,7 +546,11 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	case correctness.OpCreate:
 		err = store.Create(ctx, key, request.Create.Object, out, 0)
 	case correctness.OpDelete:
-		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		validateDeletion := request.Delete.ValidateDeletion
+		if validateDeletion == nil {
+			validateDeletion = storage.ValidateAllObjectFunc
+		}
+		err = store.Delete(ctx, key, out, request.Delete.Preconditions, validateDeletion, request.Delete.CachedExistingObject, storage.DeleteOptions{})
 	case correctness.OpGet:
 		err = store.Get(ctx, key, request.Get.Options, out)
 	case correctness.OpList:
@@ -403,7 +562,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
 			return correctness.Response{
 				Err: err,
 			}
@@ -416,30 +575,43 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	return response
 }
 
-func randomWatchRequest(ctx context.Context, store storage.Interface, distribution WatchDistribution) correctness.WatchRequest {
-	var rv string
+func randomWatchRequest(ctx context.Context, store storage.Interface, keys []types.NamespacedName, distribution WatchDistribution, cached runtime.Object) *correctness.WatchRequest {
 	watchList := PickRandom(distribution.SendInitialEvents)
 	selected := PickRandom(distribution.ResourceVersion)
 	for watchList && selected == RVFuture {
 		selected = PickRandom(distribution.ResourceVersion)
 	}
-	switch selected {
-	case RVEmpty:
-		rv = ""
-	case RVZero:
-		rv = "0"
-	case RVOne:
-		rv = "1"
-	case RVCurrent:
-		rv = relativeRV(ctx, store, 0)
-	case RVPast:
-		rv = relativeRV(ctx, store, -int64(1+rand.Intn(10)))
-	case RVFuture:
-		rv = relativeRV(ctx, store, int64(1+rand.Intn(10)))
-	default:
-		panic(fmt.Sprintf("%v: unknown watch request type", selected))
+	rv, ok := resolveResourceVersion(ctx, store, selected, cached)
+	if !ok {
+		return nil
 	}
-	opts := storage.ListOptions{ResourceVersion: rv, Predicate: storage.Everything, Recursive: true}
+
+	key := pickKeyTarget(keys[rand.Intn(len(keys))], distribution.KeyTarget)
+
+	watchKey := "/pods/"
+	recursive := true
+	if len(distribution.Scope) > 0 {
+		switch scope := PickRandom(distribution.Scope); scope {
+		case ScopeCluster:
+			watchKey, recursive = "/pods/", true
+		case ScopeNamespace:
+			watchKey, recursive = "/pods/"+key.Namespace, true
+		case ScopeObject:
+			watchKey, recursive = storageKey(key), false
+		default:
+			panic(fmt.Sprintf("%v: unknown watch scope", scope))
+		}
+	}
+	if len(distribution.Recursive) > 0 {
+		recursive = PickRandom(distribution.Recursive)
+	}
+
+	pred := pickPredicate(key, distribution.FieldSelector, distribution.LabelSelector)
+	if len(distribution.AllowWatchBookmarks) > 0 {
+		pred.AllowWatchBookmarks = PickRandom(distribution.AllowWatchBookmarks)
+	}
+
+	opts := storage.ListOptions{ResourceVersion: rv, Predicate: pred, Recursive: recursive}
 	switch {
 	case watchList:
 		opts.Predicate.AllowWatchBookmarks = true
@@ -451,7 +623,58 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		opts.SendInitialEvents = new(false)
 		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 	}
-	return correctness.WatchRequest{Key: "/pods/", Options: opts}
+	return &correctness.WatchRequest{Key: watchKey, Options: opts}
+}
+
+func pickPredicate(key types.NamespacedName, fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWeight[LabelSelector]) storage.SelectionPredicate {
+	node := nonEmptyNodes[rand.Intn(len(nonEmptyNodes))]
+	app := nonEmptyApps[rand.Intn(len(nonEmptyApps))]
+
+	fieldSel := fields.Everything()
+	var indexFields []string
+	if len(fieldDist) > 0 {
+		switch fs := PickRandom(fieldDist); fs {
+		case FieldEverything:
+			fieldSel = fields.Everything()
+		case FieldByName:
+			fieldSel = fields.OneTermEqualSelector("metadata.name", key.Name)
+		case FieldByNamespace:
+			fieldSel = fields.OneTermEqualSelector("metadata.namespace", key.Namespace)
+		case FieldByNode:
+			fieldSel = fields.OneTermEqualSelector("spec.nodeName", node)
+			indexFields = []string{"spec.nodeName"}
+		case FieldByEmptyNode:
+			fieldSel = fields.OneTermEqualSelector("spec.nodeName", "")
+			indexFields = []string{"spec.nodeName"}
+		case FieldCombined:
+			fieldSel = fields.AndSelectors(
+				fields.OneTermEqualSelector("metadata.namespace", key.Namespace),
+				fields.OneTermEqualSelector("spec.nodeName", node),
+			)
+			indexFields = []string{"spec.nodeName"}
+		default:
+			panic(fmt.Sprintf("%v: unknown field selector", fs))
+		}
+	}
+
+	labelSel := labels.Everything()
+	if len(labelDist) > 0 {
+		switch ls := PickRandom(labelDist); ls {
+		case LabelEverything:
+			labelSel = labels.Everything()
+		case LabelByApp:
+			labelSel = labels.SelectorFromSet(labels.Set{"app": app})
+		default:
+			panic(fmt.Sprintf("%v: unknown label selector", ls))
+		}
+	}
+
+	return storage.SelectionPredicate{
+		Label:       labelSel,
+		Field:       fieldSel,
+		GetAttrs:    registrypod.GetAttrs,
+		IndexFields: indexFields,
+	}
 }
 
 func relativeRV(ctx context.Context, store storage.Interface, offset int64) string {
@@ -462,10 +685,23 @@ func relativeRV(ctx context.Context, store storage.Interface, offset int64) stri
 	return strconv.FormatInt(max(int64(currentRV)+offset, 1), 10)
 }
 
-func runWatch(ctx context.Context, store storage.Interface, req correctness.WatchRequest, cfg WatchConfig) correctness.WatchResponse {
-	w, err := store.Watch(ctx, req.Key, req.Options)
+func runWatch(ctx context.Context, store storage.Interface, req correctness.WatchRequest, mode WatcherBehavior, cfg WatchConfig) correctness.WatchResponse {
+	// Cacher schedules a pre-timeout bookmark 2s before the context deadline.
+	// Setting a deadline just over 2s triggers periodic bookmarks within the
+	// test watch window while timer.C still terminates the watch after cfg.Duration.
+	watchCtx, cancel := context.WithTimeout(ctx, 2*time.Second+cfg.HiccupDuration)
+	defer cancel()
+	switch parts := strings.Split(strings.Trim(req.Key, "/"), "/"); len(parts) {
+	case 2:
+		watchCtx = genericapirequest.WithNamespace(watchCtx, parts[1])
+	case 3:
+		watchCtx = genericapirequest.WithNamespace(watchCtx, parts[1])
+		watchCtx = genericapirequest.WithRequestInfo(watchCtx, &genericapirequest.RequestInfo{Name: parts[2]})
+	}
+
+	w, err := store.Watch(watchCtx, req.Key, req.Options)
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || apierrors.IsTooManyRequests(err) {
 			return correctness.WatchResponse{Err: err}
 		}
 		panic(err)
@@ -475,8 +711,42 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 	timer := time.NewTimer(cfg.Duration)
 	defer timer.Stop()
 
+	if mode == WatcherStalled && watchCtx.Err() == nil {
+		stalledTimer := timer.C
+		if cfg.HiccupDuration > 0 {
+			stalledTimer = time.After(cfg.HiccupDuration)
+		}
+		select {
+		case <-ctx.Done():
+			return correctness.WatchResponse{Err: ctx.Err()}
+		case <-stalledTimer:
+			return correctness.WatchResponse{}
+		}
+	}
+
+	initialEventsDone := req.Options.SendInitialEvents == nil || !*req.Options.SendInitialEvents
+	hiccupDone := mode != WatcherHiccup
 	var events []watch.Event
 	for {
+		if initialEventsDone {
+			var delay time.Duration
+			switch {
+			case !hiccupDone && len(events) > 0:
+				delay = cfg.HiccupDuration
+				hiccupDone = true
+			case mode == WatcherSlow:
+				delay = cfg.SlowDelay
+			}
+			if delay > 0 {
+				select {
+				case <-ctx.Done():
+					return correctness.WatchResponse{Events: events, Err: ctx.Err()}
+				case <-timer.C:
+					return correctness.WatchResponse{Events: events}
+				case <-time.After(delay):
+				}
+			}
+		}
 		select {
 		case <-ctx.Done():
 			return correctness.WatchResponse{Events: events, Err: ctx.Err()}
@@ -490,6 +760,9 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 				event.Object = cacheable.GetObject()
 			}
 			events = append(events, event)
+			if event.Type == watch.Bookmark {
+				initialEventsDone = true
+			}
 			if event.Type == watch.Error {
 				_, open := <-w.ResultChan()
 				if open {
@@ -507,12 +780,20 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 func validPod(namespace, name string) *api.Pod {
 	gracePeriod := int64(30)
 	enableServiceLinks := true
+	nodeName := nodeNames[rand.Intn(len(nodeNames))]
+	appLabel := appLabels[rand.Intn(len(appLabels))]
+	var podLabels map[string]string
+	if appLabel != "" {
+		podLabels = map[string]string{"app": appLabel}
+	}
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
+			Labels:    podLabels,
 		},
 		Spec: api.PodSpec{
+			NodeName:                      nodeName,
 			RestartPolicy:                 api.RestartPolicyAlways,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			DNSPolicy:                     api.DNSClusterFirst,

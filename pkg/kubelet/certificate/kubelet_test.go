@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
@@ -60,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

@@ -41,10 +41,15 @@ func init() {
 			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
@@ -60,6 +65,11 @@ func init() {
 			},
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"status.storageHealth[*].healthConditions[*].reason": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-condition-reason"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"status.storageHealth[*].name": {
 				{ErrorType: "FieldValueRequired"},

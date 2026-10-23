@@ -28,10 +28,10 @@ func TestQuantityProtoMarshal(t *testing.T) {
 		quantity string
 		expect   Quantity
 	}{
-		{"0", Quantity{i: int64Amount{value: 0, scale: 0}, s: "0", Format: DecimalSI}},
-		{"100m", Quantity{i: int64Amount{value: 100, scale: -3}, s: "100m", Format: DecimalSI}},
-		{"50m", Quantity{i: int64Amount{value: 50, scale: -3}, s: "50m", Format: DecimalSI}},
-		{"10000T", Quantity{i: int64Amount{value: 10000, scale: 12}, s: "10000T", Format: DecimalSI}},
+		{"0", Quantity{i: int64Amount{value: 0, scale: 0}, s: newCachedString("0", DecimalSI), Format: DecimalSI}},
+		{"100m", Quantity{i: int64Amount{value: 100, scale: -3}, s: newCachedString("100m", DecimalSI), Format: DecimalSI}},
+		{"50m", Quantity{i: int64Amount{value: 50, scale: -3}, s: newCachedString("50m", DecimalSI), Format: DecimalSI}},
+		{"10000T", Quantity{i: int64Amount{value: 10000, scale: 12}, s: newCachedString("10000T", DecimalSI), Format: DecimalSI}},
 	}
 	for _, testCase := range table {
 		q := MustParse(testCase.quantity)
@@ -47,9 +47,9 @@ func TestQuantityProtoMarshal(t *testing.T) {
 		dec    *inf.Dec
 		expect Quantity
 	}{
-		{dec(0, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}},
-		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}},
-		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}},
+		{dec(0, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: newCachedString("0", DecimalSI), Format: DecimalSI}},
+		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: newCachedString("10", DecimalSI), Format: DecimalSI}},
+		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: newCachedString("-10", DecimalSI), Format: DecimalSI}},
 	}
 	for _, testCase := range table2 {
 		q := Quantity{d: infDecAmount{testCase.dec}, Format: DecimalSI}
@@ -67,14 +67,14 @@ func TestQuantitySizeDoesNotMutateReceiver(t *testing.T) {
 	// Protobuf encoding recomputing the canonical string twice (once in Size(),
 	// once in MarshalToSizedBuffer()) is the accepted cost of that guarantee.
 	q := decQuantity(1000, 6, DecimalSI) // canonicalizes to "1G", built without a cached string
-	if len(q.s) != 0 {
-		t.Fatalf("test precondition failed: expected no cached string, got %q", q.s)
+	if len(q.s.str) != 0 {
+		t.Fatalf("test precondition failed: expected no cached string, got %q", q.s.str)
 	}
 	if n := q.Size(); n <= 0 {
 		t.Fatalf("Size() = %d, expected a positive value", n)
 	}
-	if len(q.s) != 0 {
-		t.Errorf("Size() unexpectedly mutated q.s to %q", q.s)
+	if len(q.s.str) != 0 {
+		t.Errorf("Size() unexpectedly mutated q.s to %q", q.s.str)
 	}
 }
 
@@ -84,10 +84,10 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 		input  Quantity
 		expect string
 	}{
-		{Quantity{i: int64Amount{value: 0, scale: 0}, s: "0", Format: DecimalSI}, "0"},
-		{Quantity{i: int64Amount{value: 100, scale: -3}, s: "100m", Format: DecimalSI}, "100m"},
-		{Quantity{i: int64Amount{value: 50, scale: -3}, s: "50m", Format: DecimalSI}, "50m"},
-		{Quantity{i: int64Amount{value: 10000, scale: 12}, s: "10000T", Format: DecimalSI}, "10000T"},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, s: newCachedString("0", DecimalSI), Format: DecimalSI}, "0"},
+		{Quantity{i: int64Amount{value: 100, scale: -3}, s: newCachedString("100m", DecimalSI), Format: DecimalSI}, "100m"},
+		{Quantity{i: int64Amount{value: 50, scale: -3}, s: newCachedString("50m", DecimalSI), Format: DecimalSI}, "50m"},
+		{Quantity{i: int64Amount{value: 10000, scale: 12}, s: newCachedString("10000T", DecimalSI), Format: DecimalSI}, "10000T"},
 	}
 	for _, testCase := range table {
 		var inputQ Quantity
@@ -103,9 +103,9 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 		input  Quantity
 		expect *inf.Dec
 	}{
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}, dec(0, 0).Dec},
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}, dec(10, 0).Dec},
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}, dec(-10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: newCachedString("0", DecimalSI), Format: DecimalSI}, dec(0, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: newCachedString("10", DecimalSI), Format: DecimalSI}, dec(10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: newCachedString("-10", DecimalSI), Format: DecimalSI}, dec(-10, 0).Dec},
 	}
 	for _, testCase := range table2 {
 		var inputQ Quantity

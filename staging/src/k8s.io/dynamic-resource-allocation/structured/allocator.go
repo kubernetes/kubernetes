@@ -78,8 +78,7 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
 }
 
-func NewDeviceConsumedCapacity(deviceID DeviceID,
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
+func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 

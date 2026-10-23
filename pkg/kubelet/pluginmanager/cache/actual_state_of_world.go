@@ -57,6 +57,7 @@ type ActualStateOfWorld interface {
 
 	// PluginExistsWithCorrectTimestamp checks if the given plugin exists in the current actual
 	// state of world cache with the correct timestamp.
+	//
 	// Deprecated: please use `PluginExistsWithCorrectUUID` instead as it provides a better
 	// cross-platform support
 	PluginExistsWithCorrectTimestamp(pluginInfo PluginInfo) bool

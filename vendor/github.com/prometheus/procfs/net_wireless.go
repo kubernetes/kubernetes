@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Wireless models the content of /proc/net/wireless.
@@ -61,7 +61,7 @@ type Wireless struct {
 
 // Wireless returns kernel wireless statistics.
 func (fs FS) Wireless() ([]*Wireless, error) {
-	b, err := util.ReadFileNoStat(fs.proc.Path("net/wireless"))
+	b, err := parsers.ReadFileNoStat(fs.proc.Path("net/wireless"))
 	if err != nil {
 		return nil, err
 	}

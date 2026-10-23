@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,12 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting/initoption"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -53,31 +54,31 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
 )
 
 type operationCode string
 
 const (
-	allocResourceClaimsOpcode    operationCode = "allocResourceClaims"
-	createAnyOpcode              operationCode = "createAny"
-	createNodesOpcode            operationCode = "createNodes"
-	createNamespacesOpcode       operationCode = "createNamespaces"
-	createPodsOpcode             operationCode = "createPods"
-	createPodSetsOpcode          operationCode = "createPodSets"
-	deletePodsOpcode             operationCode = "deletePods"
-	createResourceClaimsOpcode   operationCode = "createResourceClaims"
-	churnOpcode                  operationCode = "churn"
-	updateAnyOpcode              operationCode = "updateAny"
-	barrierOpcode                operationCode = "barrier"
-	sleepOpcode                  operationCode = "sleep"
-	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
-	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
-	createPodGroupsOpcode        operationCode = "createPodGroups"
-	startCollectingProfileOpcode operationCode = "startCollectingProfile"
-	stopCollectingProfileOpcode  operationCode = "stopCollectingProfile"
+	allocResourceClaimsOpcode      operationCode = "allocResourceClaims"
+	createAnyOpcode                operationCode = "createAny"
+	createNodesOpcode              operationCode = "createNodes"
+	createNamespacesOpcode         operationCode = "createNamespaces"
+	createPodsOpcode               operationCode = "createPods"
+	createPodSetsOpcode            operationCode = "createPodSets"
+	deletePodsOpcode               operationCode = "deletePods"
+	createResourceClaimsOpcode     operationCode = "createResourceClaims"
+	churnOpcode                    operationCode = "churn"
+	updateAnyOpcode                operationCode = "updateAny"
+	barrierOpcode                  operationCode = "barrier"
+	sleepOpcode                    operationCode = "sleep"
+	startCollectingMetricsOpcode   operationCode = "startCollectingMetrics"
+	stopCollectingMetricsOpcode    operationCode = "stopCollectingMetrics"
+	createPodGroupsOpcode          operationCode = "createPodGroups"
+	createCompositePodGroupsOpcode operationCode = "createCompositePodGroups"
+	startCollectingProfileOpcode   operationCode = "startCollectingProfile"
+	stopCollectingProfileOpcode    operationCode = "stopCollectingProfile"
 )
 
 const (
@@ -178,6 +179,7 @@ var (
 		names.DefaultBinder,
 		names.DefaultPreemption,
 		names.DynamicResources,
+		names.GangScheduling,
 		names.ImageLocality,
 		names.InterPodAffinity,
 		names.NodeAffinity,
@@ -467,6 +469,22 @@ func (p *params) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// set stores an integer parameter for subsequent operations that need it.
+func (p *params) set(key string, val int) error {
+	if p.params == nil {
+		p.params = map[string]any{}
+	}
+	if p.isUsed == nil {
+		p.isUsed = map[string]bool{}
+	}
+	if _, exists := p.params[key]; exists && !p.isUsed[key] {
+		return fmt.Errorf("parameter %s is already defined", key)
+	}
+	p.params[key] = float64(val)
+	p.isUsed[key] = false
+	return nil
+}
+
 // get retrieves the parameter as an integer
 func (p params) get(key string) (int, error) {
 	// JSON unmarshal integer constants in an "any" field as float.
@@ -514,23 +532,24 @@ type op struct {
 // which op we're decoding at runtime.
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := map[operationCode]realOp{
-		allocResourceClaimsOpcode:    &allocResourceClaimsOp{},
-		createAnyOpcode:              &createAny{},
-		createNodesOpcode:            &createNodesOp{},
-		createNamespacesOpcode:       &createNamespacesOp{},
-		createPodsOpcode:             &createPodsOp{},
-		createPodSetsOpcode:          &createPodSetsOp{},
-		deletePodsOpcode:             &deletePodsOp{},
-		createResourceClaimsOpcode:   &createResourceClaimsOp{},
-		churnOpcode:                  &churnOp{},
-		updateAnyOpcode:              &updateAny{},
-		barrierOpcode:                &barrierOp{},
-		sleepOpcode:                  &sleepOp{},
-		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
-		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
-		createPodGroupsOpcode:        &createPodGroups{},
-		startCollectingProfileOpcode: &startCollectingProfileOp{},
-		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
+		allocResourceClaimsOpcode:      &allocResourceClaimsOp{},
+		createAnyOpcode:                &createAny{},
+		createNodesOpcode:              &createNodesOp{},
+		createNamespacesOpcode:         &createNamespacesOp{},
+		createPodsOpcode:               &createPodsOp{},
+		createPodSetsOpcode:            &createPodSetsOp{},
+		deletePodsOpcode:               &deletePodsOp{},
+		createResourceClaimsOpcode:     &createResourceClaimsOp{},
+		churnOpcode:                    &churnOp{},
+		updateAnyOpcode:                &updateAny{},
+		barrierOpcode:                  &barrierOp{},
+		sleepOpcode:                    &sleepOp{},
+		startCollectingMetricsOpcode:   &startCollectingMetricsOp{},
+		stopCollectingMetricsOpcode:    &stopCollectingMetricsOp{},
+		createPodGroupsOpcode:          &createPodGroups{},
+		createCompositePodGroupsOpcode: &createCompositePodGroups{},
+		startCollectingProfileOpcode:   &startCollectingProfileOp{},
+		stopCollectingProfileOpcode:    &stopCollectingProfileOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
@@ -599,7 +618,7 @@ func isValidCount(allowParameterization bool, count int, countParam string) bool
 	return isValidParameterizable(countParam)
 }
 
-func initTestOutput(tb testing.TB) io.Writer {
+func initTestOutput(tb testutils.TB) io.Writer {
 	var output io.Writer
 	if UseTestingLog {
 		output = framework.NewTBWriter(tb)
@@ -632,7 +651,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
+func setupTestCase(t ktesting.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -740,32 +759,6 @@ func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featurega
 	return result
 }
 
-// fixJSONOutput works around Go not emitting a "pass" action for
-// sub-benchmarks
-// (https://github.com/golang/go/issues/66825#issuecomment-2343229005), which
-// causes gotestsum to report a successful benchmark run as failed
-// (https://github.com/gotestyourself/gotestsum/issues/413#issuecomment-2343206787).
-//
-// It does this by printing the missing "PASS" output line that test2json
-// then converts into the "pass" action.
-func fixJSONOutput(b *testing.B) {
-	if !slices.Contains(os.Args, "-test.v=test2json") {
-		// Not printing JSON.
-		return
-	}
-
-	start := time.Now()
-	b.Cleanup(func() {
-		if b.Failed() {
-			// Really has failed, do nothing.
-			return
-		}
-		// SYN gets injected when using -test.v=test2json, see
-		// https://cs.opensource.google/go/go/+/refs/tags/go1.23.3:src/testing/testing.go;drc=87ec2c959c73e62bfae230ef7efca11ec2a90804;l=527
-		fmt.Fprintf(os.Stderr, "%c--- PASS: %s (%.2fs)\n", 22 /* SYN */, b.Name(), time.Since(start).Seconds())
-	})
-}
-
 // RunBenchmarkPerfScheduling runs the scheduler performance benchmark tests.
 //
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
@@ -787,7 +780,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 	if err = validateTestCases(testCases); err != nil {
 		b.Fatal(err)
 	}
-	fixJSONOutput(b)
+	framework.FixBenchmarkJSONOutput(b)
 
 	if testing.Short() {
 		PerfSchedulingLabelFilter += ",+short"
@@ -807,13 +800,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 	dataItems := DataItems{Version: "v1"}
 	for _, tc := range testCases {
 		b.Run(tc.Name, func(b *testing.B) {
-			fixJSONOutput(b)
+			framework.FixBenchmarkJSONOutput(b)
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						b.Skipf("disabled by label filter %q", PerfSchedulingLabelFilter)
 					}
-					fixJSONOutput(b)
+					framework.FixBenchmarkJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(b, tc, featureGates, w, opts)
@@ -916,7 +909,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 }
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
-func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) {
+func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) { //nolint:forbidigo // calls t.Run, which requires *testing.T
 	opts := &schedulerPerfOptions{}
 	for _, option := range options {
 		option(opts)
@@ -936,9 +929,9 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 	testcaseLabelSelectors := strings.Split(TestSchedulingLabelFilter, ",")
 
 	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 			for _, w := range tc.Workloads {
-				t.Run(w.Name, func(t *testing.T) {
+				t.Run(w.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
@@ -986,7 +979,7 @@ func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
-func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
+func unrollWorkloadTemplate(tb testutils.TB, wt []op, w *Workload) []op {
 	var unrolled []op
 	for opIndex, o := range wt {
 		realOp, err := o.realOp.patchParams(w)
@@ -1128,6 +1121,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		podGroupInformer:             informerFactory.Scheduling().V1beta1().PodGroups(),
+		compositePodGroupInformer:    informerFactory.Scheduling().V1alpha3().CompositePodGroups(),
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

@@ -995,14 +995,20 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, err
 				}
 
-				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				var found bool
+				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
 				if err != nil {
+					// A missing file is equivalent to a missing key: the env var is
+					// simply not published when the reference is optional.
+					if optional && goerrors.Is(err, os.ErrNotExist) {
+						continue
+					}
 					logger.Error(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
 				}
 
 				// If the key was not found, and it's not optional, return an error
-				if runtimeVal == "" {
+				if !found {
 					if optional {
 						// If the key doesn't exist, and it's optional, skip this environment variable
 						continue
@@ -1939,14 +1945,22 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// Perform a three-way merge between the statuses from the status manager,
 	// runtime, and generated status to ensure terminal status is correctly set.
-	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+	// A phase already recorded as Failed is kept even when the container exit
+	// codes alone would compute Succeeded: the kubelet may have failed the pod
+	// for a reason the containers cannot see, such as an eviction whose
+	// SIGTERM the container handled by exiting 0.
+	if s.Phase != v1.PodFailed {
 		switch {
 		case oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded:
-			logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
-			s.Phase = oldPodStatus.Phase
+			if s.Phase != oldPodStatus.Phase {
+				logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
+				s.Phase = oldPodStatus.Phase
+			}
 		case pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded:
-			logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
-			s.Phase = pod.Status.Phase
+			if s.Phase != pod.Status.Phase {
+				logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
+				s.Phase = pod.Status.Phase
+			}
 		}
 	}
 
