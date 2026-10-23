@@ -48,6 +48,7 @@ func (in *GenericControllerManagerConfiguration) DeepCopyInto(out *GenericContro
 	out.ClientConnection = in.ClientConnection
 	out.ControllerStartInterval = in.ControllerStartInterval
 	in.LeaderElection.DeepCopyInto(&out.LeaderElection)
+	out.LeaderElectionRecoveryDeadline = in.LeaderElectionRecoveryDeadline
 	if in.Controllers != nil {
 		in, out := &in.Controllers, &out.Controllers
 		*out = make([]string, len(*in))

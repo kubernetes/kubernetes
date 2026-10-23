@@ -167,6 +167,7 @@ API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,Generi
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElection
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElectionRecoveryDeadline
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderMigration
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderMigrationEnabled
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,MinResyncPeriod
