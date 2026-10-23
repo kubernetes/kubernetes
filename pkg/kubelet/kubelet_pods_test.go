@@ -3959,6 +3959,50 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			},
 		},
 		{
+			name: "preserves Started for the same running container after kubelet restart",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "containerA"}},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "containerA",
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "old"},
+					State: kubecontainer.ContainerStateRunning,
+				}},
+			},
+			previousStatus: []v1.ContainerStatus{
+				withID(startedState("containerA"), "test://old"),
+			},
+			containers: []v1.Container{{Name: "containerA"}},
+			expected: []v1.ContainerStatus{
+				startedState("containerA"),
+			},
+		},
+		{
+			name: "does not preserve Started for a replacement container after kubelet restart",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "containerA"}},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "containerA",
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "new"},
+					State: kubecontainer.ContainerStateRunning,
+				}},
+			},
+			previousStatus: []v1.ContainerStatus{
+				withID(startedState("containerA"), "test://old"),
+			},
+			containers: []v1.Container{{Name: "containerA"}},
+			expected: []v1.ContainerStatus{
+				runningState("containerA"),
+			},
+		},
+		{
 			name: "containerB dies and triggers RestartAllContainers in place",
 			pod: &v1.Pod{
 				Spec: desiredState,
@@ -4193,9 +4237,10 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
-		features.RestartAllContainersOnContainerExits: true,
+		features.ChangeContainerStatusOnKubeletRestart: false,
+		features.ContainerRestartRules:                 true,
+		features.NodeDeclaredFeatures:                  true,
+		features.RestartAllContainersOnContainerExits:  true,
 	})
 
 	for _, test := range tests {
