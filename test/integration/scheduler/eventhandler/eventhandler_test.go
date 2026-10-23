@@ -115,7 +115,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 	)
 	defer teardown()
 
-	node, err := testutils.CreateNode(testCtx.ClientSet, nodeWrapper)
+	node, err := schedulerutils.CreateNode(testCtx.ClientSet, nodeWrapper)
 	if err != nil {
 		t.Fatalf("Creating node error: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		t.Fatalf("Creating pod error: %v", err)
 	}
 
-	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+	if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Fatalf("Pod %v got scheduled: %v", pod.Name, err)
 	}
 	node, err = testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
@@ -142,7 +142,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		t.Fatalf("Error updating the node: %v", err)
 	}
 
-	if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+	if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 	}
 }
@@ -195,7 +195,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 			},
@@ -203,7 +203,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		{
 			name: "Remove nominated pod",
 			updateFunc: func(testCtx *testutils.TestContext) {
-				if err := testutils.DeletePod(testCtx.ClientSet, podMidNominated.Name, podMidNominated.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.ClientSet, podMidNominated.Name, podMidNominated.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 			},
@@ -227,13 +227,13 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				)
 				defer teardown()
 
-				_, err := testutils.CreateNode(testCtx.ClientSet, testNode)
+				_, err := schedulerutils.CreateNode(testCtx.ClientSet, testNode)
 				if err != nil {
 					t.Fatalf("Creating node error: %v", err)
 				}
 
 				// Ensure node is present in scheduler cache.
-				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
+				if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
 					t.Fatalf("Waiting for node in cache error: %v", err)
 				}
 
@@ -242,7 +242,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 
@@ -251,15 +251,15 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("NominatedNodeName field was not set for pod %v: %v", pod.Name, err)
 				}
-				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Pod %v haven't become unschedulabe: %v", pod.Name, err)
 				}
 
 				// Remove the initial low-priority pod, which will move the nominated unschedulable pod back to the backoff queue.
-				if err := testutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 
@@ -268,7 +268,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 
@@ -280,7 +280,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				fakeClock.Step(2 * testBackoff)
 
 				// Expect the low-priority pod is notified about unnominated mid-pririty pod and gets scheduled, as it should fit this time.
-				if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {
+				if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", podLow.Name, err)
 				}
 				testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, cleanupPods)

@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
@@ -2683,14 +2684,14 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 
 	for _, pv := range tt.InitialPVs {
-		if _, err := testutils.CreatePV(cs, pv); err != nil {
+		if _, err := schedulerutils.CreatePV(cs, pv); err != nil {
 			t.Fatalf("Failed to create a PV %q: %v", pv.Name, err)
 		}
 	}
 
 	for _, pvc := range tt.InitialPVCs {
 		pvc.Namespace = ns
-		if _, err := testutils.CreatePVC(cs, pvc); err != nil {
+		if _, err := schedulerutils.CreatePVC(cs, pvc); err != nil {
 			t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
 		}
 	}
