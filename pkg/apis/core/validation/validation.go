@@ -4136,6 +4136,98 @@ func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
+// isPodNetworkIsolated reports whether the spec opts out of the pod network.
+func isPodNetworkIsolated(spec *core.PodSpec) bool {
+	return spec.PodNetwork != nil && *spec.PodNetwork == core.PodNetworkIsolated
+}
+
+// validatePodNetwork validates spec.podNetwork: that the field may be set at
+// all, and its interactions with hostNetwork and the fields that need a pod IP.
+func validatePodNetwork(spec *core.PodSpec, specPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.PodNetwork == nil {
+		return allErrs
+	}
+	netPath := specPath.Child("podNetwork")
+
+	// "Isolated" is not dropped while the gate is disabled (see
+	// dropDisabledFields) because dropping it silently attaches a pod
+	// that asked for isolation to the pod network. Objects that already
+	// set podNetwork stay valid.
+	if !opts.AllowPodNetwork {
+		allErrs = append(allErrs, field.Forbidden(netPath, "the NetworkIsolatedPods feature gate is disabled"))
+	}
+
+	// The field describes the pod's own network namespace. A host network pod
+	// has none, so no value makes sense for it.
+	if spec.HostNetwork {
+		allErrs = append(allErrs, field.Forbidden(netPath, "may not be set when hostNetwork is true"))
+	}
+
+	if *spec.PodNetwork == core.PodNetworkIsolated {
+		allErrs = append(allErrs, validateIsolatedPodSpec(spec, specPath)...)
+	}
+	return allErrs
+}
+
+// validateIsolatedPodSpec ensures that a Pod that sets podNetwork to "Isolated"
+// does not request features that need to reach the pod from the node:
+// hostPort, and the httpGet, tcpSocket and grpc probes and lifecycle handlers.
+func validateIsolatedPodSpec(spec *core.PodSpec, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	const forbiddenDetail = `may not be set when podNetwork is "Isolated"`
+
+	podshelper.VisitContainersWithPath(spec, specPath, func(c *core.Container, cFldPath *field.Path) bool {
+		// httpGet, tcpSocket and grpc probes are run by the kubelet from the
+		// node. Nothing in an isolated pod is reachable from there, whatever
+		// host the probe names. Only exec works.
+		checkProbe := func(probe *core.Probe, probePath *field.Path) {
+			if probe == nil {
+				return
+			}
+			if probe.HTTPGet != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("httpGet"), forbiddenDetail))
+			}
+			if probe.TCPSocket != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("tcpSocket"), forbiddenDetail))
+			}
+			if probe.GRPC != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("grpc"), forbiddenDetail))
+			}
+		}
+		checkProbe(c.LivenessProbe, cFldPath.Child("livenessProbe"))
+		checkProbe(c.ReadinessProbe, cFldPath.Child("readinessProbe"))
+		checkProbe(c.StartupProbe, cFldPath.Child("startupProbe"))
+
+		if c.Lifecycle != nil {
+			checkHandler := func(h *core.LifecycleHandler, hPath *field.Path) {
+				if h == nil {
+					return
+				}
+				if h.HTTPGet != nil {
+					allErrs = append(allErrs, field.Forbidden(hPath.Child("httpGet"), forbiddenDetail))
+				}
+				if h.TCPSocket != nil {
+					allErrs = append(allErrs, field.Forbidden(hPath.Child("tcpSocket"), forbiddenDetail))
+				}
+			}
+			checkHandler(c.Lifecycle.PostStart, cFldPath.Child("lifecycle", "postStart"))
+			checkHandler(c.Lifecycle.PreStop, cFldPath.Child("lifecycle", "preStop"))
+		}
+
+		// hostPort does not work with podNetwork "Isolated": there is no pod IP to forward to.
+		portsPath := cFldPath.Child("ports")
+		for i, port := range c.Ports {
+			if port.HostPort > 0 {
+				allErrs = append(allErrs, field.Forbidden(portsPath.Index(i).Child("hostPort"), forbiddenDetail))
+			}
+		}
+		return true
+	})
+
+	return allErrs
+}
+
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
 func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4609,6 +4701,19 @@ func validatePodIPs(pod, oldPod *core.Pod) field.ErrorList {
 
 	podIPsField := field.NewPath("status", "podIPs")
 
+	// A pod that is not attached to the pod network never has pod IPs.
+	// Rejecting them here turns the guarantee into an API invariant and makes a
+	// kubelet that ignored the field (fail open) visible.
+	if isPodNetworkIsolated(&pod.Spec) {
+		if len(pod.Status.PodIP) > 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("status", "podIP"), `must be unset when spec.podNetwork is "Isolated"`))
+		}
+		if len(pod.Status.PodIPs) > 0 {
+			allErrs = append(allErrs, field.Forbidden(podIPsField, `must be unset when spec.podNetwork is "Isolated"`))
+		}
+		return allErrs
+	}
+
 	// all new PodIPs must be valid IPs, but existing invalid ones can be kept.
 	var existingPodIPs []string
 	if oldPod != nil {
@@ -4748,6 +4853,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath)...)
 	allErrs = append(allErrs, validateHostUsers(spec, fldPath, opts)...)
 	allErrs = append(allErrs, validatePodHostName(spec, fldPath)...)
+	allErrs = append(allErrs, validatePodNetwork(spec, fldPath, opts)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
