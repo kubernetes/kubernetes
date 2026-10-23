@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -56,13 +57,24 @@ type podResizesAdmitHandler struct {
 // Admit counts infeasible resizes in metrics, so it must be registered before any other admit
 // handler, which ensures it never runs in dry run.
 func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	if attrs.Operation != lifecycle.UpdateOperation || !attrs.Update.Resize {
+	if attrs.Operation != lifecycle.UpdateOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
 	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod := attrs.Update.AllocatedPod
+	// This also covers containers without resources, which aren't resizes.
+	if disallowed, msg := h.disallowContainerChangesForPodLevelExclusiveResources(pod, allocatedPod); disallowed {
+		logger.V(3).Info(msg, "pod", format.Pod(pod))
+		if attrs.Update.Resize {
+			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_level_resources_exclusive_allocation").Inc()
+		}
+		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
+	}
+	if !attrs.Update.Resize {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
@@ -90,7 +102,7 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 			cpuMode := h.resourceManager.AllocationMode(v1.ResourceCPU)
-			if cpuMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
+			if cpuMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, allocatedPod, v1.ResourceCPU) {
 				msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods when CPU allocation mode is %s", cpuMode)
 				logger.V(3).Info(msg, "pod", format.Pod(pod))
 				metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
@@ -99,7 +111,7 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) {
 			memMode := h.resourceManager.AllocationMode(v1.ResourceMemory)
-			if memMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
+			if memMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, allocatedPod, v1.ResourceMemory) {
 				msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods when memory allocation mode is %s", memMode)
 				logger.V(3).Info(msg, "pod", format.Pod(pod))
 				metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
@@ -140,37 +152,80 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		}
 		return false
 	}
-	allocatedContainers := make(map[string]*v1.Container)
-	for container := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
-		allocatedContainers[container.Name] = container
-	}
-	for desiredContainer := range podutil.ContainerIter(&desiredPod.Spec, podutil.InitContainers|podutil.Containers) {
-		allocatedContainer, ok := allocatedContainers[desiredContainer.Name]
-		if !ok {
-			continue
-		}
-		origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
-		newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
-		if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
-			aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
-			bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
-			if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
-				return true, "In-place resize of containers with swap is not supported."
+	const dynamicContainerSwapMsg = "Adding or removing containers with swap is not supported."
+	for pair := range podutil.ContainerPairs(desiredPod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+		desiredContainer, allocatedContainer := pair.New, pair.Old
+		switch {
+		case allocatedContainer == nil:
+			if runtime.GetContainerSwapBehavior(desiredPod, desiredContainer) != kubetypes.NoSwap {
+				return true, dynamicContainerSwapMsg
+			}
+		case desiredContainer == nil:
+			if runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer) != kubetypes.NoSwap {
+				return true, dynamicContainerSwapMsg
+			}
+		default:
+			origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
+			newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
+			if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
+				aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
+				bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
+				if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
+					return true, "In-place resize of containers with swap is not supported."
+				}
 			}
 		}
 	}
 	return false, ""
 }
 
-func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod, resourceName v1.ResourceName) bool {
-	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+// disallowContainerChangesForPodLevelExclusiveResources returns whether containers are added to or
+// removed from a Guaranteed pod whose pod-level resources the CPU or memory manager allocates
+// exclusively. The managers only partition such an allocation among the containers when the pod is
+// admitted, so a container added later would run outside of it.
+// TODO(KEP-5972): Allow this once the static policies can repartition a pod-level allocation.
+func (h *podResizesAdmitHandler) disallowContainerChangesForPodLevelExclusiveResources(pod, allocatedPod *v1.Pod) (bool, string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !resourcehelper.IsPodLevelResourcesSet(pod) || v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+		return false, ""
+	}
+	changed := false
+	for pair := range podutil.ContainerPairs(pod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+		if pair.New == nil || pair.Old == nil {
+			changed = true
+			break
+		}
+	}
+	if !changed {
+		return false, ""
+	}
+	for _, resourceName := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if mode := h.resourceManager.AllocationMode(resourceName); mode == cm.ResourceAllocationModeExclusive {
+			return true, fmt.Sprintf("Adding or removing containers is infeasible for Guaranteed Pods with pod-level resources when %s allocation mode is %s", resourceName, mode)
+		}
+	}
+	return false, ""
+}
+
+func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod, allocatedPod *v1.Pod, resourceName v1.ResourceName) bool {
+	// Adding or removing a container that requests the resource changes the allocation like a
+	// resize does.
+	for pair, containerType := range podutil.ContainerPairs(pod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+		container := pair.New
+		if container == nil {
+			container = pair.Old
+		}
 		if !IsResizableContainer(container, containerType) {
 			continue
 		}
-		requestedResources := container.Resources
-		allocatedresources, _ := h.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
 		// For Guaranteed pods, requests must equal limits, so checking requests is sufficient.
-		if !requestedResources.Requests[resourceName].Equal(allocatedresources.Requests[resourceName]) {
+		var desiredRequests, allocatedRequests v1.ResourceList
+		if pair.New != nil {
+			desiredRequests = pair.New.Resources.Requests
+		}
+		if pair.Old != nil {
+			allocatedRequests = pair.Old.Resources.Requests
+		}
+		if desired, allocated := desiredRequests[resourceName], allocatedRequests[resourceName]; !desired.Equal(allocated) {
 			return true
 		}
 	}

@@ -3152,19 +3152,12 @@ func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
 // recordContainerResizeOperations records the resizes that an update of a pod requests for its
 // containers.
 func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
-	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(oldContainer, containerType) {
+	for pair, containerType := range podutil.ContainerPairs(newPod, oldPod, podutil.InitContainers|podutil.Containers) {
+		oldContainer, newContainer := pair.Old, pair.New
+		// An added or removed container isn't a resize.
+		if oldContainer == nil || newContainer == nil ||
+			!allocation.IsResizableContainer(oldContainer, containerType) || !allocation.IsResizableContainer(newContainer, containerType) {
 			continue
-		}
-
-		var newContainer *v1.Container
-		for new, newType := range podutil.ContainerIter(&newPod.Spec, podutil.InitContainers|podutil.Containers) {
-			if !allocation.IsResizableContainer(new, newType) {
-				continue
-			}
-			if new.Name == oldContainer.Name && containerType == newType {
-				newContainer = new
-			}
 		}
 
 		newResources := newContainer.Resources

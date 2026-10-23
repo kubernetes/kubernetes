@@ -313,8 +313,17 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 // of a container is allocated. A field that is added to the API fails it until it is classified
 // here and, if it is passthrough, copied in copyPassthroughFields.
 func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
+	for _, dynamicContainers := range []bool{false, true} {
+		t.Run(fmt.Sprintf("DynamicContainers=%t", dynamicContainers), func(t *testing.T) {
+			testUpdatePodFromAllocationFieldClassification(t, dynamicContainers)
+		})
+	}
+}
+
+func testUpdatePodFromAllocationFieldClassification(t *testing.T, dynamicContainers bool) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+	setDynamicContainersGate(t, dynamicContainers)
 
 	type category string
 	const (
@@ -349,6 +358,11 @@ func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
 			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
 			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
 		},
+	}
+	if dynamicContainers {
+		// With DynamicContainers, an image update is allocated atomically with the rest of the pod.
+		containerFields[gated] = append(containerFields[gated], containerFields[passthrough]...)
+		containerFields[passthrough] = nil
 	}
 
 	// classify returns the category of each field of typ, and fails if a field has no category or
@@ -700,6 +714,121 @@ func TestUpdatePodFromAllocationPending(t *testing.T) {
 					assert.Equal(t, test.resize, isResizeRequested(pod, allocatedPod), "resize")
 				})
 			}
+		}
+	}
+}
+
+func setDynamicContainersGate(t *testing.T, enabled bool) {
+	t.Helper()
+	if enabled {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, enabled)
+}
+
+// TestUpdatePodFromAllocationDynamicContainers checks which changes that DynamicContainers makes
+// possible are pending, and which of them are resizes.
+func TestUpdatePodFromAllocationDynamicContainers(t *testing.T) {
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "uid", Name: "test", Namespace: "default"},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{{Name: "init", Image: "i0", Resources: cpu("100m")}},
+				Containers: []v1.Container{
+					{Name: "c1", Image: "i1", Resources: cpu("300m")},
+					{Name: "c2", Image: "i2"},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		// change makes the pod differ from its allocated pod.
+		change func(pod *v1.Pod)
+		// pending and resize are whether the change is pending and a resize, by the state of the
+		// DynamicContainers feature gate.
+		pending, resize map[bool]bool
+	}{{
+		name: "container added with resources",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Resources: cpu("1")})
+		},
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: true},
+	}, {
+		name:    "container added without resources",
+		change:  func(pod *v1.Pod) { pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3"}) },
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: false},
+	}, {
+		name:    "container with resources removed",
+		change:  func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[1:] },
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: true},
+	}, {
+		name:    "container without resources removed",
+		change:  func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[:1] },
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: false},
+	}, {
+		name:    "container replaced by one with the same resources",
+		change:  func(pod *v1.Pod) { pod.Spec.Containers[0].Name = "c3" },
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: true},
+	}, {
+		name: "container added before a resized container",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append([]v1.Container{{Name: "c0"}}, pod.Spec.Containers...)
+			pod.Spec.Containers[1].Resources = cpu("500m")
+		},
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: true, true: true},
+	}, {
+		name:    "containers reordered",
+		change:  func(pod *v1.Pod) { slices.Reverse(pod.Spec.Containers) },
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: false, true: false},
+	}, {
+		name: "containers reordered and resized",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers[0].Resources = cpu("500m")
+			slices.Reverse(pod.Spec.Containers)
+		},
+		pending: map[bool]bool{false: true, true: true},
+		resize:  map[bool]bool{false: true, true: true},
+	}, {
+		name:    "image",
+		change:  func(pod *v1.Pod) { pod.Spec.Containers[0].Image = "new" },
+		pending: map[bool]bool{false: false, true: true},
+		resize:  map[bool]bool{false: false, true: false},
+	}, {
+		name:    "init container image",
+		change:  func(pod *v1.Pod) { pod.Spec.InitContainers[0].Image = "new" },
+		pending: map[bool]bool{false: false, true: true},
+		resize:  map[bool]bool{false: false, true: false},
+	}}
+
+	for _, test := range tests {
+		for _, gate := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DynamicContainers=%t", test.name, gate), func(t *testing.T) {
+				setDynamicContainersGate(t, gate)
+				logger, _ := ktesting.NewTestContext(t)
+				m := &manager{allocated: state.NewStateMemory(logger, nil, nil)}
+				require.NoError(t, m.allocated.SetPod(logger, newPod()))
+
+				pod := newPod()
+				test.change(pod)
+				allocatedPod, pending := m.UpdatePodFromAllocation(pod)
+				assert.Equal(t, test.pending[gate], pending, "pending")
+				assert.Equal(t, test.resize[gate], isResizeRequested(pod, allocatedPod), "resize")
+				if pending {
+					assert.Equal(t, newPod().Spec, allocatedPod.Spec, "allocated spec")
+				}
+			})
 		}
 	}
 }
@@ -2204,6 +2333,477 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 			_, pending := allocationManager.UpdatePodFromAllocation(pod)
 			assert.Equal(t, !tc.expectAllocated, pending, "pending")
 			assert.Equal(t, tc.expectQueued, allocationManager.HasPendingAllocations(), "queued for retry")
+		})
+	}
+}
+
+// TestRetryPendingResizesDynamicContainers checks that added and removed containers and image
+// updates are allocated atomically with resizes, through the same admit handlers.
+func TestRetryPendingResizesDynamicContainers(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	addContainer := func(resources v1.ResourceRequirements) func(pod *v1.Pod) {
+		return func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3", Resources: resources})
+		}
+	}
+	updateImage := func(pod *v1.Pod) { pod.Spec.Containers[0].Image = "new" }
+	rejectAll := func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+		return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test"}
+	}
+
+	tests := []struct {
+		name     string
+		disabled bool
+		// change makes the pod differ from its allocated pod.
+		change func(pod *v1.Pod)
+		reject func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+		// expectedCondition is the type and reason of the expected resize condition, if any.
+		expectedCondition *v1.PodCondition
+		// expectedEvent is the prefix of the expected event, if any.
+		expectedEvent   string
+		expectAllocated bool
+		// expectRetry is whether the pod stays queued for another retry.
+		expectRetry bool
+	}{{
+		name:              "container added",
+		change:            addContainer(cpu("1")),
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
+		expectedEvent:     "Normal ResizeStarted",
+		expectAllocated:   true,
+	}, {
+		name:              "container added beyond capacity",
+		change:            addContainer(cpu("10")),
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		expectedEvent:     "Warning ResizeDeferred",
+		expectRetry:       true,
+	}, {
+		name: "container added beyond capacity with an image update",
+		change: func(pod *v1.Pod) {
+			addContainer(cpu("10"))(pod)
+			updateImage(pod)
+		},
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		expectedEvent:     "Warning ResizeDeferred",
+		expectRetry:       true,
+	}, {
+		name: "container added and removed",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = pod.Spec.Containers[1:]
+			addContainer(cpu("2"))(pod)
+		},
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
+		expectedEvent:     "Normal ResizeStarted",
+		expectAllocated:   true,
+	}, {
+		name:              "container removed",
+		change:            func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[1:] },
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
+		expectedEvent:     "Normal ResizeStarted",
+		expectAllocated:   true,
+	}, {
+		name:            "container added without resources",
+		change:          addContainer(v1.ResourceRequirements{}),
+		expectAllocated: true,
+	}, {
+		name:              "container added without resources, rejected by an admit handler",
+		change:            addContainer(v1.ResourceRequirements{}),
+		reject:            rejectAll,
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		expectedEvent:     "Warning ResizeDeferred",
+		expectRetry:       true,
+	}, {
+		name:            "image update",
+		change:          updateImage,
+		expectAllocated: true,
+	}, {
+		name:              "image update, rejected by an admit handler",
+		change:            updateImage,
+		reject:            rejectAll,
+		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		expectedEvent:     "Warning ResizeDeferred",
+		expectRetry:       true,
+	}, {
+		name:            "image update with the gate disabled",
+		disabled:        true,
+		change:          updateImage,
+		reject:          rejectAll,
+		expectAllocated: true,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setDynamicContainersGate(t, !tc.disabled)
+			logger, tCtx := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Image: "i1", Resources: cpu("1")},
+						{Name: "c2", Image: "i2", Resources: cpu("1")},
+					},
+				},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			if tc.reject != nil {
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{admitFunc: tc.reject}})
+			}
+
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+			if tc.expectedCondition == nil {
+				assert.Empty(t, conditions, "conditions")
+			} else if assert.Len(t, conditions, 1, "conditions") {
+				assert.Equal(t, tc.expectedCondition.Type, conditions[0].Type)
+				assert.Equal(t, tc.expectedCondition.Reason, conditions[0].Reason)
+			}
+			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			if tc.expectedEvent != "" {
+				require.Len(t, fakeRecorder.Events, 1)
+				assert.True(t, strings.HasPrefix(<-fakeRecorder.Events, tc.expectedEvent), "event")
+			} else {
+				require.Empty(t, fakeRecorder.Events)
+			}
+
+			// The change is allocated as a whole or not at all.
+			allocated, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, !tc.expectAllocated, pending, "pending")
+			if tc.expectAllocated {
+				assert.Equal(t, pod.Spec, allocated.Spec, "allocated spec")
+			} else {
+				assert.Equal(t, allocatedPod.Spec, allocated.Spec, "allocated spec")
+			}
+			assert.Equal(t, tc.expectRetry, allocationManager.HasPendingAllocations(), "queued for retry")
+		})
+	}
+}
+
+// TestRetryPendingResizesDynamicContainersExclusiveResources checks that adding or removing a
+// container of a Guaranteed pod is subject to the same exclusive CPU and memory limitations as a
+// resize.
+func TestRetryPendingResizesDynamicContainersExclusiveResources(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	guaranteed := func(cpu, memory string) v1.ResourceRequirements {
+		resources := v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu), v1.ResourceMemory: resource.MustParse(memory)}
+		return v1.ResourceRequirements{Requests: resources, Limits: resources}
+	}
+	removeC2 := func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[:1] }
+	addC3 := func(pod *v1.Pod) {
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3", Resources: guaranteed("1", "1Gi")})
+	}
+	cpuInfeasible := "Resize is infeasible for Guaranteed Pods when CPU allocation mode is exclusive"
+	memoryInfeasible := "Resize is infeasible for Guaranteed Pods when memory allocation mode is exclusive"
+
+	tests := []struct {
+		name            string
+		change          func(pod *v1.Pod)
+		exclusiveCPUs   bool
+		exclusiveMemory bool
+		// expectedInfeasible is the message of the expected Infeasible condition, if any.
+		expectedInfeasible string
+	}{{
+		name:               "container removed",
+		change:             removeC2,
+		expectedInfeasible: cpuInfeasible,
+	}, {
+		name:               "container removed with InPlacePodVerticalScalingExclusiveCPUs",
+		change:             removeC2,
+		exclusiveCPUs:      true,
+		expectedInfeasible: memoryInfeasible,
+	}, {
+		name:            "container removed with both exclusive resize gates",
+		change:          removeC2,
+		exclusiveCPUs:   true,
+		exclusiveMemory: true,
+	}, {
+		name:               "container added",
+		change:             addC3,
+		expectedInfeasible: cpuInfeasible,
+	}, {
+		name:            "container added with both exclusive resize gates",
+		change:          addC3,
+		exclusiveCPUs:   true,
+		exclusiveMemory: true,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setDynamicContainersGate(t, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InPlacePodVerticalScalingExclusiveCPUs:   tc.exclusiveCPUs,
+				features.InPlacePodVerticalScalingExclusiveMemory: tc.exclusiveMemory,
+			})
+			logger, tCtx := ktesting.NewTestContext(t)
+			nodeConfig := cm.NodeConfig{}
+			nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+			nodeConfig.MemoryManagerPolicy = string(memorymanager.PolicyTypeStatic)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Image: "i1", Resources: guaranteed("1", "1Gi")},
+						{Name: "c2", Image: "i2", Resources: guaranteed("1", "1Gi")},
+					},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, &nodeConfig)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			if tc.expectedInfeasible == "" {
+				assert.False(t, pending, "pending")
+				return
+			}
+			assert.True(t, pending, "pending")
+			if assert.Len(t, conditions, 1, "conditions") {
+				assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+				assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
+				assert.Equal(t, tc.expectedInfeasible, conditions[0].Message)
+			}
+		})
+	}
+}
+
+// TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources checks that containers can't
+// be added to or removed from a Guaranteed pod whose pod-level resources are allocated exclusively.
+func TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	guaranteed := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+	tests := []struct {
+		name                     string
+		change                   func(pod *v1.Pod)
+		podLevelResourceManagers bool
+		expectInfeasible         bool
+		// expectMetric is whether the rejection is counted as an infeasible resize, which it is only
+		// if the change is a resize.
+		expectMetric bool
+	}{{
+		name: "container added",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3"})
+		},
+		podLevelResourceManagers: true,
+		expectInfeasible:         true,
+	}, {
+		name: "container with resources added",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3", Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			}})
+		},
+		podLevelResourceManagers: true,
+		expectInfeasible:         true,
+		expectMetric:             true,
+	}, {
+		name:                     "container removed",
+		change:                   func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[:1] },
+		podLevelResourceManagers: true,
+		expectInfeasible:         true,
+	}, {
+		name:                     "image update",
+		change:                   func(pod *v1.Pod) { pod.Spec.Containers[0].Image = "new" },
+		podLevelResourceManagers: true,
+	}, {
+		name:                     "containers reordered",
+		change:                   func(pod *v1.Pod) { slices.Reverse(pod.Spec.Containers) },
+		podLevelResourceManagers: true,
+	}, {
+		name: "container added without PodLevelResourceManagers",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3"})
+		},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setDynamicContainersGate(t, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagers)
+			logger, tCtx := ktesting.NewTestContext(t)
+			metrics.Register()
+			metrics.PodInfeasibleResizes.Reset()
+			nodeConfig := cm.NodeConfig{}
+			nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+			nodeConfig.MemoryManagerPolicy = string(memorymanager.PolicyTypeStatic)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: guaranteed, Limits: guaranteed},
+					Containers: []v1.Container{{Name: "c1", Image: "i1"}, {Name: "c2", Image: "i2"}},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, &nodeConfig)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, tc.expectInfeasible, pending, "pending")
+			assert.Equal(t, tc.expectInfeasible, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(pod.UID), "infeasible")
+			expectedMetrics := ""
+			if tc.expectMetric {
+				expectedMetrics = `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="guaranteed_pod_level_resources_exclusive_allocation"} 1
+				`
+			}
+			assert.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+			))
+		})
+	}
+}
+
+// TestRetryPendingAllocationsInfeasibleMetric checks that an infeasible rejection by another admit
+// handler is only counted as an infeasible resize if the change is a resize.
+func TestRetryPendingAllocationsInfeasibleMetric(t *testing.T) {
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	tests := []struct {
+		name         string
+		change       func(pod *v1.Pod)
+		expectMetric bool
+	}{{
+		name:   "image update",
+		change: func(pod *v1.Pod) { pod.Spec.Containers[0].Image = "new" },
+	}, {
+		name: "container without resources added",
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c2", Image: "i2"})
+		},
+	}, {
+		name:         "resize",
+		change:       func(pod *v1.Pod) { pod.Spec.Containers[0].Resources = cpu("2") },
+		expectMetric: true,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setDynamicContainersGate(t, true)
+			logger, tCtx := ktesting.NewTestContext(t)
+			metrics.Register()
+			metrics.PodInfeasibleResizes.Reset()
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("1")}},
+				},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
+				admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+					return lifecycle.PodAdmitResult{Reason: "TestInfeasible", RejectionType: lifecycle.RejectionInfeasible}
+				},
+			}})
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			require.True(t, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(pod.UID), "infeasible")
+			expectedMetrics := ""
+			if tc.expectMetric {
+				expectedMetrics = `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="TestInfeasible"} 1
+				`
+			}
+			assert.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+			))
+		})
+	}
+}
+
+// TestRetryPendingResizesDynamicContainersWithSwap checks that containers with swap can't be added
+// or removed, since in-place resize with swap isn't supported.
+func TestRetryPendingResizesDynamicContainersWithSwap(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	memory := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}}
+	newContainer := func(name string) v1.Container { return v1.Container{Name: name, Image: name, Resources: memory} }
+	tests := []struct {
+		name             string
+		allocated        []v1.Container
+		desired          []v1.Container
+		expectInfeasible bool
+	}{{
+		name:             "container with swap added",
+		allocated:        []v1.Container{newContainer("noswap")},
+		desired:          []v1.Container{newContainer("noswap"), newContainer("swap")},
+		expectInfeasible: true,
+	}, {
+		name:             "container with swap removed",
+		allocated:        []v1.Container{newContainer("noswap"), newContainer("swap")},
+		desired:          []v1.Container{newContainer("noswap")},
+		expectInfeasible: true,
+	}, {
+		name:      "container without swap added",
+		allocated: []v1.Container{newContainer("swap")},
+		desired:   []v1.Container{newContainer("swap"), newContainer("noswap")},
+	}, {
+		name:      "container without swap removed",
+		allocated: []v1.Container{newContainer("swap"), newContainer("noswap")},
+		desired:   []v1.Container{newContainer("swap")},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setDynamicContainersGate(t, true)
+			logger, tCtx := ktesting.NewTestContext(t)
+			allocatedPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec:       v1.PodSpec{Containers: tc.allocated},
+				Status:     v1.PodStatus{Phase: v1.PodRunning},
+			}
+			pod := allocatedPod.DeepCopy()
+			pod.Spec.Containers = tc.desired
+
+			runtime := &containertest.FakeRuntime{SwapBehavior: map[string]kubetypes.SwapBehavior{
+				"noswap": kubetypes.NoSwap,
+				"swap":   kubetypes.LimitedSwap,
+			}}
+			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, tc.expectInfeasible, pending, "pending")
+			assert.Equal(t, tc.expectInfeasible, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(pod.UID), "infeasible")
 		})
 	}
 }
