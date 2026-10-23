@@ -50,6 +50,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +85,7 @@ import (
 	"k8s.io/kubectl/pkg/util/rbac"
 	kubectlresourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
+	"k8s.io/utils/ptr"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -193,45 +195,46 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 	}
 
 	m := map[schema.GroupKind]ResourceDescriber{
-		{Group: corev1.GroupName, Kind: "Pod"}:                               &PodDescriber{c},
-		{Group: corev1.GroupName, Kind: "ReplicationController"}:             &ReplicationControllerDescriber{c},
-		{Group: corev1.GroupName, Kind: "Secret"}:                            &SecretDescriber{c},
-		{Group: corev1.GroupName, Kind: "Service"}:                           &ServiceDescriber{c},
-		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                    &ServiceAccountDescriber{c},
-		{Group: corev1.GroupName, Kind: "Node"}:                              &NodeDescriber{c},
-		{Group: corev1.GroupName, Kind: "LimitRange"}:                        &LimitRangeDescriber{c},
-		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                     &ResourceQuotaDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                  &PersistentVolumeDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:             &PersistentVolumeClaimDescriber{c},
-		{Group: corev1.GroupName, Kind: "Namespace"}:                         &NamespaceDescriber{c},
-		{Group: corev1.GroupName, Kind: "Endpoints"}:                         &EndpointsDescriber{c},
-		{Group: corev1.GroupName, Kind: "ConfigMap"}:                         &ConfigMapDescriber{c},
-		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
-		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
-		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:              &IPAddressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                 &ServiceCIDRDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
-		{Group: batchv1.GroupName, Kind: "Job"}:                              &JobDescriber{c},
-		{Group: batchv1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
-		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                       &StatefulSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "Deployment"}:                        &DeploymentDescriber{c},
-		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                         &DaemonSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                        &ReplicaSetDescriber{c},
-		{Group: certificatesv1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
-		{Group: storagev1.GroupName, Kind: "StorageClass"}:                   &StorageClassDescriber{c},
-		{Group: storagev1.GroupName, Kind: "CSINode"}:                        &CSINodeDescriber{c},
-		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:          &VolumeAttributesClassDescriber{c},
-		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "Role"}:                              &RoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                       &ClusterRoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                       &RoleBindingDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                &ClusterRoleBindingDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
-		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
+		{Group: corev1.GroupName, Kind: "Pod"}:                                 &PodDescriber{c},
+		{Group: corev1.GroupName, Kind: "ReplicationController"}:               &ReplicationControllerDescriber{c},
+		{Group: corev1.GroupName, Kind: "Secret"}:                              &SecretDescriber{c},
+		{Group: corev1.GroupName, Kind: "Service"}:                             &ServiceDescriber{c},
+		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                      &ServiceAccountDescriber{c},
+		{Group: corev1.GroupName, Kind: "Node"}:                                &NodeDescriber{c},
+		{Group: corev1.GroupName, Kind: "LimitRange"}:                          &LimitRangeDescriber{c},
+		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                       &ResourceQuotaDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                    &PersistentVolumeDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:               &PersistentVolumeClaimDescriber{c},
+		{Group: corev1.GroupName, Kind: "Namespace"}:                           &NamespaceDescriber{c},
+		{Group: corev1.GroupName, Kind: "Endpoints"}:                           &EndpointsDescriber{c},
+		{Group: corev1.GroupName, Kind: "ConfigMap"}:                           &ConfigMapDescriber{c},
+		{Group: corev1.GroupName, Kind: "PriorityClass"}:                       &PriorityClassDescriber{c},
+		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                  &EndpointSliceDescriber{c},
+		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:      &HorizontalPodAutoscalerDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "Ingress"}:                       &IngressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                  &IngressClassDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:              &ServiceCIDRDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:                &IPAddressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                   &ServiceCIDRDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                     &IPAddressDescriber{c},
+		{Group: batchv1.GroupName, Kind: "Job"}:                                &JobDescriber{c},
+		{Group: batchv1.GroupName, Kind: "CronJob"}:                            &CronJobDescriber{c},
+		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                         &StatefulSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "Deployment"}:                          &DeploymentDescriber{c},
+		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                           &DaemonSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                          &ReplicaSetDescriber{c},
+		{Group: certificatesv1.GroupName, Kind: "CertificateSigningRequest"}:   &CertificateSigningRequestDescriber{c},
+		{Group: storagev1.GroupName, Kind: "StorageClass"}:                     &StorageClassDescriber{c},
+		{Group: storagev1.GroupName, Kind: "CSINode"}:                          &CSINodeDescriber{c},
+		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:            &VolumeAttributesClassDescriber{c},
+		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:               &PodDisruptionBudgetDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                                &RoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                         &ClusterRoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                         &RoleBindingDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                  &ClusterRoleBindingDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                 &NetworkPolicyDescriber{c},
+		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:                 &PriorityClassDescriber{c},
+		{Group: resourcev1alpha3.GroupName, Kind: "ResourcePoolStatusRequest"}: &ResourcePoolStatusRequestDescriber{c},
 	}
 
 	return m, nil
@@ -4776,6 +4779,171 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 
 		return nil
 	})
+}
+
+// ResourcePoolStatusRequestDescriber shows the per-pool status of a request.
+type ResourcePoolStatusRequestDescriber struct {
+	clientset.Interface
+}
+
+func (d *ResourcePoolStatusRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	request, err := d.ResourceV1alpha3().ResourcePoolStatusRequests().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), request, describerSettings.ChunkSize)
+	}
+
+	return describeResourcePoolStatusRequest(request, events)
+}
+
+func describeResourcePoolStatusRequest(request *resourcev1alpha3.ResourcePoolStatusRequest, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", request.Name)
+		printLabelsMultiline(w, "Labels", request.Labels)
+		printAnnotationsMultiline(w, "Annotations", request.Annotations)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", request.CreationTimestamp.Time.Format(time.RFC1123Z))
+
+		spec := request.Spec
+		w.Write(LEVEL_0, "Spec:\n")
+		w.Write(LEVEL_1, "Driver:\t%s\n", spec.Driver)
+		w.Write(LEVEL_1, "Pool Name:\t%s\n", stringOrNone(ptr.Deref(spec.PoolName, "")))
+		if spec.Limit != nil {
+			w.Write(LEVEL_1, "Limit:\t%d\n", *spec.Limit)
+		}
+		if spec.DefaultPartitionTypeAttribute != nil {
+			w.Write(LEVEL_1, "Default Partition Type Attribute:\t%s\n", *spec.DefaultPartitionTypeAttribute)
+		}
+
+		status := request.Status
+		if status == nil {
+			w.Write(LEVEL_0, "Status:\tPending\n")
+		} else {
+			describeResourcePoolStatusRequestStatus(w, status)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+func describeResourcePoolStatusRequestStatus(w PrefixWriter, status *resourcev1alpha3.ResourcePoolStatusRequestStatus) {
+	state := "Complete"
+	if meta.IsStatusConditionTrue(status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionFailed) {
+		state = "Failed"
+	}
+	w.Write(LEVEL_0, "Status:\t%s\n", state)
+
+	// pools is truncated at spec.limit; poolCount is not.
+	poolCount := int(ptr.Deref(status.PoolCount, int32(len(status.Pools))))
+	if poolCount > len(status.Pools) {
+		w.Write(LEVEL_1, "Pool Count:\t%d (showing %d, truncated by limit)\n", poolCount, len(status.Pools))
+	} else {
+		w.Write(LEVEL_1, "Pool Count:\t%d\n", poolCount)
+	}
+
+	if len(status.Conditions) > 0 {
+		w.Write(LEVEL_0, "Conditions:\n")
+		w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+		w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+		for _, c := range status.Conditions {
+			w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+				c.Type,
+				c.Status,
+				c.LastTransitionTime.Time.Format(time.RFC1123Z),
+				c.Reason,
+				c.Message)
+		}
+	}
+
+	if len(status.Pools) == 0 {
+		return
+	}
+
+	// Unset counts print as "-".
+	count := func(v *int32) string {
+		if v == nil {
+			return "-"
+		}
+		return strconv.Itoa(int(*v))
+	}
+	w.Write(LEVEL_0, "Pools:\n")
+	w.Write(LEVEL_1, "Pool\tNode\tGeneration\tSlices\tTotal\tAllocated\tAvailable\tUnavailable\n")
+	w.Write(LEVEL_1, "----\t----\t----------\t------\t-----\t---------\t---------\t-----------\n")
+	var withErrors, withPartitions, withShareable []resourcev1alpha3.PoolStatus
+	for _, p := range status.Pools {
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
+			p.PoolName,
+			stringOrNone(ptr.Deref(p.NodeName, "")),
+			p.Generation,
+			count(p.ResourceSliceCount),
+			count(p.TotalDevices),
+			count(p.AllocatedDevices),
+			count(p.AvailableDevices),
+			count(p.UnavailableDevices))
+		if p.ValidationError != nil {
+			withErrors = append(withErrors, p)
+		}
+		if len(p.PartitionSummary) > 0 {
+			withPartitions = append(withPartitions, p)
+		}
+		if p.ShareableSummary != nil {
+			withShareable = append(withShareable, p)
+		}
+	}
+
+	if len(withErrors) > 0 {
+		w.Write(LEVEL_0, "Validation Errors:\n")
+		w.Write(LEVEL_1, "Pool\tError\n")
+		w.Write(LEVEL_1, "----\t-----\n")
+		for _, p := range withErrors {
+			w.Write(LEVEL_1, "%s\t%s\n", p.PoolName, *p.ValidationError)
+		}
+	}
+
+	if len(withPartitions) > 0 {
+		w.Write(LEVEL_0, "Partition Summary:\n")
+		w.Write(LEVEL_1, "Pool\tAttribute\tType\tTotal\tAllocatable\n")
+		w.Write(LEVEL_1, "----\t---------\t----\t-----\t-----------\n")
+		for _, p := range withPartitions {
+			for _, ps := range p.PartitionSummary {
+				w.Write(LEVEL_1, "%s\t%s\t%s\t%s\t%s\n", p.PoolName, ps.Attribute, ps.Type, count(ps.Total), count(ps.Allocatable))
+			}
+		}
+	}
+
+	if len(withShareable) > 0 {
+		w.Write(LEVEL_0, "Shareable Summary:\n")
+		w.Write(LEVEL_1, "Pool\tFully Available\tIn Use\tCapacity\tTotal\tConsumed\tAvailable\n")
+		w.Write(LEVEL_1, "----\t---------------\t------\t--------\t-----\t--------\t---------\n")
+		quantity := func(q *resource.Quantity) string {
+			if q == nil {
+				return "-"
+			}
+			return q.String()
+		}
+		for _, p := range withShareable {
+			sh := p.ShareableSummary
+			fully, inUse := count(sh.FullyAvailableDevices), count(sh.PartiallyAvailableDevices)
+			if len(sh.Capacity) == 0 {
+				w.Write(LEVEL_1, "%s\t%s\t%s\t<none>\t\t\t\n", p.PoolName, fully, inUse)
+				continue
+			}
+			for i, c := range sh.Capacity {
+				// Device counts on the first row only.
+				if i > 0 {
+					fully, inUse = "", ""
+				}
+				w.Write(LEVEL_1, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", p.PoolName, fully, inUse, c.Name, quantity(c.Total), quantity(c.Consumed), quantity(c.Available))
+			}
+		}
+	}
 }
 
 func stringOrNone(s string) string {
