@@ -8480,6 +8480,28 @@ func TestPrintResourcePoolStatusRequest(t *testing.T) {
 			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "Pending", "<none>"}}},
 		},
 		{
+			name: "ResourcePoolStatusRequest waiting for pools",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: new(int32(0)),
+					Conditions: []metav1.Condition{
+						{
+							Type:   resourceapis.ResourcePoolStatusRequestConditionWaitingForPools,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "WaitingForPools", "<none>"}}},
+		},
+		{
 			name: "ResourcePoolStatusRequest with Complete status",
 			request: resourceapis.ResourcePoolStatusRequest{
 				ObjectMeta: metav1.ObjectMeta{

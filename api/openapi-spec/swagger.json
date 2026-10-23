@@ -18182,7 +18182,7 @@
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequest": {
-      "description": "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+      "description": "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed. Users should delete and recreate requests to get updated information.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -18202,7 +18202,7 @@
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestStatus",
-          "description": "status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable."
+          "description": "status is populated by the controller with the calculated pool status. While pools are still being published, the controller may first set a status with only a WaitingForPools condition. Once status has a Complete or Failed condition, the entire object becomes immutable."
         }
       },
       "required": [
@@ -18283,7 +18283,7 @@
       "description": "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
       "properties": {
         "conditions": {
-          "description": "conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+          "description": "conditions provide information about the state of the request. The final status always has a condition with type=Complete or type=Failed. Before that, a status with only WaitingForPools=True may be set; its poolCount is 0 and pools is empty.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed - \"WaitingForPools\": True while the controller waits for incomplete pools",
           "items": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
           },

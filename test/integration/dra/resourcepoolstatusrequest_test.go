@@ -564,6 +564,18 @@ func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 		deleteAndWait(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Delete, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
 	})
 
+	// The wait start is recorded on the object first.
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]metav1.Condition, error) {
+		r, err := tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
+		if err != nil || r.Status == nil {
+			return nil, err
+		}
+		return r.Status.Conditions, nil
+	}).WithTimeout(10*time.Second).Should(
+		gomega.ContainElement(gomega.HaveField("Type", resourcev1alpha3.ResourcePoolStatusRequestConditionWaitingForPools)),
+		"request with an incomplete pool should first report WaitingForPools",
+	)
+
 	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourcev1alpha3.ResourcePoolStatusRequest, error) {
 		return tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
 	}).WithTimeout(30*time.Second).Should(

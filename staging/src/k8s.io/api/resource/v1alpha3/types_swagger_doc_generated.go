@@ -141,10 +141,10 @@ func (PoolStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourcePoolStatusRequest = map[string]string{
-	"":         "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+	"":         "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed. Users should delete and recreate requests to get updated information.",
 	"metadata": "metadata is the standard object metadata.",
 	"spec":     "spec defines the filters for which pools to include in the status. The spec is immutable once created.",
-	"status":   "status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
+	"status":   "status is populated by the controller with the calculated pool status. While pools are still being published, the controller may first set a status with only a WaitingForPools condition. Once status has a Complete or Failed condition, the entire object becomes immutable.",
 }
 
 func (ResourcePoolStatusRequest) SwaggerDoc() map[string]string {
@@ -177,7 +177,7 @@ var map_ResourcePoolStatusRequestStatus = map[string]string{
 	"":           "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
 	"poolCount":  "poolCount is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
 	"pools":      "pools contains the first `spec.limit` matching pools, sorted by driver then pool name. If `len(pools) < poolCount`, the list was truncated. When omitted, no pools matched the request filters.",
-	"conditions": "conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+	"conditions": "conditions provide information about the state of the request. The final status always has a condition with type=Complete or type=Failed. Before that, a status with only WaitingForPools=True may be set; its poolCount is 0 and pools is empty.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed - \"WaitingForPools\": True while the controller waits for incomplete pools",
 }
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {
