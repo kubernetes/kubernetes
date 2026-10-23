@@ -3588,6 +3588,23 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodNetwork selects whether a pod is attached to the pod network.
+type PodNetwork string
+
+const (
+	// PodNetworkDefault attaches the pod to the pod network (the network that
+	// Kubernetes connects every pod to unless the pod opts out). The container
+	// runtime performs its configured network plumbing and the pod is assigned
+	// pod IPs. This is the historical behavior (for non-hostNetwork pods).
+	PodNetworkDefault PodNetwork = "Default"
+
+	// PodNetworkIsolated does not attach the pod to the pod network. The pod gets
+	// an isolated network namespace with only the loopback interface
+	// configured. The pod's podIPs are left unset and the pod is never
+	// selected into Services.
+	PodNetworkIsolated PodNetwork = "Isolated"
+)
+
 // NodeSelector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
@@ -4001,6 +4018,8 @@ type PodSpec struct {
 	// Use the host's network namespace.  If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false
+	// When true, PodNetwork may not be set: the pod has no network namespace
+	// of its own.
 	// +optional
 	HostNetwork bool
 	// Use the host's pid namespace.
@@ -4248,6 +4267,20 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+
+	// PodNetwork selects whether a non-hostNetwork pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network. "Isolated" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network and with no automatic
+	// network plumbing.
+	// This field must be unset if hostNetwork is true. For non-hostNetwork
+	// pods, this behaves as if it was set to "Default" if it is not set.
+	// If a pod is "Isolated", hostPort and network-based probes and lifecycle
+	// handlers are not allowed.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	PodNetwork *PodNetwork
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

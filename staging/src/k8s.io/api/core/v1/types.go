@@ -4115,6 +4115,25 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodNetwork selects whether a pod is attached to the pod network.
+// +enum
+// +k8s:enum
+type PodNetwork string
+
+const (
+	// PodNetworkDefault attaches the pod to the pod network (the network that
+	// Kubernetes connects every pod to unless the pod opts out). The container
+	// runtime performs its configured network plumbing and the pod is assigned
+	// pod IPs. This is the historical behavior (for non-hostNetwork pods).
+	PodNetworkDefault PodNetwork = "Default"
+
+	// PodNetworkIsolated does not attach the pod to the pod network. The pod gets
+	// an isolated network namespace with only the loopback interface
+	// configured. The pod's podIPs are left unset and the pod is never
+	// selected into Services.
+	PodNetworkIsolated PodNetwork = "Isolated"
+)
+
 const (
 	// DefaultTerminationGracePeriodSeconds indicates the default duration in
 	// seconds a pod needs to terminate gracefully.
@@ -4608,6 +4627,8 @@ type PodSpec struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// When true, podNetwork may not be set: the pod has no network namespace
+	// of its own.
 	// +optional
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// hostPID uses the host's pid namespace.
@@ -4893,6 +4914,21 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:beta(since: "1.38")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// podNetwork selects whether a non-hostNetwork pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network. "Isolated" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network and with no automatic
+	// network plumbing.
+	// This field must be unset if hostNetwork is true. For non-hostNetwork
+	// pods, this behaves as if it was set to "Default" if it is not set.
+	// If a pod is "Isolated", hostPort and network-based probes and lifecycle
+	// handlers are not allowed.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	// +k8s:optional
+	PodNetwork *PodNetwork `json:"podNetwork,omitempty" protobuf:"bytes,45,opt,name=podNetwork,casttype=PodNetwork"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

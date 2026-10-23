@@ -1345,6 +1345,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: NetworkIsolatedPods
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: NFTablesNetlink
   versionedSpecs:
   - default: true
