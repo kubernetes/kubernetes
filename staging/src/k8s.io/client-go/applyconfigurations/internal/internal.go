@@ -7293,6 +7293,9 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: podNetwork
+      type:
+        scalar: string
     - name: preemptionPolicy
       type:
         scalar: string
