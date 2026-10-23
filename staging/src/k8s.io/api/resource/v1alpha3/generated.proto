@@ -91,8 +91,44 @@ message CELDeviceSelector {
   // cost of evaluating it is also limited based on the estimated number
   // of logical steps.
   //
+  // Variables contain named sub-expressions that can be referenced from Expression.
+  //
+  // Each variable is compiled in order. A variable may reference the device input and
+  // variables declared earlier in the list. The list must be acyclic.
+  //
+  // In later variables and in Expression, variables are available as variables.<name>,
+  // for example variables.attributes for a variable named "attributes".
+  // Bare names are not in scope.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DRAVariablesInCEL
+  repeated CELSelectorVariable variables = 2;
+
+  // Expression is a CEL expression which evaluates a single device.
+  // See the type comment above for the full expression semantics.
+  //
   // +required
+  // +k8s:required
   optional string expression = 1;
+}
+
+// CELSelectorVariable is a named CEL sub-expression for use in a CELDeviceSelector
+// or DeviceDerivedAttribute.
+// +structType=atomic
+message CELSelectorVariable {
+  // Name must be a valid CEL identifier and unique among variables in this
+  // CELDeviceSelector or DeviceDerivedAttribute.
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // Expression is evaluated in the DRA device CEL environment. It may refer to device
+  // and to variables.<earlierName>. The result type is unconstrained (any CEL type).
+  // +required
+  // +k8s:required
+  optional string expression = 2;
 }
 
 // DeviceSelector must have exactly one field set.

@@ -23,6 +23,15 @@ package v1
 //
 // CELDeviceSelector contains a CEL expression for selecting a device.
 type CELDeviceSelectorApplyConfiguration struct {
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	//
+	// Each variable is compiled in order. A variable may reference the device input and
+	// variables declared earlier in the list. The list must be acyclic.
+	//
+	// In later variables and in Expression, variables are available as variables.<name>,
+	// for example variables.attributes for a variable named "attributes".
+	// Bare names are not in scope.
+	Variables []CELSelectorVariableApplyConfiguration `json:"variables,omitempty"`
 	// Expression is a CEL expression which evaluates a single device. It
 	// must evaluate to true when the device under consideration satisfies
 	// the desired criteria, and false when it does not. Any other result
@@ -89,6 +98,9 @@ type CELDeviceSelectorApplyConfiguration struct {
 	//
 	// device.attributes["dra.example.com"].models.includes("some-model")
 	//
+	// When DRAVariablesInCEL is enabled, Expression may also reference
+	// variables.<name> for names declared in Variables.
+	//
 	// The length of the expression must be smaller or equal to 10 Ki. The
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
@@ -99,6 +111,19 @@ type CELDeviceSelectorApplyConfiguration struct {
 // apply.
 func CELDeviceSelector() *CELDeviceSelectorApplyConfiguration {
 	return &CELDeviceSelectorApplyConfiguration{}
+}
+
+// WithVariables adds the given value to the Variables field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Variables field.
+func (b *CELDeviceSelectorApplyConfiguration) WithVariables(values ...*CELSelectorVariableApplyConfiguration) *CELDeviceSelectorApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVariables")
+		}
+		b.Variables = append(b.Variables, *values[i])
+	}
+	return b
 }
 
 // WithExpression sets the Expression field in the declarative configuration to the given value

@@ -388,12 +388,86 @@ func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, opt
 	if selector.CEL == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("cel"), ""))
 	} else {
-		allErrs = append(allErrs, validateCELExpression(selector.CEL.Expression, fldPath.Child("cel", "expression"), opts, false)...)
+		allErrs = append(allErrs, validateCELSelector(selector.CEL, fldPath.Child("cel"), opts, false)...)
 	}
 	return allErrs
 }
 
-func validateCELExpression(expression string, fldPath *field.Path, opts deviceValidationOptions, derivedAttribute bool) field.ErrorList {
+func validateCELSelector(celSelector *resource.CELDeviceSelector, fldPath *field.Path, opts deviceValidationOptions, derivedAttribute bool) field.ErrorList {
+	var allErrs field.ErrorList
+	if celSelector == nil {
+		return allErrs
+	}
+
+	variablesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRAVariablesInCEL)
+	if len(celSelector.Variables) > 0 && !variablesEnabled {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("variables"), "feature DRAVariablesInCEL is disabled"))
+		return allErrs
+	}
+
+	variables, varErrs := validateCELSelectorVariables(celSelector.Variables, fldPath.Child("variables"))
+	allErrs = append(allErrs, varErrs...)
+	if len(varErrs) > 0 {
+		// Don't bother compiling if variable metadata is already invalid.
+		return allErrs
+	}
+
+	allErrs = append(allErrs, validateCELExpression(celSelector.Expression, variables, fldPath.Child("expression"), opts, derivedAttribute)...)
+	return allErrs
+}
+
+func validateCELSelectorVariables(variables []resource.CELSelectorVariable, fldPath *field.Path) ([]dracel.NamedVariable, field.ErrorList) {
+	var allErrs field.ErrorList
+	if len(variables) == 0 {
+		return nil, nil
+	}
+	if len(variables) > resource.CELSelectorVariablesMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath, len(variables), resource.CELSelectorVariablesMaxSize))
+		return nil, allErrs
+	}
+
+	named := make([]dracel.NamedVariable, 0, len(variables))
+	seen := sets.New[string]()
+	for i, v := range variables {
+		idxPath := fldPath.Index(i)
+		if len(v.Name) == 0 || strings.TrimSpace(v.Name) == "" {
+			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
+		} else {
+			if len(v.Name) > resource.CELSelectorVariableNameMaxLength {
+				allErrs = append(allErrs, field.TooLong(idxPath.Child("name"), "" /*unused*/, resource.CELSelectorVariableNameMaxLength))
+			}
+			if !isCELIdentifier(v.Name) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), v.Name, "must be a valid CEL identifier"))
+			}
+			if seen.Has(v.Name) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), v.Name))
+			}
+			seen.Insert(v.Name)
+		}
+		if len(v.Expression) == 0 || strings.TrimSpace(v.Expression) == "" {
+			allErrs = append(allErrs, field.Required(idxPath.Child("expression"), ""))
+		} else if len(v.Expression) > resource.CELSelectorExpressionMaxLength {
+			allErrs = append(allErrs, field.TooLong(idxPath.Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength))
+		}
+		named = append(named, dracel.NamedVariable{Name: v.Name, Expression: v.Expression})
+	}
+	return named, allErrs
+}
+
+var (
+	celIdentRegex = regexp.MustCompile(`^[_a-zA-Z][_a-zA-Z0-9]*$`)
+	celReserved   = sets.NewString("true", "false", "null", "in",
+		"as", "break", "const", "continue", "else",
+		"for", "function", "if", "import", "let",
+		"loop", "package", "namespace", "return",
+		"var", "void", "while")
+)
+
+func isCELIdentifier(name string) bool {
+	return celIdentRegex.MatchString(name) && !celReserved.Has(name)
+}
+
+func validateCELExpression(expression string, variables []dracel.NamedVariable, fldPath *field.Path, opts deviceValidationOptions, derivedAttribute bool) field.ErrorList {
 	if opts.stored {
 		// If a CEL expression is stored, it must have been valid at the
 		// time it was stored and thus must also be valid now. Returning
@@ -410,13 +484,20 @@ func validateCELExpression(expression string, fldPath *field.Path, opts deviceVa
 		return allErrs
 	}
 
-	result := dracel.GetCompiler(dracel.Features{
+	compiler := dracel.GetCompiler(dracel.Features{
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
-	}).CompileCELExpression(expression, dracel.Options{
+	})
+	compileOpts := dracel.Options{
 		EnvType:          &envType,
 		DerivedAttribute: derivedAttribute,
-	})
+	}
+	var result dracel.CompilationResult
+	if len(variables) == 0 {
+		result = compiler.CompileCELExpression(expression, compileOpts)
+	} else {
+		result = compiler.CompileCELExpressionWithVariables(expression, variables, compileOpts)
+	}
 	if result.Error != nil {
 		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, expression, result.Error))
 	} else {
@@ -492,10 +573,23 @@ func validateDeviceDerivedAttribute(attr resource.DeviceDerivedAttribute, fldPat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), attr.Name, "must be referenced by at least one matchAttribute or distinctAttribute constraint targeting this request"))
 		}
 	}
+
+	variablesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRAVariablesInCEL)
+	if len(attr.Variables) > 0 && !variablesEnabled {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("variables"), "feature DRAVariablesInCEL is disabled"))
+		return allErrs
+	}
+
+	variables, varErrs := validateCELSelectorVariables(attr.Variables, fldPath.Child("variables"))
+	allErrs = append(allErrs, varErrs...)
+	if len(varErrs) > 0 {
+		return allErrs
+	}
+
 	// Declarative validation checks for non-empty value,
 	// no need to check that here.
 	if attr.Expression != "" {
-		allErrs = append(allErrs, validateCELExpression(attr.Expression, fldPath.Child("expression"), opts, true)...)
+		allErrs = append(allErrs, validateCELExpression(attr.Expression, variables, fldPath.Child("expression"), opts, true)...)
 	}
 	return allErrs
 }

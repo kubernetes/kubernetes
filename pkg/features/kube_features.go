@@ -209,6 +209,13 @@ const (
 	// Enables support for derived attributes in Dynamic Resource Allocation (DRA).
 	DRADerivedAttributes featuregate.Feature = "DRADerivedAttributes"
 
+	// owner: @vishalanarase
+	// kep: https://kep.k8s.io/5259
+	//
+	// Enables named CEL variables on CELDeviceSelector and DeviceDerivedAttribute
+	// for composing complex DRA device selection and derived-attribute expressions.
+	DRAVariablesInCEL featuregate.Feature = "DRAVariablesInCEL"
+
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
 	// alpha: v1.34
@@ -1413,6 +1420,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRAVariablesInCEL: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRADeviceBindingConditions: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2474,6 +2485,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAConsumableCapacity: {DynamicResourceAllocation},
 
 	DRADerivedAttributes: {DynamicResourceAllocation},
+
+	DRAVariablesInCEL: {DynamicResourceAllocation},
 
 	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
 

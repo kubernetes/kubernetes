@@ -42,6 +42,9 @@ type DeviceDerivedAttributeApplyConfiguration struct {
 	// It is not valid to define a derived attribute that isn't used in at least
 	// one constraint.
 	Name *resourcev1beta1.FullyQualifiedName `json:"name,omitempty"`
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	// Semantics match CELDeviceSelector.Variables.
+	Variables []CELSelectorVariableApplyConfiguration `json:"variables,omitempty"`
 	// Expression is a CEL expression evaluated against each candidate device.
 	// The expression must evaluate to a primitive scalar (string, integer,
 	// boolean, or semver) or a list of these scalars ([]string, []int64,
@@ -49,7 +52,8 @@ type DeviceDerivedAttributeApplyConfiguration struct {
 	// is an error and causes CEL evaluation for the device to fail.
 	//
 	// The expression's input is an object named "device", which carries the
-	// same properties as in a CELDeviceSelector.
+	// same properties as in a CELDeviceSelector. When DRAVariablesInCEL is
+	// enabled, Expression may also reference variables.<name>.
 	//
 	// When pod scheduling encounters CEL runtime errors (such as looking
 	// up an attribute that isn't defined) for some devices, it will abort
@@ -83,6 +87,19 @@ func DeviceDerivedAttribute() *DeviceDerivedAttributeApplyConfiguration {
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *DeviceDerivedAttributeApplyConfiguration) WithName(value resourcev1beta1.FullyQualifiedName) *DeviceDerivedAttributeApplyConfiguration {
 	b.Name = &value
+	return b
+}
+
+// WithVariables adds the given value to the Variables field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Variables field.
+func (b *DeviceDerivedAttributeApplyConfiguration) WithVariables(values ...*CELSelectorVariableApplyConfiguration) *DeviceDerivedAttributeApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVariables")
+		}
+		b.Variables = append(b.Variables, *values[i])
+	}
 	return b
 }
 

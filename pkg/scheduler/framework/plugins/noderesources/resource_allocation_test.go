@@ -635,7 +635,7 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 // getCachedDeviceMatch checks the cache for a DeviceMatches result
 // returns (matches, found)
 func (r *resourceAllocationScorer) getCachedDeviceMatch(expression string, driver string, poolName string, deviceName string) (bool, bool) {
-	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
+	key := buildDeviceMatchCacheKey(expression, nil, driver, poolName, deviceName)
 
 	if value, ok := r.deviceMatchCache.Load(key); ok {
 		return value.(bool), true
@@ -646,7 +646,7 @@ func (r *resourceAllocationScorer) getCachedDeviceMatch(expression string, drive
 
 // setCachedDeviceMatch stores a DeviceMatches result in the cache
 func (r *resourceAllocationScorer) setCachedDeviceMatch(expression string, driver string, poolName string, deviceName string, matches bool) {
-	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
+	key := buildDeviceMatchCacheKey(expression, nil, driver, poolName, deviceName)
 	r.deviceMatchCache.Store(key, matches)
 }
 

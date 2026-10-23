@@ -1400,6 +1400,21 @@ type DeviceSelector struct {
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
 type CELDeviceSelector struct {
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	//
+	// Each variable is compiled in order. A variable may reference the device input and
+	// variables declared earlier in the list. The list must be acyclic.
+	//
+	// In later variables and in Expression, variables are available as variables.<name>,
+	// for example variables.attributes for a variable named "attributes".
+	// Bare names are not in scope.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAVariablesInCEL
+	Variables []CELSelectorVariable
+
 	// Expression is a CEL expression which evaluates a single device. It
 	// must evaluate to true when the device under consideration satisfies
 	// the desired criteria, and false when it does not. Any other result
@@ -1449,6 +1464,9 @@ type CELDeviceSelector struct {
 	//
 	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
 	//
+	// When DRAVariablesInCEL is enabled, Expression may also reference
+	// variables.<name> for names declared in Variables.
+	//
 	// When the DRAListTypeAttributes feature gate is enabled,
 	// the includes() helper is available and it can work for both scalar
 	// and list-type attributes. It was introduced to support smooth migration
@@ -1461,6 +1479,21 @@ type CELDeviceSelector struct {
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
 	//
+	// +required
+	Expression string
+}
+
+// CELSelectorVariable is a named CEL sub-expression for use in a CELDeviceSelector
+// or DeviceDerivedAttribute.
+// +structType=atomic
+type CELSelectorVariable struct {
+	// Name must be a valid CEL identifier and unique among variables in this
+	// CELDeviceSelector or DeviceDerivedAttribute.
+	// +required
+	Name string
+
+	// Expression is evaluated in the DRA device CEL environment. It may refer to device
+	// and to variables.<earlierName>. The result type is unconstrained (any CEL type).
 	// +required
 	Expression string
 }
@@ -1484,6 +1517,15 @@ type DeviceDerivedAttribute struct {
 	//
 	// +required
 	Name FullyQualifiedName
+
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	// Semantics match CELDeviceSelector.Variables.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAVariablesInCEL
+	Variables []CELSelectorVariable
 
 	// Expression is a CEL expression evaluated against each candidate device.
 	// The expression must evaluate to a primitive scalar (string, integer,
@@ -1563,6 +1605,13 @@ const DeviceClaimDerivedAttributeCELMaxCost = 1000000
 
 // CELSelectorExpressionMaxLength is the maximum length of a CEL selector expression string.
 const CELSelectorExpressionMaxLength = 10 * 1024
+
+// CELSelectorVariablesMaxSize is the maximum number of variables allowed in a
+// single CELDeviceSelector or DeviceDerivedAttribute when DRAVariablesInCEL is enabled.
+const CELSelectorVariablesMaxSize = 32
+
+// CELSelectorVariableNameMaxLength is the maximum length of a CEL selector variable name.
+const CELSelectorVariableNameMaxLength = 63
 
 // DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraint struct {

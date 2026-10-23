@@ -560,9 +560,12 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		if !alloc.features.DerivedAttributes {
 			return requestData, fmt.Errorf("claim %s, request %s: cannot handle request with derived attributes, the feature is disabled", klog.KObj(claim), request.name())
 		}
-		requestData.derivedAttributes = make(map[resourceapi.FullyQualifiedName]string, len(derivedAttrs))
+		requestData.derivedAttributes = make(map[resourceapi.FullyQualifiedName]derivedAttributeCEL, len(derivedAttrs))
 		for _, attr := range derivedAttrs {
-			requestData.derivedAttributes[attr.Name] = attr.Expression
+			requestData.derivedAttributes[attr.Name] = derivedAttributeCEL{
+				expression: attr.Expression,
+				variables:  cel.NamedVariablesFromAPI(attr.Variables),
+			}
 		}
 	}
 	for i, selector := range request.selectors() {
@@ -722,7 +725,28 @@ type matchKey struct {
 // constraints reference them.
 type deviceExprKey struct {
 	DeviceID
-	expr string
+	expr      string
+	variables string // canonical encoding of named variables for cache keying
+}
+
+// derivedAttributeCEL stores the CEL source for a derived attribute.
+type derivedAttributeCEL struct {
+	expression string
+	variables  []cel.NamedVariable
+}
+
+func (d derivedAttributeCEL) cacheVariablesKey() string {
+	if len(d.variables) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, v := range d.variables {
+		b.WriteString(v.Name)
+		b.WriteByte(0)
+		b.WriteString(v.Expression)
+		b.WriteByte(0)
+	}
+	return b.String()
 }
 
 // requestIndices identifies one specific request
@@ -771,7 +795,8 @@ type requestData struct {
 	allDevices []deviceWithID
 
 	// derivedAttributes maps derived attribute name to its CEL expression
-	derivedAttributes map[resourceapi.FullyQualifiedName]string
+	// and optional named variables.
+	derivedAttributes map[resourceapi.FullyQualifiedName]derivedAttributeCEL
 }
 
 func (rd *requestData) requestName() string {
@@ -1115,13 +1140,13 @@ func lookupStaticAttribute(device *draapi.Device, deviceID DeviceID, attributeNa
 //  2. Otherwise, it falls back to looking up the static attribute on
 //     the Device object.
 func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) (*resourceapi.DeviceAttribute, error) {
-	if targetExpr, found := request.derivedAttributes[attributeName]; found {
-		cacheKey := deviceExprKey{DeviceID: deviceID, expr: targetExpr}
+	if target, found := request.derivedAttributes[attributeName]; found {
+		cacheKey := deviceExprKey{DeviceID: deviceID, expr: target.expression, variables: target.cacheVariablesKey()}
 		if attr, found := alloc.derivedAttributesCache[cacheKey]; found {
 			return attr, nil
 		}
 
-		expr := alloc.celCache.GetOrCompileDerivedAttribute(targetExpr)
+		expr := alloc.celCache.GetOrCompileDerivedAttributeWithVariables(target.expression, target.variables)
 		if expr.Error != nil {
 			return nil, fmt.Errorf("compile derived attribute %s failed: %w", attributeName, expr.Error)
 		}
@@ -1510,7 +1535,7 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
-		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
+		expr := alloc.celCache.GetOrCompileSelector(selector.CEL.Expression, cel.NamedVariablesFromAPI(selector.CEL.Variables))
 		if expr.Error != nil {
 			// Could happen if some future apiserver accepted some
 			// future expression and then got downgraded. Normally

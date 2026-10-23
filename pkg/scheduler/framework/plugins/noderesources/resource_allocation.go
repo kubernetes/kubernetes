@@ -90,13 +90,20 @@ func buildNodeMatchCacheKey(nodeName string, nodeNameToMatch string, allNodesMat
 
 // buildDeviceMatchCacheKey creates a string cache key for device matching results
 // Using a string key is significantly faster than struct keys with sync.Map
-// This concatenates expression|driver|poolName|deviceName with pipe separators
-func buildDeviceMatchCacheKey(expression string, driver string, poolName string, deviceName string) string {
+// This concatenates expression|variables|driver|poolName|deviceName with pipe separators
+func buildDeviceMatchCacheKey(expression string, variables []resourceapi.CELSelectorVariable, driver string, poolName string, deviceName string) string {
 	// Pre-allocate sufficient capacity to avoid reallocation
 	var b strings.Builder
-	b.Grow(len(expression) + len(driver) + len(poolName) + len(deviceName) + 3)
+	b.Grow(len(expression) + len(driver) + len(poolName) + len(deviceName) + 4 + 32*len(variables))
 
 	b.WriteString(expression)
+	b.WriteByte('|')
+	for _, v := range variables {
+		b.WriteString(v.Name)
+		b.WriteByte(0)
+		b.WriteString(v.Expression)
+		b.WriteByte(0)
+	}
 	b.WriteByte('|')
 	b.WriteString(driver)
 	b.WriteByte('|')
@@ -463,7 +470,7 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 			continue
 		}
 
-		key := buildDeviceMatchCacheKey(selector.CEL.Expression, driver, poolName, device.Name)
+		key := buildDeviceMatchCacheKey(selector.CEL.Expression, selector.CEL.Variables, driver, poolName, device.Name)
 
 		// Check if result is already cached
 		if matches, ok := r.deviceMatchCache.Load(key); ok {
@@ -485,7 +492,7 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 		}
 
 		// Use cached CEL compilation for performance
-		result := r.celCache.GetOrCompile(selector.CEL.Expression)
+		result := r.celCache.GetOrCompileSelector(selector.CEL.Expression, cel.NamedVariablesFromAPI(selector.CEL.Variables))
 		if result.Error != nil {
 			return false, result.Error
 		}

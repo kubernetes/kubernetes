@@ -1494,6 +1494,23 @@ type CapacityRequirements struct {
 	Requests map[QualifiedName]resource.Quantity `json:"requests,omitempty" protobuf:"bytes,1,rep,name=requests,castkey=QualifiedName"`
 }
 
+// CELSelectorVariable is a named CEL sub-expression for use in a CELDeviceSelector
+// or DeviceDerivedAttribute.
+// +structType=atomic
+type CELSelectorVariable struct {
+	// Name must be a valid CEL identifier and unique among variables in this
+	// CELDeviceSelector or DeviceDerivedAttribute.
+	// +required
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Expression is evaluated in the DRA device CEL environment. It may refer to device
+	// and to variables.<earlierName>. The result type is unconstrained (any CEL type).
+	// +required
+	// +k8s:required
+	Expression string `json:"expression" protobuf:"bytes,2,name=expression"`
+}
+
 // DeviceDerivedAttribute defines a derived attribute computed via CEL.
 type DeviceDerivedAttribute struct {
 	// Name is the identifier for this derived attribute, used in constraints.
@@ -1516,6 +1533,15 @@ type DeviceDerivedAttribute struct {
 	// +k8s:format=k8s-resource-fully-qualified-name
 	Name FullyQualifiedName `json:"name" protobuf:"bytes,1,name=name"`
 
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	// Semantics match CELDeviceSelector.Variables.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAVariablesInCEL
+	Variables []CELSelectorVariable `json:"variables,omitempty" protobuf:"bytes,3,rep,name=variables"`
+
 	// Expression is a CEL expression evaluated against each candidate device.
 	// The expression must evaluate to a primitive scalar (string, integer,
 	// boolean, or semver) or a list of these scalars ([]string, []int64,
@@ -1523,7 +1549,8 @@ type DeviceDerivedAttribute struct {
 	// is an error and causes CEL evaluation for the device to fail.
 	//
 	// The expression's input is an object named "device", which carries the
-	// same properties as in a CELDeviceSelector.
+	// same properties as in a CELDeviceSelector. When DRAVariablesInCEL is
+	// enabled, Expression may also reference variables.<name>.
 	//
 	// When pod scheduling encounters CEL runtime errors (such as looking
 	// up an attribute that isn't defined) for some devices, it will abort
@@ -1647,7 +1674,26 @@ type CELDeviceSelector struct {
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
 	//
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	//
+	// Each variable is compiled in order. A variable may reference the device input and
+	// variables declared earlier in the list. The list must be acyclic.
+	//
+	// In later variables and in Expression, variables are available as variables.<name>,
+	// for example variables.attributes for a variable named "attributes".
+	// Bare names are not in scope.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAVariablesInCEL
+	Variables []CELSelectorVariable `json:"variables,omitempty" protobuf:"bytes,2,rep,name=variables"`
+
+	// Expression is a CEL expression which evaluates a single device.
+	// See the type comment above for the full expression semantics.
+	//
 	// +required
+	// +k8s:required
 	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
 }
 
@@ -1697,6 +1743,13 @@ const DeviceClaimDerivedAttributeCELMaxCost = 1000000
 
 // CELSelectorExpressionMaxLength is the maximum length of a CEL selector expression string.
 const CELSelectorExpressionMaxLength = 10 * 1024
+
+// CELSelectorVariablesMaxSize is the maximum number of variables allowed in a
+// single CELDeviceSelector or DeviceDerivedAttribute when DRAVariablesInCEL is enabled.
+const CELSelectorVariablesMaxSize = 32
+
+// CELSelectorVariableNameMaxLength is the maximum length of a CEL selector variable name.
+const CELSelectorVariableNameMaxLength = 63
 
 // DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraint struct {

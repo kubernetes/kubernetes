@@ -105,6 +105,10 @@ type CompilationResult struct {
 
 	typesFromEnv
 	emptyMapVal ref.Val
+
+	// composition holds compiled named variables when the expression was compiled
+	// with CompileCELExpressionWithVariables. Nil for plain CompileCELExpression.
+	composition *compositionState
 }
 
 // Device defines the input values for a CEL selector expression.
@@ -327,40 +331,12 @@ func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (
 var boolType = reflect.TypeOf(true)
 
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
-	// TODO (future): avoid building these maps and instead use a proxy
-	// which wraps the underlying maps and directly looks up values.
-	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
+	activation, err := c.buildActivation(ctx, input)
+	if err != nil {
+		return false, nil, err
 	}
 
-	capacity := make(map[string]any)
-	for name, cap := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
-	}
-
-	variables := map[string]any{
-		deviceVar: map[string]any{
-			driverVar:     input.Driver,
-			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
-			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
-			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
-		},
-	}
-
-	result, details, err := c.Program.ContextEval(ctx, variables)
+	result, details, err := c.Program.ContextEval(ctx, activation)
 	if err != nil {
 		// CEL does not wrap the context error. We have to deduce why it failed.
 		// See https://github.com/google/cel-go/issues/1195.
@@ -383,11 +359,34 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 // EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
 // returning the evaluated DeviceAttribute or an error.
 func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
+	activation, err := c.buildActivation(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result, details, err := c.Program.ContextEval(ctx, activation)
+	if err != nil {
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return nil, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
+		}
+		return nil, details, err
+	}
+
+	attr, err := valToDeviceAttribute(result)
+	if err != nil {
+		return nil, details, err
+	}
+	return attr, details, nil
+}
+
+func (c CompilationResult) buildActivation(ctx context.Context, input Device) (map[string]any, error) {
+	// TODO (future): avoid building these maps and instead use a proxy
+	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
 		value, err := c.getAttributeValue(attr)
 		if err != nil {
-			return nil, nil, fmt.Errorf("attribute %s: %w", name, err)
+			return nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
 		domain, id := parseQualifiedName(name, input.Driver)
 		if attributes[domain] == nil {
@@ -405,7 +404,7 @@ func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input D
 		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 	}
 
-	variables := map[string]any{
+	activation := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
 			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
@@ -413,20 +412,10 @@ func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input D
 			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
 		},
 	}
-
-	result, details, err := c.Program.ContextEval(ctx, variables)
-	if err != nil {
-		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
-			return nil, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
-		}
-		return nil, details, err
+	if c.composition != nil {
+		activation[variablesVar] = c.composition.lazyVariables(ctx, activation)
 	}
-
-	attr, err := valToDeviceAttribute(result)
-	if err != nil {
-		return nil, details, err
-	}
-	return attr, details, nil
+	return activation, nil
 }
 
 func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {

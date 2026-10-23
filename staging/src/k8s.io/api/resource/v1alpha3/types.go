@@ -92,8 +92,44 @@ type CELDeviceSelector struct {
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
 	//
+	// Variables contain named sub-expressions that can be referenced from Expression.
+	//
+	// Each variable is compiled in order. A variable may reference the device input and
+	// variables declared earlier in the list. The list must be acyclic.
+	//
+	// In later variables and in Expression, variables are available as variables.<name>,
+	// for example variables.attributes for a variable named "attributes".
+	// Bare names are not in scope.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAVariablesInCEL
+	Variables []CELSelectorVariable `json:"variables,omitempty" protobuf:"bytes,2,rep,name=variables"`
+
+	// Expression is a CEL expression which evaluates a single device.
+	// See the type comment above for the full expression semantics.
+	//
 	// +required
+	// +k8s:required
 	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
+}
+
+// CELSelectorVariable is a named CEL sub-expression for use in a CELDeviceSelector
+// or DeviceDerivedAttribute.
+// +structType=atomic
+type CELSelectorVariable struct {
+	// Name must be a valid CEL identifier and unique among variables in this
+	// CELDeviceSelector or DeviceDerivedAttribute.
+	// +required
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Expression is evaluated in the DRA device CEL environment. It may refer to device
+	// and to variables.<earlierName>. The result type is unconstrained (any CEL type).
+	// +required
+	// +k8s:required
+	Expression string `json:"expression" protobuf:"bytes,2,name=expression"`
 }
 
 // CELSelectorExpressionMaxCost specifies the cost limit for a single CEL selector
@@ -123,6 +159,13 @@ const CELSelectorExpressionMaxCost = 1000000
 
 // CELSelectorExpressionMaxLength is the maximum length of a CEL selector expression string.
 const CELSelectorExpressionMaxLength = 10 * 1024
+
+// CELSelectorVariablesMaxSize is the maximum number of variables allowed in a
+// single CELDeviceSelector or DeviceDerivedAttribute when DRAVariablesInCEL is enabled.
+const CELSelectorVariablesMaxSize = 32
+
+// CELSelectorVariableNameMaxLength is the maximum length of a CEL selector variable name.
+const CELSelectorVariableNameMaxLength = 63
 
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,

@@ -37,6 +37,11 @@ func (in CELDeviceSelector) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CELSelectorVariable) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.CELSelectorVariable"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CapacityRequestPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.CapacityRequestPolicy"
 }

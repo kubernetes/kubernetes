@@ -36,6 +36,7 @@ func DropDisabledFields(new, old *resource.ResourceClaimSpec) {
 	dropDisabledDRAAdminAccessFields(new, old)
 	dropDisabledDRAResourceClaimConsumableCapacityFields(new, old)
 	dropDisabledDRADerivedAttributesFields(new, old)
+	dropDisabledDRAVariablesInCELFields(new, old)
 }
 
 func dropDisabledDRADeviceTaintsFields(new, old *resource.ResourceClaimSpec) {
@@ -209,5 +210,75 @@ func draDerivedAttributesInUse(spec *resource.ResourceClaimSpec) bool {
 		}
 	}
 
+	return false
+}
+
+func dropDisabledDRAVariablesInCELFields(new, old *resource.ResourceClaimSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAVariablesInCEL) ||
+		draVariablesInCELInUse(old) {
+		return
+	}
+
+	for i := range new.Devices.Requests {
+		req := &new.Devices.Requests[i]
+		if exactly := req.Exactly; exactly != nil {
+			clearCELVariablesInSelectors(exactly.Selectors)
+			clearCELVariablesInDerivedAttributes(exactly.DerivedAttributes)
+		}
+		for e := range req.FirstAvailable {
+			clearCELVariablesInSelectors(req.FirstAvailable[e].Selectors)
+			clearCELVariablesInDerivedAttributes(req.FirstAvailable[e].DerivedAttributes)
+		}
+	}
+}
+
+func draVariablesInCELInUse(spec *resource.ResourceClaimSpec) bool {
+	if spec == nil {
+		return false
+	}
+	for _, req := range spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil {
+			if selectorsHaveCELVariables(exactly.Selectors) || derivedAttributesHaveCELVariables(exactly.DerivedAttributes) {
+				return true
+			}
+		}
+		for _, sub := range req.FirstAvailable {
+			if selectorsHaveCELVariables(sub.Selectors) || derivedAttributesHaveCELVariables(sub.DerivedAttributes) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func clearCELVariablesInSelectors(selectors []resource.DeviceSelector) {
+	for i := range selectors {
+		if selectors[i].CEL != nil {
+			selectors[i].CEL.Variables = nil
+		}
+	}
+}
+
+func clearCELVariablesInDerivedAttributes(attrs []resource.DeviceDerivedAttribute) {
+	for i := range attrs {
+		attrs[i].Variables = nil
+	}
+}
+
+func selectorsHaveCELVariables(selectors []resource.DeviceSelector) bool {
+	for _, s := range selectors {
+		if s.CEL != nil && len(s.CEL.Variables) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func derivedAttributesHaveCELVariables(attrs []resource.DeviceDerivedAttribute) bool {
+	for _, a := range attrs {
+		if len(a.Variables) > 0 {
+			return true
+		}
+	}
 	return false
 }

@@ -233,3 +233,55 @@ func TestDropDisabledDRADerivedAttributesFields(t *testing.T) {
 		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
 	})
 }
+
+func TestDropDisabledDRAVariablesInCELFields(t *testing.T) {
+	claim := obj.DeepCopy()
+	claim.Spec.Devices.Requests[0].Exactly.Selectors = []resource.DeviceSelector{{
+		CEL: &resource.CELDeviceSelector{
+			Expression: "variables.ok",
+			Variables: []resource.CELSelectorVariable{{
+				Name:       "ok",
+				Expression: "true",
+			}},
+		},
+	}}
+	claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{{
+		Name:       "derived/numa",
+		Expression: "variables.n",
+		Variables: []resource.CELSelectorVariable{{
+			Name:       "n",
+			Expression: `device.attributes["dra.example.com"].numa`,
+		}},
+	}}
+
+	t.Run("drop-on-create-when-feature-gate-disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAVariablesInCEL, false)
+		// Keep derived attributes so DropDisabled for derived attrs does not wipe the whole slice.
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, true)
+		newClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, nil)
+		assert.Nil(t, newClaim.Spec.Devices.Requests[0].Exactly.Selectors[0].CEL.Variables)
+		assert.Equal(t, "variables.ok", newClaim.Spec.Devices.Requests[0].Exactly.Selectors[0].CEL.Expression)
+		assert.Nil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes[0].Variables)
+		assert.Equal(t, "variables.n", newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes[0].Expression)
+	})
+
+	t.Run("keep-on-create-when-feature-gate-enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAVariablesInCEL, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, true)
+		newClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, nil)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.Selectors[0].CEL.Variables)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes[0].Variables)
+	})
+
+	t.Run("keep-on-update-when-feature-gate-disabled-but-in-use", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAVariablesInCEL, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, true)
+		newClaim := claim.DeepCopy()
+		oldClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, &oldClaim.Spec)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.Selectors[0].CEL.Variables)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes[0].Variables)
+	})
+}

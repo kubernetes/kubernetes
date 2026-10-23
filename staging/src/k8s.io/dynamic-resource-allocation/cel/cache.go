@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"strings"
 	"sync"
 
 	"k8s.io/utils/keymutex"
@@ -49,8 +50,17 @@ func NewCache(maxCacheEntries int, features Features) *Cache {
 // results and returns the new result.
 //
 // Cost estimation is disabled.
+//
+// Deprecated: prefer GetOrCompileSelector so cache keys include variables.
 func (c *Cache) GetOrCompile(expression string) CompilationResult {
-	return c.getOrCompile(expression, "selector", Options{DisableCostEstimation: true})
+	return c.GetOrCompileSelector(expression, nil)
+}
+
+// GetOrCompileSelector compiles a CEL device selector expression together with
+// optional named variables. The cache key includes both the expression and the
+// variables so composed selectors are not confused with plain ones.
+func (c *Cache) GetOrCompileSelector(expression string, variables []NamedVariable) CompilationResult {
+	return c.getOrCompile(expression, variables, "selector", Options{DisableCostEstimation: true})
 }
 
 // GetOrCompileDerivedAttribute checks whether the cache already has a
@@ -58,28 +68,57 @@ func (c *Cache) GetOrCompile(expression string) CompilationResult {
 // if available. Otherwise it compiles, stores successful results and returns
 // the new result with DerivedAttribute compilation option enabled.
 func (c *Cache) GetOrCompileDerivedAttribute(expression string) CompilationResult {
-	return c.getOrCompile(expression, "derived", Options{
+	return c.GetOrCompileDerivedAttributeWithVariables(expression, nil)
+}
+
+// GetOrCompileDerivedAttributeWithVariables compiles a derived-attribute
+// expression together with optional named variables.
+func (c *Cache) GetOrCompileDerivedAttributeWithVariables(expression string, variables []NamedVariable) CompilationResult {
+	return c.getOrCompile(expression, variables, "derived", Options{
 		DisableCostEstimation: true,
 		DerivedAttribute:      true,
 	})
 }
 
-func (c *Cache) getOrCompile(expression string, cacheScope string, opts Options) CompilationResult {
-	cacheKey := cacheScope + ":" + expression
+func cacheKey(scope, expression string, variables []NamedVariable) string {
+	if len(variables) == 0 {
+		return scope + ":" + expression
+	}
+	var b strings.Builder
+	b.Grow(len(scope) + 1 + len(expression) + 32*len(variables))
+	b.WriteString(scope)
+	b.WriteByte(':')
+	b.WriteString(expression)
+	for _, v := range variables {
+		b.WriteByte(0)
+		b.WriteString(v.Name)
+		b.WriteByte(0)
+		b.WriteString(v.Expression)
+	}
+	return b.String()
+}
+
+func (c *Cache) getOrCompile(expression string, variables []NamedVariable, cacheScope string, opts Options) CompilationResult {
+	key := cacheKey(cacheScope, expression, variables)
 	// Compiling a CEL expression is expensive enough that it is cheaper
 	// to lock a mutex than doing it several times in parallel.
-	c.compileMutex.LockKey(cacheKey)
+	c.compileMutex.LockKey(key)
 	//nolint:errcheck // Only returns an error for unknown keys, which isn't the case here.
-	defer c.compileMutex.UnlockKey(cacheKey)
+	defer c.compileMutex.UnlockKey(key)
 
-	cached := c.get(cacheKey)
+	cached := c.get(key)
 	if cached != nil {
 		return *cached
 	}
 
-	expr := c.compiler.CompileCELExpression(expression, opts)
+	var expr CompilationResult
+	if len(variables) == 0 {
+		expr = c.compiler.CompileCELExpression(expression, opts)
+	} else {
+		expr = c.compiler.CompileCELExpressionWithVariables(expression, variables, opts)
+	}
 	if expr.Error == nil {
-		c.add(cacheKey, &expr)
+		c.add(key, &expr)
 	}
 	return expr
 }

@@ -1078,7 +1078,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
-		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
+		expr := alloc.celCache.GetOrCompileSelector(selector.CEL.Expression, cel.NamedVariablesFromAPI(selector.CEL.Variables))
 		if expr.Error != nil {
 			// Could happen if some future apiserver accepted some
 			// future expression and then got downgraded. Normally

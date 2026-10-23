@@ -123,6 +123,21 @@ message AllocationResult {
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
 message CELDeviceSelector {
+  // Variables contain named sub-expressions that can be referenced from Expression.
+  //
+  // Each variable is compiled in order. A variable may reference the device input and
+  // variables declared earlier in the list. The list must be acyclic.
+  //
+  // In later variables and in Expression, variables are available as variables.<name>,
+  // for example variables.attributes for a variable named "attributes".
+  // Bare names are not in scope.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DRAVariablesInCEL
+  repeated CELSelectorVariable variables = 2;
+
   // Expression is a CEL expression which evaluates a single device. It
   // must evaluate to true when the device under consideration satisfies
   // the desired criteria, and false when it does not. Any other result
@@ -189,12 +204,32 @@ message CELDeviceSelector {
   //
   //     device.attributes["dra.example.com"].models.includes("some-model")
   //
+  // When DRAVariablesInCEL is enabled, Expression may also reference
+  // variables.<name> for names declared in Variables.
+  //
   // The length of the expression must be smaller or equal to 10 Ki. The
   // cost of evaluating it is also limited based on the estimated number
   // of logical steps.
   //
   // +required
   optional string expression = 1;
+}
+
+// CELSelectorVariable is a named CEL sub-expression for use in a CELDeviceSelector
+// or DeviceDerivedAttribute.
+// +structType=atomic
+message CELSelectorVariable {
+  // Name must be a valid CEL identifier and unique among variables in this
+  // CELDeviceSelector or DeviceDerivedAttribute.
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // Expression is evaluated in the DRA device CEL environment. It may refer to device
+  // and to variables.<earlierName>. The result type is unconstrained (any CEL type).
+  // +required
+  // +k8s:required
+  optional string expression = 2;
 }
 
 // CapacityRequestPolicy defines how requests consume device capacity.
@@ -938,7 +973,6 @@ message DeviceCounterConsumption {
   repeated string compatibilityGroups = 3;
 }
 
-// DeviceDerivedAttribute defines a derived attribute computed via CEL.
 message DeviceDerivedAttribute {
   // Name is the identifier for this derived attribute, used in constraints.
   //
@@ -960,6 +994,15 @@ message DeviceDerivedAttribute {
   // +k8s:format=k8s-resource-fully-qualified-name
   optional string name = 1;
 
+  // Variables contain named sub-expressions that can be referenced from Expression.
+  // Semantics match CELDeviceSelector.Variables.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DRAVariablesInCEL
+  repeated CELSelectorVariable variables = 3;
+
   // Expression is a CEL expression evaluated against each candidate device.
   // The expression must evaluate to a primitive scalar (string, integer,
   // boolean, or semver) or a list of these scalars ([]string, []int64,
@@ -967,7 +1010,8 @@ message DeviceDerivedAttribute {
   // is an error and causes CEL evaluation for the device to fail.
   //
   // The expression's input is an object named "device", which carries the
-  // same properties as in a CELDeviceSelector.
+  // same properties as in a CELDeviceSelector. When DRAVariablesInCEL is
+  // enabled, Expression may also reference variables.<name>.
   //
   // When pod scheduling encounters CEL runtime errors (such as looking
   // up an attribute that isn't defined) for some devices, it will abort
