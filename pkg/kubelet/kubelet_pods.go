@@ -917,62 +917,76 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				if err != nil {
 					return result, err
 				}
-			case envVar.ValueFrom.ConfigMapKeyRef != nil:
-				cm := envVar.ValueFrom.ConfigMapKeyRef
-				name := cm.Name
-				key := cm.Key
-				optional := cm.Optional != nil && *cm.Optional
-				configMap, ok := configMaps[name]
-				if !ok {
-					if kl.kubeClient == nil {
-						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
-					}
-					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
-					if err != nil {
-						if errors.IsNotFound(err) && optional {
-							// ignore error when marked optional
-							continue
-						}
-						return result, err
-					}
-					configMaps[name] = configMap
+		case envVar.ValueFrom.ConfigMapKeyRef != nil:
+			cm := envVar.ValueFrom.ConfigMapKeyRef
+			name := cm.Name
+			key := cm.Key
+			optional := cm.Optional != nil && *cm.Optional
+
+			// When the feature gate is enabled and key is not specified,
+			// infer the key from the environment variable name.
+			if key == "" && utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyInference) {
+				key = envVar.Name
+			}
+
+			configMap, ok := configMaps[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
-				runtimeVal, ok = configMap.Data[key]
-				if !ok {
-					if optional {
+				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
 						continue
 					}
-					return result, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+					return result, err
 				}
-			case envVar.ValueFrom.SecretKeyRef != nil:
-				s := envVar.ValueFrom.SecretKeyRef
-				name := s.Name
-				key := s.Key
-				optional := s.Optional != nil && *s.Optional
-				secret, ok := secrets[name]
-				if !ok {
-					if kl.kubeClient == nil {
-						return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
-					}
-					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
-					if err != nil {
-						if errors.IsNotFound(err) && optional {
-							// ignore error when marked optional
-							continue
-						}
-						return result, err
-					}
-					secrets[name] = secret
+				configMaps[name] = configMap
+			}
+			runtimeVal, ok = configMap.Data[key]
+			if !ok {
+				if optional {
+					continue
 				}
-				runtimeValBytes, ok := secret.Data[key]
-				if !ok {
-					if optional {
+				return result, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+			}
+		case envVar.ValueFrom.SecretKeyRef != nil:
+			s := envVar.ValueFrom.SecretKeyRef
+			name := s.Name
+			key := s.Key
+			optional := s.Optional != nil && *s.Optional
+
+			// When the feature gate is enabled and key is not specified,
+			// infer the key from the environment variable name.
+			if key == "" && utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyInference) {
+				key = envVar.Name
+			}
+
+			secret, ok := secrets[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+				}
+				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
 						continue
 					}
-					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
+					return result, err
 				}
-				// TODO: validate no NUL bytes
-				runtimeVal = string(runtimeValBytes)
+				secrets[name] = secret
+			}
+			runtimeValBytes, ok := secret.Data[key]
+			if !ok {
+				if optional {
+					continue
+				}
+				return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
+			}
+			// TODO: validate no NUL bytes
+			runtimeVal = string(runtimeValBytes)
 			case envVar.ValueFrom.FileKeyRef != nil:
 				f := envVar.ValueFrom.FileKeyRef
 				key := f.Key
