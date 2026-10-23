@@ -182,8 +182,20 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
+	// Plugins which hold resources for the preemptor learn about the
+	// nomination before any victim gets preempted. Assigned pods (deferred
+	// resizes) don't get nominated.
+	runner, _ := ev.Handler.(framework.NominationExtensionsRunner)
+	notifyNomination := runner != nil && pod.Spec.NodeName == ""
+	if notifyNomination {
+		runner.RunNominationExtensionsAddNominatedPod(ctx, state, pod, bestCandidate.Name(), bestCandidate.Victims().Pods)
+	}
+
 	// 5) Actuate the preemption.
 	if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
+		if notifyNomination {
+			runner.RunNominationExtensionsRemoveNominatedPod(ctx, pod, bestCandidate.Name(), true)
+		}
 		return nil, status
 	}
 
