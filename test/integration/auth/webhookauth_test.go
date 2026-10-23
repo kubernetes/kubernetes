@@ -41,7 +41,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -56,6 +55,38 @@ import (
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func webhookAuthRequest(t *testing.T, kind metav1.GroupVersionKind, resource metav1.GroupVersionResource, subresource string, operation admissionv1.Operation) *admissionv1.AdmissionRequest {
+	t.Helper()
+	apiVersion := kind.Version
+	if kind.Group != "" {
+		apiVersion = kind.Group + "/" + kind.Version
+	}
+	raw, err := json.Marshal(metav1.TypeMeta{APIVersion: apiVersion, Kind: kind.Kind})
+	if err != nil {
+		t.Fatalf("marshal admitted object metadata: %v", err)
+	}
+	req := &admissionv1.AdmissionRequest{
+		UID:                "real-token-e2e",
+		Kind:               kind,
+		Resource:           resource,
+		SubResource:        subresource,
+		RequestKind:        &kind,
+		RequestResource:    &resource,
+		RequestSubResource: subresource,
+		Operation:          operation,
+	}
+	switch operation {
+	case admissionv1.Create, admissionv1.Connect:
+		req.Object.Raw = raw
+	case admissionv1.Update:
+		req.Object.Raw = raw
+		req.OldObject.Raw = bytes.Clone(raw)
+	case admissionv1.Delete:
+		req.OldObject.Raw = raw
+	}
+	return req
+}
 
 func TestWebhookAuthIssuedToken(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
@@ -199,60 +230,45 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 			if err != nil {
 				t.Fatalf("construct consumer verifier: %v", err)
 			}
-			request := &admissionv1.AdmissionRequest{
-				Kind:      metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
-				Resource:  metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-				Operation: admissionv1.Create,
-				Object:    runtime.RawExtension{Raw: []byte(`{"apiVersion":"apps/v1","kind":"Deployment"}`)},
-			}
+			request := webhookAuthRequest(t,
+				metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+				metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+				"", admissionv1.Create,
+			)
 			if err := verifier.Verify(ctx, request, token.Status.Token); err != nil {
 				t.Fatalf("verify issued %s token with audience %q: %v", tc.kind, tc.audience, err)
 			}
 			// The signed attestation covers the resource group, while a /scale
 			// subresource legitimately carries an autoscaling Scale object.
-			scale := &admissionv1.AdmissionRequest{
-				Kind:        metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
-				Resource:    request.Resource,
-				SubResource: "scale",
-				Operation:   admissionv1.Update,
-				Object:      runtime.RawExtension{Raw: []byte(`{"apiVersion":"autoscaling/v1","kind":"Scale"}`)},
-			}
+			scale := webhookAuthRequest(t,
+				metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
+				request.Resource, "scale", admissionv1.Update,
+			)
 			if err := verifier.Verify(ctx, scale, token.Status.Token); err != nil {
 				t.Fatalf("verify issued token for legitimate /scale subresource: %v", err)
 			}
 
-			wrongGroup := &admissionv1.AdmissionRequest{
-				Kind:     metav1.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
-				Resource: metav1.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
-				Object:   runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)},
-			}
+			wrongGroup := webhookAuthRequest(t,
+				metav1.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
+				metav1.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
+				"", admissionv1.Create,
+			)
 			if err := verifier.Verify(ctx, wrongGroup, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
 				t.Fatalf("verify token for unauthorized group: got %v, want generic denial", err)
 			}
+			objectMismatch := request.DeepCopy()
+			objectMismatch.Object.Raw = []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)
+			oldObjectMismatch := webhookAuthRequest(t, request.Kind, request.Resource, "", admissionv1.Update)
+			oldObjectMismatch.OldObject.Raw = []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)
 			for _, mismatch := range []struct {
 				name string
 				req  *admissionv1.AdmissionRequest
 			}{
-				{
-					name: "object group",
-					req: &admissionv1.AdmissionRequest{
-						Kind:     request.Kind,
-						Resource: request.Resource,
-						Object:   runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)},
-					},
-				},
-				{
-					name: "old object group",
-					req: &admissionv1.AdmissionRequest{
-						Kind:      request.Kind,
-						Resource:  request.Resource,
-						Object:    request.Object,
-						OldObject: runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)},
-					},
-				},
+				{name: "object group", req: objectMismatch},
+				{name: "old object group", req: oldObjectMismatch},
 			} {
 				if err := verifier.Verify(ctx, mismatch.req, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("verify token for mismatched %s: got %v, want generic denial", mismatch.name, err)
+					t.Fatalf("verify mismatched %s: got %v, want generic denial", mismatch.name, err)
 				}
 			}
 			wrongAudienceVerifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithRemoteIssuer(issuer, tc.audience+"-other", client))
@@ -302,7 +318,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 			}
 			review := &admissionv1.AdmissionReview{
 				TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-				Request:  &admissionv1.AdmissionRequest{UID: "real-token-e2e", Kind: request.Kind, Resource: request.Resource, Object: request.Object},
+				Request:  request.DeepCopy(),
 			}
 			allowedReview, status := postReview(review, token.Status.Token)
 			if status != http.StatusOK || allowedReview == nil || allowedReview.Response == nil || !allowedReview.Response.Allowed || allowedReview.Response.UID != review.Request.UID || admissions.Load() != 1 {
@@ -439,10 +455,12 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 
 	webhookURL := webhookProxy.URL + "/validate"
 	var admittedCount atomic.Int32
+	var lastAdmittedRequest atomic.Pointer[admissionv1.AdmissionRequest]
 	verifiedHandler, err := admissionauth.WithTokenVerification(
 		ctx,
 		func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 			admittedCount.Add(1)
+			lastAdmittedRequest.Store(req.DeepCopy())
 			return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 		},
 		admissionauth.WithRemoteIssuer(issuer, webhookURL, discoveryClient),
@@ -489,7 +507,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{URL: &webhookURL, CABundle: caBundle},
 				Rules: []admissionregistrationv1.RuleWithOperations{
 					{
-						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update, admissionregistrationv1.Delete},
 						Rule:       admissionregistrationv1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}},
 					},
 				},
@@ -556,9 +574,8 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	// Wait until the webhook informer intercepts an unauthenticated request.
 	err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		lastWebhookStatus.Store(0)
-		_, createErr := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("warmup-probe"), metav1.CreateOptions{})
+		_, createErr := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("warmup-probe"), metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 		if createErr == nil {
-			_ = cs.AppsV1().Deployments(ns.Name).Delete(ctx, "warmup-probe", metav1.DeleteOptions{})
 			return false, nil
 		}
 		return lastWebhookStatus.Load() == http.StatusUnauthorized, nil
@@ -707,5 +724,18 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 				t.Fatalf("forged probe %q reached downstream handler", fp.name)
 			}
 		})
+	}
+
+	activeToken.Store(issuedToken.Status.Token)
+	lastWebhookStatus.Store(0)
+	if err := cs.AppsV1().Deployments(ns.Name).Delete(ctx, createdDeploy.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("delete Deployment with authenticated oldObject: %v", err)
+	}
+	if admittedCount.Load() != 3 || lastWebhookStatus.Load() != http.StatusOK {
+		t.Fatalf("Deployment delete: admissions=%d status=%d, want 3 and 200", admittedCount.Load(), lastWebhookStatus.Load())
+	}
+	deleted := lastAdmittedRequest.Load()
+	if deleted == nil || deleted.Operation != admissionv1.Delete || len(deleted.Object.Raw) != 0 || deleted.Object.Object != nil || len(deleted.OldObject.Raw) == 0 {
+		t.Fatalf("DELETE admission shape: %+v", deleted)
 	}
 }
