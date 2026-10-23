@@ -382,6 +382,12 @@ var (
 	// the PullSecurityProfile CRI call.
 	SecurityProfileOCI = framework.WithFeature(framework.ValidFeatures.Add("SecurityProfileOCI"))
 
+	// Owner: sig-auth
+	// Marks tests of the service-serving certificate signer, which need kube-controller-manager
+	// to be given a signer CA keypair and trust bundle (--service-serving-signer-cert,
+	// --service-serving-signer-key and --service-serving-trust-bundle).
+	ServiceServingSigner = framework.WithFeature(framework.ValidFeatures.Add("ServiceServingSigner"))
+
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314
 	// Tests marked with this feature require:
