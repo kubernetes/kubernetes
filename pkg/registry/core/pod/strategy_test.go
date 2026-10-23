@@ -510,6 +510,24 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   nil,
 		},
 		{
+			name:                "limits not defaulted when container explicitly sets limit to 0",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("50m", "64Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("0", "0"), getResourceList("0", "0")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   nil,
+		},
+		{
 			name:                "partial limit defaulting - cpu set, memory not",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,

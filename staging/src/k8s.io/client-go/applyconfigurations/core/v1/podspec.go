@@ -256,10 +256,14 @@ type PodSpecApplyConfiguration struct {
 	//
 	// This field enables fine-grained control over resource allocation for the
 	// entire pod, allowing resource sharing among containers in a pod.
-	// TODO: For beta graduation, expand this comment with a detailed explanation.
 	//
-	// This is an alpha field and requires enabling the PodLevelResources feature
-	// gate.
+	// If a limit is not specified at the pod level, the pod is limited by the aggregate of
+	// its container limits:
+	// - For cpu and memory, the aggregate is used only if every init and regular container
+	// specifies a limit; otherwise the pod is not limited for that resource.
+	// - For hugepages, the container limits are summed and unspecified values are treated as 0.
+	//
+	// More details: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// hostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod.
 	// This field only specifies the pod's hostname and does not affect its DNS records.
