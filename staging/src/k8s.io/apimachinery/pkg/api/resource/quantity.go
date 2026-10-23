@@ -177,6 +177,10 @@ func (s cachedString) validFor(format Format) bool {
 	return len(s.str) > 0 && s.format == formatCodeOf(format)
 }
 
+// assertUnreachable is called from code paths that should be unreachable,
+// and is swappable for a panic when exercised from tests.
+var assertUnreachable = func(msg string) {}
+
 // formatCode identifies a Format in a compact byte representation.
 type formatCode uint8
 
@@ -440,12 +444,43 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		exponentInfScale, canInfScale := Scale(exponent).infScale()
-		if !canInfScale {
+		if !Scale(exponent).canInfScale() {
+			// Return an error if the exponent is math.MinInt32 rather than
+			// rounding it to 1n.
 			return Quantity{}, ErrSuffix
 		}
-		// TODO: handle scale addition overflow
-		amount.SetScale(amount.Scale() + exponentInfScale)
+		// This is guaranteed to fit within inf.Scale because of the above check.
+		widenedExponentScale := widenScale(Scale(exponent))
+
+		// amount only contains the mantissa+fractional part at this point (with no exponent / suffix).
+		// Values without fractional digits have scale 0.
+		// Values with fractional digits have scale < 0.
+		// Therefore, this must be <=0.
+		widenedAmountScale := widenInfScale(amount.Scale())
+
+		effectiveScale, fits := narrowScale(widenedAmountScale + widenedExponentScale)
+		effectiveInfScale, canInfScale := effectiveScale.infScale()
+		if fits && canInfScale {
+			amount.SetScale(effectiveInfScale)
+		} else {
+			// We can only get here for a negative scale that doesn't fit. We deal with this
+			// edge case by doing some rounding early. Since we haven't applied the exponent
+			// yet, we figure out the scale we need to round to, so that when the
+			// exponent is later set, we end with nano scale precision.
+
+			// The exponent is negative here, so the result (-9 minus a negative exponent)
+			// always fits.
+			scaleBeforeExponent, fits := narrowScale(widenScale(Nano) - widenedExponentScale)
+			if !fits {
+				assertUnreachable("scaleBeforeExponent did not fit")
+			}
+			beforeExponentAmount, _ := infDecAmount{amount}.AsScale(scaleBeforeExponent)
+			amount = beforeExponentAmount.Dec // TODO: If we add an inf.Dec asScale utility, we can avoid converting to/from infDecAmount here
+
+			// We've reduced precision to nanos for a negative exponent number, so finally,
+			// we apply the exponent by setting nano as the scale.
+			amount.SetScale(nanoInfScale)
+		}
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
@@ -464,7 +499,10 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, nanoInfScale, inf.RoundUp)
+		// AsScale rounds values with sub-nano digits up to the next multiple of
+		// 1n without expanding larger scales into nano digits.
+		rounded, _ := infDecAmount{amount}.AsScale(Nano)
+		amount = rounded.Dec
 	}
 
 	// The max is just a simple cap.
@@ -551,7 +589,9 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 			// exponent there is no suffix, so fall back to decimal exponent
 			// notation ("e") instead of dropping the exponent, which would
 			// silently corrupt the value (e.g. "1000E" serializing to "1").
-			suffix, _ = quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			if suffix, ok = quantitySuffixer.constructBytes(10, exponent, DecimalExponent); !ok {
+				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
+			}
 		}
 		return number, suffix
 	default:
@@ -567,7 +607,10 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 			// notation, so recompute the canonical mantissa and exponent in
 			// base 10.
 			number, exponent := rounded.AsCanonicalBytes(out)
-			suffix, _ := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			suffix, ok := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			if !ok {
+				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
+			}
 			return number, suffix
 		}
 		return number, suffix
