@@ -162,12 +162,18 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 	if p == nil || !p.root.canRelease {
 		return nil
 	}
-	pod := podInfoToRemove.GetPod()
-	if len(pod.Spec.ResourceClaims) == 0 || p.sim.removedPods.Has(pod.UID) || nodeInfo.Node() == nil {
+	if nodeInfo.Node() == nil {
 		return nil
 	}
-	logger := klog.FromContext(ctx)
-	nodeName := nodeInfo.Node().Name
+	pl.removePod(klog.FromContext(ctx), p, podInfoToRemove.GetPod(), nodeInfo.Node().Name)
+	return nil
+}
+
+// removePod updates the simulation like RemovePod.
+func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, pod *v1.Pod, nodeName string) {
+	if len(pod.Spec.ResourceClaims) == 0 || p.sim.removedPods.Has(pod.UID) {
+		return
+	}
 	if p.sim.removedPods == nil {
 		p.sim.removedPods = sets.New[types.UID]()
 	}
@@ -200,7 +206,6 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 			consumers:  consumers,
 		}
 	}
-	return nil
 }
 
 // AddPod reverts RemovePod. Pods which were not removed are ignored.
@@ -507,19 +512,25 @@ func (s *simulation) applyTo(state *structured.AllocatedState, consumableCapacit
 // pod on the node with lower priority uses claims (only those can be
 // preempted), and some device which is local to the node is allocated (only
 // those get released).
-func preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
+//
+// While claims of preempted pods on the node are being deallocated, the node
+// stays a candidate even if those pods are gone already. Otherwise
+// DefaultPreemption would let a preemptor nominated to the node preempt
+// elsewhere without asking PodEligibleToPreempt.
+func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
 	p := state.preemption
 	if p == nil || !p.root.canRelease || allocatedState == nil {
 		return false
 	}
+	nodeName := nodeInfo.Node().Name
 	priority := corev1helpers.PodPriority(pod)
 	if !slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
 		other := podInfo.GetPod()
 		return len(other.Spec.ResourceClaims) > 0 && corev1helpers.PodPriority(other) < priority
-	}) {
+	}) && len(pl.settlingVictimClaims(nodeName, true)) == 0 {
 		return false
 	}
-	return p.root.hasAllocatedNodeLocalDevice(nodeInfo.Node().Name, allocatedState)
+	return p.root.hasAllocatedNodeLocalDevice(nodeName, allocatedState)
 }
 
 // hasAllocatedNodeLocalDevice returns true if some device which is local to the
