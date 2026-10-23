@@ -28,6 +28,7 @@ import (
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
@@ -110,4 +111,92 @@ func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
 	// ExtendWebSocketsToKubelet is GA and locked on, so the kubelet always declares it.
 	features := kubelet.discoverNodeDeclaredFeatures()
 	assert.Contains(t, features, "ExtendWebSocketsToKubelet")
+}
+
+func TestCgroupOptionsFeatureDiscovery(t *testing.T) {
+	testcases := []struct {
+		name              string
+		cgroupOptionsGate bool
+		cgroupVersion     int
+		cgroupsPerQOS     bool
+		cgroupNsdelegate  bool
+		runtimeSupport    bool
+		expectFeature     bool
+	}{
+		{
+			name:              "gate enabled, cgroup v2 node, runtime supports it",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			cgroupsPerQOS:     true,
+			cgroupNsdelegate:  true,
+			runtimeSupport:    true,
+			expectFeature:     true,
+		},
+		{
+			name:              "gate disabled",
+			cgroupOptionsGate: false,
+			cgroupVersion:     2,
+			cgroupsPerQOS:     true,
+			cgroupNsdelegate:  true,
+			runtimeSupport:    true,
+			expectFeature:     false,
+		},
+		{
+			name:              "cgroup v1 node",
+			cgroupOptionsGate: true,
+			cgroupVersion:     1,
+			cgroupsPerQOS:     true,
+			cgroupNsdelegate:  true,
+			runtimeSupport:    true,
+			expectFeature:     false,
+		},
+		{
+			name:              "runtime does not support cgroup mount mode",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			cgroupsPerQOS:     true,
+			cgroupNsdelegate:  true,
+			runtimeSupport:    false,
+			expectFeature:     false,
+		},
+		{
+			name:              "kubelet does not manage per-QoS cgroups",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			cgroupsPerQOS:     false,
+			cgroupNsdelegate:  true,
+			runtimeSupport:    true,
+			expectFeature:     false,
+		},
+		{
+			name:              "cgroup hierarchy is not mounted with nsdelegate",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			cgroupsPerQOS:     true,
+			cgroupNsdelegate:  false,
+			runtimeSupport:    true,
+			expectFeature:     false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, tc.cgroupOptionsGate)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.containerManager = cm.NewFakeContainerManagerWithNodeConfig(cm.NodeConfig{CgroupVersion: tc.cgroupVersion, CgroupsPerQOS: tc.cgroupsPerQOS, CgroupNsdelegate: tc.cgroupNsdelegate})
+			kubelet.runtimeState.setRuntimeFeatures(&kubecontainer.RuntimeFeatures{
+				CgroupMountMode: tc.runtimeSupport,
+			})
+			kubelet.nodeDeclaredFeaturesFramework = ndf.New(ndffeatures.AllFeatures)
+
+			declared := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expectFeature {
+				assert.Contains(t, declared, "CgroupOptions")
+			} else {
+				assert.NotContains(t, declared, "CgroupOptions")
+			}
+		})
+	}
 }
