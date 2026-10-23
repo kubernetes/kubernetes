@@ -355,6 +355,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
 	}
+	if hasNominatedNodeNameChanged(oldPod, newPod) {
+		sched.removeNomination(klog.NewContext(context.Background(), logger), oldPod, oldPod.Status.NominatedNodeName)
+	}
 }
 
 // hasNominatedNodeNameChanged returns true when nominated node name has existed but changed.
@@ -369,6 +372,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Delete(logger, pod)
+	// Covers deletion and binding by another component. A nomination ends in
+	// both cases; a pod bound by this scheduler already ended it when it got assumed.
+	sched.removeNomination(klog.NewContext(context.Background(), logger), pod, "")
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
@@ -409,6 +415,20 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	return func(entity framework.QueuedEntityInfo) bool {
 		return entity.GetPriority() <= priority
 	}
+}
+
+// removeNomination notifies plugins which implement
+// framework.NominationExtensions that the nomination of the pod ended.
+// A non-empty nodeName restricts this to a nomination for that node.
+func (sched *Scheduler) removeNomination(ctx context.Context, pod *v1.Pod, nodeName string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		return
+	}
+	schedFramework, err := sched.frameworkForPod(pod)
+	if err != nil {
+		return
+	}
+	schedFramework.RunNominationExtensionsRemoveNominatedPod(ctx, pod, nodeName)
 }
 
 func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {

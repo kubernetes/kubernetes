@@ -201,6 +201,14 @@ func (sched *Scheduler) prepareForBindingCycle(
 	scheduleResult ScheduleResult,
 ) (*framework.QueuedPodInfo, *fwk.Status) {
 	assumedPodInfo, status := sched.algorithm.AssumeAndReserveInCache(ctx, state, schedFramework, podInfo, scheduleResult)
+	// The nomination ends in this function: the nominator forgets an assumed
+	// pod, and every failure clears the nominated node. Plugins see the node
+	// only if the pod is still assumed when this returns, because a rejected
+	// pod has been unreserved by then and its resources are free again.
+	podWithEndedNomination := podInfo.Pod
+	defer func() {
+		sched.removeNomination(ctx, podWithEndedNomination, "")
+	}()
 	if !status.IsSuccess() {
 		return assumedPodInfo, status
 	}
@@ -232,6 +240,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 
 		return assumedPodInfo, runPermitStatus
 	}
+	podWithEndedNomination = assumedPod
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
@@ -858,6 +867,15 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
 		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
+	}
+	// Plugins otherwise learn about a cleared nomination only from the
+	// informer, which never reports it if the API server did not have the
+	// nominated node yet: asynchronous API calls merge a pending patch that
+	// sets it into the one that clears it. This comes after requeueing the
+	// pod, so that it does not get the events which plugins emit for its own
+	// ended nomination.
+	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName == "" {
+		sched.removeNomination(ctx, pod, "")
 	}
 
 	if err == nil {
