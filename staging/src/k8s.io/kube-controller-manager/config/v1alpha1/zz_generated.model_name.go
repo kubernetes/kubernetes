@@ -177,6 +177,11 @@ func (in SAControllerConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ServiceServingSignerConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kube-controller-manager.config.v1alpha1.ServiceServingSignerConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in StatefulSetControllerConfiguration) OpenAPIModelName() string {
 	return "io.k8s.kube-controller-manager.config.v1alpha1.StatefulSetControllerConfiguration"
 }
