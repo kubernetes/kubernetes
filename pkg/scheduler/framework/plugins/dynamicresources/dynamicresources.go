@@ -1565,13 +1565,17 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	// we process user claims here first, extendedResourceClaim if any is handled below.
 	for _, claim := range state.claims.allUserClaims() {
 		// If allocation was in-flight, then it might not be anymore if no pods
-		// still need the pending allocation. If the allocation was removed from
-		// in-flight, we need to revert the claim object in the assume cache to
-		// what it was before. The allocation is not removed until the last Pod
-		// sharing it is Bound or Unreserved.
+		// still need the pending allocation. The allocation is not removed
+		// until the last Pod sharing it is Bound or Unreserved.
+		//
+		// The assume cache is not restored. Reserve does not modify it and
+		// PreBind only assumes claims returned by the API server. The informer
+		// copy can be older than such a claim because the assume cache ignores
+		// informer events whose ResourceVersion is not newer than the assumed
+		// claim, so restoring could drop an allocation stored by PreBind of
+		// this or another Pod sharing the claim and make its devices look free.
 		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
-			pl.draManager.ResourceClaims().AssumedClaimRestore(claim.Namespace, claim.Name)
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,
 			// then the pendingAllocations set does not need to be updated. New
@@ -1839,8 +1843,11 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// We may run into a ResourceVersion conflict because there may be some
 	// benign concurrent changes. In that case we get the latest claim and
 	// try again.
+	//
+	// claim is never modified in place and only gets replaced by objects
+	// returned by the API server, so the deferred assume only stores what
+	// was actually written.
 	refreshClaim := false
-	claim = claim.DeepCopy()
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
 			updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
@@ -1867,33 +1874,37 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			// The finalizer needs to be added in a normal update.
 			// If we were interrupted in the past, it might already be set and we simply continue.
 			if !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
-				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
-				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				withFinalizer := claim.DeepCopy()
+				withFinalizer.Finalizers = append(withFinalizer.Finalizers, resourceapi.Finalizer)
+				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, withFinalizer, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
 				}
 				claim = updatedClaim
 			}
-			claim.Status.Allocation = allocation
 		}
 
+		update := claim.DeepCopy()
+		if allocation != nil {
+			update.Status.Allocation = allocation
+		}
 		// We can simply try to add the pod here without checking
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, binding)
+		update.Status.ReservedFor = append(update.Status.ReservedFor, binding)
 		if pl.fts.EnableDRADeviceBindingConditions &&
 			pl.fts.EnableDRAResourceClaimDeviceStatus {
 			// Once the feature gate checks get removed, this code can be moved into an else branch
 			// for `if allocation != nil` above. For now it is kept here to avoid changing normal
 			// behavior.
-			if claim.Status.Allocation == nil {
+			if update.Status.Allocation == nil {
 				return fmt.Errorf("claim %s got deallocated elsewhere in the meantime", klog.KObj(claim))
 			}
-			if claim.Status.Allocation.AllocationTimestamp == nil {
-				claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
+			if update.Status.Allocation.AllocationTimestamp == nil {
+				update.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
 			}
 		}
-		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, update, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
 				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)

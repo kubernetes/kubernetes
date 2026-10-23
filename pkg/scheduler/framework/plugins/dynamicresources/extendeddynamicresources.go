@@ -66,7 +66,7 @@ import (
 // - Mark the claim as "allocation in-flight" via SignalClaimPendingAllocation()
 //
 // Unreserve
-// - Remove claim from in-flight allocations and restore assume cache
+// - Remove claim from in-flight allocations
 // - Delete claim from API server if it has real name
 //
 // PreBind - bindClaim()
@@ -587,8 +587,8 @@ func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 }
 
 // unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim
-// when scheduling fails. It reverts the assume cache, and deletes the claim from the API
-// server if it was already created.
+// when scheduling fails. It removes the pending allocation, and deletes the claim from
+// the API server if it was already created.
 func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, pod *v1.Pod, state *stateData) {
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 	if extendedResourceClaim == nil {
@@ -596,11 +596,11 @@ func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, 
 		return
 	}
 
-	// If the claim was marked as pending allocation (in-flight), remove that marker and restore
-	// the assumed claim state to what it was before this scheduling attempt.
-	if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID(), false); deleted {
-		pl.draManager.ResourceClaims().AssumedClaimRestore(extendedResourceClaim.Namespace, extendedResourceClaim.Name)
-	}
+	// If the claim was marked as pending allocation (in-flight), remove that
+	// marker. The assume cache is not restored for the same reason as in
+	// Unreserve. Deleting the claim below updates the assume cache through
+	// the informer.
+	pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID(), false)
 	if isSpecialClaimName(extendedResourceClaim.Name) {
 		// In memory temporary extended resource claim does not need to be deleted
 		return
