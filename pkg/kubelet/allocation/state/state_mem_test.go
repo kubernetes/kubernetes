@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	podUID := types.UID("pod-1")
@@ -45,7 +45,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 
 	// Set volume limit on nonexistent pod should implicitly initialize the pod and insert it
 	targetLimit := resource.MustParse("256Mi")
-	err := state.SetEmptyDirVolumeLimit(podUID, volName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit})
+	err := state.SetEmptyDirVolumeLimit(logger, podUID, volName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit})
 	require.NoError(t, err)
 
 	// Get volume limit should return the parsed value and true
@@ -68,7 +68,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	// Set another volume on the same pod should keep existing limits intact
 	anotherVolName := "volume-2"
 	anotherLimit := resource.MustParse("128Mi")
-	err = state.SetEmptyDirVolumeLimit(podUID, anotherVolName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &anotherLimit})
+	err = state.SetEmptyDirVolumeLimit(logger, podUID, anotherVolName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &anotherLimit})
 	require.NoError(t, err)
 
 	// Verify both volumes are present and correct
@@ -82,7 +82,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 }
 
 func TestStateMemory_ResourceIsolation(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	podUID := types.UID("pod-1")
@@ -124,7 +124,7 @@ func TestStateMemory_ResourceIsolation(t *testing.T) {
 
 	// Set emptyDir volume limit
 	targetLimit := resource.MustParse("256Mi")
-	require.NoError(t, state.SetEmptyDirVolumeLimit(podUID, volumeName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit}))
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, volumeName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit}))
 
 	// Verify volume limit is set, AND both container and pod-level resources are still intact
 	volLimit, exists = state.GetEmptyDirVolumeLimit(podUID, volumeName)
@@ -158,7 +158,7 @@ func TestStateMemory_ResourceIsolation(t *testing.T) {
 }
 
 func TestStateMemory_SetContainerResources_ContainerTypes(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 	podUID := types.UID("pod-1")
 
@@ -217,7 +217,7 @@ func TestStateMemory_SetContainerResources_ContainerTypes(t *testing.T) {
 }
 
 func TestStateMemory_SetPod(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	pod := &v1.Pod{
@@ -273,7 +273,8 @@ func TestStateMemory_SetPod(t *testing.T) {
 }
 
 func TestStateMemory_SettersCopyTheirInput(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
+
 	state := NewStateMemory(logger, PodMap{}, nil)
 	podUID := types.UID("pod-1")
 
@@ -282,7 +283,7 @@ func TestStateMemory_SettersCopyTheirInput(t *testing.T) {
 	podResources := &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}}
 	require.NoError(t, state.SetPodLevelResources(logger, podUID, podResources))
 	limit := resource.MustParse("1Gi")
-	require.NoError(t, state.SetEmptyDirVolumeLimit(podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
 
 	containerResources.Requests[v1.ResourceCPU] = resource.MustParse("2")
 	podResources.Requests[v1.ResourceMemory] = resource.MustParse("2Gi")
@@ -313,7 +314,8 @@ func TestStateMemory_SettersCopyTheirInput(t *testing.T) {
 
 // A stored pod is shared with toPodList, so every update has to leave it, and anything it refers to, alone.
 func TestStateMemory_UpdatesDoNotModifyStoredPods(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
+
 	sm := newStateMemory(logger, PodMap{}, nil)
 	podUID := types.UID("pod-1")
 
@@ -349,10 +351,10 @@ func TestStateMemory_UpdatesDoNotModifyStoredPods(t *testing.T) {
 			return sm.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")}})
 		},
 		"volume limit": func() error {
-			return sm.SetEmptyDirVolumeLimit(podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
+			return sm.SetEmptyDirVolumeLimit(logger, podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
 		},
 		"new volume limit": func() error {
-			return sm.SetEmptyDirVolumeLimit(podUID, "new-volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
+			return sm.SetEmptyDirVolumeLimit(logger, podUID, "new-volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
 		},
 	}
 	for _, name := range []string{"init container", "container", "ephemeral container", "new container", "pod-level resources", "volume limit", "new volume limit"} {
@@ -377,7 +379,7 @@ func TestStateMemory_UpdatesDoNotModifyStoredPods(t *testing.T) {
 }
 
 func TestStateMemory_GetPodUIDs(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	assert.Empty(t, state.GetPodUIDs())
@@ -393,7 +395,7 @@ func TestStateMemory_GetPodUIDs(t *testing.T) {
 }
 
 func TestStateMemory_HasPod(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	podUID := types.UID("pod-1")
@@ -408,7 +410,7 @@ func TestStateMemory_HasPod(t *testing.T) {
 }
 
 func TestStateMemory_RemoveOrphanedPods(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodMap{}, nil)
 	for _, uid := range []types.UID{"pod-1", "pod-2", "pod-3"} {
 		require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: uid}}))
@@ -419,7 +421,7 @@ func TestStateMemory_RemoveOrphanedPods(t *testing.T) {
 }
 
 func TestStateMemory_ToPodList(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	sm := newStateMemory(logger, PodMap{}, nil)
 	assert.Empty(t, sm.toPodList().Items)
 

@@ -222,9 +222,7 @@ func (s *stateMemory) SetPodLevelResources(logger klog.Logger, podUID types.UID,
 	return nil
 }
 
-func (s *stateMemory) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error {
-	logger := klog.TODO()
-
+func (s *stateMemory) SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error {
 	err := s.updatePod(podUID, func(pod *v1.Pod) error {
 		pod.Spec.Volumes = slices.Clone(pod.Spec.Volumes)
 		for i := range pod.Spec.Volumes {

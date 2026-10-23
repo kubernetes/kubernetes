@@ -3520,9 +3520,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
-
-	logger := klog.FromContext(tCtx)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	tests := []struct {
 		name                     string
@@ -3937,7 +3935,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			}
 
 			// Actuate
-			resizeAllocated, err := allocationManager.(*manager).handlePodResourcesResize(context.Background(), test.targetPod)
+			resizeAllocated, err := allocationManager.(*manager).handlePodResourcesResize(tCtx, test.targetPod)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectResizeAllocated, resizeAllocated)
 
@@ -4049,6 +4047,7 @@ func verifyResizeConditions(t *testing.T, expected, actual []*v1.PodCondition) {
 // TestNonAllocatedPodsExcludedFromCapacity_Resize verifies that a pending pod
 // without an allocation does not block resize of an already-running pod.
 func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	allocationManager, runningPod, pendingPod, logger := setupNonAllocatedCapacityTest(t)
 
 	cpu1500m := resource.MustParse("1500m")
@@ -4068,7 +4067,7 @@ func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
 	}
 
 	allocationManager.PushPendingResize(logger, runningPod.UID)
-	allocationManager.RetryPendingResizes(context.TODO(), TriggerReasonPodUpdated)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 	// If pendingPod was incorrectly included in capacity calculations, this
 	// resize would be deferred (1500m + 10000m > 4000m allocatable).
@@ -4088,6 +4087,7 @@ func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
 // TestNonAllocatedPodsExcludedFromCapacity_AddPod verifies that a pending pod
 // without an allocation does not block admission of a new pod.
 func TestNonAllocatedPodsExcludedFromCapacity_AddPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	allocationManager, runningPod, pendingPod, _ := setupNonAllocatedCapacityTest(t)
 
 	cpu500m := resource.MustParse("500m")
@@ -4117,7 +4117,7 @@ func TestNonAllocatedPodsExcludedFromCapacity_AddPod(t *testing.T) {
 
 	// If pendingPod was incorrectly included in capacity calculations,
 	// AddPod would fail (500m + 1000m + 10000m > 4000m allocatable).
-	ok, reason, message := allocationManager.AddPod(context.TODO(), []*v1.Pod{runningPod, pendingPod}, newPod)
+	ok, reason, message := allocationManager.AddPod(tCtx, []*v1.Pod{runningPod, pendingPod}, newPod)
 	assert.True(t, ok, "AddPod should succeed: reason=%s message=%s", reason, message)
 
 	newAlloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c1")
