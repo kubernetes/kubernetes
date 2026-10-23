@@ -74,7 +74,7 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				tCtx.Run("AdminAccessNotCounted", testAdminAccessNotCounted)
 			},
 		},
-		// DRAPartitionableDevicesType depends on DRAResourcePoolStatus, so both are off.
+		// DRAPartitionableDevicesType requires DRAResourcePoolStatus.
 		"feature-disabled": {
 			features: map[featuregate.Feature]bool{
 				features.DRAResourcePoolStatus:       false,
@@ -452,9 +452,7 @@ func testShareableSummary(tCtx ktesting.TContext) {
 	}
 }
 
-// testAdminAccessNotCounted checks that AdminAccess allocations are invisible
-// in every part of the pool status, while a regular allocation in the same
-// pool is counted.
+// testAdminAccessNotCounted checks that AdminAccess allocations are not counted.
 func testAdminAccessNotCounted(tCtx ktesting.TContext) {
 	startResourcePoolStatusRequestController(tCtx)
 
@@ -541,9 +539,7 @@ func testAdminAccessNotCounted(tCtx ktesting.TContext) {
 	}
 }
 
-// testIncompletePoolTerminalStatus verifies that a pool which never receives all
-// of its slices still gets a status once the controller gives up retrying, with
-// a PoolIncomplete validationError instead of device counts.
+// testIncompletePoolTerminalStatus checks the partial status for a pool that never completes.
 func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 	startResourcePoolStatusRequestController(tCtx)
 
@@ -593,8 +589,7 @@ func testIncompletePoolTerminalStatus(tCtx ktesting.TContext) {
 		tCtx.Errorf("expected Complete=True condition, got %+v", request.Status.Conditions)
 	}
 
-	// The status alone is easy to miss, so a Warning event is emitted as well.
-	// Events for cluster-scoped objects are recorded in the default namespace.
+	// Events for cluster-scoped objects go to the default namespace.
 	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Event, error) {
 		events, err := tCtx.Client().CoreV1().Events(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{
 			FieldSelector: "involvedObject.name=" + request.Name + ",reason=PoolIncomplete",
@@ -918,10 +913,8 @@ func testValidationErrors(tCtx ktesting.TContext) {
 
 const rpsrControllerRole = "system:controller:resourcepoolstatusrequest-controller"
 
-// testFeatureDisabled pins the apiserver behavior with DRAResourcePoolStatus
-// off. The storage stays registered while resource.k8s.io/v1alpha3 is enabled,
-// so leftover requests can still be listed and deleted, but the gated field is
-// dropped and the controller's ClusterRole is not installed.
+// testFeatureDisabled checks the gate off: the API stays served for cleanup,
+// the gated field is dropped and the controller role is absent.
 func testFeatureDisabled(tCtx ktesting.TContext) {
 	requests := tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests()
 	request := &resourcev1alpha3.ResourcePoolStatusRequest{
@@ -949,9 +942,7 @@ func testFeatureDisabled(tCtx ktesting.TContext) {
 	}
 }
 
-// testPartitionTypeFieldsDropped covers DRAResourcePoolStatus on with
-// DRAPartitionableDevicesType off: both partition type fields are dropped on
-// create.
+// testPartitionTypeFieldsDropped checks that both partition type fields are dropped.
 func testPartitionTypeFieldsDropped(tCtx ktesting.TContext) {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{Name: "partition-type-off-slice"},
@@ -988,9 +979,7 @@ func testPartitionTypeFieldsDropped(tCtx ktesting.TContext) {
 	}
 }
 
-// testStatusRBAC checks that only the controller's bootstrap role can write
-// the status: a user allowed to create and update requests cannot use the
-// status subresource.
+// testStatusRBAC checks that only the controller role can write the status.
 func testStatusRBAC(tCtx ktesting.TContext) {
 	admin := tCtx.Client()
 	must(tCtx, admin.RbacV1().ClusterRoles().Get, rpsrControllerRole, metav1.GetOptions{})
@@ -1027,8 +1016,11 @@ func testStatusRBAC(tCtx ktesting.TContext) {
 	}
 	// RBAC changes take effect asynchronously.
 	tCtx.Eventually(func(tCtx ktesting.TContext) error {
-		var err error
-		request, err = userClient.ResourceV1alpha3().ResourcePoolStatusRequests().Create(tCtx, request, metav1.CreateOptions{})
+		// Create returns an empty object on error, so keep request for the retry.
+		created, err := userClient.ResourceV1alpha3().ResourcePoolStatusRequests().Create(tCtx, request, metav1.CreateOptions{})
+		if err == nil {
+			request = created
+		}
 		return err
 	}).WithTimeout(30 * time.Second).Should(gomega.Succeed())
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
@@ -1051,7 +1043,7 @@ func testStatusRBAC(tCtx ktesting.TContext) {
 		tCtx.Errorf("expected user UpdateStatus to be forbidden, got %v", err)
 	}
 
-	// The controller's bootstrap role grants the status subresource.
+	// Granted by the controller's bootstrap role.
 	if _, err := controllerClient.ResourceV1alpha3().ResourcePoolStatusRequests().UpdateStatus(tCtx, withStatus, metav1.UpdateOptions{}); err != nil {
 		tCtx.Errorf("expected controller UpdateStatus to succeed, got %v", err)
 	}
