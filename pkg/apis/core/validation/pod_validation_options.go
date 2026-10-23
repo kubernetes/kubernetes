@@ -75,6 +75,8 @@ type PodValidationOptions struct {
 	AllowTaintTolerationComparisonOperators bool
 	// Allow hostNetwork pods to use user namespaces
 	AllowUserNamespacesHostNetworkSupport bool
+	// Allow spec.podNetwork to be set (NetworkIsolatedPods gate enabled, or the object already sets it)
+	AllowPodNetwork bool
 	// Allow containers to have restart policy rule with RestartAllContainers action, applicable for init, sidecar, and regular containers.
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
@@ -214,6 +216,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
+	opts.AllowPodNetwork = allowPodNetwork(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
@@ -557,4 +560,11 @@ func seccompProfileOCIInUse(podSpec *core.PodSpec) bool {
 		return true
 	})
 	return inUse
+}
+
+// allowPodNetwork returns true when spec.podNetwork may be set: the
+// NetworkIsolatedPods gate is enabled, or the existing object already sets it
+// so that it stays valid after the gate is disabled.
+func allowPodNetwork(oldPodSpec *core.PodSpec) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) || podutil.PodNetworkInUse(oldPodSpec)
 }

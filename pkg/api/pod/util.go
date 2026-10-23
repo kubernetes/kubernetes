@@ -494,6 +494,18 @@ func dropDisabledFields(
 		podSpec.HostnameOverride = nil
 	}
 
+	// spec.podNetwork "Isolated" is not dropped when the NetworkIsolatedPods gate
+	// is disabled; validation rejects new uses instead (see
+	// allowPodNetwork). Dropping it would silently attach a pod that asked
+	// for isolation to the pod network. "Default" means the same as unset and
+	// is dropped when the existing object does not already set podNetwork, so
+	// controllers can create pods from a "Default" template while the gate is
+	// disabled. Objects that already set podNetwork keep it on update.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkIsolatedPods) && !PodNetworkInUse(oldPodSpec) &&
+		podSpec.PodNetwork != nil && *podSpec.PodNetwork == api.PodNetworkDefault {
+		podSpec.PodNetwork = nil
+	}
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -508,6 +520,11 @@ func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return true
+}
+
+// PodNetworkInUse returns true if the pod spec sets podNetwork.
+func PodNetworkInUse(podSpec *api.PodSpec) bool {
+	return podSpec != nil && podSpec.PodNetwork != nil
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {

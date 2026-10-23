@@ -1411,3 +1411,30 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestAllowPodNetwork(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		enabled    bool
+		oldPodSpec *core.PodSpec
+		want       bool
+	}{
+		{name: "gate enabled, no old spec", enabled: true, want: true},
+		{name: "gate enabled, old spec without field", enabled: true, oldPodSpec: &core.PodSpec{}, want: true},
+		{name: "gate disabled, no old spec", enabled: false, want: false},
+		{name: "gate disabled, old spec without field", enabled: false, oldPodSpec: &core.PodSpec{}, want: false},
+		{name: "gate disabled, old spec with Default", enabled: false, oldPodSpec: &core.PodSpec{PodNetwork: new(core.PodNetworkDefault)}, want: true},
+		{name: "gate disabled, old spec with Isolated", enabled: false, oldPodSpec: &core.PodSpec{PodNetwork: new(core.PodNetworkIsolated)}, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, tc.enabled)
+			if got := allowPodNetwork(tc.oldPodSpec); got != tc.want {
+				t.Errorf("allowPodNetwork() = %v, want %v", got, tc.want)
+			}
+			opts := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if opts.AllowPodNetwork != tc.want {
+				t.Errorf("AllowPodNetwork = %v, want %v", opts.AllowPodNetwork, tc.want)
+			}
+		})
+	}
+}
