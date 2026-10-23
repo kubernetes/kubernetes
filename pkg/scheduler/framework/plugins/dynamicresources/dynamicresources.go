@@ -1079,7 +1079,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
 		}
-		allocator, err := pl.allocatorForNode(ctx, state, node.Name)
+		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, node.Name)
 		if err != nil {
 			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
 		}
@@ -1096,7 +1096,15 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		case errors.Is(err, structured.ErrFailedAllocationOnNode):
 			// Not a fatal error, allocation on other nodes may proceed.
 			// The error is only surfaced if allocation fails on all nodes.
-			return statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			//
+			// The allocator returns it instead of no result when
+			// allocation failed and some pool on the node is invalid or
+			// being updated, which may be unrelated to the allocation.
+			status := statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
+			}
+			return status
 		case ctx.Err() != nil:
 			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		case err != nil:
@@ -1114,7 +1122,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
-			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			status := statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
+			}
+			return status
 		}
 
 		// Reserve uses this information.
@@ -1189,7 +1201,13 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	_, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	if foundClaim && status.Code() == fwk.Unschedulable && state.preemption != nil {
+		// Stop the other PostFilter plugins: preemption would be based on
+		// the claim before the change. The claim update triggers another
+		// scheduling attempt.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, status.Reasons()...)
+	}
 	return nil, status
 }
 
