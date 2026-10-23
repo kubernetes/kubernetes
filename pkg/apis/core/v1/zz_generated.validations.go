@@ -1457,6 +1457,21 @@ func Validate_Pod(
 	return errs
 }
 
+var symbolsForPodNetwork = sets.New(corev1.PodNetworkDefault, corev1.PodNetworkIsolated)
+
+// Validate_PodNetwork validates an instance of PodNetwork according
+// to declarative validation rules in the API schema.
+func Validate_PodNetwork(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodNetwork) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPodNetwork, nil).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_PodSecurityContext validates an instance of PodSecurityContext according
 // to declarative validation rules in the API schema.
 func Validate_PodSecurityContext(
@@ -1805,6 +1820,36 @@ func Validate_PodSpec(
 				return oldObj.EvictionResponders
 			})
 		errs = append(errs, fn(fldPath.Child("evictionResponders"), obj.EvictionResponders, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodSpec.PodNetwork
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodNetwork,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodNetwork(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *corev1.PodNetwork {
+				return oldObj.PodNetwork
+			})
+		errs = append(errs, fn(fldPath.Child("podNetwork"), obj.PodNetwork, oldVal, oldObj != nil)...)
 	}
 
 	return errs

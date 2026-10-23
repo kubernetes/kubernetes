@@ -1932,7 +1932,8 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "podNetwork": "podNetworkValue"
       }
     }
   },
