@@ -1131,7 +1131,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// In a preemption simulation, RemovePod may have released victim
 		// claims on this node in cs, so build or reuse an allocator reflecting
 		// that state.
-		allocator, err := pl.allocatorForNode(ctx, state, getPreemptionSimulationState(cs), node.Name)
+		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, getPreemptionSimulationState(cs), node.Name)
 		if err != nil {
 			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
 		}
@@ -1148,6 +1148,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		case errors.Is(err, structured.ErrFailedAllocationOnNode):
 			// Not a fatal error, allocation on other nodes may proceed.
 			// The error is only surfaced if allocation fails on all nodes.
+			//
+			// Allocate returns this error whenever allocation fails and any
+			// pool on the node (even from an unrelated driver) is invalid or
+			// incomplete, so preempting a victim in a healthy pool may still
+			// let the pod fit.
+			if len(unavailableClaims) == 0 && pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				return statusPreemptionMightHelp(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			}
 			return statusUnschedulableAndUnresolvable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
 		case ctx.Err() != nil:
 			return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
@@ -1166,6 +1174,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
+			if len(unavailableClaims) == 0 && pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				return statusPreemptionMightHelp(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			}
 			return statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		}
 
@@ -1253,7 +1264,14 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	_, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	if foundClaim && status.Code() == fwk.Unschedulable && state.preemption != nil {
+		// Return UnschedulableAndUnresolvable to short-circuit later PostFilter
+		// plugins (DefaultPreemption) for this cycle. CycleState still reflects
+		// the claim's stale allocation, and once the claim update triggers a new
+		// cycle the pod may fit elsewhere without preemption.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, status.Reasons()...)
+	}
 	return nil, status
 }
 
@@ -2270,6 +2288,19 @@ func statusUnschedulableAndUnresolvable(logger klog.Logger, reason string, kv ..
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, reason)
+}
+
+// statusPreemptionMightHelp is like statusUnschedulableAndUnresolvable, but
+// returns Unschedulable so that DefaultPreemption evaluates the node.
+func statusPreemptionMightHelp(logger klog.Logger, reason string, kv ...interface{}) *fwk.Status {
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		helper, loggerV := loggerV.WithCallStackHelper()
+		helper()
+		kv = append(kv, "reason", reason)
+		// nolint: logcheck // warns because it cannot check key/values
+		loggerV.Info("pod unschedulable, preemption might help", kv...)
+	}
+	return fwk.NewStatus(fwk.Unschedulable, reason)
 }
 
 // statusError ensures that there is a log message associated with the

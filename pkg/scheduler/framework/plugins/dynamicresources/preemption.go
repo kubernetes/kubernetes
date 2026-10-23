@@ -20,6 +20,7 @@ import (
 	"context"
 	"iter"
 	"maps"
+	"slices"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -119,6 +121,17 @@ func (data *preemptionData) canReleaseOnNode(allocation *resourceapi.AllocationR
 		found = true
 	}
 	return found
+}
+
+// hasAllocatedNodeLocalDevice reports whether a device local to nodeName is
+// allocated exclusively, the only kind which preemption frees in alpha.
+func (data *preemptionData) hasAllocatedNodeLocalDevice(nodeName string, allocatedState *structured.AllocatedState) bool {
+	for id := range data.slices.localDevices(nodeName) {
+		if allocatedState.AllocatedDevices.Has(id) {
+			return true
+		}
+	}
+	return false
 }
 
 // allocatedStateForSlices returns PreFilter's AllocatedState with
@@ -488,11 +501,15 @@ func (pl *DynamicResources) inPodGroup(pod *v1.Pod) bool {
 
 // allocatorForNode returns state.allocator unless sim released devices on
 // nodeName, in which case it builds a node-scoped allocator with those devices
-// freed.
-func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, sim *preemptionSimulationState, nodeName string) (structured.Allocator, error) {
+// freed. When DRAPreemption is enabled, it also returns the AllocatedState
+// backing the allocator.
+func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, sim *preemptionSimulationState, nodeName string) (structured.Allocator, *structured.AllocatedState, error) {
 	data := state.preemption
-	if data == nil || sim == nil || !sim.changesNode(nodeName) {
-		return state.allocator, nil
+	if data == nil || sim == nil {
+		return state.allocator, nil, nil
+	}
+	if !sim.changesNode(nodeName) {
+		return state.allocator, data.allocatedState, nil
 	}
 	// structured.NewAllocator precomputes consumed counters from
 	// AllocatedState, so state.allocator cannot be mutated in place. Scope
@@ -501,5 +518,35 @@ func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateDa
 	resourceSlices := data.slices.forNode(nodeName)
 	allocatedState := data.allocatedStateForSlices(resourceSlices)
 	sim.applyTo(allocatedState)
-	return structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), resourceSlices, pl.celCache)
+	allocator, err := structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), resourceSlices, pl.celCache)
+	if err != nil {
+		return nil, nil, err
+	}
+	return allocator, allocatedState, nil
+}
+
+// preemptionMightHelp reports whether Filter should return Unschedulable
+// instead of UnschedulableAndUnresolvable after device allocation fails on
+// nodeInfo, allowing DefaultPreemption to evaluate the node. Callers skip it
+// when a claim of the pod is unavailable on the node: removing pods with lower
+// priority doesn't change that, so the node fails anyway.
+//
+// As a fast check without looking up each pod's ResourceClaims, it requires a
+// lower-priority pod with claims on the node, outside a PodGroup (RemovePod
+// releases nothing for those), and at least one node-local device allocated
+// exclusively in allocatedState.
+func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
+	data := state.preemption
+	if data == nil || !data.canPreemptDevices || allocatedState == nil {
+		return false
+	}
+	priority := corev1helpers.PodPriority(pod)
+	hasLowerPriorityClaimPod := slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
+		other := podInfo.GetPod()
+		return len(other.Spec.ResourceClaims) > 0 && !pl.inPodGroup(other) && corev1helpers.PodPriority(other) < priority
+	})
+	if !hasLowerPriorityClaimPod {
+		return false
+	}
+	return data.hasAllocatedNodeLocalDevice(nodeInfo.Node().Name, allocatedState)
 }

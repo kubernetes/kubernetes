@@ -1585,7 +1585,13 @@ func testResourceSliceUpdatePreservesSharedCounterAllocation(tCtx ktesting.TCont
 }
 
 func TestPlugin(t *testing.T) {
-	testPlugin(ktesting.Init(t))
+	testPlugin(ktesting.Init(t), false /* preemption */)
+}
+
+// TestPluginWithPreemption re-runs TestPlugin cases with DRAPreemption enabled,
+// verifying behavior stays identical apart from preemption-related status codes.
+func TestPluginWithPreemption(t *testing.T) {
+	testPlugin(ktesting.Init(t), true /* preemption */)
 }
 
 func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
@@ -1907,7 +1913,7 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
 }
 
-func testPlugin(tCtx ktesting.TContext) {
+func testPlugin(tCtx ktesting.TContext, preemption bool) {
 	testcases := map[string]testPluginCase{
 		"empty-with-extended-resources-disabled": {
 			emulatedVersion:  "1.36",
@@ -5168,10 +5174,17 @@ func testPlugin(tCtx ktesting.TContext) {
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
+			if preemption && tc.emulatedVersion != "" {
+				// DRAPreemption was introduced in 1.38 and cannot be enabled at older emulated versions.
+				tCtx.Skipf("DRAPreemption needs version 1.38, the test case emulates %s", tc.emulatedVersion)
+			}
 			if tc.emulatedVersion != "" {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+			if preemption {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			}
 			feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.podGroups, tc.objs, feats, tc.failPatch, tc.reactors)
 			for _, pod := range tc.existingPods {
@@ -5367,9 +5380,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					})
 				} else {
 					result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+					wantPostFilter := tc.want.postfilter
+					if preemption && wantPostFilter.status != nil && wantPostFilter.status.Code() == fwk.Unschedulable && len(wantPostFilter.status.Reasons()) > 0 {
+						// Under DRAPreemption, PostFilter returns UnschedulableAndUnresolvable
+						// after deallocating or deleting a claim to skip preemption for the cycle.
+						wantPostFilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, wantPostFilter.status.Reasons()...)
+					}
 					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
 						assert.Equal(tCtx, tc.want.postFilterResult, result)
-						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
+						testCtx.verify(tCtx, wantPostFilter, initialObjects, tc.pod, nil, status)
 					})
 				}
 			}

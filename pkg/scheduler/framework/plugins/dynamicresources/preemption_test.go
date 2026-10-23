@@ -628,6 +628,198 @@ func testPreemptionGateDisabled(tCtx ktesting.TContext) {
 	require.Equal(tCtx, fwk.UnschedulableAndUnresolvable, testCtx.p.Filter(tCtx, testCtx.state, preemptor, testCtx.nodeInfos[0]).Code(), "Filter")
 }
 
+func TestPreemptionStatusCode(t *testing.T) {
+	testPreemptionStatusCode(ktesting.Init(t))
+}
+
+// testPreemptionStatusCode verifies when Filter returns Unschedulable (eligible
+// for preemption) versus UnschedulableAndUnresolvable.
+func testPreemptionStatusCode(tCtx ktesting.TContext) {
+	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
+	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
+	victimClaim := reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj(), victim)
+	// otherNodeClaim is allocated for another node, so it is unavailable on
+	// this one whichever pods get preempted.
+	otherNodeClaim := preemptionClaim("other-node-claim").
+		Allocation(&resourceapi.AllocationResult{NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{"other-node"}, st.NodeSelectorTypeMatchFields).Obj()}).
+		Obj()
+	preemptorWithOtherNodeClaim := preemptionPod("preemptor", "preemptor-claim", "other-node-claim").Priority(100).Obj()
+	// Duplicate device names across slices in the same pool invalidate that
+	// pool, causing Allocate to return ErrFailedAllocationOnNode.
+	brokenSlices := func() []*resourceapi.ResourceSlice {
+		var slices []*resourceapi.ResourceSlice
+		for _, name := range []string{"broken-1", "broken-2"} {
+			slice := st.MakeResourceSlice(nodeName, driver2).Device("duplicate").ResourceSliceCount(2).Obj()
+			slice.Name = name
+			slice.Spec.Pool.Name = "broken"
+			slices = append(slices, slice)
+		}
+		return slices
+	}()
+
+	for name, tc := range map[string]struct {
+		features   feature.Features
+		preemptor  *v1.Pod
+		podsOnNode []*v1.Pod
+		claims     []*resourceapi.ResourceClaim
+		slices     []*resourceapi.ResourceSlice
+		want       *fwk.Status
+	}{
+		"lower-priority-pod": {
+			podsOnNode: []*v1.Pod{victim},
+			want:       fwk.NewStatus(fwk.Unschedulable, "cannot allocate all claims"),
+		},
+		"equal-priority-pod": {
+			podsOnNode: []*v1.Pod{fromPod(victim).Priority(100).Obj()},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"lower-priority-pod-without-claims": {
+			// victimClaim still allocates the node's device, but the only
+			// lower-priority pod on the node has no claims to preempt.
+			podsOnNode: []*v1.Pod{preemptionPod("other").Node(nodeName).Obj()},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"no-node-local-device": {
+			podsOnNode: []*v1.Pod{victim},
+			claims: []*resourceapi.ResourceClaim{
+				preemptionClaim("preemptor-claim").Obj(),
+				reserve(preemptionClaim("victim-claim").Allocation(poolAllocation("network", "instance-1")).Obj(), victim),
+			},
+			slices: []*resourceapi.ResourceSlice{st.MakeResourceSliceWithAllNodes("network", driver).Device("instance-1").Obj()},
+			want:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"preemptor-with-standalone-claim": {
+			preemptor:  preemptionPod("preemptor", "standalone").Priority(100).Obj(),
+			podsOnNode: []*v1.Pod{victim},
+			claims:     []*resourceapi.ResourceClaim{preemptionClaim("standalone").Obj(), victimClaim},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"only-shared-device": {
+			// Preemption frees no shares in alpha.
+			features:   feature.Features{EnableDRAConsumableCapacity: true},
+			podsOnNode: []*v1.Pod{victim},
+			claims: []*resourceapi.ResourceClaim{
+				preemptionClaim("preemptor-claim").Obj(),
+				reserve(preemptionClaim("victim-claim").Allocation(withShares(preemptionAllocation("instance-1"), "instance-1")).Obj(), victim),
+			},
+			want: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"preemption-policy-never": {
+			preemptor:  fromPod(preemptor).PreemptionPolicy(v1.PreemptNever).Obj(),
+			podsOnNode: []*v1.Pod{victim},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"pod-group": {
+			features:   feature.Features{EnableGenericWorkload: true},
+			preemptor:  fromPod(preemptor).PodGroupName(podGroupName).Obj(),
+			podsOnNode: []*v1.Pod{victim},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"lower-priority-pod-in-pod-group": {
+			// RemovePod releases nothing for pods in a PodGroup.
+			features:   feature.Features{EnableGenericWorkload: true},
+			podsOnNode: []*v1.Pod{fromPod(victim).PodGroupName(podGroupName).Obj()},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"invalid-pool": {
+			podsOnNode: []*v1.Pod{victim},
+			slices:     append([]*resourceapi.ResourceSlice{slice}, brokenSlices...),
+			want:       fwk.NewStatus(fwk.Unschedulable, "invalid resource pools were encountered"),
+		},
+		"invalid-pool-equal-priority": {
+			podsOnNode: []*v1.Pod{fromPod(victim).Priority(100).Obj()},
+			slices:     append([]*resourceapi.ResourceSlice{slice}, brokenSlices...),
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "invalid resource pools were encountered"),
+		},
+		"claim-unavailable-on-node": {
+			preemptor:  preemptorWithOtherNodeClaim,
+			podsOnNode: []*v1.Pod{victim},
+			claims:     []*resourceapi.ResourceClaim{preemptionClaim("preemptor-claim").Obj(), otherNodeClaim, victimClaim},
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"),
+		},
+		"invalid-pool-claim-unavailable-on-node": {
+			preemptor:  preemptorWithOtherNodeClaim,
+			podsOnNode: []*v1.Pod{victim},
+			claims:     []*resourceapi.ResourceClaim{preemptionClaim("preemptor-claim").Obj(), otherNodeClaim, victimClaim},
+			slices:     append([]*resourceapi.ResourceSlice{slice}, brokenSlices...),
+			want:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "invalid resource pools were encountered"),
+		},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			for gateName, enabled := range map[string]bool{"enabled": true, "disabled": false} {
+				tCtx.Run(gateName, func(tCtx ktesting.TContext) {
+					features := tc.features
+					features.EnableDRAPreemption = enabled
+					claims := tc.claims
+					if claims == nil {
+						claims = []*resourceapi.ResourceClaim{preemptionClaim("preemptor-claim").Obj(), victimClaim}
+					}
+					objs := []apiruntime.Object{}
+					resourceSlices := tc.slices
+					if resourceSlices == nil {
+						resourceSlices = []*resourceapi.ResourceSlice{slice}
+					}
+					for _, slice := range resourceSlices {
+						objs = append(objs, slice)
+					}
+					testCtx := setupPreemption(tCtx, []*v1.Node{workerNode}, claims, objs, features)
+					nodeInfo := testCtx.nodeInfos[0].(*framework.NodeInfo)
+					for _, pod := range tc.podsOnNode {
+						nodeInfo.AddPod(pod)
+					}
+					pod := tc.preemptor
+					if pod == nil {
+						pod = preemptor
+					}
+
+					_, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, testCtx.nodeInfos)
+					require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+					want := tc.want
+					if !enabled {
+						want = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, want.Reasons()...)
+					}
+					require.Equal(tCtx, want, testCtx.p.Filter(tCtx, testCtx.state, pod, nodeInfo), "Filter")
+				})
+			}
+		})
+	}
+}
+
+func TestPreemptionPostFilter(t *testing.T) {
+	testPreemptionPostFilter(ktesting.Init(t))
+}
+
+// testPreemptionPostFilter verifies that PostFilter returns
+// UnschedulableAndUnresolvable after deallocating a pod claim when
+// DRAPreemption is enabled, preventing preemption in that cycle.
+func testPreemptionPostFilter(tCtx ktesting.TContext) {
+	allocation := preemptionAllocation("instance-1")
+	allocation.NodeSelector = st.MakeNodeSelector().In("metadata.name", []string{node2Name}, st.NodeSelectorTypeMatchFields).Obj()
+	pod := preemptionPod("pod", "claim").Obj()
+	claims := []*resourceapi.ResourceClaim{preemptionClaim("claim").Allocation(allocation).Obj()}
+	objs := []apiruntime.Object{st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()}
+
+	for name, tc := range map[string]struct {
+		features feature.Features
+		want     fwk.Code
+	}{
+		"enabled":  {features: feature.Features{EnableDRAPreemption: true}, want: fwk.UnschedulableAndUnresolvable},
+		"disabled": {want: fwk.Unschedulable},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			testCtx := setupPreemption(tCtx, []*v1.Node{workerNode}, claims, objs, tc.features)
+			_, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, testCtx.nodeInfos)
+			require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+			status = testCtx.p.Filter(tCtx, testCtx.state, pod, testCtx.nodeInfos[0])
+			require.Equal(tCtx, fwk.UnschedulableAndUnresolvable, status.Code(), "Filter: %v", status)
+			_, status = testCtx.p.PostFilter(tCtx, testCtx.state, pod, nil)
+			require.Equal(tCtx, tc.want, status.Code(), "PostFilter: %v", status)
+			require.Equal(tCtx, []string{"deallocation of ResourceClaim completed"}, status.Reasons(), "PostFilter reasons")
+		})
+	}
+}
+
 // TestAllocatedStateForSlices verifies that allocatedStateForSlices reduces
 // AllocatedDevices to the devices in the slices, in a set of its own, and
 // shares all other fields with PreFilter's AllocatedState.
