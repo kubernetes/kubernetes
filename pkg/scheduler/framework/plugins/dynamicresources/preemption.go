@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -409,11 +410,15 @@ func (s *simulation) changesNode(nodeName string) bool {
 	return false
 }
 
-// allocatorForNode returns the allocator which Filter must use for the node.
-func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, nodeName string) (structured.Allocator, error) {
+// allocatorForNode returns the allocator which Filter must use for the node
+// and, if DRAPreemption is enabled, the allocated state it is based on.
+func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, nodeName string) (structured.Allocator, *structured.AllocatedState, error) {
 	p := state.preemption
-	if p == nil || !p.sim.changesNode(nodeName) {
-		return state.allocator, nil
+	if p == nil {
+		return state.allocator, nil, nil
+	}
+	if !p.sim.changesNode(nodeName) {
+		return state.allocator, p.root.allocatedState, nil
 	}
 	// The PreFilter allocator cannot be reused because allocators cache
 	// counters derived from the allocated state. A new allocator for all
@@ -422,7 +427,11 @@ func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateDa
 	nodeSlices := p.root.slicesForNode(nodeName)
 	allocatedState := p.root.allocatedStateForSlices(nodeSlices)
 	p.sim.applyTo(allocatedState, pl.fts.EnableDRAConsumableCapacity, p.root.sharesOfDevices)
-	return structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), nodeSlices, pl.celCache)
+	allocator, err := structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), nodeSlices, pl.celCache)
+	if err != nil {
+		return nil, nil, err
+	}
+	return allocator, allocatedState, nil
 }
 
 // slicesForNode returns the slices for the node and all slices which are not
@@ -487,6 +496,41 @@ func (s *simulation) applyTo(state *structured.AllocatedState, consumableCapacit
 			state.AllocatedSharedDeviceIDs.Delete(id)
 		}
 	}
+}
+
+// preemptionMightHelp is called by Filter when the allocator found no devices
+// for the claims of the pod on the node, with the allocated state that the
+// allocator used. Preemption only considers nodes where Filter returned
+// Unschedulable, so this decides between that and UnschedulableAndUnresolvable.
+//
+// Removing pods might help if the pod can get devices of removed pods, some
+// pod on the node with lower priority uses claims (only those can be
+// preempted), and some device which is local to the node is allocated (only
+// those get released).
+func preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
+	p := state.preemption
+	if p == nil || !p.root.canRelease || allocatedState == nil {
+		return false
+	}
+	priority := corev1helpers.PodPriority(pod)
+	if !slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
+		other := podInfo.GetPod()
+		return len(other.Spec.ResourceClaims) > 0 && corev1helpers.PodPriority(other) < priority
+	}) {
+		return false
+	}
+	return p.root.hasAllocatedNodeLocalDevice(nodeInfo.Node().Name, allocatedState)
+}
+
+// hasAllocatedNodeLocalDevice returns true if some device which is local to the
+// node is allocated in the given state.
+func (r *preemptionRoot) hasAllocatedNodeLocalDevice(nodeName string, state *structured.AllocatedState) bool {
+	for id := range r.nodeLocalDevices(nodeName) {
+		if structured.IsDeviceAllocated(id, state) {
+			return true
+		}
+	}
+	return false
 }
 
 // sharedDeviceCounter is implemented by claimTracker.
