@@ -2778,6 +2778,10 @@ type Capabilities struct {
 	// Removed capabilities
 	// +optional
 	Drop []Capability
+	// Ambient capabilities to add to all capability sets. Requires the
+	// AmbientCapabilities feature gate and a supporting runtime.
+	// +optional
+	Ambient []Capability
 }
 
 // ResourceRequirements describes the compute resource requirements.

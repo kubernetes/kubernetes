@@ -18,6 +18,7 @@ package policy
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,8 @@ Adding NET_RAW or capabilities beyond the default set must be disallowed.
 **Restricted Fields:**
 spec.containers[*].securityContext.capabilities.add
 spec.initContainers[*].securityContext.capabilities.add
+spec.containers[*].securityContext.capabilities.ambient
+spec.initContainers[*].securityContext.capabilities.ambient
 
 **Allowed Values:**
 undefined / empty
@@ -78,14 +81,21 @@ var (
 
 func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var badContainers []string
+	forbiddenFields := sets.NewString()
 	nonDefaultCapabilities := sets.NewString()
 	visitContainers(podSpec, func(container *corev1.Container) {
 		if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
 			valid := true
-			for _, c := range container.SecurityContext.Capabilities.Add {
-				if !capabilities_allowed_1_0.Has(string(c)) {
-					valid = false
-					nonDefaultCapabilities.Insert(string(c))
+			for fieldName, caps := range map[string][]corev1.Capability{
+				"securityContext.capabilities.add":     container.SecurityContext.Capabilities.Add,
+				"securityContext.capabilities.ambient": container.SecurityContext.Capabilities.Ambient,
+			} {
+				for _, c := range caps {
+					if !capabilities_allowed_1_0.Has(string(c)) {
+						valid = false
+						nonDefaultCapabilities.Insert(string(c))
+						forbiddenFields.Insert(fieldName)
+					}
 				}
 			}
 			if !valid {
@@ -99,10 +109,11 @@ func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.Po
 			Allowed:         false,
 			ForbiddenReason: "non-default capabilities",
 			ForbiddenDetail: fmt.Sprintf(
-				"%s %s must not include %s in securityContext.capabilities.add",
+				"%s %s must not include %s in %s",
 				pluralize("container", "containers", len(badContainers)),
 				joinQuote(badContainers),
 				joinQuote(nonDefaultCapabilities.List()),
+				strings.Join(forbiddenFields.List(), " or "),
 			),
 		}
 	}

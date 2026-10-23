@@ -158,9 +158,10 @@ func (CSIVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_Capabilities = map[string]string{
-	"":     "Adds and removes POSIX capabilities from running containers.",
-	"add":  "add lists the capabilities to add to the container.",
-	"drop": "drop lists the capabilities to remove from the container.",
+	"":        "Adds and removes POSIX capabilities from running containers.",
+	"add":     "add lists the capabilities to add to the container.",
+	"drop":    "drop lists the capabilities to remove from the container.",
+	"ambient": "Ambient capabilities to add to the ambient, inheritable, permitted, effective and bounding sets. Uses the same capability names and add/drop semantics as Add: ALL selects all capabilities, Drop ALL resets defaults before individual additions, and individual drops take precedence. Requires the AmbientCapabilities feature gate and a supporting runtime.",
 }
 
 func (Capabilities) SwaggerDoc() map[string]string {

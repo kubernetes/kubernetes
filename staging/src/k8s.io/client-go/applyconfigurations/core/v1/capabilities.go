@@ -31,6 +31,12 @@ type CapabilitiesApplyConfiguration struct {
 	Add []corev1.Capability `json:"add,omitempty"`
 	// drop lists the capabilities to remove from the container.
 	Drop []corev1.Capability `json:"drop,omitempty"`
+	// Ambient capabilities to add to the ambient, inheritable, permitted,
+	// effective and bounding sets. Uses the same capability names and add/drop
+	// semantics as Add: ALL selects all capabilities, Drop ALL resets defaults
+	// before individual additions, and individual drops take precedence.
+	// Requires the AmbientCapabilities feature gate and a supporting runtime.
+	Ambient []corev1.Capability `json:"ambient,omitempty"`
 }
 
 // CapabilitiesApplyConfiguration constructs a declarative configuration of the Capabilities type for use with
@@ -55,6 +61,16 @@ func (b *CapabilitiesApplyConfiguration) WithAdd(values ...corev1.Capability) *C
 func (b *CapabilitiesApplyConfiguration) WithDrop(values ...corev1.Capability) *CapabilitiesApplyConfiguration {
 	for i := range values {
 		b.Drop = append(b.Drop, values[i])
+	}
+	return b
+}
+
+// WithAmbient adds the given value to the Ambient field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Ambient field.
+func (b *CapabilitiesApplyConfiguration) WithAmbient(values ...corev1.Capability) *CapabilitiesApplyConfiguration {
+	for i := range values {
+		b.Ambient = append(b.Ambient, values[i])
 	}
 	return b
 }
