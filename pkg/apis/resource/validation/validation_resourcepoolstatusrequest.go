@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -46,8 +47,8 @@ func ValidateResourcePoolStatusRequestStatusUpdate(request, oldRequest *resource
 func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.ResourcePoolStatusRequestStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Once status is set, it becomes immutable (request is complete) — not DV covered
-	if oldStatus != nil {
+	// The final status is immutable; a waiting status may only be replaced, not cleared — not DV covered
+	if oldStatus != nil && (status == nil || !isWaitingForPools(oldStatus)) {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status, oldStatus, fldPath)...)
 		return allErrs
 	}
@@ -61,4 +62,12 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	allErrs = append(allErrs, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
 
 	return allErrs
+}
+
+// isWaitingForPools reports whether status is a waiting status set before the
+// final calculation: WaitingForPools is true and neither Complete nor Failed is set.
+func isWaitingForPools(status *resource.ResourcePoolStatusRequestStatus) bool {
+	return apimeta.IsStatusConditionTrue(status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) &&
+		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionComplete) == nil &&
+		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionFailed) == nil
 }

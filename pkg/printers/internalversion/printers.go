@@ -3366,7 +3366,9 @@ func printResourcePoolStatusRequest(obj *resource.ResourcePoolStatusRequest, opt
 	validationErrors = "-"
 
 	var completedTime *metav1.Time
-	if obj.Status != nil {
+	if obj.Status != nil && meta.IsStatusConditionTrue(obj.Status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) {
+		status = resource.ResourcePoolStatusRequestConditionWaitingForPools
+	} else if obj.Status != nil {
 		isFailed := false
 		for _, cond := range obj.Status.Conditions {
 			if cond.Type == resource.ResourcePoolStatusRequestConditionComplete && cond.Status == metav1.ConditionTrue {

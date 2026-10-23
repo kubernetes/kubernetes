@@ -141,6 +141,24 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 		r := testResourcePoolStatusRequestForUpdate(goodName, validResourcePoolStatusRequestSpec)
 		return r
 	}
+	withStatus := func(status *resource.ResourcePoolStatusRequestStatus) *resource.ResourcePoolStatusRequest {
+		r := baseRequest()
+		r.Status = status
+		return r
+	}
+	statusWith := func(conditionTypes ...string) *resource.ResourcePoolStatusRequestStatus {
+		status := &resource.ResourcePoolStatusRequestStatus{PoolCount: new(int32(0))}
+		for _, t := range conditionTypes {
+			status.Conditions = append(status.Conditions, metav1.Condition{Type: t, Status: metav1.ConditionTrue, LastTransitionTime: now, Reason: "Test"})
+		}
+		return status
+	}
+	waitingStatus := func() *resource.ResourcePoolStatusRequestStatus {
+		return statusWith(resource.ResourcePoolStatusRequestConditionWaitingForPools)
+	}
+	completeStatus := func() *resource.ResourcePoolStatusRequestStatus {
+		return statusWith(resource.ResourcePoolStatusRequestConditionComplete)
+	}
 
 	scenarios := map[string]struct {
 		oldRequest   *resource.ResourcePoolStatusRequest
@@ -224,6 +242,31 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				field.Invalid(field.NewPath("status"),
 					&resource.ResourcePoolStatusRequestStatus{PoolCount: new(int32(5))},
 					"field is immutable"),
+			},
+		},
+		"waiting-status-can-be-replaced-by-final-status": {
+			oldRequest: withStatus(waitingStatus()),
+			newRequest: withStatus(completeStatus()),
+		},
+		"waiting-status-cannot-be-cleared": {
+			oldRequest: withStatus(waitingStatus()),
+			newRequest: baseRequest(),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status"), (*resource.ResourcePoolStatusRequestStatus)(nil), "field is immutable"),
+			},
+		},
+		"final-status-cannot-go-back-to-waiting": {
+			oldRequest: withStatus(completeStatus()),
+			newRequest: withStatus(waitingStatus()),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status"), waitingStatus(), "field is immutable"),
+			},
+		},
+		"waiting-status-with-complete-condition-is-immutable": {
+			oldRequest: withStatus(statusWith(resource.ResourcePoolStatusRequestConditionWaitingForPools, resource.ResourcePoolStatusRequestConditionComplete)),
+			newRequest: withStatus(completeStatus()),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status"), completeStatus(), "field is immutable"),
 			},
 		},
 	}
