@@ -102,6 +102,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 
 	dropStatefulSetDisabledFields(newStatefulSet, oldStatefulSet)
 	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.

@@ -4705,6 +4705,141 @@ func TestDropPodNetworkDefault(t *testing.T) {
 	}
 }
 
+func TestSyncPodNetworkOnUpdate(t *testing.T) {
+	spec := func(podNetwork *api.PodNetwork, hostNetwork bool) *api.PodSpec {
+		return &api.PodSpec{PodNetwork: podNetwork, HostNetwork: hostNetwork}
+	}
+	def := new(api.PodNetworkDefault)
+	none := new(api.PodNetworkNone)
+
+	for _, tc := range []struct {
+		name     string
+		old, new *api.PodSpec
+		want     *api.PodSpec
+	}{
+		// Nothing changed.
+		{name: "unchanged unset", old: spec(nil, false), new: spec(nil, false), want: spec(nil, false)},
+		{name: "unchanged Default", old: spec(def, false), new: spec(def, false), want: spec(def, false)},
+		{name: "unchanged None", old: spec(none, false), new: spec(none, false), want: spec(none, false)},
+		{name: "unset to None", old: spec(nil, false), new: spec(none, false), want: spec(none, false)},
+
+		// A client that does not know the field sends the object back
+		// without it: the stored value is kept.
+		{name: "None cleared by old client is kept", old: spec(none, false), new: spec(nil, false), want: spec(none, false)},
+		{name: "Default cleared by old client is kept", old: spec(def, false), new: spec(nil, false), want: spec(def, false)},
+
+		// The same kind of client turns hostNetwork on: the stored value gives
+		// way, whether the request omitted the field (PUT) or carried the
+		// stored value through (PATCH).
+		{name: "old client PUT turns hostNetwork on, None", old: spec(none, false), new: spec(nil, true), want: spec(nil, true)},
+		{name: "old client PATCH turns hostNetwork on, None", old: spec(none, false), new: spec(none, true), want: spec(nil, true)},
+		{name: "old client PUT turns hostNetwork on, Default", old: spec(def, false), new: spec(nil, true), want: spec(nil, true)},
+		{name: "old client PATCH turns hostNetwork on, Default", old: spec(def, false), new: spec(def, true), want: spec(nil, true)},
+
+		// A value set in the same request as hostNetwork: true, on an object
+		// that did not have that value: left for validation.
+		{name: "None set while turning hostNetwork on", old: spec(nil, false), new: spec(none, true), want: spec(none, true)},
+		{name: "None set on a hostNetwork object", old: spec(nil, true), new: spec(none, true), want: spec(none, true)},
+		{name: "Default to None while turning hostNetwork on", old: spec(def, false), new: spec(none, true), want: spec(none, true)},
+		{name: "None to Default while turning hostNetwork on", old: spec(none, false), new: spec(def, true), want: spec(def, true)},
+
+		// hostNetwork already on, or turned off: nothing to reconcile.
+		{name: "hostNetwork stays on, field omitted", old: spec(none, true), new: spec(nil, true), want: spec(none, true)},
+		{name: "hostNetwork turned off, field omitted", old: spec(none, true), new: spec(nil, false), want: spec(none, false)},
+
+		// Isolation is turned off with "Default".
+		{name: "None to Default", old: spec(none, false), new: spec(def, false), want: spec(def, false)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oldCopy := tc.old.DeepCopy()
+			got := tc.new.DeepCopy()
+			SyncPodNetworkOnUpdate(got, tc.old)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("unexpected spec (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(oldCopy, tc.old); diff != "" {
+				t.Errorf("old spec changed (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	// Leaving "None" undoes the dnsPolicy default it implied, and nothing else.
+	t.Run("dnsPolicy", func(t *testing.T) {
+		loopback := &api.PodDNSConfig{Nameservers: []string{"127.0.0.53"}}
+		searchOnly := &api.PodDNSConfig{Searches: []string{"example.com"}}
+		for _, tc := range []struct {
+			name          string
+			old, new      *api.PodSpec
+			wantDNSPolicy api.DNSPolicy
+		}{
+			{
+				name:          "defaulted None is reset when hostNetwork is turned on",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSNone},
+				new:           &api.PodSpec{DNSPolicy: api.DNSNone, HostNetwork: true},
+				wantDNSPolicy: api.DNSClusterFirst,
+			},
+			{
+				name:          "defaulted None is reset when the field changes to Default",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSNone},
+				new:           &api.PodSpec{PodNetwork: def, DNSPolicy: api.DNSNone},
+				wantDNSPolicy: api.DNSClusterFirst,
+			},
+			{
+				name:          "explicit None with nameservers is kept",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSNone, DNSConfig: loopback},
+				new:           &api.PodSpec{PodNetwork: def, DNSPolicy: api.DNSNone, DNSConfig: loopback},
+				wantDNSPolicy: api.DNSNone,
+			},
+			{
+				name:          "explicit None with searches only is left for validation",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSNone, DNSConfig: searchOnly},
+				new:           &api.PodSpec{PodNetwork: def, DNSPolicy: api.DNSNone, DNSConfig: searchOnly},
+				wantDNSPolicy: api.DNSNone,
+			},
+			{
+				name:          "other policies are kept",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSDefault},
+				new:           &api.PodSpec{PodNetwork: def, DNSPolicy: api.DNSDefault},
+				wantDNSPolicy: api.DNSDefault,
+			},
+			{
+				name:          "still None keeps the default",
+				old:           &api.PodSpec{PodNetwork: none, DNSPolicy: api.DNSNone},
+				new:           &api.PodSpec{DNSPolicy: api.DNSNone},
+				wantDNSPolicy: api.DNSNone,
+			},
+			{
+				name:          "was never None",
+				old:           &api.PodSpec{DNSPolicy: api.DNSNone},
+				new:           &api.PodSpec{PodNetwork: def, DNSPolicy: api.DNSNone},
+				wantDNSPolicy: api.DNSNone,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				got := tc.new.DeepCopy()
+				SyncPodNetworkOnUpdate(got, tc.old)
+				if got.DNSPolicy != tc.wantDNSPolicy {
+					t.Errorf("dnsPolicy = %q, want %q", got.DNSPolicy, tc.wantDNSPolicy)
+				}
+			})
+		}
+	})
+
+	t.Run("nil specs", func(t *testing.T) {
+		SyncPodNetworkOnUpdate(nil, spec(none, false))
+		SyncPodNetworkOnUpdate(spec(none, false), nil)
+		SyncPodNetworkOnTemplateUpdate(nil, nil)
+	})
+
+	t.Run("template", func(t *testing.T) {
+		newTemplate := &api.PodTemplateSpec{Spec: *spec(nil, true)}
+		SyncPodNetworkOnTemplateUpdate(newTemplate, &api.PodTemplateSpec{Spec: *spec(none, false)})
+		if diff := cmp.Diff(spec(nil, true), &newTemplate.Spec); diff != "" {
+			t.Errorf("unexpected template spec (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 
