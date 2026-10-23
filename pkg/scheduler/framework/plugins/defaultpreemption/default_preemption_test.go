@@ -2444,7 +2444,11 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		nodes               []string
 		features            feature.Features
 		nominatedNodeStatus *fwk.Status
-		expected            bool
+		// nominationExtensions, if set, is enabled as a plugin with framework.NominationExtensions.
+		nominationExtensions *tf.FakeNominationExtensionsPlugin
+		expected             bool
+		expectedReason       string
+		expectedCalls        []string
 	}{
 		{
 			name:                "Pod with nominated node",
@@ -2515,6 +2519,53 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			features: feature.Features{EnableGenericWorkload: true},
 			expected: false,
 		},
+		{
+			name:                 "NominationExtensions not eligible with nominated node",
+			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodes:                []string{"node1"},
+			features:             feature.Features{EnableDRAPreemption: true},
+			nominatedNodeStatus:  fwk.NewStatus(fwk.Unschedulable),
+			nominationExtensions: &tf.FakeNominationExtensionsPlugin{NotEligibleReason: "still reclaiming"},
+			expected:             false,
+			expectedReason:       "still reclaiming",
+			expectedCalls:        []string{"PodEligibleToPreempt p node1"},
+		},
+		{
+			name:                 "NominationExtensions not eligible without nominated node",
+			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
+			features:             feature.Features{EnableDRAPreemption: true},
+			nominationExtensions: &tf.FakeNominationExtensionsPlugin{NotEligibleReason: "still reclaiming"},
+			expected:             false,
+			expectedReason:       "still reclaiming",
+			expectedCalls:        []string{"PodEligibleToPreempt p "},
+		},
+		{
+			name:                 "NominationExtensions eligible",
+			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodes:                []string{"node1"},
+			features:             feature.Features{EnableDRAPreemption: true},
+			nominatedNodeStatus:  fwk.NewStatus(fwk.Unschedulable),
+			nominationExtensions: &tf.FakeNominationExtensionsPlugin{},
+			expected:             true,
+			expectedCalls:        []string{"PodEligibleToPreempt p node1"},
+		},
+		{
+			name:                 "NominationExtensions not asked when the nominated node is unresolvable",
+			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodes:                []string{"node1"},
+			features:             feature.Features{EnableDRAPreemption: true},
+			nominatedNodeStatus:  fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			nominationExtensions: &tf.FakeNominationExtensionsPlugin{NotEligibleReason: "still reclaiming"},
+			expected:             true,
+		},
+		{
+			name:                 "NominationExtensions not asked with DRAPreemption disabled",
+			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodes:                []string{"node1"},
+			nominatedNodeStatus:  fwk.NewStatus(fwk.Unschedulable),
+			nominationExtensions: &tf.FakeNominationExtensionsPlugin{NotEligibleReason: "still reclaiming"},
+			expected:             true,
+		},
 	}
 
 	for _, test := range tests {
@@ -2524,6 +2575,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 					features.GenericWorkload:                 test.features.EnableGenericWorkload,
 					features.TopologyAwareWorkloadScheduling: test.features.EnableCompositePodGroup,
 					features.CompositePodGroup:               test.features.EnableCompositePodGroup,
+					features.DRAPreemption:                   test.features.EnableDRAPreemption,
 				})
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -2553,6 +2605,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			if test.nominationExtensions != nil {
+				registeredPlugins = append(registeredPlugins,
+					tf.RegisterPreFilterPlugin(test.nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(test.nominationExtensions)))
+			}
 			cache := internalcache.New(ctx, nil, test.features.EnableGenericWorkload, test.features.EnableCompositePodGroup)
 			for _, pg := range test.podGroups {
 				cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
@@ -2579,8 +2635,17 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got, _ := pl.PodEligibleToPreemptOthers(ctx, test.pod, test.nominatedNodeStatus); got != test.expected {
+			got, reason := pl.PodEligibleToPreemptOthers(ctx, test.pod, test.nominatedNodeStatus)
+			if got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
+			}
+			if test.expectedReason != "" && reason != test.expectedReason {
+				t.Errorf("expected reason %q, got %q", test.expectedReason, reason)
+			}
+			if test.nominationExtensions != nil {
+				if diff := cmp.Diff(test.expectedCalls, test.nominationExtensions.Calls()); diff != "" {
+					t.Errorf("unexpected NominationExtensions calls (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -3042,6 +3107,130 @@ type fakePodActivator struct {
 }
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
+
+// TestPreemptNominationExtensions checks that plugins with
+// NominationExtensions learn about the nomination before the first victim
+// gets preempted, and that the nomination gets removed when preempting the
+// victims fails.
+func TestPreemptNominationExtensions(t *testing.T) {
+	metrics.Register()
+	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
+	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
+	eligibleCall := "PodEligibleToPreempt default/p "
+	addCall := "AddNominatedPod default/p node1 [default/v]"
+	removeCall := "RemoveNominatedPod default/p node1 assigned= failed=true"
+
+	for name, tc := range map[string]struct {
+		asyncPreemption bool
+		deleteErr       error
+		wantCalls       []string
+	}{
+		"sync": {
+			wantCalls: []string{eligibleCall, addCall},
+		},
+		"sync-failure": {
+			deleteErr: errors.New("injected delete error"),
+			wantCalls: []string{eligibleCall, addCall, removeCall},
+		},
+		"async": {
+			asyncPreemption: true,
+			wantCalls:       []string{eligibleCall, addCall},
+		},
+		"async-failure": {
+			asyncPreemption: true,
+			deleteErr:       errors.New("injected delete error"),
+			wantCalls:       []string{eligibleCall, addCall, removeCall},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: tc.asyncPreemption,
+				features.DRAPreemption:            true,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			client := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			for _, pod := range []*v1.Pod{preemptor, victim} {
+				if err := podInformer.GetStore().Add(pod.DeepCopy()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
+			})
+			deleted := make(chan []string, 1)
+			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				deleted <- nominationExtensions.Calls()
+				return true, nil, tc.deleteErr
+			})
+
+			node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+			snapshot := internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{node})
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+					tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPodActivator(&fakePodActivator{}),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return preemption.NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cycleState := framework.NewCycleState()
+			if _, s, _ := schedFramework.RunPreFilterPlugins(ctx, cycleState, preemptor); !s.IsSuccess() {
+				t.Fatalf("Unexpected PreFilter status: %v", s)
+			}
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFramework, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodeToStatus := framework.NewDefaultNodeToStatus()
+			nodeToStatus.Set(node.Name, fwk.NewStatus(fwk.Unschedulable))
+			if _, status := pl.Evaluator.Preempt(ctx, cycleState, preemptor, nodeToStatus); status.Code() == fwk.Error && tc.deleteErr == nil {
+				t.Fatalf("Unexpected preemption error: %v", status.AsError())
+			}
+
+			select {
+			case callsAtDeletion := <-deleted:
+				if diff := cmp.Diff([]string{eligibleCall, addCall}, callsAtDeletion); diff != "" {
+					t.Errorf("Unexpected calls when the victim got deleted (-want, +got):\n%s", diff)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("victim was not deleted")
+			}
+			// The victim stays in the informer, so the asynchronous
+			// preemption is running until its goroutine is done.
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+				return !pl.Executor.IsPodRunningPreemption(preemptor.UID), nil
+			}); err != nil {
+				t.Errorf("Waiting for the end of the preemption: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
 
 type mockProposedAssignment struct {
 	nodeName   string

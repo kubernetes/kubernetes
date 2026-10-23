@@ -559,12 +559,13 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 }
 
 func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue, apiDispatcher *apidispatcher.APIDispatcher,
-	client kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Scheduler, framework.Framework, error) {
+	client kubernetes.Interface, informerFactory informers.SharedInformerFactory, extraPlugins ...tf.RegisterPluginFunc) (*Scheduler, framework.Framework, error) {
 	logger := klog.FromContext(ctx)
 	registerPluginFuncs := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
+	registerPluginFuncs = append(registerPluginFuncs, extraPlugins...)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 	fwk, err := tf.NewFramework(ctx,

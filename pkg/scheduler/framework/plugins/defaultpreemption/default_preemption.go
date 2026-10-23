@@ -434,7 +434,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 //  2. The pod has already preempted other pods and the victims are in their graceful termination period.
 //     Currently we check the node that is nominated for this pod, and as long as there are
 //     terminating pods on this node, we don't attempt to preempt more pods.
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+//  3. A plugin implementing framework.NominationExtensions reports that resources freed by
+//     an earlier preemption are still being reclaimed.
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
@@ -456,6 +458,14 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
 			}
+		}
+	}
+
+	// Asked also without a nominated node: with asynchronous API calls the
+	// pod in the informer may not show the nomination which plugins already know about.
+	if runner, ok := pl.fh.(framework.NominationExtensionsRunner); ok {
+		if eligible, reason := runner.RunNominationExtensionsPodEligibleToPreempt(ctx, pod, nomNodeName); !eligible {
+			return false, reason
 		}
 	}
 	return true, ""
