@@ -640,11 +640,11 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_workload_disruptions",
-			Help:      "Number of workload preemption units being preempted. A single preemption unit can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all), or a single pod (in case of DisruptionMode=single).",
+			Help:      "Number of preemption units evicted by a single workload preemption (either pod groups or composite pod groups), by victim type. A unit is either all pods of a pod group or composite pod group hierarchy with DisruptionMode=all (victim is the type of its topmost group with DisruptionMode=all), or a single pod evicted on its own (victim=pod), which covers pods outside of any group and pods of groups with DisruptionMode=single.",
 			// Start with 1 with the last bucket being [1024, Inf)
 			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"preemptor"})
+		}, []string{"preemptor", "victim"})
 	PreemptionEvaluationDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,

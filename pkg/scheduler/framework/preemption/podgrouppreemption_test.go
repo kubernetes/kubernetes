@@ -23,9 +23,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -166,28 +168,31 @@ func (f *maxReprievesFilter) OnVictimReprieved(_ context.Context, _ fwk.Preempti
 
 func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 	tests := []struct {
-		name                           string
-		nodes                          []*v1.Node
-		initPods                       []*v1.Pod
-		initPodGroups                  []*schedulingv1beta1.PodGroup
-		preemptor                      fwk.PodGroupInfo
-		pdbs                           []*policy.PodDisruptionBudget
-		nodeCapacities                 []nodeCapacity
-		reprieveFilter                 fwk.ReprieveFilter
-		returnNilReprieveFilter        bool
-		expectedVictims                []string
-		expectedStatus                 *fwk.Status
-		expectedNumPodGroupDisruptions int
-		expectedNumPDBViolations       int
+		name          string
+		nodes         []*v1.Node
+		initPods      []*v1.Pod
+		initPodGroups []*schedulingv1beta1.PodGroup
+		// initCompositePodGroups enables the CompositePodGroup feature gate when set.
+		initCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
+		preemptor               fwk.PodGroupInfo
+		pdbs                    []*policy.PodDisruptionBudget
+		nodeCapacities          []nodeCapacity
+		reprieveFilter          fwk.ReprieveFilter
+		returnNilReprieveFilter bool
+		expectedVictims         []string
+		expectedStatus          *fwk.Status
+		// expectedDisruptions is the number of evicted preemption units per victim type.
+		expectedDisruptions      map[fwk.EntityKeyType]int
+		expectedNumPDBViolations int
 	}{
 		{
-			name: "Priority: mix of no groups and pod groups",
+			name: "Priority: pods from a group with disruption mode single rank as individual pods",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).StartTime(metav1.Unix(0, 0)).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").StartTime(metav1.Unix(1, 0)).Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
@@ -202,8 +207,10 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims: []string{"p1"}, // p1 is less important than p2 because it's not part of a pod group
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			// p2 is evicted alone, so it ranks like the standalone p1 and the earlier start time of p1 wins.
+			expectedVictims:     []string{"p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Priority: StartTime of pods from same group with disruption mode single ",
@@ -227,9 +234,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims:                []string{"p1"}, // p1 is less important than p2 because of later StartTime
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"p1"}, // p1 is less important than p2 because of later StartTime
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Pod group with disruption mode group not reprieved",
@@ -258,9 +265,286 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims:                []string{"p1", "p2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: composite pod group with disruption mode all is a single compositepodgroup unit",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			// The whole hierarchy is evicted together and labeled by its topmost group.
+			expectedVictims:     []string{"pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: pod group with disruption mode all under a composite pod group with disruption mode single is a podgroup unit",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pa2").UID("pa2").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			// The composite pod group doesn't evict its children together, so the topmost all-group is pg-a.
+			expectedVictims:     []string{"pa1", "pa2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: pods of a pod group with disruption mode single in a composite pod group with disruption mode single are pod units",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 1},
+			},
+			expectedVictims:     []string{"pa1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
+		},
+		{
+			name: "Disruptions: composite pod group with disruption mode all spanning nodes is a single unit",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node2").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 1},
+				{nodeName: "node2", capacity: 1},
+			},
+			// Making room on one node evicts the whole hierarchy, including pods on other nodes.
+			expectedVictims:     []string{"pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: nested composite pod group with disruption mode all under a root with disruption mode single is a compositepodgroup unit",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").UID("cpg-root").DisruptionModeSingle().Priority(lowPriority).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").UID("cpg-child").ParentCompositePodGroup("cpg-root").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			// The topmost group with disruption mode all is cpg-child, even though its descendants are single.
+			expectedVictims:     []string{"pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: root composite pod group with disruption mode all overrides single descendants",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").UID("cpg-root").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").UID("cpg-child").ParentCompositePodGroup("cpg-root").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			expectedVictims:     []string{"pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
+		},
+		{
+			name: "Disruptions: sibling pod groups with disruption mode all under a composite pod group with disruption mode single are separate units",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Labels(map[string]string{"size": "2"}).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			expectedVictims:     []string{"pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 2},
+		},
+		{
+			name: "Disruptions: standalone pod and composite pod group evicted together are counted per victim type",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Labels(map[string]string{"size": "3"}).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 3},
+			},
+			expectedVictims:     []string{"p1", "pa1", "pb1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.CompositePodGroupKeyType: 1},
+		},
+		{
+			name: "Priority: standalone pod is preempted before a composite pod group with disruption mode all of the same priority",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").Obj(),
+				st.MakePod().Name("pb1").UID("pb1").Node("node1").Priority(lowPriority).PodGroupName("pg-b").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 3},
+			},
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
+		},
+		{
+			name: "Priority: pods of single groups in a composite pod group rank as individual pods",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).StartTime(metav1.Unix(0, 0)).Obj(),
+				st.MakePod().Name("pa1").UID("pa1").Node("node1").Priority(lowPriority).PodGroupName("pg-a").StartTime(metav1.Unix(1, 0)).Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			// pa1 is evicted alone, so it ranks like the standalone p1 and the earlier start time of p1 wins.
+			expectedVictims:     []string{"pa1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Complex Mixed: Shared, different, and no groups",
@@ -313,9 +597,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims:                []string{"p2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PDB: Mixed groups",
@@ -342,9 +626,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims:                []string{"victim-no-pdb"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"victim-no-pdb"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PodGroup preemptor with PreemptLowerPriority preemption policy performs preemption",
@@ -368,8 +652,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				{nodeName: "node2", capacity: 1},
 				{nodeName: "node3", capacity: 1},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PodGroup preemptor with PreemptLowerPriority preemption policy performs preemption, ignoring member pod preemption policy",
@@ -395,8 +680,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				{nodeName: "node2", capacity: 1},
 				{nodeName: "node3", capacity: 1},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Preemptor group is eligible if terminating pods are on non-nominated nodes",
@@ -426,8 +712,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims: []string{"other-victim", "victim"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"other-victim", "victim"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
 		},
 		{
 			name: "Preemptor group is eligible if nominated node has terminating pod belonging to a pod group of higher priority",
@@ -459,8 +746,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims: []string{"other-victim"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"other-victim"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Preemptor group is eligible if nominated node has terminating pod belonging to a pod group of higher priority with nil DisruptionMode",
@@ -492,8 +780,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims: []string{"other-victim"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"other-victim"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Preempt single lower priority pod",
@@ -513,8 +802,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Priority: Prefer lower priority victim",
@@ -536,8 +826,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims: []string{"p1", "p2"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
 		},
 		{
 			name: "Efficiency: Preempt minimum number of victims",
@@ -560,8 +851,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 3,
 				},
 			},
-			expectedVictims: []string{"p3", "p4"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p3", "p4"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
 		},
 		{
 			name: "PDB: Prefer non-violating victim",
@@ -585,8 +877,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 2},
 			},
-			expectedVictims: []string{"victim-no-pdb"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"victim-no-pdb"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PDB: Prefer removing non-violating victim over lower priority violating victim",
@@ -610,8 +903,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 2},
 			},
-			expectedVictims: []string{"victim-no-pdb"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"victim-no-pdb"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PodGroup preemptor with PreemptLowerPriority preemption policy performs preemption with PodGroup victims",
@@ -641,8 +935,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				},
 				v1.PreemptLowerPriority,
 			),
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PodGroup preemptor with PreemptLowerPriority preemption policy performs preemption with PodGroup victims, ignoring member pod preemption policy",
@@ -672,8 +967,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				{nodeName: "node2", capacity: 1},
 				{nodeName: "node3", capacity: 1},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PDB: Prefer lower priority pod for preemption, when preemption without pdb violation is not possible",
@@ -702,6 +998,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			},
 			expectedVictims:          []string{"p1"},
 			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedDisruptions:      map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 			expectedNumPDBViolations: 1,
 		},
 		{
@@ -732,9 +1029,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims:                []string{"p1", "p2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "PodGroup: Prefer single pod over podGroup for preemption candidate",
@@ -760,8 +1057,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 3,
 				},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "PodGroup: Preempt group as a whole on single node",
@@ -787,9 +1085,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 3,
 				},
 			},
-			expectedVictims:                []string{"g1-1", "g1-2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"g1-1", "g1-2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "PDB: Unit violation if any member violates",
@@ -821,8 +1119,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 3,
 				},
 			},
-			expectedVictims: []string{"p1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 		},
 		{
 			name: "Failure: Cannot preempt the victim with higher priority",
@@ -929,8 +1228,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				},
 			},
 			// Preemptor has 3 pods and minCount of 1, but maxScheduledCount will be 2, because there are higher priority pods p3, p4.
-			expectedVictims: []string{"p1", "p2"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
 		},
 		{
 			name: "Gang scheduling: do not reprieve victim pod group of lower priority",
@@ -969,9 +1269,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims:                []string{"v1", "v2", "v3"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"v1", "v2", "v3"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "Gang scheduling: preempt a pod group victim but do not schedule full pod group",
@@ -1017,9 +1317,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims:                []string{"v1", "v2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"v1", "v2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "Basic scheduling: schedule as many pods as possible without preempting higher priority pods",
@@ -1062,8 +1362,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims: []string{"p1", "p2"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
 		},
 		{
 			name: "Basic scheduling: do not reprieve victim pod group of lower priority",
@@ -1102,9 +1403,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims:                []string{"v1", "v2", "v3"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"v1", "v2", "v3"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "Basic scheduling: preempt a pod group victim but do not schedule full pod group",
@@ -1150,9 +1451,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 1,
 				},
 			},
-			expectedVictims:                []string{"v1", "v2"},
-			expectedStatus:                 fwk.NewStatus(fwk.Success),
-			expectedNumPodGroupDisruptions: 1,
+			expectedVictims:     []string{"v1", "v2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
 		},
 		{
 			name: "ReprieveFilter: OnVictimReprieved is not called when a victim allowed by ShouldAttemptReprieval fails Filter",
@@ -1184,9 +1485,10 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 10,
 				},
 			},
-			reprieveFilter:  &maxReprievesFilter{remainingReprieves: 1},
-			expectedVictims: []string{"v4", "v2", "v1"},
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			reprieveFilter:      &maxReprievesFilter{remainingReprieves: 1},
+			expectedVictims:     []string{"v4", "v2", "v1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 3},
 		},
 		{
 			name: "ReprieveFilter: error from OnVictimReprieved results in error status",
@@ -1268,10 +1570,15 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			gates := featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:          true,
 				features.PodGroupPreemptionPolicy: true,
-			})
+			}
+			if len(tt.initCompositePodGroups) > 0 {
+				gates[features.TopologyAwareWorkloadScheduling] = true
+				gates[features.CompositePodGroup] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, gates)
 			logger, ctx := ktesting.NewTestContext(t)
 
 			mockFilterFactory := func(ctx context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
@@ -1299,7 +1606,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			parallelism := parallelize.DefaultParallelism
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, tt.initCompositePodGroups)
 			mockPreemptionManager := &mockPreemptionManager{
 				reprieveFilter:          tt.reprieveFilter,
 				returnNilReprieveFilter: tt.returnNilReprieveFilter,
@@ -1421,8 +1728,8 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			if diff := cmp.Diff(wantNames, gotNames); diff != "" {
 				t.Errorf("Victims mismatch (-want +got):\n%s", diff)
 			}
-			if mockPreemptionManager.candidate.NumPodGroupDisruptions() != tt.expectedNumPodGroupDisruptions {
-				t.Errorf("numPodGroupDisruptions mismatch. Want %d, Got %d", tt.expectedNumPodGroupDisruptions, mockPreemptionManager.candidate.NumPodGroupDisruptions())
+			if diff := cmp.Diff(tt.expectedDisruptions, mockPreemptionManager.candidate.NumDisruptionsByVictimType(), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Disruptions by victim type mismatch (-want +got):\n%s", diff)
 			}
 			if mockPreemptionManager.candidate.Victims().NumPDBViolations != int64(tt.expectedNumPDBViolations) {
 				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, mockPreemptionManager.candidate.Victims().NumPDBViolations)

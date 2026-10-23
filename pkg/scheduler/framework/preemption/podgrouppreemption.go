@@ -94,7 +94,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 	for _, ni := range res.nominatedNodeNames {
 		preemptorNodes.Insert(ni.NominatedNodeName)
 	}
-	candidate := newCandidate(res.victims, "cluster", res.numPodGroupDisruptions, preemptorNodes.UnsortedList()...)
+	candidate := newCandidate(res.victims, "cluster", res.disruptions, preemptorNodes.UnsortedList()...)
 	status = preemptionManager.Executor().ActuatePodGroupPreemption(ctx, candidate, pgInfo, names.DefaultPreemption)
 	if status.IsSuccess() {
 		status = fwk.NewStatus(fwk.Success, fmt.Sprintf("found a placement for podgroup, preempting %d victims", len(res.victims.Pods)))
@@ -104,10 +104,9 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 
 type selectVictimsResult struct {
 	nominatedNodeNames map[types.NamespacedName]*fwk.NominatingInfo
-	// numPodGroupDisruptions should only be used for metrics.
-	// See [isGroupVictim].
-	numPodGroupDisruptions int
-	victims                *extenderv1.Victims
+	// disruptions should only be used for metrics.
+	disruptions map[fwk.EntityKeyType]int
+	victims     *extenderv1.Victims
 }
 
 // selectVictimsOnDomain selects a set of victims that can be removed
@@ -285,12 +284,10 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			numViolatingVictim += v.NumPDBViolations()
 		}
 	}
-	numPodGroupDisruptions := 0
+	disruptions := make(map[fwk.EntityKeyType]int)
 	var podsToPreempt []*v1.Pod
 	for _, v := range victimsToPreempt {
-		if isGroupVictim(v) {
-			numPodGroupDisruptions++
-		}
+		disruptions[v.Type()]++
 		for _, pi := range v.Pods() {
 			podsToPreempt = append(podsToPreempt, pi.GetPod())
 		}
@@ -311,9 +308,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	return &selectVictimsResult{
-		nominatedNodeNames:     n,
-		victims:                v,
-		numPodGroupDisruptions: numPodGroupDisruptions,
+		nominatedNodeNames: n,
+		victims:            v,
+		disruptions:        disruptions,
 	}, nil
 }
 
@@ -337,18 +334,4 @@ func buildCurrentNominatingInfos(preemptor fwk.PodGroupInfo) map[types.Namespace
 		}
 	}
 	return n
-}
-
-// isGroupVictim returns true if the victim represents a PodGroup or CompositePodGroup.
-// Should only be called with GenericWorkload gate enabled.
-// This function should only be used for metrics.
-func isGroupVictim(v fwk.PreemptionVictim) bool {
-	pods := v.Pods()
-	if len(pods) == 0 {
-		return false
-	}
-	// Only a single pod is checked.
-	// It is only valid for the default preemption manager which groups by PGs.
-	// The assumption is that custom preemption managers will only be supplied in contexts where this metric isn't recorded.
-	return pods[0].GetPod().Spec.SchedulingGroup != nil
 }

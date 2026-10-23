@@ -290,7 +290,7 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 			logger.V(2).Info("Dropped node because no preemption extender reported victims", "node", klog.KRef("", nodeName))
 			continue
 		}
-		newCandidates = append(newCandidates, newCandidate(victims, nodeName, 0, nodeName))
+		newCandidates = append(newCandidates, newCandidate(victims, nodeName, nil, nodeName))
 	}
 	return newCandidates, nil
 }
@@ -327,7 +327,7 @@ func (ev *Evaluator) SelectCandidate(ctx context.Context, candidates []fwk.Preem
 	// Same as candidatesToVictimsMap, this logic is not applicable for out-of-tree
 	// preemption plugins that exercise different candidates on the same nominated node.
 	if victims := victimsMap[candidateNode]; victims != nil {
-		return newCandidate(victims, candidateNode, 0, candidateNode)
+		return newCandidate(victims, candidateNode, nil, candidateNode)
 	}
 
 	// We shouldn't reach here.
@@ -490,7 +490,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),
 			}
-			c := newCandidate(&victims, nodeInfo.Node().Name, 0, nodeInfo.Node().Name)
+			c := newCandidate(&victims, nodeInfo.Node().Name, nil, nodeInfo.Node().Name)
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
 			} else {
