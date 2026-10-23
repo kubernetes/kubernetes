@@ -300,6 +300,14 @@ const (
 	// DRAResourcePoolStatus (the feature that consumes it).
 	DRAPartitionableDevicesType featuregate.Feature = "DRAPartitionableDevicesType"
 
+	// owner: @mortent, @troychiu
+	// kep: http://kep.k8s.io/5690
+	//
+	// Enables the scheduler to preempt lower priority pods that use DRA
+	// devices and to hold the freed capacity for the preemptor while the
+	// claims of the preempted pods are being deallocated.
+	DRAPreemption featuregate.Feature = "DRAPreemption"
+
 	// owner: @mortent
 	// kep: http://kep.k8s.io/4816
 	//
@@ -1408,6 +1416,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRAPreemption: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAPrioritizedList: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2417,6 +2429,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAPartitionableDevices: {},
 
 	DRAPartitionableDevicesType: {DRAPartitionableDevices, DRAResourcePoolStatus},
+
+	DRAPreemption: {},
 
 	DRAPrioritizedList: {},
 
