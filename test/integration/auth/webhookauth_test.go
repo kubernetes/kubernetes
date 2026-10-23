@@ -401,12 +401,10 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		return tok
 	}
 
-	// Stand up the target webhook server running admission.WithTokenVerification
-	// and a front TLS proxy that kube-apiserver dials. Because kube-apiserver
-	// does not yet attach webhook tokens automatically on outbound admission calls,
-	// the proxy injects the test's activeToken as Authorization: Bearer <token>
-	// before forwarding the live AdmissionReview over HTTP to verifiedHandler.
+	// The proxy injects the test token; automatic apiserver token attachment is
+	// outside this test. Token issuance and AdmissionReview dispatch are real.
 	var targetHandler atomic.Value
+	var lastWebhookStatus atomic.Int32
 	targetWebhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		targetHandler.Load().(http.Handler).ServeHTTP(w, r)
 	}))
@@ -428,6 +426,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 			return
 		}
 		defer resp.Body.Close()
+		lastWebhookStatus.Store(int32(resp.StatusCode))
 		for k, vals := range resp.Header {
 			for _, v := range vals {
 				w.Header().Add(k, v)
@@ -477,11 +476,8 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		Resources: []string{"serviceaccounts/token"},
 	})
 
-	// Register a ValidatingWebhookConfiguration that intercepts both apps/v1
-	// deployments (+ deployments/scale) AND batch/v1 jobs. It uses
-	// failurePolicy: Ignore on the batch/v1 rule so we can prove that post-decode
-	// token verification failures return HTTP 200 Allowed:false (which Ignore
-	// cannot bypass), whereas pre-decode 401 with failurePolicy: Fail blocks admission.
+	// Fail blocks early authentication errors; Ignore still honors explicit
+	// admission-policy denials for the unauthorized batch group.
 	failPolicy := admissionregistrationv1.Fail
 	ignorePolicy := admissionregistrationv1.Ignore
 	sideEffects := admissionregistrationv1.SideEffectClassNone
@@ -557,17 +553,15 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		}
 	}
 
-	// Wait until the ValidatingWebhookConfiguration informer in kube-apiserver is active:
-	// with no bearer token set, our handler returns HTTP 401 pre-decode, which client-go's
-	// RESTClient translates to "the server has asked for the client to provide credentials"
-	// and failurePolicy: Fail rejects the admission.
+	// Wait until the webhook informer intercepts an unauthenticated request.
 	err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		lastWebhookStatus.Store(0)
 		_, createErr := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("warmup-probe"), metav1.CreateOptions{})
 		if createErr == nil {
 			_ = cs.AppsV1().Deployments(ns.Name).Delete(ctx, "warmup-probe", metav1.DeleteOptions{})
 			return false, nil
 		}
-		return strings.Contains(createErr.Error(), "the server has asked for the client to provide credentials"), nil
+		return lastWebhookStatus.Load() == http.StatusUnauthorized, nil
 	})
 	if err != nil {
 		t.Fatalf("timed out waiting for webhook registration to intercept Deployment creation: %v", err)
@@ -579,14 +573,16 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	// 1. Live positive dispatch: configure the real CreateToken-issued bearer.
 	// Creating an apps/v1 Deployment and updating its /scale subresource must both succeed.
 	activeToken.Store(issuedToken.Status.Token)
+	lastWebhookStatus.Store(0)
 	createdDeploy, err := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("verified-deploy"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("create Deployment with valid webhook token failed: %v", err)
 	}
-	if admittedCount.Load() != 1 {
-		t.Fatalf("admittedCount after Deployment create = %d, want 1", admittedCount.Load())
+	if admittedCount.Load() != 1 || lastWebhookStatus.Load() != http.StatusOK {
+		t.Fatalf("Deployment create: admissions=%d status=%d, want 1 and 200", admittedCount.Load(), lastWebhookStatus.Load())
 	}
 
+	lastWebhookStatus.Store(0)
 	_, err = cs.AppsV1().Deployments(ns.Name).UpdateScale(ctx, createdDeploy.Name, &autoscalingv1.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            createdDeploy.Name,
@@ -598,14 +594,15 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update Deployment /scale with valid apps webhook token failed: %v", err)
 	}
-	if admittedCount.Load() != 2 {
-		t.Fatalf("admittedCount after Deployment /scale update = %d, want 2", admittedCount.Load())
+	if admittedCount.Load() != 2 || lastWebhookStatus.Load() != http.StatusOK {
+		t.Fatalf("Deployment scale: admissions=%d status=%d, want 2 and 200", admittedCount.Load(), lastWebhookStatus.Load())
 	}
 
 	// 2. Unauthorized API group with failurePolicy: Ignore:
 	// The token only authorizes "apps", not "batch". Even though the batch webhook
 	// rule uses failurePolicy: Ignore, our handler returns HTTP 200 Allowed:false,
 	// so kube-apiserver must deny the Job creation.
+	lastWebhookStatus.Store(0)
 	_, err = cs.BatchV1().Jobs(ns.Name).Create(ctx, &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "unauthorized-job", Namespace: ns.Name},
 		Spec: batchv1.JobSpec{
@@ -617,8 +614,8 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 			},
 		},
 	}, metav1.CreateOptions{})
-	if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
-		t.Fatalf("create batch/v1 Job with apps-only token: got %v, want explicit webhook token verification failed denial", err)
+	if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") || lastWebhookStatus.Load() != http.StatusOK {
+		t.Fatalf("apps-only token for Job: error=%v status=%d, want HTTP200 admission denial", err, lastWebhookStatus.Load())
 	}
 	if admittedCount.Load() != 2 {
 		t.Fatalf("unauthorized batch/v1 Job must not reach downstream handler, admittedCount=%d", admittedCount.Load())
@@ -635,17 +632,16 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		t.Fatalf("issue ordinary ServiceAccount token: %v", err)
 	}
 	activeToken.Store(ordinarySAToken.Status.Token)
+	lastWebhookStatus.Store(0)
 	_, err = cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("ordinary-sa-token-deploy"), metav1.CreateOptions{})
-	if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
-		t.Fatalf("create Deployment with ordinary SA token: got %v, want webhook token verification failed", err)
+	if err == nil || lastWebhookStatus.Load() != http.StatusUnauthorized {
+		t.Fatalf("ordinary SA token: error=%v status=%d, want HTTP401 blocked by failurePolicy Fail", err, lastWebhookStatus.Load())
 	}
 	if admittedCount.Load() != 2 {
 		t.Fatalf("ordinary SA token must not reach downstream handler, admittedCount=%d", admittedCount.Load())
 	}
 
-	// 4. Forged tokens signed with kube-apiserver's own borrowed ECDSA signing key:
-	// verify that tokens bypassing CreateToken validation (dual bindings, multi-group
-	// attestation, wrong audience, expired) are all rejected with the identical generic message.
+	// Signed tokens must still satisfy binding and attestation policy.
 	now := time.Now()
 	forgedProbes := []struct {
 		name   string
@@ -702,9 +698,10 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	for i, fp := range forgedProbes {
 		t.Run(fp.name, func(t *testing.T) {
 			activeToken.Store(signWithBorrowedKey(fp.claims))
+			lastWebhookStatus.Store(0)
 			_, err := cs.AppsV1().Deployments(ns.Name).Create(ctx, makeDeployment("forged-deploy-"+string(rune('a'+i))), metav1.CreateOptions{})
-			if err == nil || !strings.Contains(err.Error(), "webhook token verification failed") {
-				t.Fatalf("forged probe %q: got %v, want webhook token verification failed", fp.name, err)
+			if err == nil || lastWebhookStatus.Load() != http.StatusUnauthorized {
+				t.Fatalf("forged probe %q: error=%v status=%d, want HTTP401 rejection", fp.name, err, lastWebhookStatus.Load())
 			}
 			if admittedCount.Load() != 2 {
 				t.Fatalf("forged probe %q reached downstream handler", fp.name)

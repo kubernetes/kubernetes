@@ -16,28 +16,28 @@ limitations under the License.
 
 package admission
 
-import "k8s.io/component-helpers/auth/admission/internal/verify"
+import (
+	"context"
 
-// NewHandlerForTest lets black-box tests use a real core verifier while the
-// HTTP adapter is exercised without rebuilding its OIDC discovery fixture.
-func NewHandlerForTest(v *verify.Verifier, next AdmissionHandler, opts ...Option) *Handler {
-	b := newBuilder()
+	"k8s.io/client-go/rest"
+)
+
+func NewHandlerForTest(v *Verifier, next AdmissionHandler, opts ...func(*Handler)) *Handler {
+	h := newHandler(v, next, defaultMaxBodyBytes)
 	for _, opt := range opts {
-		opt(b)
+		opt(h)
 	}
-	return newHandler(v, next, b.maxBody)
+	return h
 }
 
-// NewVerifierForTest exposes the internal Verifier wrapper so tests can exercise
-// [Verifier.Verify] against an already-built verify.Verifier without going
-// through NewVerifier (which constructs its own verifier via OIDC discovery).
-func NewVerifierForTest(v *verify.Verifier) *Verifier {
-	return &Verifier{verifier: v}
+func NewLocalVerifierForTest(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+	return newLocalVerifier(ctx, config, audience)
 }
 
-// WithInClusterEndpointForTest redirects in-cluster issuer discovery and JWKS
-// calls to a TLS test server without bypassing audience or signature checks.
-var WithInClusterEndpointForTest = withInClusterEndpoint
-
-// WithMaxBodyBytesForTest tests the fixed production body limit with small inputs.
-var WithMaxBodyBytesForTest = withMaxBodyBytes
+func WithMaxBodyBytesForTest(n int64) func(*Handler) {
+	return func(h *Handler) {
+		if n > 0 {
+			h.maxBody = n
+		}
+	}
+}
