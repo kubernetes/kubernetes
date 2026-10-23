@@ -400,6 +400,7 @@ func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration,
 		routes.Profiling{}.Install(pathRecorderMux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
+			goruntime.SetMutexProfileFraction(1)
 		}
 		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}

@@ -70709,7 +70709,7 @@ func schema_k8sio_component_base_config_v1alpha1_DebuggingConfiguration(ref comm
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block and mutex profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -73979,7 +73979,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block and mutex profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
