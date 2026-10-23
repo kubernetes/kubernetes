@@ -5809,8 +5809,8 @@
     endpoint: /metrics
 - name: request_processing_duration_seconds
   subsystem: resourcepoolstatusrequest_controller
-  help: Time from the first processing attempt of a ResourcePoolStatusRequest until
-    its status is written, including retries
+  help: Time from the creation of a ResourcePoolStatusRequest until its status is
+    written
   type: Histogram
   stabilityLevel: ALPHA
   labels:

@@ -34,15 +34,15 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
 )
 
-// failingSliceLister makes calculatePoolStatus take its CalculationFailed path.
+// failingSliceLister forces the CalculationFailed path.
 type failingSliceLister struct{}
 
 func (failingSliceLister) List(labels.Selector) ([]*resourcev1.ResourceSlice, error) {
@@ -55,65 +55,58 @@ func (failingSliceLister) Get(string) (*resourcev1.ResourceSlice, error) {
 
 var _ resourcev1listers.ResourceSliceLister = failingSliceLister{}
 
-// TestSyncRequestObservability asserts which metrics and events each sync
-// outcome produces, so that no path is silent.
+// TestSyncRequestObservability checks the metrics and events of each sync outcome.
 func TestSyncRequestObservability(t *testing.T) {
+	conflict := apierrors.NewConflict(schema.GroupResource{Resource: "resourcepoolstatusrequests"}, "test-request", errors.New("modified"))
 	testCases := map[string]struct {
-		slice             *resourcev1.ResourceSlice
-		retriesExhausted  bool
-		updateStatusErr   error
-		failListing       bool
-		wantErr           error // nil, errIncompletePool, or errAny
-		wantProcessed     float64
-		wantErrors        float64
-		wantIncomplete    float64
-		wantDurationCount uint64
-		wantEventReason   string
-		// firstAttemptAgo pretends earlier attempts started this long ago.
-		firstAttemptAgo    time.Duration
-		wantFirstAttemptOK bool // entry kept for a later retry
+		slice           *resourcev1.ResourceSlice
+		age             time.Duration // since creation
+		updateStatusErr error
+		failListing     bool
+		wantErr         error // nil, errIncompletePool, or errAny
+		wantProcessed   float64
+		wantErrors      float64
+		wantIncomplete  float64
+		wantDurations   uint64
+		wantEventReason string
 	}{
 		"complete pool": {
-			slice:             makeSlice("slice-1", "complete.example.com", "pool-1", "node-1", 4),
-			wantProcessed:     1,
-			wantDurationCount: 1,
+			slice:         makeSlice("slice-1", "complete.example.com", "pool-1", "node-1", 4),
+			wantProcessed: 1,
+			wantDurations: 1,
 		},
-		"incomplete pool with retries left is requeued silently": {
-			slice:              makeSliceWithExpectedCount("slice-1", "requeue.example.com", "pool-1", "node-1", 4, 1, 3),
-			wantErr:            errIncompletePool,
-			wantFirstAttemptOK: true,
+		"incomplete pool within the wait window is requeued silently": {
+			slice:   makeSliceWithExpectedCount("slice-1", "requeue.example.com", "pool-1", "node-1", 4, 1, 3),
+			wantErr: errIncompletePool,
 		},
-		"incomplete pool after retries is written and reported": {
-			slice:             makeSliceWithExpectedCount("slice-1", "giveup.example.com", "pool-1", "node-1", 4, 1, 3),
-			retriesExhausted:  true,
-			firstAttemptAgo:   20 * time.Second,
-			wantProcessed:     1,
-			wantIncomplete:    1,
-			wantDurationCount: 1,
-			wantEventReason:   eventReasonPoolIncomplete,
+		"incomplete pool after the wait window is written and reported": {
+			slice:           makeSliceWithExpectedCount("slice-1", "giveup.example.com", "pool-1", "node-1", 4, 1, 3),
+			age:             20 * time.Second,
+			wantProcessed:   1,
+			wantIncomplete:  1,
+			wantDurations:   1,
+			wantEventReason: eventReasonPoolIncomplete,
 		},
-		// A concurrent modification is retried quietly, not counted as an error.
+		// Retried quietly, not an error.
 		"status update conflict": {
-			slice:              makeSlice("slice-1", "conflict.example.com", "pool-1", "node-1", 4),
-			updateStatusErr:    apierrors.NewConflict(schema.GroupResource{Resource: "resourcepoolstatusrequests"}, "test-request", errors.New("modified")),
-			wantErr:            errStatusConflict,
-			wantFirstAttemptOK: true,
+			slice:           makeSlice("slice-1", "conflict.example.com", "pool-1", "node-1", 4),
+			updateStatusErr: conflict,
+			wantErr:         errStatusConflict,
 		},
 		"status update failure": {
-			slice:              makeSlice("slice-1", "updatefail.example.com", "pool-1", "node-1", 4),
-			updateStatusErr:    errors.New("injected update failure"),
-			wantErr:            errAny,
-			wantProcessed:      1,
-			wantErrors:         1,
-			wantFirstAttemptOK: true,
+			slice:           makeSlice("slice-1", "updatefail.example.com", "pool-1", "node-1", 4),
+			updateStatusErr: errors.New("injected update failure"),
+			wantErr:         errAny,
+			wantProcessed:   1,
+			wantErrors:      1,
 		},
 		"calculation failure": {
-			slice:             makeSlice("slice-1", "listfail.example.com", "pool-1", "node-1", 4),
-			failListing:       true,
-			wantProcessed:     1,
-			wantErrors:        1,
-			wantDurationCount: 1,
-			wantEventReason:   eventReasonCalculationFailed,
+			slice:           makeSlice("slice-1", "listfail.example.com", "pool-1", "node-1", 4),
+			failListing:     true,
+			wantProcessed:   1,
+			wantErrors:      1,
+			wantDurations:   1,
+			wantEventReason: eventReasonCalculationFailed,
 		},
 	}
 
@@ -122,6 +115,7 @@ func TestSyncRequestObservability(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			driver := tc.slice.Spec.Driver
 			request := makeRequest(driver)
+			request.CreationTimestamp = metav1.NewTime(time.Now().Add(-tc.age))
 
 			fakeClient := fake.NewClientset(request)
 			if tc.updateStatusErr != nil {
@@ -129,45 +123,19 @@ func TestSyncRequestObservability(t *testing.T) {
 					return action.GetSubresource() == "status", nil, tc.updateStatusErr
 				})
 			}
-			informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-			controller, err := NewController(ctx, fakeClient,
-				informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
-				informerFactory.Resource().V1().ResourceSlices(),
-				informerFactory.Resource().V1().ResourceClaims(),
-				informerFactory.Resource().V1().DeviceTaintRules(),
-			)
-			if err != nil {
-				t.Fatalf("Failed to create controller: %v", err)
-			}
+			controller, informerFactory := newObservabilityController(t, ctx, fakeClient)
 			recorder := record.NewFakeRecorder(10)
 			controller.recorder = recorder
-			if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
-				t.Fatalf("Failed to add request to informer: %v", err)
-			}
-			if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(tc.slice); err != nil {
-				t.Fatalf("Failed to add slice to informer: %v", err)
-			}
+			addToStore(t, informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore(), request)
+			addToStore(t, informerFactory.Resource().V1().ResourceSlices().Informer().GetStore(), tc.slice)
 			if tc.failListing {
 				controller.sliceLister = failingSliceLister{}
 			}
-			if tc.retriesExhausted {
-				controller.workqueue.ShutDown()
-				controller.workqueue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 0))
-				for range maxRetries {
-					controller.workqueue.AddRateLimited(request.Name)
-					key, _ := controller.workqueue.Get()
-					controller.workqueue.Done(key)
-				}
-			}
 
-			if tc.firstAttemptAgo > 0 {
-				controller.firstAttempt[request.Name] = time.Now().Add(-tc.firstAttemptAgo)
-			}
 			durationSum, err := testutil.GetHistogramMetricValue(metrics.RequestProcessingDuration.WithLabelValues(driver))
 			if err != nil {
 				t.Fatalf("read histogram: %v", err)
 			}
-
 			processed := counterDelta(t, metrics.RequestsProcessed.WithLabelValues(driver))
 			errs := counterDelta(t, metrics.RequestProcessingErrors.WithLabelValues(driver))
 			incomplete := counterDelta(t, metrics.IncompleteRequests.WithLabelValues(driver))
@@ -194,17 +162,17 @@ func TestSyncRequestObservability(t *testing.T) {
 			if got := incomplete(); got != tc.wantIncomplete {
 				t.Errorf("incomplete_requests_total delta = %v, want %v", got, tc.wantIncomplete)
 			}
-			if got := durations(); got != tc.wantDurationCount {
-				t.Errorf("request_processing_duration_seconds count delta = %v, want %v", got, tc.wantDurationCount)
+			if got := durations(); got != tc.wantDurations {
+				t.Errorf("request_processing_duration_seconds count delta = %v, want %v", got, tc.wantDurations)
 			}
-
-			if tc.firstAttemptAgo > 0 {
+			// The duration is measured from creation.
+			if tc.age > 0 && tc.wantDurations > 0 {
 				after, err := testutil.GetHistogramMetricValue(metrics.RequestProcessingDuration.WithLabelValues(driver))
 				if err != nil {
 					t.Fatalf("read histogram: %v", err)
 				}
-				if got := after - durationSum; got < tc.firstAttemptAgo.Seconds() {
-					t.Errorf("Observed duration %vs, want at least %v since the first attempt", got, tc.firstAttemptAgo)
+				if got := after - durationSum; got < tc.age.Seconds() {
+					t.Errorf("Observed duration %vs, want at least %v since creation", got, tc.age)
 				}
 			}
 
@@ -218,23 +186,20 @@ func TestSyncRequestObservability(t *testing.T) {
 			case tc.wantEventReason != "" && (len(events) != 1 || !strings.HasPrefix(events[0], "Warning "+tc.wantEventReason+" ")):
 				t.Errorf("Expected one Warning %s event, got %v", tc.wantEventReason, events)
 			}
-
-			if _, ok := controller.firstAttempt[request.Name]; ok != tc.wantFirstAttemptOK {
-				t.Errorf("firstAttempt entry present = %v, want %v", ok, tc.wantFirstAttemptOK)
-			}
 		})
 	}
 }
 
-// A conflict on the final attempt for an incomplete pool must not drop the
-// request: the retry does not count against maxRetries.
-func TestConflictDoesNotUseRetryBudget(t *testing.T) {
+// Incomplete-pool requeues must not use the retry budget, so a conflict on the
+// final write is still retried instead of dropping the request.
+func TestIncompleteRequeueDoesNotUseRetryBudget(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	slice := makeSliceWithExpectedCount("slice-1", "conflict-giveup.example.com", "pool-1", "node-1", 4, 1, 3)
+	slice := makeSliceWithExpectedCount("slice-1", "budget.example.com", "pool-1", "node-1", 4, 1, 3)
 	request := makeRequest(slice.Spec.Driver)
+	request.CreationTimestamp = metav1.Now()
 
 	fakeClient := fake.NewClientset(request)
-	conflicts := 1
+	conflicts := maxRetries
 	fakeClient.PrependReactor("update", "resourcepoolstatusrequests", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		if action.GetSubresource() != "status" || conflicts == 0 {
 			return false, nil, nil
@@ -242,8 +207,62 @@ func TestConflictDoesNotUseRetryBudget(t *testing.T) {
 		conflicts--
 		return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "resourcepoolstatusrequests"}, request.Name, errors.New("modified"))
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-	controller, err := NewController(ctx, fakeClient,
+	controller, informerFactory := newObservabilityController(t, ctx, fakeClient)
+	defer controller.workqueue.ShutDown()
+	requests := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore()
+	addToStore(t, requests, request)
+	addToStore(t, informerFactory.Resource().V1().ResourceSlices().Informer().GetStore(), slice)
+
+	controller.workqueue.Add(request.Name)
+	controller.processNextWorkItem(ctx)
+	if got := controller.workqueue.NumRequeues(request.Name); got != 0 {
+		t.Fatalf("NumRequeues = %d after an incomplete-pool requeue, want 0", got)
+	}
+
+	// Past the window, maxRetries conflicts in a row are still retried.
+	request.CreationTimestamp = metav1.NewTime(time.Now().Add(-incompleteWaitWindow))
+	if err := requests.Update(request); err != nil {
+		t.Fatalf("Failed to update request in informer: %v", err)
+	}
+	for range maxRetries + 1 {
+		// A dropped key would block the next Get forever.
+		if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+			return controller.workqueue.Len() > 0, nil
+		}); err != nil {
+			t.Fatal("Request was dropped instead of being retried")
+		}
+		controller.processNextWorkItem(ctx)
+	}
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("Expected the partial status to be written after the conflicts, got none")
+	}
+}
+
+// A request recreated with the same name must not inherit the retry count.
+func TestDeleteForgetsRetries(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	request := makeRequest("forget.example.com")
+	fakeClient := fake.NewClientset()
+	controller, _ := newObservabilityController(t, ctx, fakeClient)
+	defer controller.workqueue.ShutDown()
+
+	for range 3 {
+		controller.workqueue.AddRateLimited(request.Name)
+	}
+	controller.forgetRequest(cache.DeletedFinalStateUnknown{Key: request.Name, Obj: request})
+	if got := controller.workqueue.NumRequeues(request.Name); got != 0 {
+		t.Errorf("NumRequeues = %d after delete, want 0", got)
+	}
+}
+
+func newObservabilityController(t *testing.T, ctx context.Context, client *fake.Clientset) (*Controller, informers.SharedInformerFactory) {
+	t.Helper()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	controller, err := NewController(ctx, client,
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
@@ -252,40 +271,13 @@ func TestConflictDoesNotUseRetryBudget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
 	}
-	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
-		t.Fatalf("Failed to add request to informer: %v", err)
-	}
-	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice); err != nil {
-		t.Fatalf("Failed to add slice to informer: %v", err)
-	}
-	controller.workqueue.ShutDown()
-	controller.workqueue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 0))
-	defer controller.workqueue.ShutDown()
-	for range maxRetries {
-		controller.workqueue.AddRateLimited(request.Name)
-		key, _ := controller.workqueue.Get()
-		controller.workqueue.Done(key)
-	}
+	return controller, informerFactory
+}
 
-	// The give-up attempt conflicts, the retry writes the partial status.
-	controller.workqueue.Add(request.Name)
-	controller.processNextWorkItem(ctx)
-	// Checked before the next Get, which would block forever on a dropped key.
-	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
-		return controller.workqueue.Len() > 0, nil
-	}); err != nil {
-		t.Fatal("Request was dropped after the conflict instead of being retried")
-	}
-	controller.processNextWorkItem(ctx)
-	if got := controller.workqueue.NumRequeues(request.Name); got != 0 {
-		t.Errorf("NumRequeues = %d after the status was written, want 0 (forgotten)", got)
-	}
-	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get request: %v", err)
-	}
-	if updated.Status == nil {
-		t.Fatal("Expected the partial status to be written after the conflict, got none")
+func addToStore(t *testing.T, store cache.Store, obj interface{}) {
+	t.Helper()
+	if err := store.Add(obj); err != nil {
+		t.Fatalf("Failed to add %T to informer: %v", obj, err)
 	}
 }
 

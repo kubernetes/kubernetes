@@ -69,7 +69,7 @@ func TestRequestProcessingDuration(t *testing.T) {
 
 	// Use gatherWithoutDurations to strip timing-dependent histogram fields
 	// (SampleSum and Bucket), verifying only _count lines.
-	want := `# HELP resourcepoolstatusrequest_controller_request_processing_duration_seconds [ALPHA] Time from the first processing attempt of a ResourcePoolStatusRequest until its status is written, including retries
+	want := `# HELP resourcepoolstatusrequest_controller_request_processing_duration_seconds [ALPHA] Time from the creation of a ResourcePoolStatusRequest until its status is written
 # TYPE resourcepoolstatusrequest_controller_request_processing_duration_seconds histogram
 resourcepoolstatusrequest_controller_request_processing_duration_seconds_count{driver_name="driver-a.example.com"} 1
 resourcepoolstatusrequest_controller_request_processing_duration_seconds_count{driver_name="driver-b.example.com"} 1
@@ -79,7 +79,7 @@ resourcepoolstatusrequest_controller_request_processing_duration_seconds_count{d
 	}
 }
 
-// The completion SLO is 30s, so the histogram needs a bucket boundary there.
+// The 30s SLO needs a bucket boundary.
 func TestRequestProcessingDurationSLOBucket(t *testing.T) {
 	registry := metrics.NewKubeRegistry()
 	defer registry.Reset()

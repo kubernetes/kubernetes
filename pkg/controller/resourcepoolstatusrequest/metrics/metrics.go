@@ -52,8 +52,7 @@ var (
 		[]string{"driver_name"},
 	)
 
-	// IncompleteRequests tracks requests whose status was written while at
-	// least one pool was still incomplete, after retries were exhausted.
+	// IncompleteRequests counts requests completed with incomplete pools.
 	IncompleteRequests = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      Subsystem,
@@ -64,14 +63,13 @@ var (
 		[]string{"driver_name"},
 	)
 
-	// RequestProcessingDuration tracks the time from the first sync attempt of
-	// a request until its status is written, including requeues. The 30s and
-	// 60s buckets make the 30s completion SLO measurable.
+	// RequestProcessingDuration covers request creation to status write. The
+	// 30s bucket matches the SLO.
 	RequestProcessingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      Subsystem,
 			Name:           "request_processing_duration_seconds",
-			Help:           "Time from the first processing attempt of a ResourcePoolStatusRequest until its status is written, including retries",
+			Help:           "Time from the creation of a ResourcePoolStatusRequest until its status is written",
 			Buckets:        []float64{0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, 30, 60},
 			StabilityLevel: metrics.ALPHA,
 		},

@@ -17,22 +17,26 @@ limitations under the License.
 package resourcepoolstatusrequest
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
@@ -518,7 +522,7 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	request := &resourcev1alpha3.ResourcePoolStatusRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request", CreationTimestamp: metav1.Now()},
 		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
 			Driver: "test.example.com",
 		},
@@ -550,11 +554,11 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		t.Fatalf("Failed to add slice to informer: %v", err)
 	}
 
-	// While retries remain, syncRequest returns an error so the request is
-	// requeued and the driver has time to publish the remaining slices.
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to return error for incomplete pool requeue, got nil")
+	// Requeued within the wait window, however often it is synced (e.g. label updates).
+	for range 2 * maxRetries {
+		if err := controller.syncRequest(ctx, "test-request"); !errors.Is(err, errIncompletePool) {
+			t.Fatalf("Expected errIncompletePool within the wait window, got %v", err)
+		}
 	}
 
 	// Verify no status update was made
@@ -564,19 +568,13 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		}
 	}
 
-	// Once retries are exhausted the partial status is written, so the request
-	// reaches a terminal state and PoolIncomplete is visible to the user.
-	// A zero-delay limiter counts the retries without waiting out the backoff.
-	controller.workqueue.ShutDown()
-	controller.workqueue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 0))
-	for range maxRetries {
-		controller.workqueue.AddRateLimited("test-request")
-		key, _ := controller.workqueue.Get()
-		controller.workqueue.Done(key)
+	// Partial status once the window has passed.
+	request.CreationTimestamp = metav1.NewTime(time.Now().Add(-incompleteWaitWindow))
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Update(request); err != nil {
+		t.Fatalf("Failed to update request in informer: %v", err)
 	}
-
 	if err := controller.syncRequest(ctx, "test-request"); err != nil {
-		t.Fatalf("Expected partial status to be written after retries exhausted, got error: %v", err)
+		t.Fatalf("Expected partial status to be written after the wait window, got error: %v", err)
 	}
 
 	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, "test-request", metav1.GetOptions{})
@@ -584,7 +582,7 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		t.Fatalf("Failed to get request: %v", err)
 	}
 	if updated.Status == nil {
-		t.Fatal("Expected status to be written after retries exhausted, got nil")
+		t.Fatal("Expected status to be written after the wait window, got nil")
 	}
 	pool := requireSinglePool(t, *updated.Status)
 	if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, prefixPoolIncomplete) {
@@ -661,7 +659,7 @@ func TestSyncRequestWritesStructuralViewError(t *testing.T) {
 	if !strings.HasPrefix(*ve, prefixPartitionTypeMissing) {
 		t.Errorf("Expected validationError with prefix %q, got %q", prefixPartitionTypeMissing, *ve)
 	}
-	// A structural error is not incompleteness; the message must not say so.
+	// Not reported as incomplete.
 	cond := apimeta.FindStatusCondition(updated.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete)
 	if cond == nil {
 		t.Fatalf("Expected Complete condition, got %+v", updated.Status.Conditions)
@@ -916,8 +914,18 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			},
 			wantTotal: 4, wantAllocated: 1, wantAvailable: 3,
 		},
-		// The claim outlives the device: the driver republished the pool
-		// without it. Counting the claim would push the tallies past total.
+		// A name published twice in one pool is one device.
+		"duplicate device name counts once": {
+			slices: []*resourcev1.ResourceSlice{
+				makeSliceWithExpectedCount("slice-1", driver, "pool-1", "node-1", 1, 1, 2),
+				makeSliceWithExpectedCount("slice-2", driver, "pool-1", "node-1", 1, 1, 2),
+			},
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 2, wantAllocated: 1, wantAvailable: 1,
+		},
+		// The claim outlives the device.
 		"allocation of unpublished device is ignored": {
 			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
 			claims: []*resourcev1.ResourceClaim{
@@ -956,9 +964,7 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			rules:     []*resourcev1.DeviceTaintRule{taintRule},
 			wantTotal: 4, wantAvailable: 3, wantUnavailable: 1,
 		},
-		// A taint applied after allocation does not evict (NoSchedule), so the
-		// device is both allocated and tainted. It must count only as allocated,
-		// keeping total = allocated + unavailable + available.
+		// NoSchedule taint added after allocation.
 		"tainted allocated device counts as allocated only": {
 			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
 			claims: []*resourcev1.ResourceClaim{
@@ -982,8 +988,7 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			rules:     []*resourcev1.DeviceTaintRule{taintRule},
 			wantTotal: 4, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 0,
 		},
-		// AdminAccess is not an allocation, so a tainted device with only an
-		// AdminAccess claim stays unavailable.
+		// AdminAccess is not an allocation.
 		"tainted device with adminAccess claim stays unavailable": {
 			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
 			claims: []*resourcev1.ResourceClaim{
@@ -1278,6 +1283,54 @@ func TestCleanupExpiredRequests(t *testing.T) {
 	}
 }
 
+// The TTL sweep waits for cleanupLimiter between deletes.
+func TestCleanupExpiredRequestsIsPaced(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	var objects []runtime.Object
+	for i := range 5 {
+		objects = append(objects, &resourcev1alpha3.ResourcePoolStatusRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              fmt.Sprintf("expired-%d", i),
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-25 * time.Hour)),
+			},
+			Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: "test.example.com"},
+		})
+	}
+	fakeClient := fake.NewClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+	for _, obj := range objects {
+		if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(obj); err != nil {
+			t.Fatalf("Failed to add request to informer: %v", err)
+		}
+	}
+
+	// Burst of 2, then a wait longer than the deadline.
+	controller.cleanupLimiter = rate.NewLimiter(rate.Every(time.Hour), 2)
+	sweepCtx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	controller.cleanupExpiredRequests(sweepCtx)
+
+	var deletes int
+	for _, action := range fakeClient.Actions() {
+		if action.GetVerb() == "delete" {
+			deletes++
+		}
+	}
+	if deletes != 2 {
+		t.Errorf("Got %d deletes, want 2: the sweep must wait for cleanupLimiter between deletes", deletes)
+	}
+}
+
 func makeSliceWithoutNode(name, driver, pool string, deviceCount int) *resourcev1.ResourceSlice {
 	devices := make([]resourcev1.Device, deviceCount)
 	for i := range deviceCount {
@@ -1393,14 +1446,13 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 			requestAttr: ptr.To(profileAttr),
 			want:        map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
-		// Allocating the Full partition uses up the shared counter, so nothing
-		// else fits.
+		// Full uses up the shared counter.
 		"allocated partition consumes the shared counter": {
 			declarePoolAttr: true,
 			claims:          []*resourcev1.ResourceClaim{makeAllocatedClaim("c0", "ns", driver, "pool-0", "full-0")},
 			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 0}, key(profileAttr, "Half"): {2, 0}},
 		},
-		// AdminAccess is not an allocation: it must not consume counters.
+		// AdminAccess does not consume counters.
 		"adminAccess claim does not consume the shared counter": {
 			declarePoolAttr: true,
 			claims:          []*resourcev1.ResourceClaim{makeAdminAccessClaim("admin-0", "ns", driver, "pool-0", "full-0")},
@@ -1473,8 +1525,7 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			wantPartially: 1,
 			want:          map[string][3]string{"memory": {"40Gi", "10Gi", "30Gi"}},
 		},
-		// AdminAccess is not an allocation: the device stays fully available
-		// and its consumed capacity is not counted.
+		// AdminAccess does not consume capacity.
 		"adminAccess claim is not counted": {
 			capacity:    map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{"memory": {Value: qty("40Gi")}},
 			consumed:    map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
@@ -1526,19 +1577,5 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 				t.Errorf("capacity {total,consumed,available} = %v, want %v", got, tc.want)
 			}
 		})
-	}
-}
-
-// Incomplete pools are retried maxRetries times before the partial status is
-// written. The total wait must give a driver time to finish publishing, yet
-// stay within the 30s completion SLO.
-func TestRateLimiterRetryWindow(t *testing.T) {
-	limiter := newRateLimiter()
-	var total time.Duration
-	for range maxRetries {
-		total += limiter.When("request")
-	}
-	if want := 15500 * time.Millisecond; total != want {
-		t.Errorf("Total backoff over %d retries = %v, want %v", maxRetries, total, want)
 	}
 }
