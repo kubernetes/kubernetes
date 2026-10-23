@@ -18,6 +18,7 @@ limitations under the License.
 package admission // import "k8s.io/component-helpers/auth/admission"
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -346,73 +348,150 @@ func (h *Handler) decodeReview(r *http.Request) (*admissionv1.AdmissionReview, e
 	return review, nil
 }
 
-// checkObjectGroup binds the objects to the admitted Kind, allowing only known
-// subresources to carry an object outside the attested resource group.
-func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
+func checkRequestObjectKinds(req *admissionv1.AdmissionRequest) (bool, bool, error) {
 	if req == nil {
-		return errors.New("admission request is nil")
+		return false, false, errors.New("admission request is nil")
 	}
-	group, version, kind := req.Resource.Group, "", ""
-	kindSpecified := req.Kind.Group != "" || req.Kind.Version != "" || req.Kind.Kind != ""
-	if req.SubResource != "" && !kindSpecified {
-		return errors.New("subresource admission request has no kind")
+	if kindOrResourceIncomplete(req) {
+		return false, false, errors.New("admission request kind or resource is incomplete")
 	}
-	if kindSpecified {
-		if req.Kind.Version == "" || req.Kind.Kind == "" {
-			return errors.New("admission request kind is incomplete")
+	if req.Kind.Group != req.Resource.Group && !allowedKindResourceGroupMismatch(req) {
+		return false, false, fmt.Errorf("object kind group %q differs from authorized resource group %q", req.Kind.Group, req.Resource.Group)
+	}
+	objectPresent, err := checkObjectMatchesAdmittedKind("object", req.Object, req.Kind.Group, req.Kind.Version, req.Kind.Kind)
+	if err != nil {
+		return false, false, err
+	}
+	oldObjectPresent, err := checkObjectMatchesAdmittedKind("oldObject", req.OldObject, req.Kind.Group, req.Kind.Version, req.Kind.Kind)
+	if err != nil {
+		return false, false, err
+	}
+	return objectPresent, oldObjectPresent, nil
+}
+
+func checkOperationObjectPresence(operation admissionv1.Operation, objectPresent, oldObjectPresent bool) error {
+	switch operation {
+	case admissionv1.Create:
+		if !objectPresent || oldObjectPresent {
+			return fmt.Errorf("CREATE requires object and no oldObject (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
 		}
-		if req.Kind.Group != req.Resource.Group {
-			switch {
-			case req.SubResource == "scale" && req.Kind.Group == "autoscaling" && req.Kind.Version == "v1" && req.Kind.Kind == "Scale":
-			case req.Resource.Group == "" && req.Resource.Resource == "pods" && req.SubResource == "eviction" && req.Kind.Group == "policy" && req.Kind.Version == "v1" && req.Kind.Kind == "Eviction":
-			case req.Resource.Group == "" && req.Resource.Resource == "serviceaccounts" && req.SubResource == "token" && req.Kind.Group == "authentication.k8s.io" && req.Kind.Version == "v1" && req.Kind.Kind == "TokenRequest":
-			default:
-				return fmt.Errorf("object kind group %q differs from authorized resource group %q", req.Kind.Group, req.Resource.Group)
+	case admissionv1.Update:
+		if !objectPresent || !oldObjectPresent {
+			return fmt.Errorf("UPDATE requires object and oldObject (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
+		}
+	case admissionv1.Delete:
+		if objectPresent || !oldObjectPresent {
+			return fmt.Errorf("DELETE requires oldObject and no object (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
+		}
+	case admissionv1.Connect:
+		if oldObjectPresent {
+			return fmt.Errorf("CONNECT must not carry oldObject (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
+		}
+	default:
+		return fmt.Errorf("unsupported admission operation %q", operation)
+	}
+	return nil
+}
+
+func kindOrResourceIncomplete(req *admissionv1.AdmissionRequest) bool {
+	return req.Kind.Version == "" || req.Kind.Kind == "" || req.Resource.Version == "" || req.Resource.Resource == ""
+}
+
+// Tokens attest the parent resource group; these subresources have cross-group kinds.
+func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest) bool {
+	switch {
+	case req.SubResource == "scale" && req.Kind.Group == "autoscaling" && req.Kind.Version == "v1" && req.Kind.Kind == "Scale":
+	case req.Resource.Group == "" && req.Resource.Resource == "pods" && req.SubResource == "eviction" && req.Kind.Group == "policy" && req.Kind.Version == "v1" && req.Kind.Kind == "Eviction":
+	case req.Resource.Group == "" && req.Resource.Resource == "serviceaccounts" && req.SubResource == "token" && req.Kind.Group == "authentication.k8s.io" && req.Kind.Version == "v1" && req.Kind.Kind == "TokenRequest":
+	default:
+		return false
+	}
+	return true
+}
+
+// checkObjectMatchesAdmittedKind validates both RawExtension representations against the admitted GVK.
+func checkObjectMatchesAdmittedKind(name string, extension runtime.RawExtension, group, version, kind string) (bool, error) {
+	rawPresent, err := checkRawObjectMatchesAdmittedKind(name, extension.Raw, group, version, kind)
+	if err != nil {
+		return false, err
+	}
+	objectPresent, err := checkRuntimeObjectMatchesAdmittedKind(name, extension.Object, group, version, kind)
+	if err != nil {
+		return false, err
+	}
+	// Raw marshaling and runtime conversion prefer different representations.
+	if extension.Raw != nil && extension.Object != nil && rawPresent != objectPresent {
+		return false, fmt.Errorf("%s representations disagree about object presence", name)
+	}
+	return rawPresent || objectPresent, nil
+}
+
+// checkRuntimeObjectMatchesAdmittedKind reads in-memory GVK without marshaling object contents.
+func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, group, version, kind string) (bool, error) {
+	if object == nil {
+		return false, nil
+	}
+	value := reflect.ValueOf(object)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		if value.IsNil() {
+			return false, nil
+		}
+	}
+	if unknown, ok := object.(*runtime.Unknown); ok {
+		// Unknown serializes Raw, not its TypeMeta.
+		if unknown.ContentEncoding != "" || (unknown.ContentType != "" && unknown.ContentType != runtime.ContentTypeJSON) {
+			return false, fmt.Errorf("%s has unsupported content encoding or type", name)
+		}
+		present, err := checkRawObjectMatchesAdmittedKind(name, unknown.Raw, group, version, kind)
+		if err != nil {
+			return false, err
+		}
+		if unknown.APIVersion != "" || unknown.Kind != "" {
+			if !present {
+				return false, fmt.Errorf("%s has type metadata without an object", name)
+			}
+			if err := checkGVKMatchesAdmittedKind(name, unknown.GroupVersionKind(), group, version, kind); err != nil {
+				return false, err
 			}
 		}
-		group, version, kind = req.Kind.Group, req.Kind.Version, req.Kind.Kind
+		return present, nil
 	}
-	if err := checkExtensionObjectGroup("object", req.Object, group, version, kind); err != nil {
-		return err
+	objectKind := object.GetObjectKind()
+	if objectKind == nil {
+		return false, fmt.Errorf("%s has no kind", name)
 	}
-	return checkExtensionObjectGroup("oldObject", req.OldObject, group, version, kind)
+	if err := checkGVKMatchesAdmittedKind(name, objectKind.GroupVersionKind(), group, version, kind); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-func checkExtensionObjectGroup(name string, extension runtime.RawExtension, group, version, kind string) error {
-	raw := extension.Raw
-	if len(raw) == 0 && extension.Object != nil {
-		var err error
-		raw, err = json.Marshal(extension.Object)
-		if err != nil {
-			return fmt.Errorf("%s is undecodable: %w", name, err)
-		}
-	}
-	return checkRawObjectGroup(name, raw, group, version, kind)
-}
-
-func checkRawObjectGroup(name string, raw []byte, group, version, kind string) error {
-	if len(raw) == 0 {
-		return nil
+// checkRawObjectMatchesAdmittedKind reads JSON TypeMeta; empty or null data is absent.
+func checkRawObjectMatchesAdmittedKind(name string, raw []byte, group, version, kind string) (bool, error) {
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return false, nil
 	}
 	var tm metav1.TypeMeta
 	if err := json.Unmarshal(raw, &tm); err != nil {
-		return fmt.Errorf("%s is undecodable: %w", name, err)
-	}
-	if tm.APIVersion == "" || tm.Kind == "" {
-		return fmt.Errorf("%s has no apiVersion or kind", name)
+		return false, fmt.Errorf("%s is undecodable: %w", name, err)
 	}
 	gv, err := schema.ParseGroupVersion(tm.APIVersion)
 	if err != nil {
-		return fmt.Errorf("%s apiVersion %q is invalid: %w", name, tm.APIVersion, err)
+		return false, fmt.Errorf("%s apiVersion %q is invalid: %w", name, tm.APIVersion, err)
 	}
-	if gv.Version == "" {
-		return fmt.Errorf("%s apiVersion %q is missing a version", name, tm.APIVersion)
+	if err := checkGVKMatchesAdmittedKind(name, gv.WithKind(tm.Kind), group, version, kind); err != nil {
+		return false, err
 	}
-	if gv.Group != group {
-		return fmt.Errorf("%s group %q differs from admitted kind group %q", name, gv.Group, group)
+	return true, nil
+}
+
+func checkGVKMatchesAdmittedKind(name string, gvk schema.GroupVersionKind, group, version, kind string) error {
+	if gvk.Version == "" || gvk.Kind == "" {
+		return fmt.Errorf("%s has no apiVersion or kind", name)
 	}
-	if (version != "" && gv.Version != version) || (kind != "" && tm.Kind != kind) {
-		return fmt.Errorf("%s GVK %s %q differs from the admitted kind", name, gv.String(), tm.Kind)
+	if gvk.Group != group || gvk.Version != version || gvk.Kind != kind {
+		return fmt.Errorf("%s GVK %s differs from the admitted kind", name, gvk.String())
 	}
 	return nil
 }
@@ -435,7 +514,7 @@ func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
 	return b.buildVerifier(ctx)
 }
 
-// Verify authenticates token and checks the request's API group and object kinds.
+// Verify authenticates token and checks the request's API group, operation and object kinds.
 // Any denial, including a nil request, returns the same generic error.
 func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
@@ -473,8 +552,14 @@ func (v *Verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token admissionReviewAPIGroups does not authorize the review's API group")
 		return errVerificationFailed
 	}
-	if err := checkObjectGroup(req); err != nil {
-		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "admitted object does not match AdmissionReview kind", "detail", err.Error())
+	objectPresent, oldObjectPresent, err := checkRequestObjectKinds(req)
+	if err == nil {
+		err = checkOperationObjectPresence(req.Operation, objectPresent, oldObjectPresent)
+	}
+	if err != nil {
+		klog.FromContext(ctx).V(2).Info("Admission request rejected", "reason", "invalid admission request",
+			"requestUID", req.UID, "operation", req.Operation, "resource", schema.GroupVersionResource(req.Resource).String(),
+			"detail", err.Error())
 		return errVerificationFailed
 	}
 	return nil

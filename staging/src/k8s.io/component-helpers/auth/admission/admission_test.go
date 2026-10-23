@@ -233,15 +233,43 @@ func (ts *oidcTestServer) coreGroupClaims() map[string]any {
 	return c
 }
 
-// admissionReview builds an AdmissionReview whose resource belongs to apiGroup.
+func admissionRequest(kind metav1.GroupVersionKind, resource metav1.GroupVersionResource, subresource string, operation admissionv1.Operation) *admissionv1.AdmissionRequest {
+	apiVersion := kind.Version
+	if kind.Group != "" {
+		apiVersion = kind.Group + "/" + kind.Version
+	}
+	raw, _ := json.Marshal(metav1.TypeMeta{APIVersion: apiVersion, Kind: kind.Kind})
+	req := &admissionv1.AdmissionRequest{
+		UID:                types.UID(reviewUID),
+		Kind:               kind,
+		Resource:           resource,
+		SubResource:        subresource,
+		RequestKind:        &kind,
+		RequestResource:    &resource,
+		RequestSubResource: subresource,
+		Operation:          operation,
+		Name:               "my-deploy",
+	}
+	switch operation {
+	case admissionv1.Create, admissionv1.Connect:
+		req.Object.Raw = raw
+	case admissionv1.Update:
+		req.Object.Raw = raw
+		req.OldObject.Raw = bytes.Clone(raw)
+	case admissionv1.Delete:
+		req.OldObject.Raw = raw
+	}
+	return req
+}
+
 func admissionReview(apiGroup string) *admissionv1.AdmissionReview {
 	return &admissionv1.AdmissionReview{
 		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Request: &admissionv1.AdmissionRequest{
-			UID:      types.UID(reviewUID),
-			Resource: metav1.GroupVersionResource{Group: apiGroup, Version: "v1", Resource: "deployments"},
-			Name:     "my-deploy",
-		},
+		Request: admissionRequest(
+			metav1.GroupVersionKind{Group: apiGroup, Version: "v1", Kind: "Deployment"},
+			metav1.GroupVersionResource{Group: apiGroup, Version: "v1", Resource: "deployments"},
+			"", admissionv1.Create,
+		),
 	}
 }
 
@@ -1187,14 +1215,8 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 		if err != nil {
 			t.Fatalf("marshal object: %v", err)
 		}
-		review := &admissionv1.AdmissionReview{
-			TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-			Request: &admissionv1.AdmissionRequest{
-				UID:      types.UID(reviewUID),
-				Resource: metav1.GroupVersionResource{Group: resourceGroup, Version: "v1", Resource: "deployments"},
-				Object:   runtime.RawExtension{Raw: obj},
-			},
-		}
+		review := admissionReview(resourceGroup)
+		review.Request.Object.Raw = obj
 		body, err := json.Marshal(review)
 		if err != nil {
 			t.Fatalf("marshal review: %v", err)
@@ -1245,15 +1267,10 @@ func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
 		return b
 	}
 	updateReview := func(objectAPIVersion, oldObjectAPIVersion string) []byte {
-		review := &admissionv1.AdmissionReview{
-			TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-			Request: &admissionv1.AdmissionRequest{
-				UID:       types.UID(reviewUID),
-				Resource:  metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
-				Object:    runtime.RawExtension{Raw: rawObj(objectAPIVersion)},
-				OldObject: runtime.RawExtension{Raw: rawObj(oldObjectAPIVersion)},
-			},
-		}
+		review := admissionReview(testGroup)
+		review.Request.Operation = admissionv1.Update
+		review.Request.Object.Raw = rawObj(objectAPIVersion)
+		review.Request.OldObject.Raw = rawObj(oldObjectAPIVersion)
 		body, err := json.Marshal(review)
 		if err != nil {
 			t.Fatalf("marshal review: %v", err)
@@ -1345,13 +1362,9 @@ func exampleSignedToken(issuer *oidcTestServer, group string) string {
 // exampleReview builds a minimal AdmissionReview for a resource in group. A real
 // webhook receives this from the API server on the wire.
 func exampleReview(group string) *admissionv1.AdmissionReview {
-	return &admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Request: &admissionv1.AdmissionRequest{
-			Resource: metav1.GroupVersionResource{Group: group, Version: "v1", Resource: "deployments"},
-			Name:     "my-deploy",
-		},
-	}
+	review := admissionReview(group)
+	review.Request.UID = ""
+	return review
 }
 
 // Example_rawHTTPWebhook puts token verification in front of admission logic.
@@ -1961,9 +1974,7 @@ func TestVerifierVerify_ZeroDecode(t *testing.T) {
 	vv := ts.verifier(t)
 	token := ts.sign(t, ts.baseClaims())
 
-	req := &admissionv1.AdmissionRequest{
-		Resource: metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
-	}
+	req := admissionReview(testGroup).Request
 	if err := vv.Verify(context.Background(), req, token); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -2632,6 +2643,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 							SubResource: "scale",
 							Operation:   admissionv1.Update,
 							Object:      runtime.RawExtension{Raw: []byte(`{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role"}`)},
+							OldObject:   runtime.RawExtension{Raw: []byte(`{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role"}`)},
 						}
 					},
 				},
@@ -2777,6 +2789,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 						SubResource: "scale",
 						Operation:   admissionv1.Update,
 						Object:      runtime.RawExtension{Raw: []byte(`{"apiVersion":"autoscaling/v1","kind":"Scale"}`)},
+						OldObject:   runtime.RawExtension{Raw: []byte(`{"apiVersion":"autoscaling/v1","kind":"Scale"}`)},
 					},
 				},
 				{
@@ -3003,9 +3016,17 @@ func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			request := &admissionv1.AdmissionRequest{
-				Resource: appsResource, Kind: tc.kind, SubResource: tc.sub,
-				Object: runtime.RawExtension{Raw: []byte(tc.object)}, OldObject: runtime.RawExtension{Raw: []byte(tc.old)},
+			operation := admissionv1.Create
+			if tc.sub == "scale" || tc.old != "" {
+				operation = admissionv1.Update
+			}
+			request := admissionRequest(tc.kind, appsResource, tc.sub, operation)
+			request.Object.Raw = []byte(tc.object)
+			if operation == admissionv1.Update {
+				request.OldObject.Raw = bytes.Clone(request.Object.Raw)
+			}
+			if tc.old != "" {
+				request.OldObject.Raw = []byte(tc.old)
 			}
 			err := verifier.Verify(context.Background(), request, token)
 			if tc.wantDeny {
@@ -3041,11 +3062,18 @@ func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
 		{name: "missing object type metadata", current: &unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"name": "missing"}}}, wantDeny: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := &admissionv1.AdmissionRequest{
-				Kind:      metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
-				Resource:  metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-				Object:    runtime.RawExtension{Object: tc.current},
-				OldObject: runtime.RawExtension{Object: tc.old},
+			operation := admissionv1.Create
+			if tc.old != nil {
+				operation = admissionv1.Update
+			}
+			req := admissionRequest(
+				metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+				metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+				"", operation,
+			)
+			req.Object = runtime.RawExtension{Object: tc.current}
+			if tc.old != nil {
+				req.OldObject = runtime.RawExtension{Object: tc.old}
 			}
 			err := verifier.Verify(context.Background(), req, token)
 			if tc.wantDeny {
@@ -3092,12 +3120,12 @@ func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			request := &admissionv1.AdmissionRequest{
-				Resource:    metav1.GroupVersionResource{Version: "v1", Resource: tc.resource},
-				SubResource: tc.subresource,
-				Kind:        metav1.GroupVersionKind{Group: tc.group, Version: "v1", Kind: tc.kind},
-				Object:      runtime.RawExtension{Raw: []byte(tc.object)},
-			}
+			request := admissionRequest(
+				metav1.GroupVersionKind{Group: tc.group, Version: "v1", Kind: tc.kind},
+				metav1.GroupVersionResource{Version: "v1", Resource: tc.resource},
+				tc.subresource, admissionv1.Create,
+			)
+			request.Object.Raw = []byte(tc.object)
 			err := verifier.Verify(context.Background(), request, token)
 			if tc.wantDeny {
 				if err == nil || err.Error() != "webhook token verification failed" {
@@ -3127,13 +3155,205 @@ func TestVerifier_RejectsMissingObjectTypeMetaForCoreGroup(t *testing.T) {
 		{name: "versionless apiVersion", object: `{"apiVersion":"/","kind":"Pod"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			request := &admissionv1.AdmissionRequest{
-				Resource: metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-				Kind:     metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				Object:   runtime.RawExtension{Raw: []byte(tc.object)},
-			}
+			request := admissionRequest(
+				metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+				metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+				"", admissionv1.Create,
+			)
+			request.Object.Raw = []byte(tc.object)
 			if err := verifier.Verify(context.Background(), request, token); err == nil || err.Error() != "webhook token verification failed" {
 				t.Fatalf("missing object type metadata: got %v, want generic denial", err)
+			}
+		})
+	}
+}
+
+func TestVerifierOperationShapes(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	claims := ts.baseClaims()
+	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{admissionReviewAPIGroupsClaimKey: []string{"*"}}
+	token := ts.sign(t, claims)
+	appsKind := metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	appsResource := metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	for _, tc := range []struct {
+		name      string
+		operation admissionv1.Operation
+		mutate    func(*admissionv1.AdmissionRequest)
+		deny      bool
+	}{
+		{name: "create", operation: admissionv1.Create},
+		{name: "create missing object", operation: admissionv1.Create, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object = runtime.RawExtension{} }},
+		{name: "create with old object", operation: admissionv1.Create, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.OldObject = r.Object }},
+		{name: "update", operation: admissionv1.Update},
+		{name: "update missing current", operation: admissionv1.Update, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object = runtime.RawExtension{} }},
+		{name: "update missing old", operation: admissionv1.Update, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.OldObject = runtime.RawExtension{} }},
+		{name: "delete old only", operation: admissionv1.Delete},
+		{name: "delete missing old", operation: admissionv1.Delete, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.OldObject = runtime.RawExtension{} }},
+		{name: "delete with current", operation: admissionv1.Delete, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object = r.OldObject }},
+		{name: "connect with options", operation: admissionv1.Connect, mutate: func(r *admissionv1.AdmissionRequest) {
+			*r = *admissionRequest(metav1.GroupVersionKind{Version: "v1", Kind: "PodExecOptions"}, metav1.GroupVersionResource{Version: "v1", Resource: "pods"}, "exec", admissionv1.Connect)
+		}},
+		{name: "connect without options", operation: admissionv1.Connect, mutate: func(r *admissionv1.AdmissionRequest) { r.Object = runtime.RawExtension{} }},
+		{name: "connect with old object", operation: admissionv1.Connect, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.OldObject = r.Object }},
+		{name: "core group", operation: admissionv1.Create, mutate: func(r *admissionv1.AdmissionRequest) {
+			*r = *admissionRequest(metav1.GroupVersionKind{Version: "v1", Kind: "Pod"}, metav1.GroupVersionResource{Version: "v1", Resource: "pods"}, "", admissionv1.Create)
+		}},
+		{name: "CRD scale version differs from parent", operation: admissionv1.Update, mutate: func(r *admissionv1.AdmissionRequest) {
+			*r = *admissionRequest(metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}, metav1.GroupVersionResource{Group: "example.com", Version: "v2", Resource: "widgets"}, "scale", admissionv1.Update)
+		}},
+		{name: "missing operation", operation: admissionv1.Create, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Operation = "" }},
+		{name: "unknown operation", operation: admissionv1.Create, deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Operation = "UNKNOWN" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := admissionRequest(appsKind, appsResource, "", tc.operation)
+			if tc.mutate != nil {
+				tc.mutate(req)
+			}
+			err := v.Verify(context.Background(), req, token)
+			if tc.deny {
+				if err == nil || err.Error() != "webhook token verification failed" {
+					t.Fatalf("Verify = %v, want generic denial", err)
+				}
+			} else if err != nil {
+				t.Fatalf("legitimate operation denied: %v", err)
+			}
+			raw, err := json.Marshal(&admissionv1.AdmissionReview{TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"}, Request: req})
+			if err != nil {
+				t.Fatal(err)
+			}
+			spy := newSpyHandler()
+			h := admission.NewHandlerForTest(v, spy.serve)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, newRequest(t, raw, token))
+			var result admissionv1.AdmissionReview
+			if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if rec.Code != http.StatusOK || result.Response == nil || result.Response.Allowed == tc.deny || result.Response.UID != req.UID || spy.wasReached() == tc.deny {
+				t.Fatalf("HTTP verification: status=%d response=%+v callback=%t", rec.Code, result.Response, spy.wasReached())
+			}
+		})
+	}
+}
+
+type metadataOnlyObject struct {
+	metav1.TypeMeta
+	NonJSON chan struct{} `json:"nonJSON"`
+}
+
+func (o *metadataOnlyObject) DeepCopyObject() runtime.Object {
+	if o == nil {
+		return nil
+	}
+	copy := *o
+	return &copy
+}
+
+func TestVerifierMetadataRepresentations(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	token := ts.sign(t, ts.baseClaims())
+	decoded := func(apiVersion, kind string) runtime.Object {
+		return &unstructured.Unstructured{Object: map[string]any{"apiVersion": apiVersion, "kind": kind}}
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*admissionv1.AdmissionRequest)
+		deny   bool
+	}{
+		{name: "complete metadata"},
+		{name: "missing kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind = metav1.GroupVersionKind{} }},
+		{name: "missing kind version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind.Version = "" }},
+		{name: "missing kind name", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind.Kind = "" }},
+		{name: "missing resource version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Resource.Version = "" }},
+		{name: "missing resource name", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Resource.Resource = "" }},
+		{name: "null object", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(" \nnull\t ") }},
+		{name: "malformed raw object", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte("{") }},
+		{name: "missing object version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(`{"kind":"Deployment"}`) }},
+		{name: "missing object kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(`{"apiVersion":"apps/v1"}`) }},
+		{name: "wrong object version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object.Raw = []byte(`{"apiVersion":"apps/v2","kind":"Deployment"}`)
+		}},
+		{name: "wrong object kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object.Raw = []byte(`{"apiVersion":"apps/v1","kind":"StatefulSet"}`)
+		}},
+		{name: "matching raw and decoded", mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Object = decoded("apps/v1", "Deployment") }},
+		{name: "conflicting raw and decoded", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Object = decoded("batch/v1", "Job") }},
+		{name: "null raw and present decoded", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object.Raw = []byte("null")
+			r.Object.Object = decoded("apps/v1", "Deployment")
+		}},
+		{name: "raw with typed nil decoded", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { var object *unstructured.Unstructured; r.Object.Object = object }},
+		{name: "typed nil object", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			var object *unstructured.Unstructured
+			r.Object = runtime.RawExtension{Object: object}
+		}},
+		{name: "decoded metadata only", mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object = runtime.RawExtension{Object: &metadataOnlyObject{TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, NonJSON: make(chan struct{})}}
+		}},
+		{name: "unknown raw object", mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object = runtime.RawExtension{Object: &runtime.Unknown{Raw: bytes.Clone(r.Object.Raw)}}
+		}},
+		{name: "unknown raw group mismatch", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			u := &runtime.Unknown{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job"}`)}
+			u.APIVersion, u.Kind = "apps/v1", "Deployment"
+			r.Object = runtime.RawExtension{Object: u}
+		}},
+		{name: "unknown TypeMeta mismatch", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			u := &runtime.Unknown{Raw: bytes.Clone(r.Object.Raw)}
+			u.APIVersion, u.Kind = "v1", "Secret"
+			r.Object = runtime.RawExtension{Object: u}
+		}},
+		{name: "unknown content type", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
+			r.Object = runtime.RawExtension{Object: &runtime.Unknown{Raw: bytes.Clone(r.Object.Raw), ContentType: "application/yaml"}}
+		}},
+		{name: "original equivalent version differs", mutate: func(r *admissionv1.AdmissionRequest) {
+			r.RequestKind = &metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}
+			r.RequestResource = &metav1.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := admissionReview(testGroup).Request
+			if tc.mutate != nil {
+				tc.mutate(req)
+			}
+			err := v.Verify(context.Background(), req, token)
+			if tc.deny {
+				if err == nil || err.Error() != "webhook token verification failed" {
+					t.Fatalf("Verify = %v, want generic denial", err)
+				}
+			} else if err != nil {
+				t.Fatalf("matching metadata denied: %v", err)
+			}
+		})
+	}
+}
+
+func TestVerifierRejectsMalformedUnknownMetadata(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	token := ts.sign(t, ts.baseClaims())
+	for _, tc := range []struct {
+		apiVersion string
+		operation  admissionv1.Operation
+		withRaw    bool
+	}{
+		{apiVersion: "bad/api/version", operation: admissionv1.Create, withRaw: true},
+		{apiVersion: "/", operation: admissionv1.Create, withRaw: true},
+		{apiVersion: "bad/api/version", operation: admissionv1.Connect},
+	} {
+		t.Run(tc.apiVersion+"/"+string(tc.operation), func(t *testing.T) {
+			req := admissionReview(testGroup).Request
+			object := &runtime.Unknown{}
+			object.APIVersion = tc.apiVersion
+			if tc.withRaw {
+				object.Raw = bytes.Clone(req.Object.Raw)
+			}
+			req.Operation = tc.operation
+			req.Object = runtime.RawExtension{Object: object}
+			if err := v.Verify(context.Background(), req, token); err == nil || err.Error() != "webhook token verification failed" {
+				t.Fatalf("malformed Unknown TypeMeta: verification = %v, want generic denial", err)
 			}
 		})
 	}
