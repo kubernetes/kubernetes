@@ -1986,7 +1986,8 @@
                 "name": "nameValue",
                 "priority": 2
               }
-            ]
+            ],
+            "podNetwork": "podNetworkValue"
           }
         },
         "ttlSecondsAfterFinished": 8,

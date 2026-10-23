@@ -150,6 +150,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.jobTemplate.spec.template.spec.podNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.jobTemplate.spec.template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

@@ -88,6 +88,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.podNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
