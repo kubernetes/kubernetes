@@ -198,8 +198,8 @@ func (ShareableCapacityStatus) SwaggerDoc() map[string]string {
 
 var map_ShareableSummaryStatus = map[string]string{
 	"":                          "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
-	"fullyAvailableDevices":     "fullyAvailableDevices is the number of shareable devices that are not in use, i.e. not allocated to any claim other than for admin access.",
-	"partiallyAvailableDevices": "partiallyAvailableDevices is the number of shareable devices that are in use, i.e. allocated to at least one claim other than for admin access. A device counts here regardless of how much of its capacity remains, including none; see capacity for the remaining amounts.",
+	"fullyAvailableDevices":     "fullyAvailableDevices is the number of shareable devices with no allocation other than for admin access.",
+	"partiallyAvailableDevices": "partiallyAvailableDevices is the number of shareable devices with at least one allocation other than for admin access, regardless of remaining capacity.",
 	"capacity":                  "capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
 }
 
