@@ -101,54 +101,42 @@ func (wf *workloadForest) deleteGenericPodGroup(gpg *fwk.GenericPodGroup) {
 
 // getRootLookupInfoForPod returns the lookup info of the current root PodGroup or CompositePodGroup for a given pod.
 func (wf *workloadForest) getRootLookupInfoForPod(logger klog.Logger, pod *v1.Pod) (*framework.QueuedPodGroupInfo, bool) {
-	podGroup, exists := wf.podGroups[podGroupKeyForPod(pod)]
-	if !exists {
-		return nil, false
-	}
-	return wf.getRootLookupInfo(logger, podGroup)
+	return wf.getRootLookupInfo(logger, podGroupKeyForPod(pod))
 }
 
-// getRootLookupInfo returns the lookup info of the current root PodGroup or CompositePodGroup for a given GenericPodGroup.
-func (wf *workloadForest) getRootLookupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup) (*framework.QueuedPodGroupInfo, bool) {
-	storedGPG, exists := wf.podGroups[gpg.GetKey()]
+// getRootLookupInfo returns the lookup info of the current root PodGroup or CompositePodGroup for a given EntityKey.
+func (wf *workloadForest) getRootLookupInfo(logger klog.Logger, key fwk.EntityKey) (*framework.QueuedPodGroupInfo, bool) {
+	gpg, exists := wf.podGroups[key]
 	if !exists {
 		return nil, false
 	}
 
-	if !wf.isCompositePodGroupEnabled || !storedGPG.HasParent() {
-		return &framework.QueuedPodGroupInfo{
-			PodGroupInfo: &framework.PodGroupInfo{
-				GenericPodGroup: storedGPG,
-			},
-		}, true
-	}
-	return wf.getRootLookupInfoForParentCPG(logger, storedGPG.GetKey(), *storedGPG.GetParentCompositePodGroupName(), storedGPG.GetNamespace())
-}
-
-// getRootLookupInfoForParentCPG is a helper to traverse up the parent chain and return the lookup info of the root CompositePodGroup.
-// It should be called only when the CompositePodGroup feature gate is enabled.
-func (wf *workloadForest) getRootLookupInfoForParentCPG(logger klog.Logger, startKey fwk.EntityKey, parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
-	currParentName := parentName
-	visited := []fwk.EntityKey{startKey}
-	for {
-		cpgKey := fwk.CompositePodGroupKey(namespace, currParentName)
-		if slices.Contains(visited, cpgKey) {
+	if wf.isCompositePodGroupEnabled && gpg.HasParent() {
+		visited := []fwk.EntityKey{key}
+		for {
+			cpgKey, hasParent := gpg.GetParentKey()
+			if !hasParent {
+				break
+			}
+			if slices.Contains(visited, cpgKey) {
+				visited = append(visited, cpgKey)
+				utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting root info", "cpgName", cpgKey.GetName(), "namespace", cpgKey.GetNamespace(), "cycle", visited)
+				return nil, false
+			}
 			visited = append(visited, cpgKey)
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting root info", "parentName", parentName, "namespace", namespace, "cycle", visited)
-			return nil, false
-		}
-		visited = append(visited, cpgKey)
 
-		cpg, exists := wf.podGroups[cpgKey]
-		if !exists {
-			return nil, false
+			gpg, exists = wf.podGroups[cpgKey]
+			if !exists {
+				return nil, false
+			}
 		}
-
-		if !cpg.HasParent() {
-			return newCompositePodGroupInfoForLookup(cpg.GetNamespace(), cpg.GetName()), true
-		}
-		currParentName = *cpg.GetParentCompositePodGroupName()
 	}
+
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: gpg,
+		},
+	}, true
 }
 
 // getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given rootLookupInfo.

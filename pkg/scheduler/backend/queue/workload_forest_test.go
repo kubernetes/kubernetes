@@ -915,7 +915,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			gotInfo, gotFound := wf.getRootLookupInfo(logger, fwk.NewGenericPodGroup(tt.podGroup))
+			gotInfo, gotFound := wf.getRootLookupInfo(logger, fwk.PodGroupKey(tt.podGroup.Namespace, tt.podGroup.Name))
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
@@ -980,7 +980,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			gotInfo, gotFound := wf.getRootLookupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg))
+			gotInfo, gotFound := wf.getRootLookupInfo(logger, fwk.CompositePodGroupKey(tt.cpg.Namespace, tt.cpg.Name))
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
