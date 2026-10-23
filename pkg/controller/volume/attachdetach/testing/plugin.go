@@ -17,12 +17,14 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -88,11 +90,11 @@ func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *TestPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *TestPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
+func (plugin *TestPlugin) NewMounter(ctx context.Context, spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()
 	if spec == nil {
@@ -105,7 +107,7 @@ func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Un
 	return nil, nil
 }
 
-func (plugin *TestPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *TestPlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -146,7 +148,7 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
-func (plugin *TestPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *TestPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
@@ -170,7 +172,7 @@ func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
-func (plugin *TestPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *TestPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

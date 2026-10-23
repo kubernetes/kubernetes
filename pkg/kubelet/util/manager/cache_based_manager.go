@@ -155,7 +155,7 @@ func (s *objectStore) isObjectFresh(data *objectData) bool {
 	return s.clock.Now().Before(data.lastUpdateTime.Add(objectTTL))
 }
 
-func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
+func (s *objectStore) Get(ctx context.Context, namespace, name string) (runtime.Object, error) {
 	key := objectKey{namespace: namespace, name: name}
 
 	data := func() *objectData {
@@ -217,8 +217,8 @@ type cacheBasedManager struct {
 	registeredPods map[objectKey]*v1.Pod
 }
 
-func (c *cacheBasedManager) GetObject(namespace, name string) (runtime.Object, error) {
-	return c.objectStore.Get(namespace, name)
+func (c *cacheBasedManager) GetObject(ctx context.Context, namespace, name string) (runtime.Object, error) {
+	return c.objectStore.Get(ctx, namespace, name)
 }
 
 func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {

@@ -2455,7 +2455,7 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 }
 
 func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	// fake Setup error
@@ -2560,7 +2560,7 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mounter, err := fakePlugin.NewMounter(volumeSpec, pod)
+	mounter, err := fakePlugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -2584,7 +2584,7 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 	}
 
 	// Act first reconcile to trigger mount reconstructed volume
-	reconciler.reconcile(ctx)
+	reconciler.reconcile(tCtx)
 
 	// Wait for the operation executor to finish processing the mount failure.
 	// SetUp returning is not sufficient because the executor clears the pending
@@ -2613,7 +2613,7 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 	// mock remove pod
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	// Act second reconcile to trigger unmount reconstructed volume after removed pod from volume
-	reconciler.reconcile(ctx)
+	reconciler.reconcile(tCtx)
 
 	// assert volume unmount succeed
 	waitForUnmount(t, generatedVolumeName, podName, asw)

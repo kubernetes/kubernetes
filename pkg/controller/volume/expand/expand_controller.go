@@ -412,7 +412,7 @@ func (expc *expandController) GetKubeClient() clientset.Interface {
 	return expc.kubeClient
 }
 
-func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (expc *expandController) NewWrapperMounter(ctx context.Context, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
 }
 
@@ -424,7 +424,7 @@ func (expc *expandController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (expc *expandController) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
@@ -444,8 +444,8 @@ func (expc *expandController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueV
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (expc *expandController) GetServiceAccountTokenFunc() func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in expandController")
 	}
 }

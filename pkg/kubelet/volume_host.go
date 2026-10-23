@@ -173,10 +173,7 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (kvh *kubeletVolumeHost) WaitForCacheSync(logger klog.Logger) error {
 	if kvh.csiDriversSynced == nil {
 		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
@@ -192,12 +189,10 @@ func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(
+	ctx context.Context,
 	volName string,
 	spec volume.Spec,
 	pod *v1.Pod) (volume.Mounter, error) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
 
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
@@ -205,7 +200,7 @@ func (kvh *kubeletVolumeHost) NewWrapperMounter(
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	return kvh.kubelet.newVolumeMounterFromPlugins(logger, &spec, pod)
+	return kvh.kubelet.newVolumeMounterFromPlugins(ctx, &spec, pod)
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
@@ -227,9 +222,8 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
-func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
+func (kvh *kubeletVolumeHost) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
+	node, err := kvh.kubelet.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -238,7 +232,10 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	if kvh.secretManager != nil {
-		return kvh.secretManager.GetSecret
+		return func(namespace, name string) (*v1.Secret, error) {
+			// TODO: Pass the caller's context when VolumeHost supports it.
+			return kvh.secretManager.GetSecret(context.TODO(), namespace, name)
+		}
 	}
 	return func(namespace, name string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
@@ -254,7 +251,7 @@ func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*
 	}
 }
 
-func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return kvh.tokenManager.GetServiceAccountToken
 }
 

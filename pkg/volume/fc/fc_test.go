@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/ktesting"
 	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
 
@@ -146,6 +147,7 @@ func (fake *fakeDiskManager) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, device
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
+	tCtx := ktesting.Init(t)
 	tmpDir, err := utiltesting.MkTmpdir("fc_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -177,7 +179,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -334,6 +336,7 @@ func TestPluginPersistentVolumeNoDiskInfo(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, err := utiltesting.MkTmpdir("fc_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -384,7 +387,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, _ := plug.NewMounter(spec, pod)
+	mounter, _ := plug.NewMounter(tCtx, spec, pod)
 	if mounter == nil {
 		t.Fatalf("Got a nil Mounter")
 	}

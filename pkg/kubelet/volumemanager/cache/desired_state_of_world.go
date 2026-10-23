@@ -359,7 +359,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	mountRequestTime := time.Now()
 	var outerVolumeSpecNames []string
 	if ok {
-		if !volumePlugin.RequiresRemount(volumeSpec) {
+		if !volumePlugin.RequiresRemount(logger, volumeSpec) {
 			mountRequestTime = oldPodMount.mountRequestTime
 		}
 		outerVolumeSpecNames = oldPodMount.outerVolumeSpecNames
@@ -407,7 +407,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 // It returns error if the SELinux label cannot be constructed or when the volume is used with multiple SELinux
 // labels.
 func (dsw *desiredStateOfWorld) getSELinuxLabel(logger klog.Logger, volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (seLinuxFileLabel string, pluginSupportsSELinuxContextMount bool, err error) {
-	labelInfo, err := util.GetMountSELinuxLabel(volumeSpec, seLinuxContainerContexts, podSecurityContext, dsw.volumePluginMgr, dsw.seLinuxTranslator)
+	labelInfo, err := util.GetMountSELinuxLabel(logger, volumeSpec, seLinuxContainerContexts, podSecurityContext, dsw.volumePluginMgr, dsw.seLinuxTranslator)
 	if err != nil {
 		accessMode := getVolumeAccessMode(volumeSpec)
 		seLinuxSupported := util.VolumeSupportsSELinuxMount(volumeSpec)

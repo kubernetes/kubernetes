@@ -800,7 +800,7 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
-	tokenManager := token.NewManager(kubeDeps.KubeClient)
+	tokenManager := token.NewManager(ctx, kubeDeps.KubeClient)
 	getServiceAccount := func(namespace, name string) (*v1.ServiceAccount, error) {
 		return nil, fmt.Errorf("get service account is not implemented")
 	}
@@ -2258,7 +2258,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	kl.containerRuntime.InitializeActuatedPod(logger, pod)
 
 	// Fetch the pull secrets for the pod
-	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
+	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(ctx, pod)
 
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
