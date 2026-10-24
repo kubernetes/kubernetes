@@ -17,13 +17,16 @@ limitations under the License.
 package deployment
 
 import (
+	"errors"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -36,6 +39,130 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/utils/ptr"
 )
+
+func TestSyncDeploymentScalingFailure(t *testing.T) {
+	scaleErr := errors.New("ReplicaSet update failed")
+	statusErr := errors.New("Deployment status update failed")
+	tests := []struct {
+		name            string
+		progressExpired bool
+		paused          bool
+		statusErr       error
+	}{
+		{name: "scaling failure reports rollout timeout", progressExpired: true},
+		{name: "scaling failure updates status before the deadline"},
+		{name: "scaling and status update errors are returned", progressExpired: true, statusErr: statusErr},
+		{name: "paused deployment does not report timeout", progressExpired: true, paused: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			maxSurge := intstr.FromString("25%")
+			maxUnavailable := intstr.FromString("25%")
+			d := newDeployment("foo", 8, nil, &maxSurge, &maxUnavailable, map[string]string{"app": "foo"})
+			d.Generation = 2
+			d.Spec.Paused = test.paused
+			d.Spec.ProgressDeadlineSeconds = ptr.To[int32](600)
+			d.Annotations[deploymentutil.RevisionAnnotation] = "2"
+
+			oldRS := newReplicaSet(d, "foo-old", 10)
+			oldRS.Spec.Template = *d.Spec.Template.DeepCopy()
+			oldRS.Spec.Template.Spec.Containers[0].Image = "foo/old"
+			oldRS.Annotations = map[string]string{deploymentutil.RevisionAnnotation: "1"}
+			oldRS.Status = apps.ReplicaSetStatus{Replicas: 10, ReadyReplicas: 10, AvailableReplicas: 10}
+			newRS := newReplicaSet(d, "foo-new", 3)
+			newRS.Annotations = map[string]string{deploymentutil.RevisionAnnotation: "2"}
+			newRS.Status = apps.ReplicaSetStatus{Replicas: 3, ReadyReplicas: 3, AvailableReplicas: 3}
+			allRSs := []*apps.ReplicaSet{oldRS, newRS}
+			for _, rs := range allRSs {
+				deploymentutil.SetReplicasAnnotations(rs, 10, 13)
+			}
+
+			d.Status = calculateStatus(allRSs, newRS, d)
+			d.Status.ObservedGeneration = 1
+			condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.ReplicaSetUpdatedReason, "Deployment is progressing.")
+			if test.paused {
+				condition.Status = v1.ConditionUnknown
+				condition.Reason = deploymentutil.PausedDeployReason
+			}
+			if test.progressExpired {
+				condition.LastUpdateTime = metav1.NewTime(time.Now().Add(-time.Hour))
+			}
+			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
+
+			f := newFixture(t)
+			f.dLister = []*apps.Deployment{d}
+			f.rsLister = allRSs
+			f.objects = []runtime.Object{d, oldRS, newRS}
+			dc, _, err := f.newController(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.client.PrependReactor("update", "replicasets", func(action testclient.Action) (bool, runtime.Object, error) {
+				return true, nil, scaleErr
+			})
+			if test.statusErr != nil {
+				f.client.PrependReactor("update", "deployments", func(action testclient.Action) (bool, runtime.Object, error) {
+					return true, nil, test.statusErr
+				})
+			}
+
+			err = dc.syncDeployment(ctx, d.Namespace+"/"+d.Name)
+			if !errors.Is(err, scaleErr) {
+				t.Errorf("expected scaling error %v, got %v", scaleErr, err)
+			}
+			if test.statusErr != nil && !errors.Is(err, test.statusErr) {
+				t.Errorf("expected status update error %v, got %v", test.statusErr, err)
+			}
+
+			actions := f.client.Actions()
+			expectedActions := 2
+			if test.paused {
+				expectedActions = 1
+			}
+			if len(actions) != expectedActions {
+				t.Fatalf("expected %d actions, got %v", expectedActions, actions)
+			}
+			if !actions[0].Matches("update", "replicasets") {
+				t.Fatalf("expected ReplicaSet update, got %v", actions[0])
+			}
+			scaledRS := actions[0].(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
+			if scaledRS.Name != oldRS.Name || *scaledRS.Spec.Replicas != 8 {
+				t.Errorf("expected proportional scaling of %s to 8 replicas, got %s with %d replicas", oldRS.Name, scaledRS.Name, *scaledRS.Spec.Replicas)
+			}
+			expectedCondition := *condition
+			if !test.paused {
+				if !actions[1].Matches("update", "deployments") || actions[1].GetSubresource() != "status" {
+					t.Fatalf("expected Deployment status update, got %v", actions[1])
+				}
+				updated := actions[1].(testclient.UpdateAction).GetObject().(*apps.Deployment)
+				if updated.Status.ObservedGeneration != d.Generation {
+					t.Errorf("expected observed generation %d, got %d", d.Generation, updated.Status.ObservedGeneration)
+				}
+				if test.progressExpired {
+					expectedCondition.Status = v1.ConditionFalse
+					expectedCondition.Reason = deploymentutil.TimedOutReason
+				}
+				assertProgressingCondition(t, updated.Status, expectedCondition.Status, expectedCondition.Reason)
+			}
+			if test.statusErr == nil {
+				stored, err := f.client.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertProgressingCondition(t, stored.Status, expectedCondition.Status, expectedCondition.Reason)
+			}
+		})
+	}
+}
+
+func assertProgressingCondition(t *testing.T, status apps.DeploymentStatus, expectedStatus v1.ConditionStatus, expectedReason string) {
+	t.Helper()
+	condition := deploymentutil.GetDeploymentCondition(status, apps.DeploymentProgressing)
+	if condition == nil || condition.Status != expectedStatus || condition.Reason != expectedReason {
+		t.Errorf("expected Progressing condition %s with reason %s, got %+v", expectedStatus, expectedReason, condition)
+	}
+}
 
 func TestScale(t *testing.T) {
 	newTimestamp := metav1.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
