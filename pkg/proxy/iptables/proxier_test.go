@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"regexp"
 	stdruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -2591,6 +2593,74 @@ func TestDropInvalidRule(t *testing.T) {
 
 			expected := tc.dropRule + kubeForwardChainRules
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
+		})
+	}
+}
+
+// fakeNFAcct is an nfacct.Interface that records which counters were ensured.
+type fakeNFAcct struct {
+	ensured []string
+}
+
+func (f *fakeNFAcct) Ensure(name string) error {
+	f.ensured = append(f.ensured, name)
+	return nil
+}
+func (f *fakeNFAcct) Add(string) error { return nil }
+func (f *fakeNFAcct) Get(name string) (*nfacct.Counter, error) {
+	return &nfacct.Counter{Name: name}, nil
+}
+func (f *fakeNFAcct) List() ([]*nfacct.Counter, error) { return nil, nil }
+
+// nfacctMatchIPTables wraps FakeIPTables to model a kernel without the
+// iptables "nfacct" match (xt_nfacct), which rejects any rule using it.
+type nfacctMatchIPTables struct {
+	*iptablestest.FakeIPTables
+}
+
+func (f *nfacctMatchIPTables) EnsureRule(position utiliptables.RulePosition, table utiliptables.Table, chain utiliptables.Chain, args ...string) (bool, error) {
+	if slices.Contains(args, "nfacct") {
+		return false, fmt.Errorf("error appending rule: exit status 2: Couldn't load match `nfacct'")
+	}
+	return f.FakeIPTables.EnsureRule(position, table, chain, args...)
+}
+
+func TestCheckNFAcctMatch(t *testing.T) {
+	testCases := []struct {
+		name           string
+		ipv6           bool
+		matchAvailable bool
+	}{
+		{name: "IPv4, match available", matchAvailable: true},
+		{name: "IPv4, match unavailable", matchAvailable: false},
+		{name: "IPv6, match available", ipv6: true, matchAvailable: true},
+		{name: "IPv6, match unavailable", ipv6: true, matchAvailable: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := iptablestest.NewFake()
+			if tc.ipv6 {
+				fake = iptablestest.NewIPv6Fake()
+			}
+			var ipt utiliptables.Interface = fake
+			if !tc.matchAvailable {
+				ipt = &nfacctMatchIPTables{FakeIPTables: fake}
+			}
+			runner := &fakeNFAcct{}
+
+			err := checkNFAcctMatch(ipt, runner)
+			if tc.matchAvailable && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			} else if !tc.matchAvailable && err == nil {
+				t.Errorf("expected an error, got nil")
+			}
+
+			if !slices.Equal(runner.ensured, []string{metrics.IPTablesCTStateInvalidDroppedNFAcctCounter}) {
+				t.Errorf("expected the test rule's counter to be ensured, got %v", runner.ensured)
+			}
+			if canary, _ := fake.Dump.GetChain(utiliptables.TableFilter, kubeProxyCanaryChain); canary != nil && len(canary.Rules) != 0 {
+				t.Errorf("expected test rule to be removed, got %v", canary.Rules)
+			}
 		})
 	}
 }
