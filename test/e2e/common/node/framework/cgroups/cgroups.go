@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -45,6 +44,15 @@ const (
 	cgroupv2MemLimitFile  string = "memory.max"
 	cgroupVolumeName      string = "sysfscgroup"
 	cgroupMountPath       string = "/sysfscgroup"
+)
+
+// these match pkg/kubelet/cm on linux, we don't import them because they're
+// zero when building for other platforms, and e2e.test may be built for other
+// platforms while testing linux nodes
+const (
+	cpuQuotaPeriod    int64 = 100000 // 100ms
+	minCPUQuotaPeriod int64 = 1000   // 1ms
+	milliCPUToCPU     int64 = 1000
 )
 
 var (
@@ -175,13 +183,26 @@ func getCgroupCPURequestPath(cgPath string, podOnCgroupv2 bool) string {
 	}
 }
 
+// milliCPUToQuota matches MilliCPUToQuota in pkg/kubelet/cm with the default period
+func milliCPUToQuota(milliCPU int64) int64 {
+	if milliCPU == 0 {
+		return 0
+	}
+	quota := (milliCPU * cpuQuotaPeriod) / milliCPUToCPU
+	// quota needs to be a minimum of 1ms
+	if quota < minCPUQuotaPeriod {
+		quota = minCPUQuotaPeriod
+	}
+	return quota
+}
+
 // TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
 // is fixed.
 func getCPULimitCgroupExpectations(cpuLimit *resource.Quantity, podOnCgroupV2 bool) []string {
 	var expectedCPULimits []string
 	milliCPULimit := cpuLimit.MilliValue()
 
-	cpuQuota := kubecm.MilliCPUToQuota(milliCPULimit, kubecm.QuotaPeriod)
+	cpuQuota := milliCPUToQuota(milliCPULimit)
 	if cpuLimit.IsZero() {
 		cpuQuota = -1
 	}
@@ -189,7 +210,7 @@ func getCPULimitCgroupExpectations(cpuLimit *resource.Quantity, podOnCgroupV2 bo
 
 	if milliCPULimit%10 != 0 && cpuQuota != -1 {
 		roundedCPULimit := (milliCPULimit/10 + 1) * 10
-		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
+		cpuQuotaRounded := milliCPUToQuota(roundedCPULimit)
 		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded, podOnCgroupV2))
 	}
 
@@ -202,7 +223,7 @@ func getExpectedCPULimitFromCPUQuota(cpuQuota int64, podOnCgroupV2 bool) string 
 		if expectedCPULimitString == "-1" {
 			expectedCPULimitString = "max"
 		}
-		expectedCPULimitString = fmt.Sprintf("%s %d", expectedCPULimitString, kubecm.QuotaPeriod)
+		expectedCPULimitString = fmt.Sprintf("%s %d", expectedCPULimitString, cpuQuotaPeriod)
 	}
 	return expectedCPULimitString
 }

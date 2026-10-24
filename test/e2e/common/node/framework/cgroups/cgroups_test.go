@@ -55,6 +55,12 @@ func TestGetCPULimitCgroupExpectations(t *testing.T) {
 			expected:          []string{"2000"},
 		},
 		{
+			name:              "minimum quota, podOnCGroupv2Node=true",
+			cpuLimit:          resource.NewMilliQuantity(5, resource.DecimalSI),
+			podOnCgroupv2Node: true,
+			expected:          []string{"1000 100000", "1000 100000"},
+		},
+		{
 			name:              "cpuQuota=0, podOnCGroupv2Node=true",
 			cpuLimit:          resource.NewMilliQuantity(0, resource.DecimalSI),
 			podOnCgroupv2Node: true,
