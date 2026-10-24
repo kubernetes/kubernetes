@@ -429,7 +429,6 @@ func splitTerm(term string) (lhs, op, rhs string, ok bool) {
 
 func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 	parts := splitTerms(selector)
-	sort.StringSlice(parts).Sort()
 	var items []Selector
 	for _, part := range parts {
 		if part == "" {
@@ -454,6 +453,13 @@ func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
 		}
 	}
+	// Order the terms by their serialized form rather than by the raw input text.
+	// The two are not the same string: "==" is emitted as "=" and values are
+	// re-escaped, so sorting the input did not guarantee sorted output and
+	// String() was not a fixed point. Parsing and re-serializing a selector such
+	// as "metadata.name==,metadata.name=0" kept swapping the two terms around.
+	sort.SliceStable(items, func(i, j int) bool { return items[i].String() < items[j].String() })
+
 	if len(items) == 1 {
 		return items[0].Transform(fn)
 	}
