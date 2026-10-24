@@ -19,6 +19,7 @@ package populator
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -36,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -319,6 +323,95 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 				"Found volume %v in the list of desired state of world volumes to mount. Expected not",
 				expectedVolumeName)
 		}
+	}
+}
+
+// lockedPodStateProvider lets a test change pod state while Run is reading it.
+type lockedPodStateProvider struct {
+	lock  sync.Mutex
+	state fakePodStateProvider
+}
+
+func (p *lockedPodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UID) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.state.ShouldPodContainersBeTerminating(uid)
+}
+
+func (p *lockedPodStateProvider) ShouldPodRuntimeBeRemoved(uid kubetypes.UID) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.state.ShouldPodRuntimeBeRemoved(uid)
+}
+
+func (p *lockedPodStateProvider) markRemoved(uid kubetypes.UID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.state.removed = map[kubetypes.UID]struct{}{uid: {}}
+}
+
+// Like a static etcd pod being replaced while the local API server hangs.
+func TestRunRemovesDeletedPodWhilePVCGetHangs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	dswp, _, terminatedPod, volumeName, _ := prepareDSWPWithPodPV(t)
+	podState := &lockedPodStateProvider{}
+	dswp.podStateProvider = podState
+
+	getStarted := make(chan struct{})
+	var startedOnce sync.Once
+	release := make(chan struct{})
+	defer close(release)
+	dswp.kubeClient.(*fake.Clientset).PrependReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		if action.(core.GetAction).GetName() != "hanging-claim" {
+			return false, nil, nil
+		}
+		startedOnce.Do(func() { close(getStarted) })
+		<-release
+		return true, nil, fmt.Errorf("the server was unable to return a response in the time allotted")
+	})
+
+	containers := []v1.Container{{VolumeMounts: []v1.VolumeMount{{Name: "hanging-volume", MountPath: "/mnt"}}}}
+	pendingPod := createPodWithVolume("pending-pod", "hanging-volume", "hanging-claim", containers)
+	dswp.podManager.(kubepod.Manager).AddPod(pendingPod)
+
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	go dswp.Run(ctx, config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }))
+
+	select {
+	case <-getStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("findAndAddNewPods did not reach the PVC Get")
+	}
+
+	dswp.podManager.(mutablePodManager).RemovePod(terminatedPod)
+	podState.markRemoved(terminatedPod.UID)
+
+	podName := util.GetUniquePodName(terminatedPod)
+	err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return !dswp.desiredStateOfWorld.PodExistsInVolume(podName, volumeName, "" /* SELinuxContext */), nil
+	})
+	if err != nil {
+		t.Fatalf("Volume %q of the terminated pod is still in the desired state while a PVC Get hangs: %v", volumeName, err)
+	}
+}
+
+func TestFindAndAddNewPodsSkipsPodRemovedDuringPVCGet(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	dswp, fakePodManager, podState := prepareDswpWithVolume(t)
+	containers := []v1.Container{{VolumeMounts: []v1.VolumeMount{{Name: "dswp-test-volume-name", MountPath: "/mnt"}}}}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+	fakePodManager.AddPod(pod)
+
+	dswp.kubeClient.(*fake.Clientset).PrependReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		podState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
+		return false, nil, nil
+	})
+
+	dswp.findAndAddNewPods(tCtx)
+
+	if volumes := dswp.desiredStateOfWorld.GetVolumesToMount(); len(volumes) != 0 {
+		t.Fatalf("Expected no volumes for a pod removed during the PVC Get, got %d", len(volumes))
 	}
 }
 
