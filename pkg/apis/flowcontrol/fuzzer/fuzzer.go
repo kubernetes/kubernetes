@@ -32,8 +32,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			// NOTE: setting a zero value here will cause the roundtrip
 			// test (from internal to v1beta2, v1beta1) to fail
-			if obj.NominalConcurrencyShares == 0 {
-				obj.NominalConcurrencyShares = int32(1)
+			if obj.NominalConcurrencyShares == nil || *obj.NominalConcurrencyShares == 0 {
+				obj.NominalConcurrencyShares = new(int32(1))
 			}
 			if obj.LendablePercent == nil {
 				obj.LendablePercent = ptr.To(int32(0))

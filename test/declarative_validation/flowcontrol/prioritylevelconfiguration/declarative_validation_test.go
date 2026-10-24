@@ -70,7 +70,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"spec.type: Exempt with limited set": {
 			input: mkPLC(tweakExempt(), tweakLimited(&flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 100,
+				NominalConcurrencyShares: ptrInt32(100),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -223,7 +223,7 @@ func mkPLC(tweaks ...func(*flowcontrol.PriorityLevelConfiguration)) flowcontrol.
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 100,
+				NominalConcurrencyShares: ptrInt32(100),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},

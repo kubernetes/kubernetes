@@ -75,7 +75,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: v,
+					NominalConcurrencyShares: new(v),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject},
 				},
