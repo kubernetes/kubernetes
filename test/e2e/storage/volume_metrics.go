@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -136,7 +135,7 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
-		pluginName := sc.Provisioner
+		pluginName := "kubernetes.io/csi:" + sc.Provisioner
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 
@@ -678,14 +677,9 @@ func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginN
 			for _, sample := range samples {
 				count := int64(sample.Value)
 				operation := string(sample.Metric["operation_name"])
-				// if the volumes were provisioned with a CSI Driver
-				// the metric operation name will be prefixed with
-				// "kubernetes.io/csi:"
 				metricPluginName := string(sample.Metric["volume_plugin"])
 				status := string(sample.Metric["status"])
-				if !strings.Contains(metricPluginName, pluginName) {
-					// the metric volume plugin field doesn't match
-					// the default storageClass.Provisioner field
+				if metricPluginName != pluginName {
 					continue
 				}
 
