@@ -8793,7 +8793,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			opts: validationOptions{requireAtomicSetType: true},
 			expectedErrors: []validationMatch{
-				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
+				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type").contains(`Invalid value: "granular"`),
 			},
 		},
 		{
@@ -8814,7 +8814,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			opts: validationOptions{requireAtomicSetType: true},
 			expectedErrors: []validationMatch{
-				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
+				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type").contains("Invalid value: null"),
 			},
 		},
 		{
