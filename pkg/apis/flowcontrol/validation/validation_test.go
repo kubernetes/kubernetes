@@ -162,9 +162,9 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is required when subject kind is 'ServiceAccount'"),
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'"),
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'"),
+			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is required when subject kind is 'ServiceAccount'").MarkCoveredByDeclarative(),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'").MarkCoveredByDeclarative(),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "Subject union malformed in User case",
@@ -191,9 +191,9 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"),
-			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is required when subject kind is 'User'"),
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'"),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'").MarkCoveredByDeclarative(),
+			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is required when subject kind is 'User'").MarkCoveredByDeclarative(),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "malformed Subject union in Group case",
@@ -220,9 +220,9 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"),
-			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'"),
-			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is required when subject kind is 'Group'"),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'").MarkCoveredByDeclarative(),
+			field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'").MarkCoveredByDeclarative(),
+			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is required when subject kind is 'Group'").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "exempt flow-schema should work",
@@ -555,7 +555,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind(""), supportedSubjectKinds.List()),
+			field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "Omitted ResourceRule.Namespaces should fail",
