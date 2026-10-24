@@ -1250,6 +1250,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*corev1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*corev1.NodeSpec), b.(*core.NodeSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.NodeSpec)(nil), (*corev1.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_NodeSpec_To_v1_NodeSpec(a.(*core.NodeSpec), b.(*corev1.NodeSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*corev1.NodeStatus)(nil), (*core.NodeStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_NodeStatus_To_core_NodeStatus(a.(*corev1.NodeStatus), b.(*core.NodeStatus), scope)
 	}); err != nil {
@@ -2030,6 +2040,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*corev1.Secret)(nil), (*core.Secret)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Secret_To_core_Secret(a.(*corev1.Secret), b.(*core.Secret), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*core.Secret)(nil), (*corev1.Secret)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_Secret_To_v1_Secret(a.(*core.Secret), b.(*corev1.Secret), scope)
 	}); err != nil {
@@ -2530,11 +2545,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*core.NodeSpec)(nil), (*corev1.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_NodeSpec_To_v1_NodeSpec(a.(*core.NodeSpec), b.(*corev1.NodeSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*core.PersistentVolumeSpec)(nil), (*corev1.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(a.(*core.PersistentVolumeSpec), b.(*corev1.PersistentVolumeSpec), scope)
 	}); err != nil {
@@ -2542,11 +2552,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*core.PodTemplateSpec)(nil), (*corev1.PodTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(a.(*core.PodTemplateSpec), b.(*corev1.PodTemplateSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*corev1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*corev1.NodeSpec), b.(*core.NodeSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -2577,11 +2582,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*corev1.ResourceList)(nil), (*core.ResourceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ResourceList_To_core_ResourceList(a.(*corev1.ResourceList), b.(*core.ResourceList), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*corev1.Secret)(nil), (*core.Secret)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Secret_To_core_Secret(a.(*corev1.Secret), b.(*core.Secret), scope)
 	}); err != nil {
 		return err
 	}
@@ -4966,17 +4966,7 @@ func Convert_core_NodeFeatures_To_v1_NodeFeatures(in *core.NodeFeatures, out *co
 
 func autoConvert_v1_NodeList_To_core_NodeList(in *corev1.NodeList, out *core.NodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.Node, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Node_To_core_Node(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.Node)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -4987,17 +4977,7 @@ func Convert_v1_NodeList_To_core_NodeList(in *corev1.NodeList, out *core.NodeLis
 
 func autoConvert_core_NodeList_To_v1_NodeList(in *core.NodeList, out *corev1.NodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.Node, len(*in))
-		for i := range *in {
-			if err := Convert_core_Node_To_v1_Node(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.Node)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -5165,26 +5145,23 @@ func Convert_core_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *core.NodeSelectorT
 }
 
 func autoConvert_v1_NodeSpec_To_core_NodeSpec(in *corev1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
-	// WARNING: in.PodCIDR requires manual conversion: does not exist in peer-type
-	out.PodCIDRs = *(*[]string)(unsafe.Pointer(&in.PodCIDRs))
-	out.ProviderID = in.ProviderID
-	out.Unschedulable = in.Unschedulable
-	out.Taints = *(*[]core.Taint)(unsafe.Pointer(&in.Taints))
-	out.ConfigSource = (*core.NodeConfigSource)(unsafe.Pointer(in.ConfigSource))
-	out.DoNotUseExternalID = in.DoNotUseExternalID
-	out.PodPreemptionPolicy = (*core.NodePodPreemptionPolicy)(unsafe.Pointer(in.PodPreemptionPolicy))
+	*out = *(*core.NodeSpec)(unsafe.Pointer(in))
 	return nil
 }
 
+// Convert_v1_NodeSpec_To_core_NodeSpec is an autogenerated conversion function.
+func Convert_v1_NodeSpec_To_core_NodeSpec(in *corev1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
+	return autoConvert_v1_NodeSpec_To_core_NodeSpec(in, out, s)
+}
+
 func autoConvert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *corev1.NodeSpec, s conversion.Scope) error {
-	out.PodCIDRs = *(*[]string)(unsafe.Pointer(&in.PodCIDRs))
-	out.ProviderID = in.ProviderID
-	out.Unschedulable = in.Unschedulable
-	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
-	out.ConfigSource = (*corev1.NodeConfigSource)(unsafe.Pointer(in.ConfigSource))
-	out.DoNotUseExternalID = in.DoNotUseExternalID
-	out.PodPreemptionPolicy = (*corev1.NodePodPreemptionPolicy)(unsafe.Pointer(in.PodPreemptionPolicy))
+	*out = *(*corev1.NodeSpec)(unsafe.Pointer(in))
 	return nil
+}
+
+// Convert_core_NodeSpec_To_v1_NodeSpec is an autogenerated conversion function.
+func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *corev1.NodeSpec, s conversion.Scope) error {
+	return autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s)
 }
 
 func autoConvert_v1_NodeStatus_To_core_NodeStatus(in *corev1.NodeStatus, out *core.NodeStatus, s conversion.Scope) error {
@@ -7103,15 +7080,21 @@ func autoConvert_v1_Secret_To_core_Secret(in *corev1.Secret, out *core.Secret, s
 	out.ObjectMeta = in.ObjectMeta
 	out.Immutable = (*bool)(unsafe.Pointer(in.Immutable))
 	out.Data = *(*map[string][]byte)(unsafe.Pointer(&in.Data))
-	// INFO: in.StringData opted out of conversion generation
+	out.StringData = *(*map[string]string)(unsafe.Pointer(&in.StringData))
 	out.Type = core.SecretType(in.Type)
 	return nil
+}
+
+// Convert_v1_Secret_To_core_Secret is an autogenerated conversion function.
+func Convert_v1_Secret_To_core_Secret(in *corev1.Secret, out *core.Secret, s conversion.Scope) error {
+	return autoConvert_v1_Secret_To_core_Secret(in, out, s)
 }
 
 func autoConvert_core_Secret_To_v1_Secret(in *core.Secret, out *corev1.Secret, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Immutable = (*bool)(unsafe.Pointer(in.Immutable))
 	out.Data = *(*map[string][]byte)(unsafe.Pointer(&in.Data))
+	out.StringData = *(*map[string]string)(unsafe.Pointer(&in.StringData))
 	out.Type = corev1.SecretType(in.Type)
 	return nil
 }
@@ -7163,17 +7146,7 @@ func Convert_core_SecretKeySelector_To_v1_SecretKeySelector(in *core.SecretKeySe
 
 func autoConvert_v1_SecretList_To_core_SecretList(in *corev1.SecretList, out *core.SecretList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.Secret, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Secret_To_core_Secret(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.Secret)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -7184,17 +7157,7 @@ func Convert_v1_SecretList_To_core_SecretList(in *corev1.SecretList, out *core.S
 
 func autoConvert_core_SecretList_To_v1_SecretList(in *core.SecretList, out *corev1.SecretList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.Secret, len(*in))
-		for i := range *in {
-			if err := Convert_core_Secret_To_v1_Secret(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.Secret)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
