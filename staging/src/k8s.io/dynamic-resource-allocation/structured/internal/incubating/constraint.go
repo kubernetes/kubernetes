@@ -19,7 +19,8 @@ package incubating
 import (
 	"fmt"
 
-	resourceapi "k8s.io/api/resource/v1"
+	"github.com/blang/semver/v4"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
@@ -33,35 +34,57 @@ import (
 // We don't need to track *which* devices are part of the set, only
 // how many.
 type distinctAttributeConstraint struct {
-	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	logger        klog.Logger  // Includes name and attribute name, so no need to repeat in log messages.
+	loggerV7      *klog.Logger // Non-nil only if V(7) is enabled, to avoid the cost of building log arguments otherwise.
 	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
+	attributeName draapi.FullyQualifiedName
 
-	attributes []*resourceapi.DeviceAttribute
+	attributes []any
 }
 
-func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
+func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
-		return true
+		return true, nil
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
-	if attribute == nil {
+	attribute, ok := device.Attributes.Lookup(m.attributeName)
+	if !ok {
 		// Doesn't have the attribute.
-		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
+		if m.loggerV7 != nil {
+			m.loggerV7.Info("Constraint not satisfied, attribute not set")
+		}
+		return false, nil
+	}
+	if attribute == nil {
+		// Has the attribute, but with a value that this client cannot represent
+		// (for example, a value type added in a newer API version).
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
 	}
 
-	if !m.matchesAttribute(*attribute) {
-		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
-		return false
+	switch attribute.(type) {
+	case string:
+	case int64:
+	case bool:
+	case semver.Version:
+	default:
+		// Unknown value type, cannot compare. Better stop instead of
+		// silently ignoring the device.
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
 	}
 
+	matches := m.matchesAttribute(attribute)
+	if !matches {
+		if m.loggerV7 != nil {
+			m.loggerV7.Info("Constraint not satisfied, has some duplicated attributes")
+		}
+		return false, nil
+	}
 	m.attributes = append(m.attributes, attribute)
-	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
-	return true
-
+	if m.loggerV7 != nil {
+		m.loggerV7.Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
+	}
+	return true, nil
 }
 
 func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
@@ -71,7 +94,9 @@ func (m *distinctAttributeConstraint) remove(requestName, subRequestName string,
 	}
 
 	m.attributes = m.attributes[:len(m.attributes)-1]
-	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
+	if m.loggerV7 != nil {
+		m.loggerV7.Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
+	}
 }
 
 func (m *distinctAttributeConstraint) matches(requestName, subRequestName string) bool {
@@ -83,37 +108,79 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
+func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
 	for _, attr := range m.attributes {
-		switch {
-		case attribute.StringValue != nil:
-			if attr.StringValue != nil && *attribute.StringValue == *attr.StringValue {
-				m.logger.V(7).Info("String values duplicated")
+		switch existing := attr.(type) {
+		case string:
+			candidate, ok := attribute.(string)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
+				continue
+			}
+			if existing == candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("String values duplicated")
+				}
 				return false
 			}
-		case attribute.IntValue != nil:
-			if attr.IntValue != nil && *attribute.IntValue == *attr.IntValue {
-				m.logger.V(7).Info("Int values duplicated")
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
+		case int64:
+			candidate, ok := attribute.(int64)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
+				continue
+			}
+			if existing == candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Int values duplicated")
+				}
 				return false
 			}
-		case attribute.BoolValue != nil:
-			if attr.BoolValue != nil && *attribute.BoolValue == *attr.BoolValue {
-				m.logger.V(7).Info("Bool values duplicated")
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
+		case bool:
+			candidate, ok := attribute.(bool)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
+				continue
+			}
+			if existing == candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Bool values duplicated")
+				}
 				return false
 			}
-		case attribute.VersionValue != nil:
-			// semver 2.0.0 requires that version strings are in their
-			// minimal form (in particular, no leading zeros). Therefore a
-			// strict "exact equal" check can do a string comparison.
-			if attr.VersionValue != nil && *attribute.VersionValue == *attr.VersionValue {
-				m.logger.V(7).Info("Version values duplicated")
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
+		case semver.Version:
+			candidate, ok := attribute.(semver.Version)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
+				continue
+			}
+			if existing.Equals(candidate) {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Version values duplicated")
+				}
 				return false
+			}
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
 			}
 		default:
-			// Unknown value type, cannot match.
-			// This condition should not be reached
-			// as the unknown value type should be failed on CEL compile (getAttributeValue).
-			m.logger.V(7).Info("Distinct attribute type unknown")
+			// Dead code, existing values were checked already.
 			return false
 		}
 	}

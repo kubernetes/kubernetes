@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -593,8 +595,10 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 	tCtx = tCtx.WithCancel()
 	client := fake.NewClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 	resourceSliceTrackerOpts := tracker.Options{
-		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:   draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer: sliceInformer,
 		KubeClient:    client,
 	}
 	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
