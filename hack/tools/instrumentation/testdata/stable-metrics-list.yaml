@@ -50,6 +50,28 @@
   help: CEL evaluation time in seconds.
   type: Histogram
   stabilityLevel: BETA
+- name: certificate_expiration_seconds
+  subsystem: client
+  namespace: apiserver
+  help: Distribution of the remaining lifetime on the certificate used to authenticate
+    a request.
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0
+  - 1800
+  - 3600
+  - 7200
+  - 21600
+  - 43200
+  - 86400
+  - 172800
+  - 345600
+  - 604800
+  - 2.592e+06
+  - 7.776e+06
+  - 1.5552e+07
+  - 3.1104e+07
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
