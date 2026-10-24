@@ -647,6 +647,153 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 	}
 }
 
+// TestSoftEvictionNegativeMaxPodGracePeriod verifies that when
+// MaxPodGracePeriodSeconds is negative, a soft eviction defers to the pod's own
+// terminationGracePeriodSeconds instead of forwarding the negative value to the
+// runtime (which would cause an immediate SIGKILL). See issue #118172.
+func TestSoftEvictionNegativeMaxPodGracePeriod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	summaryStatsMaker := makeMemoryStats
+
+	// Pod declares its own grace period; the eviction must honor it.
+	podGracePeriod := int64(42)
+	pod, podStat := makePodWithMemoryStats("under-pressure", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "800Mi")
+	pod.Spec.TerminationGracePeriodSeconds = &podGracePeriod
+	pods := []*v1.Pod{pod}
+	podStats := map[*v1.Pod]statsapi.PodStats{pod: podStat}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		// Negative value means "defer to pod specified value".
+		MaxPodGracePeriodSeconds: -1,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+				GracePeriod: time.Minute * 2,
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// induce soft threshold and let the grace period elapse
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+	fakeClock.Step(3 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	if podKiller.pod != pod {
+		t.Fatalf("Manager should have evicted the pod under pressure")
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Fatalf("Manager should have set a grace period override")
+	}
+	if got := *podKiller.gracePeriodOverride; got != podGracePeriod {
+		t.Errorf("With negative MaxPodGracePeriodSeconds, expected the pod's grace period %d, got %d", podGracePeriod, got)
+	}
+}
+
+// TestSoftEvictionNegativeMaxPodGracePeriodPodDefault verifies that when
+// MaxPodGracePeriodSeconds is negative and the pod does not declare a grace
+// period, the eviction falls back to the default grace period.
+func TestSoftEvictionNegativeMaxPodGracePeriodPodDefault(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	summaryStatsMaker := makeMemoryStats
+
+	pod, podStat := makePodWithMemoryStats("under-pressure", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "800Mi")
+	pod.Spec.TerminationGracePeriodSeconds = nil
+	pods := []*v1.Pod{pod}
+	podStats := map[*v1.Pod]statsapi.PodStats{pod: podStat}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: -1,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+				GracePeriod: time.Minute * 2,
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+	fakeClock.Step(3 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	if podKiller.pod != pod {
+		t.Fatalf("Manager should have evicted the pod under pressure")
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Fatalf("Manager should have set a grace period override")
+	}
+	if got := *podKiller.gracePeriodOverride; got != int64(v1.DefaultTerminationGracePeriodSeconds) {
+		t.Errorf("With negative MaxPodGracePeriodSeconds and no pod grace period, expected default %d, got %d", v1.DefaultTerminationGracePeriodSeconds, got)
+	}
+}
+
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
 	tCtx := ktesting.Init(t)

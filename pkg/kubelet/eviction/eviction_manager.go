@@ -430,9 +430,21 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		pod := activePods[i]
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
-			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-			if pod.Spec.TerminationGracePeriodSeconds != nil {
-				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+			// A negative MaxPodGracePeriodSeconds means "defer to the pod's own
+			// terminationGracePeriodSeconds" per the --eviction-max-pod-grace-period
+			// flag contract. Applying min() with a negative cap would always yield the
+			// negative value and force a near-immediate SIGKILL, ignoring the pod's
+			// grace period (see kubernetes/kubernetes#118172).
+			if m.config.MaxPodGracePeriodSeconds < 0 {
+				gracePeriodOverride = v1.DefaultTerminationGracePeriodSeconds
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+				}
+			} else {
+				gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+				}
 			}
 		}
 
