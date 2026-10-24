@@ -1156,6 +1156,7 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 		routes.Profiling{}.Install(s.Handler.NonGoRestfulMux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
+			goruntime.SetMutexProfileFraction(1)
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
 		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
@@ -1165,6 +1166,7 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 		s.UnprotectedDebugSocket.InstallDebugFlag("v", routes.StringFlagPutHandler(logs.GlogSetter))
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
+			goruntime.SetMutexProfileFraction(1)
 		}
 	}
 
