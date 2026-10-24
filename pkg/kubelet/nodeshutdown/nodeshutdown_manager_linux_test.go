@@ -701,7 +701,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				nodeRef:               tt.fields.nodeRef,
 				getPods:               tt.fields.getPods,
 				syncNodeStatus:        tt.fields.syncNodeStatus,
-				dbusCon:               tt.fields.dbusCon,
 				inhibitLock:           tt.fields.inhibitLock,
 				nodeShuttingDownMutex: sync.Mutex{},
 				nodeShuttingDownNow:   tt.fields.nodeShuttingDownNow,
@@ -713,7 +712,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			err := m.processShutdownEvent(tCtx)
+			err := m.processShutdownEvent(tCtx, tt.fields.dbusCon)
 			if tt.wantErr {
 				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
 			} else {
@@ -767,7 +766,6 @@ func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
 			}
 		},
 		syncNodeStatus: syncNodeStatus,
-		dbusCon:        &fakeDbus{},
 		podManager: &podManager{
 			logger:        logger,
 			volumeManager: fakeVolumeManager,
@@ -785,7 +783,7 @@ func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent(tCtx)
+	err := m.processShutdownEvent(tCtx, &fakeDbus{})
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
@@ -854,6 +852,64 @@ func TestStartDbusConnectionClosedOnError(t *testing.T) {
 	assert.True(t, createdConnections[0].closed, "expected the dbus connection to be closed after start() failure")
 }
 
+func TestStartClosesConnectionOnContextCancel(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStartClosesConnectionOnContextCancel)
+}
+
+func testStartClosesConnectionOnContextCancel(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
+
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	closed := make(chan struct{}, 1)
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		return &fakeDbus{
+			currentInhibitDelay:        40 * time.Second,
+			overrideSystemInhibitDelay: 40 * time.Second,
+			shutdownChan:               make(chan bool),
+			onCloseChan:                closed,
+		}, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+
+	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	manager := NewManager(&Config{
+		Logger:        logger,
+		VolumeManager: fakeVolumeManager,
+		Recorder:      fakeRecorder,
+		NodeRef:       nodeRef,
+		GetPodsFunc:   func() []*v1.Pod { return nil },
+		KillPodFunc: func(*v1.Pod, bool, *int64, func(*v1.PodStatus)) error {
+			return nil
+		},
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    30 * time.Second,
+		ShutdownGracePeriodCriticalPods: 10 * time.Second,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	ctx, cancel := context.WithCancel(tCtx.Context)
+	err := manager.Start(ctx)
+	lock.Unlock()
+	require.NoError(t, err)
+
+	cancel()
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("dbus connection not closed after context cancellation")
+	}
+}
+
 // TestRestartClosesOldConnection verifies that when the retry loop in Start()
 // reconnects, the old dbus connection is closed before a new one is created.
 // See #120613.
@@ -884,6 +940,10 @@ func testRestartClosesOldConnection(tCtx ktesting.TContext) {
 			overrideSystemInhibitDelay: 40 * time.Second,
 			shutdownChan:               ch,
 		}
+		if firstConn == nil {
+			firstConn = fd
+			firstConn.onCloseChan = firstConnClosedChan
+		}
 		return fd, nil
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
@@ -907,11 +967,6 @@ func testRestartClosesOldConnection(tCtx ktesting.TContext) {
 	})
 
 	err := manager.Start(tCtx)
-
-	// Grab a reference to the first connection and arm its close notification.
-	m := manager.(*managerImpl)
-	firstConn = m.dbusCon.(*fakeDbus)
-	firstConn.onCloseChan = firstConnClosedChan
 	lock.Unlock()
 
 	require.NoError(t, err)
@@ -919,7 +974,7 @@ func testRestartClosesOldConnection(tCtx ktesting.TContext) {
 	// Trigger reconnect by closing the shutdown channel (simulates dbus disconnect).
 	close(firstConn.shutdownChan)
 
-	// Wait for Close() to be called on the first connection by start().
+	// Wait for the watcher's deferred Close() call on the first connection.
 	select {
 	case <-firstConnClosedChan:
 	case <-time.After(5 * time.Second):
