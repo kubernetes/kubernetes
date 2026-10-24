@@ -552,8 +552,10 @@ func (a *Authenticator) refreshCredsLocked() error {
 //
 // It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) wrapCmdRunErrorLocked(err error, stdoutBytes []byte) error {
-	switch err := err.(type) {
-	case *exec.Error: // Binary does not exist (see exec.Error).
+	var execError *exec.Error
+	var exitError *exec.ExitError
+	switch {
+	case errors.As(err, &execError): // Binary does not exist (see exec.Error).
 		builder := strings.Builder{}
 		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
 
@@ -566,7 +568,7 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error, stdoutBytes []byte) err
 
 		return errors.New(builder.String())
 
-	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
+	case errors.As(err, &exitError): // Binary execution failed (see exec.Cmd.Run()).
 		if features.FeatureGates().Enabled(features.ExecPluginStatusError) {
 			stdoutTrimmed := bytes.TrimSpace(stdoutBytes)
 			if len(stdoutTrimmed) > 0 {
@@ -580,7 +582,7 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error, stdoutBytes []byte) err
 		return fmt.Errorf(
 			"exec: executable %s failed with exit code %d",
 			a.cmd,
-			err.ProcessState.ExitCode(),
+			exitError.ProcessState.ExitCode(),
 		)
 
 	default:
