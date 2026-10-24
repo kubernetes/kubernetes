@@ -28,6 +28,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// newThreadSafeMapForTest constructs the default threadSafeMap directly:
+// these tests exercise its internals, independent of KUBE_BYTECACHE.
+func newThreadSafeMapForTest(indexers Indexers, indices Indices) *threadSafeMap {
+	return &threadSafeMap{
+		items:   map[string]interface{}{},
+		index:   &storeIndex{indexers: indexers, indices: indices},
+		metrics: newStoreMetrics(InformerNameAndResource{}, noopInformerMetricsProvider{}),
+	}
+}
+
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	testIndexer := "testIndexer"
 
@@ -39,7 +49,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := newThreadSafeMapForTest(indexers, indices)
 
 	testKey := "testKey"
 
@@ -73,7 +83,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := newThreadSafeMapForTest(indexers, indices)
 
 	store.Add("retain", "retain")
 	store.Add("delete", "delete")
@@ -109,7 +119,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := newThreadSafeMapForTest(indexers, indices)
 
 	store.Add("key1", "foo")
 	store.Add("key2", "bar")
@@ -170,14 +180,14 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 
 func TestThreadSafeStoreRV(t *testing.T) {
 	t.Run("Initial state", func(t *testing.T) {
-		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store := newThreadSafeMapForTest(Indexers{}, Indices{})
 		if rv := store.LastStoreSyncResourceVersion(); rv != "" {
 			t.Errorf("Expected initial RV to be \"\", got %q", rv)
 		}
 	})
 
 	t.Run("Add Update and Delete", func(t *testing.T) {
-		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store := newThreadSafeMapForTest(Indexers{}, Indices{})
 
 		// Add obj with RV "10"
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
@@ -251,7 +261,7 @@ func TestThreadSafeStoreRV(t *testing.T) {
 	})
 
 	t.Run("Replace", func(t *testing.T) {
-		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store := newThreadSafeMapForTest(Indexers{}, Indices{})
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
 
 		if rv := store.LastStoreSyncResourceVersion(); rv != "10" {
@@ -271,7 +281,7 @@ func TestThreadSafeStoreRV(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store := newThreadSafeMapForTest(Indexers{}, Indices{})
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
 
 		if rv := store.LastStoreSyncResourceVersion(); rv != "10" {
@@ -387,7 +397,7 @@ func BenchmarkIndexer(b *testing.B) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := newThreadSafeMapForTest(indexers, indices)
 
 	// The following benchmark imitates what is happening in indexes
 	// used in storage layer, where indexing is mostly static (e.g.
