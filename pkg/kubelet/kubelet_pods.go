@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -160,7 +161,7 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	// So we check for the kubelet user first, if it exist and getsubids is present, we expect
 	// to get _some_ configuration. If the user exist and getsubids doesn't give us any
 	// configuration, then we consider the remote down and fail to start the kubelet.
-	found, err := getentUserExists(kubeletUser)
+	found, err := userExists(kubeletUser)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -194,12 +195,16 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	return parseGetSubIdsOutput(string(outUids))
 }
 
-// getentUserExists checks name via getent(1), so it sees NSS accounts (sssd,
-// LDAP, FreeIPA) that a static (CGO_ENABLED=0) os/user would miss.
-func getentUserExists(name string) (bool, error) {
+// userExists reports whether name is a known account. It uses getent(1), which
+// sees NSS accounts (sssd, LDAP, FreeIPA), and falls back to os/user when getent
+// is not on PATH.
+func userExists(name string) (bool, error) {
 	getent, err := exec.LookPath("getent")
 	if err != nil {
-		return false, nil // no getent: same as "not configured"
+		if _, err := user.Lookup(name); err != nil {
+			return false, nil
+		}
+		return true, nil
 	}
 	err = exec.Command(getent, "passwd", name).Run()
 	if err == nil {

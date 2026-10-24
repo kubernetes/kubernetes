@@ -23,6 +23,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -9024,7 +9025,7 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 	}
 }
 
-func TestGetentUserExists(t *testing.T) {
+func TestUserExists(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("getent is a Linux tool")
 	}
@@ -9050,7 +9051,7 @@ func TestGetentUserExists(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:      "getent not installed",
+			name:      "no getent, os/user reports not found",
 			wantFound: false,
 		},
 	}
@@ -9065,7 +9066,7 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			found, err := userExists("kubelet-nonexistent-test-user")
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
@@ -9079,6 +9080,23 @@ func TestGetentUserExists(t *testing.T) {
 				t.Errorf("%s: got found=%v, want %v", tc.name, found, tc.wantFound)
 			}
 		})
+	}
+
+	// With getent absent, an account that os/user resolves must be reported
+	// as found. Use the current user, and skip where it cannot be resolved.
+	if cur, err := user.Current(); err == nil {
+		if _, err := user.Lookup(cur.Username); err == nil {
+			t.Run("no getent, os/user finds an existing account", func(t *testing.T) {
+				t.Setenv("PATH", t.TempDir())
+				found, err := userExists(cur.Username)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if !found {
+					t.Errorf("got found=false for existing account %q, want true", cur.Username)
+				}
+			})
+		}
 	}
 }
 
