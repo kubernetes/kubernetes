@@ -1619,12 +1619,7 @@ function start-kubelet {
 
   local -r kubelet_env_file="/etc/default/kubelet"
 
-  local kubelet_cgroup_driver=""
-  if [[ "${CGROUP_CONFIG-}" == "cgroup2fs" ]]; then
-    kubelet_cgroup_driver="--cgroup-driver=systemd"
-  fi
-
-  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} ${kubelet_cgroup_driver:-}"
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
 
