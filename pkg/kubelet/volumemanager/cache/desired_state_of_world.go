@@ -258,6 +258,16 @@ const (
 	maxPodErrors = 10
 )
 
+// sizeLimitBytes rounds q up to whole bytes, reporting 0 for a value too large
+// for an int64. Zero already means "no limit" to callers.
+func sizeLimitBytes(q *resource.Quantity) int64 {
+	bytes, ok := q.AsScaledInt64(0)
+	if !ok {
+		return 0
+	}
+	return bytes
+}
+
 func (dsw *desiredStateOfWorld) AddPodToVolume(
 	logger klog.Logger,
 	podName types.UniquePodName,
@@ -315,12 +325,13 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
 				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
-				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
-				if volumeSpec.Volume.EmptyDir != nil &&
-					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
-					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
-					(sizeLimit.Value() == 0 || volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value()) {
-					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
+				podLimitBytes := sizeLimitBytes(&ephemeralStorageLimit)
+				sizeLimit = resource.NewQuantity(podLimitBytes, resource.BinarySI)
+				if volumeSpec.Volume.EmptyDir != nil && volumeSpec.Volume.EmptyDir.SizeLimit != nil {
+					volumeLimitBytes := sizeLimitBytes(volumeSpec.Volume.EmptyDir.SizeLimit)
+					if volumeLimitBytes > 0 && (podLimitBytes == 0 || volumeLimitBytes < podLimitBytes) {
+						sizeLimit = resource.NewQuantity(volumeLimitBytes, resource.BinarySI)
+					}
 				}
 			}
 		}
