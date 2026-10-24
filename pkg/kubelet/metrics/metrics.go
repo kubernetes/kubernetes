@@ -17,8 +17,10 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -1656,5 +1658,45 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 		return PriorityBucketLow
 	default:
 		return PriorityBucketVeryLow
+	}
+}
+
+// GetImageNameForMetrics strips the tag and digest from an image reference for use in metrics
+// labels. This bounds cardinality to distinct repositories regardless of tagging scheme.
+// Only a ':' after the last '/' is treated as a tag separator so registry ports are preserved.
+func GetImageNameForMetrics(image string) string {
+	if before, _, found := strings.Cut(image, "@"); found {
+		image = before
+	}
+	slash := strings.LastIndex(image, "/")
+	tail := image[slash+1:]
+	if before, _, found := strings.Cut(tail, ":"); found {
+		image = image[:slash+1] + before
+	}
+	return image
+}
+
+// ObserveImagePullDuration records an image pull duration observation with image and pull_policy
+// attached as exemplar labels rather than metric labels, avoiding unbounded cardinality growth.
+func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
+	metrics.ObserveWithExemplar(ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize)), duration, imagePullExemplarLabels(image, pullPolicy))
+}
+
+// imagePullExemplarLabels builds the exemplar labels for an image pull observation.
+//
+// client_golang panics if the exemplar label names and values together exceed
+// metrics.ExemplarMaxRunes or contain invalid UTF-8. The image reference comes from the pod
+// spec and is not bounded, so it is truncated to the remaining rune budget (keeping the registry
+// and the start of the repository path) instead of crashing the pull path. The full reference
+// is still available in the pull event and log.
+func imagePullExemplarLabels(image, pullPolicy string) map[string]string {
+	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
+	budget := max(metrics.ExemplarMaxRunes-utf8.RuneCountInString("image"+"pull_policy"+pullPolicy), 0)
+	if utf8.RuneCountInString(image) > budget {
+		image = string([]rune(image)[:budget])
+	}
+	return map[string]string{
+		"image":       image,
+		"pull_policy": pullPolicy,
 	}
 }
