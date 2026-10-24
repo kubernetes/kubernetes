@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -164,6 +165,118 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
 				return validateDirExists(filepath.Join(podDir, "volume-subpaths/volume/container/index"))
+			},
+		},
+
+		// #105536: residual CSI vol_data.json after reboot must not block orphan cleanup.
+		"pod-doesnot-exist-with-csi-vol-data-json": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake")
+				if err := os.MkdirAll(filepath.Join(volumePath, "mount"), 0750); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{"driverName":"test.csi"}`), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return validateDirNotExists(podDir)
+			},
+		},
+		// Non-metadata content under a CSI volume path must be preserved.
+		"pod-doesnot-exist-with-csi-userdata-preserved": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake")
+				if err := os.MkdirAll(volumePath, 0750); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{"driverName":"test.csi"}`), 0640); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "userdata.txt"), []byte("keep-me"), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				dataPath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake/vol_data.json")
+				if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
+					return fmt.Errorf("expected vol_data.json removed, stat err=%v", err)
+				}
+				userPath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake/userdata.txt")
+				if _, err := os.Stat(userPath); err != nil {
+					return fmt.Errorf("expected userdata.txt preserved: %v", err)
+				}
+				return nil
+			},
+		},
+
+		// CSI plugin path as a file: ReadDir fails and is reported.
+		"pod-csi-plugin-dir-is-file": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				pluginPath := filepath.Join(podDir, "volumes/kubernetes.io~csi")
+				if err := os.MkdirAll(filepath.Dir(pluginPath), 0750); err != nil {
+					return err
+				}
+				return os.WriteFile(pluginPath, []byte("not-a-dir"), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				pluginPath := filepath.Join(kubelet.getPodDir("pod1uid"), "volumes/kubernetes.io~csi")
+				fi, err := os.Stat(pluginPath)
+				if err != nil {
+					return err
+				}
+				if fi.IsDir() {
+					return fmt.Errorf("expected plugin path to remain a file")
+				}
+				return nil
+			},
+		},
+		// Non-directory entry under CSI plugin dir is skipped.
+		"pod-csi-plugin-has-file-entry-skipped": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				pluginPath := filepath.Join(podDir, "volumes/kubernetes.io~csi")
+				if err := os.MkdirAll(pluginPath, 0750); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(pluginPath, "not-a-volume"), []byte("x"), 0640); err != nil {
+					return err
+				}
+				volumePath := filepath.Join(pluginPath, "pvc-ok")
+				if err := os.MkdirAll(volumePath, 0750); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{}`), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				dataPath := filepath.Join(kubelet.getPodDir("pod1uid"), "volumes/kubernetes.io~csi/pvc-ok/vol_data.json")
+				if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
+					return fmt.Errorf("expected vol_data cleaned, err=%v", err)
+				}
+				return nil
+			},
+		},
+		// Non-empty mount path blocks CSI metadata cleanup for that volume.
+		"pod-csi-nonempty-mount-blocks-cleanup": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake")
+				mountPath := filepath.Join(volumePath, "mount")
+				if err := os.MkdirAll(mountPath, 0750); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(mountPath, "stuck"), []byte("x"), 0640); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{}`), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				dataPath := filepath.Join(kubelet.getPodDir("pod1uid"), "volumes/kubernetes.io~csi/pvc-fake/vol_data.json")
+				if _, err := os.Stat(dataPath); err != nil {
+					return fmt.Errorf("expected vol_data to remain when mount dir non-empty: %v", err)
+				}
+				return nil
 			},
 		},
 		// TODO: test volume in volume-manager
@@ -311,4 +424,70 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanOrphanedCSIVolumeDirs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	logger, _ := ktesting.NewTestContext(t)
+
+	t.Run("plugin-dir-missing", func(t *testing.T) {
+		testKubelet := newTestKubelet(t, false)
+		defer testKubelet.Cleanup()
+		kl := testKubelet.kubelet
+		errs := kl.cleanOrphanedCSIVolumeDirs(logger, "pod-missing")
+		if len(errs) != 0 {
+			t.Fatalf("expected no errors, got %v", errs)
+		}
+	})
+
+	t.Run("plugin-dir-is-file", func(t *testing.T) {
+		testKubelet := newTestKubelet(t, false)
+		defer testKubelet.Cleanup()
+		kl := testKubelet.kubelet
+		uid := types.UID("pod-file")
+		pluginPath := filepath.Join(kl.getPodVolumesDir(uid), "kubernetes.io~csi")
+		if err := os.MkdirAll(filepath.Dir(pluginPath), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(pluginPath, []byte("x"), 0640); err != nil {
+			t.Fatal(err)
+		}
+		errs := kl.cleanOrphanedCSIVolumeDirs(logger, uid)
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 error, got %v", errs)
+		}
+		if !strings.Contains(errs[0].Error(), "reading CSI volume plugin dir") {
+			t.Fatalf("unexpected error: %v", errs[0])
+		}
+	})
+
+	t.Run("cleanup-artifact-error-propagates", func(t *testing.T) {
+		testKubelet := newTestKubelet(t, false)
+		defer testKubelet.Cleanup()
+		kl := testKubelet.kubelet
+		uid := types.UID("pod-block")
+		volumePath := filepath.Join(kl.getPodVolumesDir(uid), "kubernetes.io~csi", "pvc-x")
+		mountPath := filepath.Join(volumePath, "mount")
+		if err := os.MkdirAll(mountPath, 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(mountPath, "stuck"), []byte("x"), 0640); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{}`), 0640); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(filepath.Dir(volumePath), "not-dir"), []byte("x"), 0640); err != nil {
+			t.Fatal(err)
+		}
+		errs := kl.cleanOrphanedCSIVolumeDirs(logger, uid)
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 error from nonempty mount, got %v", errs)
+		}
+		if !strings.Contains(errs[0].Error(), "failed to clean residual CSI volume artifacts") {
+			t.Fatalf("unexpected error: %v", errs[0])
+		}
+	})
 }
