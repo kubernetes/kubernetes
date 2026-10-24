@@ -80,6 +80,10 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 			}
 		}
 	}
+	for i := range obj.Spec.VolumeClaimTemplates {
+		obj.Spec.VolumeClaimTemplates[i].APIVersion = ""
+		obj.Spec.VolumeClaimTemplates[i].Kind = ""
+	}
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart

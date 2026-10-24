@@ -99,6 +99,10 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
+	for i := range obj.Spec.VolumeClaimTemplates {
+		obj.Spec.VolumeClaimTemplates[i].APIVersion = ""
+		obj.Spec.VolumeClaimTemplates[i].Kind = ""
+	}
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart

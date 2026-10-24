@@ -25,14 +25,11 @@ import (
 	unsafe "unsafe"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	apicorev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -63,16 +60,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*appsv1beta1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Deployment_To_apps_Deployment(a.(*appsv1beta1.Deployment), b.(*apps.Deployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apps.Deployment)(nil), (*appsv1beta1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_Deployment_To_v1beta1_Deployment(a.(*apps.Deployment), b.(*appsv1beta1.Deployment), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*appsv1beta1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(a.(*appsv1beta1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
 	}); err != nil {
@@ -100,11 +87,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apps.DeploymentRollback)(nil), (*appsv1beta1.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(a.(*apps.DeploymentRollback), b.(*appsv1beta1.DeploymentRollback), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*appsv1beta1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(a.(*appsv1beta1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -233,6 +215,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*appsv1beta1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*appsv1beta1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetSpec)(nil), (*appsv1beta1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*appsv1beta1.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*appsv1beta1.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*appsv1beta1.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
 	}); err != nil {
@@ -253,8 +245,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*appsv1beta1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*appsv1beta1.StatefulSetSpec), scope)
+	if err := s.AddConversionFunc((*apps.Deployment)(nil), (*appsv1beta1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_Deployment_To_v1beta1_Deployment(a.(*apps.Deployment), b.(*appsv1beta1.Deployment), scope)
 	}); err != nil {
 		return err
 	}
@@ -263,13 +255,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*appsv1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*appsv1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
+	if err := s.AddConversionFunc((*appsv1beta1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(a.(*appsv1beta1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*appsv1beta1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*appsv1beta1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
+	if err := s.AddConversionFunc((*appsv1beta1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Deployment_To_apps_Deployment(a.(*appsv1beta1.Deployment), b.(*apps.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*appsv1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*appsv1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -333,11 +330,6 @@ func autoConvert_v1beta1_Deployment_To_apps_Deployment(in *appsv1beta1.Deploymen
 	return nil
 }
 
-// Convert_v1beta1_Deployment_To_apps_Deployment is an autogenerated conversion function.
-func Convert_v1beta1_Deployment_To_apps_Deployment(in *appsv1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
-	return autoConvert_v1beta1_Deployment_To_apps_Deployment(in, out, s)
-}
-
 func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *appsv1beta1.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -347,11 +339,6 @@ func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out 
 		return err
 	}
 	return nil
-}
-
-// Convert_apps_Deployment_To_v1beta1_Deployment is an autogenerated conversion function.
-func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *appsv1beta1.Deployment, s conversion.Scope) error {
-	return autoConvert_apps_Deployment_To_v1beta1_Deployment(in, out, s)
 }
 
 func autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
@@ -445,9 +432,7 @@ func Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.Depl
 }
 
 func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
+	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -458,20 +443,13 @@ func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.D
 	out.MinReadySeconds = in.MinReadySeconds
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	out.Paused = in.Paused
-	out.RollbackTo = (*apps.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
+	// WARNING: in.RollbackTo requires manual conversion: does not exist in peer-type
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
 	return nil
 }
 
-// Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec is an autogenerated conversion function.
-func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
-}
-
 func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta1.DeploymentSpec, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
+	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -482,7 +460,6 @@ func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.Deployme
 	out.MinReadySeconds = in.MinReadySeconds
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	out.Paused = in.Paused
-	out.RollbackTo = (*appsv1beta1.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
 	return nil
 }
@@ -513,16 +490,7 @@ func Convert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.Deployme
 }
 
 func autoConvert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *appsv1beta1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = apps.DeploymentStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(apps.RollingUpdateDeployment)
-		if err := Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
+	*out = *(*apps.DeploymentStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -532,16 +500,7 @@ func Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy(in *appsv1bet
 }
 
 func autoConvert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.DeploymentStrategy, out *appsv1beta1.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = appsv1beta1.DeploymentStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(appsv1beta1.RollingUpdateDeployment)
-		if err := Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
+	*out = *(*appsv1beta1.DeploymentStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -571,12 +530,7 @@ func Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConf
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *appsv1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
-		return err
-	}
+	*out = *(*apps.RollingUpdateDeployment)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -586,12 +540,7 @@ func Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in 
 }
 
 func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *appsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
-	if err := v1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
-		return err
-	}
+	*out = *(*appsv1beta1.RollingUpdateDeployment)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -601,10 +550,7 @@ func Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in 
 }
 
 func autoConvert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *appsv1beta1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
-		return err
-	}
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	*out = *(*apps.RollingUpdateStatefulSetStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -614,10 +560,7 @@ func Convert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateState
 }
 
 func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1beta1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *appsv1beta1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
-		return err
-	}
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	*out = *(*appsv1beta1.RollingUpdateStatefulSetStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -826,49 +769,38 @@ func Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1beta1_Sta
 }
 
 func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
-	out.ServiceName = in.ServiceName
-	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
-	if err := Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
-	out.MinReadySeconds = in.MinReadySeconds
-	out.PersistentVolumeClaimRetentionPolicy = (*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
-	out.Ordinals = (*apps.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	*out = *(*apps.StatefulSetSpec)(unsafe.Pointer(in))
 	return nil
+}
+
+// Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec is an autogenerated conversion function.
+func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s)
 }
 
 func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	out.VolumeClaimTemplates = *(*[]apicorev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
-	out.ServiceName = in.ServiceName
-	out.PodManagementPolicy = appsv1beta1.PodManagementPolicyType(in.PodManagementPolicy)
-	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
-	out.MinReadySeconds = in.MinReadySeconds
-	out.PersistentVolumeClaimRetentionPolicy = (*appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
-	out.Ordinals = (*appsv1beta1.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	*out = *(*appsv1beta1.StatefulSetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
+// Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec is an autogenerated conversion function.
+func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in, out, s)
+}
+
 func autoConvert_v1beta1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
-	*out = *(*apps.StatefulSetStatus)(unsafe.Pointer(in))
+	if err := v1.Convert_Pointer_int64_To_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+		return err
+	}
+	out.Replicas = in.Replicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.CurrentReplicas = in.CurrentReplicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.CurrentRevision = in.CurrentRevision
+	out.UpdateRevision = in.UpdateRevision
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
@@ -878,7 +810,18 @@ func Convert_v1beta1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta1
 }
 
 func autoConvert_apps_StatefulSetStatus_To_v1beta1_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1beta1.StatefulSetStatus, s conversion.Scope) error {
-	*out = *(*appsv1beta1.StatefulSetStatus)(unsafe.Pointer(in))
+	if err := v1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+		return err
+	}
+	out.Replicas = in.Replicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.CurrentReplicas = in.CurrentReplicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.CurrentRevision = in.CurrentRevision
+	out.UpdateRevision = in.UpdateRevision
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	out.Conditions = *(*[]appsv1beta1.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
@@ -888,16 +831,7 @@ func Convert_apps_StatefulSetStatus_To_v1beta1_StatefulSetStatus(in *apps.Statef
 }
 
 func autoConvert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1beta1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(apps.RollingUpdateStatefulSetStrategy)
-		if err := Convert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
+	*out = *(*apps.StatefulSetUpdateStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -907,16 +841,7 @@ func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy
 }
 
 func autoConvert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *appsv1beta1.StatefulSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = appsv1beta1.StatefulSetUpdateStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(appsv1beta1.RollingUpdateStatefulSetStrategy)
-		if err := Convert_apps_RollingUpdateStatefulSetStrategy_To_v1beta1_RollingUpdateStatefulSetStrategy(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
+	*out = *(*appsv1beta1.StatefulSetUpdateStrategy)(unsafe.Pointer(in))
 	return nil
 }
 

@@ -18,16 +18,16 @@ package v1beta1
 
 import (
 	"fmt"
+	"maps"
+	"strconv"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -80,44 +80,53 @@ func Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(in *appsv1beta1.Scal
 	return nil
 }
 
-// Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
-// setting apiVersion/kind in nested persistent volume claim objects.
-func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s); err != nil {
+// Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec is defined here, because public
+// conversion is not auto-generated due to existing warnings.
+func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
+}
+
+func Convert_v1beta1_Deployment_To_apps_Deployment(in *appsv1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_Deployment_To_apps_Deployment(in, out, s); err != nil {
 		return err
 	}
-	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
-	// see https://issue.k8s.io/87583
-	if out.VolumeClaimTemplates != nil {
-		// copy so we don't modify the input
-		templatesCopy := make([]core.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
-		copy(templatesCopy, out.VolumeClaimTemplates)
-		out.VolumeClaimTemplates = templatesCopy
-		for i := range out.VolumeClaimTemplates {
-			out.VolumeClaimTemplates[i].APIVersion = ""
-			out.VolumeClaimTemplates[i].Kind = ""
+
+	if in.Spec.RollbackTo != nil {
+		out.Annotations = deepCopyStringMap(out.Annotations)
+		out.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
+	} else if out.Annotations != nil {
+		if _, ok := out.Annotations[apps.DeprecatedRollbackTo]; ok {
+			out.Annotations = deepCopyStringMap(out.Annotations)
+			delete(out.Annotations, apps.DeprecatedRollbackTo)
 		}
 	}
+
 	return nil
 }
 
-// Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
-// setting apiVersion/kind in nested persistent volume claim objects.
-func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
-	if err := autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in, out, s); err != nil {
+func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *appsv1beta1.Deployment, s conversion.Scope) error {
+	if err := autoConvert_apps_Deployment_To_v1beta1_Deployment(in, out, s); err != nil {
 		return err
 	}
-	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
-	// see https://issue.k8s.io/87583
-	if out.VolumeClaimTemplates != nil {
-		// copy so we don't modify the input
-		templatesCopy := make([]corev1.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
-		copy(templatesCopy, out.VolumeClaimTemplates)
-		out.VolumeClaimTemplates = templatesCopy
-		for i := range out.VolumeClaimTemplates {
-			out.VolumeClaimTemplates[i].APIVersion = "v1"
-			out.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
+
+	if revision := in.Annotations[apps.DeprecatedRollbackTo]; revision != "" {
+		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
+			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %w", apps.DeprecatedRollbackTo, revision, err)
+		} else {
+			out.Spec.RollbackTo = new(appsv1beta1.RollbackConfig)
+			out.Spec.RollbackTo.Revision = revision64
 		}
+		out.Annotations = deepCopyStringMap(out.Annotations)
+		delete(out.Annotations, apps.DeprecatedRollbackTo)
+	} else {
+		out.Spec.RollbackTo = nil
 	}
+
 	return nil
+}
+
+func deepCopyStringMap(m map[string]string) map[string]string {
+	ret := make(map[string]string, len(m))
+	maps.Copy(ret, m)
+	return ret
 }

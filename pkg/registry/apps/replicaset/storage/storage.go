@@ -46,6 +46,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/replicaset"
+	"k8s.io/utils/ptr"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -280,7 +281,7 @@ func scaleFromReplicaSet(rs *apps.ReplicaSet) (*autoscaling.Scale, error) {
 			CreationTimestamp: rs.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: rs.Spec.Replicas,
+			Replicas: ptr.Deref(rs.Spec.Replicas, 0),
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: rs.Status.Replicas,
@@ -366,7 +367,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	// move replicas/resourceVersion fields to object and return
-	replicaset.Spec.Replicas = scale.Spec.Replicas
+	replicaset.Spec.Replicas = new(scale.Spec.Replicas)
 	replicaset.ResourceVersion = scale.ResourceVersion
 
 	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
