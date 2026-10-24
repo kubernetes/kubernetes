@@ -71,6 +71,8 @@ func processEnvFileLine(line []byte, filePath string,
 
 // AddFromEnvFile processes an env file allows a generic addTo to handle the
 // collection of key value pairs or returns an error.
+// A value can span multiple lines by writing `KEY="""` on its own line,
+// followed by the value lines and a closing line containing only `"""`.
 func AddFromEnvFile(filePath string, addTo func(key, value string) error) error {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -93,6 +95,23 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 		if len(key) == 0 {
 			// no key means line was empty or a comment
 			continue
+		}
+
+		if value == `"""` {
+			startLine := currentLine
+			var lines []string
+			for {
+				if !scanner.Scan() {
+					return fmt.Errorf("env file %s has an unterminated multi-line value for key %q starting at line %d",
+						filePath, key, startLine)
+				}
+				currentLine++
+				if scanner.Text() == `"""` {
+					break
+				}
+				lines = append(lines, scanner.Text())
+			}
+			value = strings.Join(lines, "\n")
 		}
 
 		if err = addTo(key, value); err != nil {
