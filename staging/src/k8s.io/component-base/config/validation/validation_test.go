@@ -177,3 +177,26 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateLeaderElectionConfigurationReportsLeaseDuration(t *testing.T) {
+	cfg := &config.LeaderElectionConfiguration{
+		ResourceLock:      "leases",
+		LeaderElect:       true,
+		LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+		RenewDeadline:     metav1.Duration{Duration: 45 * time.Second},
+		RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+		ResourceNamespace: "namespace",
+		ResourceName:      "name",
+	}
+
+	errs := ValidateLeaderElectionConfiguration(cfg, field.NewPath("leaderElectionConfiguration"))
+	if len(errs) != 1 {
+		t.Fatalf("expected exactly one error, got %d: %v", len(errs), errs)
+	}
+	if want := "leaderElectionConfiguration.leaseDuration"; errs[0].Field != want {
+		t.Errorf("expected the error to be reported on %q, got %q", want, errs[0].Field)
+	}
+	if errs[0].BadValue != cfg.LeaseDuration {
+		t.Errorf("expected the error to carry the leaseDuration %v, got %v", cfg.LeaseDuration, errs[0].BadValue)
+	}
+}
