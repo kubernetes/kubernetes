@@ -866,12 +866,13 @@ func TestNodeExpandVolume(t *testing.T) {
 			mustFail:   false,
 		},
 		{
-			// TODO(#141166): A size past int64 must be rejected before the CSI call.
+			// Value saturates at MaxInt64 for this input, so the driver would be
+			// asked to resize to a byte count the request never named.
 			name:       "with quantity past int64",
 			volID:      "vol-1234",
 			volumePath: "/foo/bar",
 			newSize:    resource.MustParse("100E"),
-			mustFail:   false,
+			mustFail:   true,
 		},
 	}
 

@@ -322,6 +322,14 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, errors.New("size can not be less than 0")
 	}
 
+	// CapacityRange.RequiredBytes is an int64. Value saturates at MaxInt64 when
+	// the quantity does not fit, so a size past int64 would ask the driver to
+	// resize to a byte count the request never named. Reject it instead.
+	requiredBytes, ok := opts.newSize.AsScaledInt64(0)
+	if !ok {
+		return opts.newSize, fmt.Errorf("size %s is too large to express as an int64 number of bytes", opts.newSize.String())
+	}
+
 	accessModeMapper, err := c.getNodeV1AccessModeMapper(ctx)
 	if err != nil {
 		return opts.newSize, err
@@ -336,7 +344,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 	req := &csipbv1.NodeExpandVolumeRequest{
 		VolumeId:      opts.volumeID,
 		VolumePath:    opts.volumePath,
-		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: requiredBytes},
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
 				Mode: accessModeMapper(opts.accessMode),
