@@ -54,7 +54,10 @@ import (
 	"github.com/onsi/gomega"
 )
 
-const rootCAConfigMapName = "kube-root-ca.crt"
+const (
+	rootCAConfigMapName        = "kube-root-ca.crt"
+	kubeAPIServerServingSigner = "kubernetes.io/kube-apiserver-serving"
+)
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
@@ -164,6 +167,37 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		if !ok || len(nodeUID) != 1 || nodeUID[0] != string(node.UID) {
 			framework.Failf("expected single authentication.kubernetes.io/node-uid extra info item matching %v, got %v", node.UID, nodeUID)
 		}
+	})
+
+	framework.It("should mount CA from signerName='kubernetes.io/kube-apiserver-serving' ClusterTrustBundle into pods", f.WithFeatureGate(features.KubeAPIServerWorkloadsTrust), func(ctx context.Context) {
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(ctx, &v1.ServiceAccount{Name: "mount-test"}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, &v1.Pod{
+			Name: "pod-service-account-" + string(uuid.NewUUID()),
+			Spec: v1.PodSpec{
+				ServiceAccountName: sa.Name,
+				Containers: []v1.Container{{
+					Name:    "test",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sleep", "100000"},
+				}},
+				TerminationGracePeriodSeconds: new(int64(0)),
+				RestartPolicy:                 v1.RestartPolicyNever,
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+		mountedCA, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey))
+		framework.ExpectNoError(err)
+
+		servingTrustBundles, err := f.ClientSet.CertificatesV1().ClusterTrustBundles().List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.signerName=%s", kubeAPIServerServingSigner)})
+		framework.ExpectNoError(err)
+		gomega.Expect(servingTrustBundles.Items).To(gomega.HaveLen(1)) // currently we only ever create a single ClusterTrustBundle for the signer
+
+		gomega.Expect(mountedCA).To(gomega.Equal(servingTrustBundles.Items[0].Spec.TrustBundle))
 	})
 
 	/*
