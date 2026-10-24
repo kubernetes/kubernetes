@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -395,7 +396,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Listing mounted volumes in the pod")
-		hostExec := storageutils.NewHostExec(f)
+		hostExec := e2ehostexec.New(f)
 		ginkgo.DeferCleanup(hostExec.Cleanup)
 		volumePaths, devicePaths, err := listPodVolumePluginDirectory(ctx, hostExec, pod, node)
 		framework.ExpectNoError(err)
@@ -481,7 +482,7 @@ func swapVolumeMode(podTemplate *v1.Pod) *v1.Pod {
 //
 //	/var/lib/kubelet/pods/a4717a30-000a-4081-a7a8-f51adf280036/volumes/kubernetes.io~secret/default-token-rphdt
 //	/var/lib/kubelet/pods/4475b7a3-4a55-4716-9119-fd0053d9d4a6/volumeDevices/kubernetes.io~aws-ebs/pvc-5f9f80f5-c90b-4586-9966-83f91711e1c0
-func listPodVolumePluginDirectory(ctx context.Context, h storageutils.HostExec, pod *v1.Pod, node *v1.Node) (mounts []string, devices []string, err error) {
+func listPodVolumePluginDirectory(ctx context.Context, h e2ehostexec.HostExec, pod *v1.Pod, node *v1.Node) (mounts []string, devices []string, err error) {
 	mountPath := filepath.Join("/var/lib/kubelet/pods/", string(pod.UID), "volumes")
 	devicePath := filepath.Join("/var/lib/kubelet/pods/", string(pod.UID), "volumeDevices")
 
@@ -496,7 +497,7 @@ func listPodVolumePluginDirectory(ctx context.Context, h storageutils.HostExec, 
 	return mounts, devices, nil
 }
 
-func listPodDirectory(ctx context.Context, h storageutils.HostExec, path string, node *v1.Node) ([]string, error) {
+func listPodDirectory(ctx context.Context, h e2ehostexec.HostExec, path string, node *v1.Node) ([]string, error) {
 	// Return no error if the directory does not exist (e.g. there are no block volumes used)
 	_, err := h.IssueCommandWithResult(ctx, "test ! -d "+path, node)
 	if err == nil {

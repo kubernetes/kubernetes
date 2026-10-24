@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -567,7 +568,7 @@ func GetSectorSize(ctx context.Context, f *framework.Framework, pod *v1.Pod, dev
 }
 
 // findMountPoints returns all mount points on given node under specified directory.
-func findMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node, dir string) []string {
+func findMountPoints(ctx context.Context, hostExec e2ehostexec.HostExec, node *v1.Node, dir string) []string {
 	result, err := hostExec.IssueCommandWithResult(ctx, fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$' || true`, dir), node)
 	framework.ExpectNoError(err, "Encountered HostExec error.")
 	var mountPoints []string
@@ -583,8 +584,8 @@ func findMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node, dir 
 }
 
 // FindVolumeGlobalMountPoints returns all volume global mount points on the node of given pod.
-func FindVolumeGlobalMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node) sets.String {
-	return sets.NewString(findMountPoints(ctx, hostExec, node, "/var/lib/kubelet/plugins")...)
+func FindVolumeGlobalMountPoints(ctx context.Context, hostExec e2ehostexec.HostExec, node *v1.Node) sets.Set[string] {
+	return sets.New(findMountPoints(ctx, hostExec, node, "/var/lib/kubelet/plugins")...)
 }
 
 // CreateDriverNamespace creates a namespace for CSI driver installation.
