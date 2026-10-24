@@ -711,6 +711,29 @@ func TestOnlyResetResourceSizeEstimator(s storage.Interface) {
 	}
 }
 
+// TestOnlyWaitForWatches waits until every watch started on s has finished
+// processing events and closed its result channel. Stopping a watch only
+// cancels it, so without this an event decode scheduled before the stop can
+// still run after the test that started the watch has returned. Every watch
+// on s must already be stopped, otherwise this times out.
+func TestOnlyWaitForWatches(s storage.Interface, timeout time.Duration) error {
+	st, ok := s.(*store)
+	if !ok {
+		return nil
+	}
+	done := make(chan struct{})
+	go func() {
+		st.watcher.running.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("watches on %s still running after %v", st.groupResource, timeout)
+	}
+}
+
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
 	prefix, err := s.prepareKey(s.resourcePrefix, true)
