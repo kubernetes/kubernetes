@@ -17,7 +17,12 @@ limitations under the License.
 package flexvolume
 
 import (
+	"errors"
 	"testing"
+	"time"
+
+	"k8s.io/utils/exec"
+	exectesting "k8s.io/utils/exec/testing"
 )
 
 func TestHandleResponseDefaults(t *testing.T) {
@@ -28,5 +33,29 @@ func TestHandleResponseDefaults(t *testing.T) {
 
 	if *ds.Capabilities != *defaultCapabilities() {
 		t.Error("wrong default capabilities: ", *ds.Capabilities)
+	}
+}
+
+func TestDriverCallTimeout(t *testing.T) {
+	plugin := &flexVolumePlugin{
+		driverName: "test",
+		execPath:   "/plugin",
+		runner: fakeRunner(func(_ string, _ ...string) exec.Cmd {
+			return &exectesting.FakeCmd{
+				CombinedOutputScript: []exectesting.FakeAction{
+					func() ([]byte, []byte, error) {
+						// Let the timeout callback run without synchronizing with its flag update.
+						time.Sleep(20 * time.Millisecond)
+						return nil, nil, errors.New("command stopped")
+					},
+				},
+			}
+		}),
+	}
+
+	call := plugin.NewDriverCallWithTimeout("test", time.Millisecond)
+	_, err := call.Run()
+	if err != errTimeout {
+		t.Fatalf("expected timeout error %v, got %v", errTimeout, err)
 	}
 }
