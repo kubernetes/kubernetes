@@ -63,6 +63,16 @@ func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
 	return volume.Spec.StorageClassName
 }
 
+// ContainsAccessMode returns true if the requested access mode is present.
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
