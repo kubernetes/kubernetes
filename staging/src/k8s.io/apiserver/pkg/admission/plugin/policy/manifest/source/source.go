@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/util/filesystem"
@@ -61,9 +62,27 @@ type StaticPolicySource[P, B runtime.Object, E generic.Evaluator] struct {
 	getBindingPolicyName BindingPolicyName[B]
 	manifestType         metrics.ManifestType
 
+	staticPolicySourceOptions[P, B]
+
 	current      atomic.Pointer[[]generic.PolicyHook[P, B, E]]
 	lastReadHash atomic.Pointer[string] // hash of last file content read (for short-circuiting)
 	hasSynced    atomic.Bool
+}
+
+// StaticPolicySourceOption configures optional behavior of a static policy source.
+type StaticPolicySourceOption[P, B runtime.Object] func(*staticPolicySourceOptions[P, B])
+
+type staticPolicySourceOptions[P, B runtime.Object] struct {
+	newCoverageGaps func(P, B) *coverage.Gaps
+}
+
+// WithCoverageGapsFunc makes the source build PolicyHook.CoverageGaps
+// with f, called for each (policy, binding) pair whenever the manifests are
+// compiled.
+func WithCoverageGapsFunc[P, B runtime.Object](f func(P, B) *coverage.Gaps) StaticPolicySourceOption[P, B] {
+	return func(o *staticPolicySourceOptions[P, B]) {
+		o.newCoverageGaps = f
+	}
 }
 
 // NewStaticPolicySource creates a new static policy source that loads configurations from the specified directory.
@@ -73,9 +92,10 @@ func NewStaticPolicySource[P, B runtime.Object, E generic.Evaluator](
 	loadFunc PolicyLoadFunc[P, B],
 	getBindingPolicyName BindingPolicyName[B],
 	manifestType metrics.ManifestType,
+	opts ...StaticPolicySourceOption[P, B],
 ) *StaticPolicySource[P, B, E] {
 	metrics.RegisterMetrics()
-	return &StaticPolicySource[P, B, E]{
+	s := &StaticPolicySource[P, B, E]{
 		manifestsDir:         manifestsDir,
 		apiServerID:          apiServerID,
 		reloadInterval:       defaultReloadInterval,
@@ -84,6 +104,10 @@ func NewStaticPolicySource[P, B runtime.Object, E generic.Evaluator](
 		getBindingPolicyName: getBindingPolicyName,
 		manifestType:         manifestType,
 	}
+	for _, opt := range opts {
+		opt(&s.staticPolicySourceOptions)
+	}
+	return s
 }
 
 // LoadInitial performs the initial load of manifests.
@@ -144,6 +168,12 @@ func (s *StaticPolicySource[P, B, E]) compile(policies []P, bindings []B) ([]gen
 			Policy:    policy,
 			Bindings:  bindingsByPolicy[nameGetter.GetName()],
 			Evaluator: evaluator,
+		}
+		if s.newCoverageGaps != nil {
+			hook.CoverageGaps = make([]*coverage.Gaps, len(hook.Bindings))
+			for i, binding := range hook.Bindings {
+				hook.CoverageGaps[i] = s.newCoverageGaps(policy, binding)
+			}
 		}
 		hooks = append(hooks, hook)
 	}

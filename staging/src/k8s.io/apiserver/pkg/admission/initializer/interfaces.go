@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -109,6 +110,14 @@ type WantsSchemaResolver interface {
 // for an admission plugin that needs it.
 type WantsExcludedAdmissionResources interface {
 	SetExcludedAdmissionResources(excludedAdmissionResources []schema.GroupResource)
+	admission.InitializationValidator
+}
+
+// WantsAdmissionCoverage defines a function which sets the admission coverage
+// requirements for plugins that dispatch to configurable hooks (webhooks,
+// admission policies).
+type WantsAdmissionCoverage interface {
+	SetAdmissionCoverage(requirements []coverage.Requirement)
 	admission.InitializationValidator
 }
 

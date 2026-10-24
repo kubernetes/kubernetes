@@ -53,9 +53,13 @@ var (
 // ObserverFunc is a func that emits metrics.
 type ObserverFunc func(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string)
 
+// Values of the kind label of match condition and coverage metrics.
 const (
-	kindWebhook  = "webhook"
-	kindPolicy   = "policy"
+	KindWebhook = "webhook"
+	KindPolicy  = "policy"
+)
+
+const (
 	stepValidate = "validate"
 	stepAdmit    = "admit"
 )
@@ -123,6 +127,7 @@ type AdmissionMetrics struct {
 	matchConditionEvalErrors        *metrics.CounterVec
 	matchConditionExclusions        *metrics.CounterVec
 	matchConditionEvaluationSeconds *metricSet
+	coverageViolations              *metrics.CounterVec
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -257,6 +262,16 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		latenciesSummary: nil,
 	}
 
+	coverageViolations := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "coverage_violations_total",
+			Help:           "Admission coverage violations count, identified by name of the webhook or policy that intercepts a coverage source but not its target, and broken out for each kind (webhook or policy), admission type (validate or admit), and operation.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "kind", "type", "operation"})
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
@@ -266,7 +281,8 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	legacyregistry.MustRegister(webhookRequest)
 	legacyregistry.MustRegister(matchConditionEvalError)
 	legacyregistry.MustRegister(matchConditionExclusions)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds}
+	legacyregistry.MustRegister(coverageViolations)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds, coverageViolations: coverageViolations}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -328,6 +344,12 @@ func (m *AdmissionMetrics) ObserveMatchConditionExclusion(ctx context.Context, n
 // ObserveMatchConditionEvaluationTime records duration of match condition evaluation process.
 func (m *AdmissionMetrics) ObserveMatchConditionEvaluationTime(ctx context.Context, elapsed time.Duration, name, kind, stepType, operation string) {
 	m.matchConditionEvaluationSeconds.observe(ctx, elapsed, name, kind, stepType, operation)
+}
+
+// ObserveCoverageViolation records a webhook or policy that intercepts a coverage source but not
+// the target of a request.
+func (m *AdmissionMetrics) ObserveCoverageViolation(ctx context.Context, name, kind, stepType, operation string) {
+	m.coverageViolations.WithContext(ctx).WithLabelValues(name, kind, stepType, operation).Inc()
 }
 
 type metricSet struct {

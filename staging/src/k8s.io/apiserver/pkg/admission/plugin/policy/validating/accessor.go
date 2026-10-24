@@ -84,3 +84,13 @@ func (v *validatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1.Match
 func (v *validatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
 	return v.Spec.ParamRef
 }
+
+// policyOf and bindingOf unwrap accessors built by this package, e.g. those in
+// a generic.CoverageViolation from the dispatcher's coverage checker.
+func policyOf(a generic.PolicyAccessor) *v1.ValidatingAdmissionPolicy {
+	return a.(*validatingAdmissionPolicyAccessor).ValidatingAdmissionPolicy
+}
+
+func bindingOf(a generic.BindingAccessor) *v1.ValidatingAdmissionPolicyBinding {
+	return a.(*validatingAdmissionPolicyBindingAccessor).ValidatingAdmissionPolicyBinding
+}
