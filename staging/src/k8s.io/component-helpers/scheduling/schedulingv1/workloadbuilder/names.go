@@ -19,6 +19,7 @@ package workloadbuilder
 import (
 	"fmt"
 	"hash/fnv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -42,9 +43,10 @@ func GenerateWorkloadName(ownerName string, ownerUID types.UID) string {
 		return hash
 	}
 
+	// A truncated prefix must not leave a label separator before the next "-".
 	maxPrefixLen := validation.DNS1123SubdomainMaxLength - len(hash) - 1
 	if len(ownerName) > maxPrefixLen {
-		ownerName = ownerName[:maxPrefixLen]
+		ownerName = strings.TrimRight(ownerName[:maxPrefixLen], ".")
 	}
 	return fmt.Sprintf("%s-%s", ownerName, hash)
 }
@@ -60,19 +62,20 @@ func GeneratePodGroupName(workloadName, templateName string) string {
 	_, _ = hasher.Write([]byte(templateName))
 	hash := rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 
+	// A truncated prefix must not leave a label separator before the next "-".
 	maxPrefixLen := validation.DNS1123SubdomainMaxLength - len(hash) - 1
 	if workloadName == "" {
 		if templateName == "" {
 			return hash
 		}
 		if len(templateName) > maxPrefixLen {
-			templateName = templateName[:maxPrefixLen]
+			templateName = strings.TrimRight(templateName[:maxPrefixLen], ".")
 		}
 		return fmt.Sprintf("%s-%s", templateName, hash)
 	}
 	if templateName == "" {
 		if len(workloadName) > maxPrefixLen {
-			workloadName = workloadName[:maxPrefixLen]
+			workloadName = strings.TrimRight(workloadName[:maxPrefixLen], ".")
 		}
 		return fmt.Sprintf("%s-%s", workloadName, hash)
 	}
@@ -83,12 +86,12 @@ func GeneratePodGroupName(workloadName, templateName string) string {
 		half := maxAvailable / 2
 		switch {
 		case len(wl) <= half:
-			tpl = tpl[:maxAvailable-len(wl)]
+			tpl = strings.TrimRight(tpl[:maxAvailable-len(wl)], ".")
 		case len(tpl) <= half:
-			wl = wl[:maxAvailable-len(tpl)]
+			wl = strings.TrimRight(wl[:maxAvailable-len(tpl)], ".")
 		default:
-			wl = wl[:maxAvailable-half]
-			tpl = tpl[:half]
+			wl = strings.TrimRight(wl[:maxAvailable-half], ".")
+			tpl = strings.TrimRight(tpl[:half], ".")
 		}
 	}
 	return fmt.Sprintf("%s-%s-%s", wl, tpl, hash)
