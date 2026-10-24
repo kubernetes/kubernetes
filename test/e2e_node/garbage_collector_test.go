@@ -71,7 +71,7 @@ type testRun struct {
 }
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
-// http://kubernetes.io/docs/admin/garbage-collection/
+// https://kubernetes.io/docs/concepts/architecture/garbage-collection/
 var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
