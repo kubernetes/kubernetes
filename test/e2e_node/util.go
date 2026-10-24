@@ -338,7 +338,7 @@ func findKubeletServiceName(running bool) string {
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	gomega.Expect(matches).ToNot(gomega.BeEmpty(), "Found more than one kubelet service running: %q", stdout)
+	gomega.Expect(matches).ToNot(gomega.BeEmpty(), "No kubelet service found: %q", stdout)
 	kubeletServiceName := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
 	return kubeletServiceName
