@@ -69,7 +69,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
-	return &ControllerExpectations{ttlStore}, fakeClock
+	return &ControllerExpectations{Store: ttlStore, clock: fakeClock}, fakeClock
 }
 
 func newReplicationController(replicas int) *v1.ReplicationController {
