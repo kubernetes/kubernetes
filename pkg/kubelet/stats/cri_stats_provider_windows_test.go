@@ -574,3 +574,24 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	assert.Equal(t, *got.Logs.UsedBytes, logStatsUsed, "Logs.UsedBytes does not match expected value")
 	assert.Equal(t, *got.Logs.InodesUsed, logStatsInodesUsed, "Logs.InodesUsed does not match expected value")
 }
+
+func Test_criInterfaceToWinSummary_droppedCounters(t *testing.T) {
+	criIface := &runtimeapi.WindowsNetworkInterfaceUsage{
+		Name:             "eth0",
+		RxBytes:          &runtimeapi.UInt64Value{Value: 1000},
+		RxPacketsDropped: &runtimeapi.UInt64Value{Value: 7},
+		TxBytes:          &runtimeapi.UInt64Value{Value: 2000},
+		TxPacketsDropped: &runtimeapi.UInt64Value{Value: 3},
+	}
+	got := criInterfaceToWinSummary(criIface)
+	want := statsapi.InterfaceStats{
+		Name:      "eth0",
+		RxBytes:   ptr.To[uint64](1000),
+		RxDropped: ptr.To[uint64](7),
+		TxBytes:   ptr.To[uint64](2000),
+		TxDropped: ptr.To[uint64](3),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("criInterfaceToWinSummary() = %#v, want %#v", got, want)
+	}
+}
