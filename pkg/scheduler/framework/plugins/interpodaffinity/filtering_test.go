@@ -1064,6 +1064,54 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 }
 
+func TestPreFilterDoesNotSkipPodGroupSchedulingCycle(t *testing.T) {
+	for _, hostnameFastPathEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("InterPodAffinityHostnameFastPath=%v", hostnameFastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, hostnameFastPathEnabled)
+
+			_, ctx := ktesting.NewTestContext(t)
+			node := st.MakeNode().Name("node").Label(v1.LabelHostname, "node").Obj()
+			snapshot := cache.NewSnapshot(nil, []*v1.Node{node})
+			plugin := plugintesting.SetupPluginWithInformers(
+				ctx,
+				t,
+				schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: hostnameFastPathEnabled}, New),
+				&config.InterPodAffinityArgs{},
+				snapshot,
+				nil,
+			).(*InterPodAffinity)
+
+			preemptor := st.MakePod().Namespace(defaultNamespace).Name("preemptor").Label("app", "preemptor").Obj()
+			state := framework.NewCycleState()
+			state.SetPodGroupCycleState(framework.NewCycleState())
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, status := plugin.PreFilter(ctx, state, preemptor, nodeInfos); !status.IsSuccess() {
+				t.Fatalf("PreFilter returned %v, want success", status)
+			}
+
+			victim := st.MakePod().Namespace(defaultNamespace).Name("victim").Node(node.Name).PodAntiAffinityIn(
+				"app", v1.LabelHostname, []string{"preemptor"}, st.PodAntiAffinityWithRequiredReq,
+			).Obj()
+			victimInfo, err := framework.NewPodInfo(victim)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodeInfo := framework.NewNodeInfo(victim)
+			nodeInfo.SetNode(node)
+			if status := plugin.AddPod(ctx, state, preemptor, victimInfo, nodeInfo); !status.IsSuccess() {
+				t.Fatalf("AddPod returned %v, want success", status)
+			}
+			wantStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonExistingAntiAffinityRulesNotMatch)
+			if diff := cmp.Diff(wantStatus, plugin.Filter(ctx, state, preemptor, nodeInfo)); diff != "" {
+				t.Errorf("Filter status mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestPreFilterStateAddRemovePod(t *testing.T) {
 	var label1 = map[string]string{
 		"region": "r1",
