@@ -422,7 +422,7 @@ func (w *watchSomething[NP, N, OP]) run() {
 		select {
 		case w.resultChan <- e:
 		case <-w.stopChan:
-			break
+			return
 		}
 	}
 }
