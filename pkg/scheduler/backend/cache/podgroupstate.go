@@ -39,7 +39,7 @@ func nextPodGroupGeneration() int64 {
 
 // podGroupStateData holds data and functionality shared between podGroupState and podGroupStateSnapshot.
 // Note that the podGroup field is populated from the observed PodGroup API object,
-// while other fields are populated from observed Pod objects. This means podGroupStateData
+// while other fields, except initiallyScheduledUID, are populated from observed Pod objects. This means podGroupStateData
 // can exist without a corresponding PodGroup API object as long as at least one
 // Pod references it.
 type podGroupStateData struct {
@@ -58,6 +58,11 @@ type podGroupStateData struct {
 	assignedPods sets.Set[types.UID]
 	// podGroup is the cached API object of the PodGroup.
 	podGroup *schedulingv1beta1.PodGroup
+	// initiallyScheduledUID is the UID of the PodGroup for which the scheduler set the InitiallyScheduled
+	// condition to True. It is set by the scheduler rather than from the observed PodGroup object,
+	// so it is known before the status update is observed. Only the live cache uses it,
+	// so it is not copied to snapshots and changing it does not bump the generation.
+	initiallyScheduledUID types.UID
 }
 
 func newPodGroupStateData() podGroupStateData {
@@ -217,7 +222,7 @@ func (d *podGroupStateData) unscheduledPodsMap() map[string]*v1.Pod {
 
 // compositePodGroupStateData holds data and functionality shared between compositePodGroupState and compositePodGroupStateSnapshot.
 // Note that the compositePodGroup field is populated from the observed CompositePodGroup API object,
-// while other fields are populated from observed child PodGroups and CompositePodGroups. This means compositePodGroupStateData
+// while other fields, except initiallyScheduledUID, are populated from observed child PodGroups and CompositePodGroups. This means compositePodGroupStateData
 // can exist without a corresponding CompositePodGroup API object as long as at least one
 // child references it.
 type compositePodGroupStateData struct {
@@ -228,6 +233,11 @@ type compositePodGroupStateData struct {
 	compositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// children tracks all keys for child pod groups and composite pod groups.
 	children sets.Set[fwk.EntityKey]
+	// initiallyScheduledUID is the UID of the CompositePodGroup for which the scheduler set the InitiallyScheduled
+	// condition to True. It is set by the scheduler rather than from the observed CompositePodGroup object,
+	// so it is known before the status update is observed. Only the live cache uses it,
+	// so it is not copied to snapshots and changing it does not bump the generation.
+	initiallyScheduledUID types.UID
 }
 
 func newCompositePodGroupStateData() compositePodGroupStateData {
@@ -377,6 +387,37 @@ func (pgs *podGroupState) removePodGroup() {
 	pgs.podGroupStateData.generation = nextPodGroupGeneration()
 }
 
+// assumeInitiallyScheduled records that the scheduler sets the InitiallyScheduled condition
+// of the PodGroup with the given UID to True.
+// It must be called under the cache lock.
+func (pgs *podGroupState) assumeInitiallyScheduled(uid types.UID) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.initiallyScheduledUID = uid
+}
+
+// forgetInitiallyScheduled reverts assumeInitiallyScheduled for the PodGroup with the given UID.
+// It must be called under the cache lock.
+func (pgs *podGroupState) forgetInitiallyScheduled(uid types.UID) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	if pgs.podGroupStateData.initiallyScheduledUID == uid {
+		pgs.podGroupStateData.initiallyScheduledUID = ""
+	}
+}
+
+// isInitiallyScheduledAssumed returns true if assumeInitiallyScheduled was called
+// for the PodGroup with the given UID. An empty UID never matches.
+// It must be called under the cache lock.
+func (pgs *podGroupState) isInitiallyScheduledAssumed(uid types.UID) bool {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return uid != "" && pgs.podGroupStateData.initiallyScheduledUID == uid
+}
+
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
 func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
@@ -486,6 +527,37 @@ func (cpgs *compositePodGroupState) removeCompositePodGroup() {
 	defer cpgs.lock.Unlock()
 
 	cpgs.compositePodGroupStateData.removeCompositePodGroup()
+}
+
+// assumeInitiallyScheduled records that the scheduler sets the InitiallyScheduled condition
+// of the CompositePodGroup with the given UID to True.
+// It must be called under the cache lock.
+func (cpgs *compositePodGroupState) assumeInitiallyScheduled(uid types.UID) {
+	cpgs.lock.Lock()
+	defer cpgs.lock.Unlock()
+
+	cpgs.compositePodGroupStateData.initiallyScheduledUID = uid
+}
+
+// forgetInitiallyScheduled reverts assumeInitiallyScheduled for the CompositePodGroup with the given UID.
+// It must be called under the cache lock.
+func (cpgs *compositePodGroupState) forgetInitiallyScheduled(uid types.UID) {
+	cpgs.lock.Lock()
+	defer cpgs.lock.Unlock()
+
+	if cpgs.compositePodGroupStateData.initiallyScheduledUID == uid {
+		cpgs.compositePodGroupStateData.initiallyScheduledUID = ""
+	}
+}
+
+// isInitiallyScheduledAssumed returns true if assumeInitiallyScheduled was called
+// for the CompositePodGroup with the given UID. An empty UID never matches.
+// It must be called under the cache lock.
+func (cpgs *compositePodGroupState) isInitiallyScheduledAssumed(uid types.UID) bool {
+	cpgs.lock.RLock()
+	defer cpgs.lock.RUnlock()
+
+	return uid != "" && cpgs.compositePodGroupStateData.initiallyScheduledUID == uid
 }
 
 // CompositePodGroup returns the CompositePodGroup API object.

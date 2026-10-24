@@ -1817,6 +1817,126 @@ func TestAssumePodGroupMember(t *testing.T) {
 	}
 }
 
+func TestAssumeGroupInitiallyScheduled(t *testing.T) {
+	groups := []struct {
+		group *fwk.GenericPodGroup
+		// updatedGroup is the group as observed from the informer, without the True condition set by the scheduler.
+		updatedGroup *fwk.GenericPodGroup
+	}{
+		{
+			group: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1beta1.PodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+		{
+			group: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1alpha3.CompositePodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+	}
+
+	tests := []struct {
+		name string
+		// update changes the cache after the group is added to it.
+		update func(logger klog.Logger, cache *cacheImpl, group, updatedGroup *fwk.GenericPodGroup)
+		uid    types.UID
+		want   bool
+	}{
+		{
+			name:   "not assumed",
+			update: func(klog.Logger, *cacheImpl, *fwk.GenericPodGroup, *fwk.GenericPodGroup) {},
+			uid:    "uid",
+		},
+		{
+			name: "assumed",
+			update: func(_ klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+			},
+			uid:  "uid",
+			want: true,
+		},
+		{
+			name: "assumed for an empty UID",
+			update: func(_ klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "")
+			},
+			uid: "",
+		},
+		{
+			name: "assumed for a group with another UID",
+			update: func(_ klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+			},
+			uid: "recreated-uid",
+		},
+		{
+			name: "assumed, then the group object is updated",
+			update: func(logger klog.Logger, cache *cacheImpl, group, updatedGroup *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+				cache.UpdateGenericPodGroup(logger, updatedGroup)
+			},
+			uid:  "uid",
+			want: true,
+		},
+		{
+			name: "assumed, then forgotten",
+			update: func(_ klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+				cache.ForgetGroupInitiallyScheduled(group.GetKey(), "uid")
+			},
+			uid: "uid",
+		},
+		{
+			name: "assumed, then forgotten for a group with another UID",
+			update: func(_ klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+				cache.ForgetGroupInitiallyScheduled(group.GetKey(), "recreated-uid")
+			},
+			uid:  "uid",
+			want: true,
+		},
+		{
+			name: "assumed, then the group is removed and added again",
+			update: func(logger klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+				cache.RemoveGenericPodGroup(logger, group)
+				cache.AddGenericPodGroup(group)
+			},
+			uid: "uid",
+		},
+		{
+			name: "assumed after the group is removed",
+			update: func(logger klog.Logger, cache *cacheImpl, group, _ *fwk.GenericPodGroup) {
+				cache.RemoveGenericPodGroup(logger, group)
+				cache.AssumeGroupInitiallyScheduled(group.GetKey(), "uid")
+			},
+			uid: "uid",
+		},
+	}
+
+	for _, g := range groups {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%v, %v", g.group.GetType(), tt.name), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, true)
+				cache.AddGenericPodGroup(g.group)
+
+				tt.update(logger, cache, g.group, g.updatedGroup)
+
+				if got := cache.IsGroupInitiallyScheduledAssumed(g.group.GetKey(), tt.uid); got != tt.want {
+					t.Errorf("IsGroupInitiallyScheduledAssumed(%v, %q) = %v, want %v", g.group.GetKey(), tt.uid, got, tt.want)
+				}
+			})
+		}
+	}
+}
+
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
 func buildNodeInfo(node *v1.Node, pods []*v1.Pod, imageStates map[string]*fwk.ImageStateSummary) *framework.NodeInfo {
 	expected := framework.NewNodeInfo()

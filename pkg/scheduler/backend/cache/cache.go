@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1083,6 +1084,63 @@ func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1
 		return nil, fmt.Errorf("composite pod group object not found for composite pod group %s", key)
 	}
 	return cpg, nil
+}
+
+// AssumeGroupInitiallyScheduled records that the scheduler sets the InitiallyScheduled condition
+// of the pod group or composite pod group with the given key and UID to True.
+// The record is kept in the group state, and UpdateGenericPodGroup doesn't change it.
+// If the group state is not in the cache anymore, the group was removed and nothing is recorded.
+func (cache *cacheImpl) AssumeGroupInitiallyScheduled(key fwk.EntityKey, uid types.UID) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			pgs.assumeInitiallyScheduled(uid)
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			cpgs.assumeInitiallyScheduled(uid)
+		}
+	}
+}
+
+// ForgetGroupInitiallyScheduled removes the record made by AssumeGroupInitiallyScheduled
+// for the group with the given key and UID.
+func (cache *cacheImpl) ForgetGroupInitiallyScheduled(key fwk.EntityKey, uid types.UID) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			pgs.forgetInitiallyScheduled(uid)
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			cpgs.forgetInitiallyScheduled(uid)
+		}
+	}
+}
+
+// IsGroupInitiallyScheduledAssumed returns true if AssumeGroupInitiallyScheduled was called
+// for the group with the given key and UID.
+func (cache *cacheImpl) IsGroupInitiallyScheduledAssumed(key fwk.EntityKey, uid types.UID) bool {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			return pgs.isInitiallyScheduledAssumed(uid)
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			return cpgs.isInitiallyScheduledAssumed(uid)
+		}
+	}
+	return false
 }
 
 // BindPod handles the pod binding by adding a bind API call to the dispatcher.
