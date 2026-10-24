@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -845,7 +846,10 @@ func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
 
 func TestInClusterClientConfigPrecedence(t *testing.T) {
 	tt := []struct {
-		overrides *ConfigOverrides
+		overrides                  *ConfigOverrides
+		expectedTimeout            time.Duration
+		expectedDisableCompression bool
+		expectedProxyURL           string
 	}{
 		{
 			overrides: &ConfigOverrides{
@@ -934,6 +938,28 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		{
 			overrides: &ConfigOverrides{},
 		},
+		{
+			overrides: &ConfigOverrides{
+				Timeout: "30s",
+			},
+			expectedTimeout: 30 * time.Second,
+		},
+		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					DisableCompression: true,
+				},
+			},
+			expectedDisableCompression: true,
+		},
+		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					ProxyURL: "http://proxy.example",
+				},
+			},
+			expectedProxyURL: "http://proxy.example",
+		},
 	}
 
 	for _, tc := range tt {
@@ -983,6 +1009,28 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
+		}
+		if clientConfig.Timeout != tc.expectedTimeout {
+			t.Errorf("Expected timeout %v, got %v", tc.expectedTimeout, clientConfig.Timeout)
+		}
+		if clientConfig.DisableCompression != tc.expectedDisableCompression {
+			t.Errorf("Expected DisableCompression %v, got %v", tc.expectedDisableCompression, clientConfig.DisableCompression)
+		}
+		if tc.expectedProxyURL == "" {
+			if clientConfig.Proxy != nil {
+				t.Errorf("Expected no proxy, got non-nil proxy")
+			}
+		} else {
+			if clientConfig.Proxy == nil {
+				t.Fatalf("Expected proxy %v, got nil", tc.expectedProxyURL)
+			}
+			proxyURL, err := clientConfig.Proxy(nil)
+			if err != nil {
+				t.Fatalf("Unexpected proxy error: %v", err)
+			}
+			if proxyURL.String() != tc.expectedProxyURL {
+				t.Errorf("Expected proxy %v, got %v", tc.expectedProxyURL, proxyURL.String())
+			}
 		}
 	}
 }
