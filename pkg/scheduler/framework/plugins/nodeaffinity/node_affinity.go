@@ -46,10 +46,15 @@ type NodeAffinity struct {
 
 var _ fwk.PreFilterPlugin = &NodeAffinity{}
 var _ fwk.FilterPlugin = &NodeAffinity{}
+var _ fwk.NodeLocalFilterPlugin = &NodeAffinity{}
 var _ fwk.PreScorePlugin = &NodeAffinity{}
 var _ fwk.ScorePlugin = &NodeAffinity{}
 var _ fwk.EnqueueExtensions = &NodeAffinity{}
 var _ fwk.SignPlugin = &NodeAffinity{}
+
+func (pl *NodeAffinity) IsNodeLocal() bool {
+	return true
+}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
