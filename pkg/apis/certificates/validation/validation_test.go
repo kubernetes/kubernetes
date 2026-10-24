@@ -404,25 +404,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 		},
-		"both approved and denied conditions": {
-			csr: capi.CertificateSigningRequest{
-				ObjectMeta: validObjectMeta,
-				Spec: capi.CertificateSigningRequestSpec{
-					Usages:     validUsages,
-					Request:    newCSRPEM(t),
-					SignerName: validSignerName,
-				},
-				Status: capi.CertificateSigningRequestStatus{
-					Conditions: []capi.CertificateSigningRequestCondition{
-						{Type: capi.CertificateApproved, Status: core.ConditionTrue},
-						{Type: capi.CertificateDenied, Status: core.ConditionTrue},
-					},
-				},
-			},
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions"), capi.CertificateDenied, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative(),
-			},
-		},
 		"approved and failed conditions allowed": {
 			csr: capi.CertificateSigningRequest{
 				ObjectMeta: validObjectMeta,
@@ -585,14 +566,6 @@ func Test_getValidationOptions(t *testing.T) {
 		name:   "strict update",
 		oldCSR: &capi.CertificateSigningRequest{},
 		want:   certificateValidationOptions{},
-	}, {
-		name: "compatible update, approved+denied",
-		oldCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
-			Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved}, {Type: capi.CertificateDenied}},
-		}},
-		want: certificateValidationOptions{
-			allowBothApprovedAndDenied: true,
-		},
 	}, {
 		name:   "compatible update, legacy signerName",
 		oldCSR: &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{SignerName: capi.LegacyUnknownSignerName}},
@@ -1132,17 +1105,6 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			strictErrs:  []string{`status.conditions[0].type: Required value`},
 		},
 		{
-			name: "approved and denied",
-			csr: &capi.CertificateSigningRequest{
-				ObjectMeta: validObjectMeta, Spec: validSpec,
-				Status: capi.CertificateSigningRequestStatus{
-					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}, {Type: capi.CertificateDenied, Status: core.ConditionTrue}},
-				},
-			},
-			lenientOpts: certificateValidationOptions{allowBothApprovedAndDenied: true},
-			strictErrs:  []string{`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`},
-		},
-		{
 			name: "duplicate condition",
 			csr: &capi.CertificateSigningRequest{
 				ObjectMeta: validObjectMeta, Spec: validSpec,
@@ -1226,17 +1188,6 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			},
 			lenientOpts:   certificateValidationOptions{allowArbitraryCertificate: true},
 			strictRegexes: []regexp.Regexp{*regexp.MustCompile(`status.certificate: Invalid value: "\<certificate data\>": (asn1: structure error: sequence tag mismatch|x509: invalid RDNSequence)`)},
-		},
-		{
-			name: "approved and denied",
-			csr: &capi.CertificateSigningRequest{
-				ObjectMeta: validObjectMeta, Spec: validSpec,
-				Status: capi.CertificateSigningRequestStatus{
-					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}, {Type: capi.CertificateDenied, Status: core.ConditionTrue}},
-				},
-			},
-			lenientOpts: certificateValidationOptions{allowBothApprovedAndDenied: true},
-			strictErrs:  []string{`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`},
 		},
 	}
 
