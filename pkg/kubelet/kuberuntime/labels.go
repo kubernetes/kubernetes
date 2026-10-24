@@ -25,6 +25,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/types"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -39,7 +40,42 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerTypeLabel                     = "io.kubernetes.container.type"
+
+	// Values of containerTypeLabel.
+	containerTypeRegular   = "regular"
+	containerTypeInit      = "init"
+	containerTypeEphemeral = "ephemeral"
 )
+
+// containerTypeToLabel returns the annotation value for containerType, or "" if
+// unknown. podutil.ContainerType is an in-process bitmask, so persist stable names instead.
+func containerTypeToLabel(containerType podutil.ContainerType) string {
+	switch containerType {
+	case podutil.Containers:
+		return containerTypeRegular
+	case podutil.InitContainers:
+		return containerTypeInit
+	case podutil.EphemeralContainers:
+		return containerTypeEphemeral
+	default:
+		return ""
+	}
+}
+
+// containerTypeFromLabel is the inverse of containerTypeToLabel, returning 0 if unknown.
+func containerTypeFromLabel(value string) podutil.ContainerType {
+	switch value {
+	case containerTypeRegular:
+		return podutil.Containers
+	case containerTypeInit:
+		return podutil.InitContainers
+	case containerTypeEphemeral:
+		return podutil.EphemeralContainers
+	default:
+		return 0
+	}
+}
 
 type labeledPodSandboxInfo struct {
 	// Labels from v1.Pod
@@ -70,6 +106,8 @@ type annotatedContainerInfo struct {
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
 	PreStopHandler            *v1.LifecycleHandler
 	ContainerPorts            []v1.ContainerPort
+	// Zero if the annotation is missing or unrecognized.
+	ContainerType podutil.ContainerType
 }
 
 // newPodLabels creates pod labels from v1.Pod.
@@ -105,7 +143,7 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 }
 
 // newContainerAnnotations creates container annotations from v1.Container and v1.Pod.
-func newContainerAnnotations(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, opts *kubecontainer.RunContainerOptions) map[string]string {
+func newContainerAnnotations(ctx context.Context, container *v1.Container, containerType podutil.ContainerType, pod *v1.Pod, restartCount int, opts *kubecontainer.RunContainerOptions) map[string]string {
 	logger := klog.FromContext(ctx)
 	annotations := map[string]string{}
 
@@ -118,6 +156,9 @@ func newContainerAnnotations(ctx context.Context, container *v1.Container, pod *
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
+	if v := containerTypeToLabel(containerType); v != "" {
+		annotations[containerTypeLabel] = v
+	}
 
 	if pod.DeletionGracePeriodSeconds != nil {
 		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
@@ -220,6 +261,12 @@ func getContainerInfoFromAnnotations(ctx context.Context, annotations map[string
 		logger.Error(err, "Unable to get label value from annotations", "label", containerPortsLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
+	}
+
+	if v := getStringValueFromLabel(logger, annotations, containerTypeLabel); v != "" {
+		if containerInfo.ContainerType = containerTypeFromLabel(v); containerInfo.ContainerType == 0 {
+			logger.V(3).Info("Unknown container type annotation value", "label", containerTypeLabel, "value", v)
+		}
 	}
 
 	return containerInfo

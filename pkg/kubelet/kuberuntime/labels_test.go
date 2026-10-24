@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -161,11 +162,12 @@ func TestContainerAnnotations(t *testing.T) {
 		RestartCount:              restartCount,
 		TerminationMessagePath:    container.TerminationMessagePath,
 		PreStopHandler:            container.Lifecycle.PreStop,
+		ContainerType:             podutil.Containers,
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	// Test whether we can get right information from label
-	annotations := newContainerAnnotations(tCtx, container, pod, restartCount, opts)
+	annotations := newContainerAnnotations(tCtx, container, podutil.Containers, pod, restartCount, opts)
 	containerInfo := getContainerInfoFromAnnotations(tCtx, annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
@@ -184,13 +186,66 @@ func TestContainerAnnotations(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = kubecontainer.HashContainer(container)
-	annotations = newContainerAnnotations(tCtx, container, pod, restartCount, opts)
+	annotations = newContainerAnnotations(tCtx, container, podutil.Containers, pod, restartCount, opts)
 	containerInfo = getContainerInfoFromAnnotations(tCtx, annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
 	}
 	if v, ok := annotations[opts.Annotations[0].Name]; !ok || v != opts.Annotations[0].Value {
 		t.Errorf("expected annotation %s to exist got %v, %v", opts.Annotations[0].Name, ok, v)
+	}
+}
+
+func TestContainerTypeToLabel(t *testing.T) {
+	for _, tc := range []struct {
+		containerType podutil.ContainerType
+		expected      string
+	}{
+		{podutil.Containers, "regular"},
+		{podutil.InitContainers, "init"},
+		{podutil.EphemeralContainers, "ephemeral"},
+		{0, ""},
+		{podutil.AllContainers, ""},
+	} {
+		if got := containerTypeToLabel(tc.containerType); got != tc.expected {
+			t.Errorf("containerTypeToLabel(%v): expected %q, got %q", tc.containerType, tc.expected, got)
+		}
+	}
+}
+
+func TestContainerTypeFromLabel(t *testing.T) {
+	for _, tc := range []struct {
+		value    string
+		expected podutil.ContainerType
+	}{
+		{"regular", podutil.Containers},
+		{"init", podutil.InitContainers},
+		{"ephemeral", podutil.EphemeralContainers},
+		{"", 0},
+		{"sidecar", 0},
+		{"2", 0},
+	} {
+		if got := containerTypeFromLabel(tc.value); got != tc.expected {
+			t.Errorf("containerTypeFromLabel(%q): expected %v, got %v", tc.value, tc.expected, got)
+		}
+	}
+}
+
+func TestContainerTypeAnnotation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	container := &v1.Container{Name: "test_container"}
+	pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{*container}}}
+	opts := &kubecontainer.RunContainerOptions{}
+
+	for _, containerType := range []podutil.ContainerType{podutil.Containers, podutil.InitContainers, podutil.EphemeralContainers} {
+		annotations := newContainerAnnotations(tCtx, container, containerType, pod, 0, opts)
+		if got := getContainerInfoFromAnnotations(tCtx, annotations).ContainerType; got != containerType {
+			t.Errorf("round trip of container type %v: got %v", containerType, got)
+		}
+	}
+
+	if got := getContainerInfoFromAnnotations(tCtx, map[string]string{}).ContainerType; got != 0 {
+		t.Errorf("missing container type annotation: expected 0, got %v", got)
 	}
 }
 

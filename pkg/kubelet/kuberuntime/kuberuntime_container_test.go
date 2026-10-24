@@ -303,6 +303,44 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"init container": {
+			input: &runtimeapi.ContainerStatus{
+				Id:          cid.ID,
+				Metadata:    meta,
+				Image:       imageSpec,
+				State:       runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt:   createdAt,
+				StartedAt:   startedAt,
+				Annotations: map[string]string{containerTypeLabel: containerTypeInit},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Type:      podutil.InitContainers,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+			},
+		},
+		"ephemeral container": {
+			input: &runtimeapi.ContainerStatus{
+				Id:          cid.ID,
+				Metadata:    meta,
+				Image:       imageSpec,
+				State:       runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt:   createdAt,
+				StartedAt:   startedAt,
+				Annotations: map[string]string{containerTypeLabel: containerTypeEphemeral},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Type:      podutil.EphemeralContainers,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			actual := m.toKubeContainerStatus(tCtx, podUID, test.input, cid.Type)

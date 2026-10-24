@@ -54,6 +54,7 @@ import (
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -4251,6 +4252,10 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
+			containerType := podutil.Containers
+			if test.isInitContainer {
+				containerType = podutil.InitContainers
+			}
 			containerStatuses := kl.convertToAPIContainerStatuses(
 				tCtx,
 				test.pod,
@@ -4259,7 +4264,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.containers,
 				nil,
 				test.hasInitContainers,
-				test.isInitContainer,
+				containerType,
 				test.podRestarting,
 			)
 			for i, status := range containerStatuses {
@@ -4446,7 +4451,7 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 				test.pod.Spec.Containers,
 				sets.New(imageVolumeName),
 				false,
-				false,
+				podutil.Containers,
 				false,
 			)
 			for i, status := range containerStatuses {
@@ -7012,8 +7017,108 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, false, false)
+			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, podutil.Containers, false)
 		}()
+	}
+}
+
+func TestConvertToAPIContainerStatusesByType(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{{Name: "init"}},
+		Containers:     []v1.Container{{Name: "main"}},
+		EphemeralContainers: []v1.EphemeralContainer{{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"},
+		}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	now := time.Now()
+	status := func(name, id string, containerType podutil.ContainerType, state kubecontainer.State, age time.Duration) *kubecontainer.Status {
+		return &kubecontainer.Status{
+			Name:      name,
+			ID:        kubecontainer.ContainerID{Type: "test", ID: id},
+			Type:      containerType,
+			State:     state,
+			CreatedAt: now.Add(-age),
+		}
+	}
+	initStatus := status("init", "init-id", podutil.InitContainers, kubecontainer.ContainerStateExited, 3*time.Minute)
+	mainStatus := status("main", "main-id", podutil.Containers, kubecontainer.ContainerStateRunning, 2*time.Minute)
+	debugStatus := status("debug", "debug-id", podutil.EphemeralContainers, kubecontainer.ContainerStateRunning, time.Minute)
+	unannotated := func(s *kubecontainer.Status) *kubecontainer.Status {
+		c := *s
+		c.Type = 0
+		return &c
+	}
+
+	// Each expected map is container name -> container ID.
+	tests := []struct {
+		name              string
+		statuses          []*kubecontainer.Status
+		expectedMain      map[string]string
+		expectedInit      map[string]string
+		expectedEphemeral map[string]string
+	}{{
+		name:              "in-spec containers",
+		statuses:          []*kubecontainer.Status{initStatus, mainStatus, debugStatus},
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name:              "unannotated in-spec containers",
+		statuses:          []*kubecontainer.Status{unannotated(initStatus), unannotated(mainStatus), unannotated(debugStatus)},
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name: "removed regular container",
+		statuses: []*kubecontainer.Status{initStatus, mainStatus, debugStatus,
+			status("removed", "removed-id", podutil.Containers, kubecontainer.ContainerStateRunning, time.Minute)},
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id", "removed": "test://removed-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name: "unannotated removed container",
+		statuses: []*kubecontainer.Status{initStatus, mainStatus, debugStatus,
+			status("removed", "removed-id", 0, kubecontainer.ContainerStateExited, time.Minute)},
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id", "removed": "test://removed-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			podStatus := &kubecontainer.PodStatus{
+				ID:                pod.UID,
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				ContainerStatuses: test.statuses,
+			}
+			var ecSpecs []v1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			for _, tc := range []struct {
+				containerType podutil.ContainerType
+				containers    []v1.Container
+				expected      map[string]string
+			}{
+				{podutil.InitContainers, pod.Spec.InitContainers, test.expectedInit},
+				{podutil.Containers, pod.Spec.Containers, test.expectedMain},
+				{podutil.EphemeralContainers, ecSpecs, test.expectedEphemeral},
+			} {
+				statuses := kl.convertToAPIContainerStatuses(tCtx, pod, podStatus, nil, tc.containers, nil, true, tc.containerType, false)
+				actual := map[string]string{}
+				for _, s := range statuses {
+					actual[s.Name] = s.ContainerID
+				}
+				assert.Equal(t, tc.expected, actual, "container type %v", tc.containerType)
+			}
+		})
 	}
 }
 
@@ -7578,7 +7683,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				hasExclusiveCPUs := kubelet.containerManager.ContainerHasExclusiveCPUs(logger, tPod, &tPod.Spec.Containers[0])
 				assert.Equal(t, tc.MockHasExclusiveCPUs, hasExclusiveCPUs)
 			}
-			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false, false)
+			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
 			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
@@ -7706,7 +7811,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
 
-		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false, false)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}

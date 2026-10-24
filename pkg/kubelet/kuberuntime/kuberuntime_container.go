@@ -263,7 +263,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, pod, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
+	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, spec.containerType, pod, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
 	if cleanupAction != nil {
 		defer cleanupAction()
 	}
@@ -352,7 +352,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, containerType podutil.ContainerType, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
 	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
 	if err != nil {
 		return nil, nil, err
@@ -387,7 +387,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(ctx, container, pod, restartCount, opts),
+		Annotations: newContainerAnnotations(ctx, container, containerType, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
 		CDIDevices:  makeCDIDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
@@ -758,6 +758,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		ImageRuntimeHandler: status.Image.RuntimeHandler,
 		Hash:                annotatedInfo.Hash,
 		RestartCount:        annotatedInfo.RestartCount,
+		Type:                annotatedInfo.ContainerType,
 		State:               toKubeContainerState(status.State),
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,

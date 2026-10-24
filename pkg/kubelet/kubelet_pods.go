@@ -2172,7 +2172,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.Containers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.Containers,
 		podRestarting,
 	)
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
@@ -2182,7 +2182,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.InitContainers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		true,
+		podutil.InitContainers,
 		podRestarting,
 	)
 	var ecSpecs []v1.Container
@@ -2199,7 +2199,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		ecSpecs,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.EphemeralContainers,
 		podRestarting,
 	)
 
@@ -2338,7 +2338,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers, isInitContainer bool, podRestarting bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
 	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus) *v1.ContainerStatus {
 		cid := cs.ID.String()
@@ -2713,8 +2713,21 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
-		if _, ok := statuses[cName]; !ok {
-			// This would also ignore the infra container.
+		cType := cStatus.Type
+		if cType == 0 {
+			// Fallback to spec lookup if the container type is missing.
+			for c, t := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+				if c.Name == cName {
+					cType = t
+					break
+				}
+			}
+			if cType == 0 && containerType == podutil.Containers {
+				logger.V(3).Info("Container type unknown for missing container; assuming regular", "pod", klog.KObj(pod), "containerName", cName)
+				cType = podutil.Containers
+			}
+		}
+		if cType != containerType {
 			continue
 		}
 		if containerSeen[cName] >= 2 {
@@ -2761,6 +2774,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if containerSeen[cName] == 0 {
+			// This also creates the entry for a container removed from the spec.
+			// TODO(KEP-5972): revisit removed-container status GC and ContainerStateUnknown handling.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State
@@ -2770,7 +2785,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
-		if isInitContainer {
+		if containerType == podutil.InitContainers {
 			// If the init container is terminated with exit code 0, it won't be restarted.
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
@@ -2832,7 +2847,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
-	if isInitContainer {
+	if containerType == podutil.InitContainers {
 		return kubetypes.SortStatusesOfInitContainers(pod, statuses)
 	}
 	containerStatuses := make([]v1.ContainerStatus, 0, len(statuses))
