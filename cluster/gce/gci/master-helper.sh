@@ -193,7 +193,9 @@ function create-master-instance-internal() {
       return 0
     else
       echo "${result}" >&2
-      if [[ ! "${result}" =~ "try again later" ]]; then
+      # Retry temporary GCE zone capacity exhaustion as well.
+      if [[ ! "${result}" =~ "try again later" &&
+            ! "${result}" =~ "ZONE_RESOURCE_POOL_EXHAUSTED" ]]; then
         echo "Failed to create master instance due to non-retryable error" >&2
         return 1
       fi
