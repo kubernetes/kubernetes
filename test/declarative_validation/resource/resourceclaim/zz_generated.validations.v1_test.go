@@ -200,6 +200,18 @@ func init() {
 			"status.allocation.devices.results[*].bindingFailureConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"status.allocation.devices.results[*].consumedCounters.perAllocation": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.allocation.devices.results[*].consumedCounters.perAllocation[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.allocation.devices.results[*].consumedCounters.perDevice": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.allocation.devices.results[*].consumedCounters.perDevice[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
 			"status.allocation.devices.results[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
 				{ErrorType: "FieldValueRequired"},

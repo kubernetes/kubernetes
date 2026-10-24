@@ -28,17 +28,17 @@ import (
 func qty(s string) resource.Quantity { return resource.MustParse(s) }
 
 func counterSet(name string, counters map[string]string) resourcev1.CounterSet {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.SharedCounter, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.SharedCounter{Value: ptr.To(qty(v))}
 	}
 	return resourcev1.CounterSet{Name: name, Counters: c}
 }
 
 func consumes(set string, counters map[string]string) resourcev1.DeviceCounterConsumption {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.ConsumeCounter, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.ConsumeCounter{Value: ptr.To(qty(v))}
 	}
 	return resourcev1.DeviceCounterConsumption{CounterSet: set, Counters: c}
 }
@@ -474,5 +474,22 @@ func TestResolvePartitionType(t *testing.T) {
 		if v, ok := resolvePartitionType("gpu.example.com", both, "gpu.example.com/profile"); !ok || v != "Explicit" {
 			t.Fatalf("colliding keys: got (%q,%v), want (Explicit,true)", v, ok)
 		}
+	}
+}
+
+func TestPartitionSummaryRequestDependentCounters(t *testing.T) {
+	set := counterSet("shared", map[string]string{"memory": "1"})
+	set.Counters["memory"] = resourcev1.SharedCounter{Value: ptr.To(qty("1")), RequestPolicy: &resourcev1.CapacityRequestPolicy{Default: ptr.To(qty("1"))}}
+	dynamic := resourcev1.DeviceCounterConsumption{CounterSet: "shared", Counters: map[string]resourcev1.ConsumeCounter{"memory": {ValueFrom: &resourcev1.CounterValueFrom{CapacityName: "memory"}}}}
+	in := poolViewInput{
+		driver: "gpu.example.com", poolName: "pool", sharedCounters: []resourcev1.CounterSet{set},
+		devices: []deviceRecord{partitionDevice("used", "Dynamic", dynamic), partitionDevice("fresh", "Static", consumes("shared", map[string]string{"memory": "1"}))},
+		inUse:   inUseSet("used"),
+	}
+	// An ungrouped device still consumes the budget shared by grouped devices.
+	in.devices[0].partitionAttr = ""
+	result, err := computePartitionSummary(in)
+	if !strings.HasPrefix(err, prefixCounterAccounting) || result != nil {
+		t.Fatalf("expected uncomputable partition view, got %v, %q", result, err)
 	}
 }

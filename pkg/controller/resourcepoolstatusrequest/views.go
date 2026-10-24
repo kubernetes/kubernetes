@@ -24,6 +24,7 @@ import (
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/utils/ptr"
@@ -39,6 +40,7 @@ const (
 	// prefixPoolIncomplete is the only transient error; syncRequest requeues on it.
 	prefixPoolIncomplete = "PoolIncomplete:"
 
+	prefixCounterAccounting       = "CounterAccountingUnavailable:"
 	prefixPartitionTypeMissing    = "PartitionTypeMissing:"
 	prefixPartitionCostMismatch   = "PartitionCostMismatch:"
 	prefixPartitionSummaryOverCap = "PartitionSummaryOverCap:"
@@ -112,7 +114,8 @@ type poolViewInput struct {
 	// sharedCounters merged from all slices in the pool (names are unique per pool).
 	sharedCounters []resourcev1.CounterSet
 	// inUse holds device names with at least one non-AdminAccess claim.
-	inUse map[string]struct{}
+	inUse       map[string]struct{}
+	allocations []resourcev1.DeviceRequestAllocationResult
 	// consumedCapacity is per-key consumption summed over non-AdminAccess claims.
 	consumedCapacity map[resourcev1.QualifiedName]resource.Quantity
 }
@@ -188,6 +191,17 @@ func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.Par
 // consumption. Devices that consume no counters are not partitions and are
 // skipped; so are devices for which no grouping attribute was resolved.
 func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionTypeStatus, string) {
+	// A pool-wide count cannot resolve a cost that depends on a future claim's request.
+	for _, d := range in.devices {
+		for _, set := range d.consumesCounters {
+			for _, counter := range set.Counters {
+				if counter.ValueFrom != nil {
+					return nil, fmt.Sprintf("%s pool %s/%s has request-dependent counter costs; partition allocatability requires a capacity request", prefixCounterAccounting, in.driver, in.poolName)
+				}
+			}
+		}
+	}
+
 	type groupKey struct{ attr, typ string }
 	type group struct {
 		total   int32
@@ -225,7 +239,10 @@ func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionType
 
 	// Headroom after in-use consumption. Each group is measured independently
 	// against this baseline: allocatable[G] = min(fresh[G], floor(avail/cost[G])).
-	baseline := availableCounters(in.sharedCounters, in.devices, in.inUse)
+	baseline, accountingError := availableCounters(in)
+	if accountingError != "" {
+		return nil, accountingError
+	}
 
 	result := make([]resourcev1alpha3.PartitionTypeStatus, 0, len(groups))
 	for k, g := range groups {
@@ -319,33 +336,73 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 	}, ""
 }
 
-// availableCounters returns [set][counter] capacity minus in-use consumption.
-// A counter is debited once per in-use device (not per claim), matching the
-// scheduler.
-func availableCounters(sharedCounters []resourcev1.CounterSet, devices []deviceRecord, inUse map[string]struct{}) map[string]map[string]resource.Quantity {
+// availableCounters charges static snapshots once per device and request-driven
+// snapshots once per allocation. Legacy allocations fall back to live static costs.
+func availableCounters(in poolViewInput) (map[string]map[string]resource.Quantity, string) {
 	avail := map[string]map[string]resource.Quantity{}
-	for _, cs := range sharedCounters {
-		m := avail[cs.Name]
-		if m == nil {
-			m = map[string]resource.Quantity{}
-			avail[cs.Name] = m
-		}
+	for _, cs := range in.sharedCounters {
+		m := map[string]resource.Quantity{}
 		for name, c := range cs.Counters {
-			m[name] = c.Value.DeepCopy()
+			m[name] = ptr.Deref(c.Value, resource.Quantity{})
 		}
+		avail[cs.Name] = m
 	}
-	deductInUse(avail, devices, inUse)
-	return avail
-}
-
-// deductInUse subtracts each in-use device's counter consumption from avail.
-func deductInUse(avail map[string]map[string]resource.Quantity, devices []deviceRecord, inUse map[string]struct{}) {
-	for i := range devices {
-		d := devices[i]
-		if _, used := inUse[d.name]; !used {
+	perDevice := map[string]map[string]map[string]resource.Quantity{}
+	legacy := map[string]bool{}
+	for _, allocation := range in.allocations {
+		snapshot := allocation.ConsumedCounters
+		if snapshot == nil {
+			legacy[allocation.Device] = true
 			continue
 		}
-		deductCounters(d.consumesCounters, avail)
+		counters := snapshotCounters(snapshot.PerDevice)
+		if previous, found := perDevice[allocation.Device]; found {
+			if !apiequality.Semantic.DeepEqual(previous, counters) {
+				return nil, fmt.Sprintf("%s device %q in pool %s/%s has conflicting counter snapshots", prefixCounterAccounting, allocation.Device, in.driver, in.poolName)
+			}
+		} else {
+			perDevice[allocation.Device] = counters
+			subtractCounters(avail, counters)
+		}
+		subtractCounters(avail, snapshotCounters(snapshot.PerAllocation))
+	}
+	devices := make(map[string]deviceRecord, len(in.devices))
+	for _, d := range in.devices {
+		devices[d.name] = d
+	}
+	for name := range in.inUse {
+		_, hasSnapshot := perDevice[name]
+		if hasSnapshot && !legacy[name] {
+			continue
+		}
+		d, found := devices[name]
+		if !found {
+			return nil, fmt.Sprintf("%s allocated device %q in pool %s/%s has no counter snapshot or live definition", prefixCounterAccounting, name, in.driver, in.poolName)
+		}
+		if !hasSnapshot {
+			deductCounters(d.consumesCounters, avail)
+		}
+	}
+	return avail, ""
+}
+
+// Normalize the lists so their order cannot make equivalent device snapshots conflict.
+func snapshotCounters(consumption []resourcev1.CounterSetConsumption) map[string]map[string]resource.Quantity {
+	counters := make(map[string]map[string]resource.Quantity, len(consumption))
+	for _, set := range consumption {
+		counters[set.CounterSet] = set.Counters
+	}
+	return counters
+}
+
+func subtractCounters(avail, consumption map[string]map[string]resource.Quantity) {
+	for set, counters := range consumption {
+		for name, quantity := range counters {
+			if have, found := avail[set][name]; found {
+				have.Sub(quantity)
+				avail[set][name] = have
+			}
+		}
 	}
 }
 
@@ -358,7 +415,7 @@ func deviceFits(cost []resourcev1.DeviceCounterConsumption, avail map[string]map
 			if !ok {
 				return false
 			}
-			if have.Cmp(c.Value) < 0 {
+			if have.Cmp(ptr.Deref(c.Value, resource.Quantity{})) < 0 {
 				return false
 			}
 		}
@@ -378,7 +435,7 @@ func deductCounters(cost []resourcev1.DeviceCounterConsumption, avail map[string
 			if !ok {
 				continue
 			}
-			have.Sub(c.Value)
+			have.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 			set[name] = have
 		}
 	}
@@ -410,7 +467,8 @@ func consumesCountersKey(cost []resourcev1.DeviceCounterConsumption) string {
 		sort.Strings(names)
 		for _, name := range names {
 			q := cc.Counters[name]
-			parts = append(parts, cc.CounterSet+"/"+name+"="+q.Value.String())
+			quantity := ptr.Deref(q.Value, resource.Quantity{})
+			parts = append(parts, cc.CounterSet+"/"+name+"="+quantity.String())
 		}
 	}
 	sort.Strings(parts)

@@ -52,13 +52,28 @@ func (in CapacityRequirements) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in Counter) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1.Counter"
+func (in ConsumeCounter) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.ConsumeCounter"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterConsumption) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.CounterConsumption"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CounterSet) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1.CounterSet"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterSetConsumption) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.CounterSetConsumption"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterValueFrom) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.CounterValueFrom"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -279,4 +294,9 @@ func (in ResourceSliceList) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceSliceSpec) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1.ResourceSliceSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SharedCounter) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.SharedCounter"
 }
