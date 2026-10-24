@@ -3697,6 +3697,16 @@ type ContainerStatus struct {
 	// imageID is the image ID of the container's image. The image ID may not
 	// match the image ID of the image used in the PodSpec, as it may have been
 	// resolved by the runtime.
+	//
+	// The format of imageID is determined by the container runtime (CRI) and is
+	// not guaranteed to be consistent across runtimes, runtime configurations,
+	// or nodes. It may also depend on how the image was pulled or loaded. It may
+	// be a repository digest reference (for example
+	// "registry.example.com/image@sha256:..."), which can refer to a
+	// multi-platform image index rather than a platform-specific manifest, or an
+	// image configuration digest (for example "sha256:..."). Do not assume it can
+	// be resolved against a container registry. To find the image that was
+	// requested, use the container's image field in the PodSpec.
 	ImageID string `json:"imageID" protobuf:"bytes,7,opt,name=imageID"`
 	// containerID is the ID of the container in the format '<type>://<container_id>'.
 	// Where type is a container runtime identifier, returned from Version call of CRI API
