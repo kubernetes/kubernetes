@@ -1594,6 +1594,90 @@ func TestKeepExistingPDBConditionDuringSync(t *testing.T) {
 	}
 }
 
+// getQueuedPDBKeys drains the disruption workqueue and returns the enqueued PDB keys.
+func getQueuedPDBKeys(t *testing.T, dc *disruptionController) []string {
+	t.Helper()
+	var keys []string
+	for dc.queue.Len() > 0 {
+		key, quit := dc.queue.Get()
+		if quit {
+			t.Fatal("queue shut down while draining PDB keys")
+		}
+		keys = append(keys, key)
+		dc.queue.Done(key)
+	}
+	return keys
+}
+
+func pdbKey(t *testing.T, pdb *policy.PodDisruptionBudget) string {
+	t.Helper()
+	key, err := controller.KeyFunc(pdb)
+	if err != nil {
+		t.Fatalf("Unexpected error naming pdb %q: %v", pdb.Name, err)
+	}
+	return key
+}
+
+// Label changes must wake PDBs that matched the pod before the change, even if
+// they no longer match afterwards (otherwise their status stays stale).
+func TestUpdatePodEnqueuesPreviouslyMatchingPDB(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	dc, _ := newFakeDisruptionController(ctx)
+
+	oldPDB, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	oldPDB.Name = "old-pdb"
+	oldPDB.Spec.Selector = newSel(map[string]string{"app": "old"})
+	oldKey := pdbKey(t, oldPDB)
+
+	newPDB, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	newPDB.Name = "new-pdb"
+	newPDB.Spec.Selector = newSel(map[string]string{"app": "new"})
+	newKey := pdbKey(t, newPDB)
+
+	add(t, dc.pdbStore, oldPDB)
+	add(t, dc.pdbStore, newPDB)
+
+	oldPod, _ := newPod(t, "pod")
+	oldPod.Labels = map[string]string{"app": "old"}
+	curPod := oldPod.DeepCopy()
+	curPod.Labels = map[string]string{"app": "new"}
+
+	dc.updatePod(logger, oldPod, curPod)
+
+	got := getQueuedPDBKeys(t, dc)
+	want := []string{oldKey, newKey}
+	if diff := cmp.Diff(want, got, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+		t.Fatalf("enqueued PDB keys mismatch (-want,+got):\n%s", diff)
+	}
+}
+
+// When multiple PDBs match one pod, all of them must be enqueued so each status
+// can be updated (overlap is unsupported for eviction, but status still matters).
+func TestAddPodEnqueuesAllMatchingPDBs(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	dc, _ := newFakeDisruptionController(ctx)
+
+	pdbA, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	pdbA.Name = "pdb-a"
+	keyA := pdbKey(t, pdbA)
+
+	pdbB, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	pdbB.Name = "pdb-b"
+	keyB := pdbKey(t, pdbB)
+
+	add(t, dc.pdbStore, pdbA)
+	add(t, dc.pdbStore, pdbB)
+
+	pod, _ := newPod(t, "pod") // labels foo=bar; both PDBs use that selector
+	dc.addPod(logger, pod)
+
+	got := getQueuedPDBKeys(t, dc)
+	want := []string{keyA, keyB}
+	if diff := cmp.Diff(want, got, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+		t.Fatalf("enqueued PDB keys mismatch (-want,+got):\n%s", diff)
+	}
+}
+
 // waitForCacheCount blocks until the given cache store has the desired number
 // of items in it. This will return an error if the condition is not met after a
 // 10 second timeout.
