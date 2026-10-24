@@ -17363,6 +17363,66 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 			errorField:  "status.extraNodeAllocatableResources[1].source",
 		},
 		{
+			name: "Valid same source for different containers",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{Name: "c1", Image: "image", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "claim1", Request: "req-1"}}}},
+					{Name: "c2", Image: "image", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "claim1", Request: "req-2"}}}},
+				},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
+						},
+					},
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c2"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid duplicate source with the same containers in a different order",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{Name: "c1", Image: "image", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "claim1"}}}},
+					{Name: "c2", Image: "image", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "claim1"}}}},
+				},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1", "c2"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c2", "c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.extraNodeAllocatableResources[1].source",
+		},
+		{
 			name: "Invalid Kubernetes source apiGroup ends in .k8s.io not supported",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{

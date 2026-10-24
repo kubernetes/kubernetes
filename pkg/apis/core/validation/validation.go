@@ -6340,8 +6340,9 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 	}
 
 	// Declarative validation cannot dedupe on a struct key.
+	// A source can have one entry per set of containers (e.g., for different claim requests).
 	type sourceKey struct {
-		apiGroup, kind, name string
+		apiGroup, kind, name, containers string
 	}
 	seenSources := sets.New[sourceKey]()
 	for i, res := range podStatus.ExtraNodeAllocatableResources {
@@ -6351,7 +6352,8 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 
 		// Missing fields get required errors from declarative validation.
 		if source.APIGroup != "" && source.Kind != "" && source.Name != "" {
-			key := sourceKey{apiGroup: source.APIGroup, kind: source.Kind, name: source.Name}
+			containers := strings.Join(slices.Sorted(slices.Values(res.Containers)), ",")
+			key := sourceKey{apiGroup: source.APIGroup, kind: source.Kind, name: source.Name, containers: containers}
 			if seenSources.Has(key) {
 				allErrs = append(allErrs, field.Duplicate(sourceFldPath, source))
 			} else {
