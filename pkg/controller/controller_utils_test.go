@@ -1214,6 +1214,22 @@ func TestComputeHash(t *testing.T) {
 	}
 }
 
+func TestComputeHashLength(t *testing.T) {
+	// ComputeHash encodes the 32 bit hash as a decimal string, and SafeEncodeString
+	// returns one character per input character. A Sum32 value below 1000000000 has nine
+	// digits rather than ten, which used to produce a shorter suffix. Roughly a quarter of
+	// the value range is in that band, so a run of distinct templates covers it.
+	const expectedLen = 10
+	for i := 0; i < 500; i++ {
+		template := &v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": fmt.Sprint(i)}},
+		}
+		if hash := ComputeHash(template, nil); len(hash) != expectedLen {
+			t.Errorf("template %d: expected a hash of %d characters, got %q of length %d", i, expectedLen, hash, len(hash))
+		}
+	}
+}
+
 func TestRemoveTaintOffNode(t *testing.T) {
 	tests := []struct {
 		name           string
