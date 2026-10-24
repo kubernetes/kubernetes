@@ -55,6 +55,7 @@ const (
 	TriggerReasonPodsAdded     = "pods_added"
 	TriggerReasonPodsRemoved   = "pods_removed"
 	TriggerReasonPodTerminated = "pod_terminated"
+	TriggerReasonNodeUpdated   = "node_updated"
 
 	triggerReasonPeriodic = "periodic_retry"
 )
@@ -124,8 +125,9 @@ type manager struct {
 	getActivePods  func() []*v1.Pod
 	getPodByUID    func(types.UID) (*v1.Pod, bool)
 
-	allocationMutex        sync.Mutex
-	podsWithPendingResizes []types.UID
+	allocationMutex                   sync.Mutex
+	podsWithPendingResizes            []types.UID
+	podsWithCapacityInfeasibleResizes []types.UID
 
 	recorder record.EventRecorderLogger
 }
@@ -232,7 +234,13 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 	m.ticker.Reset(retryDelay)
 
+	if trigger == TriggerReasonNodeUpdated {
+		m.podsWithPendingResizes = append(m.podsWithPendingResizes, m.podsWithCapacityInfeasibleResizes...)
+		m.podsWithCapacityInfeasibleResizes = nil
+	}
+
 	var newPendingResizes []types.UID
+	var newCapacityInfeasible []types.UID
 	var successfulResizes []*v1.Pod
 
 	// Retry all pending resizes.
@@ -255,7 +263,12 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 			logger.V(4).Info("Pod resize is deferred; will reevaluate later", "pod", klog.KObj(pod))
 			newPendingResizes = append(newPendingResizes, uid)
 		case m.statusManager.IsPodResizeInfeasible(uid):
-			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
+			if m.statusManager.IsPodResizeCapacityInfeasible(uid) {
+				logger.V(4).Info("Pod resize is capacity-infeasible; will retry on node upscale", "pod", klog.KObj(pod))
+				newCapacityInfeasible = append(newCapacityInfeasible, uid)
+			} else {
+				logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
+			}
 		default:
 			logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
 			successfulResizes = append(successfulResizes, pod)
@@ -272,6 +285,7 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 	}
 
 	m.podsWithPendingResizes = newPendingResizes
+	m.podsWithCapacityInfeasibleResizes = append(m.podsWithCapacityInfeasibleResizes, newCapacityInfeasible...)
 	return successfulResizes
 }
 
@@ -575,12 +589,17 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	if reason != "" && resizeRequested {
+		// Normalize the internal CapacityInfeasible reason to the API-facing Infeasible.
+		eventReason := reason
+		if reason == lifecycle.CapacityInfeasible {
+			eventReason = v1.PodReasonInfeasible
+		}
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
+			if eventReason == v1.PodReasonInfeasible {
 				eventType = events.ResizeInfeasible
 			}
-			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
+			msg := events.PodResizePendingMsg(logger, pod, eventReason, message, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 		}
 	}

@@ -874,7 +874,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request memory increase beyond node capacity - expect Deferred",
+			name:                  "Request memory increase beyond node capacity - expect Infeasible",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem4500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
@@ -883,14 +883,14 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Deferred",
+					Reason:  "Infeasible",
 					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
 				},
 			},
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request CPU increase beyond node capacity - expect Deferred",
+			name:                  "Request CPU increase beyond node capacity - expect Infeasible",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu5000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
@@ -899,7 +899,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Deferred",
+					Reason:  "Infeasible",
 					Message: "Node didn't have enough resource: cpu, requested: 5000, used: 2000, capacity: 4000",
 				},
 			},
@@ -1089,7 +1089,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                         "pod-level: Request memory increase beyond node capacity - expect Deferred",
+			name:                         "pod-level: Request memory increase beyond node capacity - expect Infeasible",
 			inPlacePodLevelResizeEnabled: true,
 			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
 			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem4500M},
@@ -1101,7 +1101,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Deferred",
+					Reason:  "Infeasible",
 					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
 				},
 			},
@@ -1946,7 +1946,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				{
 					Type:               v1.PodResizePending,
 					Status:             "True",
-					Reason:             v1.PodReasonDeferred,
+					Reason:             v1.PodReasonInfeasible,
 					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
 					ObservedGeneration: 2,
 				},
@@ -1956,7 +1956,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					ObservedGeneration: 1,
 				},
 			},
-			expectedEvent: `Warning ResizeDeferred Pod resize OutOfcpu: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000"}`,
+			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000"}`,
 		},
 		{
 			name:       "same as previous case to ensure no new event is generated",
@@ -1967,7 +1967,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				{
 					Type:               v1.PodResizePending,
 					Status:             "True",
-					Reason:             v1.PodReasonDeferred,
+					Reason:             v1.PodReasonInfeasible,
 					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
 					ObservedGeneration: 2,
 				},
@@ -3836,7 +3836,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			expectedResizeConditions: nil,
 		},
 		{
-			name:          "scale up emptyDir limit combined with out-of-resources CPU resize (expect Deferred)",
+			name:          "scale up emptyDir limit combined with out-of-resources CPU resize (expect Infeasible)",
 			isGateEnabled: true,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -3908,7 +3908,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 				{
 					Type:               v1.PodResizePending,
 					Status:             "True",
-					Reason:             "Deferred",
+					Reason:             "Infeasible",
 					Message:            "cpu",
 					ObservedGeneration: 2,
 				},
@@ -4218,4 +4218,340 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	})
 
 	return allocationManager, runningPod, pendingPod, logger
+}
+
+// makeAllocationManagerWithNodeGetter is like makeAllocationManager but accepts a
+// caller-supplied getNode function, enabling tests to swap allocatable between
+// RetryPendingResizes calls and observe state-machine transitions.
+func makeAllocationManagerWithNodeGetter(
+	t *testing.T,
+	runtime *containertest.FakeRuntime,
+	allocatedPods []*v1.Pod,
+	getNode func(context.Context, bool) (*v1.Node, error),
+) Manager {
+	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
+	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	containerManager := cm.NewFakeContainerManager(logger)
+	allocationManager := NewInMemoryManager(
+		logger,
+		statusManager,
+		func(_ context.Context, pod *v1.Pod) {
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
+			pod.Annotations["pod-sync-triggered"] = "true"
+		},
+		func() []*v1.Pod { return allocatedPods },
+		func(uid types.UID) (*v1.Pod, bool) {
+			for _, p := range allocatedPods {
+				if p.UID == uid {
+					return p, true
+				}
+			}
+			return nil, false
+		},
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		record.NewFakeRecorder(20),
+	)
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager)
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
+	return allocationManager
+}
+
+// TestDeferredResizeRetriedOnNodeUpscale verifies that a pod resize that was
+// Deferred because the node lacked capacity is re-evaluated and accepted when
+// Node.Status.Allocatable increases.
+func TestDeferredResizeRetriedOnNodeUpscale(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	mem1000M := resource.MustParse("1Gi")
+	mem3500M := resource.MustParse("3500Mi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "resize-pod", Name: "resize-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}},
+		},
+	}
+
+	// Filler pod consumes 1Gi so that only 3Gi is free on the 4Gi node.
+	fillerPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "filler-pod", Name: "filler-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}}},
+	}
+
+	// Node starts at 4Gi allocatable, filler takes 1Gi, leaving 3Gi free.
+	node := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			},
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+		ContainerStatuses: make([]*kubecontainer.Status, 1),
+	}
+	setContainerStatus(podStatus, &pod.Spec.Containers[0], 0)
+
+	allPods := []*v1.Pod{pod, fillerPod}
+	allocationManager := makeAllocationManagerWithNodeGetter(t, &containertest.FakeRuntime{PodStatus: *podStatus}, allPods,
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil })
+
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, pod))
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, fillerPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(logger, pod.UID)
+		allocationManager.RemovePod(logger, fillerPod.UID)
+	})
+
+	// Submit resize to 3.5Gi.
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = mem3500M
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) { return resizedPod, true }
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after initial retry")
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type, "resize should be Deferred at 4Gi allocatable")
+	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
+
+	// Simulate node upscale to 8Gi.
+	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("8Gi")
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonNodeUpdated)
+
+	conditions = allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after upscale")
+	assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type, "resize should be InProgress after upscale")
+	assert.Equal(t, v1.ConditionTrue, conditions[0].Status)
+}
+
+// TestDeferredResizeBecomesInfeasibleOnNodeDownscale verifies that a pod resize
+// that was Deferred transitions to Infeasible when Node.Status.Allocatable
+// decreases below the requested size.
+func TestDeferredResizeBecomesInfeasibleOnNodeDownscale(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	mem1000M := resource.MustParse("1Gi")
+	mem6000M := resource.MustParse("6Gi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "resize-pod", Name: "resize-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}},
+		},
+	}
+
+	// Node starts at 8Gi, resize to 6Gi is Deferred due to contention.
+	node := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("8Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			},
+		},
+	}
+
+	// Filler pod consumes 4Gi, leaving only 3Gi free, insufficient for the 6Gi resize.
+	fillerPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "filler-pod", Name: "filler-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: resource.MustParse("4Gi")},
+				},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: resource.MustParse("4Gi")},
+				Resources:          &v1.ResourceRequirements{},
+			}}},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+		ContainerStatuses: make([]*kubecontainer.Status, 1),
+	}
+	setContainerStatus(podStatus, &pod.Spec.Containers[0], 0)
+
+	allPods := []*v1.Pod{pod, fillerPod}
+	allocationManager := makeAllocationManagerWithNodeGetter(t, &containertest.FakeRuntime{PodStatus: *podStatus}, allPods,
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil })
+
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, pod))
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, fillerPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(logger, pod.UID)
+		allocationManager.RemovePod(logger, fillerPod.UID)
+	})
+
+	// Resize to 6Gi, Deferred because only 3Gi is free.
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = mem6000M
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) { return resizedPod, true }
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after initial retry")
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type, "resize should be Deferred initially")
+	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
+
+	// Simulate node downscale to 3Gi, the 6Gi resize can never fit; must become Infeasible.
+	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("3Gi")
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonNodeUpdated)
+
+	conditions = allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after downscale")
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type, "resize should still be Pending after downscale")
+	assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason, "resize should be Infeasible after downscale below request")
+}
+
+// TestInfeasibleResizeClearedOnNodeUpscale verifies that a pod resize that was
+// Infeasible due to insufficient node capacity is re-evaluated and accepted when
+// Node.Status.Allocatable increases above the requested size.
+func TestInfeasibleResizeClearedOnNodeUpscale(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	mem1000M := resource.MustParse("1Gi")
+	mem6000M := resource.MustParse("6Gi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "resize-pod", Name: "resize-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}},
+		},
+	}
+
+	// Node starts at 4Gi, a 6Gi resize exceeds total node allocatable → Infeasible.
+	node := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			},
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+		ContainerStatuses: make([]*kubecontainer.Status, 1),
+	}
+	setContainerStatus(podStatus, &pod.Spec.Containers[0], 0)
+
+	allocationManager := makeAllocationManagerWithNodeGetter(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{pod},
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil })
+
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, pod))
+	t.Cleanup(func() { allocationManager.RemovePod(logger, pod.UID) })
+
+	// Resize to 6Gi, exceeds total 4Gi allocatable → Infeasible.
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = mem6000M
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) { return resizedPod, true }
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after initial retry")
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type, "resize should be Infeasible at 4Gi allocatable")
+	assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
+
+	// Simulate node upscale to 8Gi — the 6Gi resize now fits; must transition to InProgress.
+	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("8Gi")
+	allocationManager.PushPendingResize(logger, pod.UID)
+	allocationManager.RetryPendingResizes(tCtx, TriggerReasonNodeUpdated)
+
+	conditions = allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after upscale")
+	assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type, "resize should be InProgress after upscale")
+	assert.Equal(t, v1.ConditionTrue, conditions[0].Status)
 }
