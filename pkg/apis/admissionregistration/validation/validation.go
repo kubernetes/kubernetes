@@ -938,9 +938,6 @@ func validateValidationActions(va []admissionregistration.ValidationAction, fldP
 	if actions.Has(string(admissionregistration.Deny)) && actions.Has(string(admissionregistration.Warn)) {
 		allErrors = append(allErrors, field.Invalid(fldPath, va, "must not contain both Deny and Warn (repeating the same validation failure information in the API response and headers serves no purpose)"))
 	}
-	if len(actions) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required").MarkCoveredByDeclarative())
-	}
 	return allErrors
 }
 
@@ -1181,9 +1178,7 @@ func validateValidatingAdmissionPolicyBinding(pb *admissionregistration.Validati
 func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.ValidatingAdmissionPolicyBindingSpec, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 
-	if len(spec.PolicyName) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), "").MarkCoveredByDeclarative())
-	} else {
+	if len(spec.PolicyName) != 0 {
 		for _, msg := range genericvalidation.NameIsDNSSubdomain(spec.PolicyName, false) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
 		}
