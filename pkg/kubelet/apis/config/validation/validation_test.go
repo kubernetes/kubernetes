@@ -806,6 +806,34 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 		}, {
+			name: "invalid configuration: invalid ImageGCPeriod",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ImageGCPeriod = metav1.Duration{Duration: -1}
+				return conf
+			},
+			errMsg: "invalid configuration: imageGCPeriod -1ns must not be negative",
+		}, {
+			name: "invalid configuration: invalid ContainerGCPeriod",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ContainerGCPeriod = metav1.Duration{Duration: -1}
+				return conf
+			},
+			errMsg: "invalid configuration: containerGCPeriod -1ns must not be negative",
+		}, {
+			name: "valid ContainerGCPeriod set to default 1ns",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				// Verify that values other than the default are accepted.
+				conf.ContainerGCPeriod = metav1.Duration{Duration: 1 * time.Nanosecond}
+				return conf
+			},
+		}, {
+			name: "valid ImageGCPeriod set to default 1ns",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				// Verify that values other than the default are accepted.
+				conf.ImageGCPeriod = metav1.Duration{Duration: 1 * time.Nanosecond}
+				return conf
+			},
+		}, {
 			name: "DefaultPodSysctls configured with feature gate disabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
