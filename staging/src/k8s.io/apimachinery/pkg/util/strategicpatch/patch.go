@@ -387,7 +387,7 @@ func validateMergeKeyInLists(mergeKey string, lists ...[]interface{}) error {
 				return mergepatch.ErrBadArgType(m, item)
 			}
 			if _, ok = m[mergeKey]; !ok {
-				return mergepatch.ErrNoMergeKey(m, mergeKey)
+				return mergepatch.ErrNoMergeKey(m, mergeKey, "")
 			}
 		}
 	}
@@ -620,7 +620,7 @@ func isOrderSame(original, modified []interface{}, mergeKey string) (bool, error
 		return false, nil
 	}
 	for i, modifiedItem := range modified {
-		equal, err := mergeKeyValueEqual(original[i], modifiedItem, mergeKey)
+		equal, err := mergeKeyValueEqual(original[i], modifiedItem, mergeKey, "")
 		if err != nil || !equal {
 			return equal, err
 		}
@@ -740,14 +740,14 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 		var originalElementMergeKeyValue, modifiedElementMergeKeyValue interface{}
 		var originalElement, modifiedElement map[string]interface{}
 		if originalInBounds {
-			originalElement, originalElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(originalIndex, mergeKey, originalSorted)
+		originalElement, originalElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(originalIndex, mergeKey, "", originalSorted)
 			if err != nil {
 				return nil, nil, err
 			}
 			originalElementMergeKeyValueString = fmt.Sprintf("%v", originalElementMergeKeyValue)
 		}
 		if modifiedInBounds {
-			modifiedElement, modifiedElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(modifiedIndex, mergeKey, modifiedSorted)
+		modifiedElement, modifiedElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(modifiedIndex, mergeKey, "", modifiedSorted)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -793,7 +793,7 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 }
 
 // getMapAndMergeKeyValueByIndex return a map in the list and its merge key value given the index of the map.
-func getMapAndMergeKeyValueByIndex(index int, mergeKey string, listOfMaps []interface{}) (map[string]interface{}, interface{}, error) {
+func getMapAndMergeKeyValueByIndex(index int, mergeKey, fieldName string, listOfMaps []interface{}) (map[string]interface{}, interface{}, error) {
 	m, ok := listOfMaps[index].(map[string]interface{})
 	if !ok {
 		return nil, nil, mergepatch.ErrBadArgType(m, listOfMaps[index])
@@ -801,7 +801,7 @@ func getMapAndMergeKeyValueByIndex(index int, mergeKey string, listOfMaps []inte
 
 	val, ok := m[mergeKey]
 	if !ok {
-		return nil, nil, mergepatch.ErrNoMergeKey(m, mergeKey)
+		return nil, nil, mergepatch.ErrNoMergeKey(m, mergeKey, fieldName)
 	}
 	return m, val, nil
 }
@@ -932,7 +932,7 @@ func containsDirectiveMarker(item interface{}) bool {
 	return false
 }
 
-func mergeKeyValueEqual(left, right interface{}, mergeKey string) (bool, error) {
+func mergeKeyValueEqual(left, right interface{}, mergeKey, fieldName string) (bool, error) {
 	if len(mergeKey) == 0 {
 		return left == right, nil
 	}
@@ -946,11 +946,11 @@ func mergeKeyValueEqual(left, right interface{}, mergeKey string) (bool, error) 
 	}
 	mergeKeyLeft, ok := typedLeft[mergeKey]
 	if !ok {
-		return false, mergepatch.ErrNoMergeKey(typedLeft, mergeKey)
+		return false, mergepatch.ErrNoMergeKey(typedLeft, mergeKey, fieldName)
 	}
 	mergeKeyRight, ok := typedRight[mergeKey]
 	if !ok {
-		return false, mergepatch.ErrNoMergeKey(typedRight, mergeKey)
+		return false, mergepatch.ErrNoMergeKey(typedRight, mergeKey, fieldName)
 	}
 	return mergeKeyLeft == mergeKeyRight, nil
 }
@@ -1004,7 +1004,7 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 			patchIndex++
 			continue
 		}
-		mergeKeyEqual, err := mergeKeyValueEqual(nonDeleteList[patchIndex], typedSetOrderList[setOrderIndex], mergeKey)
+		mergeKeyEqual, err := mergeKeyValueEqual(nonDeleteList[patchIndex], typedSetOrderList[setOrderIndex], mergeKey, "")
 		if err != nil {
 			return err
 		}
@@ -1191,7 +1191,7 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, schema Looku
 			merged = v.([]interface{})
 		case foundOriginal && foundPatch:
 			merged, err = mergeSliceHandler(originalList, patchList, subschema,
-				patchStrategy, patchMeta.GetPatchMergeKey(), false, mergeOptions)
+				patchStrategy, patchMeta.GetPatchMergeKey(), originalKey, false, mergeOptions)
 			if err != nil {
 				return err
 			}
@@ -1207,7 +1207,7 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, schema Looku
 
 		} else {
 			// Maps need merge key to do partitioning.
-			patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, typedSetElementOrderList, patchMeta.GetPatchMergeKey())
+			patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, typedSetElementOrderList, patchMeta.GetPatchMergeKey(), originalKey)
 			if err != nil {
 				return err
 			}
@@ -1251,7 +1251,7 @@ func partitionPrimitivesByPresentInList(original, partitionBy []interface{}) ([]
 }
 
 // partitionMapsByPresentInList partitions elements into 2 slices, the first containing items present in partitionBy, the other not.
-func partitionMapsByPresentInList(original, partitionBy []interface{}, mergeKey string) ([]interface{}, []interface{}, error) {
+func partitionMapsByPresentInList(original, partitionBy []interface{}, mergeKey, fieldName string) ([]interface{}, []interface{}, error) {
 	patch := make([]interface{}, 0, len(original))
 	serverOnly := make([]interface{}, 0, len(original))
 	for _, v := range original {
@@ -1261,7 +1261,7 @@ func partitionMapsByPresentInList(original, partitionBy []interface{}, mergeKey 
 		}
 		mergeKeyValue, foundMergeKey := typedV[mergeKey]
 		if !foundMergeKey {
-			return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
+			return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey, fieldName)
 		}
 		_, _, found, err := findMapInSliceBasedOnKeyValue(partitionBy, mergeKey, mergeKeyValue)
 		if err != nil {
@@ -1422,7 +1422,7 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 			if err2 != nil {
 				return nil, err2
 			}
-			original[k], err = mergeSliceHandler(original[k], patchV, subschema, patchStrategy, patchMeta.GetPatchMergeKey(), isDeleteList, mergeOptions)
+			original[k], err = mergeSliceHandler(original[k], patchV, subschema, patchStrategy, patchMeta.GetPatchMergeKey(), k, isDeleteList, mergeOptions)
 		default:
 			original[k], ok = removeDirectives(patchV)
 			if !ok {
@@ -1475,7 +1475,7 @@ func mergeMapHandler(original, patch interface{}, schema LookupPatchMeta,
 // mergeSliceHandler handles how to merge `patchV` whose key is `key` with `original` respecting
 // fieldPatchStrategy, fieldPatchMergeKey, isDeleteList and mergeOptions.
 func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
-	fieldPatchStrategy, fieldPatchMergeKey string, isDeleteList bool, mergeOptions MergeOptions) ([]interface{}, error) {
+	fieldPatchStrategy, fieldPatchMergeKey, fieldName string, isDeleteList bool, mergeOptions MergeOptions) ([]interface{}, error) {
 	typedOriginal, typedPatch, err := sliceTypeAssertion(original, patch)
 	if err != nil {
 		return nil, err
@@ -1483,7 +1483,7 @@ func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 
 	// Delete lists are handled the same way regardless of what the field's patch strategy is
 	if fieldPatchStrategy == mergeDirective || isDeleteList {
-		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, mergeOptions, isDeleteList)
+		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, fieldName, mergeOptions, isDeleteList)
 	} else {
 		return typedPatch, nil
 	}
@@ -1492,7 +1492,7 @@ func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 // Merge two slices together. Note: This may modify both the original slice and
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
-func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey string, mergeOptions MergeOptions, isDeleteList bool) ([]interface{}, error) {
+func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey, fieldName string, mergeOptions MergeOptions, isDeleteList bool) ([]interface{}, error) {
 	if len(original) == 0 && len(patch) == 0 {
 		return original, nil
 	}
@@ -1520,12 +1520,12 @@ func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey 
 			return nil, fmt.Errorf("cannot merge lists without merge key for %s", schema.Name())
 		}
 
-		original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey)
+		original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey, fieldName)
 		if err != nil {
 			return nil, err
 		}
 
-		merged, err = mergeSliceWithoutSpecialElements(original, patch, mergeKey, schema, mergeOptions)
+		merged, err = mergeSliceWithoutSpecialElements(original, patch, mergeKey, fieldName, schema, mergeOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -1536,7 +1536,7 @@ func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey 
 	if len(mergeKey) == 0 {
 		patchItems, serverOnlyItems = partitionPrimitivesByPresentInList(merged, patch)
 	} else {
-		patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, patch, mergeKey)
+		patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, patch, mergeKey, fieldName)
 		if err != nil {
 			return nil, err
 		}
@@ -1547,7 +1547,7 @@ func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey 
 // mergeSliceWithSpecialElements handles special elements with directiveMarker
 // before merging the slices. It returns a updated `original` and a patch without special elements.
 // original and patch must be slices of maps, they should be checked before calling this function.
-func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey string) ([]interface{}, []interface{}, error) {
+func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey, fieldName string) ([]interface{}, []interface{}, error) {
 	patchWithoutSpecialElements := []interface{}{}
 	replace := false
 	for _, v := range patch {
@@ -1566,7 +1566,7 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 						return nil, nil, err
 					}
 				} else {
-					return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
+					return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey, fieldName)
 				}
 			case replaceDirective:
 				replace = true
@@ -1603,12 +1603,12 @@ func deleteMatchingEntries(original []interface{}, mergeKey string, mergeValue i
 
 // mergeSliceWithoutSpecialElements merges slices with non-special elements.
 // original and patch must be slices of maps, they should be checked before calling this function.
-func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey string, schema LookupPatchMeta, mergeOptions MergeOptions) ([]interface{}, error) {
+func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey, fieldName string, schema LookupPatchMeta, mergeOptions MergeOptions) ([]interface{}, error) {
 	for _, v := range patch {
 		typedV := v.(map[string]interface{})
 		mergeValue, ok := typedV[mergeKey]
 		if !ok {
-			return nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
+			return nil, mergepatch.ErrNoMergeKey(typedV, mergeKey, fieldName)
 		}
 
 		// If we find a value with this merge key value in original, merge the
