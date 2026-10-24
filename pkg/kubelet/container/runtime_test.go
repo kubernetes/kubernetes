@@ -768,9 +768,9 @@ func TestRuntimeFeaturesString(t *testing.T) {
 func TestSortContainerStatusesByCreationTime(t *testing.T) {
 	now := time.Now()
 	statuses := SortContainerStatusesByCreationTime{
-		{CreatedAt: now.Add(2 * time.Hour)},
-		{CreatedAt: now},
-		{CreatedAt: now.Add(1 * time.Hour)},
+		{RestartCount: 1, CreatedAt: now.Add(2 * time.Hour)},
+		{RestartCount: 1, CreatedAt: now},
+		{RestartCount: 1, CreatedAt: now.Add(1 * time.Hour)},
 	}
 
 	// Test Len
@@ -783,9 +783,17 @@ func TestSortContainerStatusesByCreationTime(t *testing.T) {
 	assert.Equal(t, original1, statuses[2], "Swap(0, 1) did not work correctly (0)")
 	assert.Equal(t, original2, statuses[1], "Swap(0, 1) did not work correctly (1)")
 
-	// Test Less
+	// Test Less: same RestartCount falls back to CreatedAt
 	assert.True(t, statuses.Less(1, 0), "Less(1, 0) should be true")
 	assert.False(t, statuses.Less(0, 1), "Less(0, 1) should be false")
+
+	// Test Less: higher RestartCount wins regardless of CreatedAt
+	skewed := SortContainerStatusesByCreationTime{
+		{RestartCount: 9, CreatedAt: now.Add(2 * time.Minute)},
+		{RestartCount: 10, CreatedAt: now},
+	}
+	assert.False(t, skewed.Less(1, 0), "higher RestartCount should not be Less")
+	assert.True(t, skewed.Less(0, 1), "lower RestartCount should be Less")
 }
 
 func TestNewCommandRunner(t *testing.T) {
