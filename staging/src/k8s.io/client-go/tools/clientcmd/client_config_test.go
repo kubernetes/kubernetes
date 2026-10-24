@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -984,6 +985,291 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
 		}
+	}
+}
+
+func TestInClusterClientConfigOverrides(t *testing.T) {
+	newInClusterConfig := func() *restclient.Config {
+		return &restclient.Config{
+			Host:            "https://10.0.0.1:443",
+			BearerToken:     "service-account-token",
+			BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			TLSClientConfig: restclient.TLSClientConfig{
+				CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		overrides     *ConfigOverrides
+		expected      func() *restclient.Config
+		expectedError string
+	}{
+		{
+			name:      "no overrides",
+			overrides: nil,
+			expected:  newInClusterConfig,
+		},
+		{
+			name:      "empty overrides",
+			overrides: &ConfigOverrides{},
+			expected:  newInClusterConfig,
+		},
+		{
+			name: "request timeout",
+			overrides: &ConfigOverrides{
+				Timeout: "45s",
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Timeout = 45 * time.Second
+				return config
+			},
+		},
+		{
+			name: "invalid request timeout",
+			overrides: &ConfigOverrides{
+				Timeout: "not-a-duration",
+			},
+			expectedError: "Invalid timeout value",
+		},
+		{
+			name: "impersonation",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate:       "alice",
+					ImpersonateUID:    "uid-1234",
+					ImpersonateGroups: []string{"group-a", "group-b"},
+					ImpersonateUserExtra: map[string][]string{
+						"scope": {"read", "write"},
+					},
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Impersonate = restclient.ImpersonationConfig{
+					UserName: "alice",
+					UID:      "uid-1234",
+					Groups:   []string{"group-a", "group-b"},
+					Extra: map[string][]string{
+						"scope": {"read", "write"},
+					},
+				}
+				return config
+			},
+		},
+		{
+			name: "disable compression",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					DisableCompression: true,
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.DisableCompression = true
+				return config
+			},
+		},
+		{
+			name: "tls server name",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					TLSServerName: "api.example.com",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.ServerName = "api.example.com"
+				return config
+			},
+		},
+		{
+			name: "insecure skip tls verify clears the in-cluster CA",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					InsecureSkipTLSVerify: true,
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Insecure = true
+				config.CAFile = ""
+				return config
+			},
+		},
+		{
+			name: "certificate authority",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					CertificateAuthority: "/etc/pki/other-ca.crt",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.CAFile = "/etc/pki/other-ca.crt"
+				return config
+			},
+		},
+		{
+			name: "token replaces the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Token: "explicit-token",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.BearerToken = "explicit-token"
+				config.BearerTokenFile = ""
+				return config
+			},
+		},
+		{
+			name: "token file replaces the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					TokenFile: "/etc/pki/explicit-token",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.BearerToken = ""
+				config.BearerTokenFile = "/etc/pki/explicit-token"
+				return config
+			},
+		},
+		{
+			name: "basic auth replaces the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Username: "alice",
+					Password: "hunter2",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.BearerToken = ""
+				config.BearerTokenFile = ""
+				config.Username = "alice"
+				config.Password = "hunter2"
+				return config
+			},
+		},
+		{
+			name: "password without username keeps the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Password: "hunter2",
+				},
+			},
+			expected: newInClusterConfig,
+		},
+		{
+			name: "client certificate replaces the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					ClientCertificate: "/etc/pki/client.crt",
+					ClientKey:         "/etc/pki/client.key",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.BearerToken = ""
+				config.BearerTokenFile = ""
+				config.CertFile = "/etc/pki/client.crt"
+				config.KeyFile = "/etc/pki/client.key"
+				return config
+			},
+		},
+		{
+			name: "client certificate without key keeps the service account token",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					ClientCertificate: "/etc/pki/client.crt",
+				},
+			},
+			expected: newInClusterConfig,
+		},
+		{
+			name: "server replaces the in-cluster host",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server: "https://other.example.com:6443",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Host = "https://other.example.com:6443"
+				return config
+			},
+		},
+		{
+			name: "server and tls server name",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:        "https://other.example.com:6443",
+					TLSServerName: "other.example.com",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Host = "https://other.example.com:6443"
+				config.ServerName = "other.example.com"
+				return config
+			},
+		},
+		{
+			name: "flags that previously prevented the in-cluster configuration are applied",
+			overrides: &ConfigOverrides{
+				Timeout: "30s",
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate:       "alice",
+					ImpersonateGroups: []string{"admins"},
+				},
+				ClusterInfo: clientcmdapi.Cluster{
+					DisableCompression: true,
+					TLSServerName:      "api.example.com",
+				},
+			},
+			expected: func() *restclient.Config {
+				config := newInClusterConfig()
+				config.Timeout = 30 * time.Second
+				config.DisableCompression = true
+				config.ServerName = "api.example.com"
+				config.Impersonate = restclient.ImpersonationConfig{
+					UserName: "alice",
+					Groups:   []string{"admins"},
+				}
+				return config
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := &inClusterClientConfig{
+				inClusterConfigProvider: func() (*restclient.Config, error) {
+					return newInClusterConfig(), nil
+				},
+				overrides: test.overrides,
+			}
+
+			got, err := config.ClientConfig()
+			if test.expectedError != "" {
+				if err == nil || !strings.Contains(err.Error(), test.expectedError) {
+					t.Fatalf("expected error containing %q, got %v", test.expectedError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(test.expected(), got); diff != "" {
+				t.Errorf("unexpected client config (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
