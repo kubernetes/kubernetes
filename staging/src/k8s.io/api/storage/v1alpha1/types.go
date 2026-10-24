@@ -295,6 +295,8 @@ type VolumeAttributesClass struct {
 	// driverName is the name of the CSI driver
 	// This field is immutable.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 
 	// parameters hold volume attributes defined by the CSI driver. These values
