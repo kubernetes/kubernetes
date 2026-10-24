@@ -137,6 +137,7 @@ type testMetricsProvider struct {
 	unfinished testMetric
 	longest    testMetric
 	retries    testMetric
+	delayed    testMetric
 }
 
 func (m *testMetricsProvider) NewDepthMetric(name string) GaugeMetric {
@@ -166,6 +167,15 @@ func (m *testMetricsProvider) NewLongestRunningProcessorSecondsMetric(name strin
 func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return &m.retries
 }
+
+func (m *testMetricsProvider) NewDelayedMetric(name string) SettableGaugeMetric {
+	return &m.delayed
+}
+
+var (
+	_ MetricsProvider        = &testMetricsProvider{}
+	_ DelayedMetricsProvider = &testMetricsProvider{}
+)
 
 func TestMetrics(t *testing.T) {
 	mp := testMetricsProvider{}
