@@ -167,6 +167,11 @@ type manager struct {
 	// allocatableCPUs is the set of online CPUs as reported by the system,
 	// and available for allocation, minus the reserved set
 	allocatableCPUs cpuset.CPUSet
+
+	// pendingResize is the resize admission in progress, if any. One is enough:
+	// the allocation manager admits one pod at a time and ends each admission
+	// with a commit or an abort before it starts the next one.
+	pendingResize *resizeTransaction
 }
 
 var _ Manager = &manager{}
@@ -284,7 +289,7 @@ func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container, oper
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(logger, m.state, p, c, operation)
+	err := m.policy.Allocate(logger, m.admissionState(logger, p, operation), p, c, operation)
 	if err != nil {
 		logger.Error(err, "policy error")
 		return err
@@ -301,7 +306,7 @@ func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecyc
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	if err := m.policy.AllocatePod(logger, m.state, pod, operation); err != nil {
+	if err := m.policy.AllocatePod(logger, m.admissionState(logger, pod, operation), pod, operation); err != nil {
 		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
 		return err
 	}
@@ -363,15 +368,21 @@ func (m *manager) State() state.Reader {
 func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
+	m.Lock()
+	s := m.admissionState(logger, pod, operation)
+	m.Unlock()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
+	return m.policy.GetTopologyHints(logger, s, pod, container, operation)
 }
 
 func (m *manager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
+	m.Lock()
+	s := m.admissionState(logger, pod, operation)
+	m.Unlock()
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
+	return m.policy.GetPodTopologyHints(logger, s, pod, operation)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {
@@ -432,6 +443,13 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 			if err != nil {
 				logger.Error(err, "failed to remove container")
 			}
+		}
+	}
+
+	for podUID := range m.state.GetPendingResizes() {
+		if _, ok := activeContainers[podUID]; !ok {
+			rootLogger.V(2).Info("removing pending resize", "podUID", podUID)
+			m.state.DeletePendingResize(podUID)
 		}
 	}
 

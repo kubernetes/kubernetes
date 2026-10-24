@@ -18,8 +18,10 @@ package topologymanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -762,6 +764,125 @@ func TestAdmitWithPodLevelResources(t *testing.T) {
 			}
 			if tracker.allocateContainerCalled != tc.expectedAllocateContainerCalled {
 				t.Errorf("Expected allocateContainerCalled to be %v got %v", tc.expectedAllocateContainerCalled, tracker.allocateContainerCalled)
+			}
+		})
+	}
+}
+
+// mockAdmitTransactionalHintProvider is a HintProvider implementing AdmitTransactionalHintProvider
+// that records its calls, prefixed with its name, in a slice shared by providers.
+type mockAdmitTransactionalHintProvider struct {
+	mockHintProvider
+	name      string
+	stageErr  error
+	commitErr error
+	calls     *[]string
+}
+
+func (m *mockAdmitTransactionalHintProvider) record(call string, operation lifecycle.Operation) {
+	*m.calls = append(*m.calls, fmt.Sprintf("%s:%s(%s)", m.name, call, operation))
+}
+
+func (m *mockAdmitTransactionalHintProvider) StageAdmit(_ context.Context, _ *v1.Pod, operation lifecycle.Operation) error {
+	m.record("Stage", operation)
+	return m.stageErr
+}
+
+func (m *mockAdmitTransactionalHintProvider) CommitAdmit(_ context.Context, _ *v1.Pod, operation lifecycle.Operation) error {
+	m.record("Commit", operation)
+	return m.commitErr
+}
+
+func (m *mockAdmitTransactionalHintProvider) AbortAdmit(_ context.Context, _ *v1.Pod, operation lifecycle.Operation) {
+	m.record("Abort", operation)
+}
+
+func TestAdmitTransaction(t *testing.T) {
+	injected := fmt.Errorf("injected failure")
+	stage := func(ctx context.Context, m Manager, attrs *lifecycle.PodAdmitAttributes) error {
+		return m.StageAdmit(ctx, attrs)
+	}
+	commit := func(ctx context.Context, m Manager, attrs *lifecycle.PodAdmitAttributes) error {
+		return m.CommitAdmit(ctx, attrs)
+	}
+	abort := func(ctx context.Context, m Manager, attrs *lifecycle.PodAdmitAttributes) error {
+		m.AbortAdmit(ctx, attrs)
+		return nil
+	}
+
+	tcases := []struct {
+		name      string
+		operation lifecycle.Operation
+		call      func(context.Context, Manager, *lifecycle.PodAdmitAttributes) error
+		stageErr  error
+		commitErr error
+		expected  []string
+		expectErr bool
+	}{
+		{
+			name:      "stage",
+			operation: lifecycle.ResizeOperation,
+			call:      stage,
+			expected:  []string{"first:Stage(resize)", "second:Stage(resize)"},
+		},
+		{
+			name:      "stage stops at the first failure",
+			operation: lifecycle.ResizeOperation,
+			call:      stage,
+			stageErr:  injected,
+			expected:  []string{"first:Stage(resize)"},
+			expectErr: true,
+		},
+		{
+			name:      "commit",
+			operation: lifecycle.ResizeOperation,
+			call:      commit,
+			expected:  []string{"first:Commit(resize)", "second:Commit(resize)"},
+		},
+		{
+			name:      "commit continues after a failure",
+			operation: lifecycle.ResizeOperation,
+			call:      commit,
+			commitErr: injected,
+			expected:  []string{"first:Commit(resize)", "second:Commit(resize)"},
+			expectErr: true,
+		},
+		{
+			name:      "abort",
+			operation: lifecycle.ResizeOperation,
+			call:      abort,
+			expected:  []string{"first:Abort(resize)", "second:Abort(resize)"},
+		},
+		{
+			name:      "the operation is passed to the providers",
+			operation: lifecycle.AddOperation,
+			call:      stage,
+			expected:  []string{"first:Stage(add)", "second:Stage(add)"},
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			var calls []string
+			m := &manager{scope: NewNoneScope()}
+			m.AddHintProvider(logger, &mockAdmitTransactionalHintProvider{name: "first", stageErr: tc.stageErr, commitErr: tc.commitErr, calls: &calls})
+			// A provider that does not implement AdmitTransactionalHintProvider is skipped.
+			m.AddHintProvider(logger, &mockHintProvider{})
+			m.AddHintProvider(logger, &mockAdmitTransactionalHintProvider{name: "second", calls: &calls})
+
+			attrs := &lifecycle.PodAdmitAttributes{Pod: &v1.Pod{}, Operation: tc.operation}
+			err := tc.call(ctx, m, attrs)
+
+			if tc.expectErr {
+				if !errors.Is(err, injected) {
+					t.Errorf("Expected the injected error, got %v", err)
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !slices.Equal(calls, tc.expected) {
+				t.Errorf("Expected calls %v, got %v", tc.expected, calls)
 			}
 		})
 	}

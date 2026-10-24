@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -2185,6 +2186,204 @@ func (a *testPodAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmit
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	return a.admitFunc(attrs)
+}
+
+// testPodAdmitTransactionalHandler is a lifecycle.PodAdmitTransactionalHandler that records its calls
+// together with whether the pod allocation was already persisted at that point.
+type testPodAdmitTransactionalHandler struct {
+	testPodAdmitHandler
+	stageErr  error
+	commitErr error
+	// allocated reports whether the desired pod resources are persisted as allocated.
+	allocated func() bool
+	calls     []string
+}
+
+func (a *testPodAdmitTransactionalHandler) record(call string, attrs *lifecycle.PodAdmitAttributes) {
+	a.calls = append(a.calls, fmt.Sprintf("%s(%s, allocated=%t)", call, attrs.Operation, a.allocated()))
+}
+
+func (a *testPodAdmitTransactionalHandler) StageAdmit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	a.record("Stage", attrs)
+	return a.stageErr
+}
+
+func (a *testPodAdmitTransactionalHandler) CommitAdmit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) error {
+	a.record("Commit", attrs)
+	return a.commitErr
+}
+
+func (a *testPodAdmitTransactionalHandler) AbortAdmit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) {
+	a.record("Abort", attrs)
+}
+
+// failingSetPodState fails every attempt to persist a pod allocation.
+type failingSetPodState struct {
+	state.State
+}
+
+func (failingSetPodState) SetPod(klog.Logger, *v1.Pod) error {
+	return fmt.Errorf("injected checkpoint failure")
+}
+
+func TestRetryPendingResizesAdmitTransaction(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+
+	tests := []struct {
+		name string
+		// revert keeps the desired pod equal to the allocated pod.
+		revert bool
+		// rejectAfter makes an admit handler that runs after the transaction reject the pod.
+		rejectAfter     bool
+		stageErr        error
+		commitErr       error
+		failCheckpoint  bool
+		expectedCalls   []string
+		expectAllocated bool
+		expectPending   bool
+		// expectInProgress is the reason of the expected PodResizeInProgress condition, if any.
+		expectInProgress *string
+	}{
+		{
+			name:             "accepted",
+			expectedCalls:    []string{"Stage(resize, allocated=false)", "Commit(resize, allocated=true)"},
+			expectAllocated:  true,
+			expectInProgress: new(""),
+		},
+		{
+			name:          "rejected by a later handler",
+			rejectAfter:   true,
+			expectedCalls: []string{"Abort(resize, allocated=false)"},
+			expectPending: true,
+		},
+		{
+			name:          "stage fails",
+			stageErr:      fmt.Errorf("injected stage failure"),
+			expectedCalls: []string{"Stage(resize, allocated=false)", "Abort(resize, allocated=false)"},
+			expectPending: true,
+		},
+		{
+			name:           "allocation checkpoint fails",
+			failCheckpoint: true,
+			expectedCalls:  []string{"Stage(resize, allocated=false)", "Abort(resize, allocated=false)"},
+			expectPending:  true,
+		},
+		{
+			name:             "commit fails after the allocation is persisted",
+			commitErr:        fmt.Errorf("injected commit failure"),
+			expectedCalls:    []string{"Stage(resize, allocated=false)", "Commit(resize, allocated=true)"},
+			expectAllocated:  true,
+			expectInProgress: new(v1.PodReasonError),
+		},
+		{
+			name:            "reverted",
+			revert:          true,
+			expectAllocated: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("500m")}},
+				},
+			}
+			allocatedPod := pod.DeepCopy()
+			if !tc.revert {
+				// No-revert scenarios: CPU updated 500m -> 1 CPU
+				// (In revert scenario spec was mofified back so 500m -> 1 -> 500m, so no changes needed)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			}
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			if tc.failCheckpoint {
+				m := allocationManager.(*manager)
+				m.allocated = failingSetPodState{m.allocated}
+			}
+
+			tx := &testPodAdmitTransactionalHandler{
+				stageErr:  tc.stageErr,
+				commitErr: tc.commitErr,
+				allocated: func() bool {
+					// UpdatePodFromAllocation compares requested spec with allocations. Pending means that the pod is not yet allocated.
+					_, pending := allocationManager.UpdatePodFromAllocation(pod)
+					return !pending
+				},
+			}
+			handlers := lifecycle.PodAdmitHandlers{tx}
+			if tc.rejectAfter {
+				// Additional handler for simulation of admission reject after tx handler processed admission.
+				handlers = append(handlers, &testPodAdmitHandler{
+					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+						return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test"}
+					},
+				})
+			}
+			allocationManager.AddPodAdmitHandlers(handlers)
+
+			allocationManager.PushPendingResize(logger, pod.UID)
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			assert.Equal(t, tc.expectedCalls, tx.calls, "transaction calls")
+			assert.Equal(t, tc.expectAllocated, tx.allocated(), "allocated")
+			assert.Equal(t, tc.expectPending, allocationManager.HasPendingResizes(), "pending resize")
+
+			var inProgress *v1.PodCondition
+			for _, condition := range allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID) {
+				if condition.Type == v1.PodResizeInProgress {
+					inProgress = condition
+				}
+			}
+			if tc.expectInProgress == nil {
+				assert.Nil(t, inProgress, "PodResizeInProgress condition")
+			} else if assert.NotNil(t, inProgress, "PodResizeInProgress condition") {
+				assert.Equal(t, *tc.expectInProgress, inProgress.Reason, "PodResizeInProgress reason")
+			}
+
+			resizeErrorEvent := false
+			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			for len(fakeRecorder.Events) > 0 {
+				if strings.Contains(<-fakeRecorder.Events, events.ResizeError) {
+					resizeErrorEvent = true
+				}
+			}
+			assert.Equal(t, tc.commitErr != nil, resizeErrorEvent, "ResizeError event")
+		})
+	}
+}
+
+func TestAddPodDoesNotUseAdmitTransaction(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, tCtx := ktesting.NewTestContext(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1", Image: "i1"}}},
+	}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
+
+	// allocated function is used by testPodAdmitTransactionalHandler.record(). We don't expect this to be called in this scenario,
+	// but if test fails it avoid nil-pointer dereference and produces valid logs.
+	tx := &testPodAdmitTransactionalHandler{allocated: func() bool { return allocationManager.HasPodAllocatedResources(pod.UID) }}
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{tx})
+
+	ok, _, _ := allocationManager.AddPod(tCtx, nil, pod)
+	require.True(t, ok)
+	assert.Empty(t, tx.calls, "an added pod is cleaned up by garbage collection, not by the transaction")
 }
 
 func TestAllocationManagerAddPodWithPLR(t *testing.T) {

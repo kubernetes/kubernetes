@@ -56,6 +56,7 @@ type mockState struct {
 	baselines      state.ContainerCPUBaselines
 	podAssignments state.PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
+	pendingResizes state.PendingResizes
 }
 
 func (s *mockState) GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -161,6 +162,46 @@ func (s *mockState) GetPodCPUAssignments() state.PodCPUAssignments {
 
 func (s *mockState) GetCPUBaselines() state.ContainerCPUBaselines {
 	return s.baselines.Clone()
+}
+
+func (s *mockState) GetPendingResize(podUID string) (state.PendingResize, bool) {
+	pending, ok := s.pendingResizes[podUID]
+	return pending.Clone(), ok
+}
+
+func (s *mockState) GetPendingResizes() state.PendingResizes {
+	return s.pendingResizes.Clone()
+}
+
+func (s *mockState) SetPendingResize(podUID string, pending state.PendingResize) {
+	if s.pendingResizes == nil {
+		s.pendingResizes = state.PendingResizes{}
+	}
+	s.pendingResizes[podUID] = pending
+}
+
+func (s *mockState) SetPendingResizes(p state.PendingResizes) {
+	s.pendingResizes = p.Clone()
+}
+
+func (s *mockState) CommitPendingResize(podUID string) {
+	pending, ok := s.pendingResizes[podUID]
+	if !ok {
+		return
+	}
+	taken, released := state.PendingResizeDelta(s.assignments, s.podAssignments, podUID, pending)
+	for containerName, target := range pending.Containers {
+		s.SetCPUSet(podUID, containerName, target)
+	}
+	if pending.Pod != nil {
+		s.SetPodCPUSet(podUID, *pending.Pod)
+	}
+	s.defaultCPUSet = s.defaultCPUSet.Difference(taken).Union(released)
+	delete(s.pendingResizes, podUID)
+}
+
+func (s *mockState) DeletePendingResize(podUID string) {
+	delete(s.pendingResizes, podUID)
 }
 
 type mockPolicy struct {
