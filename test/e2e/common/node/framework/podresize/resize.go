@@ -354,7 +354,10 @@ func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 	}
 
 	nodeMemoryCapacity := node.Status.Capacity[v1.ResourceMemory]
-	oomScoreAdj := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
+	oomScoreAdj, err := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
+	if err != nil {
+		return err
+	}
 	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
 
 	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
