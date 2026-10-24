@@ -17,6 +17,8 @@ limitations under the License.
 package kuberc
 
 import (
+	"bytes"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -113,4 +115,22 @@ func TestDecodeEmptyPreference(t *testing.T) {
 	actual, err := decodePreference(filepath.Join("..", "..", "testdata", "kuberc", "empty.kuberc"))
 	require.NoError(t, err, "unexpected error")
 	require.Nil(t, actual, "unexpected preferences")
+}
+
+func TestSavePreference(t *testing.T) {
+	tempDir := t.TempDir()
+	kubercPath := filepath.Join(tempDir, "kuberc")
+	pref := CreateDefaultPreference()
+	var out bytes.Buffer
+
+	err := SavePreference(pref, kubercPath, &out)
+	require.NoError(t, err)
+	require.Contains(t, out.String(), fmt.Sprintf("Updated %s", kubercPath))
+
+	loaded, err := LoadPreference(kubercPath)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+	require.Equal(t, pref.APIVersion, loaded.APIVersion)
+	require.Equal(t, pref.Kind, loaded.Kind)
+	require.Equal(t, pref.Defaults, loaded.Defaults)
 }
