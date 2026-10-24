@@ -1701,6 +1701,27 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	if !reflect.DeepEqual(byName["vol2"].HealthConditions, degraded) {
 		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthConditions)
 	}
+
+	t.Log("Duplicate (status,reason) conditions should be deduplicated.")
+	duplicateConditions := []v1.VolumeHealthCondition{
+		{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for storage"},
+		{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for k8s"},
+	}
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", duplicateConditions) {
+		t.Fatal("expected update for vol1 with duplicate conditions")
+	}
+	verifyUpdates(t, m, 1)
+	status = expectPodStatus(t, m, pod)
+	for _, vh := range status.VolumeHealth {
+		if vh.Name == "vol1" {
+			if len(vh.HealthConditions) != 1 {
+				t.Fatalf("expected 1 condition after deduplication, got %d", len(vh.HealthConditions))
+			}
+			if vh.HealthConditions[0].Message != "missing controller for storage" {
+				t.Errorf("expected first occurrence message, got %q", vh.HealthConditions[0].Message)
+			}
+		}
+	}
 }
 
 func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
@@ -1742,6 +1763,32 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
 		t.Errorf("unexpected conditions after SetPodStatus: %+v", status.VolumeHealth[0].HealthConditions)
+	}
+}
+
+func TestNormalizeStatusVolumeHealth(t *testing.T) {
+	pod := getTestPod()
+	status := v1.PodStatus{
+		VolumeHealth: []v1.PodVolumeHealth{
+			{
+				Name: "vol1",
+				HealthConditions: []v1.VolumeHealthCondition{
+					{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "msg1"},
+					{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "msg2"},
+				},
+			},
+		},
+	}
+
+	normalized := normalizeStatus(pod, &status)
+	if len(normalized.VolumeHealth) != 1 {
+		t.Fatalf("expected 1 VolumeHealth, got %d", len(normalized.VolumeHealth))
+	}
+	if len(normalized.VolumeHealth[0].HealthConditions) != 1 {
+		t.Fatalf("expected 1 HealthCondition after deduplication, got %d", len(normalized.VolumeHealth[0].HealthConditions))
+	}
+	if normalized.VolumeHealth[0].HealthConditions[0].Message != "msg1" {
+		t.Errorf("expected first occurrence message 'msg1', got %q", normalized.VolumeHealth[0].HealthConditions[0].Message)
 	}
 }
 
