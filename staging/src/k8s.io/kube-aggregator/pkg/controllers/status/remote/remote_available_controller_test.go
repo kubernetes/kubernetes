@@ -501,6 +501,29 @@ func TestSync(t *testing.T) {
 	}
 }
 
+type trackingReadCloser struct {
+	*strings.Reader
+	unreadAtClose int
+}
+
+func (r *trackingReadCloser) Close() error {
+	r.unreadAtClose = r.Len()
+	return nil
+}
+
+func TestDrainAndClose(t *testing.T) {
+	body := &trackingReadCloser{
+		Reader:        strings.NewReader("discovery response"),
+		unreadAtClose: -1,
+	}
+
+	drainAndClose(body)
+
+	if body.unreadAtClose != 0 {
+		t.Errorf("response body had %d unread bytes when closed", body.unreadAtClose)
+	}
+}
+
 type fakeServiceResolver struct {
 	url string
 }
