@@ -29,7 +29,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -9127,10 +9126,10 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
 		initialPodGroups       []*schedulingv1beta1.PodGroup
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPods            []*v1.Pod
 		beforeAdd              func(ctx context.Context, q *PriorityQueue)
-		cpgToAdd               *schedulingv1alpha3.CompositePodGroup
+		cpgToAdd               *schedulingv1beta1.CompositePodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
@@ -9194,7 +9193,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9211,7 +9210,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9228,7 +9227,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("parent-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9245,7 +9244,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9338,17 +9337,17 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
-		cpgToUpdate            *schedulingv1alpha3.CompositePodGroup
+		cpgToUpdate            *schedulingv1beta1.CompositePodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
 	}{
 		{
 			name: "Root when minCount is updated",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(3).Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9364,7 +9363,7 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when minCount is updated",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9441,18 +9440,18 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeDelete           func(ctx context.Context, q *PriorityQueue)
-		cpgToDelete            *schedulingv1alpha3.CompositePodGroup
+		cpgToDelete            *schedulingv1beta1.CompositePodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
 	}{
 		{
 			name: "Non-root when parent is root and is already in activeQ with another pod",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9471,7 +9470,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Root with pods",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9490,7 +9489,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent does not exist",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9506,7 +9505,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9528,7 +9527,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root with pending pods when parent is root and is in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9552,7 +9551,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Root with pending pods when in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9573,7 +9572,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root with pods when root ancestor exists",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("mid-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9590,7 +9589,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when root ancestor is already in activeQ with another pod",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("mid-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9666,7 +9665,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 	tests := []struct {
 		name                   string
 		disableCPGFeature      bool
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeAdd              func(ctx context.Context, q *PriorityQueue)
@@ -9721,7 +9720,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9734,7 +9733,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is already in active queue with another pod",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9751,7 +9750,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent exists but root is missing",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("parent-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9764,7 +9763,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root with pending pods when parent is root and is currently in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9785,7 +9784,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is currently in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9892,7 +9891,7 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 	tests := []struct {
 		name                   string
 		disableCPGFeature      bool
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		pgToUpdate             *schedulingv1beta1.PodGroup
@@ -9915,7 +9914,7 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when minCount is updated",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -10006,7 +10005,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 	tests := []struct {
 		name                   string
 		disableCPGFeature      bool
-		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs            []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeDelete           func(ctx context.Context, q *PriorityQueue)
@@ -10017,7 +10016,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 	}{
 		{
 			name: "Non-root when parent is root and is already in activeQ with another pod",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -10048,7 +10047,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -10069,7 +10068,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Non-root with pending pods when parent is root and is in-flight (popped)",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{

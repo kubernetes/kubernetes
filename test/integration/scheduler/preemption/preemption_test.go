@@ -26,7 +26,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -165,7 +164,7 @@ func TestPreemption(t *testing.T) {
 		preemptedPodIndexes      map[int]struct{}
 		extraNodes               []*v1.Node
 		podGroups                []*schedulingv1beta1.PodGroup
-		compositePodGroups       []*schedulingv1alpha3.CompositePodGroup
+		compositePodGroups       []*schedulingv1beta1.CompositePodGroup
 		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
 	}{
@@ -683,7 +682,7 @@ func TestPreemption(t *testing.T) {
 					v1.ResourceMemory: "500",
 				}).Label("node", "node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
@@ -731,7 +730,7 @@ func TestPreemption(t *testing.T) {
 			initTokens:               maxTokens,
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-single").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
@@ -785,7 +784,7 @@ func TestPreemption(t *testing.T) {
 					v1.ResourceMemory: "500",
 				}).Label("node", "node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-low").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-medium").Priority(asyncframework.MediumPriority).BasicPolicy().
@@ -862,7 +861,7 @@ func TestPreemption(t *testing.T) {
 					v1.ResourceMemory: "1000",
 				}).Label("node", "node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
@@ -925,7 +924,7 @@ func TestPreemption(t *testing.T) {
 					v1.ResourceMemory: "500",
 				}).Label("node", "node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-single-multi").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
@@ -974,7 +973,7 @@ func TestPreemption(t *testing.T) {
 			initTokens:               maxTokens,
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Priority(asyncframework.LowPriority).MinGroupCount(1).
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
@@ -1030,7 +1029,7 @@ func TestPreemption(t *testing.T) {
 					v1.ResourceMemory: "500",
 				}).Label("node", "node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Priority(asyncframework.LowPriority).BasicPolicy().
 					DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-branch-a").Priority(asyncframework.LowPriority).MinGroupCount(1).
@@ -1167,7 +1166,7 @@ func TestPreemption(t *testing.T) {
 
 							for _, cpg := range test.compositePodGroups {
 								cpg.Namespace = ns
-								if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpg, metav1.CreateOptions{}); err != nil {
+								if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx.Ctx, cpg, metav1.CreateOptions{}); err != nil {
 									t.Fatalf("Error creating CompositePodGroup %s: %v", cpg.Name, err)
 								}
 							}

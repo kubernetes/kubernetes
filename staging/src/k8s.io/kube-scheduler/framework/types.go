@@ -21,7 +21,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -708,7 +707,7 @@ type PodGroupInfo interface {
 	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
 	// It should only be used when the CompositePodGroup feature gate is enabled.
-	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
+	GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup
 	// GetChildren returns the child pod groups of this pod group.
 	// Only composite pod groups have children.
 	GetChildren() []PodGroupInfo
@@ -813,7 +812,7 @@ type GenericPodGroup struct {
 	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
 	// It can be set only when CompositePodGroup feature is enabled.
-	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	CompositePodGroup *schedulingv1beta1.CompositePodGroup
 }
 
 // NewGenericPodGroup returns a GenericPodGroup for a PodGroup.
@@ -822,7 +821,7 @@ func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
 }
 
 // NewGenericCompositePodGroup returns a GenericPodGroup for a CompositePodGroup.
-func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
+func NewGenericCompositePodGroup(cpg *schedulingv1beta1.CompositePodGroup) *GenericPodGroup {
 	return &GenericPodGroup{CompositePodGroup: cpg}
 }
 
@@ -832,7 +831,7 @@ func (gpg *GenericPodGroup) GetPodGroup() *schedulingv1beta1.PodGroup {
 }
 
 // GetCompositePodGroup unwraps the underlying CompositePodGroup object. Returns nil if this wraps a PodGroup.
-func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup {
 	return gpg.CompositePodGroup
 }
 

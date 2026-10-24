@@ -17,7 +17,6 @@ limitations under the License.
 package workloadbuilder
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -59,37 +58,27 @@ func newPodGroup(workload *schedulingv1beta1.Workload, tmpl *schedulingv1beta1.P
 }
 
 // newCompositePodGroup materializes a runtime CompositePodGroup from the given
-// CompositePodGroupTemplate, which BuildWorkload does not create.
+// CompositePodGroupTemplate, which BuildWorkload does not create. Like
+// newPodGroup, it deep-copies the template's scheduling fields so the caller
+// can mutate the CompositePodGroup without corrupting the Workload template
+// cached in the Builder.
 func newCompositePodGroup(workload *schedulingv1beta1.Workload, tmpl *schedulingv1beta1.CompositePodGroupTemplate,
-	compositePodGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.CompositePodGroup, error) {
-	spec := schedulingv1alpha3.CompositePodGroupSpec{
-		WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+	compositePodGroupName string, owners []metav1.OwnerReference) *schedulingv1beta1.CompositePodGroup {
+	spec := schedulingv1beta1.CompositePodGroupSpec{
+		WorkloadRef: &schedulingv1beta1.WorkloadReference{
 			WorkloadName: workload.Name,
 			TemplateName: tmpl.Name,
 		},
-		PriorityClassName: tmpl.PriorityClassName,
-	}
-
-	if err := Convert_v1beta1_CompositePodGroupSchedulingPolicy_To_v1alpha3_CompositePodGroupSchedulingPolicy(&tmpl.SchedulingPolicy, &spec.SchedulingPolicy, nil); err != nil {
-		return nil, err
-	}
-	if tmpl.SchedulingConstraints != nil {
-		spec.SchedulingConstraints = &schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}
-		if err := Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_v1alpha3_CompositePodGroupSchedulingConstraints(tmpl.SchedulingConstraints, spec.SchedulingConstraints, nil); err != nil {
-			return nil, err
-		}
-	}
-	if tmpl.DisruptionMode != nil {
-		spec.DisruptionMode = &schedulingv1alpha3.CompositeDisruptionMode{}
-		if err := Convert_v1beta1_CompositeDisruptionMode_To_v1alpha3_CompositeDisruptionMode(tmpl.DisruptionMode, spec.DisruptionMode, nil); err != nil {
-			return nil, err
-		}
+		SchedulingPolicy:      *tmpl.SchedulingPolicy.DeepCopy(),
+		SchedulingConstraints: tmpl.SchedulingConstraints.DeepCopy(),
+		DisruptionMode:        tmpl.DisruptionMode.DeepCopy(),
+		PriorityClassName:     tmpl.PriorityClassName,
 	}
 	if tmpl.Priority != nil {
 		spec.Priority = new(*tmpl.Priority)
 	}
 
-	cpg := &schedulingv1alpha3.CompositePodGroup{
+	return &schedulingv1beta1.CompositePodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            compositePodGroupName,
 			Namespace:       workload.Namespace,
@@ -97,11 +86,6 @@ func newCompositePodGroup(workload *schedulingv1beta1.Workload, tmpl *scheduling
 		},
 		Spec: spec,
 	}
-	// The generated Convert_* helpers are shallow (unsafe.Pointer) copies, so
-	// the spec still aliases the template's Gang/Topology pointers. DeepCopy
-	// before returning so the caller can mutate the CompositePodGroup without
-	// corrupting the Workload template cached in the Builder.
-	return cpg.DeepCopy(), nil
 }
 
 // indexPodGroupTemplates maps every leaf PodGroupTemplate by name for O(1)

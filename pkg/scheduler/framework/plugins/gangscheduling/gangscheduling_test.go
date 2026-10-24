@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -43,7 +42,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 		pod                        *v1.Pod
 		newPod                     *v1.Pod
 		pgs                        []*schedulingv1beta1.PodGroup
-		cpgs                       []*schedulingv1alpha3.CompositePodGroup
+		cpgs                       []*schedulingv1beta1.CompositePodGroup
 		expectedHint               fwk.QueueingHint
 	}{
 		{
@@ -97,7 +96,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Obj(),
 			},
 			expectedHint: fwk.Queue,
@@ -111,7 +110,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Obj(),
 			},
 			expectedHint: fwk.QueueSkip,
@@ -125,7 +124,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root2").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-root2").Obj(),
 			},
@@ -183,7 +182,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 		pod                        *v1.Pod
 		newPodGroup                *schedulingv1beta1.PodGroup
 		pgs                        []*schedulingv1beta1.PodGroup
-		cpgs                       []*schedulingv1alpha3.CompositePodGroup
+		cpgs                       []*schedulingv1beta1.CompositePodGroup
 		expectedHint               fwk.QueueingHint
 	}{
 		{
@@ -221,7 +220,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Obj(),
 			},
 			expectedHint: fwk.Queue,
@@ -234,7 +233,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Obj(),
 			},
 			expectedHint: fwk.QueueSkip,
@@ -247,7 +246,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-root2").Obj(),
 			},
@@ -308,7 +307,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 		pod                        *v1.Pod
 		oldPodGroup                *schedulingv1beta1.PodGroup
 		newPodGroup                *schedulingv1beta1.PodGroup
-		cpgs                       []*schedulingv1alpha3.CompositePodGroup
+		cpgs                       []*schedulingv1beta1.CompositePodGroup
 		pgs                        []*schedulingv1beta1.PodGroup
 		expectedHint               fwk.QueueingHint
 	}{
@@ -375,7 +374,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").Obj(),
 			},
 			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg2").ParentCompositePodGroup("cpg-root").MinCount(4).Obj(),
@@ -389,7 +388,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").Obj(),
 			},
 			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg2").ParentCompositePodGroup("cpg-root").MinCount(4).Obj(),
@@ -403,7 +402,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg1").ParentCompositePodGroup("cpg-mid1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-mid1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-mid2").ParentCompositePodGroup("cpg-root").Obj(),
@@ -419,7 +418,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg1").ParentCompositePodGroup("cpg-mid1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-mid1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-mid2").ParentCompositePodGroup("cpg-root").Obj(),
@@ -435,7 +434,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root1").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root2").Obj(),
 			},
@@ -499,8 +498,8 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		name                       string
 		isCompositePodGroupEnabled []bool
 		pod                        *v1.Pod
-		newCPG                     *schedulingv1alpha3.CompositePodGroup
-		cpgs                       []*schedulingv1alpha3.CompositePodGroup
+		newCPG                     *schedulingv1beta1.CompositePodGroup
+		cpgs                       []*schedulingv1beta1.CompositePodGroup
 		pgs                        []*schedulingv1beta1.PodGroup
 		expectedHint               fwk.QueueingHint
 	}{
@@ -531,7 +530,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 			},
 			newCPG:       st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub").ParentCompositePodGroup("cpg-root").Obj(),
@@ -544,7 +543,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 			},
 			newCPG:       st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub").ParentCompositePodGroup("cpg-root").Obj(),
@@ -557,7 +556,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-1").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-2").Obj(),
 			},
@@ -621,7 +620,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 		// oldCPG/newCPG may be non-CPG values to exercise util.As conversion errors.
 		oldCPG       interface{}
 		newCPG       interface{}
-		cpgs         []*schedulingv1alpha3.CompositePodGroup
+		cpgs         []*schedulingv1beta1.CompositePodGroup
 		pgs          []*schedulingv1beta1.PodGroup
 		expectedHint fwk.QueueingHint
 		expectErr    bool
@@ -708,7 +707,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-other-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-other-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 			},
@@ -723,7 +722,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns-other").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns-other").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").Obj(),
 			},
@@ -738,7 +737,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -753,7 +752,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -768,7 +767,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 			},
 			oldCPG:       st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub").ParentCompositePodGroup("cpg-root").MinGroupCount(4).Obj(),
@@ -782,7 +781,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -797,7 +796,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 			},
 			oldCPG:       st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub").ParentCompositePodGroup("cpg-root").MinGroupCount(4).Obj(),
@@ -811,7 +810,7 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub1").Obj(),
 			},
-			cpgs: []*schedulingv1alpha3.CompositePodGroup{
+			cpgs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -852,10 +851,10 @@ func Test_isSchedulableAfterCompositePodGroupUpdated(t *testing.T) {
 			}
 			if isCPGEnabled {
 				cpgs := tc.cpgs
-				if oldCPG, ok := tc.oldCPG.(*schedulingv1alpha3.CompositePodGroup); ok {
+				if oldCPG, ok := tc.oldCPG.(*schedulingv1beta1.CompositePodGroup); ok {
 					cpgs = append(cpgs, oldCPG)
 				}
-				if newCPG, ok := tc.newCPG.(*schedulingv1alpha3.CompositePodGroup); ok {
+				if newCPG, ok := tc.newCPG.(*schedulingv1beta1.CompositePodGroup); ok {
 					cpgs = append(cpgs, newCPG)
 				}
 				for _, cpg := range cpgs {
@@ -938,7 +937,7 @@ func TestPreEnqueue(t *testing.T) {
 		pod                        *v1.Pod
 		initialPods                []*v1.Pod
 		initialPodGroups           []*schedulingv1beta1.PodGroup
-		initialCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
+		initialCompositePodGroups  []*schedulingv1beta1.CompositePodGroup
 		isCompositePodGroupEnabled []bool
 		wantPreEnqueueStatus       *fwk.Status
 	}
@@ -1003,7 +1002,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1CPG,
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for compositepodgroup/ns1/cpg-root to meet its quorum`),
 		},
 		{
@@ -1012,7 +1011,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1CPG,
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
@@ -1021,7 +1020,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p6CPG,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for compositepodgroup/ns1/cpg-root to meet its quorum`),
 		},
 		{
@@ -1030,7 +1029,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p6CPG,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
@@ -1039,7 +1038,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p4CPG,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
@@ -1048,7 +1047,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p4CPG,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1CPG, pg2CPG, pg3CPG, pg4CPG, pg5CPG, pg6CPG, pg7CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
@@ -1057,7 +1056,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1_1BasicCPG,
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for compositepodgroup/ns1/cpg-basic-root tree to have at least one ready child group"),
 		},
 		{
@@ -1066,7 +1065,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1_1BasicCPG,
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for podgroup/ns1/pg-basic-1 to meet its quorum`),
 		},
 		{
@@ -1075,7 +1074,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p2_1BasicCPG,
 			initialPods:                []*v1.Pod{p1_1BasicCPG, p1_2BasicCPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
@@ -1084,7 +1083,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p2_1BasicCPG,
 			initialPods:                []*v1.Pod{p1_1BasicCPG, p1_2BasicCPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
+			initialCompositePodGroups:  []*schedulingv1beta1.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for podgroup/ns1/pg-basic-2 to meet its quorum`),
 		},
 	}

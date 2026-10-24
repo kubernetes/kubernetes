@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -173,7 +172,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		initPods      []*v1.Pod
 		initPodGroups []*schedulingv1beta1.PodGroup
 		// initCompositePodGroups enables the CompositePodGroup feature gate when set.
-		initCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
+		initCompositePodGroups  []*schedulingv1beta1.CompositePodGroup
 		preemptor               fwk.PodGroupInfo
 		pdbs                    []*policy.PodDisruptionBudget
 		nodeCapacities          []nodeCapacity
@@ -282,7 +281,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -309,7 +308,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -335,7 +334,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -363,7 +362,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -392,7 +391,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").UID("cpg-root").DisruptionModeSingle().Priority(lowPriority).Obj(),
 				st.MakeCompositePodGroup().Name("cpg-child").UID("cpg-child").ParentCompositePodGroup("cpg-root").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
@@ -421,7 +420,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg-child").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").UID("cpg-root").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakeCompositePodGroup().Name("cpg-child").UID("cpg-child").ParentCompositePodGroup("cpg-root").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
@@ -449,7 +448,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -477,7 +476,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -505,7 +504,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-b").UID("pg-b").ParentCompositePodGroup("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
@@ -531,7 +530,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg-a").UID("pg-a").ParentCompositePodGroup("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(

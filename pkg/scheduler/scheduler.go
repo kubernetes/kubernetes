@@ -33,7 +33,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/informers/internalinterfaces"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -390,7 +390,7 @@ func New(ctx context.Context,
 
 	var compositePodGroupLister schedulinglisters.CompositePodGroupLister
 	if feature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		compositePodGroupLister = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister()
+		compositePodGroupLister = informerFactory.Scheduling().V1beta1().CompositePodGroups().Lister()
 	}
 
 	sched := &Scheduler{

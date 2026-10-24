@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -225,7 +224,7 @@ type compositePodGroupStateData struct {
 	// It's used to detect changes and avoid unnecessary cloning when taking a snapshot.
 	generation int64
 	// compositePodGroup is the cached API object of the CompositePodGroup.
-	compositePodGroup *schedulingv1alpha3.CompositePodGroup
+	compositePodGroup *schedulingv1beta1.CompositePodGroup
 	// children tracks all keys for child pod groups and composite pod groups.
 	children sets.Set[fwk.EntityKey]
 }
@@ -254,7 +253,7 @@ func (d *compositePodGroupStateData) empty() bool {
 	return d.compositePodGroup == nil && len(d.children) == 0
 }
 
-func (d *compositePodGroupStateData) setCompositePodGroup(compositePodGroup *schedulingv1alpha3.CompositePodGroup) {
+func (d *compositePodGroupStateData) setCompositePodGroup(compositePodGroup *schedulingv1beta1.CompositePodGroup) {
 	d.generation = nextPodGroupGeneration()
 	d.compositePodGroup = compositePodGroup
 }
@@ -472,7 +471,7 @@ func (cpgs *compositePodGroupState) empty() bool {
 
 // setCompositePodGroup sets the CompositePodGroup object.
 // It must be called under the cache lock.
-func (cpgs *compositePodGroupState) setCompositePodGroup(compositePodGroup *schedulingv1alpha3.CompositePodGroup) {
+func (cpgs *compositePodGroupState) setCompositePodGroup(compositePodGroup *schedulingv1beta1.CompositePodGroup) {
 	cpgs.lock.Lock()
 	defer cpgs.lock.Unlock()
 
@@ -489,7 +488,7 @@ func (cpgs *compositePodGroupState) removeCompositePodGroup() {
 }
 
 // CompositePodGroup returns the CompositePodGroup API object.
-func (cpgs *compositePodGroupState) CompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+func (cpgs *compositePodGroupState) CompositePodGroup() *schedulingv1beta1.CompositePodGroup {
 	cpgs.lock.RLock()
 	defer cpgs.lock.RUnlock()
 

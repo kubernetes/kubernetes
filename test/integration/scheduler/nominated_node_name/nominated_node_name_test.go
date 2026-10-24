@@ -26,7 +26,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -218,7 +217,7 @@ type createPodGroup struct {
 }
 
 type createCompositePodGroup struct {
-	compositePodGroup *schedulingv1alpha3.CompositePodGroup
+	compositePodGroup *schedulingv1beta1.CompositePodGroup
 }
 
 type schedulePod struct {
@@ -300,7 +299,7 @@ func makeBasicPodGroup(name string, priority int32) *schedulingv1beta1.PodGroup 
 	return st.MakePodGroup().Name(name).Priority(priority).BasicPolicy().Obj()
 }
 
-func makeCompositePodGroup(name string, priority int32) *schedulingv1alpha3.CompositePodGroup {
+func makeCompositePodGroup(name string, priority int32) *schedulingv1beta1.CompositePodGroup {
 	return st.MakeCompositePodGroup().Name(name).Priority(priority).BasicPolicy().WorkloadRef("wl1", "t1").Obj()
 }
 
@@ -994,7 +993,7 @@ func initializeAndRunTestScenarios(t *testing.T, sharedAPICtx *testutils.TestCon
 
 	createdPods := []*v1.Pod{}
 	createdPodGroups := []*schedulingv1beta1.PodGroup{}
-	createdCompositePodGroups := []*schedulingv1alpha3.CompositePodGroup{}
+	createdCompositePodGroups := []*schedulingv1beta1.CompositePodGroup{}
 	defer func() {
 		testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
 		schedulerutils.CleanupPodGroups(testCtx.Ctx, cs, t, createdPodGroups)
@@ -1044,8 +1043,8 @@ func runCreatePodGroup(t *testing.T, testCtx *testutils.TestContext, action *cre
 	*createdPodGroups = append(*createdPodGroups, pg)
 }
 
-func runCreateCompositePodGroup(t *testing.T, testCtx *testutils.TestContext, action *createCompositePodGroup, createdCompositePodGroups *[]*schedulingv1alpha3.CompositePodGroup) {
-	cpg, err := testCtx.ClientSet.SchedulingV1alpha3().CompositePodGroups(testCtx.NS.Name).Create(testCtx.Ctx, action.compositePodGroup, metav1.CreateOptions{})
+func runCreateCompositePodGroup(t *testing.T, testCtx *testutils.TestContext, action *createCompositePodGroup, createdCompositePodGroups *[]*schedulingv1beta1.CompositePodGroup) {
+	cpg, err := testCtx.ClientSet.SchedulingV1beta1().CompositePodGroups(testCtx.NS.Name).Create(testCtx.Ctx, action.compositePodGroup, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create CompositePodGroup %q: %v", action.compositePodGroup.Name, err)
 	}

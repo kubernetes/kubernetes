@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,7 +48,7 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
-func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
+func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1beta1.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
 	gpg := &fwk.GenericPodGroup{
 		PodGroup:          pg,
 		CompositePodGroup: cpg,
@@ -140,7 +139,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 		}
 		return pg.Obj()
 	}
-	makeCPG := func(name string, priority int32, disruptionAll bool) *schedulingv1alpha3.CompositePodGroup {
+	makeCPG := func(name string, priority int32, disruptionAll bool) *schedulingv1beta1.CompositePodGroup {
 		cpg := st.MakeCompositePodGroup().Name(name).Namespace("default").UID(name).Priority(priority)
 		if disruptionAll {
 			cpg = cpg.DisruptionModeAll()
@@ -173,7 +172,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 		featureGates           featuregatetesting.FeatureOverrides
 		initPods               []*v1.Pod
 		initPodGroups          []*schedulingv1beta1.PodGroup
-		initCompositePodGroups []*schedulingv1alpha3.CompositePodGroup
+		initCompositePodGroups []*schedulingv1beta1.CompositePodGroup
 		pdbs                   []*policy.PodDisruptionBudget
 		preemptor              fwk.PodGroupInfo
 		injectSnapshotErr      bool
@@ -222,7 +221,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				makePG("pg-child1", lowPriority, false, "cpg-all"),
 				makePG("pg-child2", lowPriority, false, "cpg-all"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				makeCPG("cpg-all", lowPriority, true),
 			},
 			preemptor: makePreemptor(highPriority),
@@ -241,7 +240,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				makePG("pg-all", lowPriority, true, "cpg-single"),
 				makePG("pg-single", lowPriority, false, "cpg-single"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				makeCPG("cpg-single", lowPriority, false),
 			},
 			preemptor: makePreemptor(highPriority),
@@ -340,7 +339,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				// pg-child has DisruptionModeSingle, so its pods are individual victims.
 				makePG("pg-child", lowPriority, false, "cpg-root"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				// If enabled, cpg-root's DisruptionModeAll would group p1/p2 into one atomic victim.
 				makeCPG("cpg-root", lowPriority, true),
 			},
@@ -380,7 +379,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			name: "non-successful status: preemptor CompositePodGroup with PreemptNever returns Unschedulable",
 			preemptor: newTestPodGroupInfo(
 				nil,
-				st.MakeCompositePodGroup().Name("cpg-never").Priority(highPriority).PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-never").Priority(highPriority).PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 				[]*v1.Pod{makePod("preemptor-pod", highPriority)},
 			),
 			wantStatusCode: fwk.Unschedulable,
@@ -496,7 +495,7 @@ func TestGetPreemptionPolicy(t *testing.T) {
 	tests := []struct {
 		name                           string
 		pg                             *schedulingv1beta1.PodGroup
-		cpg                            *schedulingv1alpha3.CompositePodGroup
+		cpg                            *schedulingv1beta1.CompositePodGroup
 		pods                           []*v1.Pod
 		enablePodGroupPreemptionPolicy bool
 		wantPolicy                     v1.PreemptionPolicy
@@ -543,21 +542,21 @@ func TestGetPreemptionPolicy(t *testing.T) {
 		},
 		{
 			name:                           "PreemptionPolicy PreemptNever is resolved from CompositePodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods:                           []*v1.Pod{preemptLowerPriorityPod},
 			enablePodGroupPreemptionPolicy: true,
 			wantPolicy:                     v1.PreemptNever,
 		},
 		{
 			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from CompositePodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
+			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			pods:                           []*v1.Pod{preemptLowerPriorityPod, preemptNeverPod},
 			enablePodGroupPreemptionPolicy: true,
 			wantPolicy:                     v1.PreemptLowerPriority,
 		},
 		{
 			name:                           "PreemptionPolicy is resolved from pods when CompositePodGroup has policy but PodGroupPreemptionPolicy is disabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
 			enablePodGroupPreemptionPolicy: false,
 			wantPolicy:                     v1.PreemptLowerPriority,
