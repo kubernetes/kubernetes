@@ -32,9 +32,15 @@
       ]
     },
     {
+      "categories": [
+        "dra"
+      ],
       "kind": "ResourcePoolStatusRequest",
       "name": "resourcepoolstatusrequests",
       "namespaced": false,
+      "shortNames": [
+        "rpsr"
+      ],
       "singularName": "resourcepoolstatusrequest",
       "storageVersionHash": "iy583CtMwdY=",
       "verbs": [

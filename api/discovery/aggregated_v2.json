@@ -2251,6 +2251,9 @@
               ]
             },
             {
+              "categories": [
+                "dra"
+              ],
               "resource": "resourcepoolstatusrequests",
               "responseKind": {
                 "group": "",
@@ -2258,6 +2261,9 @@
                 "version": ""
               },
               "scope": "Cluster",
+              "shortNames": [
+                "rpsr"
+              ],
               "singularResource": "resourcepoolstatusrequest",
               "subresources": [
                 {

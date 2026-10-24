@@ -17,16 +17,22 @@ limitations under the License.
 package resourcepoolstatusrequest
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -516,7 +522,7 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	request := &resourcev1alpha3.ResourcePoolStatusRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request", CreationTimestamp: metav1.Now()},
 		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
 			Driver: "test.example.com",
 		},
@@ -548,11 +554,11 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		t.Fatalf("Failed to add slice to informer: %v", err)
 	}
 
-	// syncRequest should always return an error for incomplete pools,
-	// letting processNextWorkItem handle retry counting and drop logic.
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to return error for incomplete pool requeue, got nil")
+	// Requeued within the wait window, however often it is synced (e.g. label updates).
+	for range 2 * maxRetries {
+		if err := controller.syncRequest(ctx, "test-request"); !errors.Is(err, errIncompletePool) {
+			t.Fatalf("Expected errIncompletePool within the wait window, got %v", err)
+		}
 	}
 
 	// Verify no status update was made
@@ -562,18 +568,35 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		}
 	}
 
-	// Even after retries are exhausted, syncRequest still returns an error;
-	// it is processNextWorkItem that decides to drop the key.
-	for range maxRetries {
-		controller.workqueue.AddRateLimited("test-request")
-		key, _ := controller.workqueue.Get()
-		controller.workqueue.Done(key)
+	// Partial status once the window has passed.
+	request.CreationTimestamp = metav1.NewTime(time.Now().Add(-incompleteWaitWindow))
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Update(request); err != nil {
+		t.Fatalf("Failed to update request in informer: %v", err)
+	}
+	if err := controller.syncRequest(ctx, "test-request"); err != nil {
+		t.Fatalf("Expected partial status to be written after the wait window, got error: %v", err)
 	}
 
-	fakeClient.ClearActions()
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to still return error for incomplete pools after retries exhausted")
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, "test-request", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("Expected status to be written after the wait window, got nil")
+	}
+	pool := requireSinglePool(t, *updated.Status)
+	if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, prefixPoolIncomplete) {
+		t.Errorf("Expected validationError with prefix %q, got %v", prefixPoolIncomplete, pool.ValidationError)
+	}
+	if pool.TotalDevices != nil || pool.ResourceSliceCount != nil {
+		t.Errorf("Expected device counts unset for incomplete pool, got totalDevices=%v resourceSliceCount=%v", pool.TotalDevices, pool.ResourceSliceCount)
+	}
+	cond := apimeta.FindStatusCondition(updated.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete)
+	if cond == nil || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("Expected Complete=True condition, got %+v", updated.Status.Conditions)
+	}
+	if want := "Calculated status for 1 pools (1 incomplete)"; cond.Message != want {
+		t.Errorf("Condition message = %q, want %q", cond.Message, want)
 	}
 }
 
@@ -635,6 +658,14 @@ func TestSyncRequestWritesStructuralViewError(t *testing.T) {
 	}
 	if !strings.HasPrefix(*ve, prefixPartitionTypeMissing) {
 		t.Errorf("Expected validationError with prefix %q, got %q", prefixPartitionTypeMissing, *ve)
+	}
+	// Not reported as incomplete.
+	cond := apimeta.FindStatusCondition(updated.Status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionComplete)
+	if cond == nil {
+		t.Fatalf("Expected Complete condition, got %+v", updated.Status.Conditions)
+	}
+	if want := "Calculated status for 1 pools (1 with validation errors)"; cond.Message != want {
+		t.Errorf("Condition message = %q, want %q", cond.Message, want)
 	}
 }
 
@@ -883,6 +914,26 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			},
 			wantTotal: 4, wantAllocated: 1, wantAvailable: 3,
 		},
+		// A name published twice in one pool is one device.
+		"duplicate device name counts once": {
+			slices: []*resourcev1.ResourceSlice{
+				makeSliceWithExpectedCount("slice-1", driver, "pool-1", "node-1", 1, 1, 2),
+				makeSliceWithExpectedCount("slice-2", driver, "pool-1", "node-1", 1, 1, 2),
+			},
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 2, wantAllocated: 1, wantAvailable: 1,
+		},
+		// The claim outlives the device.
+		"allocation of unpublished device is ignored": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-2", "default", driver, "pool-1", "removed-device"),
+			},
+			wantTotal: 5, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 1,
+		},
 		// AdminAccess allocations are observers and must not move any tally.
 		"adminAccess claim is not an allocation": {
 			slices: plainSlices,
@@ -913,6 +964,38 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			rules:     []*resourcev1.DeviceTaintRule{taintRule},
 			wantTotal: 4, wantAvailable: 3, wantUnavailable: 1,
 		},
+		// NoSchedule taint added after allocation.
+		"tainted allocated device counts as allocated only": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 5, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 1,
+		},
+		"all tainted devices allocated leaves none unavailable": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoExecute),
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-2", "default", driver, "pool-1", "device-1"),
+			},
+			wantTotal: 5, wantAllocated: 2, wantAvailable: 3, wantUnavailable: 0,
+		},
+		"taint rule on allocated device counts as allocated only": {
+			slices: plainSlices,
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+			},
+			rules:     []*resourcev1.DeviceTaintRule{taintRule},
+			wantTotal: 4, wantAllocated: 1, wantAvailable: 3, wantUnavailable: 0,
+		},
+		// AdminAccess is not an allocation.
+		"tainted device with adminAccess claim stays unavailable": {
+			slices: taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			claims: []*resourcev1.ResourceClaim{
+				makeAdminAccessClaim("admin-1", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 5, wantAllocated: 0, wantAvailable: 3, wantUnavailable: 2,
+		},
 		"taint rule ignored when gate is disabled": {
 			slices:            plainSlices,
 			rules:             []*resourcev1.DeviceTaintRule{taintRule},
@@ -939,6 +1022,9 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 			}
 			if got := derefInt32(pool.UnavailableDevices); got != tc.wantUnavailable {
 				t.Errorf("UnavailableDevices = %d, want %d", got, tc.wantUnavailable)
+			}
+			if sum := derefInt32(pool.AllocatedDevices) + derefInt32(pool.UnavailableDevices) + derefInt32(pool.AvailableDevices); sum != derefInt32(pool.TotalDevices) {
+				t.Errorf("allocated + unavailable + available = %d, want TotalDevices %d", sum, derefInt32(pool.TotalDevices))
 			}
 		})
 	}
@@ -1197,6 +1283,54 @@ func TestCleanupExpiredRequests(t *testing.T) {
 	}
 }
 
+// The TTL sweep waits for cleanupLimiter between deletes.
+func TestCleanupExpiredRequestsIsPaced(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	var objects []runtime.Object
+	for i := range 5 {
+		objects = append(objects, &resourcev1alpha3.ResourcePoolStatusRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              fmt.Sprintf("expired-%d", i),
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-25 * time.Hour)),
+			},
+			Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: "test.example.com"},
+		})
+	}
+	fakeClient := fake.NewClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+	for _, obj := range objects {
+		if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(obj); err != nil {
+			t.Fatalf("Failed to add request to informer: %v", err)
+		}
+	}
+
+	// Burst of 2, then a wait longer than the deadline.
+	controller.cleanupLimiter = rate.NewLimiter(rate.Every(time.Hour), 2)
+	sweepCtx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	controller.cleanupExpiredRequests(sweepCtx)
+
+	var deletes int
+	for _, action := range fakeClient.Actions() {
+		if action.GetVerb() == "delete" {
+			deletes++
+		}
+	}
+	if deletes != 2 {
+		t.Errorf("Got %d deletes, want 2: the sweep must wait for cleanupLimiter between deletes", deletes)
+	}
+}
+
 func makeSliceWithoutNode(name, driver, pool string, deviceCount int) *resourcev1.ResourceSlice {
 	devices := make([]resourcev1.Device, deviceCount)
 	for i := range deviceCount {
@@ -1293,6 +1427,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		requestAttr     *string
 		// mixedClass adds a second device slice grouped by a different attribute.
 		mixedClass bool
+		claims     []*resourcev1.ResourceClaim
 		want       map[string][2]int32
 	}{
 		"pool declares the attribute": {
@@ -1310,6 +1445,18 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		"request default applies when the pool declares none": {
 			requestAttr: ptr.To(profileAttr),
 			want:        map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
+		},
+		// Full uses up the shared counter.
+		"allocated partition consumes the shared counter": {
+			declarePoolAttr: true,
+			claims:          []*resourcev1.ResourceClaim{makeAllocatedClaim("c0", "ns", driver, "pool-0", "full-0")},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 0}, key(profileAttr, "Half"): {2, 0}},
+		},
+		// AdminAccess does not consume counters.
+		"adminAccess claim does not consume the shared counter": {
+			declarePoolAttr: true,
+			claims:          []*resourcev1.ResourceClaim{makeAdminAccessClaim("admin-0", "ns", driver, "pool-0", "full-0")},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
 		// Slices declaring different attributes are not a conflict: each group
 		// is reported independently under its own attribute.
@@ -1343,7 +1490,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 			request := makeRequest(driver)
 			request.Spec.DefaultPartitionTypeAttribute = tc.requestAttr
 
-			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, nil))
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, tc.claims))
 			if pool.ValidationError != nil {
 				t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
 			}
@@ -1366,6 +1513,7 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 	testCases := map[string]struct {
 		capacity      map[resourcev1.QualifiedName]resourcev1.DeviceCapacity
 		consumed      map[resourcev1.QualifiedName]resource.Quantity
+		adminAccess   bool
 		wantFully     int32
 		wantPartially int32
 		// want maps each capacity name to {total, consumed, available}.
@@ -1376,6 +1524,14 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			consumed:      map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
 			wantPartially: 1,
 			want:          map[string][3]string{"memory": {"40Gi", "10Gi", "30Gi"}},
+		},
+		// AdminAccess does not consume capacity.
+		"adminAccess claim is not counted": {
+			capacity:    map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{"memory": {Value: qty("40Gi")}},
+			consumed:    map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
+			adminAccess: true,
+			wantFully:   1,
+			want:        map[string][3]string{"memory": {"40Gi", "0", "40Gi"}},
 		},
 		"multiple capacities": {
 			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
@@ -1400,6 +1556,9 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
 			slice.Spec.Devices[0].Capacity = tc.capacity
 			claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+			if tc.adminAccess {
+				claim = makeAdminAccessClaim("c0", "ns", driver, "pool-0", "device-0")
+			}
 			claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = tc.consumed
 
 			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim}))

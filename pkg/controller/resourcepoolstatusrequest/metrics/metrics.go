@@ -52,13 +52,25 @@ var (
 		[]string{"driver_name"},
 	)
 
-	// RequestProcessingDuration tracks the time taken to process requests.
+	// IncompleteRequests counts requests completed with incomplete pools.
+	IncompleteRequests = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      Subsystem,
+			Name:           "incomplete_requests_total",
+			Help:           "Total number of ResourcePoolStatusRequests completed with at least one incomplete pool after retries were exhausted",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name"},
+	)
+
+	// RequestProcessingDuration covers request creation to status write. The
+	// 30s bucket matches the SLO.
 	RequestProcessingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      Subsystem,
 			Name:           "request_processing_duration_seconds",
-			Help:           "Time taken to process a ResourcePoolStatusRequest",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Help:           "Time from the creation of a ResourcePoolStatusRequest until its status is written",
+			Buckets:        []float64{0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, 30, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"driver_name"},
@@ -72,6 +84,7 @@ func Register() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(RequestsProcessed)
 		legacyregistry.MustRegister(RequestProcessingErrors)
+		legacyregistry.MustRegister(IncompleteRequests)
 		legacyregistry.MustRegister(RequestProcessingDuration)
 	})
 }

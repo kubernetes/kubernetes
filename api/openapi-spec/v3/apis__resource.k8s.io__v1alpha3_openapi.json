@@ -497,12 +497,12 @@
             "x-kubernetes-list-type": "atomic"
           },
           "fullyAvailableDevices": {
-            "description": "fullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+            "description": "fullyAvailableDevices is the number of shareable devices with no allocation other than for admin access.",
             "format": "int32",
             "type": "integer"
           },
           "partiallyAvailableDevices": {
-            "description": "partiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+            "description": "partiallyAvailableDevices is the number of shareable devices with at least one allocation other than for admin access, regardless of remaining capacity.",
             "format": "int32",
             "type": "integer"
           }

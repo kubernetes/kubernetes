@@ -69,12 +69,56 @@ func TestRequestProcessingDuration(t *testing.T) {
 
 	// Use gatherWithoutDurations to strip timing-dependent histogram fields
 	// (SampleSum and Bucket), verifying only _count lines.
-	want := `# HELP resourcepoolstatusrequest_controller_request_processing_duration_seconds [ALPHA] Time taken to process a ResourcePoolStatusRequest
+	want := `# HELP resourcepoolstatusrequest_controller_request_processing_duration_seconds [ALPHA] Time from the creation of a ResourcePoolStatusRequest until its status is written
 # TYPE resourcepoolstatusrequest_controller_request_processing_duration_seconds histogram
 resourcepoolstatusrequest_controller_request_processing_duration_seconds_count{driver_name="driver-a.example.com"} 1
 resourcepoolstatusrequest_controller_request_processing_duration_seconds_count{driver_name="driver-b.example.com"} 1
 `
 	if err := testutil.GatherAndCompare(gatherWithoutDurations(registry), strings.NewReader(want), "resourcepoolstatusrequest_controller_request_processing_duration_seconds"); err != nil {
+		t.Errorf("unexpected metric output: %v", err)
+	}
+}
+
+// The 30s SLO needs a bucket boundary.
+func TestRequestProcessingDurationSLOBucket(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(RequestProcessingDuration)
+
+	RequestProcessingDuration.WithLabelValues("driver-a.example.com").Observe(20)
+	RequestProcessingDuration.WithLabelValues("driver-a.example.com").Observe(45)
+
+	got, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("gather: %v", err)
+	}
+	cumulative := map[float64]uint64{}
+	for _, mf := range got {
+		for _, m := range mf.Metric {
+			for _, b := range m.GetHistogram().GetBucket() {
+				cumulative[b.GetUpperBound()] = b.GetCumulativeCount()
+			}
+		}
+	}
+	for le, want := range map[float64]uint64{16.384: 0, 30: 1, 60: 2} {
+		if c, ok := cumulative[le]; !ok || c != want {
+			t.Errorf("bucket le=%v: got %d (present=%v), want %d", le, c, ok, want)
+		}
+	}
+}
+
+func TestIncompleteRequests(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(IncompleteRequests)
+
+	IncompleteRequests.WithLabelValues("driver-a.example.com").Inc()
+
+	want := `# HELP resourcepoolstatusrequest_controller_incomplete_requests_total [ALPHA] Total number of ResourcePoolStatusRequests completed with at least one incomplete pool after retries were exhausted
+# TYPE resourcepoolstatusrequest_controller_incomplete_requests_total counter
+resourcepoolstatusrequest_controller_incomplete_requests_total{driver_name="driver-a.example.com"} 1
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(want), "resourcepoolstatusrequest_controller_incomplete_requests_total"); err != nil {
 		t.Errorf("unexpected metric output: %v", err)
 	}
 }
