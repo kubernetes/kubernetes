@@ -63,6 +63,7 @@ import (
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -177,6 +178,8 @@ type Extra struct {
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
 	RepairServicesInterval time.Duration
+
+	DisabledPodSubresources sets.Set[string]
 }
 
 // Config defines configuration for the master
@@ -401,8 +404,9 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			NodePortRange:           c.Extra.ServiceNodePortRange,
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
 		},
-		EndpointSliceGetter: c.ControlPlane.Extra.EndpointSliceGetter,
-		Authorizer:          c.ControlPlane.Generic.Authorization.Authorizer,
+		EndpointSliceGetter:     c.ControlPlane.Extra.EndpointSliceGetter,
+		Authorizer:              c.ControlPlane.Generic.Authorization.Authorizer,
+		DisabledPodSubresources: c.Extra.DisabledPodSubresources,
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
 		return nil, err

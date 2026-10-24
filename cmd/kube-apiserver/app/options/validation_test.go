@@ -18,6 +18,7 @@ package options
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -330,5 +331,48 @@ func makeOptionsWithPort(kubernetesServiceNodePort int, base int, size int) *Ser
 			ServiceNodePortRange:      portRange,
 			KubernetesServiceNodePort: kubernetesServiceNodePort,
 		},
+	}
+}
+
+func TestValidateDisablePodSubresources(t *testing.T) {
+	tests := []struct {
+		name         string
+		subresources []string
+		expectedErrs []string
+	}{
+		{
+			name: "none",
+		},
+		{
+			name:         "disableable",
+			subresources: []string{"exec", "resize"},
+		},
+		{
+			name:         "core lifecycle",
+			subresources: []string{"status"},
+			expectedErrs: []string{`pod subresource "status" is required for core pod lifecycle`},
+		},
+		{
+			name:         "unknown",
+			subresources: []string{"pods/exec", ""},
+			expectedErrs: []string{
+				`unknown pod subresource "pods/exec", valid values are: attach, ephemeralcontainers,`,
+				`unknown pod subresource ""`,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateDisablePodSubresources(Extra{DisablePodSubresources: test.subresources})
+			if len(errs) != len(test.expectedErrs) {
+				t.Fatalf("expected %d errors, got %d: %v", len(test.expectedErrs), len(errs), errs)
+			}
+			for i, err := range errs {
+				if !strings.Contains(err.Error(), test.expectedErrs[i]) {
+					t.Errorf("expected error %q to contain %q", err, test.expectedErrs[i])
+				}
+			}
+		})
 	}
 }
