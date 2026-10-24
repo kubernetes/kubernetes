@@ -18,8 +18,6 @@ package multiplekeys
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -76,10 +74,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		PtrItems: []PtrItem{
-			{StringKey: ptr.To("target-ptr"), IntKey: 42, BoolKey: true, Data: "match"},
-			{StringKey: ptr.To("target-ptr"), IntKey: 42, BoolKey: false, Data: "no match, bool differs"},
-			{StringKey: ptr.To("target-ptr"), IntKey: 99, BoolKey: true, Data: "no match, int differs"},
-			{StringKey: ptr.To("other"), IntKey: 42, BoolKey: true, Data: "no match, string differs"},
+			{StringKey: new("target-ptr"), IntKey: 42, BoolKey: true, Data: "match"},
+			{StringKey: new("target-ptr"), IntKey: 42, BoolKey: false, Data: "no match, bool differs"},
+			{StringKey: new("target-ptr"), IntKey: 99, BoolKey: true, Data: "no match, int differs"},
+			{StringKey: new("other"), IntKey: 42, BoolKey: true, Data: "no match, string differs"},
 			{StringKey: nil, IntKey: 42, BoolKey: true, Data: "no match, nil string"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
@@ -90,8 +88,8 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		MixedPtrItems: []MixedPtrItem{
-			{StringPtrKey: ptr.To("target-ptr"), StringKey: "target", Data: "match"},
-			{StringPtrKey: ptr.To("target-ptr"), StringKey: "other", Data: "no match"},
+			{StringPtrKey: new("target-ptr"), StringKey: "target", Data: "match"},
+			{StringPtrKey: new("target-ptr"), StringKey: "other", Data: "no match"},
 			{StringPtrKey: nil, StringKey: "target", Data: "no match"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
