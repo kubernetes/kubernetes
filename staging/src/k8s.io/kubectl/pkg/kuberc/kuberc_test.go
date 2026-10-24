@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,6 +70,15 @@ type testApplyAlias[T supportedTypes] struct {
 	expectedCmd        string
 	expectedArgs       []string
 	expectedErr        error
+}
+
+// readAndApply mirrors how cmd.go drives Preferences: Read once, then Apply the result.
+func readAndApply(p PreferencesHandler, rootCmd *cobra.Command, opts *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
+	prefs, err := p.Read(args, errOut)
+	if err != nil {
+		return args, err
+	}
+	return p.Apply(rootCmd, opts, prefs, args, errOut)
 }
 
 func TestApplyOverride(t *testing.T) {
@@ -869,7 +879,7 @@ func TestApplyOverride(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 
-			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			_, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1118,7 +1128,7 @@ func TestApplyOverrideBool(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			_, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1408,7 +1418,7 @@ func TestApplyAliasBool(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			lastArgs, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2612,7 +2622,7 @@ func TestApplyAlias(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 			opts := genericclioptions.NewConfigFlags(false)
-			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
+			lastArgs, err := readAndApply(pref, rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -3012,7 +3022,7 @@ users:
 			}, nil
 		}
 
-		_, err = p.Apply(rootCmd, opts, args, io.Discard)
+		_, err = readAndApply(p, rootCmd, opts, args, io.Discard)
 		require.NoError(t, err, "error applying preferences")
 
 		cfg, err := opts.ToRESTConfig()
@@ -3221,7 +3231,7 @@ credentialPluginPolicy: ""
 				return pref, nil
 			}
 
-			_, err := p.Apply(rootCmd, opts, args, io.Discard)
+			_, err := readAndApply(p, rootCmd, opts, args, io.Discard)
 			if test.shouldErr {
 				require.Error(t, err, "expected error, but error was nil")
 			} else {
@@ -3274,7 +3284,7 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 	errWriter := &bytes.Buffer{}
 	args := []string{"root", "kuberc", "view"}
 
-	_, err := pref.Apply(rootCmd, opts, args, errWriter)
+	_, err := readAndApply(pref, rootCmd, opts, args, errWriter)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -3289,5 +3299,101 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 
 	if got := actualCmd.Flag("output").Value.String(); got != "default" {
 		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
+	}
+}
+
+func TestRegisterAliasCommands(t *testing.T) {
+	tests := []struct {
+		name               string
+		nestedCmds         []fakeCmds[string]
+		args               []string
+		getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+		expectedCmdNames   []string
+		expectedCmdCount   int
+	}{
+		{
+			name: "single alias registered",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"getcmd",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+						},
+					},
+				}, nil
+			},
+			expectedCmdNames: []string{"getcmd"},
+			expectedCmdCount: 1,
+		},
+		{
+			name: "no aliases in kuberc",
+			nestedCmds: []fakeCmds[string]{
+				{name: "command1"},
+			},
+			args: []string{"root", "getcmd"},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{},
+				}, nil
+			},
+			expectedCmdNames: []string{},
+			expectedCmdCount: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+
+			prefs, err := pref.Read(test.args, io.Discard)
+			if err != nil {
+				t.Fatalf("error occurred while reading preferences %v\n", err)
+			}
+			group := GetAliasesCommandGroup(rootCmd, prefs)
+
+			if len(group.Commands) != test.expectedCmdCount {
+				t.Fatalf("expected %d command(s), got %d", test.expectedCmdCount, len(group.Commands))
+			}
+
+			for _, c := range group.Commands {
+				if !slices.Contains(test.expectedCmdNames, c.Name()) {
+					t.Fatalf("unexpected command %s, expected one of %v", c.Name(), test.expectedCmdNames)
+				}
+			}
+		})
 	}
 }
