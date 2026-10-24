@@ -144,7 +144,11 @@ func newFrameworkComponents(ctx context.Context,
 
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
-		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
+		dispatcherClient := client
+		if options.asyncClient != nil {
+			dispatcherClient = options.asyncClient
+		}
+		apiDispatcher = apidispatcher.New(dispatcherClient, int(options.parallelism), apicalls.Relevances)
 	}
 
 	var podGroupHierarchyTracker *gangscheduling.HierarchyTracker
