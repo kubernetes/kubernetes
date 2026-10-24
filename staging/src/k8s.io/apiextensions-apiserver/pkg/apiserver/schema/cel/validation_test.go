@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -5245,4 +5246,43 @@ func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 func nilInterfaceOfStringSlice() []interface{} {
 	var slice []interface{} = nil
 	return slice
+}
+
+func TestDeterministicValidationOrder(t *testing.T) {
+	s := objectType(map[string]schema.Structural{
+		"gamma": withRule(integerType, "self > 10"),
+		"alpha": withRule(integerType, "self > 10"),
+		"beta":  withRule(integerType, "self > 10"),
+	})
+
+	celValidator := validator(&s, &s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
+	if celValidator == nil {
+		t.Fatal("expected non nil validator")
+	}
+
+	obj := map[string]interface{}{
+		"gamma": int64(1),
+		"alpha": int64(1),
+		"beta":  int64(1),
+	}
+
+	expectedOrder := []string{
+		"root.alpha: Invalid value: 1: failed rule: self > 10",
+		"root.beta: Invalid value: 1: failed rule: self > 10",
+		"root.gamma: Invalid value: 1: failed rule: self > 10",
+	}
+
+	ctx := context.TODO()
+	for i := 0; i < 50; i++ {
+		errList, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, obj, nil, math.MaxInt)
+
+		var actualOrder []string
+		for _, e := range errList {
+			actualOrder = append(actualOrder, e.Error())
+		}
+
+		if !slices.Equal(expectedOrder, actualOrder) {
+			t.Fatalf("iteration %d: expected order %v, got %v", i, expectedOrder, actualOrder)
+		}
+	}
 }
