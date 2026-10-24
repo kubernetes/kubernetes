@@ -444,6 +444,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			ginkgo.By("submitting the pod to kubernetes")
 			pod = podClient.CreateSync(ctx, pod)
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 1, 20*time.Second))
 			ginkgo.DeferCleanup(func(ctx context.Context) error {
 				ginkgo.By("deleting the pod")
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -451,9 +452,10 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			ginkgo.By("verifying pod generation bumps as expected")
 			tests := []struct {
-				name                 string
-				updateFn             func(*v1.Pod)
-				expectGenerationBump bool
+				name                      string
+				updateFn                  func(*v1.Pod)
+				expectGenerationBump      bool
+				observedGenerationTimeout time.Duration
 			}{
 				{
 					name:                 "empty update",
@@ -490,7 +492,8 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 					updateFn: func(pod *v1.Pod) {
 						pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
 					},
-					expectGenerationBump: true,
+					expectGenerationBump:      true,
+					observedGenerationTimeout: framework.PodStartTimeout,
 				},
 
 				{
@@ -531,7 +534,11 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 					expectedPodGeneration++
 				}
 				gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
-				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 20*time.Second))
+				timeout := test.observedGenerationTimeout
+				if timeout == 0 {
+					timeout = 20 * time.Second
+				}
+				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, timeout))
 			}
 		})
 
