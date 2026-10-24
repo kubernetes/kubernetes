@@ -25,12 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type conditionMergeTestCase struct {
@@ -175,7 +171,6 @@ func TestMergeResizeCondition(t *testing.T) {
 
 func TestResizeFunctions(t *testing.T) {
 	basePVC := makePVC([]v1.PersistentVolumeClaimCondition{})
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	tests := []struct {
 		name        string
 		pvc         *v1.PersistentVolumeClaim
@@ -221,7 +216,6 @@ func TestResizeFunctions(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
 			pvc := tc.pvc
 			kubeClient := fake.NewSimpleClientset(pvc)
 
