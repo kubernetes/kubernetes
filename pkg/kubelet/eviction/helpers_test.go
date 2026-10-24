@@ -3116,6 +3116,109 @@ func TestAddContainerFsThresholds(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "single filesystem with no inode thresholds (ZFS-like)",
+			imageFs:     false,
+			containerFs: false,
+			expectedContainerFsHard: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("100Mi"),
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			expectedContainerFsSoft: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("200Mi"),
+				},
+				GracePeriod: gracePeriod,
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			// Empty Signal means no containerfs.inodesFree thresholds expected.
+			expectedContainerFsINodesHard: evictionapi.Threshold{},
+			expectedContainerFsINodesSoft: evictionapi.Threshold{},
+			thresholdList: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+			},
+		},
+		{
+			description: "separate image filesystem with no inode thresholds",
+			imageFs:     true,
+			containerFs: false,
+			expectedContainerFsHard: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("150Mi"),
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1.5Gi"),
+				},
+			},
+			expectedContainerFsSoft: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("300Mi"),
+				},
+				GracePeriod: gracePeriod,
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("3Gi"),
+				},
+			},
+			expectedContainerFsINodesHard: evictionapi.Threshold{},
+			expectedContainerFsINodesSoft: evictionapi.Threshold{},
+			thresholdList: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1.5Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("300Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("3Gi"),
+					},
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -3160,11 +3263,19 @@ func TestAddContainerFsThresholds(t *testing.T) {
 			if softContainerFsMatch == -1 {
 				t.Fatalf("did not find soft containerfs.available")
 			}
-			if hardContainerFsINodesMatch == -1 {
+			// containerfs.inodesfree thresholds are only expected when the source
+			// inode signal (nodefs.inodesFree / imagefs.inodesFree) is present.
+			if testCase.expectedContainerFsINodesHard.Signal != "" && hardContainerFsINodesMatch == -1 {
 				t.Fatalf("did not find hard containerfs.inodesfree")
 			}
-			if softContainerFsINodesMatch == -1 {
+			if testCase.expectedContainerFsINodesHard.Signal == "" && hardContainerFsINodesMatch != -1 {
+				t.Fatalf("did not expect hard containerfs.inodesfree but found one")
+			}
+			if testCase.expectedContainerFsINodesSoft.Signal != "" && softContainerFsINodesMatch == -1 {
 				t.Fatalf("did not find soft containerfs.inodesfree")
+			}
+			if testCase.expectedContainerFsINodesSoft.Signal == "" && softContainerFsINodesMatch != -1 {
+				t.Fatalf("did not expect soft containerfs.inodesfree but found one")
 			}
 		})
 	}
