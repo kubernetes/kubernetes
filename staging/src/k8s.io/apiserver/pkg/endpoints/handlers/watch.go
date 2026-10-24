@@ -161,7 +161,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 
 	var serverShuttingDownCh <-chan struct{}
 	if signals := apirequest.ServerShutdownSignalFrom(req.Context()); signals != nil {
-		serverShuttingDownCh = signals.ShuttingDown()
+		serverShuttingDownCh = signals.Draining()
 	}
 
 	server := &WatchServer{
