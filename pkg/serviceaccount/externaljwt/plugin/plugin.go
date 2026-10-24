@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -47,8 +48,8 @@ type VerificationKeys struct {
 
 // New calls external signer to fill out supported keys.
 // It also starts a periodic sync of external keys.
-// In order for the key cache and external signing to work correctly, pass a context that will live as
-// long as the dependent process; is used to maintain the lifetime of the connection to external signer.
+// The context is used for initialization only. Close must be called when the
+// apiserver has finished serving requests.
 func New(ctx context.Context, issuer, socketPath string, keySyncTimeout time.Duration, allowSigningWithNonOIDCKeys bool) (*Plugin, *keyCache, error) {
 	conn, err := grpc.Dial(
 		socketPath,
@@ -70,14 +71,13 @@ func New(ctx context.Context, issuer, socketPath string, keySyncTimeout time.Dur
 	defer cancel()
 
 	if err := plugin.keyCache.initialFill(initialFillCtx); err != nil {
+		_ = conn.Close()
 		return nil, nil, fmt.Errorf("while initially filling key cache: %w", err)
 	}
-	go plugin.keyCache.scheduleSync(ctx, keySyncTimeout)
 
-	go func() {
-		<-ctx.Done()
-		_ = conn.Close()
-	}()
+	lifecycleCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	plugin.cancel = cancel
+	go plugin.keyCache.scheduleSync(lifecycleCtx, keySyncTimeout)
 
 	return plugin, plugin.keyCache, nil
 }
@@ -88,6 +88,10 @@ type Plugin struct {
 	client                      externaljwtv1.ExternalJWTSignerClient
 	keyCache                    *keyCache
 	allowSigningWithNonOIDCKeys bool
+	conn                        *grpc.ClientConn
+	cancel                      context.CancelFunc
+	closeOnce                   sync.Once
+	closeErr                    error
 }
 
 // newPlugin constructs an implementation of external JWT signer plugin.
@@ -98,8 +102,20 @@ func newPlugin(iss string, conn *grpc.ClientConn, allowSigningWithNonOIDCKeys bo
 		client:                      client,
 		allowSigningWithNonOIDCKeys: allowSigningWithNonOIDCKeys,
 		keyCache:                    newKeyCache(client),
+		conn:                        conn,
 	}
 	return plugin
+}
+
+// Close stops key synchronization and closes the connection to the external signer.
+func (p *Plugin) Close() error {
+	p.closeOnce.Do(func() {
+		if p.cancel != nil {
+			p.cancel()
+		}
+		p.closeErr = p.conn.Close()
+	})
+	return p.closeErr
 }
 
 // GenerateToken creates a service account token with the provided claims by

@@ -85,6 +85,7 @@ type Options struct {
 
 	ServiceAccountSigningKeyFile     string
 	ServiceAccountIssuer             serviceaccount.TokenGenerator
+	ServiceAccountIssuerCleanup      func()
 	ServiceAccountTokenMaxExpiration time.Duration
 
 	ShowHiddenMetricsForVersion string
@@ -318,6 +319,12 @@ func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *
 			if err != nil {
 				return fmt.Errorf("while setting up external-jwt-signer: %w", err)
 			}
+			cleanup := true
+			defer func() {
+				if cleanup {
+					_ = plugin.Close()
+				}
+			}()
 			timedContext, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 			metadata, err := plugin.GetServiceMetadata(timedContext)
@@ -337,7 +344,9 @@ func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *
 			transitionWarningFmt = "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, token lifetime supported by external-jwt-signer must be longer than %d seconds (currently %s)"
 			expExtensionWarningFmt = "service-account-extend-token-expiration is true, tokens validity will be caped at the smaller of %d seconds and maximum token lifetime supported by external-jwt-signer (%s)"
 			completed.ServiceAccountIssuer = plugin
+			completed.ServiceAccountIssuerCleanup = func() { _ = plugin.Close() }
 			completed.Authentication.ServiceAccounts.ExternalPublicKeysGetter = cache
+			cleanup = false
 			// shorten ExtendedExpiration, if needed, to fit within the external signer's max expiration
 			completed.Authentication.ServiceAccounts.MaxExtendedExpiration = min(maxExternalExpiration, completed.Authentication.ServiceAccounts.MaxExtendedExpiration)
 		}
