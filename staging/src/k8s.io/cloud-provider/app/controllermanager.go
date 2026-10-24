@@ -49,7 +49,7 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/component-base/metrics/features"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
@@ -66,7 +66,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
@@ -97,6 +97,10 @@ the cloud specific control loops shipped with Kubernetes.`,
 				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
+
+			// Propagate feature gate state to the metrics subsystem. This must be called
+			// after feature gates are set and before any histogram metrics are registered.
+			metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
