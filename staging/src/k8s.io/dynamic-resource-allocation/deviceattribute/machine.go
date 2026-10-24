@@ -21,17 +21,23 @@ import (
 	"os"
 )
 
+type SysFS interface {
+	fs.ReadLinkFS
+	fs.ReadFileFS
+	fs.ReadDirFS
+}
+
 // machine is the bare minimum machine/host abstraction we need.
 // we use a wrapping struct to enable the functional option pattern
 type machine struct {
-	sysfs fs.ReadLinkFS
+	sysfs SysFS
 }
 
 // MachineModifier is the type of functional options
 type MachineModifier func(*machine)
 
 // WithFS replaces the host sysfs with a custom FS
-func WithFS(sysfs fs.ReadLinkFS) MachineModifier {
+func WithFS(sysfs SysFS) MachineModifier {
 	return func(mc *machine) {
 		mc.sysfs = sysfs
 	}
@@ -42,6 +48,6 @@ func WithFS(sysfs fs.ReadLinkFS) MachineModifier {
 // and testability and for usage within containers, not for security.
 func WithFSFromRoot(root string) MachineModifier {
 	return func(mc *machine) {
-		mc.sysfs = os.DirFS(root).(fs.ReadLinkFS)
+		mc.sysfs = os.DirFS(root).(SysFS)
 	}
 }
