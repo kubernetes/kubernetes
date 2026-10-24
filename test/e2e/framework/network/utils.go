@@ -50,12 +50,24 @@ import (
 )
 
 const (
-	// EndpointHTTPPort is an endpoint HTTP port for testing.
-	EndpointHTTPPort = 8083
-	// EndpointUDPPort is an endpoint UDP port for testing.
-	EndpointUDPPort = 8081
-	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort = 8082
+	// endpointHTTPPort is the HTTP port of pod network endpoint pods. Code
+	// operating on a NetworkingTestConfig must read config.EndpointHTTPPort
+	// rather than this constant, because host network endpoints listen
+	// somewhere else; see setEndpointPorts.
+	endpointHTTPPort = 8083
+	// endpointUDPPort is the UDP port of pod network endpoint pods. See endpointHTTPPort.
+	endpointUDPPort = 8081
+	// endpointSCTPPort is the SCTP port of pod network endpoint pods. See endpointHTTPPort.
+	endpointSCTPPort = 8082
+	// hostNetworkEndpointPortBase is the first port of the range reserved for
+	// host network endpoint pods, which need a set of ports per concurrently
+	// running test config; see setEndpointPorts. The range sits above the ports
+	// the node components bind and below the NodePort and ephemeral ranges, so
+	// nothing else on the node claims it.
+	hostNetworkEndpointPortBase = 11000
+	// hostNetworkEndpointPortRange is how many ports (http, udp, sctp) each
+	// host network test config reserves.
+	hostNetworkEndpointPortRange = 3
 	// testContainerHTTPPort is the test container http port.
 	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
@@ -205,6 +217,11 @@ type NetworkingTestConfig struct {
 	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
 	// or an InternalIP if not, for usein nodePort testing.
 	SecondaryNodeIP string
+	// The http/udp/sctp ports the endpoint pods listen on. Host network
+	// endpoints get a set of ports of their own; see setEndpointPorts.
+	EndpointHTTPPort int
+	EndpointUDPPort  int
+	EndpointSCTPPort int
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -232,7 +249,7 @@ func (config *NetworkingTestConfig) DialFromEndpointContainer(ctx context.Contex
 			dialCmd = echoNodename
 		}
 	}
-	return config.DialFromContainer(ctx, protocol, dialCmd, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
+	return config.DialFromContainer(ctx, protocol, dialCmd, config.EndpointPods[0].Status.PodIP, targetIP, config.EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialFromTestContainer executes a curl via kubectl exec in a test container. Returns an error to be handled by the caller.
@@ -591,8 +608,8 @@ func (config *NetworkingTestConfig) executeCurlCmd(ctx context.Context, cmd stri
 func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *v1.Pod {
 	netexecArgs := []string{
 		"netexec",
-		fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-		fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+		fmt.Sprintf("--http-port=%d", config.EndpointHTTPPort),
+		fmt.Sprintf("--udp-port=%d", config.EndpointUDPPort),
 	}
 	// In case of hostnetwork endpoints, we want to bind the udp listener to specific ip addresses.
 	// In order to cover legacy AND dualstack, we pass both the host ip and the two pod ips. Agnhost
@@ -610,7 +627,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/healthz",
-				Port: intstr.IntOrString{IntVal: EndpointHTTPPort},
+				Port: intstr.IntOrString{IntVal: int32(config.EndpointHTTPPort)},
 			},
 		},
 	}
@@ -633,11 +650,11 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
-							ContainerPort: EndpointHTTPPort,
+							ContainerPort: int32(config.EndpointHTTPPort),
 						},
 						{
 							Name:          "udp",
-							ContainerPort: EndpointUDPPort,
+							ContainerPort: int32(config.EndpointUDPPort),
 							Protocol:      v1.ProtocolUDP,
 						},
 					},
@@ -652,10 +669,10 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 	}
 	// we want sctp to be optional as it will load the sctp kernel module
 	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", config.EndpointSCTPPort))
 		pod.Spec.Containers[0].Ports = append(pod.Spec.Containers[0].Ports, v1.ContainerPort{
 			Name:          "sctp",
-			ContainerPort: EndpointSCTPPort,
+			ContainerPort: int32(config.EndpointSCTPPort),
 			Protocol:      v1.ProtocolSCTP,
 		})
 	}
@@ -736,8 +753,8 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
 			Ports: []v1.ServicePort{
-				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(EndpointHTTPPort)},
-				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(EndpointUDPPort)},
+				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(int32(config.EndpointHTTPPort))},
+				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(int32(config.EndpointUDPPort))},
 			},
 			Selector:        selector,
 			SessionAffinity: sessionAffinity,
@@ -745,7 +762,7 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	}
 
 	if config.SCTPEnabled {
-		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt32(EndpointSCTPPort)})
+		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt32(int32(config.EndpointSCTPPort))})
 	}
 	if config.DualStackEnabled {
 		requireDual := v1.IPFamilyPolicyRequireDualStack
@@ -809,9 +826,37 @@ func (config *NetworkingTestConfig) CreateService(ctx context.Context, serviceSp
 	return createdService
 }
 
+// hostNetworkEndpointPorts returns the http, udp and sctp ports reserved for the
+// host network endpoint pods of the config running on the given ginkgo parallel
+// process, which is 1-indexed.
+func hostNetworkEndpointPorts(parallelProcess int) (int, int, int) {
+	base := hostNetworkEndpointPortBase + hostNetworkEndpointPortRange*(parallelProcess-1)
+	return base, base + 1, base + 2
+}
+
+// setEndpointPorts selects the ports the endpoint pods listen on.
+//
+// Pod network endpoints listen inside a network namespace of their own, so every
+// test config can reuse the same well-known ports without reaching any other
+// config.
+//
+// Host network endpoints need unique ports for each parallel process
+// to avoid colliding with other parallel test processes.
+func (config *NetworkingTestConfig) setEndpointPorts() {
+	if config.EndpointsHostNetwork {
+		config.EndpointHTTPPort, config.EndpointUDPPort, config.EndpointSCTPPort = hostNetworkEndpointPorts(ginkgo.GinkgoParallelProcess())
+	} else { // pod network endpoints case
+		config.EndpointHTTPPort = endpointHTTPPort
+		config.EndpointUDPPort = endpointUDPPort
+		config.EndpointSCTPPort = endpointSCTPPort
+	}
+}
+
 // setupCore sets up the pods and core test config
 // mainly for simplified node e2e setup
 func (config *NetworkingTestConfig) setupCore(ctx context.Context, selector map[string]string) {
+	config.setEndpointPorts()
+
 	ginkgo.By("Creating the service pods in kubernetes")
 	podName := "netserver"
 	config.EndpointPods = config.createNetProxyPods(ctx, podName, selector)
