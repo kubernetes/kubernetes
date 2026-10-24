@@ -127,7 +127,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 	data := originalData[prefixLen:]
 	unk := runtime.Unknown{}
-	if err := unk.Unmarshal(data); err != nil {
+	if err := unk.UnmarshalRawZeroCopy(data); err != nil {
 		return nil, nil, err
 	}
 
@@ -136,7 +136,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
 		*intoUnknown = unk
-		if ok, _, _ := s.RecognizesData(unk.Raw); ok {
+		if len(unk.Raw) > 0 {
+			intoUnknown.Raw = bytes.Clone(unk.Raw)
+		}
+		if ok, _, _ := s.RecognizesData(intoUnknown.Raw); ok {
 			intoUnknown.ContentType = runtime.ContentTypeProtobuf
 		}
 		return intoUnknown, &actual, nil
