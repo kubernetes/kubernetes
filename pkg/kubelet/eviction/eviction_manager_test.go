@@ -3296,3 +3296,25 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }
+
+func TestSoftEvictionGracePeriod(t *testing.T) {
+	podGrace := int64(60)
+	cases := []struct {
+		name     string
+		max      int64
+		podGrace *int64
+		want     int64
+	}{
+		{name: "caps at max", max: 5, podGrace: &podGrace, want: 5},
+		{name: "negative defers to pod", max: -1, podGrace: &podGrace, want: 60},
+		{name: "negative with nil pod avoids -1", max: -1, podGrace: nil, want: 0},
+		{name: "nil pod uses max", max: 5, podGrace: nil, want: 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := softEvictionGracePeriod(tc.max, tc.podGrace); got != tc.want {
+				t.Errorf("softEvictionGracePeriod(%d, %v) = %d, want %d", tc.max, tc.podGrace, got, tc.want)
+			}
+		})
+	}
+}
