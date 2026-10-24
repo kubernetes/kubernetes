@@ -3340,6 +3340,16 @@ type expectedHintScore struct {
 	score int64
 }
 
+// scoringTopologyStore returns a topology manager store whose policy reads
+// hint scores. Hint providers skip computing a score when the configured
+// policy selects no NUMA allocation strategy, which is the default, so a test
+// that asserts scores has to ask for one.
+func scoringTopologyStore(logger klog.Logger) topologymanager.Store {
+	return topologymanager.NewFakeManagerWithPolicy(logger, topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{
+		NUMAAllocationStrategy: topologymanager.NUMAAllocationStrategyMostAllocated,
+	}))
+}
+
 func TestGenerateCPUTopologyHintsScore(t *testing.T) {
 	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each
 	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}
@@ -3464,10 +3474,12 @@ func TestGenerateCPUTopologyHintsScore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			p := staticPolicy{
 				topology:     tc.topo,
 				reservedCPUs: tc.reservedCPUs,
 				numaNodes:    tc.topo.CPUDetails.NUMANodes().List(),
+				affinity:     scoringTopologyStore(logger),
 			}
 			hints := p.generateCPUTopologyHints(tc.usableCPUs, tc.reusableCPUs, tc.freeCPUs, tc.request)
 
@@ -3544,7 +3556,7 @@ func TestRegeneratedCPUTopologyHintsScore(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			logger := tCtx.Logger()
 
-			policy, err := NewStaticPolicy(logger, topoDualSocketNoHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			policy, err := NewStaticPolicy(logger, topoDualSocketNoHT, 0, cpuset.New(), scoringTopologyStore(logger), nil)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
