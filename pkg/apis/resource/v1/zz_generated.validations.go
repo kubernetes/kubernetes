@@ -284,6 +284,39 @@ func Validate_AllocationResult(
 	return errs
 }
 
+// Validate_Counter validates an instance of Counter according
+// to declarative validation rules in the API schema.
+func Validate_Counter(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.Counter) (errs field.ErrorList) {
+
+	{ // field resourcev1.Counter.Value
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.MinimumQuantity(ctx, op, fldPath, obj, oldObj, resource.MustParse("0")); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.Counter) *resource.Quantity {
+				return &oldObj.Value
+			})
+		errs = append(errs, fn(fldPath.Child("value"), &obj.Value, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
 func Validate_CounterSet(
@@ -343,6 +376,10 @@ func Validate_CounterSet(
 				return // do not proceed
 			}
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_Counter); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1675,6 +1712,10 @@ func Validate_DeviceCounterConsumption(
 				return // do not proceed
 			}
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_Counter); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
