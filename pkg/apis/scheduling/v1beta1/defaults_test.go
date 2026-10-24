@@ -63,10 +63,7 @@ func TestSetDefaultPreempting(t *testing.T) {
 }
 
 func TestSetDefaultsPodGroup(t *testing.T) {
-	var (
-		preemptNever         = v1beta1.PreemptNever
-		preemptLowerPriority = v1beta1.PreemptLowerPriority
-	)
+	preemptNever := v1beta1.PreemptNever
 
 	tests := []struct {
 		name                           string
@@ -91,10 +88,10 @@ func TestSetDefaultsPodGroup(t *testing.T) {
 			expectedPolicy:                 &preemptNever,
 		},
 		{
-			name:                           "feature gate enabled, policy is nil",
+			name:                           "feature gate enabled, nil policy is left for priority admission",
 			podGroup:                       &v1beta1.PodGroup{},
 			enablePodGroupPreemptionPolicy: true,
-			expectedPolicy:                 &preemptLowerPriority,
+			expectedPolicy:                 nil,
 		},
 		{
 			name: "feature gate enabled, policy is set",
