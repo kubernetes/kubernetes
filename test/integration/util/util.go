@@ -605,14 +605,17 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 // multiple subtests share one API server to avoid the per-subtest startup cost.
 func WithNewNamespace(t testutils.TB, parent *TestContext, nsPrefix string) *TestContext {
 	t.Helper()
+	ctx, cancel := context.WithCancel(parent.Ctx)
+
 	child := &TestContext{
 		ClientSet:  parent.ClientSet,
 		KubeConfig: parent.KubeConfig,
-		Ctx:        parent.Ctx,
+		Ctx:        ctx,
 		CloseFn:    func() {}, // API server is owned by parent; do not tear it down here.
 	}
 	child.NS = framework.CreateNamespaceOrDie(child.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
 	t.Cleanup(func() {
+		cancel()
 		framework.DeleteNamespaceOrDie(child.ClientSet, child.NS, t)
 	})
 	return child
