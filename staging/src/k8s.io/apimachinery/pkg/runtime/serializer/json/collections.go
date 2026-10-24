@@ -19,6 +19,7 @@ package json
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 	"sort"
@@ -96,15 +97,12 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 // streamEncoder encodes JSON values to w, reusing an internal buffer across
 // values to avoid the fresh output allocation json.Marshal makes per call.
 type streamEncoder struct {
-	w    io.Writer
-	buf  bytes.Buffer
-	json *json.Encoder
+	w   io.Writer
+	buf bytes.Buffer
 }
 
 func newStreamEncoder(w io.Writer) *streamEncoder {
-	e := &streamEncoder{w: w}
-	e.json = json.NewEncoder(&e.buf)
-	return e
+	return &streamEncoder{w: w}
 }
 
 func (e *streamEncoder) encodeList(typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object) error {
@@ -237,12 +235,9 @@ func (e *streamEncoder) encodeKeyValuePair(key string, value any, suffix []byte)
 
 func (e *streamEncoder) encodeValue(value any, suffix []byte) error {
 	e.buf.Reset()
-	if err := e.json.Encode(value); err != nil {
+	if err := jsonv2.MarshalWrite(&e.buf, value, json.DefaultOptionsV1()); err != nil {
 		return err
 	}
-	// Encode appends a newline after the value; replace it with the suffix to
-	// keep the output identical to json.Marshal's.
-	e.buf.Truncate(e.buf.Len() - 1)
 	e.buf.Write(suffix)
 	_, err := e.w.Write(e.buf.Bytes())
 	return err
