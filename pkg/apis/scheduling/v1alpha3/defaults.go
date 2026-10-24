@@ -19,8 +19,6 @@ package v1alpha3
 import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -28,19 +26,15 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
-		if in.Spec.PreemptionPolicy == nil {
-			preemptLowerPriority := schedulingv1alpha3.PreemptLowerPriority
-			in.Spec.PreemptionPolicy = &preemptLowerPriority
-		}
+	if in.Spec.PreemptionPolicy == nil {
+		preemptLowerPriority := schedulingv1alpha3.PreemptLowerPriority
+		in.Spec.PreemptionPolicy = &preemptLowerPriority
 	}
 }
 
 func SetDefaults_CompositePodGroup(in *schedulingv1alpha3.CompositePodGroup) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
-		if in.Spec.PreemptionPolicy == nil {
-			preemptLowerPriority := schedulingv1alpha3.PreemptLowerPriority
-			in.Spec.PreemptionPolicy = &preemptLowerPriority
-		}
+	if in.Spec.PreemptionPolicy == nil {
+		preemptLowerPriority := schedulingv1alpha3.PreemptLowerPriority
+		in.Spec.PreemptionPolicy = &preemptLowerPriority
 	}
 }

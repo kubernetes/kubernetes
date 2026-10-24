@@ -55,7 +55,7 @@ func NewPreemptionManager(fh fwk.Handle, fts feature.Features) fwk.PreemptionMan
 func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo fwk.PodGroupInfo) ([]fwk.PreemptionVictim, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	if getPreemptionPolicy(pgInfo, m.fts.EnablePodGroupPreemptionPolicy) == v1.PreemptNever {
+	if pgInfo.GetPreemptionPolicy() == v1.PreemptNever {
 		msg := "not eligible due to preemptionPolicy=Never."
 		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(pgInfo), "type", pgInfo.GetType(), "reason", msg)
 		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
@@ -88,18 +88,6 @@ func (m *defaultPreemptionManager) ShouldAttemptReprieval(_ context.Context, _ f
 
 func (m *defaultPreemptionManager) OnVictimReprieved(_ context.Context, _ fwk.PreemptionVictim) error {
 	return nil
-}
-
-func getPreemptionPolicy(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {
-	if enablePodGroupPreemptionPolicy {
-		return pgInfo.GetPreemptionPolicy()
-	}
-	for _, pod := range pgInfo.GetAllUnscheduledPods() {
-		if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-			return *p
-		}
-	}
-	return v1.PreemptLowerPriority
 }
 
 type victimWithPDBViolations struct {

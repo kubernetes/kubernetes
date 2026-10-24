@@ -831,12 +831,6 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
-	// owner: @wojtek-t @argh4k
-	// kep: https://kep.k8s.io/5710
-	//
-	// Enables specifying PreemptionPolicy at podgroup level.
-	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
-
 	// owner: @KevinTMtz
 	// kep: https://kep.k8s.io/5526
 	//
@@ -1840,10 +1834,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PodGroupPreemptionPolicy: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	PodLevelResourceManagers: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
@@ -2620,8 +2610,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodCertificateRequest: {},
 
 	PodDeletionCost: {},
-
-	PodGroupPreemptionPolicy: {GenericWorkload},
 
 	PodLevelResourceManagers: {PodLevelResources},
 
