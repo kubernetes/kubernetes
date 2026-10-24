@@ -1040,6 +1040,13 @@ const (
 	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
 	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
 
+	// owner: @saschagrunert
+	// kep: https://kep.k8s.io/6061
+	//
+	// Enables seccomp profiles of type OCI, pulled from OCI registries by the
+	// container runtime and merged with a base profile.
+	SecurityProfileOCI featuregate.Feature = "SecurityProfileOCI"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/4412
 	//
@@ -1990,6 +1997,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	SecurityProfileOCI: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ServiceAccountNodeAudienceRestriction: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2671,6 +2682,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SchedulerPopFromBackoffQ:  {},
 	SchedulerPreQueueingHints: {},
+
+	SecurityProfileOCI: {},
 
 	ServiceAccountNodeAudienceRestriction: {},
 
