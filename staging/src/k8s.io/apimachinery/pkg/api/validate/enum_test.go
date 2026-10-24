@@ -239,3 +239,89 @@ func TestEnumExclude(t *testing.T) {
 		})
 	}
 }
+
+func TestEnumNumeric(t *testing.T) {
+	type Int32Enum int32
+	const (
+		Int32One Int32Enum = 1
+		Int32Two Int32Enum = 2
+	)
+
+	int32Cases := []struct {
+		name      string
+		value     Int32Enum
+		valid     sets.Set[Int32Enum]
+		expectErr string
+	}{{
+		name:      "valid value",
+		value:     Int32One,
+		valid:     sets.New(Int32One, Int32Two),
+		expectErr: "",
+	}, {
+		name:      "invalid value",
+		value:     3,
+		valid:     sets.New(Int32One, Int32Two),
+		expectErr: `fldpath: Unsupported value: 3: supported values: "1", "2"`,
+	}}
+
+	for _, tc := range int32Cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := operation.Operation{Type: operation.Create}
+			errs := Enum(context.Background(), op, field.NewPath("fldpath"), &tc.value, nil, tc.valid, nil)
+			if tc.expectErr == "" {
+				if len(errs) > 0 {
+					t.Fatalf("expected no error, but got: %v", errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Fatalf("expected a single error, but got: %v", errs)
+				}
+				if errs[0].Error() != tc.expectErr {
+					t.Errorf("expected error %q, but got %q", tc.expectErr, errs[0].Error())
+				}
+			}
+		})
+	}
+
+	type Int64Enum int64
+	const (
+		Int64A Int64Enum = 100
+		Int64B Int64Enum = 200
+	)
+
+	int64Cases := []struct {
+		name      string
+		value     Int64Enum
+		valid     sets.Set[Int64Enum]
+		expectErr string
+	}{{
+		name:      "valid value",
+		value:     Int64A,
+		valid:     sets.New(Int64A, Int64B),
+		expectErr: "",
+	}, {
+		name:      "invalid value",
+		value:     300,
+		valid:     sets.New(Int64A, Int64B),
+		expectErr: `fldpath: Unsupported value: 300: supported values: "100", "200"`,
+	}}
+
+	for _, tc := range int64Cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := operation.Operation{Type: operation.Create}
+			errs := Enum(context.Background(), op, field.NewPath("fldpath"), &tc.value, nil, tc.valid, nil)
+			if tc.expectErr == "" {
+				if len(errs) > 0 {
+					t.Fatalf("expected no error, but got: %v", errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Fatalf("expected a single error, but got: %v", errs)
+				}
+				if errs[0].Error() != tc.expectErr {
+					t.Errorf("expected error %q, but got %q", tc.expectErr, errs[0].Error())
+				}
+			}
+		})
+	}
+}
