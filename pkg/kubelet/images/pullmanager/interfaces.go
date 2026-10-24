@@ -72,6 +72,11 @@ type ImagePullManager interface {
 	// was found in the cache.
 	//
 	// `image` is the content of the pod's container `image` field.
+	//
+	// IMPORTANT: only call this function with details of an image that _is present_
+	// on the node. The function may write ImagePreloadedRecords for the image-related
+	// details that it was supplied, and so calling it with details of an image that
+	// does not really exist might end up with wrong information filling the cache.
 	MustAttemptImagePull(ctx context.Context, image, imageRef string, getPodCredentials GetPodCredentials) (bool, error)
 	// PruneUnknownRecords deletes all of the cache ImagePulledRecords for each of the images
 	// whose imageRef does not appear in the `imageList` iff such an record was last updated
@@ -111,11 +116,30 @@ type PullRecordsAccessor interface {
 	ListImagePulledRecords() ([]*kubeletconfiginternal.ImagePulledRecord, error)
 	// GetImagePulledRecord fetches an ImagePulledRecord for the given `imageRef`.
 	// If a file for the `imageRef` is present but the contents cannot be decoded,
-	// it returns a exists=true with err equal to the decoding error.
+	// it returns exists=true with err equal to the decoding error.
 	GetImagePulledRecord(imageRef string) (record *kubeletconfiginternal.ImagePulledRecord, exists bool, err error)
 	// WriteImagePulledRecord writes an ImagePulledRecord into the database.
 	WriteImagePulledRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePulledRecord) error
 	// DeleteImagePulledRecord removes an ImagePulledRecord for `imageRef` from the
 	// database.
 	DeleteImagePulledRecord(logger klog.Logger, imageRef string) error
+
+	// ListImagePreloadedRecords lists the database ImagePreloadedRecords.
+	// Records that cannot be decoded will be ignored.
+	// Returns an error if there was a problem reading from the database.
+	//
+	// This method may return partial success in case there were errors listing
+	// the results. A list of records that were successfully read and an aggregated
+	// error is returned in that case.
+	ListImagePreloadedRecords() ([]*kubeletconfiginternal.ImagePreloadedRecord, error)
+	// GetImagePreloadedRecord fetches an ImagePreloadedRecord for the given `imageRef`.
+	GetImagePreloadedRecord(imageRef string) (record *kubeletconfiginternal.ImagePreloadedRecord, err error)
+	// WriteImagePreloadedRecord writes an ImagePreloadedRecord into the database.
+	WriteImagePreloadedRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePreloadedRecord) error
+	// DeleteImagePreloadedRecord removes an `imageName` from the `ObservedImages` set of an
+	// ImagePreloadedRecord identified by `imageRef` from the database.
+	DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error
+	// DeleteImagePreloadedRecord removes an ImagePreloadedRecord for `imageRef` from the
+	// database.
+	DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error
 }
