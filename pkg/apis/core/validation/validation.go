@@ -6378,17 +6378,12 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 		return allErrs
 	}
 
-	containerNames := sets.New[string]()
-	for _, c := range podSpec.InitContainers {
-		containerNames.Insert(c.Name)
-	}
-	for _, c := range podSpec.Containers {
-		containerNames.Insert(c.Name)
-	}
+	containerClaims := containerResourceClaimReferences(podStatus, podSpec)
 
 	// Declarative validation cannot dedupe on a struct key.
+	// A source can have one entry per set of containers (e.g., for different claim requests).
 	type sourceKey struct {
-		apiGroup, kind, name string
+		apiGroup, kind, name, containers string
 	}
 	seenSources := sets.New[sourceKey]()
 	for i, res := range podStatus.ExtraNodeAllocatableResources {
@@ -6398,7 +6393,8 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 
 		// Missing fields get required errors from declarative validation.
 		if source.APIGroup != "" && source.Kind != "" && source.Name != "" {
-			key := sourceKey{apiGroup: source.APIGroup, kind: source.Kind, name: source.Name}
+			containers := strings.Join(slices.Sorted(slices.Values(res.Containers)), ",")
+			key := sourceKey{apiGroup: source.APIGroup, kind: source.Kind, name: source.Name, containers: containers}
 			if seenSources.Has(key) {
 				allErrs = append(allErrs, field.Duplicate(sourceFldPath, source))
 			} else {
@@ -6408,10 +6404,15 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 
 		allErrs = append(allErrs, validateExtraNodeAllocatableSource(source, podStatus, podSpec, sourceFldPath)...)
 
+		isResourceClaim := source.APIGroup == resourceapi.GroupName && source.Kind == "ResourceClaim"
 		containersFldPath := idxPath.Child("containers")
 		for j, containerName := range res.Containers {
-			if !containerNames.Has(containerName) {
+			claims, ok := containerClaims[containerName]
+			switch {
+			case !ok:
 				allErrs = append(allErrs, field.Invalid(containersFldPath.Index(j), containerName, "must match the name of an entry in `spec.initContainers` or `spec.containers`"))
+			case isResourceClaim && !claims.Has(source.Name):
+				allErrs = append(allErrs, field.Invalid(containersFldPath.Index(j), containerName, "must reference the ResourceClaim in `source`"))
 			}
 		}
 
@@ -6424,6 +6425,44 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 	}
 
 	return allErrs
+}
+
+// containerResourceClaimReferences returns the names of the ResourceClaims that each container references.
+func containerResourceClaimReferences(podStatus core.PodStatus, podSpec *core.PodSpec) map[string]sets.Set[string] {
+	claimNames := map[string]string{}
+	for _, c := range podSpec.ResourceClaims {
+		if c.ResourceClaimName != nil {
+			claimNames[c.Name] = *c.ResourceClaimName
+		}
+	}
+	// If container refers a claim tempate, the claim name is recorded in pod status
+	for _, s := range podStatus.ResourceClaimStatuses {
+		if s.ResourceClaimName != nil {
+			claimNames[s.Name] = *s.ResourceClaimName
+		}
+	}
+
+	containerClaimRefs := map[string]sets.Set[string]{}
+	for _, ctrs := range [][]core.Container{podSpec.InitContainers, podSpec.Containers} {
+		for _, c := range ctrs {
+			claims := sets.New[string]()
+			for _, ref := range c.Resources.Claims {
+				if name, ok := claimNames[ref.Name]; ok {
+					claims.Insert(name)
+				}
+			}
+			containerClaimRefs[c.Name] = claims
+		}
+	}
+	// The scheduler created claim for extended resources is recorded in ExtendedResourceClaimStatus.
+	if s := podStatus.ExtendedResourceClaimStatus; s != nil {
+		for _, m := range s.RequestMappings {
+			if ref, ok := containerClaimRefs[m.ContainerName]; ok {
+				ref.Insert(s.ResourceClaimName)
+			}
+		}
+	}
+	return containerClaimRefs
 }
 
 // isKubernetesAPIGroup reports whether group is reserved for Kubernetes APIs:

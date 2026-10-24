@@ -621,6 +621,7 @@ func makePodWithExtraNodeAllocatableResources(claimName string, resources []api.
 				ResourceClaimName: new(claimName),
 			},
 		}
+		pod.Spec.Containers[0].Resources.Claims = []api.ResourceClaim{{Name: "claim-ref"}}
 	}
 	pod.Status.ExtraNodeAllocatableResources = resources
 	return pod
