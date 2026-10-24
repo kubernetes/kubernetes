@@ -1134,7 +1134,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 	params := getExecRequestParams(request)
 	streamOpts, err := remotecommandserver.NewOptions(request.Request)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(request.Request.Context(), err, "Invalid attach request", "pod", klog.KRef(params.podNamespace, params.podName), "containerName", params.containerName)
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
@@ -1171,7 +1171,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
 	streamOpts, err := remotecommandserver.NewOptions(request.Request)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(request.Request.Context(), err, "Invalid exec request", "pod", klog.KRef(params.podNamespace, params.podName), "containerName", params.containerName)
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
@@ -1250,7 +1250,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	} else {
 		portForwardOptions, err = portforward.NewV4Options(request.Request)
 		if err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(request.Request.Context(), err, "Invalid port forward request", "pod", klog.KRef(params.podNamespace, params.podName))
 			response.WriteError(http.StatusBadRequest, err) //nolint:errcheck
 			return
 		}
