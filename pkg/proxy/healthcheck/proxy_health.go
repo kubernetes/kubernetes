@@ -172,10 +172,11 @@ func (hs *ProxyHealthServer) Health() ProxyHealth {
 }
 
 // NodeEligible returns if node is eligible or not. Eligible is defined
-// as being: not tainted by ToBeDeletedTaint and not deleted.
+// as being: not deleted, not tainted by ToBeDeletedTaint, TaintNodeNetworkUnavailable,
+// or TaintNodeOutOfService, and having no NetworkUnavailable condition set to True.
 func (hs *ProxyHealthServer) NodeEligible() bool {
-	hs.lock.Lock()
-	defer hs.lock.Unlock()
+	hs.lock.RLock()
+	defer hs.lock.RUnlock()
 
 	node := hs.nodeManager.Node()
 	if node == nil {
@@ -185,7 +186,14 @@ func (hs *ProxyHealthServer) NodeEligible() bool {
 		return false
 	}
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == ToBeDeletedTaint {
+		if taint.Key == ToBeDeletedTaint ||
+			taint.Key == v1.TaintNodeNetworkUnavailable ||
+			taint.Key == v1.TaintNodeOutOfService {
+			return false
+		}
+	}
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeNetworkUnavailable && cond.Status == v1.ConditionTrue {
 			return false
 		}
 	}
