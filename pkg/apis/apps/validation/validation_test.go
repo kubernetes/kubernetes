@@ -587,7 +587,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
 		),
 		errs: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
+			field.Invalid(field.NewPath("metadata", "labels"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "invalid_label 2",
@@ -596,7 +596,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakSelectorLabels(invalidLabels),
 		),
 		errs: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
+			field.Invalid(field.NewPath("metadata", "labels"), nil, "").MarkCoveredByDeclarative(),
 			field.Invalid(field.NewPath("spec", "selector"), nil, ""),
 			field.Invalid(field.NewPath("spec", "selector", "matchLabels"), nil, ""),
 		},
