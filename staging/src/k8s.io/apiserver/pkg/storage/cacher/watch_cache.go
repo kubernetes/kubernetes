@@ -69,8 +69,8 @@ type watchCacheEvent struct {
 	ResourceVersion uint64
 	RecordTime      time.Time
 	// timeline carries the shared, pre-fan-out dispatch-lifecycle timestamps of
-	// this event (currently PointCacheReceived). Per-watcher points are filled in
-	// on delivery.
+	// this event (the storage-layer points and PointCacheReceived). Per-watcher
+	// points are filled in on delivery.
 	timeline metrics.DispatchTimeline
 }
 
@@ -208,14 +208,37 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 	return object, resourceVersion, nil
 }
 
+// toCacheClock shifts storage-layer timestamps, which use the wall clock, onto
+// the watch cache's clock so that intervals spanning both (and RecordTime,
+// which drives history resizing) stay meaningful when that clock is not real.
+// Intervals between the storage timestamps themselves are preserved.
+func toCacheClock(ts storage.WatchEventTimestamps, cacheNow time.Time) storage.WatchEventTimestamps {
+	offset := time.Until(cacheNow)
+	shift := func(t time.Time) time.Time {
+		if t.IsZero() {
+			return t
+		}
+		return t.Add(offset)
+	}
+	return storage.WatchEventTimestamps{
+		Received:      shift(ts.Received),
+		DecodeStarted: shift(ts.DecodeStarted),
+		Decoded:       shift(ts.Decoded),
+	}
+}
+
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
 	cacheReceived := w.config.clock.Now()
-	recordTime := cacheReceived
-	if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
-		recordTime = withRecordTime.RecordTime()
-		event.Object = withRecordTime.Unwrap()
+	var storageTimestamps storage.WatchEventTimestamps
+	if withTimestamps, ok := event.Object.(storage.WatchEventWithTimestamps); ok {
+		storageTimestamps = toCacheClock(withTimestamps.Timestamps(), cacheReceived)
+		event.Object = withTimestamps.Unwrap()
+	}
+	recordTime := storageTimestamps.Received
+	if recordTime.IsZero() {
+		recordTime = cacheReceived
 	}
 
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
@@ -239,7 +262,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		ResourceVersion: resourceVersion,
 		RecordTime:      recordTime,
 	}
-	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, recordTime)
+	wcEvent.timeline.MarkAt(metrics.PointStorageReceived, recordTime)
+	wcEvent.timeline.MarkAt(metrics.PointStorageDecodeStarted, storageTimestamps.DecodeStarted)
+	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, storageTimestamps.Decoded)
 	wcEvent.timeline.MarkAt(metrics.PointCacheReceived, cacheReceived)
 
 	if err := func() error {

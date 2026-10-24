@@ -1548,3 +1548,59 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 	}
 	return maxRV
 }
+
+type timestampedTestObject struct {
+	runtime.Object
+	timestamps storage.WatchEventTimestamps
+}
+
+func (o *timestampedTestObject) Timestamps() storage.WatchEventTimestamps { return o.timestamps }
+func (o *timestampedTestObject) Unwrap() runtime.Object                   { return o.Object }
+
+// TestProcessEventStorageTimestampsOnCacheClock checks that storage-layer
+// timestamps, taken from the wall clock, are moved onto the watch cache's
+// clock so that stages crossing the two stay meaningful.
+func TestProcessEventStorageTimestampsOnCacheClock(t *testing.T) {
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+	fakeClock := store.config.clock.(*testingclock.FakeClock)
+	fakeClock.SetTime(time.Now().Add(-time.Hour))
+
+	realNow := time.Now()
+	obj := &timestampedTestObject{
+		Object: makeTestPod("foo", 2),
+		timestamps: storage.WatchEventTimestamps{
+			Received:      realNow.Add(-3 * time.Second),
+			DecodeStarted: realNow.Add(-2 * time.Second),
+			Decoded:       realNow.Add(-1 * time.Second),
+		},
+	}
+	if err := store.processEvent(watch.Event{Type: watch.Added, Object: obj}, 2); err != nil {
+		t.Fatalf("processEvent failed: %v", err)
+	}
+
+	event := store.history.cache[(store.history.endIndex-1)%store.history.capacity]
+	if _, wrapped := event.Object.(*timestampedTestObject); wrapped {
+		t.Fatal("expected the stored object to be unwrapped")
+	}
+	tl := event.timeline
+	cacheReceived := tl[metrics.PointCacheReceived]
+	// Allow for the time spent between taking realNow and processEvent reading the clocks.
+	const slack = time.Second
+	for _, tc := range []struct {
+		point metrics.DispatchPoint
+		want  time.Duration
+	}{
+		{metrics.PointStorageReceived, 3 * time.Second},
+		{metrics.PointStorageDecodeStarted, 2 * time.Second},
+		{metrics.PointStorageDecoded, 1 * time.Second},
+	} {
+		got := cacheReceived.Sub(tl[tc.point])
+		if got < tc.want || got > tc.want+slack {
+			t.Errorf("point %d: expected %v before cache receipt, got %v", tc.point, tc.want, got)
+		}
+	}
+	if !event.RecordTime.Equal(tl[metrics.PointStorageReceived]) {
+		t.Errorf("expected RecordTime %v to match PointStorageReceived %v", event.RecordTime, tl[metrics.PointStorageReceived])
+	}
+}

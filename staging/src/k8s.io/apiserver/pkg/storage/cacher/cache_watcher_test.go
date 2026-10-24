@@ -572,12 +572,14 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if !w.add(&watchCacheEvent{
 		Object:          makePod(5),
 		ResourceVersion: 5,
-		RecordTime:      fakeClock.Now().Add(-2 * time.Second),
+		RecordTime:      fakeClock.Now().Add(-4 * time.Second),
 		timeline: metrics.DispatchTimeline{
-			metrics.PointStorageDecoded:  fakeClock.Now().Add(-2 * time.Second),
-			metrics.PointCacheReceived:   fakeClock.Now().Add(-1 * time.Second),
-			metrics.PointDispatchStarted: fakeClock.Now().Add(-500 * time.Millisecond),
-			metrics.PointWatcherEnqueued: fakeClock.Now().Add(-500 * time.Millisecond),
+			metrics.PointStorageReceived:      fakeClock.Now().Add(-4 * time.Second),
+			metrics.PointStorageDecodeStarted: fakeClock.Now().Add(-3 * time.Second),
+			metrics.PointStorageDecoded:       fakeClock.Now().Add(-2 * time.Second),
+			metrics.PointCacheReceived:        fakeClock.Now().Add(-1 * time.Second),
+			metrics.PointDispatchStarted:      fakeClock.Now().Add(-500 * time.Millisecond),
+			metrics.PointWatcherEnqueued:      fakeClock.Now().Add(-500 * time.Millisecond),
 		},
 	}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
@@ -588,12 +590,14 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if !w.add(&watchCacheEvent{
 		Object:          makePod(15),
 		ResourceVersion: 15,
-		RecordTime:      fakeClock.Now().Add(-2 * time.Second),
+		RecordTime:      fakeClock.Now().Add(-4 * time.Second),
 		timeline: metrics.DispatchTimeline{
-			metrics.PointStorageDecoded:  fakeClock.Now().Add(-2 * time.Second),
-			metrics.PointCacheReceived:   fakeClock.Now().Add(-1 * time.Second),
-			metrics.PointDispatchStarted: fakeClock.Now().Add(-500 * time.Millisecond),
-			metrics.PointWatcherEnqueued: fakeClock.Now().Add(-500 * time.Millisecond),
+			metrics.PointStorageReceived:      fakeClock.Now().Add(-4 * time.Second),
+			metrics.PointStorageDecodeStarted: fakeClock.Now().Add(-3 * time.Second),
+			metrics.PointStorageDecoded:       fakeClock.Now().Add(-2 * time.Second),
+			metrics.PointCacheReceived:        fakeClock.Now().Add(-1 * time.Second),
+			metrics.PointDispatchStarted:      fakeClock.Now().Add(-500 * time.Millisecond),
+			metrics.PointWatcherEnqueued:      fakeClock.Now().Add(-500 * time.Millisecond),
 		},
 	}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
@@ -634,16 +638,25 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	}
 
 	expected := `
-# HELP apiserver_watch_events_dispatch_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.
+# HELP apiserver_watch_events_dispatch_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken down by resource type and pipeline stage. Stages: storage_to_cache (taken from the etcd client until the watch cache's reflector takes the event; the sum of the three storage_*_latency stages), storage_input_queue_latency (taken from the etcd client until decoding begins), storage_transform_decode_latency (transform, decode and in-order delivery wait), storage_output_queue_latency (decoded until the watch cache's reflector takes the event), cacher_queue_latency (watch cache processing until dispatch begins), watcher_queue_latency (enqueued to the watcher's input channel until dequeued), watcher_to_client_handler (blocked handing the event to the HTTP handler), total (taken from the etcd client until handed to the HTTP handler). The stages do not cover the whole pipeline and need not sum to total.
 # TYPE apiserver_watch_events_dispatch_duration_seconds histogram
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="cacher_queue_latency",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="cacher_queue_latency"} 1
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="cacher_queue_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_input_queue_latency",le="+Inf"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_input_queue_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_input_queue_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_output_queue_latency",le="+Inf"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_output_queue_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_output_queue_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_transform_decode_latency",le="+Inf"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_transform_decode_latency"} 2
+apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_transform_decode_latency"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_to_cache",le="+Inf"} 2
-apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_to_cache"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_to_cache"} 6
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_to_cache"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="total",le="+Inf"} 2
-apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="total"} 4
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="total"} 8
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="total"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="watcher_queue_latency",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="watcher_queue_latency"} 1
