@@ -391,13 +391,27 @@ func TestValidateFinalizersUpdate(t *testing.T) {
 			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"x/a", "y/b"}},
 			ExpectedErr: "",
 		},
+		"invalid finalizer name": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"not valid"}},
+			ExpectedErr: `Invalid value: "not valid"`,
+		},
+		"conflicting finalizers": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents}},
+			ExpectedErr: "cannot be both set",
+		},
 	}
 	for name, tc := range testcases {
 		errs := ValidateObjectMetaUpdate(&tc.New, &tc.Old, field.NewPath("field"))
-		if len(errs) == 0 {
-			if len(tc.ExpectedErr) != 0 {
-				t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
+		if len(tc.ExpectedErr) == 0 {
+			if len(errs) != 0 {
+				t.Errorf("case: %q, expected no errors, got %q", name, errs.ToAggregate().Error())
 			}
+			continue
+		}
+		if len(errs) == 0 {
+			t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
 		} else if e, a := tc.ExpectedErr, errs.ToAggregate().Error(); !strings.Contains(a, e) {
 			t.Errorf("case: %q, expected error to contain %q, got error %q", name, e, a)
 		}
