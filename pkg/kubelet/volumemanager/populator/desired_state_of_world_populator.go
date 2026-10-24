@@ -144,9 +144,13 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
 	logger := klog.FromContext(ctx)
 	logger.Info("Desired state populator starts to run")
+	// Removal does not call the API server, so it must not wait behind findAndAddNewPods.
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		dswp.findAndRemoveDeletedPods(klog.FromContext(ctx))
+	}, dswp.loopSleepDuration)
 	_ = wait.PollUntilContextCancel(ctx, dswp.loopSleepDuration, false, func(ctx context.Context) (bool, error) {
 		done := sourcesReady.AllReady()
-		dswp.populatorLoop(ctx)
+		dswp.findAndAddNewPods(ctx)
 		return done, nil
 	})
 	dswp.hasAddedPodsLock.Lock()
@@ -155,7 +159,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 		dswp.hasAddedPods = true
 	}
 	dswp.hasAddedPodsLock.Unlock()
-	wait.UntilWithContext(ctx, dswp.populatorLoop, dswp.loopSleepDuration)
+	wait.UntilWithContext(ctx, dswp.findAndAddNewPods, dswp.loopSleepDuration)
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
@@ -167,12 +171,6 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	dswp.hasAddedPodsLock.RLock()
 	defer dswp.hasAddedPodsLock.RUnlock()
 	return dswp.hasAddedPods
-}
-
-func (dswp *desiredStateOfWorldPopulator) populatorLoop(ctx context.Context) {
-	logger := klog.FromContext(ctx)
-	dswp.findAndAddNewPods(ctx)
-	dswp.findAndRemoveDeletedPods(logger)
 }
 
 // Iterate through all pods and add to desired state of world if they don't
@@ -304,6 +302,11 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 			continue
+		}
+
+		// The pod may have been removed by findAndRemoveDeletedPods while createVolumeSpec waited on the API server.
+		if dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+			return
 		}
 
 		// Add volume to desired state of world
