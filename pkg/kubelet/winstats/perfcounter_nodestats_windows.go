@@ -41,6 +41,12 @@ import (
 const (
 	bootIdRegistry = `SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters`
 	bootIdKey      = `BootId`
+
+	// machineIDRegistry is the stable per-OS-install GUID backing
+	// NodeInfo.MachineID. Like Linux's /etc/machine-id it is stable across
+	// reboots and host renames but changes on OS reinstall.
+	machineIDRegistry = `SOFTWARE\Microsoft\Cryptography`
+	machineIDKey      = `MachineGuid`
 )
 
 // MemoryStatusEx is the same as Windows structure MEMORYSTATUSEX
@@ -163,10 +169,7 @@ func (p *perfCounterNodeStatsClient) startMonitoring(logger klog.Logger) error {
 }
 
 func (p *perfCounterNodeStatsClient) getMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
+	machineID := getMachineID()
 
 	systemUUID, err := getSystemUUID()
 	if err != nil {
@@ -181,7 +184,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo(logger klog.Logger) (*cadvis
 	mi := &cadvisorapi.MachineInfo{
 		NumCores:       ProcessorCount(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
-		MachineID:      hostname,
+		MachineID:      machineID,
 		SystemUUID:     systemUUID,
 		BootID:         bootId,
 	}
@@ -295,6 +298,45 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 	perfCounterUpdatePeriodSeconds := uint64(perfCounterUpdatePeriod / time.Second)
 	cpuUsageNanoCores := ((p.cpuUsageCoreNanoSecondsCache.latestValue - p.cpuUsageCoreNanoSecondsCache.previousValue) * perfCounterUpdatePeriodSeconds) / cachePeriodSeconds
 	return cpuUsageNanoCores
+}
+
+// getMachineGuid reads the stable per-OS-install identifier stored by
+// Windows at HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid. The value is
+// returned without surrounding braces and lower-cased so it follows the same
+// textual convention as Linux /etc/machine-id (lower-case hex GUID).
+func getMachineGuid() (string, error) {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, machineIDRegistry, registry.QUERY_VALUE)
+	if err != nil {
+		return "", fmt.Errorf("failed to open registry key HKLM\\%s: %w", machineIDRegistry, err)
+	}
+	defer k.Close()
+
+	guid, _, err := k.GetStringValue(machineIDKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to read registry value %s from key HKLM\\%s: %w", machineIDKey, machineIDRegistry, err)
+	}
+	guid = strings.Trim(guid, "{}")
+	return strings.ToLower(guid), nil
+}
+
+// getMachineID returns the stable unique machine identifier used for
+// NodeInfo.MachineID on Windows. Unlike the hostname it is preserved across
+// host renames, which matches the documented contract that MachineID be a
+// stable unique identifier for the node. If the registry lookup fails we fall
+// back to the hostname so node identity still resolves and a transient
+// registry error does not prevent the kubelet from starting.
+func getMachineID() string {
+	machineID, err := getMachineGuid()
+	if err != nil {
+		klog.Errorf("failed to read machine ID from registry, using hostname: %v", err)
+		hostname, err := os.Hostname()
+		if err != nil {
+			klog.Errorf("failed to get hostname as machine ID fallback: %v", err)
+			return ""
+		}
+		return hostname
+	}
+	return machineID
 }
 
 func getSystemUUID() (string, error) {
