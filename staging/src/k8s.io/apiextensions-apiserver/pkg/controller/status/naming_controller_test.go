@@ -24,9 +24,12 @@ import (
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -344,6 +347,101 @@ func TestSync(t *testing.T) {
 				t.Errorf("expected %v, got %v", e, a)
 			}
 			if e, a := tc.expectedEstablishedCondition, establishedCondition; !apiextensionshelpers.IsCRDConditionEquivalent(&e, &a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+		})
+	}
+}
+
+func TestSyncReevaluatesNamesAccepted(t *testing.T) {
+	establishedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:   apiextensionsv1.Established,
+		Status: apiextensionsv1.ConditionTrue,
+		Reason: "InitialNamesAccepted",
+	}
+
+	tests := []struct {
+		name     string
+		in       *apiextensionsv1.CustomResourceDefinition
+		existing []*apiextensionsv1.CustomResourceDefinition
+
+		expectUpdate                  bool
+		expectedNameConflictCondition apiextensionsv1.CustomResourceDefinitionCondition
+		expectedEstablishedCondition  apiextensionsv1.CustomResourceDefinitionCondition
+	}{
+		{
+			name: "conflicting shortName removed from spec",
+			in: newCRD("alfa.bravo.com").SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				Condition(nameConflictCondition("ShortNamesConflict", `"golf-shortname" is already in use`)).
+				Condition(notEstablishedCondition).
+				NewOrDie(),
+			existing: []*apiextensionsv1.CustomResourceDefinition{
+				newCRD("india.bravo.com").StatusNames("india", "", "", "", "golf-shortname").NewOrDie(),
+			},
+			expectUpdate:                  true,
+			expectedNameConflictCondition: acceptedCondition,
+			expectedEstablishedCondition:  installingCondition,
+		},
+		{
+			name: "names already accepted",
+			in: newCRD("alfa.bravo.com").SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				Condition(acceptedCondition).
+				Condition(establishedCondition).
+				NewOrDie(),
+			expectUpdate:                  false,
+			expectedNameConflictCondition: acceptedCondition,
+			expectedEstablishedCondition:  establishedCondition,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			objs := []runtime.Object{tc.in}
+			if err := crdIndexer.Add(tc.in); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, obj := range tc.existing {
+				if err := crdIndexer.Add(obj); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				objs = append(objs, obj)
+			}
+			client := fake.NewClientset(objs...)
+
+			c := NamingConditionController{
+				crdClient:        client.ApiextensionsV1(),
+				crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
+				crdMutationCache: cache.NewIntegerResourceVersionMutationCache(logger, crdIndexer, crdIndexer, 60*time.Second, false),
+				queue:            workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+			}
+			defer c.queue.ShutDown()
+
+			if err := c.sync(ctx, tc.in.Name); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			updated := false
+			for _, action := range client.Actions() {
+				if action.Matches("update", "customresourcedefinitions") && action.GetSubresource() == "status" {
+					updated = true
+				}
+			}
+			if updated != tc.expectUpdate {
+				t.Errorf("expected status update %v, got %v", tc.expectUpdate, updated)
+			}
+
+			actual, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, tc.in.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if e, a := tc.expectedNameConflictCondition, apiextensionshelpers.FindCRDCondition(actual, apiextensionsv1.NamesAccepted); a == nil || !apiextensionshelpers.IsCRDConditionEquivalent(&e, a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			if e, a := tc.expectedEstablishedCondition, apiextensionshelpers.FindCRDCondition(actual, apiextensionsv1.Established); a == nil || !apiextensionshelpers.IsCRDConditionEquivalent(&e, a) {
 				t.Errorf("expected %v, got %v", e, a)
 			}
 		})
