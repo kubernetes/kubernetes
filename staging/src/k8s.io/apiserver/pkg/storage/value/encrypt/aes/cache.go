@@ -18,6 +18,7 @@ package aes
 
 import (
 	"bytes"
+	"hash/maphash"
 	"time"
 	"unsafe"
 
@@ -26,28 +27,55 @@ import (
 	"k8s.io/utils/clock"
 )
 
+// cacheShards is the number of independent Expiring caches the KDF cache is split into.
+// Every decrypt reads its shard under a shared lock, but a miss is followed by a Set, which takes
+// the lock exclusively and runs GC inline. With a single shard, the Sets for each new object
+// version stall every other decrypt under the same seed, which under high watch fan-out is
+// effectively every decrypt in the apiserver.
+const cacheShards = 128
+
 type simpleCache struct {
-	cache *utilcache.Expiring
-	ttl   time.Duration
+	shards []*utilcache.Expiring
+	seed   maphash.Seed
+	ttl    time.Duration
 }
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
-	cache := utilcache.NewExpiringWithClock(clock)
-	// "Stale" entries are always valid for us because the TTL is just used to prevent
-	// unbounded growth on the cache - for a given info the transformer is always the same.
-	// The key always corresponds to the exact same value, with the caveat that
-	// since we use the value.Context.AuthenticatedData to overwrite old keys,
-	// we always have to check that the info matches (to validate the transformer is correct).
-	cache.AllowExpiredGet = true
-	return &simpleCache{
-		cache: cache,
-		ttl:   ttl,
+	return newSimpleCacheWithShards(clock, ttl, cacheShards)
+}
+
+func newSimpleCacheWithShards(clock clock.Clock, ttl time.Duration, shards int) *simpleCache {
+	c := &simpleCache{shards: make([]*utilcache.Expiring, shards), seed: maphash.MakeSeed(), ttl: ttl}
+	for i := range c.shards {
+		cache := utilcache.NewExpiringWithClock(clock)
+		// "Stale" entries are always valid for us because the TTL is just used to prevent
+		// unbounded growth on the cache - for a given info the transformer is always the same.
+		// The key always corresponds to the exact same value, with the caveat that
+		// since we use the value.Context.AuthenticatedData to overwrite old keys,
+		// we always have to check that the info matches (to validate the transformer is correct).
+		cache.AllowExpiredGet = true
+		c.shards[i] = cache
 	}
+	return c
+}
+
+func (c *simpleCache) shard(key string) *utilcache.Expiring {
+	return c.shards[maphash.String(c.seed, key)%uint64(len(c.shards))]
+}
+
+// Len returns the number of entries across all shards.
+func (c *simpleCache) Len() int {
+	n := 0
+	for _, s := range c.shards {
+		n += s.Len()
+	}
+	return n
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
 func (c *simpleCache) get(info []byte, dataCtx value.Context) *transformerWithInfo {
-	val, ok := c.cache.Get(keyFunc(dataCtx))
+	key := keyFunc(dataCtx)
+	val, ok := c.shard(key).Get(key)
 	if !ok {
 		return nil
 	}
@@ -72,7 +100,15 @@ func (c *simpleCache) set(dataCtx value.Context, transformer *transformerWithInf
 	if len(transformer.info) == 0 {
 		panic("info must not be empty")
 	}
-	c.cache.Set(keyFunc(dataCtx), transformer, c.ttl)
+	key := keyFunc(dataCtx)
+	shard := c.shard(key)
+	// Many watchers decrypt the same new object version at nearly the same time and all miss.
+	// Only the first needs to store it; the rest find it under the shared read lock and skip
+	// the exclusive Set (and its inline GC).
+	if val, ok := shard.Get(key); ok && bytes.Equal(val.(*transformerWithInfo).info, transformer.info) {
+		return
+	}
+	shard.Set(key, transformer, c.ttl)
 }
 
 func keyFunc(dataCtx value.Context) string {
