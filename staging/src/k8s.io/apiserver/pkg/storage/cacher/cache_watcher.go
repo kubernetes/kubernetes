@@ -32,6 +32,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
@@ -53,10 +54,15 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+type watcherInput struct {
+	event    *watchCacheEvent
+	interval *watchCacheInterval
+}
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
+	input     chan watcherInput
 	result    chan watch.Event
 	done      chan struct{}
 	filter    watchEventFilter
@@ -110,7 +116,7 @@ func newCacheWatcher(
 		clk = clock.RealClock{}
 	}
 	return &cacheWatcher{
-		input:               make(chan *watchCacheEvent, chanSize),
+		input:               make(chan watcherInput, max(chanSize, 1)),
 		result:              make(chan watch.Event, chanSize),
 		done:                make(chan struct{}),
 		filter:              filter,
@@ -168,7 +174,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- event:
+	case c.input <- watcherInput{event: event}:
 		c.markBookmarkAfterRvAsReceived(event)
 		return true
 	default:
@@ -225,7 +231,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 
 	// OK, block sending, but only until timer fires.
 	select {
-	case c.input <- event:
+	case c.input <- watcherInput{event: event}:
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -466,22 +472,60 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval) {
+func (c *cacheWatcher) process(ctx context.Context) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
+	initialized := false
+	var resourceVersion uint64
 
-	if err := c.processInitialEvents(cacheInterval); err != nil {
-		return
+	for {
+		select {
+		case item, ok := <-c.input:
+			if !ok {
+				return
+			}
+			switch {
+			case item.interval != nil:
+				if initialized {
+					klog.ErrorS(nil, "Unexpected interval after watch was already initialized", "resource", c.groupResource, "identifier", c.identifier)
+					if consistency.PanicOnCacheInconsistency {
+						panic(fmt.Sprintf("Unexpected interval after watch was already initialized, resource: %q, identifier: %q", c.groupResource, c.identifier))
+					}
+					return
+				}
+				if err := c.processInitialEvents(item.interval); err != nil {
+					return
+				}
+				resourceVersion = item.interval.resourceVersion
+				// At this point we already start processing incoming watch events.
+				// However, the init event can still be processed because their serialization
+				// and sending to the client happens asynchrnously.
+				// TODO: As describe in the KEP, we would like to estimate that by delaying
+				//   the initialization signal proportionally to the number of events to
+				//   process, but we're leaving this to the tuning phase.
+				utilflowcontrol.WatchInitialized(ctx)
+				initialized = true
+			case item.event != nil:
+				if !initialized {
+					klog.ErrorS(nil, "Unexpected event before watch was initialized", "resource", c.groupResource, "identifier", c.identifier)
+					if consistency.PanicOnCacheInconsistency {
+						panic(fmt.Sprintf("Unexpected event before watch was initialized, resource: %q, identifier: %q", c.groupResource, c.identifier))
+					}
+					return
+				}
+				c.processEvent(item.event, resourceVersion)
+			default:
+				klog.ErrorS(nil, "Unexpected item in watch input", "resource", c.groupResource, "identifier", c.identifier)
+				if consistency.PanicOnCacheInconsistency {
+					panic(fmt.Sprintf("Unexpected item in watch input, resource: %q, identifier: %q", c.groupResource, c.identifier))
+				}
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
-	// At this point we already start processing incoming watch events.
-	// However, the init event can still be processed because their serialization
-	// and sending to the client happens asynchrnously.
-	// TODO: As describe in the KEP, we would like to estimate that by delaying
-	//   the initialization signal proportionally to the number of events to
-	//   process, but we're leaving this to the tuning phase.
-	utilflowcontrol.WatchInitialized(ctx)
-	c.processIncomingEvents(ctx, cacheInterval.resourceVersion)
 }
 
 func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) error {
@@ -540,24 +584,14 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 	return nil
 }
 
-func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersion uint64) {
-	for {
-		select {
-		case event, ok := <-c.input:
-			if !ok {
-				return
-			}
-			dequeuedAt := c.clock.Now()
-			// only send events newer than resourceVersion
-			// or a bookmark event with an RV equal to resourceVersion
-			// if we haven't sent one to the client
-			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				builtAt, sentAt := c.sendWatchCacheEvent(event)
-				c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
-			}
-		case <-ctx.Done():
-			return
-		}
+func (c *cacheWatcher) processEvent(event *watchCacheEvent, resourceVersion uint64) {
+	dequeuedAt := c.clock.Now()
+	// only send events newer than resourceVersion
+	// or a bookmark event with an RV equal to resourceVersion
+	// if we haven't sent one to the client
+	if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
+		builtAt, sentAt := c.sendWatchCacheEvent(event)
+		c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 	}
 }
 
