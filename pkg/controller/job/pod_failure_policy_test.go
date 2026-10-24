@@ -23,7 +23,10 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -811,5 +814,104 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 				t.Errorf("Unexpected failure policy action: %s", diff)
 			}
 		})
+	}
+}
+
+func TestGetFailJobMessageAndReason(t *testing.T) {
+	failedPod := func(name string, exitCode int32) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: name},
+			Status: v1.PodStatus{
+				Phase: v1.PodFailed,
+				ContainerStatuses: []v1.ContainerStatus{{
+					Name:  "main",
+					State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: exitCode}},
+				}},
+			},
+		}
+	}
+	rule := func(name *string, action batch.PodFailurePolicyAction, exitCode int32) batch.PodFailurePolicyRule {
+		return batch.PodFailurePolicyRule{
+			Name:   name,
+			Action: action,
+			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+				Values:   []int32{exitCode},
+			},
+		}
+	}
+	rules := []batch.PodFailurePolicyRule{
+		rule(new("Retriable"), batch.PodFailurePolicyActionIgnore, 1),
+		rule(new("OutOfQuota"), batch.PodFailurePolicyActionFailJob, 2),
+		rule(nil, batch.PodFailurePolicyActionFailJob, 3),
+		rule(nil, batch.PodFailurePolicyActionCount, 4),
+	}
+
+	cases := map[string]struct {
+		enableFeature bool
+		pods          []*v1.Pod
+		wantMessage   *string
+		wantReason    string
+	}{
+		"feature enabled, named FailJob rule": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("p", 2)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1"),
+			wantReason:    "PodFailurePolicy_OutOfQuota",
+		},
+		"feature enabled, unnamed FailJob rule uses the rule index": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("p", 3)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 3 matching FailJob rule at index 2"),
+			wantReason:    "PodFailurePolicy_2",
+		},
+		"feature enabled, pods matching non-FailJob rules are skipped": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("ignored", 1), failedPod("counted", 4), failedPod("p", 2)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1"),
+			wantReason:    "PodFailurePolicy_OutOfQuota",
+		},
+		"feature enabled, no FailJob match": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("ignored", 1), failedPod("counted", 4)},
+		},
+		"feature disabled, named FailJob rule uses the legacy reason": {
+			pods:        []*v1.Pod{failedPod("p", 2)},
+			wantMessage: new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1"),
+			wantReason:  batch.JobReasonPodFailurePolicy,
+		},
+		"feature disabled, unnamed FailJob rule uses the legacy reason": {
+			pods:        []*v1.Pod{failedPod("p", 3)},
+			wantMessage: new("Container main for pod default/p failed with exit code 3 matching FailJob rule at index 2"),
+			wantReason:  batch.JobReasonPodFailurePolicy,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodFailurePolicyName, tc.enableFeature)
+			job := &batch.Job{Spec: batch.JobSpec{PodFailurePolicy: &batch.PodFailurePolicy{Rules: rules}}}
+			gotMessage, gotReason := getFailJobMessageAndReason(job, tc.pods)
+			if diff := cmp.Diff(tc.wantMessage, gotMessage); diff != "" {
+				t.Errorf("Unexpected message (-want,+got):\n%s", diff)
+			}
+			if gotReason != tc.wantReason {
+				t.Errorf("Unexpected reason: want %q, got %q", tc.wantReason, gotReason)
+			}
+		})
+	}
+}
+
+func TestMetricsReason(t *testing.T) {
+	cases := map[string]string{
+		"PodFailurePolicy":            "PodFailurePolicy",
+		"PodFailurePolicy_0":          "PodFailurePolicy",
+		"PodFailurePolicy_OutOfQuota": "PodFailurePolicy",
+		"BackoffLimitExceeded":        "BackoffLimitExceeded",
+		"DeadlineExceeded":            "DeadlineExceeded",
+	}
+	for reason, want := range cases {
+		if got := metricsReason(reason); got != want {
+			t.Errorf("metricsReason(%q) = %q, want %q", reason, got, want)
+		}
 	}
 }

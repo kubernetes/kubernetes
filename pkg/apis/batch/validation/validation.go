@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +74,14 @@ const (
 	maxJobSuccessPolicySucceededIndexesLimit = 64 * 1024
 	// maximum number of rules in successPolicy.
 	maxSuccessPolicyRule = 20
+
+	// podFailurePolicyReasonPrefix prefixes the rule name (or index) in the
+	// Job Failed condition reason set by a FailJob rule.
+	podFailurePolicyReasonPrefix = batchv1.JobReasonPodFailurePolicy + "_"
+	// maxPodFailurePolicyReasonLength bounds the generated condition reason.
+	maxPodFailurePolicyReasonLength = 128
+	// maxPodFailurePolicyRuleNameLength leaves room for the reason prefix.
+	maxPodFailurePolicyRuleNameLength = maxPodFailurePolicyReasonLength - len(podFailurePolicyReasonPrefix)
 )
 
 var (
@@ -318,15 +327,25 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
 		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.PodFailurePolicy.Rules), maxPodFailurePolicyRules))
 	}
-	containerNames := sets.NewString()
+	containerNames := sets.Set[string]{}
 	for _, containerSpec := range spec.Template.Spec.Containers {
 		containerNames.Insert(containerSpec.Name)
 	}
 	for _, containerSpec := range spec.Template.Spec.InitContainers {
 		containerNames.Insert(containerSpec.Name)
 	}
+
+	ruleNames := sets.Set[string]{}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+		rulePath := rulesPath.Index(i)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulePath, containerNames)...)
+		if rule.Name != nil {
+			namePath := rulePath.Child("name")
+			allErrs = append(allErrs, ValidatePodFailurePolicyRuleName(*rule.Name, i, len(spec.PodFailurePolicy.Rules), ruleNames, namePath).MarkCoveredByDeclarative()...)
+			if len(*rule.Name) > maxPodFailurePolicyRuleNameLength {
+				allErrs = append(allErrs, field.TooLong(namePath, "", maxPodFailurePolicyRuleNameLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
+			}
+		}
 	}
 	return allErrs
 }
@@ -347,7 +366,7 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -374,6 +393,27 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 	return allErrs
 }
 
+// ValidatePodFailurePolicyRuleName checks syntax and collisions for the name
+// used in "PodFailurePolicy_<name>". The length bound is validated separately
+// by a declarative tag. Unnamed rules use their index instead.
+func ValidatePodFailurePolicyRuleName(name string, index, numRules int, seen sets.Set[string], fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(name) == 0 {
+		return append(allErrs, field.Invalid(fldPath, name, "must not be empty when set").WithOrigin("minLength"))
+	}
+	if seen.Has(name) {
+		allErrs = append(allErrs, field.Duplicate(fldPath, name))
+	}
+	seen.Insert(name)
+	if n, err := strconv.Atoi(name); err == nil && strconv.Itoa(n) == name && n != index && n >= 0 && n < numRules {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must not equal the index of another rule; a numeric name is only allowed if it equals the rule's own index (%d)", index)).WithOrigin("indexCollision"))
+	}
+	for _, msg := range unversionedvalidation.IsValidConditionReason(podFailurePolicyReasonPrefix + name) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("generated reason %q is invalid: %s", podFailurePolicyReasonPrefix+name, msg)).WithOrigin("format=condition-reason"))
+	}
+	return allErrs
+}
+
 func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFailurePolicyOnPodConditionsPattern, onPodConditionsPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(onPodConditions) > maxPodFailurePolicyOnPodConditionsPatterns {
@@ -392,7 +432,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {

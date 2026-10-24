@@ -48,6 +48,16 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	OnPodConditions []PodFailurePolicyOnPodConditionsPatternApplyConfiguration `json:"onPodConditions,omitempty"`
+	// name of the pod failure policy rule. When a rule with the FailJob action
+	// fails the Job, the Job Failed condition reason is set to
+	// `PodFailurePolicy_<name>`, or to `PodFailurePolicy_<index>` when the name
+	// is unset, where <index> is the zero-based index of the rule.
+	// The name must be non-empty, unique within the Job, must not equal the index
+	// of another rule, and the generated reason must be a valid condition reason
+	// of at most 128 characters.
+	// This field is alpha-level and is only honored by servers that enable the
+	// PodFailurePolicyName feature gate.
+	Name *string `json:"name,omitempty"`
 }
 
 // PodFailurePolicyRuleApplyConfiguration constructs a declarative configuration of the PodFailurePolicyRule type for use with
@@ -82,5 +92,13 @@ func (b *PodFailurePolicyRuleApplyConfiguration) WithOnPodConditions(values ...*
 		}
 		b.OnPodConditions = append(b.OnPodConditions, *values[i])
 	}
+	return b
+}
+
+// WithName sets the Name field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *PodFailurePolicyRuleApplyConfiguration) WithName(value string) *PodFailurePolicyRuleApplyConfiguration {
+	b.Name = &value
 	return b
 }

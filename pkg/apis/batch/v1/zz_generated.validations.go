@@ -532,7 +532,36 @@ func Validate_JobSpec(
 		errs = append(errs, fn(fldPath.Child("activeDeadlineSeconds"), obj.ActiveDeadlineSeconds, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.JobSpec.PodFailurePolicy has no validation
+	{ // field batchv1.JobSpec.PodFailurePolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.PodFailurePolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodFailurePolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *batchv1.PodFailurePolicy {
+				return oldObj.PodFailurePolicy
+			})
+		errs = append(errs, fn(fldPath.Child("podFailurePolicy"), obj.PodFailurePolicy, oldVal, oldObj != nil)...)
+	}
+
 	// field batchv1.JobSpec.SuccessPolicy has no validation
 
 	{ // field batchv1.JobSpec.BackoffLimit
@@ -764,6 +793,95 @@ func Validate_JobTemplateSpec(
 				return &oldObj.Spec
 			})
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_PodFailurePolicy validates an instance of PodFailurePolicy according
+// to declarative validation rules in the API schema.
+func Validate_PodFailurePolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.PodFailurePolicy) (errs field.ErrorList) {
+
+	{ // field batchv1.PodFailurePolicy.Rules
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []batchv1.PodFailurePolicyRule,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// custom validation
+			if e := ValidateCustom_PodFailurePolicy_Rules(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PodFailurePolicyRule); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.PodFailurePolicy) []batchv1.PodFailurePolicyRule {
+				return oldObj.Rules
+			})
+		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_PodFailurePolicyRule validates an instance of PodFailurePolicyRule according
+// to declarative validation rules in the API schema.
+func Validate_PodFailurePolicyRule(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.PodFailurePolicyRule) (errs field.ErrorList) {
+
+	// field batchv1.PodFailurePolicyRule.Action has no validation
+	// field batchv1.PodFailurePolicyRule.OnExitCodes has no validation
+	// field batchv1.PodFailurePolicyRule.OnPodConditions has no validation
+
+	{ // field batchv1.PodFailurePolicyRule.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 111).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.PodFailurePolicyRule) *string {
+				return oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), obj.Name, oldVal, oldObj != nil)...)
 	}
 
 	return errs

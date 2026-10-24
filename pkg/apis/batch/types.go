@@ -245,6 +245,19 @@ type PodFailurePolicyRule struct {
 	// +listType=atomic
 	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern
+
+	// Name of the pod failure policy rule. When a rule with the FailJob action
+	// fails the Job, the Job Failed condition reason is set to
+	// `PodFailurePolicy_<name>`, or to `PodFailurePolicy_<index>` when the name
+	// is unset, where <index> is the zero-based index of the rule.
+	// The name must be non-empty, unique within the Job, must not equal the index
+	// of another rule, and the generated reason must be a valid condition reason
+	// of at most 128 characters.
+	// This field is alpha-level and is only honored by servers that enable the
+	// PodFailurePolicyName feature gate.
+	// +featureGate=PodFailurePolicyName
+	// +optional
+	Name *string
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
