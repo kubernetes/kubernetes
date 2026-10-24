@@ -639,7 +639,7 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 	// Input fields for CSI GetCapacity are immutable.
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
 	if !apiequality.Semantic.DeepEqual(capacity.NodeTopology, oldCapacity.NodeTopology) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable").WithOrigin("immutable").MarkCoveredByDeclarative())
 	}
 	if capacity.StorageClassName != oldCapacity.StorageClassName {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable"))
