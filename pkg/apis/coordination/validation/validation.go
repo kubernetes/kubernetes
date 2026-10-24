@@ -112,7 +112,7 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 	}
 	bv := semver.Version{}
 	if spec.BinaryVersion == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("binaryVersion"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("binaryVersion"), "").MarkCoveredByDeclarative())
 	} else {
 		var err error
 		bv, err = semver.Parse(spec.BinaryVersion)
