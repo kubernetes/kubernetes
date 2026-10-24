@@ -794,6 +794,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					delayHandler:      delayFn,
 					clock:             fakeClock,
 					watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+					metrics:           newReflectorMetrics(InformerNameAndResource{}, nil),
 				}
 				start := fakeClock.Now()
 				err := r.ListAndWatchWithContext(ctx)
@@ -930,6 +931,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		delayHandler:      fd.delayFunc,
 		clock:             clock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+		metrics:           newReflectorMetrics(InformerNameAndResource{}, nil),
 	}
 
 	stopCh := make(chan struct{})
@@ -971,6 +973,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 		delayHandler:      fd.delayFunc,
 		clock:             clock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+		metrics:           newReflectorMetrics(InformerNameAndResource{}, nil),
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -1046,6 +1049,7 @@ func TestRetryInternalError(t *testing.T) {
 			delayHandler:      fd.delayFunc,
 			clock:             fakeClock,
 			watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+			metrics:           newReflectorMetrics(InformerNameAndResource{}, nil),
 		}
 
 		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration

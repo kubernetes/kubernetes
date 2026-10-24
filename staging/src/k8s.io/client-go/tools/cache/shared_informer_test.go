@@ -1577,3 +1577,55 @@ func TestShutDownEventHandler_Lifecycles(t *testing.T) {
 		}
 	})
 }
+
+type fakeListDurationMetric struct {
+	verb     string
+	observed chan<- string
+}
+
+func (m fakeListDurationMetric) Observe(float64) {
+	m.observed <- m.verb
+}
+
+type fakeListDurationMetricsProvider struct {
+	noopInformerMetricsProvider
+	observed chan<- string
+}
+
+func (p fakeListDurationMetricsProvider) NewListDurationMetric(_ InformerNameAndResource, verb string) HistogramMetric {
+	return fakeListDurationMetric{verb: verb, observed: p.observed}
+}
+
+func TestSharedInformerListDurationMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+
+	informerName, err := NewInformerName("shared-informer-list-duration")
+	require.NoError(t, err)
+	defer informerName.Release()
+
+	observed := make(chan string, 1)
+
+	source := fcache.NewFakeControllerSource()
+	defer source.Shutdown()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	informer := NewSharedIndexInformerWithOptions(source, &v1.Pod{}, SharedIndexInformerOptions{
+		Identifier:              informerName.WithResource(v1.SchemeGroupVersion.WithResource("pods")),
+		InformerMetricsProvider: fakeListDurationMetricsProvider{observed: observed},
+	})
+	var wg wait.Group
+	wg.StartWithContext(ctx, informer.RunWithContext)
+	defer wg.Wait()
+	defer cancel()
+
+	select {
+	case <-observed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for the list duration to be observed")
+	}
+	select {
+	case verb := <-observed:
+		t.Fatalf("unexpected second list duration observation with verb %q", verb)
+	default:
+	}
+}

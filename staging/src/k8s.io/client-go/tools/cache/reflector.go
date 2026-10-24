@@ -168,6 +168,8 @@ type Reflector struct {
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
 	useWatchList bool
+	// metrics are published only if ReflectorOptions.Identifier is reserved.
+	metrics *reflectorMetrics
 }
 
 func (r *Reflector) Name() string {
@@ -281,6 +283,14 @@ type ReflectorOptions struct {
 	// DelayWithReset(clock, resetDuration) will be called on it to create the delay function.
 	// TODO(#136943): Expose this configuration through SharedInformerFactory.
 	Backoff *wait.Backoff
+
+	// Identifier is used to identify the reflector for metrics purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// InformerMetricsProvider is the metrics provider for the reflector.
+	// If not set, the provider registered via SetInformerMetricsProvider is used.
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -337,6 +347,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		clock:             reflectorClock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 		expectedType:      reflect.TypeOf(expectedType),
+		metrics:           newReflectorMetrics(options.Identifier, options.InformerMetricsProvider),
 	}
 
 	if r.name == "" {
@@ -473,6 +484,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	var err error
 	var w watch.Interface
 	fallbackToList := !r.useWatchList
+	listStart := r.clock.Now()
 
 	defer func() {
 		if w != nil {
@@ -502,6 +514,14 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if ctx.Err() == nil {
+		listDuration := r.metrics.watchListDuration
+		if fallbackToList {
+			listDuration = r.metrics.listDuration
+		}
+		listDuration.Observe(r.clock.Since(listStart).Seconds())
 	}
 
 	logger.V(2).Info("Caches populated", "type", r.typeDescription, "reflector", r.name)

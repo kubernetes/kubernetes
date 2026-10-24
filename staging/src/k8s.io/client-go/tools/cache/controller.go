@@ -99,6 +99,14 @@ type Config struct {
 
 	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
 	WatchListPageSize int64
+
+	// Identifier is used to identify the reflector for metrics purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// InformerMetricsProvider is the metrics provider for the reflector.
+	// If not set, the provider registered via SetInformerMetricsProvider is used.
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -181,11 +189,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
-			Logger:          &logger,
-			ResyncPeriod:    c.config.FullResyncPeriod,
-			MinWatchTimeout: c.config.MinWatchTimeout,
-			TypeDescription: c.config.ObjectDescription,
-			Clock:           c.clock,
+			Logger:                  &logger,
+			ResyncPeriod:            c.config.FullResyncPeriod,
+			MinWatchTimeout:         c.config.MinWatchTimeout,
+			TypeDescription:         c.config.ObjectDescription,
+			Clock:                   c.clock,
+			Identifier:              c.config.Identifier,
+			InformerMetricsProvider: c.config.InformerMetricsProvider,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync
@@ -1059,6 +1069,9 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 		ObjectType:       options.ObjectType,
 		FullResyncPeriod: options.ResyncPeriod,
 		MinWatchTimeout:  options.MinWatchTimeout,
+
+		Identifier:              options.Identifier,
+		InformerMetricsProvider: options.InformerMetricsProvider,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {

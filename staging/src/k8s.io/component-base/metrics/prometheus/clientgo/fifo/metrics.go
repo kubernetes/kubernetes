@@ -55,6 +55,16 @@ var (
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	listDuration = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "list_duration_seconds",
+			Help:           "Time taken by the reflector to fetch the initial state (via LIST or WatchList) and replace the contents of the store.",
+			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource", "verb"},
+	)
 	registerOnce sync.Once
 )
 
@@ -81,6 +91,7 @@ func Register() {
 		legacyregistry.MustRegister(fifoQueuedItems)
 		legacyregistry.MustRegister(fifoProcessingLatency)
 		legacyregistry.MustRegister(storeResourceVersion)
+		legacyregistry.MustRegister(listDuration)
 	})
 	cache.SetInformerMetricsProvider(informerMetricsProvider{})
 }
@@ -122,6 +133,20 @@ func (informerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNa
 			id.GroupVersionResource().Group,
 			id.GroupVersionResource().Version,
 			id.GroupVersionResource().Resource,
+		),
+	}
+}
+
+func (informerMetricsProvider) NewListDurationMetric(id cache.InformerNameAndResource, verb string) cache.HistogramMetric {
+	Register()
+	return &reservedHistogramMetric{
+		id: id,
+		histogram: listDuration.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+			verb,
 		),
 	}
 }
