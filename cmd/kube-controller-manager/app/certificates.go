@@ -380,11 +380,7 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 
 func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
-		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
-		if err != nil {
-			return nil, err
-		}
-		return config.CAData, nil
+		return controllerContext.KubeAPIServerCAData, nil
 	}
 
 	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)
@@ -392,5 +388,4 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 	}
 	return rootCA, nil
-
 }

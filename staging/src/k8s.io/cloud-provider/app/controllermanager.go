@@ -476,7 +476,10 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 	versionedClient := clientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
-	metadataClient := metadata.NewForConfigOrDie(clientBuilder.ConfigOrDie("metadata-informers"))
+	metadataClient, err := newMetadataClient(clientBuilder, "metadata-informers")
+	if err != nil {
+		return genericcontrollermanager.ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
+	}
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -505,6 +508,20 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 	}
 	controllersmetrics.Register()
 	return ctx, nil
+}
+
+// newMetadataClient builds a metadata client through the builder. Builders
+// from outside the tree may predate TypedClientBuilder, in which case the
+// deprecated config path is the only option.
+func newMetadataClient(clientBuilder clientbuilder.ControllerClientBuilder, name string) (metadata.Interface, error) {
+	if typed, ok := clientBuilder.(clientbuilder.TypedClientBuilder); ok {
+		return typed.MetadataClient(name)
+	}
+	config, err := clientBuilder.Config(name) //nolint:forbidigo // see above
+	if err != nil {
+		return nil, err
+	}
+	return metadata.NewForConfig(config)
 }
 
 // ResyncPeriod returns a function which generates a duration each time it is
