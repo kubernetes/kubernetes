@@ -32,6 +32,7 @@ import (
 	controllermanagerconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	configv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/controller/apis/config"
+	podcertssignerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config/v1alpha1"
 	signerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
@@ -230,6 +231,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := serviceconfigv1alpha1.Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
 		return err
 	}
+	if err := podcertssignerconfigv1alpha1.Convert_v1alpha1_ServiceServingSignerConfiguration_To_config_ServiceServingSignerConfiguration(&in.ServiceServingSigner, &out.ServiceServingSigner, s); err != nil {
+		return err
+	}
 	if err := ttlafterfinishedconfigv1alpha1.Convert_v1alpha1_TTLAfterFinishedControllerConfiguration_To_config_TTLAfterFinishedControllerConfiguration(&in.TTLAfterFinishedController, &out.TTLAfterFinishedController, s); err != nil {
 		return err
 	}
@@ -333,6 +337,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := serviceaccountconfigv1alpha1.Convert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(&in.SAController, &out.SAController, s); err != nil {
+		return err
+	}
+	if err := podcertssignerconfigv1alpha1.Convert_config_ServiceServingSignerConfiguration_To_v1alpha1_ServiceServingSignerConfiguration(&in.ServiceServingSigner, &out.ServiceServingSigner, s); err != nil {
 		return err
 	}
 	if err := serviceconfigv1alpha1.Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {

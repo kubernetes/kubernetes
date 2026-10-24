@@ -21,6 +21,7 @@ import (
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cmconfig "k8s.io/controller-manager/config"
+	podcertssignerconfig "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
@@ -136,6 +137,9 @@ type KubeControllerManagerConfiguration struct {
 	// SAControllerConfiguration holds configuration for ServiceAccountController
 	// related features.
 	SAController serviceaccountconfig.SAControllerConfiguration
+	// ServiceServingSigner holds configuration for ServiceServingSigner controller
+	// related features.
+	ServiceServingSigner podcertssignerconfig.ServiceServingSignerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController serviceconfig.ServiceControllerConfiguration
