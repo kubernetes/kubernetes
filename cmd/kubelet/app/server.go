@@ -891,6 +891,14 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 
+		var systemPartition *cm.SystemPartitionConfig
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSystemPartition) {
+			systemPartition, err = parseSystemPartition(logger, machineInfo, s.SystemPartition)
+			if err != nil {
+				return fmt.Errorf("systemPartition in kubelet config failed to parse: %w", err)
+			}
+		}
+
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
@@ -960,6 +968,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				TopologyManagerPolicy:        s.TopologyManagerPolicy,
 				TopologyManagerScope:         s.TopologyManagerScope,
 				TopologyManagerPolicyOptions: topologyManagerPolicyOptions,
+				SystemPartition:              systemPartition,
 			},
 			s.FailSwapOn,
 			kubeDeps.Recorder,
@@ -1445,6 +1454,63 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		}
 	}
 	return rl, nil
+}
+
+// parseSystemPartition parses the system partition section of the kubelet
+// configuration into its internal form. The CPU topology is only discovered
+// when a cpuset is configured.
+func parseSystemPartition(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, sp *kubeletconfiginternal.SystemPartitionConfiguration) (*cm.SystemPartitionConfig, error) {
+	if sp == nil {
+		return nil, nil
+	}
+	parsed := &cm.SystemPartitionConfig{
+		Namespaces: sets.New(sp.Namespaces...),
+	}
+	var memoryLimit resource.Quantity
+	if sp.MemoryLimit != "" {
+		q, err := resource.ParseQuantity(sp.MemoryLimit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse memoryLimit %q: %w", sp.MemoryLimit, err)
+		}
+		memoryLimit = q
+		limit := q.Value()
+		parsed.MemoryLimit = &limit
+	}
+	thresholds, err := eviction.ParseSystemPartitionThresholds(sp.EvictionHard)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse evictionHard %q: %w", sp.EvictionHard, err)
+	}
+	// The memory left in the partition is measured against memoryLimit, so
+	// there is nothing to measure without one.
+	if len(sp.EvictionHard) > 0 && parsed.MemoryLimit == nil {
+		return nil, fmt.Errorf("evictionHard requires memoryLimit to be set")
+	}
+	for _, threshold := range thresholds {
+		// A threshold at or above the limit is met all the time, and would keep
+		// evicting the partition's Pods however little they use.
+		if q := evictionapi.GetThresholdQuantity(threshold.Value, &memoryLimit); q.Cmp(memoryLimit) >= 0 {
+			return nil, fmt.Errorf("evictionHard %v %q must be less than memoryLimit %q", evictionapi.SignalMemoryAvailable, sp.EvictionHard[string(evictionapi.SignalMemoryAvailable)], sp.MemoryLimit)
+		}
+	}
+	parsed.EvictionThresholds = thresholds
+	if sp.CPUSet != "" {
+		cpus, err := cpuset.Parse(sp.CPUSet)
+		if err != nil {
+			return nil, fmt.Errorf("cpuSet %q: %w", sp.CPUSet, err)
+		}
+		// Config validation can't see the node's CPUs, so catch a cpuset with
+		// missing CPUs here rather than as a cgroup write error.
+		topo, err := topology.Discover(logger, machineInfo)
+		if err != nil {
+			return nil, fmt.Errorf("unable to discover CPU topology info: %w", err)
+		}
+		online := topo.CPUDetails.CPUs()
+		if !cpus.IsSubsetOf(online) {
+			return nil, fmt.Errorf("cpuSet %q is not a subset of online CPUs %q, CPUs %s are not online", sp.CPUSet, online.String(), cpus.Difference(online))
+		}
+		parsed.CPUSet = cpus
+	}
+	return parsed, nil
 }
 
 func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {

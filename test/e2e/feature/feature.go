@@ -307,6 +307,12 @@ var (
 	// Node Problem Detect e2e tests in tree.
 	NodeProblemDetector = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
 
+	// Owner: sig-node
+	// Marks tests that exercise the node's system partition. They restart the
+	// kubelet with the NodeSystemPartition feature gate and a systemPartition
+	// configuration.
+	NodeSystemPartition = framework.WithFeature(framework.ValidFeatures.Add("NodeSystemPartition"))
+
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))

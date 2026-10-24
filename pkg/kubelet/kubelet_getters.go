@@ -319,6 +319,13 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 	return kl.containerManager.GetPodCgroupRoot()
 }
 
+// GetSystemPartitionCgroupRoot returns the literal cgroupfs value for the cgroup
+// containing the system partition's pods, or an empty string when the node has no
+// system partition.
+func (kl *Kubelet) GetSystemPartitionCgroupRoot() string {
+	return kl.containerManager.GetSystemPartitionCgroupRoot()
+}
+
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
 func (kl *Kubelet) getHostIPsAnyWay(ctx context.Context) ([]net.IP, error) {

@@ -19,16 +19,20 @@ limitations under the License.
 package cm
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestIsCgroupPod(t *testing.T) {
@@ -292,6 +296,197 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+// testQOSContainersInfo returns the default partition QoS roots under cgroupRoot.
+func testQOSContainersInfo(cgroupRoot CgroupName) QOSContainersInfo {
+	return QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+func TestGetPodContainerNameWithSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cgroupRoot := NewCgroupName(RootCgroupName, "kubepods")
+	defaultQOS := testQOSContainersInfo(cgroupRoot)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	partition := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+	burstable := newPartitionTestPod("kube-system", "100m/64Mi", "")
+	guaranteed := newPartitionTestPod("kube-system", "100m/64Mi", "100m/64Mi")
+	userPod := newPartitionTestPod(metav1.NamespaceDefault, "100m/64Mi", "")
+
+	tests := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		pod             *v1.Pod
+		wantParent      CgroupName
+	}{
+		{
+			name:       "no partition",
+			pod:        burstable,
+			wantParent: NewCgroupName(RootCgroupName, "kubepods", "burstable"),
+		},
+		{
+			name:            "pod of the partition",
+			systemPartition: partition,
+			pod:             burstable,
+			wantParent:      NewCgroupName(RootCgroupName, "kubepods", "system", "burstable"),
+		},
+		{
+			name:            "guaranteed pod of the partition sits under the partition root",
+			systemPartition: partition,
+			pod:             guaranteed,
+			wantParent:      NewCgroupName(RootCgroupName, "kubepods", "system"),
+		},
+		{
+			name:            "pod outside the partition",
+			systemPartition: partition,
+			pod:             userPod,
+			wantParent:      NewCgroupName(RootCgroupName, "kubepods", "burstable"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &podContainerManagerImpl{
+				cgroupManager:           NewCgroupManager(logger, nil, "cgroupfs"),
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         tt.systemPartition,
+			}
+			gotName, _ := m.GetPodContainerName(tt.pod)
+			require.Equal(t, NewCgroupName(tt.wantParent, GetPodCgroupNameSuffix(tt.pod.UID)), gotName)
+		})
+	}
+}
+
+func TestIsPodCgroupInSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cgroupRoot := NewCgroupName(RootCgroupName, "kubepods")
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	podUID := types.UID("123")
+
+	testCases := []struct {
+		name    string
+		input   CgroupName
+		wantUID types.UID
+	}{
+		{name: "partition root", input: systemQOS.Guaranteed},
+		{name: "partition burstable root", input: systemQOS.Burstable},
+		{name: "partition besteffort root", input: systemQOS.BestEffort},
+		{
+			name:    "guaranteed pod",
+			input:   NewCgroupName(systemQOS.Guaranteed, GetPodCgroupNameSuffix(podUID)),
+			wantUID: podUID,
+		},
+		{
+			name:    "besteffort pod",
+			input:   NewCgroupName(systemQOS.BestEffort, GetPodCgroupNameSuffix(podUID)),
+			wantUID: podUID,
+		},
+		{
+			// The partition's roots are as deep as the default partition's, and
+			// must not keep its pods from being found.
+			name:    "burstable pod outside the partition",
+			input:   NewCgroupName(cgroupRoot, "burstable", GetPodCgroupNameSuffix(podUID)),
+			wantUID: podUID,
+		},
+		{
+			name:  "container of a pod in the partition",
+			input: NewCgroupName(systemQOS.Burstable, GetPodCgroupNameSuffix(podUID), "container.scope"),
+		},
+	}
+	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
+		// Without a configured partition, so that the orphan cleanup still
+		// finds the pod cgroups an earlier one left behind.
+		m := &podContainerManagerImpl{
+			cgroupManager:           NewCgroupManager(logger, nil, cgroupDriver),
+			qosContainersInfo:       testQOSContainersInfo(cgroupRoot),
+			systemQOSContainersInfo: systemQOS,
+		}
+		for _, tc := range testCases {
+			t.Run(cgroupDriver+"/"+tc.name, func(t *testing.T) {
+				name := tc.input.ToCgroupfs()
+				if cgroupDriver == "systemd" {
+					name = tc.input.ToSystemd()
+				}
+				isPod, uid := m.IsPodCgroup(name)
+				require.Equal(t, tc.wantUID != "", isPod)
+				require.Equal(t, tc.wantUID, uid)
+			})
+		}
+	}
+}
+
+// destroyRecordingCgroupManager records the cgroups it is asked to destroy.
+type destroyRecordingCgroupManager struct {
+	fakeCgroupManager
+	destroyed []CgroupName
+}
+
+func (m *destroyRecordingCgroupManager) Destroy(_ klog.Logger, config *CgroupConfig) error {
+	m.destroyed = append(m.destroyed, config.Name)
+	return nil
+}
+
+func TestRemoveStalePodCgroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cgroupRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	defaultQOS := testQOSContainersInfo(cgroupRoot)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	partition := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+	systemPod := newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi")
+	userPod := newPartitionTestPod(metav1.NamespaceDefault, "100m/64Mi", "200m/128Mi")
+
+	cases := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		pod             *v1.Pod
+		// leftover is the pod cgroup left in the other partition, if any.
+		leftover *CgroupName
+	}{
+		{
+			name:            "a pod moved into the partition leaves its default cgroup behind",
+			systemPartition: partition,
+			pod:             systemPod,
+			leftover:        new(podCgroupNameIn(defaultQOS, systemPod)),
+		},
+		{
+			name:     "a pod moved out of the partition leaves its partition cgroup behind",
+			pod:      systemPod,
+			leftover: new(podCgroupNameIn(systemQOS, systemPod)),
+		},
+		{
+			name:            "nothing is destroyed when no cgroup is left in the other partition",
+			systemPartition: partition,
+			pod:             userPod,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mountPoint := t.TempDir()
+			if tc.leftover != nil {
+				require.NoError(t, os.MkdirAll(filepath.Join(mountPoint, tc.leftover.ToCgroupfs()), 0o755))
+			}
+			cgroupManager := &destroyRecordingCgroupManager{}
+			m := &podContainerManagerImpl{
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         tc.systemPartition,
+				subsystems:              &CgroupSubsystems{MountPoints: map[string]string{"memory": mountPoint}},
+				cgroupManager:           cgroupManager,
+			}
+
+			m.removeStalePodCgroup(logger, tc.pod)
+
+			if tc.leftover == nil {
+				require.Empty(t, cgroupManager.destroyed, "Destroy should not be called without a leftover cgroup")
+				return
+			}
+			require.Equal(t, []CgroupName{*tc.leftover}, cgroupManager.destroyed)
 		})
 	}
 }
