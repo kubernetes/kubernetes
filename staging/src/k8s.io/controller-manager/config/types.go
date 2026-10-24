@@ -35,6 +35,8 @@ type GenericControllerManagerConfiguration struct {
 	// settings for the proxy server to use when communicating with the apiserver.
 	ClientConnection componentbaseconfig.ClientConnectionConfiguration
 	// How long to wait between starting controller managers
+	//
+	// Deprecated: There is no wait interval between starting controllers anymore.
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection componentbaseconfig.LeaderElectionConfiguration
