@@ -20,3 +20,8 @@ Things go/types errors on that go build doesn't:
     - type checking mismatches between staging and generated types
 Things go build fails on that we don't:
   - CGo errors, including syntax and linker errors.
+
+With --portable, the dependency closure of the given packages must compile
+the same files on every platform (workspace modules only). e2e.test is built
+on macOS and Windows to test Linux clusters, so nothing it links may have
+platform-specific files.

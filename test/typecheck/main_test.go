@@ -51,6 +51,37 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+func TestPortable(t *testing.T) {
+	setEnvVars(t)
+
+	tcs := []struct {
+		path   string
+		pkg    string
+		expect bool // check fails
+	}{
+		{"./testdata/good", "k8s.io/kubernetes/test/typecheck/testdata/good", false},
+		{"./testdata/portable", "k8s.io/kubernetes/test/typecheck/testdata/portable", true},
+	}
+	plats := []string{"linux/amd64", "windows/amd64"}
+
+	for _, tc := range tcs {
+		portability = &portabilityCheck{
+			roots:  map[string]bool{tc.pkg: true},
+			files:  map[string]map[string][]string{},
+			parent: map[string]map[string]string{},
+		}
+		for _, plat := range plats {
+			if _, err := verify(plat, []string{tc.path}, nil); err != nil {
+				t.Fatalf("%s: unexpected error: %v", tc.path, err)
+			}
+		}
+		if got := portability.check(plats); got != tc.expect {
+			t.Errorf("%s: check() = %v, expected %v", tc.path, got, tc.expect)
+		}
+	}
+	portability = nil
+}
+
 func setEnvVars(t testing.TB) {
 	t.Helper()
 	if *goBinary != "" {
