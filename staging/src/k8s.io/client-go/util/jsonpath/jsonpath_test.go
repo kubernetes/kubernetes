@@ -613,6 +613,27 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 	)
 }
 
+func TestFilterNullArray(t *testing.T) {
+	var input = []byte(`{
+		"items": [
+			{"name": "a", "subjects": null},
+			{"name": "b", "subjects": [{"kind": "Group", "name": "g1"}, {"kind": "User", "name": "u1"}]}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []jsonpathTest{
+		{"filter skips null array", `{.items[*].subjects[?(@.kind=="Group")].name}`, data, "g1", false},
+		{"filter on null array only", `{.items[0].subjects[?(@.kind=="Group")].name}`, data, "", false},
+	}
+	testJSONPath(tests, true, t)
+	testJSONPath(tests, false, t)
+}
+
 func TestNegativeIndex(t *testing.T) {
 	var input = []byte(
 		`{
