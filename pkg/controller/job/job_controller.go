@@ -1848,15 +1848,22 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 		var indexesToAdd []int
 		if isIndexedJob(job) {
-			indexesToAdd = firstPendingIndexes(jobCtx, int(diff), int(*job.Spec.Completions))
+			indexesToAdd = pendingIndexes(jobCtx, int(*job.Spec.Completions))
+			if len(indexesToAdd) == 0 {
+				// No pending indexes (e.g. only terminating pods still hold slots under
+				// PodReplacementPolicy=Failed). Wait for pod events; do not backoff-requeue.
+				return active, metrics.JobSyncActionPodsCreated, nil
+			}
 			if hasBackoffLimitPerIndex(job) {
-				indexesToAdd, remainingTime = jm.getPodCreationInfoForIndependentIndexes(logger, indexesToAdd, jobCtx.podsWithDelayedDeletionPerIndex)
+				indexesToAdd, remainingTime = jm.getPodCreationInfoForIndependentIndexes(logger, indexesToAdd, jobCtx.podsWithDelayedDeletionPerIndex, int(diff))
 				if remainingTime > 0 {
 					jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
 					// No pods were created or deleted, so return the current
 					// active count rather than 0 (see comment above).
 					return active, metrics.JobSyncActionPodsCreated, nil
 				}
+			} else if len(indexesToAdd) > int(diff) {
+				indexesToAdd = indexesToAdd[:diff]
 			}
 			diff = int32(len(indexesToAdd))
 		}
@@ -1971,16 +1978,20 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 	return active, metrics.JobSyncActionTracking, nil
 }
 
-// getPodCreationInfoForIndependentIndexes returns a sub-list of all indexes
-// to create that contains those which can be already created. In case no indexes
-// are ready to create pods, it returns the lowest remaining time to create pods
-// out of all indexes.
-func (jm *Controller) getPodCreationInfoForIndependentIndexes(logger klog.Logger, indexesToAdd []int, podsWithDelayedDeletionPerIndex map[int]*v1.Pod) ([]int, time.Duration) {
+// getPodCreationInfoForIndependentIndexes returns up to maxReady indexes from
+// indexesToAdd that can be created now (not still in per-index backoff). Indexes
+// still in backoff are skipped so a delayed lower index does not block higher
+// ones. If none are ready, it returns the soonest remaining backoff among the
+// indexes considered.
+func (jm *Controller) getPodCreationInfoForIndependentIndexes(logger klog.Logger, indexesToAdd []int, podsWithDelayedDeletionPerIndex map[int]*v1.Pod, maxReady int) ([]int, time.Duration) {
 	var indexesToAddNow []int
 	var minRemainingTimePerIndex *time.Duration
 	for _, indexToAdd := range indexesToAdd {
 		if remainingTimePerIndex := getRemainingTimePerIndex(logger, jm.clock, DefaultJobPodFailureBackOff, MaxJobPodFailureBackOff, podsWithDelayedDeletionPerIndex[indexToAdd]); remainingTimePerIndex == 0 {
 			indexesToAddNow = append(indexesToAddNow, indexToAdd)
+			if len(indexesToAddNow) == maxReady {
+				break
+			}
 		} else if minRemainingTimePerIndex == nil || remainingTimePerIndex < *minRemainingTimePerIndex {
 			minRemainingTimePerIndex = &remainingTimePerIndex
 		}
