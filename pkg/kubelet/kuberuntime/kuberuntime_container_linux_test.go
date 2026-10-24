@@ -1916,6 +1916,104 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 	}
 }
 
+func TestGenerateLinuxContainerResourcesOOMScoreAdjTieBreak(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	const Gi = int64(1024 * 1024 * 1024)
+	// A 16Gi node needs no request-size nudge, so only the bonus for
+	// containers that cannot exceed their request (1 point) shows up.
+	m.machineInfo.MemoryCapacity = uint64(16 * Gi)
+	setCgroupVersionDuringTest(cgroupV2)
+	m.getSwapControllerAvailable = func() bool { return false }
+	m.singleProcessOOMKill = new(false)
+
+	mem := func(q string) v1.ResourceList { return v1.ResourceList{v1.ResourceMemory: resource.MustParse(q)} }
+	claim := func(containers ...string) []v1.NodeAllocatableResourceClaimStatus {
+		return []v1.NodeAllocatableResourceClaimStatus{{
+			ResourceClaimName: "claim",
+			Containers:        containers,
+			Mapping:           []v1.NodeAllocatableMappedResources{{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("4Gi"))}},
+		}}
+	}
+
+	tests := []struct {
+		name          string
+		tieBreak      bool
+		podResources  *v1.ResourceRequirements
+		c1Resources   v1.ResourceRequirements
+		claimStatuses []v1.NodeAllocatableResourceClaimStatus
+		expected      int64
+	}{
+		{
+			name:        "gate off, request equals limit",
+			c1Resources: v1.ResourceRequirements{Requests: mem("1Gi"), Limits: mem("1Gi")},
+			expected:    938,
+		},
+		{
+			name:        "request equals limit gets the bonus",
+			tieBreak:    true,
+			c1Resources: v1.ResourceRequirements{Requests: mem("1Gi"), Limits: mem("1Gi")},
+			expected:    937,
+		},
+		{
+			name:        "unlimited container gets no bonus",
+			tieBreak:    true,
+			c1Resources: v1.ResourceRequirements{Requests: mem("1Gi")},
+			expected:    938,
+		},
+		{
+			// Effective request is 1Gi + 4Gi = 5Gi, cgroup limit is 1Gi + 4Gi = 5Gi.
+			name:          "unshared DRA memory claim keeps the bonus",
+			tieBreak:      true,
+			c1Resources:   v1.ResourceRequirements{Requests: mem("1Gi"), Limits: mem("1Gi")},
+			claimStatuses: claim("c1"),
+			expected:      687,
+		},
+		{
+			// Effective request is 1Gi + 4Gi/2 = 3Gi, but the cgroup limit is
+			// 1Gi + 4Gi = 5Gi, so the container can exceed its request.
+			name:          "shared DRA memory claim loses the bonus",
+			tieBreak:      true,
+			c1Resources:   v1.ResourceRequirements{Requests: mem("1Gi"), Limits: mem("1Gi")},
+			claimStatuses: claim("c1", "c2"),
+			expected:      813,
+		},
+		{
+			// No container limit, so the 4Gi pod-level limit applies, which is
+			// above the container's 2Gi share of the pod-level request.
+			name:         "pod-level limit above the container's share gets no bonus",
+			tieBreak:     true,
+			podResources: &v1.ResourceRequirements{Requests: mem("4Gi"), Limits: mem("4Gi")},
+			expected:     875,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletOOMScoreAdjTieBreak, tc.tieBreak)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "bar"},
+				Spec: v1.PodSpec{
+					Resources: tc.podResources,
+					Containers: []v1.Container{
+						{Name: "c1", Image: "busybox", Resources: tc.c1Resources},
+						{Name: "c2", Image: "busybox", Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						}},
+					},
+				},
+				Status: v1.PodStatus{NodeAllocatableResourceClaimStatuses: tc.claimStatuses},
+			}
+			resources := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+			assert.Equal(t, tc.expected, resources.OomScoreAdj)
+		})
+	}
+}
+
 func TestGetContainerSwapBehavior(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)

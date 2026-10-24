@@ -19,6 +19,7 @@ package cgroups
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -443,19 +444,21 @@ func VerifyCgroupValue(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 }
 
 // VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
-// has the expected value in specified container of the pod. It execs into the container,
-// reads the oom_score_adj value from procfs, and compares it against the expected value.
-func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
+// has one of the expected values in specified container of the pod. It execs into the container,
+// reads the oom_score_adj value from procfs, and compares it against the expected values.
+// More than one value is accepted when the result depends on node feature gates
+// the test cannot observe.
+func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName string, expectedOomScoreAdj ...string) error {
 	cmd := "cat /proc/1/oom_score_adj"
-	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
+	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value in %v",
 		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
 	oomScoreAdj, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find expected oom_score_adj value %s for container %s in pod %s", expectedOomScoreAdj, cName, pod.Name)
+		return fmt.Errorf("failed to read oom_score_adj (expected one of %v) for container %s in pod %s: %w", expectedOomScoreAdj, cName, pod.Name, err)
 	}
 	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
-	if oomScoreAdj != expectedOomScoreAdj {
-		return fmt.Errorf("oom_score_adj value %s not equal to expected %s for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
+	if !slices.Contains(expectedOomScoreAdj, oomScoreAdj) {
+		return fmt.Errorf("oom_score_adj value %s not in expected %v for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
 	}
 	return nil
 }
