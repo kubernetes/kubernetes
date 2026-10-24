@@ -32,6 +32,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -50,11 +51,8 @@ type DRACaches struct {
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
-	Name                                          string
-	enableInPlacePodVerticalScaling               bool
-	enablePodLevelResources                       bool
-	enableDRAExtendedResource                     bool
-	enableInPlacePodLevelResourcesVerticalScaling bool
+	Name string
+	fts  feature.Features
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
@@ -215,7 +213,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 		return nodeInfo.GetAllocatable().GetEphemeralStorage(), nodeInfo.GetRequested().GetEphemeralStorage()
 	default:
 		allocatable, exists := nodeInfo.GetAllocatable().GetScalarResources()[resource]
-		if allocatable == 0 && r.enableDRAExtendedResource && draPreScoreState != nil {
+		if allocatable == 0 && r.fts.EnableDRAExtendedResource && draPreScoreState != nil {
 			// Allocatable 0 means that this resource is not handled by device plugin.
 			// Calculate allocatable and requested for resources backed by DRA.
 			allocatable, allocated := r.calculateDRAExtendedResourceAllocatableRequest(ctx, nodeInfo.Node(), resource, draPreScoreState)
@@ -236,10 +234,10 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: r.enableInPlacePodVerticalScaling,
-		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		UseStatusResources: true,
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in resource allocation scoring.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           r.fts.ResourceFeatures(),
 	}
 
 	if !r.useRequested {

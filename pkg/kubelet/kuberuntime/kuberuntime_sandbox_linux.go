@@ -23,10 +23,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 
 	resourcehelper "k8s.io/component-helpers/resource"
 )
@@ -48,9 +47,8 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Context, pod *v1.Pod) *runtimeapi.LinuxContainerResources {
 	logger := klog.FromContext(ctx)
 	opts := resourcehelper.PodResourcesOptions{
-		ExcludeOverhead:                          true,
-		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		ExcludeOverhead: true,
+		Features:        v1resource.Features(),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
 
