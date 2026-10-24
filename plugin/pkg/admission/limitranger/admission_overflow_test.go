@@ -17,11 +17,33 @@ limitations under the License.
 package limitranger
 
 import (
+	"math"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+// aboveCap holds the values these tests use that are larger than
+// 1.7976931348623157e308. ParseQuantity caps those, so they are built directly.
+var aboveCap = map[string]resource.Quantity{
+	"3e308":            *resource.NewScaledQuantity(3, 308),
+	"1e400":            *resource.NewScaledQuantity(1, 400),
+	"2e400":            *resource.NewScaledQuantity(2, 400),
+	"3e400":            *resource.NewScaledQuantity(3, 400),
+	"1e2147483647":     *resource.NewScaledQuantity(1, math.MaxInt32),
+	"3e2147483647":     *resource.NewScaledQuantity(3, math.MaxInt32),
+	"1000e2147483647":  *resource.NewScaledQuantity(1000, math.MaxInt32),
+	"10000e2147483647": *resource.NewScaledQuantity(10000, math.MaxInt32),
+}
+
+// testQuantity parses s, or returns the value aboveCap builds for it.
+func testQuantity(s string) resource.Quantity {
+	if q, ok := aboveCap[s]; ok {
+		return q
+	}
+	return resource.MustParse(s)
+}
 
 // A quantity past the int64 range wraps through Value()/MilliValue(): 2^64
 // projects to 0 and 2^63 to a negative number. The constraints used to compare
@@ -48,8 +70,8 @@ func TestConstraintsAreOverflowSafe(t *testing.T) {
 	// The ratio path forms request*ratio, whose summed scale can fall past
 	// inf.Scale; a 3:1 ratio at an extreme exponent must still be rejected.
 	if err := limitRequestRatioConstraint("Container", "memory", resource.MustParse("2"),
-		api.ResourceList{api.ResourceMemory: resource.MustParse("1e2147483647")},
-		api.ResourceList{api.ResourceMemory: resource.MustParse("3e2147483647")}); err == nil {
+		api.ResourceList{api.ResourceMemory: testQuantity("1e2147483647")},
+		api.ResourceList{api.ResourceMemory: testQuantity("3e2147483647")}); err == nil {
 		t.Error("limitRequestRatioConstraint admitted a 3:1 ratio above the 2:1 max at an extreme scale")
 	}
 
@@ -67,8 +89,8 @@ func TestLimitRangerRatioIsExact(t *testing.T) {
 	// way, and a ratio of exactly 1 was rejected as "limit is 0".
 	ratioOf := func(reqStr, limStr, maxRatioStr string) error {
 		enforced := resource.MustParse(maxRatioStr)
-		req := api.ResourceList{api.ResourceMemory: resource.MustParse(reqStr)}
-		lim := api.ResourceList{api.ResourceMemory: resource.MustParse(limStr)}
+		req := api.ResourceList{api.ResourceMemory: testQuantity(reqStr)}
+		lim := api.ResourceList{api.ResourceMemory: testQuantity(limStr)}
 		return limitRequestRatioConstraint("Container", "memory", enforced, req, lim)
 	}
 	testCases := []struct {
@@ -124,8 +146,8 @@ func TestLimitRequestRatioConstraint(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		err := limitRequestRatioConstraint("Container", "memory", resource.MustParse(testCase.maxRatio),
-			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.req)},
-			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.lim)})
+			api.ResourceList{api.ResourceMemory: testQuantity(testCase.req)},
+			api.ResourceList{api.ResourceMemory: testQuantity(testCase.lim)})
 		gotErr := ""
 		if err != nil {
 			gotErr = err.Error()

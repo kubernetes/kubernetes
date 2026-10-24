@@ -393,7 +393,8 @@ func TestQuantityKeyAsDec(t *testing.T) {
 		"exponent":                   {quantity: "1e3", wantKey: "1000"},
 		"milli":                      {quantity: "100m", wantKey: "0.100"},
 		// TODO(#141166): The key must grow with the digits written, not the exponent. Expect a short key.
-		"large-exponent": {quantity: "1e100000", wantKey: "1" + strings.Repeat("0", 100000)},
+		// ParseQuantity caps the value at 1.7976931348623157e308.
+		"large-exponent": {quantity: "1e100000", wantKey: "17976931348623157" + strings.Repeat("0", 292)},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {

@@ -56,16 +56,40 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 // For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the
 // capitalization. See http://physics.nist.gov/cuu/Units/binary.html.
 //
-// A decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is
-// limited to three decimal places: "18446744073709551616" keeps its value, and
-// "1.2345" keeps its precision (String reports it as "1234500u"). Parsing does
-// cap a binarySI quantity, silently, at 2^63-1: "8Ei" parses as 2^63-1.
-// Parsing also preserves a value only down to nano, rounding a finer non-zero
-// value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
-// may overflow on top of that: see Value, MilliValue and ScaledValue.
+// Parsing may cap or round the quantity if it exceeds the supported ranges:
+//
+// - A binarySI quantity is capped at 2^63-1. "8Ei" parses as 9223372036854775807.
+//
+// - A decimalSI quantity is capped at 1.7976931348623157e308, the largest
+// float64. A 2 followed by 308 zeros parses as 1.7976931348623157e308.
+//
+// - A decimalExponent quantity is capped at 1.7976931348623157e308. "2e308"
+// parses as 1.7976931348623157e308.
+//
+// - A value keeps at most 29 significant digits, counted from its first nonzero
+// digit. Parsing rounds the remaining digits away from zero.
+//
+// - A value rounds away from zero to a whole number of nanos (1n). "1.5n"
+// parses as 2n.
+//
+// - An exponent outside the int32 range gives an unspecified result. Each
+// digit after the decimal point lowers the exponent by one, so
+// "1.25e-2147483647" is outside that range.
+//
+// Within the supported ranges the parsed value is exact. "18446744073709551616"
+// keeps its value, and "1.2345" keeps its precision (String reports it as
+// "1234500u"). The int64 accessors round and may overflow. See Value,
+// MilliValue and ScaledValue.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
-// it had, and will use the same type again when it is serialized.
+// it had, and will use the same type again when it is serialized, with two
+// exceptions:
+//
+// - A decimalSI value whose exponent would be larger than E (10^18) is written
+// in exponent notation. "1000E" is written as "1e21".
+//
+// - A binarySI value that no binary suffix can express as a whole number is
+// written as decimalSI. "1.5Ki" is written as "1536".
 //
 // Before serializing, Quantity will be put in "canonical form".
 // This means that Exponent/suffix will be adjusted up or down (with a
