@@ -841,6 +841,7 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 	}
 	objectDecoder, streamingSerializer, framer, err := r.contentConfig.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
+		resp.Body.Close()
 		return nil, err
 	}
 
