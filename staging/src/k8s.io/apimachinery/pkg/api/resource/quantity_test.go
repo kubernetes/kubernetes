@@ -1092,21 +1092,17 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			scale: 700000000,
 			want:  outcome{ok: false, value: "1", exponent: 700000000},
 		},
-		// TODO: Should be (1000, false) on the inf.Dec route
 		{
-			name:   "MaxInt64*10^MinInt32 RoundUp(3)",
-			in:     func() Quantity { return *NewScaledQuantity(math.MaxInt64, math.MinInt32) },
-			scale:  3,
-			decGot: &outcome{ok: true, value: "9223372036854775807", exponent: -math.MinInt32},
-			want:   outcome{ok: false, value: "1", exponent: 3},
+			name:  "MaxInt64*10^MinInt32 RoundUp(3)",
+			in:    func() Quantity { return *NewScaledQuantity(math.MaxInt64, math.MinInt32) },
+			scale: 3,
+			want:  outcome{ok: false, value: "1", exponent: 3},
 		},
-		// TODO: Should be (-1000, false) on the inf.Dec route
 		{
-			name:   "MinInt64*10^MinInt32 RoundUp(3)",
-			in:     func() Quantity { return *NewScaledQuantity(math.MinInt64, math.MinInt32) },
-			scale:  3,
-			decGot: &outcome{ok: true, value: "-9223372036854775808", exponent: -math.MinInt32},
-			want:   outcome{ok: false, value: "-1", exponent: 3},
+			name:  "MinInt64*10^MinInt32 RoundUp(3)",
+			in:    func() Quantity { return *NewScaledQuantity(math.MinInt64, math.MinInt32) },
+			scale: 3,
+			want:  outcome{ok: false, value: "-1", exponent: 3},
 		},
 		{
 			name:  "1*10^-MaxInt32 RoundUp(1)",
@@ -1120,15 +1116,11 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			scale: 2,
 			want:  outcome{ok: false, value: "1", exponent: 2},
 		},
-		// TODO: Should be (1, false) on the inf.Dec route
-		// TODO: inf.Dec route: ToDec overflows negating MinInt32, so RoundUp gets
-		// 5*10^2147483648.
 		{
-			name:   "5*10^MinInt32 RoundUp(0)",
-			in:     func() Quantity { return *NewScaledQuantity(5, math.MinInt32) },
-			scale:  0,
-			decGot: &outcome{ok: true, value: "5", exponent: -math.MinInt32}, // -math.MinInt32 == +2147483648
-			want:   outcome{ok: false, value: "1"},
+			name:  "5*10^MinInt32 RoundUp(0)",
+			in:    func() Quantity { return *NewScaledQuantity(5, math.MinInt32) },
+			scale: 0,
+			want:  outcome{ok: false, value: "1"},
 		},
 		{
 			name:  "5*10^MaxInt32 RoundUp(MinInt32+1)",
@@ -1512,8 +1504,9 @@ func TestQuantityCmpInt64(t *testing.T) {
 	}
 }
 
-// TestQuantityMinInt32ScaleConstructors records what NewScaledQuantity and
-// SetScaled hold at scale math.MinInt32, which has no inf.Dec form.
+// TestQuantityMinInt32ScaleConstructors checks that NewScaledQuantity and
+// SetScaled round scale math.MinInt32, which has no inf.Dec form, away from
+// zero to math.MinInt32+1.
 func TestQuantityMinInt32ScaleConstructors(t *testing.T) {
 	constructors := map[string]func(value int64) Quantity{
 		"NewScaledQuantity": func(value int64) Quantity { return *NewScaledQuantity(value, math.MinInt32) },
@@ -1522,28 +1515,42 @@ func TestQuantityMinInt32ScaleConstructors(t *testing.T) {
 			q.SetScaled(value, math.MinInt32)
 			return q
 		},
+		"SetScaledOverDec": func(value int64) Quantity {
+			q := MustParse("1.5")
+			q.SetScaled(value, math.MinInt32)
+			return q
+		},
 	}
 	next := *NewScaledQuantity(1, math.MinInt32+1)
 	for _, tc := range []struct {
 		value int64
+		// scaledNext is the expected value at scale math.MinInt32+1.
+		scaledNext int64
 		// cmpNext is the result of Cmp against 1*10^(MinInt32+1).
 		cmpNext int
 	}{
-		{value: 0, cmpNext: -1},
-		{value: 5, cmpNext: -1},
-		{value: -5, cmpNext: -1},
-		{value: 10, cmpNext: 0},
-		{value: 15, cmpNext: 1},
-		{value: math.MaxInt64, cmpNext: 1},
-		{value: math.MinInt64, cmpNext: -1},
+		{value: 0, scaledNext: 0, cmpNext: -1},
+		{value: 5, scaledNext: 1, cmpNext: 0},
+		{value: -5, scaledNext: -1, cmpNext: -1},
+		{value: 10, scaledNext: 1, cmpNext: 0},
+		{value: 15, scaledNext: 2, cmpNext: 1},
+		{value: math.MaxInt64, scaledNext: math.MaxInt64/10 + 1, cmpNext: 1},
+		{value: math.MinInt64, scaledNext: math.MinInt64/10 - 1, cmpNext: -1},
 	} {
 		for name, construct := range constructors {
 			q := construct(tc.value)
-			if got, ok := q.AsScaledInt64(math.MinInt32); got != tc.value || !ok {
-				t.Errorf("%s(%d, MinInt32): AsScaledInt64(MinInt32) = (%d, %t), want (%d, true)", name, tc.value, got, ok, tc.value)
+			if got, ok := q.AsScaledInt64(math.MinInt32 + 1); got != tc.scaledNext || !ok {
+				t.Errorf("%s(%d, MinInt32): AsScaledInt64(MinInt32+1) = (%d, %t), want (%d, true)", name, tc.value, got, ok, tc.scaledNext)
 			}
 			if got := q.Cmp(next); got != tc.cmpNext {
 				t.Errorf("%s(%d, MinInt32): Cmp(1e-2147483647) = %d, want %d", name, tc.value, got, tc.cmpNext)
+			}
+			q.ToDec()
+			if got, ok := q.AsScaledInt64(math.MinInt32 + 1); got != tc.scaledNext || !ok {
+				t.Errorf("%s(%d, MinInt32) ToDec(): AsScaledInt64(MinInt32+1) = (%d, %t), want (%d, true)", name, tc.value, got, ok, tc.scaledNext)
+			}
+			if got := q.Cmp(next); got != tc.cmpNext {
+				t.Errorf("%s(%d, MinInt32) ToDec(): Cmp(1e-2147483647) = %d, want %d", name, tc.value, got, tc.cmpNext)
 			}
 		}
 	}
