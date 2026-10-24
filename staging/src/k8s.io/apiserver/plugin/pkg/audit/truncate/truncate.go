@@ -18,6 +18,7 @@ package truncate
 
 import (
 	"fmt"
+	"maps"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -127,6 +128,9 @@ func truncate(e *auditinternal.Event) *auditinternal.Event {
 	newEvent.RequestObject = nil
 	newEvent.ResponseObject = nil
 
+	// The original event goes on to other backends and later stages, so mark
+	// only the copy as truncated.
+	newEvent.Annotations = maps.Clone(e.Annotations)
 	if newEvent.Annotations == nil {
 		newEvent.Annotations = make(map[string]string)
 	}
