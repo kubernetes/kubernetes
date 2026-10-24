@@ -35,8 +35,11 @@ import (
 )
 
 const (
-	// At least number of fields per line in /proc/<pid>/mountinfo.
-	expectedAtLeastNumFieldsPerMountInfo = 10
+	// The mountinfo format has six mandatory fields before any optional fields and the separator.
+	mountInfoMinFieldsBeforeSeparator = 6
+	// The fields after the separator are filesystem type, mount source, and super options;
+	// an empty mount source still counts as a field.
+	mountInfoFieldsAfterSeparator = 3
 	// How many times to retry for a consistent read of /proc/mounts.
 	maxListTries = 10
 )
@@ -112,9 +115,14 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 			continue
 		}
 		// See `man proc` for authoritative description of format of the file.
-		fields := strings.Fields(line)
-		if len(fields) < expectedAtLeastNumFieldsPerMountInfo {
-			return nil, fmt.Errorf("wrong number of fields in (expected at least %d, got %d): %s", expectedAtLeastNumFieldsPerMountInfo, len(fields), line)
+		// Split only once because the mount source may itself be "-".
+		parts := strings.SplitN(line, " - ", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("missing separator in %s", line)
+		}
+		fields := strings.Split(strings.TrimSpace(parts[0]), " ")
+		if len(fields) < mountInfoMinFieldsBeforeSeparator {
+			return nil, fmt.Errorf("expect at least %d fields before separator in %s, got %d", mountInfoMinFieldsBeforeSeparator, line, len(fields))
 		}
 		id, err := strconv.Atoi(fields[0])
 		if err != nil {
@@ -146,19 +154,23 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 			MountPoint:   fields[4],
 			MountOptions: splitMountOptions(fields[5]),
 		}
-		// All fields until "-" are "optional fields".
-		i := 6
-		for ; i < len(fields) && fields[i] != "-"; i++ {
-			info.OptionalFields = append(info.OptionalFields, fields[i])
+		if len(fields) > mountInfoMinFieldsBeforeSeparator {
+			info.OptionalFields = fields[mountInfoMinFieldsBeforeSeparator:]
 		}
-		// Parse the rest 3 fields.
-		i++
-		if len(fields)-i < 3 {
-			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
+		// Preserve an empty source and spaces in filesystem-specific super options.
+		fsFields := strings.SplitN(strings.TrimSpace(parts[1]), " ", mountInfoFieldsAfterSeparator)
+		if len(fsFields) != mountInfoFieldsAfterSeparator {
+			return nil, fmt.Errorf("expect %d fields after separator in %s, got %d", mountInfoFieldsAfterSeparator, line, len(fsFields))
 		}
-		info.FsType = fields[i]
-		info.Source = fields[i+1]
-		info.SuperOptions = splitMountOptions(fields[i+2])
+		if fsFields[0] == "" {
+			return nil, fmt.Errorf("empty filesystem type in %s", line)
+		}
+		if fsFields[2] == "" {
+			return nil, fmt.Errorf("empty super options in %s", line)
+		}
+		info.FsType = fsFields[0]
+		info.Source = fsFields[1]
+		info.SuperOptions = splitMountOptions(fsFields[2])
 		infos = append(infos, info)
 	}
 	return infos, nil
