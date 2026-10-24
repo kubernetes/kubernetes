@@ -1044,7 +1044,7 @@ type PreemptionExecutor interface {
 	IsPodGroupRunningPreemption(podGroupUID types.UID) bool
 	// IsPodGroupWaitingForVictims returns true if the pod group is currently waiting for victims to be removed.
 	// This function is called within snapshot context.
-	IsPodGroupWaitingForVictims(pgInfo PodGroupInfo) bool
+	IsPodGroupWaitingForVictims(ctx context.Context, pgInfo PodGroupInfo) bool
 	// ActuatePodPreemption actuates preemption for a single pod given the selected candidate.
 	ActuatePodPreemption(ctx context.Context, candidate PreemptionCandidate, pod *v1.Pod, pluginName string) *Status
 	// ActuatePodGroupPreemption actuates preemption for a pod group given the selected candidate.
