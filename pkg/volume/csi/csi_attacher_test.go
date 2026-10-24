@@ -1281,6 +1281,13 @@ func TestAttacherMountDevice(t *testing.T) {
 				if vol.VolumeMountGroup != tc.expectedVolumeMountGroup {
 					t.Errorf("expected volume mount group %q, got: %q", tc.expectedVolumeMountGroup, vol.VolumeMountGroup)
 				}
+				data, err := loadVolumeData(parent, volDataFileName)
+				if err != nil {
+					t.Fatalf("load the global vol_data.json: %v", err)
+				}
+				if data[volDataKey.specVolID] != tc.spec.Name() || data[volDataKey.volumeLifecycleMode] != string(storage.VolumeLifecyclePersistent) {
+					t.Errorf("global vol_data.json names volume %q in mode %q, want %q in Persistent", data[volDataKey.specVolID], data[volDataKey.volumeLifecycleMode], tc.spec.Name())
+				}
 			}
 
 			// Verify the deviceMountPath was created by the plugin
