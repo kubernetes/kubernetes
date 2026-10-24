@@ -18,8 +18,9 @@ package helper
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
+
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -290,29 +291,34 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 }
 
 // GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
-func GetMatchingTolerations(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
+func GetMatchingTolerations(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration, error) {
 	if len(taints) == 0 {
-		return true, []v1.Toleration{}
+		return true, []v1.Toleration{}, nil
 	}
 	if len(tolerations) == 0 && len(taints) > 0 {
-		return false, []v1.Toleration{}
+		return false, []v1.Toleration{}, nil
 	}
 	enableComparisonOperators := utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)
 	result := []v1.Toleration{}
 	for i := range taints {
 		tolerated := false
+		var firstWarning error
 		for j := range tolerations {
-			if tolerations[j].ToleratesTaint(logger, &taints[i], enableComparisonOperators) {
+			matched, warning := tolerations[j].ToleratesTaint(&taints[i], enableComparisonOperators)
+			if matched {
 				result = append(result, tolerations[j])
 				tolerated = true
 				break
 			}
+			if firstWarning == nil && warning != nil {
+				firstWarning = warning
+			}
 		}
 		if !tolerated {
-			return false, []v1.Toleration{}
+			return false, []v1.Toleration{}, firstWarning
 		}
 	}
-	return true, result
+	return true, result, nil
 }
 
 // ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
