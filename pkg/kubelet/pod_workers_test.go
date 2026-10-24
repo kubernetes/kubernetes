@@ -1900,6 +1900,50 @@ func TestSyncKnownPods(t *testing.T) {
 	}
 }
 
+func TestSyncKnownPodsCancelsSyncOfOrphanedPod(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	podWorkers, _, processed := createPodWorkers(logger)
+
+	syncer := podWorkers.podSyncer.(*podSyncerFuncs)
+	recordSync := syncer.syncPod
+	started := make(chan struct{})
+	release := make(chan struct{})
+	syncErr := make(chan error, 1)
+	syncer.syncPod = func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+		isTerminal, postSync, err := recordSync(ctx, updateType, pod, mirrorPod, podStatus)
+		close(started)
+		// Holds the sync the way WaitForAttachAndMount does for a volume that is never mounted.
+		<-release
+		syncErr <- ctx.Err()
+		return isTerminal, postSync, err
+	}
+
+	pod := newNamedPod("1", "ns", "running-pod", true)
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	<-started
+
+	// The pod left the config while it was syncing, and no kill was delivered (deletePod skips it
+	// while the sources are not ready), so housekeeping is what finds it orphaned.
+	podWorkers.SyncKnownPods(logger, nil)
+	close(release)
+	drainAllWorkers(podWorkers)
+
+	if err := <-syncErr; !errors.Is(err, context.Canceled) {
+		t.Errorf("Expected the sync of the orphaned pod to be cancelled, got context error %v", err)
+	}
+	expected := []syncPodRecord{
+		{name: "running-pod", updateType: kubetypes.SyncPodCreate},
+		{name: "running-pod", updateType: kubetypes.SyncPodKill},
+		{name: "running-pod", terminated: true},
+	}
+	if actual := processed[pod.UID]; !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Unexpected sync history: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
+	}
+}
+
 func Test_removeTerminatedWorker(t *testing.T) {
 	podUID := types.UID("pod-uid")
 
