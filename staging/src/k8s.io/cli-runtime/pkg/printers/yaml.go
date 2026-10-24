@@ -17,15 +17,18 @@ limitations under the License.
 package printers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"sync/atomic"
 
+	goyaml "go.yaml.in/yaml/v2"
 	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -58,7 +61,7 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
 			return errors.New(InternalObjectPrinterErr)
 		}
-		data, err := yaml.Marshal(obj)
+		data, err := marshalYAML(obj, isStable(obj.Object.Object))
 		if err != nil {
 			return err
 		}
@@ -77,10 +80,33 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf("missing apiVersion or kind; try GetObjectKind().SetGroupVersionKind() if you know the type")
 	}
 
-	output, err := yaml.Marshal(obj)
+	output, err := marshalYAML(obj, isStable(obj))
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprint(w, string(output))
 	return err
+}
+
+func isStable(obj runtime.Object) bool {
+	_, ok := obj.(*unstructured.StableUnstructured)
+	return ok
+}
+
+// marshalYAML is yaml.Marshal, except that it keeps the order of fields in the
+// JSON encoding if requested. yaml.Marshal sorts them by name.
+func marshalYAML(obj runtime.Object, keepOrder bool) ([]byte, error) {
+	if !keepOrder {
+		return yaml.Marshal(obj)
+	}
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling into JSON: %w", err)
+	}
+	// MapSlice is also used for nested maps.
+	var ordered goyaml.MapSlice
+	if err := goyaml.Unmarshal(data, &ordered); err != nil {
+		return nil, err
+	}
+	return goyaml.Marshal(ordered)
 }
