@@ -765,3 +765,206 @@ func TestDoesClientSupportWatchListSemantics(t *testing.T) {
 		t.Fatalf("ObjectTracker should NOT support WatchList semantics")
 	}
 }
+
+func newConfigMapTracker(t *testing.T) ObjectTracker {
+	logger, _ := ktesting.NewTestContext(t)
+	scheme := runtime.NewScheme()
+	require.NoError(t, v1.AddToScheme(scheme))
+	return NewObjectTrackerWithLogger(logger, scheme, serializer.NewCodecFactory(scheme).UniversalDecoder())
+}
+
+var configMapGVR = v1.SchemeGroupVersion.WithResource("configmaps")
+
+func configMap(namespace, name string) *v1.ConfigMap {
+	return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}
+}
+
+func listResourceVersion(t *testing.T, tracker ObjectTracker) string {
+	list, err := tracker.List(configMapGVR, v1.SchemeGroupVersion.WithKind("ConfigMap"), "")
+	require.NoError(t, err)
+	listMeta, err := meta.ListAccessor(list)
+	require.NoError(t, err)
+	return listMeta.GetResourceVersion()
+}
+
+// drainEvents returns what has been sent to the watch so far, formatted as "<type> <namespace>/<name>".
+func drainEvents(t *testing.T, w watch.Interface) []string {
+	var events []string
+	for {
+		select {
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				return events
+			}
+			accessor, err := meta.Accessor(event.Object)
+			require.NoError(t, err)
+			events = append(events, fmt.Sprintf("%s %s/%s", event.Type, accessor.GetNamespace(), accessor.GetName()))
+		default:
+			return events
+		}
+	}
+}
+
+func TestDeleteBumpsResourceVersion(t *testing.T) {
+	tracker := newConfigMapTracker(t)
+	require.NoError(t, tracker.Add(configMap("ns", "one")))
+	before := listResourceVersion(t, tracker)
+	require.NoError(t, tracker.Delete(configMapGVR, "ns", "one"))
+	after := listResourceVersion(t, tracker)
+	require.NotEqual(t, before, after, "deleting an object must change the ResourceVersion of the list")
+
+	// Deleting something that doesn't exist is not a change.
+	require.Error(t, tracker.Delete(configMapGVR, "ns", "one"))
+	require.Equal(t, after, listResourceVersion(t, tracker))
+}
+
+// TestWatchReplaysDeletions covers a deletion which happens after List and before Watch.
+func TestWatchReplaysDeletions(t *testing.T) {
+	// The list returns ResourceVersion 4 for the three objects below.
+	setup := func(t *testing.T) ObjectTracker {
+		tracker := newConfigMapTracker(t)
+		require.NoError(t, tracker.Add(configMap("a", "one")))
+		require.NoError(t, tracker.Add(configMap("a", "two")))
+		require.NoError(t, tracker.Add(configMap("b", "three")))
+		require.Equal(t, "4", listResourceVersion(t, tracker))
+		return tracker
+	}
+
+	for name, tc := range map[string]struct {
+		mutate         func(t *testing.T, tracker ObjectTracker)
+		namespace      string
+		options        []metav1.ListOptions
+		expectedEvents []string
+	}{
+		"deleted-in-all-namespaces": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "b", "three"))
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			options:        []metav1.ListOptions{{ResourceVersion: "4"}},
+			expectedEvents: []string{"DELETED b/three", "DELETED a/one"},
+		},
+		"deleted-in-one-namespace": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "b", "three"))
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			namespace:      "a",
+			options:        []metav1.ListOptions{{ResourceVersion: "4"}},
+			expectedEvents: []string{"DELETED a/one"},
+		},
+		"deleted-and-created-again": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+				require.NoError(t, tracker.Create(configMapGVR, configMap("a", "one"), "a"))
+			},
+			options:        []metav1.ListOptions{{ResourceVersion: "4"}},
+			expectedEvents: []string{"DELETED a/one", "ADDED a/one"},
+		},
+		"deleted-before-resource-version": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			// This is what List returns now.
+			options:        []metav1.ListOptions{{ResourceVersion: "5"}},
+			expectedEvents: nil,
+		},
+		"most-recent-with-unset-resource-version": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			options:        []metav1.ListOptions{{}},
+			expectedEvents: []string{"ADDED a/two", "ADDED b/three"},
+		},
+		"most-recent-with-zero-resource-version": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			options:        []metav1.ListOptions{{ResourceVersion: "0"}},
+			expectedEvents: []string{"ADDED a/two", "ADDED b/three"},
+		},
+		"without-options": {
+			mutate: func(t *testing.T, tracker ObjectTracker) {
+				require.NoError(t, tracker.Delete(configMapGVR, "a", "one"))
+			},
+			expectedEvents: nil,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tracker := setup(t)
+			tc.mutate(t, tracker)
+			w, err := tracker.Watch(configMapGVR, tc.namespace, tc.options...)
+			require.NoError(t, err)
+			defer w.Stop()
+			require.Equal(t, tc.expectedEvents, drainEvents(t, w))
+		})
+	}
+}
+
+// TestWatchExpired covers a Watch that starts at a ResourceVersion for which not all
+// deletions are known anymore.
+func TestWatchExpired(t *testing.T) {
+	tracker := newConfigMapTracker(t)
+	for i := 0; i <= maxTrackedDeletions; i++ {
+		require.NoError(t, tracker.Add(configMap("ns", fmt.Sprintf("cm%d", i))))
+	}
+	listRV, err := strconv.ParseInt(listResourceVersion(t, tracker), 10, 64)
+	require.NoError(t, err)
+	for i := 0; i <= maxTrackedDeletions; i++ {
+		require.NoError(t, tracker.Delete(configMapGVR, "ns", fmt.Sprintf("cm%d", i)))
+	}
+
+	// The first deletion got dropped, so a watch which has seen
+	// nothing after the list may have missed it.
+	w, err := tracker.Watch(configMapGVR, "", metav1.ListOptions{ResourceVersion: strconv.FormatInt(listRV, 10)})
+	require.NoError(t, err)
+	event, ok := <-w.ResultChan()
+	require.True(t, ok, "expected an error event")
+	require.Equal(t, watch.Error, event.Type)
+	require.True(t, errors.IsResourceExpired(errors.FromObject(event.Object)), "expected an expired error, got: %v", event.Object)
+	_, ok = <-w.ResultChan()
+	require.False(t, ok, "expected the watch to be closed after the error")
+
+	// All deletions after the first one are still known.
+	w, err = tracker.Watch(configMapGVR, "", metav1.ListOptions{ResourceVersion: strconv.FormatInt(listRV+1, 10)})
+	require.NoError(t, err)
+	defer w.Stop()
+	require.Len(t, drainEvents(t, w), maxTrackedDeletions)
+
+	// Not asking for history works.
+	w, err = tracker.Watch(configMapGVR, "", metav1.ListOptions{})
+	require.NoError(t, err)
+	defer w.Stop()
+	require.Empty(t, drainEvents(t, w))
+}
+
+// TestWatchTooManyChanges covers a Watch that would have to send more events
+// than the new watch can buffer.
+func TestWatchTooManyChanges(t *testing.T) {
+	tracker := newConfigMapTracker(t)
+	for i := 0; i < maxTrackedDeletions; i++ {
+		require.NoError(t, tracker.Add(configMap("ns", fmt.Sprintf("cm%d", i))))
+	}
+	listRV, err := strconv.ParseInt(listResourceVersion(t, tracker), 10, 64)
+	require.NoError(t, err)
+	for i := 0; i < maxTrackedDeletions; i++ {
+		require.NoError(t, tracker.Delete(configMapGVR, "ns", fmt.Sprintf("cm%d", i)))
+	}
+	require.NoError(t, tracker.Add(configMap("ns", "another")))
+
+	// All deletions are still known, but together with the new object
+	// they are one event too many.
+	w, err := tracker.Watch(configMapGVR, "", metav1.ListOptions{ResourceVersion: strconv.FormatInt(listRV, 10)})
+	require.NoError(t, err)
+	defer w.Stop()
+	event := <-w.ResultChan()
+	require.Equal(t, watch.Error, event.Type)
+	require.True(t, errors.IsResourceExpired(errors.FromObject(event.Object)), "expected an expired error, got: %v", event.Object)
+
+	w, err = tracker.Watch(configMapGVR, "", metav1.ListOptions{ResourceVersion: strconv.FormatInt(listRV+1, 10)})
+	require.NoError(t, err)
+	defer w.Stop()
+	events := drainEvents(t, w)
+	require.Len(t, events, maxTrackedDeletions)
+	require.Equal(t, "ADDED ns/another", events[len(events)-1])
+}
