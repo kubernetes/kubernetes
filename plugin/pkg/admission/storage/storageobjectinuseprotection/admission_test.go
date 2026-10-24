@@ -145,6 +145,14 @@ func TestAdmit(t *testing.T) {
 			vac.Namespace,
 			true,
 		},
+		{
+			"volumeattributesclasses VacFeatureGate enabled: wrong object type -> no finalizer added",
+			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+			&api.Pod{},
+			&api.Pod{},
+			"",
+			true,
+		},
 	}
 
 	for _, test := range tests {
