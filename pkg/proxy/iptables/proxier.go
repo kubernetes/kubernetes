@@ -995,6 +995,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerVIPs() {
+				if svcInfo.LoadBalancerIPModeRouter(lbip) {
+					continue
+				}
 				filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", externalTrafficFilterComment,
