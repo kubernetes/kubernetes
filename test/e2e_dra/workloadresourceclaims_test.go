@@ -111,3 +111,80 @@ func workloadResourceClaimsGateCycle(tCtx ktesting.TContext, b *drautils.Builder
 		}
 	}
 }
+
+// workloadResourceClaimsUpgradeDowngrade verifies that a ResourceClaim's
+// allocation and reservation for a PodGroup persist an upgrade->downgrade cycle
+// and that Pods can be added and removed from the PodGroup after each
+// transition and the claim's allocation and reservation remain stable
+// throughout.
+func workloadResourceClaimsUpgradeDowngrade(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
+	namespace := tCtx.Namespace()
+	workload, template := b.WorkloadInline()
+	podGroup := b.PodGroup(workload, workload.Spec.PodGroupTemplates[0])
+	persistentPod := b.GroupedPodWithClaims(podGroup)
+	newPod := b.GroupedPodWithClaims(podGroup)
+	b.Create(tCtx, workload, podGroup, template, persistentPod, newPod)
+	b.TestPod(tCtx, persistentPod)
+	b.TestPod(tCtx, newPod)
+
+	podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Get(tCtx, podGroup.Name, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get PodGroup")
+	tCtx.Expect(podGroup.Status.ResourceClaimStatuses).To(gomega.HaveExactElements(
+		gomega.SatisfyAll(
+			gomega.HaveField("Name", podGroup.Spec.ResourceClaims[0].Name),
+			gomega.HaveField("ResourceClaimName", gomega.HaveValue(gomega.Not(gomega.BeEmpty()))),
+		),
+	), "PodGroup status is missing generated ResourceClaim name")
+	claimName := *podGroup.Status.ResourceClaimStatuses[0].ResourceClaimName
+
+	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "list ResourceClaims")
+	tCtx.Expect(claim).To(gomega.SatisfyAll(
+		gomega.HaveField("ObjectMeta.Name", claimName),
+		gomega.HaveField("Status.ReservedFor",
+			gomega.HaveExactElements(
+				resourceapi.ResourceClaimConsumerReference{
+					APIGroup: schedulingapi.GroupName,
+					Resource: "podgroups",
+					Name:     podGroup.Name,
+					UID:      podGroup.UID,
+				},
+			),
+		),
+	),
+	)
+
+	checkClaimsStable := func(tCtx ktesting.TContext) {
+		tCtx.Helper()
+		tCtx.Consistently(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+			return tCtx.Client().ResourceV1().ResourceClaims(claim.Namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+		}).
+			WithPolling(100 * time.Millisecond).
+			WithTimeout(15 * time.Second).
+			Should(gomega.SatisfyAll(
+				gomega.HaveField("ObjectMeta.UID", claim.UID),
+				gomega.HaveField("Status.Allocation", claim.Status.Allocation),
+				gomega.HaveField("Status.ReservedFor", claim.Status.ReservedFor),
+			))
+	}
+
+	return func(tCtx ktesting.TContext) downgradedTestFunc {
+		newPodAfterUpgrade := b.GroupedPodWithClaims(podGroup)
+		b.Create(tCtx, newPodAfterUpgrade)
+		b.TestPod(tCtx, newPodAfterUpgrade)
+		checkClaimsStable(tCtx)
+
+		b.DeletePodAndWaitForNotFound(tCtx, newPod)
+		checkClaimsStable(tCtx)
+
+		return func(tCtx ktesting.TContext) {
+			newPodAfterDowngrade := b.GroupedPodWithClaims(podGroup)
+			b.Create(tCtx, newPodAfterDowngrade)
+			b.TestPod(tCtx, newPodAfterDowngrade)
+			checkClaimsStable(tCtx)
+
+			b.DeletePodAndWaitForNotFound(tCtx, newPodAfterUpgrade)
+			checkClaimsStable(tCtx)
+		}
+	}
+}
