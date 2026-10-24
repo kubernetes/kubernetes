@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -1245,7 +1246,51 @@ func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimea
 	return resp, nil
 }
 
-func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
+type eventQueue struct {
+	mu     sync.Mutex
+	cond   *sync.Cond
+	buf    []*runtimeapi.ContainerEventResponse
+	closed bool
+}
+
+func newEventQueue() *eventQueue {
+	q := &eventQueue{}
+	q.cond = sync.NewCond(&q.mu)
+	return q
+}
+func (q *eventQueue) enqueue(evt *runtimeapi.ContainerEventResponse) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed {
+		return
+	}
+	q.buf = append(q.buf, evt)
+	q.cond.Signal()
+}
+
+func (q *eventQueue) dequeue() *runtimeapi.ContainerEventResponse {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for len(q.buf) == 0 && !q.closed {
+		q.cond.Wait()
+	}
+	evt := q.buf[0]
+	q.buf[0] = nil
+	q.buf = q.buf[1:]
+	return evt
+}
+
+func (q *eventQueue) Close() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed {
+		return
+	}
+	q.closed = true
+	q.cond.Broadcast()
+}
+
+func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) (ret error) {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(ctx, &runtimeapi.GetEventsRequest{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
@@ -1257,20 +1302,25 @@ func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, container
 		// The connection is successfully established and we have a streaming client ready for use.
 		connectionEstablishedCallback(containerEventsStreamingClient)
 	}
+	eq := newEventQueue()
+
+	go func() {
+		for {
+			resp := eq.dequeue()
+			containerEventsCh <- resp
+			logger.V(4).Info("container event received", "resp", resp)
+		}
+	}()
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()
 		if errors.Is(err, io.EOF) {
+			eq.Close()
 			logger.Error(err, "container events stream is closed")
 			return err
 		}
-		if err != nil {
-			logger.Error(err, "failed to receive streaming container event")
-			return err
-		}
 		if resp != nil {
-			containerEventsCh <- resp
-			logger.V(4).Info("container event received", "resp", resp)
+			eq.enqueue(resp)
 		}
 	}
 }
