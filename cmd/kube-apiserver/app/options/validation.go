@@ -22,11 +22,13 @@ import (
 	"net"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	netutils "k8s.io/utils/net"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	podregistry "k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -96,6 +98,19 @@ func validatePublicIPServiceClusterIPRangeIPFamilies(extra Extra, generic generi
 	return nil
 }
 
+func validateDisablePodSubresources(options Extra) []error {
+	var errs []error
+	for _, sub := range options.DisablePodSubresources {
+		switch {
+		case podregistry.NonDisableablePodSubresources().Has(sub):
+			errs = append(errs, fmt.Errorf("--disable-pod-subresources: pod subresource %q is required for core pod lifecycle and cannot be disabled", sub))
+		case !podregistry.DisableablePodSubresources().Has(sub):
+			errs = append(errs, fmt.Errorf("--disable-pod-subresources: unknown pod subresource %q, valid values are: %s", sub, strings.Join(sets.List(podregistry.DisableablePodSubresources()), ", ")))
+		}
+	}
+	return errs
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s CompletedOptions) Validate() []error {
 	var errs []error
@@ -104,6 +119,7 @@ func (s CompletedOptions) Validate() []error {
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)
+	errs = append(errs, validateDisablePodSubresources(s.Extra)...)
 
 	if s.MasterCount <= 0 {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))

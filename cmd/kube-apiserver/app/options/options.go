@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	cliflag "k8s.io/component-base/cli/flag"
 
@@ -34,6 +35,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	podregistry "k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
 // ServerRunOptions runs a kubernetes api server.
@@ -61,6 +63,8 @@ type Extra struct {
 	EndpointReconcilerType string
 
 	MasterCount int
+
+	DisablePodSubresources []string
 
 	InformerName *cache.InformerName
 }
@@ -155,6 +159,11 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
+
+	fs.StringSliceVar(&s.DisablePodSubresources, "disable-pod-subresources", s.DisablePodSubresources, ""+
+		"Comma-separated list of pod subresources to disable on the API server. "+
+		"Valid values are: "+strings.Join(sets.List(podregistry.DisableablePodSubresources()), ", ")+". "+
+		"Core lifecycle subresources ("+strings.Join(sets.List(podregistry.NonDisableablePodSubresources()), ", ")+") cannot be disabled.")
 
 	return fss
 }
