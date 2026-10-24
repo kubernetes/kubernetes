@@ -476,7 +476,7 @@ type JobSpec struct {
 	// constraints, disruption mode, and shared resource claims.
 	// When omitted, the Job defaults to the basic scheduling policy, which behaves
 	// as standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// This field is beta-level and gated by the WorkloadWithJob feature gate.
 	// Once set, this field is immutable except for the policy.gang.minCount.
 	//
 	// +featureGate=WorkloadWithJob
@@ -656,6 +656,10 @@ const (
 	JobFailureTarget JobConditionType = "FailureTarget"
 	// JobSuccessCriteriaMet means the Job has reached a success state and will be marked as Completed
 	JobSuccessCriteriaMet JobConditionType = "SuccessCriteriaMet"
+	// JobSchedulingBlocked means the controller cannot safely create pods because
+	// the scheduling objects for the Job are missing, ambiguous, or have an
+	// unsupported structure.
+	JobSchedulingBlocked JobConditionType = "SchedulingBlocked"
 )
 
 // JobCondition describes current state of a job.
