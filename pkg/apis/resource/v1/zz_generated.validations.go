@@ -284,6 +284,53 @@ func Validate_AllocationResult(
 	return errs
 }
 
+// Validate_CapacityRequirements validates an instance of CapacityRequirements according
+// to declarative validation rules in the API schema.
+func Validate_CapacityRequirements(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.CapacityRequirements) (errs field.ErrorList) {
+
+	{ // field resourcev1.CapacityRequirements.Requests
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[resourcev1.QualifiedName]resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 32).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resource.Quantity) field.ErrorList {
+					return validate.MinimumQuantity(ctx, op, fldPath, obj, oldObj, resource.MustParse("0"))
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.CapacityRequirements) map[resourcev1.QualifiedName]resource.Quantity {
+				return oldObj.Requests
+			})
+		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
 func Validate_CounterSet(
@@ -2086,7 +2133,43 @@ func Validate_DeviceRequestAllocationResult(
 		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.DeviceRequestAllocationResult.ConsumedCapacity has no validation
+	{ // field resourcev1.DeviceRequestAllocationResult.ConsumedCapacity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[resourcev1.QualifiedName]resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 32).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resource.Quantity) field.ErrorList {
+					return validate.MinimumQuantity(ctx, op, fldPath, obj, oldObj, resource.MustParse("0"))
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceRequestAllocationResult) map[resourcev1.QualifiedName]resource.Quantity {
+				return oldObj.ConsumedCapacity
+			})
+		errs = append(errs, fn(fldPath.Child("consumedCapacity"), obj.ConsumedCapacity, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1.DeviceRequestAllocationResult.SkipNodeOperations
 		fn := func(
@@ -2263,7 +2346,35 @@ func Validate_DeviceSubRequest(
 		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.DeviceSubRequest.Capacity has no validation
+	{ // field resourcev1.DeviceSubRequest.Capacity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.CapacityRequirements,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CapacityRequirements(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceSubRequest) *resourcev1.CapacityRequirements {
+				return oldObj.Capacity
+			})
+		errs = append(errs, fn(fldPath.Child("capacity"), obj.Capacity, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1.DeviceSubRequest.DerivedAttributes
 		fn := func(
@@ -2745,7 +2856,35 @@ func Validate_ExactDeviceRequest(
 		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.ExactDeviceRequest.Capacity has no validation
+	{ // field resourcev1.ExactDeviceRequest.Capacity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.CapacityRequirements,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CapacityRequirements(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.ExactDeviceRequest) *resourcev1.CapacityRequirements {
+				return oldObj.Capacity
+			})
+		errs = append(errs, fn(fldPath.Child("capacity"), obj.Capacity, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1.ExactDeviceRequest.DerivedAttributes
 		fn := func(

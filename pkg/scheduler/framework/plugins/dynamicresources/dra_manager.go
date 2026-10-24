@@ -380,7 +380,10 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 
 	allocated, revision1 := c.allocatedDevices.Get()
 	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.GetSharedDeviceIDs()
-	aggregatedCapacity, revision3 := c.allocatedDevices.Capacities()
+	aggregatedCapacity, revision3, err := c.allocatedDevices.Capacities()
+	if err != nil {
+		return nil, err
+	}
 
 	if revision1 != revision2 || revision2 != revision3 {
 		// Already not consistent. Try again.
@@ -403,6 +406,11 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Whatever is in flight also has to be checked.
 	for _, inFlight := range c.allInFlightAllocationsRLocked() {
 		claim := inFlight.claim
+		if enabledConsumableCapacity {
+			if err = consumedCapacityError(claim); err != nil {
+				return nil, err
+			}
+		}
 		foreachAllocatedDevice(claim,
 			func(deviceID structured.DeviceID) { // dedicatedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))

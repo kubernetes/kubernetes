@@ -6423,6 +6423,41 @@ func TestAllocator(t *testing.T,
 			node:        node(node1, region1),
 			expectError: g.MatchError(g.ContainSubstring("negative")),
 		},
+		"consumable-capacity-negative-request-with-range-policy-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// The range policy would round the negative request up to Min, a valid value.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, resource.MustParse("-1"))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("negative")),
+		},
+		"consumable-capacity-negative-request-with-valid-values-policy-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// The valid values policy would round the negative request up to the smallest valid value.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, resource.MustParse("-1"))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAllowMultipleAllocations().withCapacityRequestPolicyValidValues(one, map[resourceapi.QualifiedName]resource.Quantity{capacity0: four},
+						[]resource.Quantity{two}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("negative")),
+		},
 		"consumable-capacity-multi-allocatable-device-with-valid-values-policy": {
 			features: Features{
 				ConsumableCapacity: true,
