@@ -119,7 +119,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 // RunWithContext starts the controller sync loop with a context.
 func (c *Controller) RunWithContext(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
