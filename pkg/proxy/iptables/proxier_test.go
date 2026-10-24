@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutilnfacct "k8s.io/kubernetes/pkg/proxy/util/nfacct"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -142,6 +143,37 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
 	return p
 }
+
+type nfacctFailingIPTables struct {
+	*iptablestest.FakeIPTables
+	restoreCalls int
+}
+
+func (f *nfacctFailingIPTables) EnsureRule(position utiliptables.RulePosition, table utiliptables.Table, chain utiliptables.Chain, args ...string) (bool, error) {
+	for _, arg := range args {
+		if arg == "nfacct" {
+			return false, fmt.Errorf("nfacct match unavailable")
+		}
+	}
+	return f.FakeIPTables.EnsureRule(position, table, chain, args...)
+}
+
+func (f *nfacctFailingIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, counters utiliptables.RestoreCountersFlag) error {
+	f.restoreCalls++
+	if bytes.Contains(data, []byte("-m nfacct")) {
+		return fmt.Errorf("nfacct match unavailable")
+	}
+	return f.FakeIPTables.RestoreAll(data, flush, counters)
+}
+
+type fakeNFAcct struct{}
+
+func (fakeNFAcct) Ensure(string) error { return nil }
+func (fakeNFAcct) Add(string) error    { return nil }
+func (fakeNFAcct) Get(string) (*proxyutilnfacct.Counter, error) {
+	return nil, nil
+}
+func (fakeNFAcct) List() ([]*proxyutilnfacct.Counter, error) { return nil, nil }
 
 // parseIPTablesData takes iptables-save output and returns a map of table name to array of lines.
 func parseIPTablesData(ruleData string) (map[string][]string, error) {
@@ -5710,6 +5742,46 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	if numEndpoints != expectedEndpoints {
 		t.Errorf("Found wrong number of endpoints: expected %d, got %d", expectedEndpoints, numEndpoints)
 	}
+}
+
+func TestSyncProxyRulesDisablesNFAcctAfterMatchProbeFailure(t *testing.T) {
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
+	defer legacyregistry.Reset()
+
+	ipt := &nfacctFailingIPTables{FakeIPTables: iptablestest.NewFake()}
+	fp := NewFakeProxier(ipt)
+	fp.nfacct = fakeNFAcct{}
+	makeServiceMap(fp, makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.30.0.41"
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     "p80",
+			Port:     80,
+			Protocol: v1.ProtocolTCP,
+		}}
+	}))
+	populateEndpointSlices(fp, makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{Addresses: []string{"10.0.1.1"}}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To("p80"),
+			Port:     ptr.To[int32](80),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	}))
+
+	fp.syncProxyRules()
+	assert.Equal(t, 1, ipt.restoreCalls)
+	assert.False(t, fp.nfAcctCounters[metrics.IPTablesCTStateInvalidDroppedNFAcctCounter])
+	assert.False(t, fp.nfAcctCounters[metrics.LocalhostNodePortAcceptedNFAcctCounter])
+	assert.NotContains(t, fp.iptablesData.String(), "-m nfacct")
+	assert.Contains(t, fp.iptablesData.String(), "-d 172.30.0.41 --dport 80")
+
+	var natRules bytes.Buffer
+	if err := ipt.SaveInto(utiliptables.TableNAT, &natRules); err != nil {
+		t.Fatalf("failed to save fake nat rules: %v", err)
+	}
+	assert.Contains(t, natRules.String(), ":KUBE-SERVICES")
 }
 
 // Test calling syncProxyRules() multiple times with various changes
