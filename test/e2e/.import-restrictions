@@ -1,0 +1,4 @@
+rules:
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/util/feature$
+    forbiddenPrefixes:
+      - k8s.io/apiserver/pkg/util/feature

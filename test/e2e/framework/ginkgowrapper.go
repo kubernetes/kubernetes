@@ -659,6 +659,26 @@ func withFeature(name Feature) interface{} {
 	return newLabel("Feature", string(name))
 }
 
+// DefaultFeatureGate returns the default feature gate registry.
+func DefaultFeatureGate() featuregate.FeatureGate {
+	return utilfeature.DefaultFeatureGate
+}
+
+// SetDefaultFeatureGates configures feature gates for in-process components.
+func SetDefaultFeatureGates(featureGates map[string]bool) error {
+	return utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
+}
+
+// SetFeatureGateDuringTest changes a feature gate and returns a function
+// that restores its previous value.
+func SetFeatureGateDuringTest(feature featuregate.Feature, desired bool) func() {
+	current := utilfeature.DefaultFeatureGate.Enabled(feature)
+	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
+	return func() {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
+	}
+}
+
 // WithFeatureGate specifies that a certain test or group of tests depends on a
 // feature gate and the corresponding API group (if there is one)
 // being enabled. The return value may be passed as additional
