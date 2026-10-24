@@ -1235,7 +1235,8 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 			haveToleration := false
 			tolerationSeconds := int64(math.MaxInt64)
 			for _, toleration := range allocatedDevice.Tolerations {
-				if toleration.Effect == resourceapi.DeviceTaintEffectNoExecute &&
+				// An empty effect matches all taint effects, including NoExecute.
+				if (toleration.Effect == "" || toleration.Effect == resourceapi.DeviceTaintEffectNoExecute) &&
 					resourceclaim.ToleratesTaint(toleration, *taint.deviceTaint()) {
 					if toleration.TolerationSeconds == nil {
 						// Tolerate forever -> ignore taint.
