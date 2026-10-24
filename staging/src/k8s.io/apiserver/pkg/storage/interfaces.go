@@ -338,6 +338,14 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// WatchWithoutPrevKV requests omission of previous values from etcd watch
+	// events. Deleted objects may then contain only name, namespace, and the deletion
+	// resource version; callers must not rely on other fields being populated.
+	// This is intended for the watch cache, which retains the full previous object.
+	// Etcd storage requires an empty predicate, an object constructor, and a reverse
+	// key function. The cacher ignores this option and returns complete objects
+	// from its cache. The option is ignored for non-watch requests.
+	WatchWithoutPrevKV bool
 	// RecordTimestamps requests that the storage layer wrap each emitted watch
 	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
 	// latency telemetry. This is intended for internal clients only (the watch
@@ -457,5 +465,6 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 // cluster-scoped resources, namespace is empty and name is non-empty. An error
 // is returned if the key cannot be parsed into a valid object identity.
 // A nil ReverseKeyFunc indicates that identity cannot be derived from the
-// key and callers must fall back to decoding the stored object.
+// key. Callers must decode the stored object or reject operations that require
+// key-derived identity.
 type ReverseKeyFunc func(key string) (name string, namespace string, err error)
