@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1431,4 +1432,80 @@ spec:
 			}
 		})
 	}
+}
+
+type errReader struct {
+	data []byte
+	err  error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	n := copy(p, r.data)
+	r.data = r.data[n:]
+	if len(r.data) == 0 {
+		return n, r.err
+	}
+	return n, nil
+}
+
+func TestLimitedReadBodyBufferPooling(t *testing.T) {
+	t.Run("oversized buffer is not returned to pool", func(t *testing.T) {
+		largeBody := strings.Repeat("x", maxReadBufCap+1024)
+		req, err := http.NewRequest(request.MethodPost, "/", strings.NewReader(largeBody))
+		if err != nil {
+			t.Fatalf("http.NewRequest() unexpected error: %v", err)
+		}
+		got, err := limitedReadBody(req, int64(len(largeBody)+1024))
+		if err != nil {
+			t.Fatalf("limitedReadBody() unexpected error: %v", err)
+		}
+		if len(got) != len(largeBody) {
+			t.Fatalf("len(limitedReadBody()) = %d, want %d", len(got), len(largeBody))
+		}
+		for range 16 {
+			b := readBufPool.Get().(*bytes.Buffer)
+			if b.Cap() > maxReadBufCap {
+				t.Fatalf("readBufPool returned buffer with cap %d > maxReadBufCap (%d)", b.Cap(), maxReadBufCap)
+			}
+		}
+	})
+
+	t.Run("returned slice does not alias pooled buffer", func(t *testing.T) {
+		req1, err := http.NewRequest(request.MethodPost, "/", strings.NewReader("first-payload"))
+		if err != nil {
+			t.Fatalf("http.NewRequest() unexpected error: %v", err)
+		}
+		first, err := limitedReadBody(req1, 1024)
+		if err != nil {
+			t.Fatalf("limitedReadBody() unexpected error: %v", err)
+		}
+
+		req2, err := http.NewRequest(request.MethodPost, "/", strings.NewReader("second-payload"))
+		if err != nil {
+			t.Fatalf("http.NewRequest() unexpected error: %v", err)
+		}
+		second, err := limitedReadBody(req2, 1024)
+		if err != nil {
+			t.Fatalf("limitedReadBody() unexpected error: %v", err)
+		}
+		if got, want := string(first), "first-payload"; got != want {
+			t.Fatalf("first slice mutated after second read: got %q, want %q", got, want)
+		}
+		if got, want := string(second), "second-payload"; got != want {
+			t.Fatalf("second slice: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("read error takes precedence over limit exhaustion", func(t *testing.T) {
+		wantErr := errors.New("connection reset by peer")
+		body := io.NopCloser(&errReader{data: []byte("123456"), err: wantErr})
+		req, err := http.NewRequest(request.MethodPost, "/", body)
+		if err != nil {
+			t.Fatalf("http.NewRequest() unexpected error: %v", err)
+		}
+		_, err = limitedReadBody(req, 5)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("limitedReadBody() err = %v, want %v", err, wantErr)
+		}
+	})
 }
