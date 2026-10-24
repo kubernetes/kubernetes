@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/armon/go-socks5"
 
@@ -936,6 +938,78 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 
 			// The channel must be closed before any of the connections are closed
 			close(closed)
+		})
+	}
+}
+
+// TestNewConnectionClosesConnOnFailedUpgrade guards against leaking the dialed
+// connection when the upgrade is rejected, e.g. exec into a container that is
+// not running (https://github.com/kubernetes/kubernetes/issues/135245).
+func TestNewConnectionClosesConnOnFailedUpgrade(t *testing.T) {
+	testCases := map[string]struct {
+		statusCode       int
+		connectionHeader string
+		upgradeHeader    string
+	}{
+		"forbidden status": {
+			statusCode:       http.StatusForbidden,
+			connectionHeader: "Upgrade",
+			upgradeHeader:    "SPDY/3.1",
+		},
+		"missing connection header": {
+			statusCode:       http.StatusSwitchingProtocols,
+			connectionHeader: "",
+			upgradeHeader:    "SPDY/3.1",
+		},
+		"missing upgrade header": {
+			statusCode:       http.StatusSwitchingProtocols,
+			connectionHeader: "Upgrade",
+			upgradeHeader:    "",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(serverHandler(t, serverHandlerConfig{
+				shouldError:      true,
+				statusCode:       tc.statusCode,
+				connectionHeader: tc.connectionHeader,
+				upgradeHeader:    tc.upgradeHeader,
+			}))
+			defer server.Close()
+
+			spdyTransport, err := NewRoundTripper(nil)
+			if err != nil {
+				t.Fatalf("error creating SpdyRoundTripper: %v", err)
+			}
+
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+			if err != nil {
+				t.Fatalf("error creating request: %v", err)
+			}
+
+			client := &http.Client{Transport: spdyTransport}
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("error executing request: %v", err)
+			}
+
+			// NewConnection should fail because the upgrade was not successful.
+			_, err = spdyTransport.NewConnection(resp)
+			if err == nil {
+				t.Fatalf("expected NewConnection to fail, but it succeeded")
+			}
+
+			if spdyTransport.conn == nil {
+				t.Fatalf("conn should have been set by RoundTrip")
+			}
+			// Only a local Close yields net.ErrClosed; the deadline keeps a leaked conn
+			// from blocking the read, since the server keeps its end open.
+			_ = spdyTransport.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			_, readErr := spdyTransport.conn.Read(make([]byte, 1))
+			if !errors.Is(readErr, net.ErrClosed) {
+				t.Errorf("expected underlying conn to be closed after failed upgrade, got read error: %v", readErr)
+			}
 		})
 	}
 }
