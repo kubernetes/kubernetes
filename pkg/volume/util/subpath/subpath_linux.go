@@ -388,16 +388,9 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
 	}
 
-	// Quick check if the directory already exists
+	// Quick check if the path exists and is not a directory
 	s, err := os.Stat(pathname)
-	if err == nil {
-		// Path exists
-		if s.IsDir() {
-			// The directory already exists. It can be outside of the parent,
-			// but there is no race-proof check.
-			klog.V(4).Infof("Directory %s already exists", pathname)
-			return nil
-		}
+	if err == nil && !s.IsDir() {
 		return &os.PathError{Op: "mkdir", Path: pathname, Err: syscall.ENOTDIR}
 	}
 
@@ -412,7 +405,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return fmt.Errorf("error opening directory %s: %s", existingPath, err)
 	}
 	if !mount.PathWithinBase(fullExistingPath, base) {
-		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
+		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, base)
 	}
 
 	klog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
@@ -433,6 +426,52 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 			}
 		}
 	}()
+
+	// Translate perm (os.FileMode) to uint32 that fchmod() expects
+	kernelPerm := uint32(perm & os.ModePerm)
+	if perm&os.ModeSetgid > 0 {
+		kernelPerm |= syscall.S_ISGID
+	}
+	if perm&os.ModeSetuid > 0 {
+		kernelPerm |= syscall.S_ISUID
+	}
+	if perm&os.ModeSticky > 0 {
+		kernelPerm |= syscall.S_ISVTX
+	}
+
+	if len(toCreate) == 0 {
+		// If the resolved existing directory is base itself (for example, in the "create-base"
+		// unit test where pathname == base, or if a subpath symlink resolves back to base),
+		// we must not alter the volume base directory's permissions.
+		if fullExistingPath == base {
+			return nil
+		}
+
+		var stat unix.Stat_t
+		if err := unix.Fstat(parentFD, &stat); err != nil {
+			return fmt.Errorf("stat %q failed: %w", fullExistingPath, err)
+		}
+		actualPerm := uint32(stat.Mode) & 07777
+		if actualPerm == kernelPerm {
+			klog.V(4).Infof("Directory %s already exists with correct permissions", fullExistingPath)
+			return nil
+		}
+		klog.V(4).Infof("Directory %s already exists with permissions %04o, expected %04o; will correct", fullExistingPath, actualPerm, kernelPerm)
+
+		rwFD, err := syscall.Open(fmt.Sprintf("/proc/self/fd/%d", parentFD), syscall.O_RDONLY|unix.O_DIRECTORY|syscall.O_CLOEXEC, 0)
+		if err != nil {
+			return fmt.Errorf("reopening directory %q failed: %w", fullExistingPath, err)
+		}
+		defer func() {
+			if err := syscall.Close(rwFD); err != nil {
+				klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", rwFD, fullExistingPath, err)
+			}
+		}()
+		if err = syscall.Fchmod(rwFD, kernelPerm); err != nil {
+			return fmt.Errorf("chmod %q failed: %w", fullExistingPath, err)
+		}
+		return nil
+	}
 
 	currentPath := fullExistingPath
 	// create the directories one by one, making sure nobody can change
@@ -469,19 +508,8 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		// so user can read/write it.
 		// parentFD is the last created directory.
 
-		// Translate perm (os.FileMode) to uint32 that fchmod() expects
-		kernelPerm := uint32(perm & os.ModePerm)
-		if perm&os.ModeSetgid > 0 {
-			kernelPerm |= syscall.S_ISGID
-		}
-		if perm&os.ModeSetuid > 0 {
-			kernelPerm |= syscall.S_ISUID
-		}
-		if perm&os.ModeSticky > 0 {
-			kernelPerm |= syscall.S_ISVTX
-		}
 		if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
-			return fmt.Errorf("chmod %q failed: %s", currentPath, err)
+			return fmt.Errorf("chmod %q failed: %w", currentPath, err)
 		}
 	}
 
