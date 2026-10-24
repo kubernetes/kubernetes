@@ -411,6 +411,25 @@ func TestEmptyRange(t *testing.T) {
 	testJSONPath(tests, true, t)
 }
 
+func TestEmptyArrayAmongMultipleInputs(t *testing.T) {
+	var input = []byte(`{"items":[
+		{"name":"a","tags":["x","y"]},
+		{"name":"b","tags":[]},
+		{"name":"c","tags":["z"]}
+	]}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []jsonpathTest{
+		{"wildcard", `{.items[*].tags[*]}`, data, "x y z", false},
+		{"empty slice", `{.items[*].tags[1:1]}`, data, "", false},
+	}
+	testJSONPath(tests, false, t)
+}
+
 func TestNestedRanges(t *testing.T) {
 	var input = []byte(`{
 		"items": [
