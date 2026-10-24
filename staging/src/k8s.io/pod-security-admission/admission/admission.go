@@ -662,12 +662,36 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 			return true
 		}
 	}
-	return false
+	return podSecurityAnnotationsChanged(pod.Annotations, oldPod.Annotations)
 }
 
 // isSignificantContainerUpdate determines whether a container update should trigger a policy evaluation.
 func isSignificantContainerUpdate(container, oldContainer *corev1.Container) bool {
 	return container.Image != oldContainer.Image
+}
+
+// podSecurityAnnotationsChanged reports whether any seccomp or AppArmor annotation
+// that is read by the pod security policy has changed between two annotations.
+func podSecurityAnnotationsChanged(newAnnotations, oldAnnotations map[string]string) bool {
+	for k, v := range newAnnotations {
+		if isSecurityAnnotationKey(k) && v != oldAnnotations[k] {
+			return true
+		}
+	}
+	for k, v := range oldAnnotations {
+		if isSecurityAnnotationKey(k) && newAnnotations[k] != v {
+			return true
+		}
+	}
+	return false
+}
+
+// isSecurityAnnotationKey returns true if the key is an annotation that the
+// pod security policy reads for seccomp or AppArmor enforcement.
+func isSecurityAnnotationKey(key string) bool {
+	return key == corev1.SeccompPodAnnotationKey ||
+		strings.HasPrefix(key, corev1.SeccompContainerAnnotationKeyPrefix) ||
+		strings.HasPrefix(key, corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix)
 }
 
 func (a *Admission) exemptNamespace(namespace string) bool {
