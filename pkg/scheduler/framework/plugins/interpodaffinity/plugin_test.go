@@ -348,55 +348,95 @@ func TestPodAffinitySignature(t *testing.T) {
 		name              string
 		pod               *v1.Pod
 		expectedSignature []fwk.SignFragment
-		schedulable       bool
 		config            config.InterPodAffinityArgs
 	}{
 		{
 			name: "no affinity, default settings",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
+					Namespace: "ns-a",
+					Labels:    map[string]string{"foo": "bar"},
 				},
-				Spec: v1.PodSpec{},
 			},
 			expectedSignature: []fwk.SignFragment{
-				{
-					Key:   fwk.LabelsSignerName,
-					Value: map[string]string{"foo": "bar"},
-				},
+				{Key: fwk.NamespaceSignerName, Value: "ns-a"},
+				{Key: fwk.LabelsSignerName, Value: map[string]string{"foo": "bar"}},
 			},
-			schedulable: true,
 		},
 		{
 			name: "no affinity, ignore setting set",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
+					Namespace: "ns-a",
+					Labels:    map[string]string{"foo": "bar"},
 				},
-				Spec: v1.PodSpec{},
 			},
-			schedulable: true,
 			config: config.InterPodAffinityArgs{
 				IgnorePreferredTermsOfExistingPods: true,
 			},
 		},
 		{
-			name: "affinity set",
+			name: "pod affinity",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
+					Namespace: "ns-a",
+					Labels:    map[string]string{"foo": "bar"},
 				},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{},
-							},
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+								TopologyKey: "zone",
+							}},
 						},
 					},
 				},
 			},
-			schedulable: false,
+			expectedSignature: []fwk.SignFragment{
+				{Key: fwk.NamespaceSignerName, Value: "ns-a"},
+				{Key: fwk.LabelsSignerName, Value: map[string]string{"foo": "bar"}},
+				{
+					Key: fwk.PodAffinitySignerName,
+					Value: &v1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+							TopologyKey: "zone",
+						}},
+					},
+				},
+			},
+		},
+		{
+			name: "pod anti-affinity",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-b"},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+								Weight: 10,
+								PodAffinityTerm: v1.PodAffinityTerm{
+									TopologyKey: "rack",
+								},
+							}},
+						},
+					},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{Key: fwk.NamespaceSignerName, Value: "ns-b"},
+				{Key: fwk.LabelsSignerName, Value: map[string]string(nil)},
+				{
+					Key: fwk.PodAntiAffinitySignerName,
+					Value: &v1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+							Weight: 10,
+							PodAffinityTerm: v1.PodAffinityTerm{
+								TopologyKey: "rack",
+							},
+						}},
+					},
+				},
+			},
 		},
 	}
 
@@ -411,10 +451,9 @@ func TestPodAffinitySignature(t *testing.T) {
 			p := pl.(*InterPodAffinity)
 			signature, status := p.SignPod(ctx, test.pod)
 
-			if !status.IsSuccess() && test.schedulable {
+			if !status.IsSuccess() {
 				t.Fatalf("Expected success, got %v", status)
 			}
-
 			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
 				t.Fatalf("Diff %s", diff)
 			}

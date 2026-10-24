@@ -58,25 +58,36 @@ func (pl *InterPodAffinity) Name() string {
 	return Name
 }
 
-// Inter pod affinity make feasibility and scoring dependent on the placement of other
-// pods in addition the current pod and node, so we cannot sign pods with these
-// constraints.
-func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	if pod.Spec.Affinity != nil && (pod.Spec.Affinity.PodAffinity != nil || pod.Spec.Affinity.PodAntiAffinity != nil) {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with InterPodAffinity are not signable")
+func (pl *InterPodAffinity) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	if pod.Spec.Affinity == nil || (pod.Spec.Affinity.PodAffinity == nil && pod.Spec.Affinity.PodAntiAffinity == nil) {
+		// If this option is set then we only consider affinity between pods that have affinity configured,
+		// so we can ignore the pod's namespace and labels if it doesn't have rules set.
+		if pl.args.IgnorePreferredTermsOfExistingPods {
+			return nil, nil
+		}
+		return []fwk.SignFragment{
+			{Key: fwk.NamespaceSignerName, Value: pod.Namespace},
+			{Key: fwk.LabelsSignerName, Value: pod.Labels},
+		}, nil
 	}
 
-	// If this option is set then we only consider affinity between pods that have affinity configured,
-	// so we can ignore the pods labels if it doesn't have rules set.
-	// Otherwise we need to include the pod's labels to ensure we catch affinity between the pod
-	// and other pods which may have affinity rules set.
-	if pl.args.IgnorePreferredTermsOfExistingPods {
-		return nil, nil
-	}
-
-	return []fwk.SignFragment{
+	fragments := []fwk.SignFragment{
+		{Key: fwk.NamespaceSignerName, Value: pod.Namespace},
 		{Key: fwk.LabelsSignerName, Value: pod.Labels},
-	}, nil
+	}
+	if pod.Spec.Affinity.PodAffinity != nil {
+		fragments = append(fragments, fwk.SignFragment{
+			Key:   fwk.PodAffinitySignerName,
+			Value: pod.Spec.Affinity.PodAffinity,
+		})
+	}
+	if pod.Spec.Affinity.PodAntiAffinity != nil {
+		fragments = append(fragments, fwk.SignFragment{
+			Key:   fwk.PodAntiAffinitySignerName,
+			Value: pod.Spec.Affinity.PodAntiAffinity,
+		})
+	}
+	return fragments, nil
 }
 
 // EventsToRegister returns the possible events that may make a failed Pod
