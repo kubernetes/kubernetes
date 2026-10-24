@@ -234,9 +234,6 @@ func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *
 func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
 	cpuLim := expectedResources.Limits.Cpu()
-	if cpuLim.IsZero() && pod.Spec.Resources != nil {
-		cpuLim = pod.Spec.Resources.Limits.Cpu()
-	}
 	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
 	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
@@ -247,9 +244,6 @@ func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v
 func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
 	memLim := expectedResources.Limits.Memory()
-	if memLim.IsZero() && pod.Spec.Resources != nil {
-		memLim = pod.Spec.Resources.Limits.Memory()
-	}
 	expectedMemLim := getExpectedMemLimitString(memLim, podOnCgroupv2)
 	if expectedMemLim == "0" {
 		return nil
@@ -260,10 +254,42 @@ func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod
 	return nil
 }
 
+// ExpectedContainerLimits returns the resource limits expected in a container's
+// cgroup given the container's declared resources. When a container does not
+// declare its own CPU/memory limit but the pod defines pod-level limits, the
+// pod-level limit is propagated down to the container cgroup, so that is the
+// value we must expect. When neither is set, the limit is left unset so callers
+// assert "no limit" (e.g. containers with exclusive CPUs).
+func ExpectedContainerLimits(pod *v1.Pod, declared *v1.ResourceRequirements) *v1.ResourceRequirements {
+	expected := &v1.ResourceRequirements{Limits: make(v1.ResourceList)}
+	if declared == nil {
+		return expected
+	}
+
+	cpuLim := declared.Limits.Cpu()
+	if cpuLim.IsZero() && pod != nil && pod.Spec.Resources != nil {
+		cpuLim = pod.Spec.Resources.Limits.Cpu()
+	}
+	if !cpuLim.IsZero() {
+		expected.Limits[v1.ResourceCPU] = cpuLim.DeepCopy()
+	}
+
+	memLim := declared.Limits.Memory()
+	if memLim.IsZero() && pod != nil && pod.Spec.Resources != nil {
+		memLim = pod.Spec.Resources.Limits.Memory()
+	}
+	if !memLim.IsZero() {
+		expected.Limits[v1.ResourceMemory] = memLim.DeepCopy()
+	}
+
+	return expected
+}
+
 func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
 	var errs []error
-	errs = append(errs, VerifyContainerMemoryLimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
+	expectedLimits := ExpectedContainerLimits(pod, &tc.Resources)
+	errs = append(errs, VerifyContainerMemoryLimit(ctx, f, pod, tc.Name, expectedLimits, podOnCgroupv2))
+	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, expectedLimits, podOnCgroupv2))
 	errs = append(errs, verifyContainerCPUWeight(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
 	return utilerrors.NewAggregate(errs)
 }
