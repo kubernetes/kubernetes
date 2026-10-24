@@ -21999,7 +21999,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 					},
 					"imageID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "imageID is the image ID of the container's image. The image ID may not match the image ID of the image used in the PodSpec, as it may have been resolved by the runtime.",
+							Description: "imageID is the image ID of the container's image. The image ID may not match the image ID of the image used in the PodSpec, as it may have been resolved by the runtime.\n\nThe format and meaning of imageID are determined by the container runtime (CRI) and may differ between runtimes, runtime configurations, and nodes. Depending on the runtime and on how the image was pulled or loaded, it may be a repository digest reference (for example \"registry.example.com/image@sha256:...\"), which may identify either a multi-platform image index or a platform-specific manifest, or an image configuration digest (for example \"sha256:...\"), which is not a manifest reference and cannot be pulled from a registry. Clients should not assume a particular format. To find the image that was requested, use the image field in the PodSpec.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
