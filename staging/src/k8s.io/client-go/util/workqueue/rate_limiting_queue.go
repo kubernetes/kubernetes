@@ -155,3 +155,17 @@ func (q *rateLimitingType[T]) NumRequeues(item T) int {
 func (q *rateLimitingType[T]) Forget(item T) {
 	q.rateLimiter.Forget(item)
 }
+
+// Pause stops Get from returning items until Resume or ShutDown is called.
+func (q *rateLimitingType[T]) Pause() {
+	if p, ok := q.TypedDelayingInterface.(Pausable); ok {
+		p.Pause()
+	}
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *rateLimitingType[T]) Resume() {
+	if p, ok := q.TypedDelayingInterface.(Pausable); ok {
+		p.Resume()
+	}
+}

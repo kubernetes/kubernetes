@@ -248,6 +248,20 @@ func (q *delayingType[T]) ShutDown() {
 	})
 }
 
+// Pause stops Get from returning items until Resume or ShutDown is called.
+func (q *delayingType[T]) Pause() {
+	if p, ok := q.TypedInterface.(Pausable); ok {
+		p.Pause()
+	}
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *delayingType[T]) Resume() {
+	if p, ok := q.TypedInterface.(Pausable); ok {
+		p.Resume()
+	}
+}
+
 // AddAfter adds the given item to the work queue after the given delay
 func (q *delayingType[T]) AddAfter(item T, duration time.Duration) {
 	// don't add if we're already shutting down
