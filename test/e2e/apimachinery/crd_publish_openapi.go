@@ -669,17 +669,27 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return false, err
+			lastMsg = fmt.Sprintf("HTTP request failed: %v", err)
+			return false, nil
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNotModified {
-			spec = etagSpec
+			if etagSpec != nil {
+				spec = etagSpec
+			} else {
+				etag = ""
+				lastMsg = "received 304 without cached OpenAPI spec"
+				return false, nil
+			}
 		} else if resp.StatusCode != http.StatusOK {
-			return false, fmt.Errorf("unexpected response: %d", resp.StatusCode)
+			lastMsg = fmt.Sprintf("unexpected response: %d", resp.StatusCode)
+			return false, nil
 		} else if bs, err := io.ReadAll(resp.Body); err != nil {
-			return false, err
+			lastMsg = fmt.Sprintf("failed to read response body: %v", err)
+			return false, nil
 		} else if err := json.Unmarshal(bs, spec); err != nil {
-			return false, err
+			lastMsg = fmt.Sprintf("failed to unmarshal spec: %v", err)
+			return false, nil
 		} else {
 			etag = strings.Trim(resp.Header.Get("ETag"), `"`)
 			etagSpec = spec
