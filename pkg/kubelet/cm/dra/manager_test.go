@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/ktesting"
@@ -2227,7 +2229,68 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
 	})
 
-	// Test Case 2: Health change for a non-allocated device
+	// A connected stream which stops sending must still expire device health.
+	t.Run("HealthTimeoutForAllocatedDevice", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		initialClaim := genTestClaimInfo(claimUID, []string{string(podUID)}, true, nil)
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+		fakeClock := clocktesting.NewFakeClock(time.Now())
+		manager.healthInfoCache.clock = fakeClock
+		go manager.runHealthInfoExpirationLoop(stCtx)
+
+		responses := make(chan struct {
+			Resp *drahealthv1.NodeWatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+		responses <- struct {
+			Resp *drahealthv1.NodeWatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{{
+				Device: &drahealthv1.DeviceIdentifier{
+					PoolName:   poolName,
+					DeviceName: deviceName,
+				},
+				Health:                    drahealthv1.HealthStatus_HEALTHY,
+				LastUpdatedTime:           fakeClock.Now().Unix(),
+				HealthCheckTimeoutSeconds: 1,
+				Message:                   "fresh health",
+			}}},
+		}
+
+		select {
+		case update := <-updateChan:
+			assert.ElementsMatch(t, []string{string(podUID)}, update.PodUIDs)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for the initial device health update")
+		}
+		require.Eventually(t, fakeClock.HasWaiters, wait.ForeverTestTimeout, time.Millisecond, "expiration loop did not start a deadline timer")
+
+		fakeClock.Step(time.Second)
+		select {
+		case update := <-updateChan:
+			assert.ElementsMatch(t, []string{string(podUID)}, update.PodUIDs)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for the device health expiration update")
+		}
+
+		health := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		assert.Equal(t, state.DeviceHealthStatusUnknown, health.Health)
+		assert.Empty(t, health.Message)
+
+		close(responses)
+		select {
+		case <-done:
+			require.NoError(t, <-streamErrChan)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for the health stream to stop")
+		}
+	})
+
+	// Test Case 3: Health change for a non-allocated device
 	t.Run("NonAllocatedDeviceChange", func(t *testing.T) {
 		stCtx, stCancel := context.WithCancel(overallTestCtx)
 		defer stCancel()
