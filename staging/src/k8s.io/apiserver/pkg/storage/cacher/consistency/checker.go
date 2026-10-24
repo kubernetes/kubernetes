@@ -117,31 +117,29 @@ func (c *Checker) CalculateDigests(ctx context.Context) (*Digest, error) {
 	if !c.cacher.Ready() {
 		return nil, fmt.Errorf("cache is not ready")
 	}
-	// variables for tracking the diff in consistency checker
-	cacheItems := []namespaceNameRV{}
-	var foundDiff *diffDetail
+	// snapshot cache items for positional comparison against etcd below.
+	cacheItems := []NamespaceNameRV{}
+	var foundDiff *DiffDetail
 	var etcdIndex int
 
 	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0, func(obj metav1.Object) {
-		// collect items from cacher's list
-		cacheItems = append(cacheItems, namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()})
+		cacheItems = append(cacheItems, NamespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
 	}
 	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, checkerListPageSize, func(obj metav1.Object) {
-		// compare the item in etcd's list against cacheItems which is cacher's list
 		if foundDiff != nil {
 			return
 		}
-		etcdItem := namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()}
+		etcdItem := NamespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()}
 		if len(cacheItems) <= etcdIndex {
-			foundDiff = &diffDetail{Index: etcdIndex, EtcdItem: &etcdItem}
+			foundDiff = &DiffDetail{Index: etcdIndex, EtcdItem: &etcdItem}
 			cacheItems = nil // don't need it any more and nil it to allow GC to collect it
 			return
 		}
 		if cacheItem := cacheItems[etcdIndex]; cacheItem != etcdItem {
-			foundDiff = &diffDetail{Index: etcdIndex, EtcdItem: &etcdItem, CacheItem: &cacheItem}
+			foundDiff = &DiffDetail{Index: etcdIndex, EtcdItem: &etcdItem, CacheItem: &cacheItem}
 			cacheItems = nil // don't need it any more and nil it to allow GC to collect it
 			return
 		}
@@ -152,7 +150,7 @@ func (c *Checker) CalculateDigests(ctx context.Context) (*Digest, error) {
 	}
 	if len(cacheItems) > etcdIndex {
 		cacheItem := cacheItems[etcdIndex]
-		foundDiff = &diffDetail{Index: etcdIndex, CacheItem: &cacheItem}
+		foundDiff = &DiffDetail{Index: etcdIndex, CacheItem: &cacheItem}
 	}
 	if cacheResourceVersion != etcdResourceVersion {
 		return nil, fmt.Errorf("etcd returned different resource version then expected, cache: %q, etcd: %q", cacheResourceVersion, etcdResourceVersion)
@@ -165,23 +163,43 @@ func (c *Checker) CalculateDigests(ctx context.Context) (*Digest, error) {
 	}, nil
 }
 
-type namespaceNameRV struct {
+// NamespaceNameRV is the minimal identity of an object used during consistency checks.
+type NamespaceNameRV struct {
 	Namespace string
 	Name      string
 	RV        string
 }
 
-type diffDetail struct {
-	Index     int
-	CacheItem *namespaceNameRV
-	EtcdItem  *namespaceNameRV
+func (n *NamespaceNameRV) String() string {
+	if n == nil {
+		return "<nil>"
+	}
+	return n.Namespace + "/" + n.Name + "@" + n.RV
 }
 
+// DiffDetail is the first position where etcd and the watch cache diverge.
+type DiffDetail struct {
+	// Index is the position of the diverging item in the sorted list.
+	Index     int
+	// CacheItem is what the watch cache has at Index; nil means the cache is missing it.
+	CacheItem *NamespaceNameRV
+	// EtcdItem is what etcd has at Index; nil means etcd is missing it.
+	EtcdItem  *NamespaceNameRV
+}
+
+func (d *DiffDetail) String() string {
+	if d == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("index=%d cache=%s etcd=%s", d.Index, d.CacheItem, d.EtcdItem)
+}
+
+// Digest is the result of a single consistency check run.
 type Digest struct {
 	ResourceVersion string
 	CacheDigest     string
 	EtcdDigest      string
-	DiffDetail      *diffDetail
+	DiffDetail      *DiffDetail
 }
 
 func (c *Checker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64, metaVisitor func(objectMeta metav1.Object)) (digest, rv string, err error) {
