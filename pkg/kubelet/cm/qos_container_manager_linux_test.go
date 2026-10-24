@@ -21,6 +21,7 @@ package cm
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -819,5 +820,62 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestSaturatingAdd(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		a, b     int64
+		expected int64
+	}{
+		{"ordinary", 100, 200, 300},
+		{"zero", 0, 0, 0},
+		{"positive overflow clamps", math.MaxInt64, 1, math.MaxInt64},
+		{"positive overflow clamps, both large", math.MaxInt64, math.MaxInt64, math.MaxInt64},
+		{"negative overflow clamps", math.MinInt64, -1, math.MinInt64},
+		{"at the rail without overflow", math.MaxInt64 - 1, 1, math.MaxInt64},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, saturatingAdd(tc.a, tc.b))
+		})
+	}
+}
+
+func TestPercentOf(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		value    int64
+		percent  int64
+		expected int64
+	}{
+		{"half", 1000, 50, 500},
+		{"all", 1000, 100, 1000},
+		{"none", 1000, 0, 0},
+		{"truncates like integer division", 99, 50, 49},
+		{"zero value", 0, 50, 0},
+		// value*percent overflows int64 here, and the direct expression returns 0.
+		// percentOf returns the exact floor, which for 50% is MaxInt64/2.
+		{"no intermediate overflow", math.MaxInt64, 50, math.MaxInt64 / 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := percentOf(tc.value, tc.percent)
+			assert.Equal(t, tc.expected, got)
+			assert.GreaterOrEqual(t, got, int64(0), "a percentage of a non-negative value must not be negative")
+		})
+	}
+}
+
+// TestPercentOfMatchesDirectExpression pins percentOf to the arithmetic it replaces
+// for every input where that arithmetic does not overflow.
+func TestPercentOfMatchesDirectExpression(t *testing.T) {
+	values := []int64{0, 1, 7, 99, 100, 101, 1 << 20, 1 << 40, math.MaxInt64 / 100}
+	for _, v := range values {
+		for p := int64(0); p <= 100; p++ {
+			if v != 0 && p != 0 && v > math.MaxInt64/p {
+				continue // direct expression would overflow; nothing to compare against
+			}
+			assert.Equal(t, v*p/100, percentOf(v, p), "value=%d percent=%d", v, p)
+		}
 	}
 }
