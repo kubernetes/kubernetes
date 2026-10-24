@@ -322,7 +322,7 @@ func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListRespons
 			resp, err = c.listMembersOnce()
 			if err != nil {
 				lastError = err
-				return false, err
+				return false, nil
 			}
 			return true, nil
 		})
