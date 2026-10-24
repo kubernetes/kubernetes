@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/path"
 	"k8s.io/apiserver/pkg/authorization/union"
-	"k8s.io/apiserver/pkg/server"
+	server "k8s.io/apiserver/pkg/server/serving"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"

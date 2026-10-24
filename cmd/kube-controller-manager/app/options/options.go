@@ -27,7 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/flagz"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
