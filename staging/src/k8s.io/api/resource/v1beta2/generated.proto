@@ -81,6 +81,7 @@ message AllocatedDeviceStatus {
   // +k8s:alpha(since: "1.37")=+k8s:optional
   // +k8s:alpha(since: "1.37")=+k8s:listType=map
   // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:alpha(since: "1.38")=+k8s:maxItems=8
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
 
   // Data contains arbitrary driver-specific data.
@@ -450,6 +451,7 @@ message Device {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxItems=16
   repeated DeviceTaint taints = 8;
 
   // bindsToNode indicates if the usage of an allocation involving this device
@@ -1471,6 +1473,7 @@ message DeviceTaintRuleStatus {
   // +k8s:alpha(since: "1.37")=+k8s:optional
   // +k8s:alpha(since: "1.37")=+k8s:listType=map
   // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:alpha(since: "1.38")=+k8s:maxItems=8
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 

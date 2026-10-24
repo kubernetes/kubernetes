@@ -230,6 +230,9 @@ func init() {
 			"status.devices[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"status.devices[*].conditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
 			"status.devices[*].conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
