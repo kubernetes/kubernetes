@@ -140,6 +140,11 @@
             "default": {},
             "description": "scaleTargetRef is the reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
           },
+          "syncPeriodSeconds": {
+            "description": "syncPeriodSeconds is the delay after a reconciliation completes before the next periodic reconciliation of this HPA is eligible to run. Other events may trigger reconciliation before the delay expires. When unset, the global --horizontal-pod-autoscaler-sync-period is used. A short period does not make metrics fresher; it is useful only when the metrics source updates its values at least as often. The value must be in the range [3, 3600]. Timing is best-effort.",
+            "format": "int32",
+            "type": "integer"
+          },
           "targetCPUUtilizationPercentage": {
             "description": "targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
             "format": "int32",

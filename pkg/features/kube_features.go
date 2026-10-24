@@ -466,6 +466,12 @@ const (
 	// Enables the Protocol field on HTTPGetAction to select the wire protocol (HTTP/1.1 or HTTP/2).
 	H2CContainerProbe featuregate.Feature = "H2CContainerProbe"
 
+	// owner: @Fedosin
+	// kep: https://kep.k8s.io/6003
+	//
+	// Enables a per-HPA sync period set through spec.syncPeriodSeconds.
+	HPAConfigurableSyncPeriod featuregate.Feature = "HPAConfigurableSyncPeriod"
+
 	// owner: @jm-franc
 	// kep: https://kep.k8s.io/4951
 	//
@@ -1555,6 +1561,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	HPAConfigurableSyncPeriod: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	HPAConfigurableTolerance: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2508,6 +2518,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
 
 	H2CContainerProbe: {NodeDeclaredFeatures},
+
+	HPAConfigurableSyncPeriod: {},
 
 	HPAConfigurableTolerance: {},
 

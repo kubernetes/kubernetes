@@ -66,6 +66,7 @@ import (
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
@@ -410,6 +411,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 	monitor.MetricComputationDuration.Reset()
 	monitor.NumHorizontalPodAutoscalers.Set(0)
 	monitor.DesiredReplicasCount.Reset()
+	monitor.ReconciliationDelayRatio.Reset()
 	hpaController.monitor = monitor.New()
 
 	if s.recommendations != nil {
@@ -6750,20 +6752,24 @@ func TestBuildQuantity(t *testing.T) {
 // were enqueued via Add (immediate) or AddRateLimited (delayed).
 type spyWorkQueue struct {
 	workqueue.TypedRateLimitingInterface[string]
-	mu                  sync.Mutex
-	addCalls            []string
-	addRateLimitedCalls []string
-	onAdd               func(string)
+	rateLimiter          *PerItemIntervalRateLimiter
+	mu                   sync.Mutex
+	addCalls             []string
+	addRateLimitedCalls  []string
+	addRateLimitedDelays []time.Duration
+	onAdd                func(string)
 }
 
 func newSpyWorkQueue(resyncPeriod time.Duration) *spyWorkQueue {
+	rateLimiter := NewDefaultHPARateLimiter(resyncPeriod)
 	return &spyWorkQueue{
 		TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(resyncPeriod),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Name: "test-spy",
 			},
 		),
+		rateLimiter: rateLimiter,
 	}
 }
 
@@ -6781,8 +6787,17 @@ func (s *spyWorkQueue) Add(item string) {
 func (s *spyWorkQueue) AddRateLimited(item string) {
 	s.mu.Lock()
 	s.addRateLimitedCalls = append(s.addRateLimitedCalls, item)
+	s.addRateLimitedDelays = append(s.addRateLimitedDelays, s.rateLimiter.When(item))
 	s.mu.Unlock()
 	s.TypedRateLimitingInterface.AddRateLimited(item)
+}
+
+func (s *spyWorkQueue) getAddRateLimitedDelays() []time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]time.Duration, len(s.addRateLimitedDelays))
+	copy(result, s.addRateLimitedDelays)
+	return result
 }
 
 func (s *spyWorkQueue) getAddCalls() []string {
@@ -6804,8 +6819,11 @@ func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
 func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
 	monitor.Register()
 	ctrl := &HorizontalController{
-		queue:   spy,
-		monitor: monitor.New(),
+		queue:       spy,
+		rateLimiter: spy.rateLimiter,
+		requeues:    newRequeueTracker(),
+		clock:       clock.RealClock{},
+		monitor:     monitor.New(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
 		ctrl.selectorTracker = newHPASelectorStore()
@@ -7017,6 +7035,109 @@ func TestUpdateHPAFallsBackWhenFeatureDisabled(t *testing.T) {
 		"with HPAGeneration disabled, all updates should be rate-limited")
 }
 
+func TestUpdateHPARefreshesSyncPeriod(t *testing.T) {
+	const (
+		key          = "test-ns/test-hpa"
+		globalPeriod = 10 * time.Minute
+	)
+	newHPA := func(generation int64, syncPeriodSeconds *int32, currentReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+		return &autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-hpa",
+				Namespace:  "test-ns",
+				Generation: generation,
+			},
+			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+				SyncPeriodSeconds: syncPeriodSeconds,
+			},
+			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: currentReplicas,
+			},
+		}
+	}
+	resynced := newHPA(1, ptr.To[int32](30), 3)
+
+	tests := []struct {
+		name               string
+		gateEnabled        bool
+		existingInterval   time.Duration
+		oldObj             *autoscalingv2.HorizontalPodAutoscaler
+		curObj             *autoscalingv2.HorizontalPodAutoscaler
+		expectedInterval   time.Duration
+		expectedOverride   bool
+		expectImmediateAdd bool
+	}{
+		{
+			name:               "setting the field on a spec change enqueues immediately",
+			gateEnabled:        true,
+			oldObj:             newHPA(1, nil, 3),
+			curObj:             newHPA(2, ptr.To[int32](30), 3),
+			expectedInterval:   30 * time.Second,
+			expectedOverride:   true,
+			expectImmediateAdd: true,
+		},
+		{
+			name:             "status-only update requeues with the per-HPA interval",
+			gateEnabled:      true,
+			oldObj:           newHPA(1, ptr.To[int32](30), 3),
+			curObj:           newHPA(1, ptr.To[int32](30), 5),
+			expectedInterval: 30 * time.Second,
+			expectedOverride: true,
+		},
+		{
+			name:             "resync requeues with the per-HPA interval",
+			gateEnabled:      true,
+			oldObj:           resynced,
+			curObj:           resynced,
+			expectedInterval: 30 * time.Second,
+			expectedOverride: true,
+		},
+		{
+			name:               "removing the field restores the global interval",
+			gateEnabled:        true,
+			existingInterval:   30 * time.Second,
+			oldObj:             newHPA(1, ptr.To[int32](30), 3),
+			curObj:             newHPA(2, nil, 3),
+			expectedInterval:   globalPeriod,
+			expectImmediateAdd: true,
+		},
+		{
+			name:             "gate disabled ignores the field",
+			gateEnabled:      false,
+			existingInterval: 30 * time.Second,
+			oldObj:           resynced,
+			curObj:           resynced,
+			expectedInterval: globalPeriod,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableSyncPeriod, tt.gateEnabled)
+			spy := newSpyWorkQueue(globalPeriod)
+			defer spy.ShutDown()
+			ctrl := newTestEnqueueController(spy)
+			if tt.existingInterval > 0 {
+				spy.rateLimiter.SetInterval(key, tt.existingInterval)
+			}
+
+			ctrl.updateHPA(tt.oldObj, tt.curObj)
+
+			interval, override := spy.rateLimiter.Interval(key)
+			assert.Equal(t, tt.expectedInterval, interval)
+			assert.Equal(t, tt.expectedOverride, override)
+			if tt.expectImmediateAdd {
+				assert.Equal(t, []string{key}, spy.getAddCalls(), "expected queue.Add for a spec change")
+				assert.Empty(t, spy.getAddRateLimitedCalls())
+			} else {
+				assert.Empty(t, spy.getAddCalls())
+				assert.Equal(t, []time.Duration{tt.expectedInterval}, spy.getAddRateLimitedDelays(),
+					"the rate-limited requeue must use the refreshed interval")
+			}
+		})
+	}
+}
+
 // fakeRVGetter satisfies consistencyutil.LastSyncRVGetter for tests.
 type fakeRVGetter struct {
 	rv string
@@ -7026,15 +7147,19 @@ func (f *fakeRVGetter) LastStoreSyncResourceVersion() string { return f.rv }
 
 func newConsistencyTestController(hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
 	monitor.Register()
+	rateLimiter := NewDefaultHPARateLimiter(time.Minute)
 	ctrl := &HorizontalController{
 		hpaLister:        hpaLister,
 		hpaListerSynced:  alwaysReady,
 		monitor:          monitor.New(),
 		consistencyStore: consistencyStore,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(time.Minute),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "test"},
 		),
+		rateLimiter: rateLimiter,
+		requeues:    newRequeueTracker(),
+		clock:       clock.RealClock{},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
 		ctrl.selectorTracker = newHPASelectorStore()

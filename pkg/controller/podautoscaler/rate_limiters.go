@@ -17,41 +17,74 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"sync"
 	"time"
 
 	"k8s.io/client-go/util/workqueue"
 )
 
-// FixedItemIntervalRateLimiter limits items to a fixed-rate interval
-type FixedItemIntervalRateLimiter struct {
-	interval time.Duration
+// PerItemIntervalRateLimiter limits items to a fixed-rate interval, which can
+// be overridden for individual items.
+type PerItemIntervalRateLimiter struct {
+	defaultInterval time.Duration
+
+	mu        sync.RWMutex
+	intervals map[string]time.Duration
 }
 
-var _ workqueue.TypedRateLimiter[string] = &FixedItemIntervalRateLimiter{}
+var _ workqueue.TypedRateLimiter[string] = &PerItemIntervalRateLimiter{}
 
-// NewFixedItemIntervalRateLimiter creates a new instance of a RateLimiter using a fixed interval
-func NewFixedItemIntervalRateLimiter(interval time.Duration) workqueue.TypedRateLimiter[string] {
-	return &FixedItemIntervalRateLimiter{
-		interval: interval,
+// NewPerItemIntervalRateLimiter creates a rate limiter that returns defaultInterval
+// for every item without an override.
+func NewPerItemIntervalRateLimiter(defaultInterval time.Duration) *PerItemIntervalRateLimiter {
+	return &PerItemIntervalRateLimiter{
+		defaultInterval: defaultInterval,
+		intervals:       map[string]time.Duration{},
 	}
 }
 
-// When returns the interval of the rate limiter
-func (r *FixedItemIntervalRateLimiter) When(item string) time.Duration {
-	return r.interval
+// When returns the interval of the item.
+func (r *PerItemIntervalRateLimiter) When(item string) time.Duration {
+	interval, _ := r.Interval(item)
+	return interval
+}
+
+// Interval returns the interval of the item and whether it comes from an override.
+func (r *PerItemIntervalRateLimiter) Interval(item string) (time.Duration, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if interval, ok := r.intervals[item]; ok {
+		return interval, true
+	}
+	return r.defaultInterval, false
+}
+
+// SetInterval overrides the interval of the item.
+func (r *PerItemIntervalRateLimiter) SetInterval(item string, interval time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.intervals[item] = interval
+}
+
+// RemoveInterval removes the override of the item, so it uses the default interval again.
+func (r *PerItemIntervalRateLimiter) RemoveInterval(item string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.intervals, item)
 }
 
 // NumRequeues returns back how many failures the item has had
-func (r *FixedItemIntervalRateLimiter) NumRequeues(item string) int {
+func (r *PerItemIntervalRateLimiter) NumRequeues(item string) int {
 	return 1
 }
 
-// Forget indicates that an item is finished being retried.
-func (r *FixedItemIntervalRateLimiter) Forget(item string) {
+// Forget indicates that an item is finished being retried. Overrides are kept
+// until RemoveInterval is called.
+func (r *PerItemIntervalRateLimiter) Forget(item string) {
 }
 
 // NewDefaultHPARateLimiter creates a rate limiter which limits overall (as per the
 // default controller rate limiter), as well as per the resync interval
-func NewDefaultHPARateLimiter(interval time.Duration) workqueue.TypedRateLimiter[string] {
-	return NewFixedItemIntervalRateLimiter(interval)
+func NewDefaultHPARateLimiter(interval time.Duration) *PerItemIntervalRateLimiter {
+	return NewPerItemIntervalRateLimiter(interval)
 }
