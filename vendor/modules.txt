@@ -1172,6 +1172,7 @@ k8s.io/utils/lru
 k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/ptr
+k8s.io/utils/set
 k8s.io/utils/strings
 k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
@@ -1181,6 +1182,11 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
+# sigs.k8s.io/iptables-wrappers v0.0.0-20261023210158-2deed57c5147
+## explicit; go 1.26
+sigs.k8s.io/iptables-wrappers/pkg/iptables
+sigs.k8s.io/iptables-wrappers/pkg/iptables/testing
+sigs.k8s.io/iptables-wrappers/pkg/xtables
 # sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 ## explicit; go 1.23
 sigs.k8s.io/json

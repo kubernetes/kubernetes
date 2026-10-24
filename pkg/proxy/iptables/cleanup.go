@@ -25,13 +25,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
-	ipts := utiliptables.NewBestEffort()
+	ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 	for _, ipt := range ipts {
 		encounteredError = cleanupLeftoversForFamily(ctx, ipt) || encounteredError
 	}
@@ -47,7 +47,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 			"-m", "comment", "--comment", jump.comment,
 			"-j", string(jump.dstChain),
 		)
-		if err := ipt.DeleteRule(jump.table, jump.srcChain, args...); err != nil {
+		if err := ipt.DeleteRule(ctx, jump.table, jump.srcChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing pure-iptables proxy rule")
 				encounteredError = true
@@ -57,7 +57,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 
 	// Flush and remove all of our "-t nat" chains.
 	iptablesData := bytes.NewBuffer(nil)
-	if err := ipt.SaveInto(utiliptables.TableNAT, iptablesData); err != nil {
+	if err := ipt.SaveInto(ctx, utiliptables.TableNAT, iptablesData); err != nil {
 		logger.Error(err, "Failed to execute iptables-save", "table", utiliptables.TableNAT)
 		encounteredError = true
 	} else {
@@ -84,7 +84,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		natRules.Write("COMMIT")
 		natLines := append(natChains.Bytes(), natRules.Bytes()...)
 		// Write it.
-		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+		err = ipt.Restore(ctx, natLines)
 		if err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableNAT)
 			metrics.IPTablesRestoreFailuresTotal.WithLabelValues(string(ipt.Protocol())).Inc()
@@ -94,7 +94,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 
 	// Flush and remove all of our "-t filter" chains.
 	iptablesData.Reset()
-	if err := ipt.SaveInto(utiliptables.TableFilter, iptablesData); err != nil {
+	if err := ipt.SaveInto(ctx, utiliptables.TableFilter, iptablesData); err != nil {
 		logger.Error(err, "Failed to execute iptables-save", "table", utiliptables.TableFilter)
 		encounteredError = true
 	} else {
@@ -112,7 +112,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		filterRules.Write("COMMIT")
 		filterLines := append(filterChains.Bytes(), filterRules.Bytes()...)
 		// Write it.
-		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
+		if err := ipt.Restore(ctx, filterLines); err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableFilter)
 			metrics.IPTablesRestoreFailuresTotal.WithLabelValues(string(ipt.Protocol())).Inc()
 			encounteredError = true
@@ -120,7 +120,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 	}
 
 	// Remove our "-t mangle" canary chain; ignore errors since it may not exist.
-	_ = ipt.DeleteChain(utiliptables.TableMangle, kubeProxyCanaryChain)
+	_ = ipt.DeleteChain(ctx, utiliptables.TableMangle, kubeProxyCanaryChain)
 
 	return encounteredError
 }
