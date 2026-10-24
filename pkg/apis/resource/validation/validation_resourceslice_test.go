@@ -504,7 +504,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"missing-pool-name": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "pool", "name"), ""),
+				field.Required(field.NewPath("spec", "pool", "name"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
@@ -2281,7 +2281,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			},
 		},
 		"invalid-update-drivername": {
-			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), name+"-updated", "field is immutable")},
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), name+"-updated", "field is immutable").WithOrigin("immutable").MarkCoveredByDeclarative()},
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				slice.Spec.Driver += "-updated"
@@ -2289,7 +2289,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			},
 		},
 		"invalid-update-pool": {
-			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "pool", "name"), validResourceSlice.Spec.Pool.Name+"-updated", "field is immutable")},
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "pool", "name"), validResourceSlice.Spec.Pool.Name+"-updated", "field is immutable").WithOrigin("immutable").MarkCoveredByDeclarative()},
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				slice.Spec.Pool.Name += "-updated"
