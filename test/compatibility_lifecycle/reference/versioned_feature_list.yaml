@@ -27,20 +27,6 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.31"
-- name: AllowOverwriteTerminationGracePeriodSeconds
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: "1.0"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.32"
-  - default: false
-    lockToDefault: true
-    preRelease: Deprecated
-    version: "1.35"
 - name: AllowParsingUserUIDFromCertAuth
   versionedSpecs:
   - default: true
