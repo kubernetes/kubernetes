@@ -68,7 +68,6 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
-
 	return validation.ValidateCSIDriver(csiDriver)
 }
 
