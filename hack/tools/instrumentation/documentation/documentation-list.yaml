@@ -4525,6 +4525,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_worker_errors_total
+  subsystem: kubelet
+  help: 'Cumulative number of errors in pod worker sync operations. Broken down by
+    operation type: create, update, sync, terminating, terminated'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation_type
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_worker_start_duration_seconds
   subsystem: kubelet
   help: Duration in seconds from kubelet seeing a pod to starting a worker.
@@ -4797,6 +4808,16 @@
     be collected on Linux.
   type: Counter
   stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: sync_result_errors_total
+  subsystem: kubelet
+  help: Cumulative number of SyncResult errors during pod sync. Broken down by action
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - action
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics

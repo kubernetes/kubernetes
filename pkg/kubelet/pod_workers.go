@@ -154,6 +154,17 @@ type podWork struct {
 	Options UpdatePodOptions
 }
 
+// operationType returns the operation_type label value for pod worker metrics.
+// TerminatedPod is special-cased because its UpdateType is not meaningful.
+func (w *podWork) operationType() string {
+	switch w.WorkType {
+	case TerminatedPod, TerminatingPod:
+		return w.WorkType.String()
+	default:
+		return w.Options.UpdateType.String()
+	}
+}
+
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	// UpdatePod notifies the pod worker of a change to a pod, which will then
@@ -1336,12 +1347,15 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 		case err != nil:
 			// we will queue a retry
 			logger.Error(err, "Error syncing pod, skipping", "pod", podRef, "podUID", podUID)
+			if !kubecontainer.IsBackoffError(err) {
+				metrics.PodWorkerErrorsTotal.WithLabelValues(update.operationType()).Inc()
+			}
 
 		case update.WorkType == TerminatedPod:
 			// we can shut down the worker
 			p.completeTerminated(logger, podUID)
 			if start := update.Options.StartTime; !start.IsZero() {
-				metrics.PodWorkerDuration.WithLabelValues("terminated").Observe(metrics.SinceInSeconds(start))
+				metrics.PodWorkerDuration.WithLabelValues(update.operationType()).Observe(metrics.SinceInSeconds(start))
 			}
 			logger.V(4).Info("Processing pod event done", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 			return
@@ -1351,7 +1365,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 			if update.Options.RunningPod != nil {
 				p.completeTerminatingRuntimePod(logger, podUID)
 				if start := update.Options.StartTime; !start.IsZero() {
-					metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
+					metrics.PodWorkerDuration.WithLabelValues(update.operationType()).Observe(metrics.SinceInSeconds(start))
 				}
 				logger.V(4).Info("Processing pod event done", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 				return
@@ -1370,7 +1384,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 		// queue a retry if necessary, then put the next event in the channel if any
 		p.completeWork(logger, podUID, phaseTransition, err)
 		if start := update.Options.StartTime; !start.IsZero() {
-			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
+			metrics.PodWorkerDuration.WithLabelValues(update.operationType()).Observe(metrics.SinceInSeconds(start))
 		}
 		logger.V(4).Info("Processing pod event done", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 	}
