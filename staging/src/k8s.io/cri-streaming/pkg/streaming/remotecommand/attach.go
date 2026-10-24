@@ -43,14 +43,16 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 	}
 	defer ctx.conn.Close()
 
+	var status *streamStatusError
 	err := attacher.AttachContainer(req.Context(), podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
 		err = fmt.Errorf("error attaching to container: %v", err)
 		runtime.HandleError(err)
-		ctx.writeStatus(newInternalError(err))
+		status = newInternalError(err)
 	} else {
-		ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
+		status = &streamStatusError{ErrStatus: streamStatus{
 			Status: statusSuccess,
-		}})
+		}}
 	}
+	ctx.finish(req.Context(), status)
 }
