@@ -49,13 +49,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 
 	nodeAllocatableClaims := []*resourceapi.ResourceClaim{}
 
-	var err error
-
-	nodeSlices, err := filterSlicesForNode(pl.draManager, nodeInfo.Node())
-	if err != nil {
-		logger.Error(err, "Failed to list resource slices")
-		return nil, statusError(logger, err)
-	}
+	nodeSlices := filterSlicesForNode(state.resourceSlices, nodeInfo.Node())
 
 	for _, claim := range state.claims.all() {
 		alloc := claim.Status.Allocation
@@ -98,22 +92,29 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 	return extraResources, nil
 }
 
-func getDeviceFromManager(draManager fwk.SharedDRAManager, result *resourceapi.DeviceRequestAllocationResult) (*draapi.Device, error) {
-	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
-	if err != nil {
-		return nil, fmt.Errorf("listing resource slices: %w", err)
+// allocationHasNodeAllocatableMapping reports whether any device of the allocation maps node allocatable resources.
+func allocationHasNodeAllocatableMapping(alloc *resourceapi.AllocationResult, slices []*draapi.ResourceSlice) bool {
+	for i := range alloc.Devices.Results {
+		result := &alloc.Devices.Results[i]
+		if result.AdminAccess != nil && *result.AdminAccess {
+			continue
+		}
+		device, err := getDeviceFromSlices(slices, result, nil)
+		if err != nil || device == nil {
+			continue
+		}
+		for _, r := range device.NodeAllocatableResources {
+			if r.Mapping != nil {
+				return true
+			}
+		}
 	}
-	return getDeviceFromSlices(slices, result, nil)
+	return false
 }
 
-func filterSlicesForNode(draManager fwk.SharedDRAManager, node *v1.Node) ([]*draapi.ResourceSlice, error) {
-	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
-	if err != nil {
-		return nil, fmt.Errorf("listing resource slices: %w", err)
-	}
-
+func filterSlicesForNode(slices []*draapi.ResourceSlice, node *v1.Node) []*draapi.ResourceSlice {
 	if node == nil {
-		return slices, nil
+		return slices
 	}
 	var nodeSlices []*draapi.ResourceSlice
 	for _, slice := range slices {
@@ -130,7 +131,7 @@ func filterSlicesForNode(draManager fwk.SharedDRAManager, node *v1.Node) ([]*dra
 			nodeSlices = append(nodeSlices, slice)
 		}
 	}
-	return nodeSlices, nil
+	return nodeSlices
 }
 
 func deviceMatchesNode(device *draapi.Device, node *v1.Node) bool {

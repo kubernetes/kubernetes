@@ -544,28 +544,10 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 			state := &stateData{
 				claimHasNodeAllocatableMappedDevice: make(map[types.UID]bool),
 			}
-			if tt.claim != nil {
-				if tt.claim.Status.Allocation != nil {
-					isMapped := false
-					for _, result := range tt.claim.Status.Allocation.Devices.Results {
-						if result.AdminAccess != nil && *result.AdminAccess {
-							continue
-						}
-						device, err := getDeviceFromManager(tt.draManager, &result)
-						if err == nil && device != nil && device.NodeAllocatableResources != nil {
-							for _, mapping := range device.NodeAllocatableResources {
-								if mapping.Mapping != nil {
-									isMapped = true
-									break
-								}
-							}
-						}
-						if isMapped {
-							break
-						}
-					}
-					state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = isMapped
-				}
+			// Same as PreFilter.
+			if tt.claim != nil && tt.claim.Status.Allocation != nil {
+				slices, _ := tt.draManager.ResourceSlices().ListWithDeviceTaintRules()
+				state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = allocationHasNodeAllocatableMapping(tt.claim.Status.Allocation, slices)
 			}
 			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
@@ -2560,8 +2542,7 @@ func TestFilterSlicesForNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			draManager := &mockDRAManager{resourceSlices: apiSlices(tt.slices...)}
-			got, _ := filterSlicesForNode(draManager, tt.node)
+			got := filterSlicesForNode(apiSlices(tt.slices...), tt.node)
 
 			var gotNames []string
 			for _, slice := range got {

@@ -44,6 +44,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -126,6 +127,10 @@ type stateData struct {
 	// This map is used in the Filter phase to prevent sharing these mapped claims across pods.
 	// Populated in PreFilter and read in Filter.
 	claimHasNodeAllocatableMappedDevice map[types.UID]bool
+
+	// resourceSlices caches the cluster's ResourceSlices for the scheduling cycle.
+	// Populated in PreFilter and read in Filter.
+	resourceSlices []*draapi.ResourceSlice
 }
 
 func (d *stateData) Clone() fwk.StateData {
@@ -715,6 +720,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	// This is stored in CycleState and used during the Filter phase to determine
 	// whether a pod is sharing a direct mapped claim from another pod.
 	if pl.fts.EnableDRANodeAllocatableResources {
+		var err error
+		if s.resourceSlices, err = pl.draManager.ResourceSlices().ListWithDeviceTaintRules(); err != nil {
+			return nil, statusError(logger, err)
+		}
 		s.claimHasNodeAllocatableMappedDevice = make(map[types.UID]bool)
 		for index, claim := range claims.all() {
 			allocation := claim.Status.Allocation
@@ -725,25 +734,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				allocation = s.informationsForClaim[index].allocation
 			}
 			if allocation != nil {
-				isMapped := false
-				for _, result := range allocation.Devices.Results {
-					if result.AdminAccess != nil && *result.AdminAccess {
-						continue
-					}
-					device, err := getDeviceFromManager(pl.draManager, &result)
-					if err == nil && device != nil && device.NodeAllocatableResources != nil {
-						for _, mapping := range device.NodeAllocatableResources {
-							if mapping.Mapping != nil {
-								isMapped = true
-								break
-							}
-						}
-					}
-					if isMapped {
-						break
-					}
-				}
-				s.claimHasNodeAllocatableMappedDevice[claim.UID] = isMapped
+				s.claimHasNodeAllocatableMappedDevice[claim.UID] = allocationHasNodeAllocatableMapping(allocation, s.resourceSlices)
 			}
 		}
 	}
@@ -809,12 +800,14 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		if err != nil {
 			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
 		}
-		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
-		if err != nil {
-			return nil, statusError(logger, err)
+		if s.resourceSlices == nil {
+			s.resourceSlices, err = pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
+			if err != nil {
+				return nil, statusError(logger, err)
+			}
 		}
 		features := AllocatorFeatures(pl.fts)
-		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), s.resourceSlices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
