@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/utils/exec"
@@ -410,5 +411,36 @@ func TestNeedResize(t *testing.T) {
 				t.Fatalf("Expect result is %v but got %v", test.expectResult, needResize)
 			}
 		})
+	}
+}
+
+// TestNeedResizeErrorMessage verifies that an error returned from NeedResize
+// while checking the disk format is attributed to NeedResize, not Resize.
+func TestNeedResizeErrorMessage(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			// getDeviceRO: device is not readonly.
+			func() ([]byte, []byte, error) { return []byte("0"), nil, nil },
+			// getDiskFormat: blkid fails.
+			func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("blkid failed") },
+		},
+	}
+	fexec := &fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	resizefs := ResizeFs{exec: fexec}
+
+	_, err := resizefs.NeedResize("/dev/test1", "/mnt/test1")
+	if err == nil {
+		t.Fatal("Expect error but got nil")
+	}
+	// The error must be attributed to NeedResize, not Resize. Because
+	// "ResizeFS.NeedResize" does not contain the substring "ResizeFS.Resize",
+	// asserting the exact prefix also rejects the old, incorrect label.
+	if !strings.HasPrefix(err.Error(), "ResizeFS.NeedResize - error checking format") {
+		t.Errorf("Expect error to reference NeedResize, but got: %v", err)
 	}
 }
