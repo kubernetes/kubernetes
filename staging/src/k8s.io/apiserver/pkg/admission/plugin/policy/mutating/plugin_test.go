@@ -69,7 +69,9 @@ func setupTest(
 				},
 				Scope: meta.RESTScopeNamespace,
 			},
-		})
+		},
+		nil,
+	)
 	require.NoError(t, err)
 	t.Cleanup(testCancel)
 	require.NoError(t, testContext.Start())
