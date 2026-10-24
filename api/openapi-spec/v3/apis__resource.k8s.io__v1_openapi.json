@@ -1109,6 +1109,10 @@
       "io.k8s.api.resource.v1.DeviceTaintSelector": {
         "description": "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
         "properties": {
+          "all": {
+            "description": "all explicitly selects every device from every driver in the cluster when set to true. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
+            "type": "boolean"
+          },
           "device": {
             "description": "device represents the name of the device. If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
             "type": "string"

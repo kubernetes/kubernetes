@@ -1042,6 +1042,7 @@ type DeviceTaintRuleSpec struct {
 	// a selector, no devices are matches.
 	//
 	// +optional
+	// +k8s:optional
 	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
 
 	// taint is the taint that gets applied to matching devices.
@@ -1105,6 +1106,23 @@ type DeviceTaintSelector struct {
 	// result. Without that the eviction controller cannot evaluate these CEL expressions.
 	//
 	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+
+	// all explicitly selects every device from every driver in the
+	// cluster when set to true. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:neq=false
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
+	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
