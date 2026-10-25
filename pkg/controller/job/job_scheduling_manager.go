@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -519,7 +520,7 @@ func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1beta1.Workl
 // controller compiles for a Job. For alpha there is exactly one template per Job.
 func podGroupTemplateName(job *batch.Job) string {
 	const suffix = "-pgt-0"
-	templateName := job.Name + suffix
+	templateName := strings.ReplaceAll(job.Name, ".", "-") + suffix
 	// Preserve the suffix while keeping the name within the DNS label limit.
 	if len(templateName) > validation.DNS1123LabelMaxLength {
 		templateName = templateName[:validation.DNS1123LabelMaxLength-len(suffix)] + suffix
