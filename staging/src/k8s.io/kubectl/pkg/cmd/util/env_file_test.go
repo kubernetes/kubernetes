@@ -114,8 +114,14 @@ func TestAddFromEnvFile(t *testing.T) {
 			expected: map[string]string{"A": "1", "B": "2"},
 		},
 		{
-			name:    "multi-line value between single line values",
-			content: "A=1\nCERT=\"\"\"\nline 1\nline 2\n\"\"\"\nB=2\n",
+			name: "multi-line value between single line values",
+			content: `A=1
+CERT="""
+line 1
+line 2
+"""
+B=2
+`,
 			expected: map[string]string{
 				"A":    "1",
 				"CERT": "line 1\nline 2",
@@ -123,8 +129,13 @@ func TestAddFromEnvFile(t *testing.T) {
 			},
 		},
 		{
-			name:     "lines inside a multi-line value are not parsed",
-			content:  "KEY=\"\"\"\n# not a comment\n\nNOT_A_KEY=value\n\"\"\"\n",
+			name: "lines inside a multi-line value are not parsed",
+			content: `KEY="""
+# not a comment
+
+NOT_A_KEY=value
+"""
+`,
 			expected: map[string]string{"KEY": "# not a comment\n\nNOT_A_KEY=value"},
 		},
 		{
@@ -133,8 +144,11 @@ func TestAddFromEnvFile(t *testing.T) {
 			expected: map[string]string{"PASSWORD": "\"*2KHjkdf!@kdlq", "OTHER": "value"},
 		},
 		{
-			name:        "unterminated multi-line value",
-			content:     "A=1\nKEY=\"\"\"\nline 1\n",
+			name: "unterminated multi-line value",
+			content: `A=1
+KEY="""
+line 1
+`,
 			expectedErr: `unterminated multi-line value for key "KEY" starting at line 2`,
 		},
 	}
