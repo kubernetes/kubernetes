@@ -25,7 +25,6 @@ import (
 	"github.com/lithammer/dedent"
 
 	klogtesting "k8s.io/klog/v2/ktesting"
-	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
@@ -157,7 +156,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		COMMIT
 		`)
 
-	err := ipt.RestoreAll([]byte(initial), utiliptables.NoFlushTables, utiliptables.NoRestoreCounters)
+	err := ipt.Restore(t.Context(), []byte(initial))
 	if err != nil {
 		t.Fatalf("Unexpected error setting up iptables state: %v", err)
 	}

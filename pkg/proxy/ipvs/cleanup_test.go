@@ -72,7 +72,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		:KUBE-KUBELET-CANARY - [0:0]
 		COMMIT
 		`)
-	err := ipt.RestoreAll([]byte(initial), utiliptables.NoFlushTables, utiliptables.NoRestoreCounters)
+	err := ipt.Restore(ctx, []byte(initial))
 	if err != nil {
 		t.Fatalf("Unexpected error setting up iptables state: %v", err)
 	}

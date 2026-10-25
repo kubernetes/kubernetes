@@ -1480,7 +1480,7 @@ func TestTracePacket(t *testing.T) {
 		`)
 
 	ipt := iptablestest.NewFake()
-	err := ipt.RestoreAll([]byte(rules), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err := ipt.Restore(t.Context(), []byte(rules))
 	if err != nil {
 		t.Fatalf("Restore of test data failed: %v", err)
 	}

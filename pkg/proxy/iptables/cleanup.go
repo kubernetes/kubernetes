@@ -84,7 +84,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		natRules.Write("COMMIT")
 		natLines := append(natChains.Bytes(), natRules.Bytes()...)
 		// Write it.
-		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+		err = ipt.Restore(ctx, natLines)
 		if err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableNAT)
 			metrics.IPTablesRestoreFailuresTotal.WithLabelValues(string(ipt.Protocol())).Inc()
@@ -112,7 +112,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		filterRules.Write("COMMIT")
 		filterLines := append(filterChains.Bytes(), filterRules.Bytes()...)
 		// Write it.
-		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
+		if err := ipt.Restore(ctx, filterLines); err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableFilter)
 			metrics.IPTablesRestoreFailuresTotal.WithLabelValues(string(ipt.Protocol())).Inc()
 			encounteredError = true

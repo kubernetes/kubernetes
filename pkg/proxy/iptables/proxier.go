@@ -1381,7 +1381,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.logger.V(9).Info("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	err := proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err := proxier.iptables.Restore(ctx, proxier.iptablesData.Bytes())
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
