@@ -86,7 +86,11 @@ func createClients(tCtx ktesting.TContext) (testClients, *atomic.Value) {
 }
 
 func createTestNamespace(tCtx ktesting.TContext) *corev1.Namespace {
-	ns := framework.CreateNamespaceOrDie(tCtx.Client(), "podautoscaler", tCtx)
+	return createTestNamespaceWithName(tCtx, "podautoscaler")
+}
+
+func createTestNamespaceWithName(tCtx ktesting.TContext, name string) *corev1.Namespace {
+	ns := framework.CreateNamespaceOrDie(tCtx.Client(), name, tCtx)
 	tCtx.Cleanup(func() {
 		framework.DeleteNamespaceOrDie(tCtx.Client(), ns, tCtx)
 	})
@@ -113,6 +117,18 @@ func setupFakeExternalMetrics() (*emfake.FakeExternalMetricsClient, *atomic.Valu
 	return c, &metricValue
 }
 
+// countExternalMetricQueries returns how many times the HPA controller queried
+// the external metrics of HPAs in the namespace.
+func countExternalMetricQueries(clients testClients, namespace string) int {
+	count := 0
+	for _, action := range clients.externalMetrics.Actions() {
+		if action.GetVerb() == "list" && action.GetNamespace() == namespace {
+			count++
+		}
+	}
+	return count
+}
+
 type createHPAOption func(*autoscalingv2.HorizontalPodAutoscaler)
 
 func withHPAMinMaxReplicas(minReplicas, maxReplicas int32) createHPAOption {
@@ -125,6 +141,12 @@ func withHPAMinMaxReplicas(minReplicas, maxReplicas int32) createHPAOption {
 func withHPABehavior(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) createHPAOption {
 	return func(hpa *autoscalingv2.HorizontalPodAutoscaler) {
 		hpa.Spec.Behavior = behavior
+	}
+}
+
+func withSyncPeriodSeconds(seconds int32) createHPAOption {
+	return func(hpa *autoscalingv2.HorizontalPodAutoscaler) {
+		hpa.Spec.SyncPeriodSeconds = &seconds
 	}
 }
 
