@@ -505,71 +505,54 @@ func TestRunOp(t *testing.T) {
 			expectedFailure: true,
 		},
 		{
-			name: "Create PodGroups with Parent CompositePodGroups",
+			name: "Create PodGroups with Pods",
 			workload: &Workload{
 				Params: params{
 					params: map[string]any{
-						"podGroupsCount":          float64(4),
-						"parentLevel":             float64(2),
-						"childrenPodGroupsPerCPG": float64(2),
+						"podsPerGroup": float64(3),
 					},
 					isUsed: map[string]bool{},
 				},
 			},
 			op: &createPodGroups{
-				Opcode:    createPodGroupsOpcode,
-				Namespace: "namespace-0",
-				TemplatePath: *createObjTemplateFile(t,
-					st.MakePodGroup().
-						Name("pg-{{.Index}}").
-						Namespace("namespace-0").
-						MinCount(3).
-						ParentCompositePodGroup("cpg-l{{.parentLevel}}-{{DivideInt .Index .childrenPodGroupsPerCPG}}").
-						Obj(),
-				),
-				CountParam: "$podGroupsCount",
-				TemplateParams: map[string]any{
-					"parentLevel":             "$parentLevel",
-					"childrenPodGroupsPerCPG": "$childrenPodGroupsPerCPG",
+				Opcode:            createPodGroupsOpcode,
+				Namespace:         "namespace-0",
+				TemplatePath:      *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:             2,
+				PodsPerGroupParam: "$podsPerGroup",
+				Pods: &createPodsOp{
+					PodTemplatePath:      newPodInGroupTemplateFile(t, "namespace-0"),
+					SkipWaitToCompletion: true,
 				},
 			},
 			verifyFuncs: []verifyFunc{
-				verifyCount(4),
-				verifyNamespaceCreated("namespace-0"),
-				verifyObj([]*schedulingv1beta1.PodGroup{
-					st.MakePodGroup().Name("pg-0").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-0").Obj(),
-					st.MakePodGroup().Name("pg-1").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-0").Obj(),
-					st.MakePodGroup().Name("pg-2").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-1").Obj(),
-					st.MakePodGroup().Name("pg-3").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-1").Obj(),
-				}),
+				verifyCount(2),
+				onPods(verifyCount(6)),
+				verifyPodsPerLabel("group", map[string]int{"gang-0": 3, "gang-1": 3}),
 			},
 		},
 		{
-			name: "Create PodGroups with missing parentLevel parameter",
-			workload: &Workload{
-				Params: params{
-					params: map[string]any{
-						"podGroupsCount":          float64(2),
-						"childrenPodGroupsPerCPG": float64(2),
-					},
-					isUsed: map[string]bool{},
-				},
-			},
+			name: "Create PodGroups with PodsPerGroup but no Pods",
 			op: &createPodGroups{
-				Opcode:    createPodGroupsOpcode,
-				Namespace: "namespace-0",
-				TemplatePath: *createObjTemplateFile(t,
-					st.MakePodGroup().
-						Name("pg-{{.Index}}").
-						Namespace("namespace-0").
-						MinCount(3).
-						ParentCompositePodGroup("cpg-l{{.parentLevel}}-{{DivideInt .Index .childrenPodGroupsPerCPG}}").
-						Obj(),
-				),
-				CountParam: "$podGroupsCount",
-				TemplateParams: map[string]any{
-					"parentLevel":             "$parentLevel",
-					"childrenPodGroupsPerCPG": "$childrenPodGroupsPerCPG",
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        2,
+				PodsPerGroup: 3,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with Pods with Count",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        2,
+				PodsPerGroup: 3,
+				Pods: &createPodsOp{
+					Count:                6,
+					SkipWaitToCompletion: true,
 				},
 			},
 			expectedFailure: true,
@@ -733,72 +716,65 @@ func TestRunOp(t *testing.T) {
 			expectedFailure: true,
 		},
 		{
-			name: "Create CompositePodGroups with already defined podGroupsCount parameter",
+			name: "Create CompositePodGroups with PodGroups and Pods",
 			workload: &Workload{
 				Params: params{
 					params: map[string]any{
-						"podGroupsCount": float64(4),
+						"podsPerGroup": float64(2),
 					},
 					isUsed: map[string]bool{},
 				},
 			},
 			op: &createCompositePodGroups{
-				Opcode:                  createCompositePodGroupsOpcode,
-				Namespace:               "namespace-0",
-				TemplatePath:            *newCompositePodGroupTemplateFile(t, "namespace-0"),
-				RootCount:               1,
-				Depth:                   2,
-				ChildrenPodGroupsPerCPG: 2,
-			},
-			expectedFailure: true,
-		},
-		{
-			name: "Create CompositePodGroups with already defined parentLevel parameter",
-			workload: &Workload{
-				Params: params{
-					params: map[string]any{
-						"parentLevel": float64(1),
-					},
-					isUsed: map[string]bool{},
-				},
-			},
-			op: &createCompositePodGroups{
-				Opcode:                  createCompositePodGroupsOpcode,
-				Namespace:               "namespace-0",
-				TemplatePath:            *newCompositePodGroupTemplateFile(t, "namespace-0"),
-				RootCount:               1,
-				Depth:                   2,
-				ChildrenPodGroupsPerCPG: 2,
-			},
-			expectedFailure: true,
-		},
-		{
-			name: "Create CompositePodGroups with already used podGroupsCount and parentLevel parameters",
-			workload: &Workload{
-				Params: params{
-					params: map[string]any{
-						"podGroupsCount": float64(4),
-						"parentLevel":    float64(1),
-					},
-					isUsed: map[string]bool{
-						"podGroupsCount": true,
-						"parentLevel":    true,
+				Opcode:                           createCompositePodGroupsOpcode,
+				Namespace:                        "namespace-0",
+				TemplatePath:                     *newCompositePodGroupTemplateFile(t, "namespace-0"),
+				RootCount:                        1,
+				Depth:                            3,
+				ChildrenCompositePodGroupsPerCPG: 2,
+				ChildrenPodGroupsPerCPG:          2,
+				PodGroups: &createPodGroups{
+					TemplatePath: *createObjTemplateFile(t,
+						st.MakePodGroup().
+							Name("gang-{{.Index}}").
+							Namespace("namespace-0").
+							MinCount(3).
+							ParentCompositePodGroup("cpg-l{{.parentLevel}}-{{DivideInt .Index .childrenPodGroupsPerCPG}}").
+							Obj(),
+					),
+					PodsPerGroupParam: "$podsPerGroup",
+					Pods: &createPodsOp{
+						PodTemplatePath:      newPodInGroupTemplateFile(t, "namespace-0"),
+						SkipWaitToCompletion: true,
 					},
 				},
-			},
-			op: &createCompositePodGroups{
-				Opcode:                  createCompositePodGroupsOpcode,
-				Namespace:               "namespace-0",
-				TemplatePath:            *newCompositePodGroupTemplateFile(t, "namespace-0"),
-				RootCount:               1,
-				Depth:                   2,
-				ChildrenPodGroupsPerCPG: 2,
 			},
 			verifyFuncs: []verifyFunc{
-				verifyCount(1),
-				verifyNamespaceCreated("namespace-0"),
-				verifyObj(st.MakeCompositePodGroup().Namespace("namespace-0").MinGroupCount(2).Obj()),
+				verifyCount(3),
+				onPodGroups(verifyObj([]*schedulingv1beta1.PodGroup{
+					st.MakePodGroup().Name("gang-0").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-0").Obj(),
+					st.MakePodGroup().Name("gang-1").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-0").Obj(),
+					st.MakePodGroup().Name("gang-2").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-1").Obj(),
+					st.MakePodGroup().Name("gang-3").Namespace("namespace-0").MinCount(3).ParentCompositePodGroup("cpg-l2-1").Obj(),
+				})),
+				verifyPodsPerLabel("group", map[string]int{"gang-0": 2, "gang-1": 2, "gang-2": 2, "gang-3": 2}),
 			},
+		},
+		{
+			name: "Create CompositePodGroups with PodGroups with Namespace",
+			op: &createCompositePodGroups{
+				Opcode:                  createCompositePodGroupsOpcode,
+				Namespace:               "namespace-0",
+				TemplatePath:            *newCompositePodGroupTemplateFile(t, "namespace-0"),
+				RootCount:               1,
+				Depth:                   2,
+				ChildrenPodGroupsPerCPG: 2,
+				PodGroups: &createPodGroups{
+					Namespace:    "namespace-1",
+					TemplatePath: *newPodGroupTemplateFile(t, "namespace-1"),
+				},
+			},
+			expectedFailure: true,
 		},
 		{
 			name: "Create Namespaces",
@@ -1051,6 +1027,38 @@ func verifyCount(expectedCount int) verifyFunc {
 			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
+		}
+		return nil
+	}
+}
+
+// onPods runs vf against the pods created by a createPodGroups op.
+func onPods(vf verifyFunc) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
+		return vf(t, tCtx, op.(*createPodGroups).Pods, opIndex)
+	}
+}
+
+// onPodGroups runs vf against the PodGroups created by a createCompositePodGroups op.
+func onPodGroups(vf verifyFunc) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
+		return vf(t, tCtx, op.(*createCompositePodGroups).PodGroups, opIndex)
+	}
+}
+
+// verifyPodsPerLabel checks how many pods have each value of the given label.
+func verifyPodsPerLabel(key string, want map[string]int) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
+		pods, err := tCtx.Client().CoreV1().Pods(metav1.NamespaceAll).List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		got := map[string]int{}
+		for _, pod := range pods.Items {
+			got[pod.Labels[key]]++
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			return fmt.Errorf("unexpected pods per %q label (-want +got):\n%s", key, diff)
 		}
 		return nil
 	}
@@ -1664,6 +1672,25 @@ func newPodTemplateFile(t *testing.T, namespace string) *string {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod-{{.Index}}",
 			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: "registry.k8s.io/pause:latest",
+				},
+			},
+		},
+	}
+	return createObjTemplateFile(t, pod)
+}
+
+func newPodInGroupTemplateFile(t *testing.T, namespace string) *string {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-{{.Index}}",
+			Namespace: namespace,
+			Labels:    map[string]string{"group": "gang-{{DivideInt .Index .podsPerGroup}}"},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{

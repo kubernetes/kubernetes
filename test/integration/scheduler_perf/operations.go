@@ -695,12 +695,19 @@ type createPodGroups struct {
 	Count int
 	// CountParam is the name of the parameter that determines the count.
 	CountParam string
+	// PodsPerGroup is the number of pods created for each PodGroup.
+	// It must be set if and only if Pods is set.
+	PodsPerGroup int
+	// PodsPerGroupParam is the name of the parameter that determines PodsPerGroup.
+	PodsPerGroupParam string
+	// Pods describes the pods that get created for these PodGroups once they are cached.
+	// Count and Namespace must not be set, they are derived from the PodGroups.
+	// podsPerGroup is passed to the pod template.
+	// Optional.
+	Pods *createPodsOp
 }
 
 func (cpg *createPodGroups) isValid(allowParameterization bool) error {
-	if cpg.TemplatePath == "" {
-		return fmt.Errorf("templatePath must be set")
-	}
 	if cpg.Namespace == "" {
 		return fmt.Errorf("namespace must be set")
 	}
@@ -710,11 +717,38 @@ func (cpg *createPodGroups) isValid(allowParameterization bool) error {
 	if !allowParameterization && cpg.Count < 1 {
 		return fmt.Errorf("count must be greater than 0, got %d", cpg.Count)
 	}
+	return cpg.isValidTemplate(allowParameterization)
+}
+
+// isValidTemplate checks the fields that don't depend on how many PodGroups get created
+// and in which namespace, which createCompositePodGroups sets for its PodGroups.
+func (cpg *createPodGroups) isValidTemplate(allowParameterization bool) error {
+	if cpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if cpg.Pods == nil {
+		if cpg.PodsPerGroup != 0 || cpg.PodsPerGroupParam != "" {
+			return fmt.Errorf("podsPerGroup / podsPerGroupParam cannot be set without pods")
+		}
+		return nil
+	}
+	if !isValidCount(allowParameterization, cpg.PodsPerGroup, cpg.PodsPerGroupParam) {
+		return fmt.Errorf("invalid PodsPerGroup=%d / PodsPerGroupParam=%q", cpg.PodsPerGroup, cpg.PodsPerGroupParam)
+	}
+	if !allowParameterization && cpg.PodsPerGroup < 1 {
+		return fmt.Errorf("podsPerGroup must be greater than 0, got %d", cpg.PodsPerGroup)
+	}
+	if cpg.Pods.Count != 0 || cpg.Pods.CountParam != "" || cpg.Pods.CountMultiplierParam != "" || cpg.Pods.Namespace != nil {
+		return fmt.Errorf("pods: count, countParam, countMultiplierParam and namespace cannot be set")
+	}
+	if err := cpg.Pods.isValid(allowParameterization); err != nil {
+		return fmt.Errorf("pods: %w", err)
+	}
 	return nil
 }
 
 func (cpg *createPodGroups) collectsMetrics() bool {
-	return false
+	return cpg.Pods != nil && cpg.Pods.collectsMetrics()
 }
 
 func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
@@ -725,6 +759,13 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 		}
 		cpg.Count = count
 	}
+	if cpg.PodsPerGroupParam != "" {
+		podsPerGroup, err := w.Params.get(cpg.PodsPerGroupParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpg.PodsPerGroup = podsPerGroup
+	}
 	if len(cpg.TemplateParams) > 0 {
 		var err error
 		cpg.TemplateParams, err = resolveTemplateParams(cpg.TemplateParams, w)
@@ -732,7 +773,24 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 			return nil, err
 		}
 	}
-	return &cpg, cpg.isValid(false)
+	if err := cpg.isValid(false); err != nil {
+		return nil, err
+	}
+	if cpg.Pods != nil {
+		pods, err := cpg.Pods.patchParams(w)
+		if err != nil {
+			return nil, fmt.Errorf("pods: %w", err)
+		}
+		cpg.Pods = pods.(*createPodsOp)
+		cpg.Pods.Count = cpg.Count * cpg.PodsPerGroup
+		cpg.Pods.Namespace = &cpg.Namespace
+		cpg.Pods.TemplateParams = maps.Clone(cpg.Pods.TemplateParams)
+		if cpg.Pods.TemplateParams == nil {
+			cpg.Pods.TemplateParams = map[string]any{}
+		}
+		cpg.Pods.TemplateParams["podsPerGroup"] = cpg.PodsPerGroup
+	}
+	return &cpg, nil
 }
 
 // createCompositePodGroups defines an op where CompositePodGroups get created from a YAML template
@@ -765,6 +823,11 @@ type createCompositePodGroups struct {
 	ChildrenPodGroupsPerCPG int
 	// ChildrenPodGroupsPerCPGParam is the name of the parameter that determines ChildrenPodGroupsPerCPG.
 	ChildrenPodGroupsPerCPGParam string
+	// PodGroups describes the leaf PodGroups that get created once the CompositePodGroups are cached.
+	// Count and Namespace must not be set, they are derived from the hierarchy.
+	// parentLevel and childrenPodGroupsPerCPG are passed to the PodGroup template.
+	// Optional.
+	PodGroups *createPodGroups
 }
 
 func (ccpg *createCompositePodGroups) isValid(allowParameterization bool) error {
@@ -801,11 +864,20 @@ func (ccpg *createCompositePodGroups) isValid(allowParameterization bool) error 
 	if !allowParameterization && ccpg.ChildrenPodGroupsPerCPG < 1 {
 		return fmt.Errorf("childrenPodGroupsPerCPG must be greater than 0, got %d", ccpg.ChildrenPodGroupsPerCPG)
 	}
+	if ccpg.PodGroups != nil {
+		if ccpg.PodGroups.Count != 0 || ccpg.PodGroups.CountParam != "" || ccpg.PodGroups.Namespace != "" {
+			return fmt.Errorf("podGroups: count, countParam and namespace cannot be set")
+		}
+		// Parameters of the PodGroups are only checked here, the PodGroups get fully validated when patched.
+		if err := ccpg.PodGroups.isValidTemplate(true); err != nil {
+			return fmt.Errorf("podGroups: %w", err)
+		}
+	}
 	return nil
 }
 
 func (ccpg *createCompositePodGroups) collectsMetrics() bool {
-	return false
+	return ccpg.PodGroups != nil && ccpg.PodGroups.collectsMetrics()
 }
 
 func (ccpg createCompositePodGroups) patchParams(w *Workload) (realOp, error) {
@@ -840,22 +912,28 @@ func (ccpg createCompositePodGroups) patchParams(w *Workload) (realOp, error) {
 	if err := ccpg.isValid(false); err != nil {
 		return nil, err
 	}
+	if ccpg.PodGroups == nil {
+		return &ccpg, nil
+	}
 
-	// calculate total leaf PodGroups count and latest cpg level in the hierarchy and store
-	// them in w.Params because they are needed by subsequent createPodGroups and createPods ops.
 	podGroupParentsCount := ccpg.RootCount
 	for level := 1; level < ccpg.Depth-1; level++ {
 		podGroupParentsCount *= ccpg.ChildrenCompositePodGroupsPerCPG
 	}
-	podGroupsCount := podGroupParentsCount * ccpg.ChildrenPodGroupsPerCPG
-
-	if err := w.Params.set("podGroupsCount", podGroupsCount); err != nil {
-		return nil, err
+	podGroups := *ccpg.PodGroups
+	podGroups.Count = podGroupParentsCount * ccpg.ChildrenPodGroupsPerCPG
+	podGroups.Namespace = ccpg.Namespace
+	podGroups.TemplateParams = maps.Clone(podGroups.TemplateParams)
+	if podGroups.TemplateParams == nil {
+		podGroups.TemplateParams = map[string]any{}
 	}
-	if err := w.Params.set("parentLevel", ccpg.Depth-1); err != nil {
-		return nil, err
+	podGroups.TemplateParams["parentLevel"] = ccpg.Depth - 1
+	podGroups.TemplateParams["childrenPodGroupsPerCPG"] = ccpg.ChildrenPodGroupsPerCPG
+	patched, err := podGroups.patchParams(w)
+	if err != nil {
+		return nil, fmt.Errorf("podGroups: %w", err)
 	}
-
+	ccpg.PodGroups = patched.(*createPodGroups)
 	return &ccpg, nil
 }
 

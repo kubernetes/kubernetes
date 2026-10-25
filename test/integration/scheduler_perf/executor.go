@@ -100,9 +100,9 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 	case *sleepOp:
 		return e.runSleepOp(tCtx, concreteOp)
 	case *createPodGroups:
-		return e.runCreatePodGroupsOp(tCtx, concreteOp)
+		return e.runCreatePodGroupsOp(tCtx, opIndex, concreteOp)
 	case *createCompositePodGroups:
-		return e.runCreateCompositePodGroupsOp(tCtx, concreteOp)
+		return e.runCreateCompositePodGroupsOp(tCtx, opIndex, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
@@ -201,9 +201,10 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 // runCreatePodGroupsOp executes the createPodGroups operation.
 // It creates the configured number of PodGroups from a template and
 // then waits for them to be visible in the scheduler's informer cache.
-// This ensures that subsequent operations (like creating pods that reference these pod groups) won't fail due to cache lag.
+// This ensures that the pods referencing these pod groups won't fail due to cache lag.
 // It timeouts after 10 seconds if the condition is not met.
-func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *createPodGroups) error {
+// If op.Pods is set, it then creates the pods.
+func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, opIndex int, op *createPodGroups) error {
 	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
 		return err
 	}
@@ -242,6 +243,9 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 		return fmt.Errorf("timed out waiting for PodGroups to be cached: %w", err)
 	}
 
+	if op.Pods != nil {
+		return e.runCreatePodsOp(tCtx, opIndex, op.Pods)
+	}
 	return nil
 }
 
@@ -273,8 +277,9 @@ func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *
 
 // runCreateCompositePodGroupsOp executes the createCompositePodGroups operation.
 // It creates the configured CompositePodGroups from a template and then waits for them to be visible in the scheduler's informer cache.
-// This ensures that subsequent operations (like creating PodGroups that reference these CompositePodGroups) won't fail due to cache lag.
-func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext, op *createCompositePodGroups) error {
+// This ensures that the PodGroups referencing these CompositePodGroups won't fail due to cache lag.
+// If op.PodGroups is set, it then creates the leaf PodGroups.
+func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext, opIndex int, op *createCompositePodGroups) error {
 	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
 		return err
 	}
@@ -333,6 +338,9 @@ func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext,
 		return fmt.Errorf("timed out waiting for CompositePodGroups to be cached: %w", err)
 	}
 
+	if op.PodGroups != nil {
+		return e.runCreatePodGroupsOp(tCtx, opIndex, op.PodGroups)
+	}
 	return nil
 }
 

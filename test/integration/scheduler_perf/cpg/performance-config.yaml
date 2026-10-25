@@ -24,24 +24,14 @@
     childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
     namespace: cpg-basic-ns-0
     templatePath: templates/composite-podgroup.yaml
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-basic-ns-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-  - opcode: createPods
-    # Create pods belonging to child pod groups according to their indices.
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-basic-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        # Create pods belonging to child pod groups according to their indices.
+        podTemplatePath: templates/pod.yaml
+        collectMetrics: true
   workloads:
   - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
     labels: [integration-test, short]
@@ -123,28 +113,20 @@
     templateParams:
       gang: true
       priority: 1000
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-gang-ns-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      minCount: $minCount
-      priority: 1000
-  - opcode: createPods
-    # Create pods with reference to the child pod groups according to their indices.
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-gang-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      priority: 1000
-      cpuRequest: 100m
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        minCount: $minCount
+        priority: 1000
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        # Create pods with reference to the child pod groups according to their indices.
+        podTemplatePath: templates/pod.yaml
+        collectMetrics: true
+        templateParams:
+          priority: 1000
+          cpuRequest: 100m
   workloads:
   - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
     labels: [integration-test, short]
@@ -243,27 +225,19 @@
     templateParams:
       gang: true
       priority: 1000
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-preempt-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      priority: 1000
-      minCount: $minCount
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-preempt-0
-    podTemplatePath: templates/pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $gangCpuRequest
-      priority: 1000
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        priority: 1000
+        minCount: $minCount
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        collectMetrics: true
+        podTemplatePath: templates/pod.yaml
+        templateParams:
+          cpuRequest: $gangCpuRequest
+          priority: 1000
   workloads:
   - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
     labels: [short, integration-test]
@@ -322,26 +296,18 @@
     templateParams:
       gang: true
       priority: 1000
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-preempt-1
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      priority: 1000
-      minCount: $minCount
-  - opcode: createPods
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-preempt-1
-    podTemplatePath: templates/pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $lowPriorityCpuRequest
-      priority: 1000
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        priority: 1000
+        minCount: $minCount
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        podTemplatePath: templates/pod.yaml
+        templateParams:
+          cpuRequest: $lowPriorityCpuRequest
+          priority: 1000
   - opcode: createCompositePodGroups
     # Level 1 represents the root composite podgroup.
     rootCountParam: $highPriorityCPGs
@@ -352,27 +318,19 @@
     templateParams:
       gang: true
       priority: 10000
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are updated by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-preempt-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      priority: 10000
-      minCount: $minCount
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-preempt-0
-    podTemplatePath: templates/pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $highPriorityCpuRequest
-      priority: 10000
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        priority: 10000
+        minCount: $minCount
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        collectMetrics: true
+        podTemplatePath: templates/pod.yaml
+        templateParams:
+          cpuRequest: $highPriorityCpuRequest
+          priority: 10000
   workloads:
   - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_2LowPriorityCPGs
     labels: [short, integration-test]
@@ -449,26 +407,18 @@
     templateParams:
       gang: true
       priority: 10000
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-preempt-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      priority: 10000
-      minCount: $minCount
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-preempt-0
-    podTemplatePath: templates/pod-gang-affinity.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      priority: 10000
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        priority: 10000
+        minCount: $minCount
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        collectMetrics: true
+        podTemplatePath: templates/pod-gang-affinity.yaml
+        templateParams:
+          priority: 10000
   workloads:
   - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
     labels: [short, integration-test]
@@ -527,26 +477,17 @@
     templateParams:
       gang: true
       topologyKey: topology.kubernetes.io/zone
-  - opcode: createPodGroups
-    # Level 2 represents leaf podgroups children of the root composite podgroup.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-tas-ns-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      minCount: $minCount
-      topologyKey: topology.kubernetes.io/rack
-  - opcode: createPods
-    # Create pods with reference to the child pod groups according to their indices.
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-tas-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podGroups:
+      # Level 2 represents leaf podgroups children of the root composite podgroup.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        minCount: $minCount
+        topologyKey: topology.kubernetes.io/rack
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        # Create pods with reference to the child pod groups according to their indices.
+        podTemplatePath: templates/pod.yaml
+        collectMetrics: true
   workloads:
   - name: 12Nodes_2Zones_6Racks_2Trees_2Level_4PodGroups_12Pods
     labels: [integration-test, short]
@@ -644,28 +585,20 @@
     templateParams:
       gang: true
       priority: 1000
-  - opcode: createPodGroups
-    # Level 3 represents leaf podgroups children of composite podgroups in level 2.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-3level-ns-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      minCount: $minCount
-      priority: 1000
-  - opcode: createPods
-    # Pods belonging to leaf PodGroups
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-3level-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      priority: 1000
-      cpuRequest: 100m
+    podGroups:
+      # Level 3 represents leaf podgroups children of composite podgroups in level 2.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        minCount: $minCount
+        priority: 1000
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        # Pods belonging to leaf PodGroups
+        podTemplatePath: templates/pod.yaml
+        collectMetrics: true
+        templateParams:
+          priority: 1000
+          cpuRequest: 100m
   workloads:
   - name: 10Nodes_2Trees_3Level_16PodGroups_48Pods
     labels: [integration-test, short]
@@ -756,28 +689,20 @@
     templateParams:
       gang: true
       priority: 1000
-  - opcode: createPodGroups
-    # Level 4 represents leaf podgroups children of the composite podgroups in level 3.
-    # $podGroupsCount and $parentLevel are calculated and set by createCompositePodGroupsOp.
-    countParam: $podGroupsCount
-    namespace: cpg-4level-ns-0
-    templatePath: templates/podgroup.yaml
-    templateParams:
-      parentLevel: $parentLevel
-      childrenPodGroupsPerCPG: $childrenPodGroupsPerCPG
-      minCount: $minCount
-      priority: 1000
-  - opcode: createPods
-    # Pods belonging to leaf PodGroups
-    countParam: $podGroupsCount
-    countMultiplierParam: $podsPerGroup
-    namespace: cpg-4level-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      priority: 1000
-      cpuRequest: 100m
+    podGroups:
+      # Level 4 represents leaf podgroups children of the composite podgroups in level 3.
+      templatePath: templates/podgroup.yaml
+      templateParams:
+        minCount: $minCount
+        priority: 1000
+      podsPerGroupParam: $podsPerGroup
+      pods:
+        # Pods belonging to leaf PodGroups
+        podTemplatePath: templates/pod.yaml
+        collectMetrics: true
+        templateParams:
+          priority: 1000
+          cpuRequest: 100m
   workloads:
   - name: 10Nodes_2Trees_4Level_32PodGroups_96Pods
     labels: [integration-test, short]
