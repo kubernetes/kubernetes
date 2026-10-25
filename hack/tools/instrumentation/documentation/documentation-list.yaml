@@ -3077,6 +3077,28 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: reconciliation_delay_ratio
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Ratio of the observed delay to the requested delay between the end of an HPA
+    reconciliation and the start of the next periodic reconciliation. The label 'period_source'
+    is 'global' for HPAs that use the controller-wide sync period and 'spec' for HPAs
+    that set spec.syncPeriodSeconds.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - period_source
+  buckets:
+  - 1
+  - 1.1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 5
+  - 10
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: stale_sync_skips_total
   subsystem: horizontal_pod_autoscaler_controller
   help: Total number of HPA syncs skipped due to a stale watch cache.

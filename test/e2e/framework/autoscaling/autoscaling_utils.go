@@ -242,7 +242,8 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
-	if resp.StatusCode != http.StatusOK {
+	// The create endpoint responds with 201 Created.
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 

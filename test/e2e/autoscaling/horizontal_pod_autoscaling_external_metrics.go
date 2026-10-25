@@ -18,7 +18,9 @@ package autoscaling
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 // Requires WithSerial as test sets up external metrics server
@@ -157,5 +160,129 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZe
 
 			ginkgo.By("Waiting for HPA to scale back up from zero")
 			rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+		})
+	})
+
+// Requires WithSerial as test sets up external metrics server
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAConfigurableSyncPeriod), framework.WithSerial(), framework.WithSlow(),
+	"Horizontal pod autoscaling (configurable sync period)", func() {
+		var metricsController *e2eautoscaling.ExternalMetricsController
+
+		f := framework.NewDefaultFramework("horizontal-pod-autoscaling-sync-period")
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ginkgo.By("Setting up the external metrics server")
+			metricsController = e2eautoscaling.RunExternalMetricsServer(ctx, f.ClientSet, f.Namespace.Name, "external-metrics-server", nil)
+			ginkgo.DeferCleanup(e2eautoscaling.CleanupExternalMetricsServer, f.ClientSet, f.Namespace.Name, "external-metrics-server")
+		})
+
+		ginkgo.It("should reconcile HPAs with short, default, and long sync periods independently", ginkgo.SpecTimeout(15*time.Minute), func(ctx context.Context) {
+			const samples = 3
+			// Several observations leave room for individual delays while distinguishing
+			// overrides from the usual 15-second global period. The unset case has no
+			// lower bound because the cluster's global period may be customized.
+			tests := []struct {
+				name        string
+				period      *int32
+				minDuration time.Duration
+				maxDuration time.Duration
+			}{
+				{name: "short", period: ptr.To[int32](3), maxDuration: 30 * time.Second},
+				{name: "default", maxDuration: 2 * time.Minute},
+				{name: "long", period: ptr.To[int32](60), minDuration: 90 * time.Second, maxDuration: 4 * time.Minute},
+			}
+
+			for _, tc := range tests {
+				name := "consumer-" + tc.name
+				metricName := "sync_period_" + tc.name
+				framework.ExpectNoError(metricsController.CreateMetric(ctx, metricName, 1, nil, false), "create external metric %q", metricName)
+
+				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
+					name, f.Namespace.Name, e2eautoscaling.KindDeployment, 1,
+					0, 0, 0, int64(podCPURequest), 200,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
+				ginkgo.DeferCleanup(rc.CleanUp)
+				rc.WaitForReplicas(ctx, 1, maxResourceConsumerDelay+time.Minute)
+
+				hpa, err := f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Create(ctx, &v2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{Name: name},
+					Spec: v2.HorizontalPodAutoscalerSpec{
+						ScaleTargetRef: v2.CrossVersionObjectReference{APIVersion: "apps/v1", Kind: "Deployment", Name: name},
+						MinReplicas:    ptr.To[int32](1),
+						MaxReplicas:    2,
+						Metrics: []v2.MetricSpec{
+							e2eautoscaling.CreateExternalMetricSpec(metricName, nil, v2.ValueMetricType, 100),
+						},
+						SyncPeriodSeconds: tc.period,
+					},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "create HPA %q", name)
+				ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+			}
+
+			waitForMetric := func(ctx context.Context, name, metricName string, value int64) error {
+				return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (int64, error) {
+					hpa, err := f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
+					if err != nil {
+						return 0, err
+					}
+					for _, metric := range hpa.Status.CurrentMetrics {
+						if metric.External != nil && metric.External.Metric.Name == metricName && metric.External.Current.Value != nil {
+							return metric.External.Current.Value.Value(), nil
+						}
+					}
+					return 0, nil
+				})).WithPolling(time.Second).Should(gomega.Equal(value))
+			}
+
+			// Changing only the metrics avoids event-driven reconciliations caused by
+			// HPA spec updates. Values below the target keep the workload at one Pod,
+			// so Pod startup and stabilization do not enter the cadence measurement.
+			ginkgo.By("measuring consecutive metric observations for each HPA")
+			errs := make([]error, len(tests))
+			var wg sync.WaitGroup
+			for i, tc := range tests {
+				wg.Go(func() {
+					defer ginkgo.GinkgoRecover()
+					name := "consumer-" + tc.name
+					metricName := "sync_period_" + tc.name
+					observe := func(ctx context.Context, value int64) error {
+						if err := metricsController.SetMetricValue(ctx, metricName, value, nil); err != nil {
+							return fmt.Errorf("set external metric %q to %d: %w", metricName, value, err)
+						}
+						if err := waitForMetric(ctx, name, metricName, value); err != nil {
+							return fmt.Errorf("wait for HPA %q to observe metric %q=%d: %w", name, metricName, value, err)
+						}
+						return nil
+					}
+
+					// Establish a fresh observation after all workloads have been created;
+					// their initial reconciliations may have happened during setup.
+					bootstrapCtx, cancelBootstrap := context.WithTimeout(ctx, 2*time.Minute)
+					err := observe(bootstrapCtx, 2)
+					cancelBootstrap()
+					if err != nil {
+						errs[i] = err
+						return
+					}
+					start := time.Now()
+					measurementCtx, cancel := context.WithTimeout(ctx, tc.maxDuration)
+					defer cancel()
+					for sample := range samples {
+						if err := observe(measurementCtx, int64(sample+3)); err != nil {
+							errs[i] = err
+							return
+						}
+					}
+					elapsed := time.Since(start)
+					framework.Logf("HPA %q observed %d metric changes in %s", name, samples, elapsed)
+					if elapsed < tc.minDuration {
+						errs[i] = fmt.Errorf("HPA %q observed %d metric changes in %s, expected at least %s", name, samples, elapsed, tc.minDuration)
+					}
+				})
+			}
+			wg.Wait()
+			framework.ExpectNoError(errors.Join(errs...))
 		})
 	})
