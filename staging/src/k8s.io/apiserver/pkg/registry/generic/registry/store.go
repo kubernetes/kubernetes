@@ -1569,9 +1569,11 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	predicate := e.PredicateFunc(label, field)
 
 	resourceVersion := ""
+	var sendInitialEvents *bool
 	if options != nil {
 		resourceVersion = options.ResourceVersion
 		predicate.AllowWatchBookmarks = options.AllowWatchBookmarks
+		sendInitialEvents = options.SendInitialEvents
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 			sel, err := sharding.Parse(options.ShardSelector)
 			if err != nil {
@@ -1580,7 +1582,7 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 			predicate.ShardSelector = sel
 		}
 	}
-	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)
+	return e.WatchPredicate(ctx, predicate, resourceVersion, sendInitialEvents)
 }
 
 // WatchPredicate starts a watch for the items that matches.
