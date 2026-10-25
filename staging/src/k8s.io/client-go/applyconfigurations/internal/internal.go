@@ -3096,6 +3096,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v1.CrossVersionObjectReference
       default: {}
+    - name: syncPeriodSeconds
+      type:
+        scalar: numeric
     - name: targetCPUUtilizationPercentage
       type:
         scalar: numeric
@@ -3294,6 +3297,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
       default: {}
+    - name: syncPeriodSeconds
+      type:
+        scalar: numeric
 - name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerStatus
   map:
     fields:

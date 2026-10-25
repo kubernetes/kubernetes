@@ -39,6 +39,7 @@ spec:
     apiVersion: apiVersionValue
     kind: kindValue
     name: nameValue
+  syncPeriodSeconds: 5
   targetCPUUtilizationPercentage: 4
 status:
   currentCPUUtilizationPercentage: 5

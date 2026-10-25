@@ -51,7 +51,8 @@
     },
     "minReplicas": 2,
     "maxReplicas": 3,
-    "targetCPUUtilizationPercentage": 4
+    "targetCPUUtilizationPercentage": 4,
+    "syncPeriodSeconds": 5
   },
   "status": {
     "observedGeneration": 1,
