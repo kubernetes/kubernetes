@@ -6264,17 +6264,17 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// This is an absurd scenario, but it has to be; partial resync failures are
 	// supposed to be impossible; if we knew of any non-absurd scenario that would
 	// cause such a failure, then that would be a bug and we would fix it.
-	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+	if _, err := fp.iptables.ChainExists(t.Context(), utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
 		t.Fatalf("svc4's endpoint chain unexpected already does not exist!")
 	}
-	if _, err := fp.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.Chain("KUBE-SVC-X27LE4BHSL4DOUIK"), "-j", "KUBE-SEP-AYCN5HPXMIRJNJXU"); err != nil {
+	if _, err := fp.iptables.EnsureRule(t.Context(), utiliptables.Append, utiliptables.TableNAT, utiliptables.Chain("KUBE-SVC-X27LE4BHSL4DOUIK"), "-j", "KUBE-SEP-AYCN5HPXMIRJNJXU"); err != nil {
 		t.Fatalf("Could not add bad iptables rule: %v", err)
 	}
 
 	fp.OnServiceDelete(svc4)
 	fp.syncProxyRules()
 
-	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+	if _, err := fp.iptables.ChainExists(t.Context(), utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
 		t.Errorf("svc4's endpoint chain was successfully deleted despite dangling references!")
 	}
 	if !fp.needFullSync {

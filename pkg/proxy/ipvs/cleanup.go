@@ -38,7 +38,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 			"-m", "comment", "--comment", jc.comment,
 			"-j", string(jc.to),
 		}
-		if err := ipt.DeleteRule(jc.table, jc.from, args...); err != nil {
+		if err := ipt.DeleteRule(ctx, jc.table, jc.from, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true
@@ -48,7 +48,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 
 	// Flush and remove all of our chains. Flushing all chains before removing them also removes all links between chains first.
 	for _, ch := range iptablesCleanupChains {
-		if err := ipt.FlushChain(ch.table, ch.chain); err != nil {
+		if err := ipt.FlushChain(ctx, ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true
@@ -58,7 +58,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 
 	// Remove all of our chains.
 	for _, ch := range iptablesCleanupChains {
-		if err := ipt.DeleteChain(ch.table, ch.chain); err != nil {
+		if err := ipt.DeleteChain(ctx, ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true

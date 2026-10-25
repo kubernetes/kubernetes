@@ -1511,7 +1511,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 // createAndLinkKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkKubeChain() {
 	for _, ch := range iptablesChains {
-		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
+		if _, err := proxier.iptables.EnsureChain(context.TODO(), ch.table, ch.chain); err != nil {
 			proxier.logger.Error(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
 			return
 		}
@@ -1524,7 +1524,7 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 
 	for _, jc := range iptablesJumpChain {
 		args := []string{"-m", "comment", "--comment", jc.comment, "-j", string(jc.to)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jc.table, jc.from, args...); err != nil {
+		if _, err := proxier.iptables.EnsureRule(context.TODO(), utiliptables.Prepend, jc.table, jc.from, args...); err != nil {
 			proxier.logger.Error(err, "Failed to ensure chain jumps", "table", jc.table, "srcChain", jc.from, "dstChain", jc.to)
 		}
 	}

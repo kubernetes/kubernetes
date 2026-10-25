@@ -167,7 +167,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = ipt.SaveInto("", &buf)
+	err = ipt.SaveInto(t.Context(), "", &buf)
 	if err != nil {
 		t.Fatalf("Unexpected error reading filter table: %v", err)
 	}

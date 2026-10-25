@@ -3589,12 +3589,12 @@ func buildFakeProxier(t *testing.T) (*iptablestest.FakeIPTables, *Proxier) {
 	return ipt, NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 }
 
-func getRules(ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptablestest.Rule {
+func getRules(ctx context.Context, ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptablestest.Rule {
 	var rules []*iptablestest.Rule
 
 	buf := bytes.NewBuffer(nil)
-	_ = ipt.SaveInto(utiliptables.TableNAT, buf)
-	_ = ipt.SaveInto(utiliptables.TableFilter, buf)
+	_ = ipt.SaveInto(ctx, utiliptables.TableNAT, buf)
+	_ = ipt.SaveInto(ctx, utiliptables.TableFilter, buf)
 	lines := strings.Split(buf.String(), "\n")
 	for _, l := range lines {
 		if !strings.HasPrefix(l, "-A ") {
@@ -3612,7 +3612,7 @@ func getRules(ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptab
 // expected rules.
 func checkIptables(t *testing.T, ipt *iptablestest.FakeIPTables, epIpt netlinktest.ExpectedIptablesChain) {
 	for epChain, epRules := range epIpt {
-		rules := getRules(ipt, utiliptables.Chain(epChain))
+		rules := getRules(t.Context(), ipt, utiliptables.Chain(epChain))
 		if len(rules) != len(epRules) {
 			t.Errorf("Expected %d iptables rule in chain %s, got %d", len(epRules), epChain, len(rules))
 			continue
@@ -5522,7 +5522,7 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 
 			fp.syncProxyRules()
 
-			rules := getRules(ipt, kubeServicesChain)
+			rules := getRules(ctx, ipt, kubeServicesChain)
 			if len(rules) <= 0 {
 				t.Errorf("skip loop back ip in kubeservice chain not exist")
 				return
