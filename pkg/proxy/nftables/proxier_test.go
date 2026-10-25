@@ -24,6 +24,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -4778,6 +4779,51 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft, 0)
+}
+
+// runFailingNFTables fails the next call to Run when failNext is set.
+type runFailingNFTables struct {
+	*knftables.Fake
+	failNext atomic.Bool
+	ran      chan struct{}
+}
+
+func (f *runFailingNFTables) Run(ctx context.Context, tx *knftables.Transaction) error {
+	if f.failNext.CompareAndSwap(true, false) {
+		return fmt.Errorf("nft failed")
+	}
+	err := f.Fake.Run(ctx, tx)
+	select {
+	case f.ran <- struct{}{}:
+	default:
+	}
+	return err
+}
+
+// TestSyncProxyRulesRetry tests that a failed sync is retried when it was queued
+// by the initial sync.
+func TestSyncProxyRulesRetry(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	failingNFT := &runFailingNFTables{
+		Fake: nft,
+		ran:  make(chan struct{}, 1),
+	}
+	failingNFT.failNext.Store(true)
+	fp.nftables = failingNFT
+	fp.setInitialized(false)
+	fp.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", fp.syncProxyRules, 0, 10*time.Millisecond, time.Hour)
+
+	fp.OnServiceSynced()
+	fp.OnEndpointSlicesSynced()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go fp.syncRunner.Loop(stopCh)
+	select {
+	case <-failingNFT.ran:
+	case <-time.After(time.Second):
+		t.Fatalf("failed initial sync was not retried")
+	}
 }
 
 func TestSyncProxyRulesStartup(t *testing.T) {
