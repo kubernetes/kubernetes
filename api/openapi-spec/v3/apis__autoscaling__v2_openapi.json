@@ -379,6 +379,11 @@
             ],
             "default": {},
             "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count."
+          },
+          "syncPeriodSeconds": {
+            "description": "syncPeriodSeconds is the delay after a reconciliation completes before the next periodic reconciliation of this HPA is eligible to run. Other events may trigger reconciliation before the delay expires. When unset, the global --horizontal-pod-autoscaler-sync-period is used. A short period does not make metrics fresher; it is useful only when the metrics source updates its values at least as often. The value must be in the range [3, 3600]. Timing is best-effort.",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [

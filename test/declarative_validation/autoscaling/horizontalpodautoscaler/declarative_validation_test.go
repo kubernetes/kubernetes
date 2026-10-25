@@ -93,6 +93,24 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum").MarkBeta(),
 			},
 		},
+		"valid: syncPeriodSeconds = 3": {
+			input: makeValidHPA(tweakSyncPeriodSeconds(3)),
+		},
+		"valid: syncPeriodSeconds = 3600": {
+			input: makeValidHPA(tweakSyncPeriodSeconds(3600)),
+		},
+		"invalid: syncPeriodSeconds below minimum": {
+			input: makeValidHPA(tweakSyncPeriodSeconds(2)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "syncPeriodSeconds"), int32(2), "must be greater than or equal to 3").WithOrigin("minimum"),
+			},
+		},
+		"invalid: syncPeriodSeconds above maximum": {
+			input: makeValidHPA(tweakSyncPeriodSeconds(3601)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "syncPeriodSeconds"), int32(3601), "must be less than or equal to 3600").WithOrigin("maximum"),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -182,6 +200,24 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...), tweakMaxReplicas(20)),
 			enableScaleToZero: false,
 		},
+		"valid update: set syncPeriodSeconds": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakSyncPeriodSeconds(30)),
+		},
+		"invalid update: syncPeriodSeconds below minimum": {
+			oldObj:    makeValidHPA(tweakSyncPeriodSeconds(30)),
+			updateObj: makeValidHPA(tweakSyncPeriodSeconds(2)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "syncPeriodSeconds"), int32(2), "must be greater than or equal to 3").WithOrigin("minimum"),
+			},
+		},
+		"invalid update: syncPeriodSeconds above maximum": {
+			oldObj:    makeValidHPA(tweakSyncPeriodSeconds(30)),
+			updateObj: makeValidHPA(tweakSyncPeriodSeconds(3601)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "syncPeriodSeconds"), int32(3601), "must be less than or equal to 3600").WithOrigin("maximum"),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -242,6 +278,12 @@ func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 func tweakMetrics(metrics ...api.MetricSpec) func(*api.HorizontalPodAutoscaler) {
 	return func(hpa *api.HorizontalPodAutoscaler) {
 		hpa.Spec.Metrics = metrics
+	}
+}
+
+func tweakSyncPeriodSeconds(seconds int32) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.SyncPeriodSeconds = &seconds
 	}
 }
 

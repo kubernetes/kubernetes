@@ -67,6 +67,20 @@ type HorizontalPodAutoscalerSpec struct {
 	// if not specified the default autoscaling policy will be used.
 	// +optional
 	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty" protobuf:"varint,4,opt,name=targetCPUUtilizationPercentage"`
+
+	// syncPeriodSeconds is the delay after a reconciliation completes before
+	// the next periodic reconciliation of this HPA is eligible to run.
+	// Other events may trigger reconciliation before the delay expires.
+	// When unset, the global --horizontal-pod-autoscaler-sync-period is used.
+	// A short period does not make metrics fresher; it is useful only when
+	// the metrics source updates its values at least as often.
+	// The value must be in the range [3, 3600]. Timing is best-effort.
+	// +featureGate=HPAConfigurableSyncPeriod
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=3
+	// +k8s:maximum=3600
+	SyncPeriodSeconds *int32 `json:"syncPeriodSeconds,omitempty" protobuf:"varint,5,opt,name=syncPeriodSeconds"`
 }
 
 // current status of a horizontal pod autoscaler
