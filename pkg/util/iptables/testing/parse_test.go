@@ -26,8 +26,8 @@ import (
 
 	"github.com/lithammer/dedent"
 
-	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 func TestParseRule(t *testing.T) {

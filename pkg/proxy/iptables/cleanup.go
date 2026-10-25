@@ -25,7 +25,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier

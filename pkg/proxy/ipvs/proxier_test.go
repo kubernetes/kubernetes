@@ -52,10 +52,10 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
+	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
 const testNodeName = "test-node"

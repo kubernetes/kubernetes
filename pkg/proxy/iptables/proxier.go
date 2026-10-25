@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 const (

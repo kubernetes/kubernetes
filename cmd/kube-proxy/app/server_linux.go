@@ -39,7 +39,7 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 var defaultedMode bool

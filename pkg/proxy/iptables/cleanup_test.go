@@ -25,8 +25,8 @@ import (
 	"github.com/lithammer/dedent"
 
 	klogtesting "k8s.io/klog/v2/ktesting"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
+	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
 func TestCleanupLeftovers(t *testing.T) {

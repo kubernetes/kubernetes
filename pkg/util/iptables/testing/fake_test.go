@@ -25,7 +25,7 @@ import (
 
 	"github.com/lithammer/dedent"
 
-	"k8s.io/kubernetes/pkg/util/iptables"
+	"sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 func TestFakeIPTables(t *testing.T) {

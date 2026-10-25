@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	ipsettest "k8s.io/kubernetes/pkg/proxy/ipvs/ipset/testing"
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/ptr"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
+	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
 func TestCleanupLeftovers(t *testing.T) {
