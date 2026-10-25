@@ -39,8 +39,8 @@ import (
 func TestCleanupLeftovers(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
-	ipts := map[v1.IPFamily]utiliptables.Interface{
-		v1.IPv4Protocol: ipt,
+	ipts := map[utiliptables.Protocol]utiliptables.Interface{
+		utiliptables.ProtocolIPv4: ipt,
 	}
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)

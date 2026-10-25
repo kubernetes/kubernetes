@@ -19,6 +19,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,8 +36,10 @@ const (
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
-func (kl *Kubelet) initNetworkUtil(logger klog.Logger) {
-	iptClients := utiliptables.NewBestEffort()
+func (kl *Kubelet) initNetworkUtil(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+
+	iptClients := utiliptables.NewBestEffort(ctx, utiliptables.UseInstalledMode)
 	if len(iptClients) == 0 {
 		// We don't log this as an error because kubelet itself doesn't need any
 		// of this (it sets up these rules for the benefit of *other* components),

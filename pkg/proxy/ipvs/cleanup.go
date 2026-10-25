@@ -22,7 +22,6 @@ import (
 	"context"
 	"os/exec"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
@@ -81,14 +80,14 @@ func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
 		return false
 	}
 
-	ipts := utiliptables.NewBestEffort()
+	ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 	ipsetInterface := utilipset.New()
 	ipvsInterface := utilipvs.New()
 
 	return cleanupLeftovers(ctx, ipvsInterface, ipts, ipsetInterface)
 }
 
-func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[v1.IPFamily]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
+func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[utiliptables.Protocol]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Clear all ipvs rules
 	if ipvs != nil {

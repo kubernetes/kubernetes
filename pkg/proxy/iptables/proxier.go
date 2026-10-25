@@ -94,7 +94,7 @@ const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal
 func NewDualStackProxier(
 	ctx context.Context,
 	config *kubeproxyconfig.KubeProxyConfiguration,
-	ipts map[v1.IPFamily]utiliptables.Interface,
+	ipts map[utiliptables.Protocol]utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	nodeName string,
@@ -104,14 +104,14 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[v1.IPv4Protocol], sysctl,
+	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[utiliptables.ProtocolIPv4], sysctl,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[v1.IPv6Protocol], sysctl,
+	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[utiliptables.ProtocolIPv6], sysctl,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, initOnly)
 	if err != nil {

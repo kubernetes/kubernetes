@@ -86,8 +86,8 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		errv4 := utiliptables.New(utiliptables.ProtocolIPv4).Present()
-		errv6 := utiliptables.New(utiliptables.ProtocolIPv6).Present()
+		_, errv4 := utiliptables.New(ctx, utiliptables.ProtocolIPv4, utiliptables.DetectHostMode)
+		_, errv6 := utiliptables.New(ctx, utiliptables.ProtocolIPv6, utiliptables.DetectHostMode)
 
 		ipv4Supported = errv4 == nil
 		ipv6Supported = errv6 == nil
@@ -142,7 +142,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "KubeProxyDefaultMode", "StartKubeProxy", message)
 		}
 		logger.Info("Using iptables Proxier")
-		ipts := utiliptables.NewBestEffort()
+		ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -166,7 +166,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				ctx,
 				config,
 				s.PrimaryIPFamily,
-				ipts[s.PrimaryIPFamily],
+				ipts[utiliptables.Protocol(s.PrimaryIPFamily)],
 				utilsysctl.New(),
 				localDetectors[s.PrimaryIPFamily],
 				s.NodeName,
@@ -186,7 +186,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts := utiliptables.NewBestEffort()
+		ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 
 		logger.Info("Using ipvs Proxier")
 		message := "The ipvs proxier has been deprecated and will be disabled by default in Kubernetes 1.40 and removed in Kubernetes 1.43. Migrate to the 'nftables' proxier instead."
@@ -212,7 +212,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				ctx,
 				config,
 				s.PrimaryIPFamily,
-				ipts[s.PrimaryIPFamily],
+				ipts[utiliptables.Protocol(s.PrimaryIPFamily)],
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),

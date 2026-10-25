@@ -31,7 +31,7 @@ import (
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
-	ipts := utiliptables.NewBestEffort()
+	ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 	for _, ipt := range ipts {
 		encounteredError = cleanupLeftoversForFamily(ctx, ipt) || encounteredError
 	}

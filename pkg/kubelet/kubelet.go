@@ -1990,7 +1990,7 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 
 	// Set up iptables util rules
 	if kl.makeIPTablesUtilChains {
-		kl.initNetworkUtil(logger)
+		kl.initNetworkUtil(ctx)
 	}
 
 	// Start component sync loops.
