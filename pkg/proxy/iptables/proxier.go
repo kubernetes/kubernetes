@@ -34,7 +34,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
+	"k8s.io/utils/set"
 	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
@@ -789,8 +789,10 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		)
 	}
 
-	// Accumulate NAT chains to keep.
-	activeNATChains := sets.New[utiliptables.Chain]()
+	// Accumulate NAT chains to keep; note that this uses "k8s.io/utils/set", not
+	// "k8s.io/apimachinery/pkg/util/sets", for compatibility with
+	// utiliptables.GetChainsFromTable.
+	activeNATChains := set.New[utiliptables.Chain]()
 
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
