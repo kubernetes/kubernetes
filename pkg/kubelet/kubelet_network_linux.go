@@ -22,7 +22,6 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
@@ -55,10 +54,11 @@ func (kl *Kubelet) initNetworkUtil(ctx context.Context) {
 		if kl.syncIPTablesRules(logger, iptClient) {
 			logger.Info("Initialized iptables rules.", "protocol", iptClient.Protocol())
 			go iptClient.Monitor(
+				ctx,
 				utiliptables.Chain("KUBE-KUBELET-CANARY"),
 				[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
-				func() { kl.syncIPTablesRules(logger, iptClient) },
-				1*time.Minute, wait.NeverStop,
+				func() { kl.syncIPTablesRules(ctx, iptClient) },
+				1*time.Minute,
 			)
 		} else {
 			logger.Info("Failed to initialize iptables rules; some functionality may be missing.", "protocol", iptClient.Protocol())
