@@ -4774,6 +4774,15 @@ func TestUpdatePodContainerResources(t *testing.T) {
 	res300m350Mi := v1.ResourceList{v1.ResourceCPU: cpu300m, v1.ResourceMemory: mem350M}
 	res350m350Mi := v1.ResourceList{v1.ResourceCPU: cpu350m, v1.ResourceMemory: mem350M}
 
+	const hugepages2Mi = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
+	for _, resources := range []v1.ResourceList{
+		res100m100Mi, res150m100Mi, res100m150Mi, res150m150Mi,
+		res200m200Mi, res250m200Mi, res200m250Mi, res250m250Mi,
+		res300m300Mi, res350m300Mi, res300m350Mi, res350m350Mi,
+	} {
+		resources[hugepages2Mi] = mem100M
+	}
+
 	pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
 	makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 
@@ -4819,6 +4828,23 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			invokeUpdateResources:   true,
 			expectedCurrentLimits:   []v1.ResourceList{res100m150Mi, res200m250Mi, res300m350Mi},
 			expectedCurrentRequests: []v1.ResourceList{res100m150Mi, res200m250Mi, res300m350Mi},
+		},
+		"Guaranteed QoS Pod - swap resize requested, update swap": {
+			resourceName: v1.ResourceSwap,
+			apiSpecResources: []v1.ResourceRequirements{
+				{Limits: res150m150Mi, Requests: res150m150Mi},
+				{Limits: res250m250Mi, Requests: res250m250Mi},
+				{Limits: res350m350Mi, Requests: res350m350Mi},
+			},
+			apiStatusResources: []v1.ResourceRequirements{
+				{Limits: res100m100Mi, Requests: res100m100Mi},
+				{Limits: res200m200Mi, Requests: res200m200Mi},
+				{Limits: res300m300Mi, Requests: res300m300Mi},
+			},
+			requiresRestart:         []bool{false, false, false},
+			invokeUpdateResources:   true,
+			expectedCurrentLimits:   []v1.ResourceList{res100m100Mi, res200m200Mi, res300m300Mi},
+			expectedCurrentRequests: []v1.ResourceList{res100m100Mi, res200m200Mi, res300m300Mi},
 		},
 	} {
 		for _, allSideCarCtrs := range []bool{false, true} {
@@ -4882,6 +4908,16 @@ func TestUpdatePodContainerResources(t *testing.T) {
 					assert.Equal(t, tc.expectedCurrentLimits[idx].Memory().Value(), c.LinuxResources.MemoryLimitInBytes, dsc)
 					expectedShares := cm.MilliCPUToShares(tc.expectedCurrentRequests[idx].Cpu().MilliValue())
 					assert.Equal(t, int64(expectedShares), c.LinuxResources.CpuShares, dsc)
+					for _, limit := range c.LinuxResources.HugepageLimits {
+						if limit.PageSize == "2MB" {
+							assert.Equal(t, uint64(mem100M.Value()), limit.Limit, dsc)
+						}
+					}
+					actuated, found := m.actuatedState.GetContainerResources(pod.UID, cinfo.container.Name)
+					require.True(t, found, dsc)
+					assert.Equal(t, tc.expectedCurrentLimits[idx][hugepages2Mi], actuated.Limits[hugepages2Mi], dsc)
+					assert.Equal(t, tc.expectedCurrentRequests[idx][hugepages2Mi], actuated.Requests[hugepages2Mi], dsc)
+					assert.Equal(t, tc.apiSpecResources[idx], cinfo.container.Resources, dsc)
 				}
 			}
 			for idx := range len(containersToUpdate) {
