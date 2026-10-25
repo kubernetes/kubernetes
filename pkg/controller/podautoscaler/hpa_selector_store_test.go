@@ -241,7 +241,7 @@ func TestHPASelectorStoreRepeatedLabels(t *testing.T) {
 	}
 }
 
-func BenchmarkHPARepeatedLabels(b *testing.B) {
+func BenchmarkHPAsMatchingPodsRepeatedLabels(b *testing.B) {
 	for _, mode := range []string{"same", "alternating", "unique"} {
 		for _, count := range []int{100, 1000} {
 			b.Run(fmt.Sprintf("%s/%d", mode, count), func(b *testing.B) {
