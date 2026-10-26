@@ -1660,46 +1660,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: request_sli_duration_seconds
-  subsystem: apiserver
-  help: Response latency distribution (not counting webhook duration and priority
-    & fairness queue wait times) in seconds for each verb, group, version, resource,
-    subresource, scope and component.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - component
-  - group
-  - resource
-  - scope
-  - subresource
-  - verb
-  - version
-  buckets:
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 1.25
-  - 1.5
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
-  - 8
-  - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: request_terminations_total
   subsystem: apiserver
   help: Number of requests which apiserver terminated in self-defense.
@@ -7519,6 +7479,46 @@
   - 10
   - 15
   - 30
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: request_sli_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution (not counting webhook duration and priority
+    & fairness queue wait times) in seconds for each verb, group, version, resource,
+    subresource, scope and component.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

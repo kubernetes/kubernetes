@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -523,6 +524,90 @@ func TestCleanListScope(t *testing.T) {
 			actualScope := CleanListScope(scenario.ctx, scenario.opts)
 			if actualScope != scenario.expectedScope {
 				t.Errorf("unexpected scope = %s, expected = %s", actualScope, scenario.expectedScope)
+			}
+		})
+	}
+}
+
+func TestMonitorRequestSLILatency(t *testing.T) {
+	Register()
+	requestCounter.Reset()
+	requestLatencies.Reset()
+	requestSliLatencies.Reset()
+	fieldValidationRequestLatencies.Reset()
+
+	tests := []struct {
+		name            string
+		elapsed         time.Duration
+		mutating        time.Duration
+		validating      time.Duration
+		queueWait       time.Duration
+		dryRun          bool
+		withoutTrackers bool
+	}{
+		{name: "no excluded latency", elapsed: time.Second},
+		{name: "mutating webhook", elapsed: 2 * time.Second, mutating: time.Second},
+		{name: "validating webhook", elapsed: 3 * time.Second, validating: 2 * time.Second},
+		{name: "APF queue wait", elapsed: 4 * time.Second, queueWait: 3 * time.Second},
+		{name: "all excluded latencies", elapsed: 7 * time.Second, mutating: time.Second, validating: 2 * time.Second, queueWait: 3 * time.Second},
+		{name: "dry run", elapsed: time.Second, dryRun: true},
+		{name: "no latency trackers", elapsed: time.Second, withoutTrackers: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer requestCounter.Reset()
+			defer requestLatencies.Reset()
+			defer requestSliLatencies.Reset()
+			defer fieldValidationRequestLatencies.Reset()
+			ctx := t.Context()
+			if !tt.withoutTrackers {
+				ctx = request.WithLatencyTrackers(ctx)
+				trackers, _ := request.LatencyTrackersFrom(ctx)
+				trackers.MutatingWebhookTracker.TrackDuration(tt.mutating)
+				trackers.ValidatingWebhookTracker.TrackDuration(tt.validating)
+				trackers.APFQueueWaitTracker.TrackDuration(tt.queueWait)
+				// Authentication and storage time remain part of the SLI latency.
+				trackers.AuthenticationTracker.TrackDuration(100 * time.Millisecond)
+				trackers.StorageTracker.TrackDuration(200 * time.Millisecond)
+			}
+			req, err := http.NewRequestWithContext(ctx, http.MethodPut, "/apis/apps/v1/namespaces/default/deployments/example/scale", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.dryRun {
+				req.URL.RawQuery = "dryRun=All"
+			}
+			MonitorRequest(req, MethodPut, "apps", "v1", "deployments", "scale", "resource", APIServerComponent, false, "", http.StatusOK, 0, tt.elapsed)
+
+			if tt.dryRun || tt.withoutTrackers {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(""), "apiserver_request_sli_duration_seconds"); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+
+			histograms, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, "apiserver_request_sli_duration_seconds", map[string]string{
+				"component":   APIServerComponent,
+				"group":       "apps",
+				"resource":    "deployments",
+				"scope":       "resource",
+				"subresource": "scale",
+				"verb":        MethodPut,
+				"version":     "v1",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(histograms) != 1 {
+				t.Fatalf("expected one histogram, got %d", len(histograms))
+			}
+			histogram := histograms[0]
+			if got := histogram.GetSampleSum(); got != 1 {
+				t.Errorf("expected sum 1, got %g", got)
+			}
+			if got := histogram.GetSampleCount(); got != 1 {
+				t.Errorf("expected count 1, got %d", got)
 			}
 		})
 	}
