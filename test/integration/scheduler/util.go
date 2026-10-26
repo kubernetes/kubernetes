@@ -19,6 +19,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -423,11 +424,11 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
 		node, err := CreateNode(cs, wrapper.Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj())
 		if err != nil {
-			return nodes[:], err
+			return nodes, err
 		}
 		nodes[i] = node
 	}
-	return nodes[:], nil
+	return nodes, nil
 }
 
 // CreateAndWaitForNodesInCache calls createNodes(), and wait for the created
@@ -436,7 +437,7 @@ func CreateAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string,
 	existingNodes := testCtx.Scheduler.Cache.NodeCount()
 	nodes, err := createNodes(testCtx.ClientSet, prefix, wrapper, numNodes)
 	if err != nil {
-		return nodes, fmt.Errorf("cannot create nodes: %v", err)
+		return nodes, fmt.Errorf("cannot create nodes: %w", err)
 	}
 	return nodes, WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, numNodes+existingNodes)
 }
@@ -448,7 +449,7 @@ func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCo
 		return sched.Cache.NodeCount() >= nodeCount, nil
 	})
 	if err != nil {
-		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %v", err)
+		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %w", err)
 	}
 	return nil
 }
@@ -503,13 +504,13 @@ func DeletePV(cs clientset.Interface, pvName string) error {
 func RunPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pause pod: %v", err)
+		return nil, fmt.Errorf("failed to create pause pod: %w", err)
 	}
 	if err = WaitForPodToSchedule(context.TODO(), cs, pod); err != nil {
-		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
+		return pod, fmt.Errorf("pod %v/%v didn't schedule successfully. Error: %w", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("failed to get pod %v/%v info: %v", pod.Namespace, pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v/%v info: %w", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
@@ -540,13 +541,13 @@ func InitPodWithContainers(cs clientset.Interface, conf *PodWithContainersConfig
 func RunPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pod-with-containers: %v", err)
+		return nil, fmt.Errorf("failed to create pod-with-containers: %w", err)
 	}
 	if err = WaitForPodToSchedule(context.TODO(), cs, pod); err != nil {
-		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %v didn't schedule successfully. Error: %w", pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("failed to get pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v info: %w", pod.Name, err)
 	}
 	return pod, nil
 }
@@ -562,12 +563,7 @@ func PodScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNam
 		if pod.Spec.NodeName == "" {
 			return false, nil
 		}
-		for _, nodeName := range nodeNames {
-			if pod.Spec.NodeName == nodeName {
-				return true, nil
-			}
-		}
-		return false, nil
+		return slices.Contains(nodeNames, pod.Spec.NodeName), nil
 	}
 }
 

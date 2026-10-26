@@ -204,7 +204,9 @@ func TestMultipleSchedulers(t *testing.T) {
 			},
 		},
 	}
-	CreateNode(testCtx.ClientSet, node)
+	if _, err := CreateNode(testCtx.ClientSet, node); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
 
 	// 3. create 3 pods for testing
 	t.Logf("create 3 pods for testing")

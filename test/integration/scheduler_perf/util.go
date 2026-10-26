@@ -167,19 +167,19 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 
 // startFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
 // TODO(mborsz): Use a real PV controller here.
-func startFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
+func startFakePVController(tCtx ktesting.TContext, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
-			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
+			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(tCtx, claimRef.Name, metav1.GetOptions{})
 			if err != nil {
 				// Note that the error can be anything, because components like
 				// apiserver are also shutting down at the same time, but this
 				// check is conservative and only ignores the "context canceled"
 				// error while shutting down.
-				if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+				if tCtx.Err() == nil || !errors.Is(err, context.Canceled) {
 					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
 				}
 				return
@@ -188,9 +188,9 @@ func startFakePVController(ctx context.Context, clientSet clientset.Interface, i
 			if pvc.Spec.VolumeName == "" {
 				pvc.Spec.VolumeName = obj.Name
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
-				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
+				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(tCtx, pvc, metav1.UpdateOptions{})
 				if err != nil {
-					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+					if tCtx.Err() == nil || !errors.Is(err, context.Canceled) {
 						// Shutting down, no need to record this.
 						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
 					}
@@ -200,7 +200,7 @@ func startFakePVController(ctx context.Context, clientSet clientset.Interface, i
 		}
 	}
 
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			syncPV(obj.(*v1.PersistentVolume))
 		},
@@ -208,6 +208,7 @@ func startFakePVController(ctx context.Context, clientSet clientset.Interface, i
 			syncPV(obj.(*v1.PersistentVolume))
 		},
 	})
+	tCtx.ExpectNoError(err, "add PV event handler")
 }
 
 // createNamespaceController creates a namespace controller and returns a run
