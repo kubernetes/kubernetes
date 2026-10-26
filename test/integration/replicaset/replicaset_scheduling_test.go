@@ -18,73 +18,97 @@ package replicaset
 
 import (
 	"context"
-	"slices"
 	"testing"
 
-	apps "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-const replicaSetPodGroupFinalizer = "apps.kubernetes.io/replicaset-podgroup-cleanup"
-
-// TestReplicaSetPodGroupCleanupFinalizerGateDisabled verifies selective cleanup
-// finalizer removal when WorkloadWithDeployment is disabled.
-func TestReplicaSetPodGroupCleanupFinalizerGateDisabled(t *testing.T) {
+// TestReplicaSetDelegatedPodGroup verifies that a ReplicaSet selecting a
+// template in a Workload via the workload-name and group-template-name
+// annotations gets a PodGroup built from that template, controller-owned by
+// the ReplicaSet.
+func TestReplicaSetDelegatedPodGroup(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload:        true,
-		features.WorkloadWithDeployment: false,
+		features.WorkloadWithDeployment: true,
 	})
 
+	const (
+		workloadName     = "test-workload"
+		templateName     = "workers"
+		templateMinCount = int32(2)
+		replicas         = int32(3)
+	)
+
 	tCtx, rm, informers, c := setup(t)
-	ns := framework.CreateNamespaceOrDie(c, "rs-podgroup-cleanup", t)
+	ns := framework.CreateNamespaceOrDie(c, "rs-delegated-podgroup", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
-	const unrelatedFinalizer = "test.example.com/hold"
-	rs := newRS("gang-rs", ns.Name, 0)
-	rs.Finalizers = []string{replicaSetPodGroupFinalizer, unrelatedFinalizer}
-	created, err := c.AppsV1().ReplicaSets(ns.Name).Create(tCtx, rs, metav1.CreateOptions{})
+	wl := &schedulingv1beta1.Workload{
+		ObjectMeta: metav1.ObjectMeta{Name: workloadName, Namespace: ns.Name},
+		Spec: schedulingv1beta1.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+				{
+					Name: templateName,
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: templateMinCount},
+					},
+				},
+			},
+		},
+	}
+	workloadClient := c.SchedulingV1beta1().Workloads(ns.Name)
+	if _, err := workloadClient.Create(tCtx, wl, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create Workload: %v", err)
+	}
+
+	rs := newRS("delegated-rs", ns.Name, int(replicas))
+	rs.Annotations = map[string]string{
+		apischeduling.WorkloadNameAnnotation:      workloadName,
+		apischeduling.GroupTemplateNameAnnotation: templateName,
+	}
+	rsClient := c.AppsV1().ReplicaSets(ns.Name)
+	created, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("failed to create ReplicaSet: %v", err)
+		t.Fatalf("Failed to create ReplicaSet: %v", err)
 	}
 
 	stop := runControllerAndInformers(t, rm, informers, 0)
 	defer stop()
 
-	if err := c.AppsV1().ReplicaSets(ns.Name).Delete(tCtx, created.Name, metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("failed to delete ReplicaSet: %v", err)
-	}
-
+	pgClient := c.SchedulingV1beta1().PodGroups(ns.Name)
+	var podGroup *schedulingv1beta1.PodGroup
 	err = wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(ctx context.Context) (bool, error) {
-		got, err := c.AppsV1().ReplicaSets(ns.Name).Get(ctx, created.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+		pgs, listErr := pgClient.List(ctx, metav1.ListOptions{})
+		if listErr != nil {
+			return false, listErr
 		}
-		return got.DeletionTimestamp != nil && slices.Equal(got.Finalizers, []string{unrelatedFinalizer}), nil
+		for i := range pgs.Items {
+			for _, ref := range pgs.Items[i].OwnerReferences {
+				if ref.UID == created.UID && ref.Kind == "ReplicaSet" && ref.Controller != nil && *ref.Controller {
+					podGroup = &pgs.Items[i]
+					return true, nil
+				}
+			}
+		}
+		return false, nil
 	})
 	if err != nil {
-		t.Fatalf("failed to observe cleanup finalizer removal on ReplicaSet %q with %q preserved: %v", created.Name, unrelatedFinalizer, err)
+		t.Fatalf("Failed to observe PodGroup owned by ReplicaSet: %v", err)
 	}
 
-	updateRS(t, c.AppsV1().ReplicaSets(ns.Name), created.Name, func(update *apps.ReplicaSet) {
-		update.Finalizers = slices.DeleteFunc(update.Finalizers, func(finalizer string) bool {
-			return finalizer == unrelatedFinalizer
-		})
-	})
+	if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != templateMinCount {
+		t.Errorf("PodGroup gang minCount = %v, want %d", podGroup.Spec.SchedulingPolicy.Gang, templateMinCount)
+	}
 
-	err = wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := c.AppsV1().ReplicaSets(ns.Name).Get(ctx, created.Name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	})
-	if err != nil {
-		t.Fatalf("ReplicaSet %q stranded after cleanup while gate disabled: %v", created.Name, err)
+	if ref := podGroup.Spec.WorkloadRef; ref == nil || ref.WorkloadName != workloadName || ref.TemplateName != templateName {
+		t.Errorf("PodGroup workloadRef = %+v, want workload %q template %q", ref, workloadName, templateName)
 	}
 }

@@ -32,7 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -649,8 +649,8 @@ var _ = SIGDescribe("Deployment", func() {
 func newGangDeployment(name string, replicas int32, podLabels map[string]string, minCount *int32) *appsv1.Deployment {
 	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RecreateDeploymentStrategyType)
 	d.Spec.Scheduling = &appsv1.DeploymentSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
 		},
 	}
 	return d
@@ -694,18 +694,28 @@ func waitForDeploymentReplicaSetName(ctx context.Context, c clientset.Interface,
 }
 
 func waitForReplicaSetPodGroup(ctx context.Context, c clientset.Interface, ns, rsName string) *schedulingv1beta1.PodGroup {
+	rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get ReplicaSet %q", rsName)
+
 	var podGroup *schedulingv1beta1.PodGroup
 	gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.PodGroup, error) {
-		got, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
+		list, err := c.SchedulingV1beta1().PodGroups(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
-		podGroup = got
-		return podGroup, nil
-	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a PodGroup named %s", rsName)
+		// The controller names the PodGroup from a hash, so match on the ReplicaSet controller ownerRef.
+		for i := range list.Items {
+			pg := &list.Items[i]
+			if pg.DeletionTimestamp != nil {
+				continue
+			}
+			if owner := metav1.GetControllerOf(pg); owner != nil && owner.Kind == "ReplicaSet" && owner.UID == rs.UID {
+				podGroup = pg
+				return podGroup, nil
+			}
+		}
+		return nil, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a PodGroup controller-owned by ReplicaSet %s", rsName)
 	return podGroup
 }
 
@@ -777,13 +787,6 @@ func testGangDeploymentWorkload(ctx context.Context, f *framework.Framework) {
 	gomega.Expect(pgController).NotTo(gomega.BeNil(), "podGroup should have a controller owner")
 	gomega.Expect(pgController.Kind).To(gomega.Equal("ReplicaSet"), "podGroup controller owner kind")
 	gomega.Expect(pgController.UID).To(gomega.Equal(rs.UID), "podGroup should be controller-owned by ReplicaSet %s", rsName)
-	ownedByWorkload := false
-	for _, ref := range podGroup.OwnerReferences {
-		if ref.Kind == "Workload" && ref.UID == workload.UID {
-			ownedByWorkload = true
-		}
-	}
-	gomega.Expect(ownedByWorkload).To(gomega.BeTrueBecause("podGroup should also be owned by Workload %s", workload.Name))
 
 	ginkgo.By("waiting for the Deployment to complete")
 	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "wait for gang Deployment %q to complete", deploy.Name)
@@ -867,7 +870,7 @@ func testGangDeploymentAdmission(ctx context.Context, f *framework.Framework) {
 	exceed := newGangDeployment("gang-mincount", 2, podLabels, new(int32(3)))
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, exceed, metav1.CreateOptions{})
 	gomega.Expect(err).To(gomega.HaveOccurred(), "gang Deployment with minCount > replicas must be rejected")
-	gomega.Expect(err.Error()).To(gomega.ContainSubstring("minCount must not exceed replicas"))
+	gomega.Expect(err.Error()).To(gomega.ContainSubstring("must not be greater than replicas"))
 }
 
 func testGangDeploymentElasticMinCount(ctx context.Context, f *framework.Framework) {
@@ -883,8 +886,8 @@ func testGangDeploymentElasticMinCount(ctx context.Context, f *framework.Framewo
 
 	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
 	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
-	waitForReplicaSetPodGroup(ctx, c, ns, rsName)
-	expectGangMinCount(ctx, c, ns, workload.Name, rsName, initial)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, initial)
 
 	ginkgo.By("updating the gang minCount")
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -898,7 +901,7 @@ func testGangDeploymentElasticMinCount(ctx context.Context, f *framework.Framewo
 	})
 	framework.ExpectNoError(err, "update gang minCount")
 
-	expectGangMinCount(ctx, c, ns, workload.Name, rsName, updated)
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, updated)
 }
 
 func testGangDeploymentScaleToZero(ctx context.Context, f *framework.Framework) {
@@ -913,14 +916,14 @@ func testGangDeploymentScaleToZero(ctx context.Context, f *framework.Framework) 
 
 	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
 	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
-	waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
 	// minCount is derived from replicas when unset
-	expectGangMinCount(ctx, c, ns, workload.Name, rsName, replicas)
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, replicas)
 
 	ginkgo.By("scaling the Deployment to zero deletes the PodGroup but retains the Workload")
 	scaleGangDeployment(ctx, c, ns, deploy.Name, 0)
 	gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
-		_, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
+		_, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroup.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -942,8 +945,8 @@ func testGangDeploymentScaleToZero(ctx context.Context, f *framework.Framework) 
 	ginkgo.By("scaling the Deployment back up recreates the PodGroup")
 	scaleGangDeployment(ctx, c, ns, deploy.Name, replicas)
 	newRSName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
-	waitForReplicaSetPodGroup(ctx, c, ns, newRSName)
-	expectGangMinCount(ctx, c, ns, workload.Name, newRSName, replicas)
+	newPodGroup := waitForReplicaSetPodGroup(ctx, c, ns, newRSName)
+	expectGangMinCount(ctx, c, ns, workload.Name, newPodGroup.Name, replicas)
 }
 
 func testGangDeploymentScaleUpNonDisruptive(ctx context.Context, f *framework.Framework) {

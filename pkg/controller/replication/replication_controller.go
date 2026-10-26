@@ -52,6 +52,7 @@ type ReplicationManager struct {
 // NewReplicationManager configures a replication manager with the specified event recorder
 func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"})
 	return &ReplicationManager{
 		*replicaset.NewBaseController(ctx, informerAdapter{rcInformer}, podInformer, clientsetAdapter{kubeClient}, burstReplicas,
 			v1.SchemeGroupVersion.WithKind("ReplicationController"),
@@ -59,13 +60,16 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 			"replicationmanager",
 			podControlAdapter{controller.RealPodControl{
 				KubeClient: kubeClient,
-				Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"}),
+				Recorder:   recorder,
 			}},
 			eventBroadcaster,
+			recorder,
 			replicaset.ReplicaSetControllerFeatures{
 				// ReplicationController API does not support the .status.terminatingReplicas field. However,
 				// ReplicaSets do support this field, which is then propagated to Deployments for higher-level features.
 				EnableStatusTerminatingReplicas: false,
+				// Workload/PodGroup scheduling integration applies to ReplicaSet only.
+				EnableWorkloadScheduling: false,
 			},
 			// TODO: Replication controller does not currently support stale controller consistency.
 			// In order to support stale controller consistency, we would need to parameterize the metrics

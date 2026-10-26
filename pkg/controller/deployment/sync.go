@@ -29,7 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/features"
@@ -225,6 +227,17 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	*(newRS.Spec.Replicas) = newReplicasCount
 	// Set new replica set's annotation
 	deploymentutil.SetNewReplicaSetAnnotations(ctx, d, &newRS, newRevision, false, maxRevHistoryLengthInChars)
+	// Stamp the new ReplicaSet with the owned or delegated Workload so the
+	// ReplicaSet controller can find it by name and manage the runtime PodGroup.
+	if shouldManageWorkloadForDeployment(d) {
+		newRS.Annotations[apischeduling.WorkloadNameAnnotation] = workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
+		newRS.Annotations[apischeduling.GroupTemplateNameAnnotation] = podGroupTemplateName(d)
+	} else if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) &&
+		d.Spec.Template.Spec.SchedulingGroup == nil &&
+		hasDelegatedPodGroup(d) {
+		newRS.Annotations[apischeduling.WorkloadNameAnnotation] = d.Annotations[apischeduling.WorkloadNameAnnotation]
+		newRS.Annotations[apischeduling.GroupTemplateNameAnnotation] = d.Annotations[apischeduling.GroupTemplateNameAnnotation]
+	}
 	// Create the new ReplicaSet. If it already exists, then we need to check for possible
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.

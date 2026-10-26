@@ -62,8 +62,13 @@ type DeploymentSpecApplyConfiguration struct {
 	// constraints, disruption mode, and shared resource claims.
 	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
 	// Deployment uses standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithDeployment feature gate.
-	// Once set, this field is immutable except for policy.gang.minCount.
+	// This field is gated by the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for schedulingPolicy.gang.minCount.
+	//
+	// - The scheduling field can only be set when the Deployment is created.
+	// - A gang schedulingPolicy requires strategy.type Recreate.
+	// - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount.
+	// - template.spec.schedulingGroup must be unset.
 	Scheduling *DeploymentSchedulingConfigurationApplyConfiguration `json:"scheduling,omitempty"`
 }
 

@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,8 +135,8 @@ func TestStatusUpdatesWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) 
 func TestDeploymentStrategy_PrepareForUpdateScheduling(t *testing.T) {
 	schedulingWithMinCount := func(minCount int32) *apps.DeploymentSchedulingConfiguration {
 		return &apps.DeploymentSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
 			},
 		}
 	}
@@ -184,6 +184,53 @@ func TestDeploymentStrategy_PrepareForUpdateScheduling(t *testing.T) {
 
 			if !reflect.DeepEqual(tc.wantScheduling, newDeployment.Spec.Scheduling) {
 				t.Errorf("Scheduling = %#v, want %#v", newDeployment.Spec.Scheduling, tc.wantScheduling)
+			}
+		})
+	}
+}
+
+func TestDeploymentStrategy_PrepareForCreateScheduling(t *testing.T) {
+	schedulingWithMinCount := func(minCount int32) *apps.DeploymentSchedulingConfiguration {
+		return &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                         string
+		enableWorkloadWithDeployment bool
+		scheduling                   *apps.DeploymentSchedulingConfiguration
+		wantScheduling               *apps.DeploymentSchedulingConfiguration
+	}{
+		{
+			name:                         "scheduling dropped on create when feature gate disabled",
+			enableWorkloadWithDeployment: false,
+			scheduling:                   schedulingWithMinCount(2),
+		},
+		{
+			name:                         "scheduling retained on create when feature gate enabled",
+			enableWorkloadWithDeployment: true,
+			scheduling:                   schedulingWithMinCount(2),
+			wantScheduling:               schedulingWithMinCount(2),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.enableWorkloadWithDeployment,
+				features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
+			})
+
+			deployment := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+			deployment.Spec.Scheduling = tc.scheduling
+
+			Strategy.PrepareForCreate(genericapirequest.NewDefaultContext(), deployment)
+
+			if !reflect.DeepEqual(tc.wantScheduling, deployment.Spec.Scheduling) {
+				t.Errorf("Scheduling = %#v, want %#v", deployment.Spec.Scheduling, tc.wantScheduling)
 			}
 		})
 	}

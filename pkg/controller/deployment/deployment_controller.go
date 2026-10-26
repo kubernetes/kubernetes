@@ -177,11 +177,9 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 	dc.podIndexer = podInformer.Informer().GetIndexer()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
-		if workloadInformer == nil {
-			return nil, fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.WorkloadWithDeployment)
+		if err := dc.addSchedulingInformers(workloadInformer); err != nil {
+			return nil, err
 		}
-		dc.workloadLister = workloadInformer.Lister()
-		dc.workloadListerSynced = workloadInformer.Informer().HasSynced
 	}
 
 	return dc, nil

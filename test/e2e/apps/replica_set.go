@@ -215,7 +215,7 @@ func testGangReplicaSetPodReplacement(ctx context.Context, f *framework.Framewor
 	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "deployment should replace the deleted pod")
 
 	ginkgo.By("verifying the PodGroup was not recreated")
-	pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
+	pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroup.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "PodGroup should still exist")
 	gomega.Expect(pg.UID).To(gomega.Equal(originalPGUID), "PodGroup should not be recreated when a single pod is replaced")
 
@@ -225,7 +225,7 @@ func testGangReplicaSetPodReplacement(ctx context.Context, f *framework.Framewor
 	gomega.Expect(pods.Items).To(gomega.HaveLen(int(replicas)))
 	for _, pod := range pods.Items {
 		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
-		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(rsName)), "pod %s podGroupName", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(podGroup.Name)), "pod %s podGroupName", pod.Name)
 	}
 }
 

@@ -20,39 +20,66 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
+	"strings"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	"k8s.io/client-go/tools/cache"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2"
 	deploymentutil "k8s.io/kubernetes/pkg/api/deployment"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-// workloadNameForDeployment generates a deterministic name for a Workload associated with a Deployment.
-// The pattern is: <truncated-deployment-name>-<hash>
-// The hash is derived from the Deployment UID to ensure uniqueness and stability across restarts.
-func workloadNameForDeployment(d *apps.Deployment) string {
-	hasher := fnv.New32a()
-	hashutil.DeepHashObject(hasher, d.UID)
-	hash := rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
-
-	// Reserve space for the hash and separator in the DNS name.
-	maxPrefixLen := validation.DNS1123SubdomainMaxLength - len(hash) - 1
-	prefix := d.Name
-	if len(prefix) > maxPrefixLen {
-		prefix = prefix[:maxPrefixLen]
+func (dc *DeploymentController) addSchedulingInformers(workloadInformer schedulinginformers.WorkloadInformer) error {
+	if workloadInformer == nil {
+		return fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.WorkloadWithDeployment)
 	}
-	return fmt.Sprintf("%s-%s", prefix, hash)
+	dc.workloadLister = workloadInformer.Lister()
+	dc.workloadListerSynced = workloadInformer.Informer().HasSynced
+	_, err := workloadInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { dc.enqueueDeploymentForWorkload(obj) },
+		UpdateFunc: func(_, newObj interface{}) { dc.enqueueDeploymentForWorkload(newObj) },
+		DeleteFunc: func(obj interface{}) { dc.enqueueDeploymentForWorkload(obj) },
+	})
+	return err
+}
+
+// enqueueDeploymentForWorkload enqueues the Deployment that owns the Workload so it
+// reconciles its scheduling objects when the Workload changes or is deleted.
+func (dc *DeploymentController) enqueueDeploymentForWorkload(obj interface{}) {
+	workload, ok := obj.(*schedulingv1beta1.Workload)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			return
+		}
+		workload, ok = tombstone.Obj.(*schedulingv1beta1.Workload)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Workload %#v", obj))
+			return
+		}
+	}
+	controllerRef := metav1.GetControllerOf(workload)
+	if controllerRef == nil {
+		return
+	}
+	d := dc.resolveControllerRef(workload.Namespace, controllerRef)
+	if d == nil {
+		return
+	}
+	dc.enqueueDeployment(d)
 }
 
 // resolveMinCount returns the effective gang minCount for the Workload
@@ -73,26 +100,39 @@ func resolveMinCount(d *apps.Deployment) int32 {
 }
 
 func shouldManageWorkloadForDeployment(d *apps.Deployment) bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && d.Spec.Scheduling != nil
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) &&
+		d.Spec.Template.Spec.SchedulingGroup == nil &&
+		!hasDelegatedPodGroup(d) &&
+		d.Spec.Scheduling != nil
+}
+
+// hasDelegatedPodGroup reports whether the Deployment selects a template in an
+// external Workload via the workload-name or group-template-name annotation.
+func hasDelegatedPodGroup(d *apps.Deployment) bool {
+	_, hasWorkload := d.Annotations[apischeduling.WorkloadNameAnnotation]
+	_, hasTemplate := d.Annotations[apischeduling.GroupTemplateNameAnnotation]
+	return hasWorkload || hasTemplate
+}
+
+// podGroupTemplateName is a DNS label (63 bytes), tighter than the Workload name.
+func podGroupTemplateName(d *apps.Deployment) string {
+	const suffix = "-pgt-0"
+	templateName := strings.ReplaceAll(d.Name, ".", "-") + suffix
+	if len(templateName) > validation.DNS1123LabelMaxLength {
+		templateName = templateName[:validation.DNS1123LabelMaxLength-len(suffix)] + suffix
+	}
+	return templateName
 }
 
 // buildWorkloadForDeployment compiles the Deployment's scheduling configuration into a Workload.
 // For Gang scheduling, it stores the resolved minCount in the template so each ReplicaSet's PodGroup inherits it.
 func buildWorkloadForDeployment(d *apps.Deployment) (*schedulingv1beta1.Workload, error) {
-	minCount := resolveMinCount(d)
 	input := deploymentutil.WorkloadInputForDeploymentV1(d.Spec.Scheduling)
 
-	wlName := workloadNameForDeployment(d)
+	wlName := workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
 	item := deploymentutil.WorkloadItemForDeployment(
-		wlName, d.Spec.Template.Spec.PriorityClassName, input, nil,
+		podGroupTemplateName(d), d.Spec.Template.Spec.PriorityClassName, d.Spec.Replicas, input, nil,
 	)
-	item.Callbacks = []workloadbuilder.SchedulingConfigFunc{
-		func(cfg *workloadbuilder.SchedulingConfig) {
-			if cfg != nil && cfg.Policy != nil && cfg.Policy.Gang != nil {
-				cfg.Policy.Gang.MinCount = &minCount
-			}
-		},
-	}
 
 	builder := workloadbuilder.NewBuilder(item, workloadbuilder.BuildOptions{
 		Name:      wlName,
@@ -106,13 +146,13 @@ func buildWorkloadForDeployment(d *apps.Deployment) (*schedulingv1beta1.Workload
 // ensureWorkloadForDeployment reconciles the Workload owned by a Deployment.
 // Its template minCount is kept current so new PodGroups inherit the right value.
 func (dc *DeploymentController) ensureWorkloadForDeployment(ctx context.Context, d *apps.Deployment) (*schedulingv1beta1.Workload, error) {
-	logger := klog.FromContext(ctx)
-	wlName := workloadNameForDeployment(d)
-	minCount := resolveMinCount(d)
-
 	if dc.workloadLister == nil {
 		return nil, fmt.Errorf("workload informer is not configured")
 	}
+	logger := klog.FromContext(ctx)
+	wlName := workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
+	minCount := resolveMinCount(d)
+
 	existing, err := dc.workloadLister.Workloads(d.Namespace).Get(wlName)
 	if err == nil {
 		if !isWorkloadControlledByDeployment(existing, d) {
@@ -145,11 +185,15 @@ func (dc *DeploymentController) ensureWorkloadForDeployment(ctx context.Context,
 
 	created, err := dc.client.SchedulingV1beta1().Workloads(d.Namespace).Create(ctx, desired, metav1.CreateOptions{})
 	if err == nil {
+		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "WorkloadCreated",
+			"Created Workload %s for Deployment %s", created.Name, d.Name)
 		logger.V(2).Info("Created Workload for Deployment",
 			"workload", klog.KObj(created),
 			"deployment", klog.KObj(d))
 		return created, nil
 	}
+	dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "FailedWorkloadCreate",
+		"Failed to create Workload for Deployment %s: %v", d.Name, err)
 	if errors.IsAlreadyExists(err) {
 		return nil, err
 	}

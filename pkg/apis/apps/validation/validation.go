@@ -22,14 +22,11 @@ import (
 	"fmt"
 	"strconv"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -38,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 // StatefulSetValidationOptions is a struct that can be passed to ValidateStatefulSetSpec to record the validate options
@@ -673,43 +671,145 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 		}
 	}
 
-	allErrs = append(allErrs, validateDeploymentScheduling(spec, oldSpec, fldPath)...)
-	allErrs = append(allErrs, validateDeploymentSchedulingUpdate(spec, oldSpec, fldPath.Child("scheduling"))...)
-
-	if spec.Scheduling != nil && spec.Template.Spec.SchedulingGroup != nil {
-		allErrs = append(allErrs, field.Invalid(
-			fldPath.Child("template", "spec", "schedulingGroup"),
-			spec.Template.Spec.SchedulingGroup,
-			"cannot be set when spec.scheduling is configured because Pods must use either Deployment-managed scheduling or a user-managed PodGroup",
-		))
-	}
-
-	if spec.Scheduling != nil && spec.Scheduling.SchedulingPolicy != nil && spec.Scheduling.SchedulingPolicy.Gang != nil {
-		gangPath := fldPath.Child("scheduling", "schedulingPolicy", "gang")
-
-		if spec.Scheduling.SchedulingPolicy.Gang.MinCount != nil && spec.Replicas > 0 {
-			if *spec.Scheduling.SchedulingPolicy.Gang.MinCount > spec.Replicas {
-				allErrs = append(allErrs, field.Invalid(
-					gangPath.Child("minCount"),
-					*spec.Scheduling.SchedulingPolicy.Gang.MinCount,
-					fmt.Sprintf("minCount must not exceed replicas (%d)", spec.Replicas),
-				))
-			}
-		}
-
-		if spec.Strategy.Type != apps.RecreateDeploymentStrategyType {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("strategy", "type"),
-				spec.Strategy.Type,
-				"gang-scheduled Deployment requires strategy type Recreate",
-			))
-		}
-
-	}
+	allErrs = append(allErrs, validateGangMinCount(spec, fldPath.Child("scheduling"))...)
+	allErrs = append(allErrs, validateSchedulingAndSchedulingGroup(spec, oldSpec, fldPath.Child("scheduling"))...)
+	allErrs = append(allErrs, validateDeploymentScheduling(spec, oldSpec, fldPath.Child("scheduling"))...)
+	allErrs = append(allErrs, validateGangRequiresRecreate(spec, oldSpec, fldPath)...)
 
 	return allErrs
 }
 
+// validateSchedulingAndSchedulingGroup rejects spec.scheduling when the pod
+// template also carries schedulingGroup. On update, the combination is allowed
+// only if oldSpec already had both fields set.
+func validateSchedulingAndSchedulingGroup(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil || spec.Template.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	if oldSpec != nil && oldSpec.Scheduling != nil && oldSpec.Template.Spec.SchedulingGroup != nil {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+		"must not be set together with template.spec.schedulingGroup")}
+}
+
+// validateGangRequiresRecreate requires strategy type Recreate for gang scheduling.
+func validateGangRequiresRecreate(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if spec.Scheduling == nil || spec.Scheduling.SchedulingPolicy == nil ||
+		spec.Scheduling.SchedulingPolicy.Gang == nil ||
+		spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+		return nil
+	}
+	// Ratchet unrelated updates: a persisted gang Deployment whose strategy
+	// type is unchanged is not re-rejected.
+	if oldSpec != nil && oldSpec.Scheduling != nil &&
+		oldSpec.Scheduling.SchedulingPolicy != nil &&
+		oldSpec.Scheduling.SchedulingPolicy.Gang != nil &&
+		oldSpec.Strategy.Type == spec.Strategy.Type {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("strategy", "type"),
+		spec.Strategy.Type,
+		"gang-scheduled Deployment requires strategy type Recreate")}
+}
+
+// gangMinCountExceedsReplicas reports whether a user-set gang minCount exceeds replicas.
+func gangMinCountExceedsReplicas(spec *apps.DeploymentSpec) bool {
+	if spec == nil || spec.Scheduling == nil ||
+		spec.Scheduling.SchedulingPolicy == nil ||
+		spec.Scheduling.SchedulingPolicy.Gang == nil {
+		return false
+	}
+	minCount := spec.Scheduling.SchedulingPolicy.Gang.MinCount
+	if minCount == nil {
+		return false
+	}
+	return spec.Replicas > 0 && *minCount > spec.Replicas
+}
+
+// validateGangMinCount rejects a gang minCount that exceeds the Deployment's replicas.
+func validateGangMinCount(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if !gangMinCountExceedsReplicas(spec) {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("schedulingPolicy", "gang", "minCount"),
+		*spec.Scheduling.SchedulingPolicy.Gang.MinCount,
+		fmt.Sprintf("must not be greater than replicas (%d)", spec.Replicas))}
+}
+
+// delegationAnnotations select a template in an external Workload.
+var delegationAnnotations = []string{apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation}
+
+// validateSchedulingAndDelegationAnnotations rejects spec.scheduling when the
+// object also carries a delegation annotation. On update, an annotation is
+// allowed only if oldSpec already had spec.scheduling and oldMeta already had
+// that same annotation.
+func validateSchedulingAndDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, spec,
+	oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil {
+		return nil
+	}
+	oldHadScheduling := oldSpec != nil && oldSpec.Scheduling != nil && oldMeta != nil
+	for _, key := range delegationAnnotations {
+		if _, ok := meta.Annotations[key]; !ok {
+			continue
+		}
+		if oldHadScheduling {
+			if _, ok := oldMeta.Annotations[key]; ok {
+				continue
+			}
+		}
+		return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+			fmt.Sprintf("must not be set together with the %s annotation", key))}
+	}
+	return nil
+}
+
+// validateDelegationAnnotations requires both delegation annotations to be
+// set to non-empty values once either is present. fldPath points at
+// metadata.annotations.
+func validateDelegationAnnotations(meta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	_, hasWorkload := meta.Annotations[apischeduling.WorkloadNameAnnotation]
+	_, hasTemplate := meta.Annotations[apischeduling.GroupTemplateNameAnnotation]
+	if !hasWorkload && !hasTemplate {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, key := range delegationAnnotations {
+		if meta.Annotations[key] == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Key(key),
+				fmt.Sprintf("must be set to a non-empty value when %s or %s is set",
+					apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation)))
+		}
+	}
+	return allErrs
+}
+
+// validateDelegationAnnotationsUpdate enforces immutability of delegation
+// annotations after creation.
+func validateDelegationAnnotationsUpdate(meta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, key := range delegationAnnotations {
+		if annotationChanged(meta, oldMeta, key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(key), meta.Annotations[key], apimachineryvalidation.FieldImmutableErrorMsg))
+		}
+	}
+	return allErrs
+}
+
+func annotationChanged(meta, oldMeta *metav1.ObjectMeta, key string) bool {
+	value, ok := meta.Annotations[key]
+	oldValue, oldOk := oldMeta.Annotations[key]
+	return ok != oldOk || value != oldValue
+}
+
+// validateDeploymentSchedulingUpdate enforces the spec.scheduling immutability
+// constraint that declarative validation cannot express: the basic/gang policy
+// variant is frozen after creation. Only schedulingPolicy.gang.minCount may change.
+// Adding or removing the scheduling or schedulingPolicy fields themselves is handled by
+// declarative validation, so this only guards an in-place variant switch.
 func validateDeploymentSchedulingUpdate(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	if spec.Scheduling == nil || oldSpec == nil || oldSpec.Scheduling == nil {
 		return nil
@@ -720,8 +820,8 @@ func validateDeploymentSchedulingUpdate(spec, oldSpec *apps.DeploymentSpec, fldP
 	}
 	if (oldPolicy.Basic != nil) != (newPolicy.Basic != nil) {
 		return field.ErrorList{field.Invalid(
-			fldPath.Child("schedulingPolicy"), nil,
-			"the basic/gang policy variant is immutable after creation. Only schedulingPolicy.gang.minCount may be updated")}
+			fldPath.Child("schedulingPolicy"), field.OmitValueType{},
+			"the basic/gang policy variant is immutable after creation; only schedulingPolicy.gang.minCount may be updated")}
 	}
 	return nil
 }
@@ -730,17 +830,21 @@ func validateDeploymentScheduling(spec, oldSpec *apps.DeploymentSpec, fldPath *f
 	if spec.Scheduling == nil {
 		return nil
 	}
-	schedulingPath := fldPath.Child("scheduling")
+	// an unchanged spec skips these checks so that tightening them
+	// later never invalidates already-persisted objects.
+	if apiequality.Semantic.DeepEqual(spec, oldSpec) {
+		return nil
+	}
 	input := deploymentutil.WorkloadInputForDeploymentInternal(spec.Scheduling)
 	item := deploymentutil.WorkloadItemForDeployment(
-		"deployment", spec.Template.Spec.PriorityClassName, input, schedulingPath,
+		"deployment", spec.Template.Spec.PriorityClassName, &spec.Replicas, input, fldPath,
 	)
 
 	var oldItem *workloadbuilder.WorkloadItem
 	if oldSpec != nil {
 		oldInput := deploymentutil.WorkloadInputForDeploymentInternal(oldSpec.Scheduling)
 		oldItem = deploymentutil.WorkloadItemForDeployment( // +k8s:verify-mutation:reason=clone
-			"deployment", oldSpec.Template.Spec.PriorityClassName, oldInput, nil,
+			"deployment", oldSpec.Template.Spec.PriorityClassName, &oldSpec.Replicas, oldInput, nil,
 		)
 	}
 
@@ -749,18 +853,6 @@ func validateDeploymentScheduling(spec, oldSpec *apps.DeploymentSpec, fldPath *f
 		AllowedDisruptionModes:       []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
 		DisableDeclarativeValidation: true,
 	}).Validate(context.Background(), workloadbuilder.ValidationInput{OldRoot: oldItem})
-}
-
-// OmittedFieldPaths returns, per versioned GVK, the field paths that do not exist
-// in that version and must be ignored by cross-version validation equivalence.
-func OmittedFieldPaths() map[schema.GroupVersionKind][]string {
-	// scheduling exists only in apps/v1. The beta Deployment versions cannot
-	// produce its validation.
-	scheduling := []string{"scheduling"}
-	return map[schema.GroupVersionKind][]string{
-		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): scheduling,
-		appsv1beta2.SchemeGroupVersion.WithKind("Deployment"): scheduling,
-	}
 }
 
 // ValidateDeploymentStatus validates given deployment status.
@@ -798,7 +890,10 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&update.ObjectMeta, &old.ObjectMeta, &update.Spec, &old.Spec, field.NewPath("spec", "scheduling"))...)
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+	allErrs = append(allErrs, validateDeploymentSchedulingUpdate(&update.Spec, &old.Spec, field.NewPath("spec").Child("scheduling"))...)
 	return allErrs
 }
 
@@ -806,6 +901,7 @@ func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.P
 // is valid.
 func ValidateDeploymentStatusUpdate(update, old *apps.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
 	if apivalidation.IsDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
@@ -822,6 +918,8 @@ func ValidateDeploymentStatusUpdate(update, old *apps.Deployment) field.ErrorLis
 func ValidateDeployment(obj *apps.Deployment, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, nil, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&obj.ObjectMeta, nil, &obj.Spec, nil, field.NewPath("spec", "scheduling"))...)
+	allErrs = append(allErrs, validateDelegationAnnotations(&obj.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	return allErrs
 }
 
@@ -845,6 +943,7 @@ var ValidateReplicaSetName = apimachineryvalidation.NameIsDNSSubdomain
 func ValidateReplicaSet(rs *apps.ReplicaSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rs.ObjectMeta, true, ValidateReplicaSetName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, nil, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateDelegationAnnotations(&rs.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	return allErrs
 }
 
@@ -852,6 +951,7 @@ func ValidateReplicaSet(rs *apps.ReplicaSet, opts apivalidation.PodValidationOpt
 func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, &oldRs.Spec, field.NewPath("spec"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	return allErrs
@@ -861,6 +961,7 @@ func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet, opts apivalidation.Pod
 func ValidateReplicaSetStatusUpdate(rs, oldRs *apps.ReplicaSet) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, ValidateReplicaSetStatus(rs.Status, field.NewPath("status"))...)
 	return allErrs
 }

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1alpha3 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
 )
 
 // DeploymentSchedulingConfigurationApplyConfiguration represents a declarative configuration of the DeploymentSchedulingConfiguration type for use
@@ -32,21 +32,24 @@ type DeploymentSchedulingConfigurationApplyConfiguration struct {
 	// spec.scheduling.schedulingPolicy is omitted, the Basic policy is used.
 	// Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may
 	// be omitted to derive it from replicas.
-	SchedulingPolicy *v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
 	// schedulingConstraints defines optional scheduling constraints (e.g. topology)
 	// for the Deployment's pods.
-	SchedulingConstraints *v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 	// disruptionMode defines the mode in which the Deployment's pods can be disrupted.
 	// One of Single or All.
 	// If omitted, standard per-pod disruption behavior is used.
-	DisruptionMode *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
+	// The All mode requires a gang schedulingPolicy.
+	// disruptionMode affects scheduler preemption only. It does not affect
+	// eviction or PodDisruptionBudgets.
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
 	// PodGroup's claim exactly. The claim must have the same name and refer to
 	// the same ResourceClaim or ResourceClaimTemplate.
 	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
-	ResourceClaims []v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 }
 
 // DeploymentSchedulingConfigurationApplyConfiguration constructs a declarative configuration of the DeploymentSchedulingConfiguration type for use with
@@ -58,7 +61,7 @@ func DeploymentSchedulingConfiguration() *DeploymentSchedulingConfigurationApply
 // WithSchedulingPolicy sets the SchedulingPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
-func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingPolicy(value *v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
+func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingPolicy(value *schedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
 	b.SchedulingPolicy = value
 	return b
 }
@@ -66,7 +69,7 @@ func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingPoli
 // WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingConstraints field is set to the value of the last call.
-func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingConstraints(value *v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
+func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingConstraints(value *schedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
 	b.SchedulingConstraints = value
 	return b
 }
@@ -74,7 +77,7 @@ func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithSchedulingCons
 // WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DisruptionMode field is set to the value of the last call.
-func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithDisruptionMode(value *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
+func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithDisruptionMode(value *schedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
 	b.DisruptionMode = value
 	return b
 }
@@ -82,7 +85,7 @@ func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithDisruptionMode
 // WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResourceClaims field.
-func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithResourceClaims(values ...*v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
+func (b *DeploymentSchedulingConfigurationApplyConfiguration) WithResourceClaims(values ...*schedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration) *DeploymentSchedulingConfigurationApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithResourceClaims")

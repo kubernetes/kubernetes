@@ -18,14 +18,12 @@ package deployment
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,8 +36,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
-
-const replicaSetPodGroupFinalizer = "apps.kubernetes.io/replicaset-podgroup-cleanup"
 
 // waitForWorkload waits for a Workload owned by the given Deployment to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
@@ -210,8 +206,8 @@ func newGangDeployment(name, ns string, replicas int32, minCount *int32) *apps.D
 	d := newDeployment(name, ns, replicas)
 	d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
 	d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
 		},
 	}
 	return d
@@ -260,13 +256,13 @@ func TestDeploymentGangScheduling(t *testing.T) {
 
 			d := newGangDeployment("gang", ns.Name, tc.replicas, tc.minCount)
 			if tc.disruptionAll {
-				d.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-					All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+				d.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+					All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 				}
 			}
 			if tc.topologyKey != "" {
-				d.Spec.Scheduling.SchedulingConstraints = &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-					Topology: []schedulingv1alpha3.TopologyConstraint{{Key: tc.topologyKey}},
+				d.Spec.Scheduling.SchedulingConstraints = &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+					Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: tc.topologyKey}},
 				}
 			}
 
@@ -296,9 +292,6 @@ func TestDeploymentGangScheduling(t *testing.T) {
 			podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 			if !hasOwnerRef(podGroup.OwnerReferences, "ReplicaSet", rs.UID) {
 				t.Errorf("PodGroup %q is not owned by the ReplicaSet: %v", podGroup.Name, podGroup.OwnerReferences)
-			}
-			if !hasOwnerRef(podGroup.OwnerReferences, "Workload", workload.UID) {
-				t.Errorf("PodGroup %q is not owned by the Workload: %v", podGroup.Name, podGroup.OwnerReferences)
 			}
 			if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != tc.wantMinCount {
 				t.Errorf("PodGroup gang = %#v, want minCount %d", podGroup.Spec.SchedulingPolicy.Gang, tc.wantMinCount)
@@ -475,68 +468,6 @@ func TestDeploymentSchedulingScaleToZero(t *testing.T) {
 	}
 	if retainedWorkload.UID != workload.UID {
 		t.Fatalf("Workload UID changed after scaling to zero: got %q, want %q", retainedWorkload.UID, workload.UID)
-	}
-}
-
-// TestDeploymentReplicaSetPodGroupCleanupOnDelete verifies that deleting a
-// scheduling-enabled ReplicaSet requests PodGroup deletion and removes its
-// cleanup finalizer, so the ReplicaSet is not stranded.
-func TestDeploymentReplicaSetPodGroupCleanupOnDelete(t *testing.T) {
-	enableWorkloadGates(t, false)
-
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	closeFn, rm, dc, informers, c := dcSetup(ctx, t)
-	defer closeFn()
-
-	ns := framework.CreateNamespaceOrDie(c, "dep-rs-cleanup", t)
-	defer framework.DeleteNamespaceOrDie(c, ns, t)
-
-	tester := &deploymentTester{t: t, c: c, deployment: newGangDeployment("gang", ns.Name, 2, ptr.To[int32](2))}
-	var err error
-	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(ctx, tester.deployment, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("failed to create gang Deployment: %v", err)
-	}
-
-	stop := runControllersAndInformers(t, rm, dc, informers)
-	defer stop()
-
-	waitForWorkload(ctx, t, c, tester.deployment, false, pollTimeout)
-	rs := waitForNewReplicaSet(ctx, t, tester)
-	waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
-
-	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
-		got, err := c.AppsV1().ReplicaSets(ns.Name).Get(ctx, rs.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return slices.Contains(got.Finalizers, replicaSetPodGroupFinalizer), nil
-	})
-	if err != nil {
-		t.Fatalf("Timed out waiting for the cleanup finalizer on ReplicaSet %q: %v", rs.Name, err)
-	}
-
-	if err := c.AppsV1().ReplicaSets(ns.Name).Delete(ctx, rs.Name, metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("failed to delete ReplicaSet: %v", err)
-	}
-
-	waitForPodGroupDeletionRequested(ctx, t, c, rs)
-
-	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
-		got, err := c.AppsV1().ReplicaSets(ns.Name).Get(ctx, rs.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return true, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return got.UID != rs.UID, nil
-	})
-	if err != nil {
-		t.Fatalf("Timed out waiting for ReplicaSet %q (UID %q) to be deleted: %v", rs.Name, rs.UID, err)
 	}
 }
 
