@@ -135,8 +135,18 @@ var _ = SIGDescribe("WebSocket streaming", func() {
 			Stderr: &stderr,
 		})
 		framework.ExpectNoError(err, "attach session (stdout %q, stderr %q)", stdout.String(), stderr.String())
-		gomega.Expect(stdout.String()).To(gomega.ContainSubstring("attached"), "stdin was delivered to the container")
-		gomega.Expect(stdout.String()).To(gomega.ContainSubstring("stdin closed"), "the CLOSE signal ended the container's stdin")
+
+		// The container log, not the session's stdout, is checked: an attach
+		// only receives output written after the runtime wires its stdout, and
+		// containerd wires stdin first, so the echo of stdin can precede it.
+		ginkgo.By("checking the container received stdin and exited when it was closed")
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		}, time.Minute, 5*time.Second).Should(gomega.SatisfyAll(
+			gomega.ContainSubstring("attached"),
+			gomega.ContainSubstring("stdin closed"),
+		), "stdin was delivered and the CLOSE signal ended the container's stdin")
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout), "the container should exit 0 after stdin closes")
 	})
 
 	ginkgo.Describe("port forwarding over the WebSocket tunnel", func() {
