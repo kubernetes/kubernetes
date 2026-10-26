@@ -517,9 +517,11 @@ func TestListMembers(t *testing.T) {
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
 		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
+	transientErrors := 1
 	tests := []struct {
 		name      string
 		fields    fields
+		timeout   time.Duration
 		want      []Member
 		wantError bool
 	}{
@@ -624,6 +626,41 @@ func TestListMembers(t *testing.T) {
 			want:      nil,
 			wantError: true,
 		},
+		{
+			name: "a transient error is retried",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						memberListFunc: func(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+							if transientErrors > 0 {
+								transientErrors--
+								return nil, errNotImplemented
+							}
+							return &clientv3.MemberListResponse{
+								Members: []*pb.Member{
+									{
+										ID:   1,
+										Name: "member1",
+										PeerURLs: []string{
+											"https://member1:2380",
+										},
+									},
+								},
+							}, nil
+						},
+					}
+					return f, nil
+				},
+			},
+			timeout: 3 * time.Second,
+			want: []Member{
+				{
+					Name:    "member1",
+					PeerURL: "https://member1:2380",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -632,9 +669,13 @@ func TestListMembers(t *testing.T) {
 				newEtcdClient:   tt.fields.newEtcdClient,
 				listMembersFunc: tt.fields.listMembersFunc,
 			}
+			timeout := tt.timeout
+			if timeout == 0 {
+				timeout = 100 * time.Millisecond
+			}
 			if c.listMembersFunc == nil {
 				c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
-					return c.listMembers(100 * time.Millisecond)
+					return c.listMembers(timeout)
 				}
 			}
 			got, err := c.ListMembers()
