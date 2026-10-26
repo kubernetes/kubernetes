@@ -98,6 +98,8 @@ type cacheWatcher struct {
 
 	// state holds a numeric value indicating the current state of the watcher
 	state int
+
+	selector watchSelector
 }
 
 func newCacheWatcher(
@@ -111,6 +113,7 @@ func newCacheWatcher(
 	watcherMetrics *metrics.WatcherMetricsObservers,
 	clk clock.Clock,
 	identifier string,
+	selector watchSelector,
 ) *cacheWatcher {
 	if clk == nil {
 		clk = clock.RealClock{}
@@ -129,6 +132,7 @@ func newCacheWatcher(
 		watcherMetrics:      watcherMetrics,
 		clock:               clk,
 		identifier:          identifier,
+		selector:            selector,
 	}
 }
 
