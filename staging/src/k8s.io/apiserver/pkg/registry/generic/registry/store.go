@@ -622,7 +622,7 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 	// handling chain wants to enforce.
 	if createValidation != nil {
-		if err := createValidation(ctx, obj); err != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
@@ -839,7 +839,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 			// handling chain wants to enforce.
 			if createValidation != nil {
-				if err := createValidation(ctx, obj); err != nil {
+				if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 					return nil, nil, err
 				}
 			}
@@ -910,7 +910,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 		// handling chain wants to enforce.
 		if updateValidation != nil {
-			if err := updateValidation(ctx, obj, existing); err != nil {
+			if err := updateValidation(ctx, obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
 				return nil, nil, err
 			}
 		}
