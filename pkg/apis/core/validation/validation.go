@@ -66,6 +66,7 @@ import (
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -7400,6 +7401,40 @@ func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorL
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, &oldService.Status.LoadBalancer, field.NewPath("status", "loadBalancer"), &service.Spec)...)
 	return allErrs
+}
+func validateServiceConditionsWithRatcheting(newConditions, oldConditions []metav1.Condition, fldPath *field.Path) ([]string, field.ErrorList) {
+	var warnings []string
+	allErrs := field.ErrorList{}
+
+	oldConditionMap := make(map[string]metav1.Condition)
+	for _, cond := range oldConditions {
+		oldConditionMap[string(cond.Type)] = cond
+	}
+
+	for i, cond := range newConditions {
+		condPath := fldPath.Index(i)
+		oldCond, exists := oldConditionMap[string(cond.Type)]
+
+		// Check if condition is new or changed
+		isChanged := !exists ||
+			oldCond.Status != cond.Status ||
+			oldCond.Reason != cond.Reason ||
+			oldCond.Message != cond.Message ||
+			oldCond.LastTransitionTime != cond.LastTransitionTime
+
+		if isChanged {
+			// Validate the individual condition against metav1 rules
+			condErrs := metav1validation.ValidateCondition(cond, condPath)
+			if len(condErrs) > 0 {
+				// Phase 1: Treat as a warning instead of a hard error
+				for _, err := range condErrs {
+					warnings = append(warnings, fmt.Sprintf("%s: %s", err.Field, err.Detail))
+				}
+			}
+		}
+	}
+
+	return warnings, allErrs
 }
 
 // ValidateReplicationController tests if required fields in the replication controller are set.

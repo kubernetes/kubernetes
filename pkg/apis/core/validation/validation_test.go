@@ -33002,3 +33002,109 @@ func TestValidateBasicResource(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateServiceConditionsRatcheting(t *testing.T) {
+    now := metav1.Now()
+
+    tests := []struct {
+            name           string
+            oldConditions  []metav1.Condition
+            newConditions  []metav1.Condition
+            expectedWarningsCount int
+            expectedErrorsCount   int
+    }{
+            {
+                    name: "Valid new condition produces no warnings or errors",
+                    oldConditions: []metav1.Condition{},
+                    newConditions: []metav1.Condition{
+                            {
+                                    Type:               "Ready",
+                                    Status:             metav1.ConditionTrue,
+                                    Reason:             "ServiceReady",
+                                    Message:            "Service is fully operational",
+                                    LastTransitionTime: now,
+                            },
+                    },
+                    expectedWarningsCount: 0,
+                    expectedErrorsCount:   0,
+            },
+            {
+                    name: "New condition missing LastTransitionTime produces a warning",
+                    oldConditions: []metav1.Condition{},
+                    newConditions: []metav1.Condition{
+                            {
+                                    Type:   "LoadBalancerPortsError",
+                                    Status: metav1.ConditionTrue,
+                                    Reason: "PortError",
+                                    // LastTransitionTime omitted (invalid)
+                            },
+                    },
+                    expectedWarningsCount: 1,
+                    expectedErrorsCount:   0, // Phase 1 uses warnings instead of errors
+            },
+            {
+                    name: "Unchanged legacy invalid condition does not trigger new warnings (ratcheting)",
+                    oldConditions: []metav1.Condition{
+                            {
+                                    Type:   "LoadBalancerPortsError",
+                                    Status: metav1.ConditionTrue,
+                                    Reason: "PortError",
+                                    // Legacy condition missing LastTransitionTime
+                            },
+                    },
+                    newConditions: []metav1.Condition{
+                            {
+                                    Type:   "LoadBalancerPortsError",
+                                    Status: metav1.ConditionTrue,
+                                    Reason: "PortError",
+                                    // Still missing LastTransitionTime, but unchanged
+                            },
+                    },
+                    expectedWarningsCount: 0,
+                    expectedErrorsCount:   0,
+            },
+            {
+                    name: "Modified legacy invalid condition triggers a warning",
+                    oldConditions: []metav1.Condition{
+                            {
+                                    Type:   "LoadBalancerPortsError",
+                                    Status: metav1.ConditionTrue,
+                                    Reason: "PortError",
+                            },
+                    },
+                    newConditions: []metav1.Condition{
+                            {
+                                    Type:   "LoadBalancerPortsError",
+                                    Status: metav1.ConditionFalse, // Changed status
+                                    Reason: "PortErrorResolved",
+                                    // Still missing LastTransitionTime
+                            },
+                    },
+                    expectedWarningsCount: 1,
+                    expectedErrorsCount:   0,
+            },
+    }
+
+    for _, tc := range tests {
+            t.Run(tc.name, func(t *testing.T) {
+                    oldService := &core.Service{
+                            ObjectMeta: metav1.ObjectMeta{Name: "test-svc", Namespace: "default"},
+                            Status:     core.ServiceStatus{Conditions: tc.oldConditions},
+                    }
+                    newService := &core.Service{
+                            ObjectMeta: metav1.ObjectMeta{Name: "test-svc", Namespace: "default"},
+                            Status:     core.ServiceStatus{Conditions: tc.newConditions},
+                    }
+
+                    // Invoke your validation/warning helper function here
+                    warnings, errs := validateServiceConditionsWithRatcheting(newService.Status.Conditions, oldService.Status.Conditions, field.NewPath("status", "conditions"))
+
+                    if len(warnings) != tc.expectedWarningsCount {
+                            t.Errorf("expected %d warnings, got %d: %v", tc.expectedWarningsCount, len(warnings), warnings)
+                    }
+                    if len(errs) != tc.expectedErrorsCount {
+                            t.Errorf("expected %d errors, got %d: %v", tc.expectedErrorsCount, len(errs), errs)
+                    }
+            })
+    }
+}
