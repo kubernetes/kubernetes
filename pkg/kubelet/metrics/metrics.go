@@ -43,6 +43,7 @@ const (
 	NodeStartupPostRegistrationKey     = "node_startup_post_registration_duration_seconds"
 	NodeStartupKey                     = "node_startup_duration_seconds"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
+	PodWorkerErrorsTotalKey            = "pod_worker_errors_total"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
 	PodStartTotalDurationKey           = "pod_start_total_duration_seconds"
@@ -106,6 +107,7 @@ const (
 	StartedContainersTotalKey       = "started_containers_total"
 	TerminatedContainersTotalKey    = "terminated_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
+	SyncResultErrorsTotalKey        = "sync_result_errors_total"
 
 	// Metrics to track HostProcess container usage by this kubelet
 	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
@@ -241,6 +243,11 @@ const (
 	DeferredResizeResolutionTerminated DeferredResizeResolution = "terminated"
 )
 
+const (
+	// SyncResultActionSyncPod is the action label value for top-level PodSyncResult.SyncError errors.
+	SyncResultActionSyncPod = "SyncPod"
+)
+
 type imageSizeBucket struct {
 	lowerBoundInBytes uint64
 	label             string
@@ -307,6 +314,17 @@ var (
 			Name:           PodWorkerDurationKey,
 			Help:           "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
 			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// PodWorkerErrorsTotal is a Counter that tracks the number of errors in pod worker sync operations.
+	// Broken down by the operation type.
+	PodWorkerErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWorkerErrorsTotalKey,
+			Help:           "Cumulative number of errors in pod worker sync operations. Broken down by operation type: create, update, sync, terminating, terminated",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -833,6 +851,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
+	)
+	// SyncResultErrorsTotal is a Counter that tracks the number of SyncResult errors during pod sync.
+	// Broken down by the sync action.
+	SyncResultErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SyncResultErrorsTotalKey,
+			Help:           "Cumulative number of SyncResult errors during pod sync. Broken down by action",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"action"},
 	)
 	// StartedHostProcessContainersTotal is a counter that tracks the number of hostprocess container creation operations
 	StartedHostProcessContainersTotal = metrics.NewCounterVec(
@@ -1463,6 +1492,7 @@ func Register() {
 		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
+		legacyregistry.MustRegister(PodWorkerErrorsTotal)
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(PodStartTotalDuration)
@@ -1519,6 +1549,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
+		legacyregistry.MustRegister(SyncResultErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
