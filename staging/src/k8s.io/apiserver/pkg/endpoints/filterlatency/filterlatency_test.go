@@ -27,6 +27,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -182,6 +185,39 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 	}
 	if actionCallCount != 0 {
 		t.Errorf("expected the callback to not be invoked, but was actually invoked %d times", actionCallCount)
+	}
+}
+
+func TestFilterLatencyMetrics(t *testing.T) {
+	metrics.Register()
+	const metricName = "apiserver_request_filter_duration_seconds"
+	filterName := t.Name()
+	getSampleCount := func() uint64 {
+		t.Helper()
+		families, err := legacyregistry.DefaultGatherer.Gather()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, family := range families {
+			if family.GetName() != metricName {
+				continue
+			}
+			for _, metric := range family.GetMetric() {
+				if testutil.LabelsMatch(metric, map[string]string{"filter": filterName}) {
+					return metric.GetHistogram().GetSampleCount()
+				}
+			}
+		}
+		return 0
+	}
+
+	before := getSampleCount()
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	wrapped := TrackStarted(TrackCompleted(handler), noopoteltrace.NewTracerProvider(), filterName)
+	wrapped.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/namespaces", nil))
+
+	if got := getSampleCount(); got != before+1 {
+		t.Errorf("expected %s count %d for filter %q, got %d", metricName, before+1, filterName, got)
 	}
 }
 

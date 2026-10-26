@@ -157,6 +157,27 @@
   - 10
   - 15
   - 30
+- name: request_filter_duration_seconds
+  subsystem: apiserver
+  help: Request filter latency distribution in seconds, for each filter type
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - filter
+  buckets:
+  - 0.0001
+  - 0.0003
+  - 0.001
+  - 0.003
+  - 0.01
+  - 0.03
+  - 0.1
+  - 0.3
+  - 1
+  - 5
+  - 10
+  - 15
+  - 30
 - name: apiserver_resource_size_estimate_bytes
   help: Estimated size of stored objects in database. Estimate is based on sum of
     last observed sizes of serialized objects.

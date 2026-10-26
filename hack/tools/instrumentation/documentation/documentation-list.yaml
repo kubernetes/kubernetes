@@ -1648,30 +1648,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: request_filter_duration_seconds
-  subsystem: apiserver
-  help: Request filter latency distribution in seconds, for each filter type
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - filter
-  buckets:
-  - 0.0001
-  - 0.0003
-  - 0.001
-  - 0.003
-  - 0.01
-  - 0.03
-  - 0.1
-  - 0.3
-  - 1
-  - 5
-  - 10
-  - 15
-  - 30
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: request_post_timeout_total
   subsystem: apiserver
   help: Tracks the activity of the request handlers after the associated requests
@@ -7515,6 +7491,30 @@
   - 0.5
   - 1
   - 2
+  - 5
+  - 10
+  - 15
+  - 30
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: request_filter_duration_seconds
+  subsystem: apiserver
+  help: Request filter latency distribution in seconds, for each filter type
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - filter
+  buckets:
+  - 0.0001
+  - 0.0003
+  - 0.001
+  - 0.003
+  - 0.01
+  - 0.03
+  - 0.1
+  - 0.3
+  - 1
   - 5
   - 10
   - 15
