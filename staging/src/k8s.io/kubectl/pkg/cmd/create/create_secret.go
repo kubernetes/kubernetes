@@ -160,7 +160,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOS
 
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
-	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, `Specify the path to a file to read lines of key=val pairs to create a secret. Multi-line values start with key=""" and end with a line containing only """.`)
+	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, `Specify the path to a file to read lines of key=val pairs to create a secret. Multi-line values start with key=""" and nothing else, and end with a line containing only """.`)
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("The type of secret to create"))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
