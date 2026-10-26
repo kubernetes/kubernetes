@@ -19,7 +19,6 @@ package util
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -363,19 +362,6 @@ func NodeTainted(ctx context.Context, cs clientset.Interface, nodeName string, t
 	}
 }
 
-// NodeReadyStatus returns the status of first condition with type NodeReady.
-// If none of the condition is of type NodeReady, returns an error.
-func NodeReadyStatus(conditions []v1.NodeCondition) (v1.ConditionStatus, error) {
-	for _, c := range conditions {
-		if c.Type != v1.NodeReady {
-			continue
-		}
-		// Just return the first condition with type NodeReady
-		return c.Status, nil
-	}
-	return v1.ConditionFalse, errors.New("None of the conditions is of type NodeReady")
-}
-
 // GetTolerationSeconds gets the period of time the toleration
 func GetTolerationSeconds(tolerations []v1.Toleration) (int64, error) {
 	for _, t := range tolerations {
@@ -384,23 +370,6 @@ func GetTolerationSeconds(tolerations []v1.Toleration) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("cannot find toleration")
-}
-
-// NodeCopyWithConditions duplicates the ode object with conditions
-func NodeCopyWithConditions(node *v1.Node, conditions []v1.NodeCondition) *v1.Node {
-	copy := node.DeepCopy()
-	copy.ResourceVersion = "0"
-	copy.Status.Conditions = conditions
-	for i := range copy.Status.Conditions {
-		copy.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
-	}
-	return copy
-}
-
-// UpdateNodeStatus updates the status of node.
-func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
-	_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
-	return err
 }
 
 // InitTestAPIServer initializes a test environment and creates an API server with default
