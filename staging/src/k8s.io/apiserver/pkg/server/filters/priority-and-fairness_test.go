@@ -402,6 +402,11 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	if !canExecute {
 		return
 	}
+	defer func() {
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		f.inflight--
+	}()
 
 	if f.preExecutePanic {
 		panic("pre-exec-panic")
@@ -410,10 +415,6 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	if f.postExecutePanic {
 		panic("post-exec-panic")
 	}
-
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.inflight--
 }
 
 func (f *fakeWatchApfFilter) Run(stopCh <-chan struct{}) error {
@@ -577,9 +578,7 @@ func TestApfWatchHandlePanic(t *testing.T) {
 		},
 	}
 
-	onExecuteFunc := func() {
-		time.Sleep(5 * time.Second)
-	}
+	onExecuteFunc := func() {}
 	postExecuteFunc := func() {}
 
 	for _, test := range testCases {
@@ -596,8 +595,14 @@ func TestApfWatchHandlePanic(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
 
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+			resp, err := server.Client().Get(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL))
+			if err != nil {
 				t.Errorf("unexpected error: %v", err)
+			} else {
+				resp.Body.Close()
+				if resp.StatusCode != http.StatusOK {
+					t.Errorf("unexpected response: %v", resp.StatusCode)
+				}
 			}
 		})
 	}
