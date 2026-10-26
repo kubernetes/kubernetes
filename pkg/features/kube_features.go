@@ -51,11 +51,6 @@ const (
 	// for kubelet signers where CN=system:node:$nodeName.
 	AllowInsecureKubeletCertificateSigningRequests featuregate.Feature = "AllowInsecureKubeletCertificateSigningRequests"
 
-	// owner: @HirazawaUi
-	//
-	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
-	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
-
 	// owner: @adrianmoisey
 	// kep: https://kep.k8s.io/5707
 	//
@@ -1253,12 +1248,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
-	AllowOverwriteTerminationGracePeriodSeconds: {
-		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
-	},
-
 	AllowServiceExternalIPs: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 	},
@@ -2364,8 +2353,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AllowDNSOnlyNodeCSR: {},
 
 	AllowInsecureKubeletCertificateSigningRequests: {},
-
-	AllowOverwriteTerminationGracePeriodSeconds: {},
 
 	AllowServiceExternalIPs: {},
 
