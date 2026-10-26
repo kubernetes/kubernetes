@@ -618,6 +618,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
 		bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
 	}
+	// Update the bookMarkAfterResourceVersion
+	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
 
 	addedWatcher := false
 	func() {
@@ -633,8 +635,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 		// Update watcher.forget function once we can compute it.
 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
-		// Update the bookMarkAfterResourceVersion
-		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
 		c.watchers.addWatcher(watcher, c.watcherIdx)
 		addedWatcher = true
 
