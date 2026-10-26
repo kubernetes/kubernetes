@@ -386,14 +386,14 @@
   - opcode: createNamespaces
     prefix: gang-preempt
     count: 4
-  # Training (Medium Priority 10000): 30% of cluster
+  # Training (Medium Priority 10000 by default): 30% of cluster
   - opcode: createPodGroups
     countParam: $trainingGroups
     namespace: gang-preempt-1
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $trainingPodsPerGroup
-      priority: 10000
+      priority: $trainingPriority|10000
       disruptionMode: $disruptionMode
   - opcode: createPods
     countParam: $trainingGroups
@@ -404,7 +404,7 @@
       podsPerGroup: $trainingPodsPerGroup
       cpuRequest: 2800m
       hostPortBase: 8000
-      priority: 10000
+      priority: $trainingPriority|10000
   # Large Batch (Low Priority 100): ~20% of cluster
   - opcode: createPodGroups
     countParam: $largeBatchGroups
@@ -452,8 +452,11 @@
       podsPerGroup: $heroPodsPerGroup
       priority: 1000000
       disruptionMode: $disruptionMode
+  - opcode: startCollectingMetrics
+    name: gang-preempt-0
+    namespaces: [gang-preempt-0]
   - opcode: createPods
-    collectMetrics: true
+    skipWaitToCompletion: true
     countParam: $heroGroups
     countMultiplierParam: $heroPodsPerGroup
     namespace: gang-preempt-0
@@ -463,6 +466,10 @@
       cpuRequest: 2800m
       hostPortBase: 9000
       priority: 1000000
+  - opcode: barrier
+    namespaces: [gang-preempt-0]
+    stageRequirement: $stageRequirement|Scheduled
+  - opcode: stopCollectingMetrics
   workloads:
   - name: 10Nodes_Hero5Pods_60PctOccupied
     labels: [short, integration-test]
@@ -529,5 +536,40 @@
       heroGroups: 1
       heroPodsPerGroup: 2450
       disruptionMode: Single
+  # Sparse victims scenario: 2400 nodes are free, 2450 nodes run higher-priority pods (priority 2000000),
+  # and 50 nodes run low-priority victims (priority 100). Isolates the CPU cost of victim-aware ranking
+  # and disabling OpportunisticBatching when eviction count (50 pods) is minimal.
+  - name: 4900Nodes_Hero2450Pods_SparseVictims
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 490
+      trainingPriority: 2000000
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 25
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 25
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+  # Unschedulable preemption scenario: 2900 nodes run higher-priority pods (priority 2000000) that cannot
+  # be preempted, leaving only 2000 feasible nodes (550 free + 1450 low-priority batch nodes) for 2450 Hero pods.
+  # The Hero PodGroup schedules 2000 out of 2450 pods in PodGroupPostFilter before failing and evicting zero victims.
+  - name: 4900Nodes_Hero2450Pods_Unschedulable
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 580
+      trainingPriority: 2000000
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+      stageRequirement: Attempted
 
 

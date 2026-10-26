@@ -617,6 +617,9 @@ type barrierOp struct {
 }
 
 func (bo *barrierOp) isValid(allowParameterization bool) error {
+	if allowParameterization && isValidParameterizable(string(bo.StageRequirement)) {
+		return nil
+	}
 	if bo.StageRequirement != "" && bo.StageRequirement != Scheduled && bo.StageRequirement != Attempted {
 		return fmt.Errorf("invalid StageRequirement %s", bo.StageRequirement)
 	}
@@ -628,10 +631,21 @@ func (*barrierOp) collectsMetrics() bool {
 }
 
 func (bo barrierOp) patchParams(w *Workload) (realOp, error) {
+	if isValidParameterizable(string(bo.StageRequirement)) {
+		resolved, err := resolveTemplateParams(map[string]any{"stageRequirement": string(bo.StageRequirement)}, w)
+		if err != nil {
+			return nil, err
+		}
+		stage, ok := resolved["stageRequirement"].(string)
+		if !ok {
+			return nil, fmt.Errorf("parameter %s has the wrong type %T", bo.StageRequirement, resolved["stageRequirement"])
+		}
+		bo.StageRequirement = SchedulingStage(stage)
+	}
 	if bo.StageRequirement == "" {
 		bo.StageRequirement = Scheduled
 	}
-	return &bo, nil
+	return &bo, (&bo).isValid(false)
 }
 
 // sleepOp defines an op that can be used to sleep for a specified amount of time.
