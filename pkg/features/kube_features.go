@@ -107,11 +107,6 @@ const (
 	// for details about the removal of this feature gate.
 	CPUManagerPolicyBetaOptions featuregate.Feature = "CPUManagerPolicyBetaOptions"
 
-	// owner: @ffromani
-	//
-	// Allow the usage of options to fine-tune the cpumanager policies.
-	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
-
 	// owner: @bitoku
 	// kep: https://kep.k8s.io/5825
 	//
@@ -1286,12 +1281,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	CPUManagerPolicyOptions: {
-		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
-	},
-
 	CRIListStreaming: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2378,8 +2367,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CPUManagerPolicyAlphaOptions: {},
 
 	CPUManagerPolicyBetaOptions: {},
-
-	CPUManagerPolicyOptions: {},
 
 	CRIListStreaming: {},
 
