@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//nolint:unused // This implementation is intentionally not wired into the watch path yet.
 package watch
 
 import (
 	"fmt"
+	"io"
 	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -30,6 +31,111 @@ import (
 type rawWatchEventResult struct {
 	event *metav1.WatchEvent
 	err   error
+}
+
+type decodedWatchEventResult struct {
+	event *watch.Event
+	err   error
+}
+
+type bufferedConcurrentWatchEventProcessor struct {
+	rawResultsCh     <-chan rawWatchEventResult
+	objectDecoder    runtime.Decoder
+	pendingResultsCh chan chan *decodedWatchEventResult
+	decodedResultsCh chan *decodedWatchEventResult
+	doneCh           chan struct{}
+	closeOnce        sync.Once
+}
+
+func (p *bufferedConcurrentWatchEventProcessor) close() {
+	p.closeOnce.Do(func() {
+		close(p.doneCh)
+	})
+}
+
+func (p *bufferedConcurrentWatchEventProcessor) nextResult() *decodedWatchEventResult {
+	select {
+	case <-p.doneCh:
+		return &decodedWatchEventResult{err: io.EOF}
+	case result, ok := <-p.decodedResultsCh:
+		if !ok {
+			return &decodedWatchEventResult{err: io.EOF}
+		}
+		select {
+		case <-p.doneCh:
+			return &decodedWatchEventResult{err: io.EOF}
+		default:
+			return result
+		}
+	}
+}
+
+func (p *bufferedConcurrentWatchEventProcessor) collectResults() {
+	defer close(p.decodedResultsCh)
+	var resultCh chan *decodedWatchEventResult
+	var ok bool
+
+	for {
+		select {
+		case <-p.doneCh:
+			return
+		case resultCh, ok = <-p.pendingResultsCh:
+			if !ok {
+				return
+			}
+		}
+		var result *decodedWatchEventResult
+		select {
+		case <-p.doneCh:
+			return
+		case result = <-resultCh:
+		}
+		select {
+		case <-p.doneCh:
+			return
+		case p.decodedResultsCh <- result:
+		}
+	}
+}
+
+func (p *bufferedConcurrentWatchEventProcessor) scheduleDecoding(waitGroup *sync.WaitGroup) {
+	defer close(p.pendingResultsCh)
+	for {
+		var eventResult rawWatchEventResult
+		select {
+		case <-p.doneCh:
+			return
+		case result, ok := <-p.rawResultsCh:
+			if !ok {
+				return
+			}
+			eventResult = result
+		}
+		resultCh := make(chan *decodedWatchEventResult, 1)
+		select {
+		case <-p.doneCh:
+			return
+		case p.pendingResultsCh <- resultCh:
+		}
+		waitGroup.Add(1)
+		go func(eventResult rawWatchEventResult) {
+			defer waitGroup.Done()
+			resultCh <- p.decodeEvent(eventResult)
+		}(eventResult)
+	}
+}
+
+func (p *bufferedConcurrentWatchEventProcessor) decodeEvent(eventResult rawWatchEventResult) *decodedWatchEventResult {
+	if eventResult.err != nil {
+		return &decodedWatchEventResult{err: eventResult.err}
+	}
+	obj, err := runtime.Decode(p.objectDecoder, eventResult.event.Object.Raw)
+	if err != nil {
+		return &decodedWatchEventResult{err: fmt.Errorf("unable to decode watch event: %w", err)}
+	}
+	return &decodedWatchEventResult{
+		event: &watch.Event{Type: watch.EventType(eventResult.event.Type), Object: obj},
+	}
 }
 
 type bufferedWatchEventDecoder struct {
