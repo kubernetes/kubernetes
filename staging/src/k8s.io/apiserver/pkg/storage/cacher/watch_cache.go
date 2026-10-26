@@ -465,7 +465,8 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	if err != nil {
 		return listResp{}, "", err
 	}
-	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, "", nil
+	w.checkSnapshotResourceVersion(snap, resourceVersion)
+	return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, "", nil
 }
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
