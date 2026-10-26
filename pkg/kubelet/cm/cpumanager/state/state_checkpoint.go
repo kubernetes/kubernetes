@@ -171,10 +171,22 @@ func (sc *stateCheckpoint) restoreState() error {
 		}
 	}
 
+	var tmpPendingResize *PendingResize
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && cp.CheckpointData.PendingResize != nil {
+		pending, err := cp.CheckpointData.PendingResize.toPendingResize()
+		if err != nil {
+			return fmt.Errorf("could not parse pending resize of pod %q: %w", cp.CheckpointData.PendingResize.PodUID, err)
+		}
+		tmpPendingResize = &pending
+	}
+
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		sc.cache.SetCPUBaselines(tmpBaselines)
+	}
+	if tmpPendingResize != nil {
+		sc.cache.SetPendingResize(*tmpPendingResize)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		sc.cache.SetPodCPUAssignments(cp.CheckpointData.PodEntries)
@@ -288,6 +300,9 @@ func (sc *stateCheckpoint) storeState() error {
 			for container, cpuAllocation := range baselines[pod] {
 				checkpoint.CheckpointData.Baselines[pod][container] = ContainerCPUs{Baseline: cpuAllocation.Baseline.String()}
 			}
+		}
+		if pending, ok := sc.cache.GetPendingResize(); ok {
+			checkpoint.CheckpointData.PendingResize = newPendingResizeEntry(pending)
 		}
 	}
 
@@ -466,4 +481,83 @@ func (sc *stateCheckpoint) SetCPUBaselines(a ContainerCPUBaselines) {
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
+}
+
+// GetPendingResize returns the pending resize, if any
+func (sc *stateCheckpoint) GetPendingResize() (PendingResize, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetPendingResize()
+}
+
+// SetPendingResize stores the pending resize, replacing any previous one, without applying it
+func (sc *stateCheckpoint) SetPendingResize(pending PendingResize) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetPendingResize(pending)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", pending.PodUID)
+	}
+}
+
+// CommitPendingResize applies the pending resize and deletes it with a single
+// write of the checkpoint, so that a kubelet restart never sees the resize
+// half applied.
+func (sc *stateCheckpoint) CommitPendingResize() {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.CommitPendingResize()
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// DeletePendingResize deletes the pending resize, without applying it
+func (sc *stateCheckpoint) DeletePendingResize() {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.DeletePendingResize()
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+func newPendingResizeEntry(pending PendingResize) *PendingResizeEntry {
+	entry := &PendingResizeEntry{PodUID: pending.PodUID}
+	if len(pending.ContainerCPUSets) > 0 {
+		entry.ContainerCPUSets = make(map[string]string, len(pending.ContainerCPUSets))
+		for containerName, target := range pending.ContainerCPUSets {
+			entry.ContainerCPUSets[containerName] = target.String()
+		}
+	}
+	if pending.PodCPUSet != nil {
+		entry.PodCPUSet = new(pending.PodCPUSet.String())
+	}
+	return entry
+}
+
+func (e PendingResizeEntry) toPendingResize() (PendingResize, error) {
+	pending := PendingResize{PodUID: e.PodUID}
+	if len(e.ContainerCPUSets) > 0 {
+		pending.ContainerCPUSets = make(map[string]cpuset.CPUSet, len(e.ContainerCPUSets))
+		for containerName, cpuString := range e.ContainerCPUSets {
+			target, err := cpuset.Parse(cpuString)
+			if err != nil {
+				return pending, fmt.Errorf("could not parse cpuset %q for container %q: %w", cpuString, containerName, err)
+			}
+			pending.ContainerCPUSets[containerName] = target
+		}
+	}
+	if e.PodCPUSet != nil {
+		target, err := cpuset.Parse(*e.PodCPUSet)
+		if err != nil {
+			return pending, fmt.Errorf("could not parse pod-level cpuset %q: %w", *e.PodCPUSet, err)
+		}
+		pending.PodCPUSet = &target
+	}
+	return pending, nil
 }

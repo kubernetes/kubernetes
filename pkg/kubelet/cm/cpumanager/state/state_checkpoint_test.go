@@ -735,6 +735,65 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 			},
 		},
+		// The pending resize changes both a container and the pod-level assignment.
+		// PodLevelResourceManagers does not support in-place resize yet, so the scenario is artificial.
+		{
+			"Restore a pending resize with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: true},
+			`{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}},\"pendingResize\":{\"podUID\":\"pod\",\"containerCpuSets\":{\"container1\":\"4-5\"},\"podCpuSet\":\"4-9\"}}",
+				"dataChecksum": 2220107972
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(4, 5),
+						},
+						"container2": {
+							Baseline: cpuset.New(7, 8),
+						},
+					},
+				},
+				pendingResize: &PendingResize{
+					PodUID: "pod",
+					ContainerCPUSets: map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5),
+					},
+					PodCPUSet: new(cpuset.New(4, 5, 6, 7, 8, 9)),
+				},
+			},
+		},
+		{
+			"Ignore a pending resize with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: false},
+			`{
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"baselines\":{\"pod\":{\"container1\":{\"baseline\":\"4-5\"},\"container2\":{\"baseline\":\"7-8\"}}},\"pendingResize\":{\"podUID\":\"pod\",\"containerCpuSets\":{\"container1\":\"4-5\"},\"podCpuSet\":\"4-9\"}}",
+				"dataChecksum": 2220107972
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+		},
 	}
 
 	// create temp dir
@@ -841,6 +900,30 @@ func TestCheckpointStateStore(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:    "Store a pending resize",
+			fgRequirements: FeatureGateCombination{features.InPlacePodVerticalScalingExclusiveCPUs: true},
+			expectedState: &stateMemory{
+				assignments: map[string]map[string]cpuset.CPUSet{
+					"pod": {
+						"container1": cpuset.New(1, 5, 8),
+					},
+				},
+				baselines: ContainerCPUBaselines{
+					"pod": {
+						"container1": {
+							Baseline: cpuset.New(1, 5),
+						},
+					},
+				},
+				pendingResize: &PendingResize{
+					PodUID: "pod",
+					ContainerCPUSets: map[string]cpuset.CPUSet{
+						"container1": cpuset.New(1, 5, 8, 9),
+					},
+				},
+			},
+		},
 	}
 
 	// create temp dir
@@ -896,6 +979,9 @@ func TestCheckpointStateStore(t *testing.T) {
 					cs1.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
 					cs1.SetCPUAssignments(tc.expectedState.assignments)
 					cs1.SetCPUBaselines(tc.expectedState.baselines)
+					if tc.expectedState.pendingResize != nil {
+						cs1.SetPendingResize(*tc.expectedState.pendingResize)
+					}
 
 					// restore checkpoint with previously stored values
 					cs2, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
@@ -1061,6 +1147,12 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpubaselinesSm := sm.GetCPUBaselines()
 	if !reflect.DeepEqual(cpubaselinesSf, cpubaselinesSm) {
 		t.Errorf("State CPU baseline entries mismatch. Have %s, want %s", cpubaselinesSf, cpubaselinesSm)
+	}
+
+	pendingSf, foundSf := sf.GetPendingResize()
+	pendingSm, foundSm := sm.GetPendingResize()
+	if foundSf != foundSm || !reflect.DeepEqual(pendingSf, pendingSm) {
+		t.Errorf("State pending resize mismatch. Have %v (found %t), want %v (found %t)", pendingSf, foundSf, pendingSm, foundSm)
 	}
 
 }
@@ -1520,4 +1612,381 @@ func TestDeletePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+// pendingResizeCheckpoint has two pods with one container each, and a pending
+// resize of pod1 that grows its container from {4,5} to {4,5,6}.
+const pendingResizeCheckpoint = `{
+	"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3,6\",\"entries\":{\"pod1\":{\"container\":\"4-5\"},\"pod2\":{\"container\":\"7-8\"}},\"pendingResize\":{\"podUID\":\"pod1\",\"containerCpuSets\":{\"container\":\"4-6\"}}}",
+	"dataChecksum": 212795483
+}`
+
+// noPendingResizeCheckpoint is pendingResizeCheckpoint without the pending resize.
+const noPendingResizeCheckpoint = `{
+	"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3,6\",\"entries\":{\"pod1\":{\"container\":\"4-5\"},\"pod2\":{\"container\":\"7-8\"}}}",
+	"dataChecksum": 3305408017
+}`
+
+// newPendingResizeTestCheckpoint returns a checkpoint manager for a temporary
+// directory, removed when the test ends.
+func newPendingResizeTestCheckpoint(t *testing.T) (string, checkpointmanager.CheckpointManager) {
+	t.Helper()
+	tmpDir, err := os.MkdirTemp("", stateDir)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+	cpm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
+	return tmpDir, cpm
+}
+
+// writeTestCheckpoint replaces the testing checkpoint with content.
+func writeTestCheckpoint(t *testing.T, cpm checkpointmanager.CheckpointManager, content string) {
+	t.Helper()
+	require.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove previous checkpoint")
+	require.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, &testutil.MockCheckpoint{Content: content}), "could not create testing checkpoint")
+}
+
+// Test describes artificial scenario as pod-level exclusive CPUs are not scalable.
+func TestSetPendingResize(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		expectedFound      bool
+	}{
+		{
+			description:        "Store the pending resize with InPlacePodVerticalScalingExclusiveCPUs feature gate enabled",
+			featureGateEnabled: true,
+			expectedFound:      true,
+		},
+		{
+			description:        "Store the pending resize with InPlacePodVerticalScalingExclusiveCPUs feature gate disabled",
+			featureGateEnabled: false,
+			expectedFound:      false,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, testCase.featureGateEnabled)
+			tmpDir, _ := newPendingResizeTestCheckpoint(t)
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			// The second pending resize replaces the first one.
+			state1.SetPendingResize(PendingResize{
+				PodUID:           "pod1",
+				ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(1, 2)},
+			})
+			expected := PendingResize{
+				PodUID:           "pod2",
+				ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(4, 5, 6)},
+				PodCPUSet:        new(cpuset.New(4, 5, 6, 7, 8, 9)),
+			}
+			state1.SetPendingResize(expected)
+
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			actual, found := state2.GetPendingResize()
+			require.Equal(t, testCase.expectedFound, found)
+			if found {
+				require.Equal(t, expected, actual)
+			}
+		})
+	}
+}
+
+// An empty pod-level target and an unchanged pod-level assignment must stay
+// distinct through the checkpoint.
+// Test describes artificial scenario as pod-level exclusive CPUs are not scalable.
+func TestPendingResizePodCPUSetThroughCheckpoint(t *testing.T) {
+	testCases := []struct {
+		description string
+		podCPUSet   *cpuset.CPUSet
+	}{
+		{
+			description: "Unchanged pod-level assignment",
+		},
+		{
+			description: "Empty pod-level target",
+			podCPUSet:   new(cpuset.New()),
+		},
+		{
+			description: "Non-empty pod-level target",
+			podCPUSet:   new(cpuset.New(4, 5, 6)),
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			tmpDir, _ := newPendingResizeTestCheckpoint(t)
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+			expected := PendingResize{
+				PodUID:           "pod",
+				ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(4, 5)},
+				PodCPUSet:        testCase.podCPUSet,
+			}
+			state1.SetPendingResize(expected)
+
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+			actual, found := state2.GetPendingResize()
+			require.True(t, found)
+			require.Equal(t, expected, actual)
+		})
+	}
+}
+
+func TestGetPendingResize(t *testing.T) {
+	testCases := []struct {
+		description        string
+		featureGateEnabled bool
+		content            string
+		expectedFound      bool
+	}{
+		{
+			description:        "Get the pending resize with InPlacePodVerticalScalingExclusiveCPUs feature gate enabled when the pendingResize field is included",
+			featureGateEnabled: true,
+			content:            pendingResizeCheckpoint,
+			expectedFound:      true,
+		},
+		{
+			description:        "Get the pending resize with InPlacePodVerticalScalingExclusiveCPUs feature gate enabled when the pendingResize field is excluded",
+			featureGateEnabled: true,
+			content:            noPendingResizeCheckpoint,
+			expectedFound:      false,
+		},
+		{
+			description:        "Get the pending resize with InPlacePodVerticalScalingExclusiveCPUs feature gate disabled",
+			featureGateEnabled: false,
+			content:            pendingResizeCheckpoint,
+			expectedFound:      false,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, cpm := newPendingResizeTestCheckpoint(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, testCase.featureGateEnabled)
+			writeTestCheckpoint(t, cpm, testCase.content)
+
+			state, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			actual, found := state.GetPendingResize()
+			require.Equal(t, testCase.expectedFound, found)
+			if found {
+				require.Equal(t, PendingResize{PodUID: "pod1", ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(4, 5, 6)}}, actual)
+			}
+		})
+	}
+}
+
+func TestCommitPendingResize(t *testing.T) {
+	testCases := []struct {
+		description           string
+		content               string
+		expectedAssignments   map[string]string
+		expectedDefaultCPUSet string
+	}{
+		{
+			description: "Commit the pending resize",
+			content:     pendingResizeCheckpoint,
+			expectedAssignments: map[string]string{
+				"pod1": "4-6",
+				"pod2": "7-8",
+			},
+			expectedDefaultCPUSet: "1-3",
+		},
+		{
+			description: "Commit without a pending resize",
+			content:     noPendingResizeCheckpoint,
+			expectedAssignments: map[string]string{
+				"pod1": "4-5",
+				"pod2": "7-8",
+			},
+			expectedDefaultCPUSet: "1-3,6",
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, cpm := newPendingResizeTestCheckpoint(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			writeTestCheckpoint(t, cpm, testCase.content)
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			state1.CommitPendingResize()
+
+			// The commit is stored in the checkpoint, so restore it to check what a kubelet restart sees.
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			for _, state := range []State{state1, state2} {
+				for pod, expected := range testCase.expectedAssignments {
+					actual, _ := state.GetCPUSet(pod, "container")
+					require.Equal(t, expected, actual.String())
+				}
+				require.Equal(t, testCase.expectedDefaultCPUSet, state.GetDefaultCPUSet().String())
+				_, found := state.GetPendingResize()
+				require.False(t, found, "the commit must delete the pending resize")
+			}
+		})
+	}
+}
+
+func TestDeletePendingResize(t *testing.T) {
+	testCases := []struct {
+		description string
+		content     string
+	}{
+		{
+			description: "Delete the pending resize",
+			content:     pendingResizeCheckpoint,
+		},
+		{
+			description: "Delete without a pending resize",
+			content:     noPendingResizeCheckpoint,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, cpm := newPendingResizeTestCheckpoint(t)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			writeTestCheckpoint(t, cpm, testCase.content)
+
+			state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			state1.DeletePendingResize()
+
+			// The deletion is stored in the checkpoint, so restore it to check what a kubelet restart sees.
+			state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+			require.NoError(t, err)
+
+			for _, state := range []State{state1, state2} {
+				_, found := state.GetPendingResize()
+				require.False(t, found, "the pending resize must be deleted")
+				actual, _ := state.GetCPUSet("pod1", "container")
+				require.Equal(t, "4-5", actual.String(), "deleting a pending resize must not apply it")
+				require.Equal(t, "1-3,6", state.GetDefaultCPUSet().String(), "deleting a pending resize must not change the default CPU set")
+			}
+		})
+	}
+}
+
+// checkpointV4WithoutPendingResize is the V4 checkpoint before adding `PendingResize`.
+type checkpointV4WithoutPendingResize struct {
+	Data           string            `json:"data"`
+	DataChecksum   checksum.Checksum `json:"dataChecksum"`
+	CheckpointData struct {
+		PolicyName    string                              `json:"policyName"`
+		DefaultCPUSet string                              `json:"defaultCpuSet"`
+		Entries       map[string]map[string]string        `json:"entries,omitempty"`
+		PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
+		Baselines     map[string]map[string]ContainerCPUs `json:"baselines,omitempty"`
+	} `json:"-"`
+}
+
+func (cp *checkpointV4WithoutPendingResize) MarshalCheckpoint() ([]byte, error) {
+	return nil, fmt.Errorf("not used by the test")
+}
+
+func (cp *checkpointV4WithoutPendingResize) UnmarshalCheckpoint(blob []byte) error {
+	if err := json.Unmarshal(blob, cp); err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(cp.Data), &cp.CheckpointData)
+}
+
+func (cp *checkpointV4WithoutPendingResize) VerifyChecksum() error {
+	return cp.DataChecksum.Verify(cp.Data)
+}
+
+// writePendingResizeCheckpoint stores, through the state and with
+// InPlacePodVerticalScalingExclusiveCPUs enabled, a checkpoint where the
+// container of pod has {4,5}, the default CPU set is {1,2,3,6}, and a pending
+// resize grows the container to {4,5,6}.
+func writePendingResizeCheckpoint(t *testing.T) (string, checkpointmanager.CheckpointManager) {
+	t.Helper()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, cpm := newPendingResizeTestCheckpoint(t)
+	s, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+	s.SetCPUSet("pod", "container", cpuset.New(4, 5))
+	s.SetDefaultCPUSet(cpuset.New(1, 2, 3, 6))
+	s.SetPendingResize(PendingResize{PodUID: "pod", ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(4, 5, 6)}})
+	return tmpDir, cpm
+}
+
+func TestPendingResizeCheckpointWrittenWithoutFeatureGate(t *testing.T) {
+	tmpDir, _ := writePendingResizeCheckpoint(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
+	logger, _ := ktesting.NewTestContext(t)
+
+	s, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+	// Force checkpoint to be overwritten while FG is off.
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet())
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	s, err = NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+
+	_, found := s.GetPendingResize()
+	require.False(t, found, "a write with the feature gate disabled must drop the pending resize")
+	cset, _ := s.GetCPUSet("pod", "container")
+	require.Equal(t, "4-5", cset.String())
+	require.Equal(t, "1-3,6", s.GetDefaultCPUSet().String())
+}
+
+// After a rollback, a kubelet with V4 that predates pending resizes reads the
+// checkpoint without the pendingResize field. The feature gate only decides
+// whether such a kubelet restores the baselines after decoding, so it does not
+// matter for reading the checkpoint.
+func TestPendingResizeCheckpointReadByV4WithoutPendingResizes(t *testing.T) {
+	_, cpm := writePendingResizeCheckpoint(t)
+
+	cp := &checkpointV4WithoutPendingResize{}
+	require.NoError(t, cpm.GetCheckpoint(testingCheckpoint, cp))
+
+	require.Equal(t, "static", cp.CheckpointData.PolicyName)
+	require.Equal(t, "1-3,6", cp.CheckpointData.DefaultCPUSet)
+	require.Equal(t, map[string]map[string]string{"pod": {"container": "4-5"}}, cp.CheckpointData.Entries)
+	require.Equal(t, map[string]map[string]ContainerCPUs{"pod": {"container": {Baseline: "4-5"}}}, cp.CheckpointData.Baselines)
+}
+
+// After a rollback, a kubelet that predates V4 reads only the embedded V2
+// fields, which have their own checksum.
+func TestPendingResizeCheckpointReadByV2(t *testing.T) {
+	_, cpm := writePendingResizeCheckpoint(t)
+
+	cp := newCPUManagerCheckpointV2()
+	require.NoError(t, cpm.GetCheckpoint(testingCheckpoint, cp))
+
+	// An empty checksum is always accepted, so make sure it was verified.
+	require.NotZero(t, cp.Checksum, "the checkpoint must carry a V2 checksum")
+	require.Equal(t, "static", cp.PolicyName)
+	require.Equal(t, "1-3,6", cp.DefaultCPUSet)
+	require.Equal(t, map[string]map[string]string{"pod": {"container": "4-5"}}, cp.Entries)
 }

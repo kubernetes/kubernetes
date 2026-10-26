@@ -44,6 +44,15 @@ type ContainerCPUs struct {
 	Baseline string `json:"baseline"`
 }
 
+// PendingResizeEntry struct is used in a checkpoint in v4 format to store a
+// resize that is prepared but not committed yet.
+type PendingResizeEntry struct {
+	PodUID           string            `json:"podUID"`
+	ContainerCPUSets map[string]string `json:"containerCpuSets,omitempty"`
+	// PodCPUSet is the target pod-level CPU set, or nil if it does not change.
+	PodCPUSet *string `json:"podCpuSet,omitempty"`
+}
+
 // CPUManagerCheckpointData struct is used to store CPU/pod assignments, which is part of a checkpoint in v4 format
 // CPU assignments at admission time is required for in-place vertical scaling, and stored in Baselines.
 type CPUManagerCheckpointData struct {
@@ -52,6 +61,7 @@ type CPUManagerCheckpointData struct {
 	Entries       map[string]map[string]string        `json:"entries,omitempty"`
 	PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
 	Baselines     map[string]map[string]ContainerCPUs `json:"baselines,omitempty"`
+	PendingResize *PendingResizeEntry                 `json:"pendingResize,omitempty"`
 }
 
 // CPUManagerCheckpoint represents a structure to store CPU manager checkpoint data.
