@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -296,9 +298,30 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	output, err := filesutil.CopyDir(runningEtcdDir, backupEtcdDir)
+	var (
+		attempt   int
+		lastError error
+	)
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true,
+		func(_ context.Context) (bool, error) {
+			attempt++
+			klog.V(2).Infof("[upgrade/etcd] Backing up etcd data, attempt %d", attempt)
+			if err := os.RemoveAll(backupEtcdDir); err != nil {
+				lastError = errors.Wrapf(err, "could not clear the etcd backup dir %s", backupEtcdDir)
+				return false, lastError
+			}
+			if err := os.Mkdir(backupEtcdDir, 0700); err != nil {
+				lastError = errors.Wrapf(err, "could not create the etcd backup dir %s", backupEtcdDir)
+				return false, lastError
+			}
+			lastError = filesutil.CopyDir(runningEtcdDir, backupEtcdDir)
+			return lastError == nil, nil
+		})
 	if err != nil {
-		return true, errors.Wrapf(err, "failed to back up etcd data, output: %q", output)
+		if lastError != nil {
+			err = lastError
+		}
+		return true, errors.Wrapf(err, "failed to back up etcd data after %d attempts", attempt)
 	}
 
 	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
@@ -561,10 +584,18 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	output, err := filesutil.CopyDir(backupEtcdDir, runningEtcdDir)
-	if err != nil {
-		// Let the user know there we're problems, but we tried to reçover
-		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s, output: %q", backupEtcdDir, output)
+	// Clearing the live member dir is only safe if there is a backup to restore it from.
+	if _, err := os.Stat(filepath.Join(backupEtcdDir, "member")); err != nil {
+		return errors.Wrapf(err, "will not roll back the etcd data dir, no member dir in the etcd backup: %s", backupEtcdDir)
+	}
+
+	// Files etcd wrote after the backup must not survive the rollback.
+	if err := os.RemoveAll(filepath.Join(runningEtcdDir, "member")); err != nil {
+		return errors.Wrapf(err, "could not clear the etcd member dir in %s", runningEtcdDir)
+	}
+
+	if err := filesutil.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
+		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s", backupEtcdDir)
 	}
 
 	return nil
