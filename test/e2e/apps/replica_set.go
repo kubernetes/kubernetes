@@ -42,8 +42,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -176,7 +178,56 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	framework.ConformanceIt("should validate Replicaset Status endpoints", func(ctx context.Context) {
 		testRSStatus(ctx, f)
 	})
+
+	f.It("should replace a deleted gang pod without recreating the PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangReplicaSetPodReplacement(ctx, f)
+	})
 })
+
+func testGangReplicaSetPodReplacement(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-rs-replace"}
+	replicas := int32(3)
+
+	d := newGangDeployment("gang-rs-replace", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "gang replicas should bind")
+
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	originalPGUID := podGroup.UID
+
+	pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list gang pods")
+	gomega.Expect(pods.Items).NotTo(gomega.BeEmpty())
+	victim := pods.Items[0].Name
+
+	ginkgo.By("deleting one gang pod")
+	err = c.CoreV1().Pods(ns).Delete(ctx, victim, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "delete pod %q", victim)
+
+	ginkgo.By("waiting for the Deployment to replace the pod")
+	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, c, victim, ns, f.Timeouts.PodDelete), "victim pod %q should be deleted", victim)
+	deploy, err = c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "deployment should replace the deleted pod")
+
+	ginkgo.By("verifying the PodGroup was not recreated")
+	pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "PodGroup should still exist")
+	gomega.Expect(pg.UID).To(gomega.Equal(originalPGUID), "PodGroup should not be recreated when a single pod is replaced")
+
+	ginkgo.By("verifying all pods remain wired to the same PodGroup")
+	pods, err = e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list gang pods after replacement")
+	gomega.Expect(pods.Items).To(gomega.HaveLen(int(replicas)))
+	for _, pod := range pods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(rsName)), "pod %s podGroupName", pod.Name)
+	}
+}
 
 // A basic test to check the deployment of an image using a ReplicaSet. The
 // image serves its hostname which is checked for each replica.
