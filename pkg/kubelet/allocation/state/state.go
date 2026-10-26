@@ -32,6 +32,7 @@ type PodMap map[types.UID]*v1.Pod
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+	GetContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool)
 	GetPodVolumes(podUID types.UID) ([]v1.Volume, bool)
 	GetPodUIDs() []types.UID
 	GetPod(podUID types.UID) (*v1.Pod, bool)
@@ -41,6 +42,7 @@ type Reader interface {
 }
 
 type writer interface {
+	SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error
 	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error
 	SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error
 	RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error

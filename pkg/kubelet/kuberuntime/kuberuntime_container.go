@@ -273,8 +273,8 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources as actuated.
-	if err := m.setActuatedContainerResources(logger, pod, container, spec.containerType); err != nil {
+	// When creating a container, mark the resources and volume mounts as actuated.
+	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -430,6 +430,18 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 		err = m.setActuatedContainerResources(logger, pod, container, containerType)
 	}
 	return err
+}
+
+func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		return m.setActuatedContainerResources(logger, pod, container, containerType)
+	}
+	actuatedContainer := *container
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		actuatedContainer.Resources = *container.Resources.DeepCopy()
+		actuatedContainer.Resources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
+	}
+	return m.actuatedState.SetContainer(logger, pod.UID, containerType, actuatedContainer)
 }
 
 func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
