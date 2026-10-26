@@ -46,15 +46,12 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
-	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
-	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
@@ -142,51 +139,6 @@ func CreateResourceClaimController(ctx context.Context, tb testutils.TB, clientS
 	}
 }
 
-// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
-// TODO(mborsz): Use a real PV controller here.
-func StartFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
-	pvInformer := informerFactory.Core().V1().PersistentVolumes()
-
-	syncPV := func(obj *v1.PersistentVolume) {
-		if obj.Spec.ClaimRef != nil {
-			claimRef := obj.Spec.ClaimRef
-			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
-			if err != nil {
-				// Note that the error can be anything, because components like
-				// apiserver are also shutting down at the same time, but this
-				// check is conservative and only ignores the "context canceled"
-				// error while shutting down.
-				if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
-					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
-				}
-				return
-			}
-
-			if pvc.Spec.VolumeName == "" {
-				pvc.Spec.VolumeName = obj.Name
-				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
-				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
-				if err != nil {
-					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
-						// Shutting down, no need to record this.
-						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
-					}
-					return
-				}
-			}
-		}
-	}
-
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			syncPV(obj.(*v1.PersistentVolume))
-		},
-		UpdateFunc: func(_, obj interface{}) {
-			syncPV(obj.(*v1.PersistentVolume))
-		},
-	})
-}
-
 // CreateGCController creates a garbage controller and returns a run function
 // for it. The informer factory needs to be started before invoking that
 // function.
@@ -223,30 +175,6 @@ func CreateGCController(ctx context.Context, tb testutils.TB, restConfig restcli
 		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
 	}
 	return startGC
-}
-
-// CreateNamespaceController creates a namespace controller and returns a run
-// function for it. The informer factory needs to be started before invoking
-// that function.
-func CreateNamespaceController(ctx context.Context, tb testutils.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
-	restclient.AddUserAgent(&restConfig, "namespace-controller")
-	clientSet := clientset.NewForConfigOrDie(&restConfig)
-	metadataClient, err := metadata.NewForConfig(&restConfig)
-	if err != nil {
-		tb.Fatalf("Failed to create metadataClient: %v", err)
-	}
-	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
-	controller := namespace.NewNamespaceController(
-		ctx,
-		clientSet,
-		metadataClient,
-		discoverResourcesFn,
-		informerSet.Core().V1().Namespaces(),
-		10*time.Hour,
-		v1.FinalizerKubernetes)
-	return func() {
-		go controller.Run(ctx, 5)
-	}
 }
 
 // TestContext store necessary context info.
