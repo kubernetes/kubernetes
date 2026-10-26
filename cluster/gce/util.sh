@@ -54,13 +54,12 @@ if [[ ${NODE_LOCAL_SSDS:-} -ge 1 ]] && [[ -n ${NODE_LOCAL_SSDS_EXT:-} ]] ; then
   exit 2
 fi
 
-# If the master image is not set, we use the latest image based on image
-# family.
+# If the master image is not set, use the latest READY image in the family.
 kube_master_image="${KUBE_GCE_MASTER_IMAGE:-}"
 if [[ -z "${kube_master_image}" ]]; then
   # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-  # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
-  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
+  # A singleton status list avoids nested Compute API filter expressions.
+  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64 status=(READY)" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
 fi
 
 echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
@@ -74,18 +73,33 @@ export MASTER_IMAGE="${kube_master_image}"
 #   NODE_IMAGE
 function set-linux-node-image() {
 
-  # If the node image is not set, we use the latest image based on image
-  # family.
+  # If the node image is not set, use the latest READY image in the family.
 
   kube_node_image="${KUBE_GCE_NODE_IMAGE:-}"
   if [[ -z "${kube_node_image}" ]]; then
     # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-    # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
-    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
+    # A singleton status list avoids nested Compute API filter expressions.
+    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64 status=(READY)" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
   fi
 
   echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
   export NODE_IMAGE="${kube_node_image}"
+}
+
+# An empty --image makes gcloud select its default image. Check before creating
+# resources, not while sourcing this file: kube-down and kubectl also source it.
+function require-master-image() {
+  if [[ -z "${MASTER_IMAGE}" ]]; then
+    echo "No READY X86_64 master image found in project ${MASTER_IMAGE_PROJECT} for family ${MASTER_IMAGE_FAMILY}" >&2
+    return 1
+  fi
+}
+
+function require-node-image() {
+  if [[ -z "${NODE_IMAGE}" ]]; then
+    echo "No READY X86_64 node image found in project ${NODE_IMAGE_PROJECT} for family ${NODE_IMAGE_FAMILY}" >&2
+    return 1
+  fi
 }
 
 # Requires:
@@ -2299,11 +2313,15 @@ function validate-node-local-ssds-ext(){
 # $4: String of comma-separated metadata (key=value) entries.
 # $5: the node OS ("linux" or "windows").
 function create-node-template() {
+  local os="$5"
+  if [[ "${os}" == "linux" ]]; then
+    require-node-image || return 1
+  fi
+
   detect-project
   detect-subnetworks
   local template_name="$1"
   local metadata_values="$4"
-  local os="$5"
   local machine_type="$6"
 
   # First, ensure the template doesn't exist.
@@ -2427,6 +2445,15 @@ function create-node-template() {
 #   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up() {
+  # Check before changing cloud resources, including etcd membership when
+  # replicating a master. Existing-master mode uses existing node templates.
+  if [[ "${KUBE_USE_EXISTING_MASTER:-}" != "true" ]]; then
+    require-master-image || return 1
+    if [[ "${KUBE_REPLICATE_EXISTING_MASTER:-}" != "true" ]]; then
+      require-node-image || return 1
+    fi
+  fi
+
   kube::util::ensure-temp-dir
   detect-project
 
@@ -3426,6 +3453,8 @@ function create-windows-nodes() {
 # - SUBNETWORK
 # - IP_ALIAS_SIZE
 function create-heapster-node() {
+  require-node-image || return 1
+
   local gcloud="gcloud"
 
   local network
