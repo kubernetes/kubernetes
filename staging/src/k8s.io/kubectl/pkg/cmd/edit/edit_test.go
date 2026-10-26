@@ -67,10 +67,11 @@ type EditStep struct {
 	StepType string `yaml:"type"`
 
 	// only applies to request
-	RequestMethod      string `yaml:"expectedMethod,omitempty"`
-	RequestPath        string `yaml:"expectedPath,omitempty"`
-	RequestContentType string `yaml:"expectedContentType,omitempty"`
-	Input              string `yaml:"expectedInput"`
+	RequestMethod      string            `yaml:"expectedMethod,omitempty"`
+	RequestPath        string            `yaml:"expectedPath,omitempty"`
+	RequestContentType string            `yaml:"expectedContentType,omitempty"`
+	RequestQuery       map[string]string `yaml:"expectedQuery,omitempty"`
+	Input              string            `yaml:"expectedInput"`
 
 	// only applies to request
 	ResponseStatusCode int `yaml:"resultingStatusCode,omitempty"`
@@ -142,6 +143,11 @@ func TestEdit(t *testing.T) {
 				step.RequestMethod, step.RequestPath, step.RequestContentType,
 				req.Method, req.URL.Path, req.Header.Get("Content-Type"),
 			)
+		}
+		for key, want := range step.RequestQuery {
+			if got := req.URL.Query().Get(key); got != want {
+				t.Errorf("%s, step %d: query parameter %q = %q, want %q", name, i, key, got, want)
+			}
 		}
 		if !bytes.Equal(body, expectedInput) {
 			if updateInputFixtures {
