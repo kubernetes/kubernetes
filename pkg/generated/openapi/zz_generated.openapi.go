@@ -77113,7 +77113,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"topologyManagerPolicyOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TopologyManagerPolicyOptions is a set of key=value which allows to set extra options to fine tune the behaviour of the topology manager policies. Requires  both the \"TopologyManager\" and \"TopologyManagerPolicyOptions\" feature gates to be enabled. Default: nil",
+							Description: "TopologyManagerPolicyOptions is a set of key=value which allows to set extra options to fine tune the behaviour of the topology manager policies. Default: nil",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
