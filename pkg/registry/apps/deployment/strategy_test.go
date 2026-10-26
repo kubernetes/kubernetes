@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,8 +135,8 @@ func TestStatusUpdatesWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) 
 func TestDeploymentStrategy_PrepareForUpdateScheduling(t *testing.T) {
 	schedulingWithMinCount := func(minCount int32) *apps.DeploymentSchedulingConfiguration {
 		return &apps.DeploymentSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
 			},
 		}
 	}
@@ -184,6 +184,146 @@ func TestDeploymentStrategy_PrepareForUpdateScheduling(t *testing.T) {
 
 			if !reflect.DeepEqual(tc.wantScheduling, newDeployment.Spec.Scheduling) {
 				t.Errorf("Scheduling = %#v, want %#v", newDeployment.Spec.Scheduling, tc.wantScheduling)
+			}
+		})
+	}
+}
+
+func TestDeploymentStrategy_PrepareForCreateScheduling(t *testing.T) {
+	schedulingWithMinCount := func(minCount int32) *apps.DeploymentSchedulingConfiguration {
+		return &apps.DeploymentSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                         string
+		enableWorkloadWithDeployment bool
+		scheduling                   *apps.DeploymentSchedulingConfiguration
+		wantScheduling               *apps.DeploymentSchedulingConfiguration
+	}{
+		{
+			name:                         "scheduling dropped on create when feature gate disabled",
+			enableWorkloadWithDeployment: false,
+			scheduling:                   schedulingWithMinCount(2),
+		},
+		{
+			name:                         "scheduling retained on create when feature gate enabled",
+			enableWorkloadWithDeployment: true,
+			scheduling:                   schedulingWithMinCount(2),
+			wantScheduling:               schedulingWithMinCount(2),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.enableWorkloadWithDeployment,
+				features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
+			})
+
+			deployment := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+			deployment.Spec.Scheduling = tc.scheduling
+
+			Strategy.PrepareForCreate(genericapirequest.NewDefaultContext(), deployment)
+
+			if !reflect.DeepEqual(tc.wantScheduling, deployment.Spec.Scheduling) {
+				t.Errorf("Scheduling = %#v, want %#v", deployment.Spec.Scheduling, tc.wantScheduling)
+			}
+		})
+	}
+}
+
+func TestDeploymentStrategy_DropDisabledSchedulingSubfields(t *testing.T) {
+	withConstraints := func() *apps.DeploymentSchedulingConfiguration {
+		return &apps.DeploymentSchedulingConfiguration{
+			SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+				Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+			},
+		}
+	}
+	withResourceClaims := func() *apps.DeploymentSchedulingConfiguration {
+		return &apps.DeploymentSchedulingConfiguration{
+			ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
+				{Name: "claim", ResourceClaimName: new("rc-a")},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                    string
+		enableTopologyAware     bool
+		enableDRAResourceClaims bool
+		oldScheduling           *apps.DeploymentSchedulingConfiguration
+		scheduling              *apps.DeploymentSchedulingConfiguration
+		wantScheduling          *apps.DeploymentSchedulingConfiguration
+	}{
+		{
+			name:                    "schedulingConstraints dropped on create when TopologyAwareWorkloadScheduling disabled",
+			enableDRAResourceClaims: true,
+			scheduling:              withConstraints(),
+			wantScheduling:          &apps.DeploymentSchedulingConfiguration{},
+		},
+		{
+			name:                    "schedulingConstraints retained on create when TopologyAwareWorkloadScheduling enabled",
+			enableTopologyAware:     true,
+			enableDRAResourceClaims: true,
+			scheduling:              withConstraints(),
+			wantScheduling:          withConstraints(),
+		},
+		{
+			name:                    "schedulingConstraints retained on update when TopologyAwareWorkloadScheduling disabled but old object already set it",
+			enableDRAResourceClaims: true,
+			oldScheduling:           withConstraints(),
+			scheduling:              withConstraints(),
+			wantScheduling:          withConstraints(),
+		},
+		{
+			name:                "resourceClaims dropped on create when DRAWorkloadResourceClaims disabled",
+			enableTopologyAware: true,
+			scheduling:          withResourceClaims(),
+			wantScheduling:      &apps.DeploymentSchedulingConfiguration{},
+		},
+		{
+			name:                    "resourceClaims retained on create when DRAWorkloadResourceClaims enabled",
+			enableTopologyAware:     true,
+			enableDRAResourceClaims: true,
+			scheduling:              withResourceClaims(),
+			wantScheduling:          withResourceClaims(),
+		},
+		{
+			name:                "resourceClaims retained on update when DRAWorkloadResourceClaims disabled but old object already set it",
+			enableTopologyAware: true,
+			oldScheduling:       withResourceClaims(),
+			scheduling:          withResourceClaims(),
+			wantScheduling:      withResourceClaims(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.WorkloadWithDeployment:          true,
+				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAware,
+				features.DRAWorkloadResourceClaims:       tc.enableDRAResourceClaims,
+			})
+
+			newDep := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+			newDep.Spec.Scheduling = tc.scheduling
+
+			if tc.oldScheduling == nil {
+				Strategy.PrepareForCreate(genericapirequest.NewDefaultContext(), newDep)
+			} else {
+				oldDep := newDeploymentWithSelectorLabels(map[string]string{"app": "test"})
+				oldDep.Spec.Scheduling = tc.oldScheduling
+				Strategy.PrepareForUpdate(genericapirequest.NewDefaultContext(), newDep, oldDep)
+			}
+
+			if !reflect.DeepEqual(tc.wantScheduling, newDep.Spec.Scheduling) {
+				t.Errorf("Scheduling = %#v, want %#v", newDep.Spec.Scheduling, tc.wantScheduling)
 			}
 		})
 	}

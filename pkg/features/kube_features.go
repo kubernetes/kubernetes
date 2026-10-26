@@ -1205,6 +1205,7 @@ const (
 	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
 
 	// owner: @PannagaRao
+	// kep: https://kep.k8s.io/6276
 	// alpha: v1.38
 	//
 	// Enables the Deployment and ReplicaSet controllers to automatically create

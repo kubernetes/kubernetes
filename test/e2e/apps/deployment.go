@@ -32,7 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -649,8 +649,8 @@ var _ = SIGDescribe("Deployment", func() {
 func newGangDeployment(name string, replicas int32, podLabels map[string]string, minCount *int32) *appsv1.Deployment {
 	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RecreateDeploymentStrategyType)
 	d.Spec.Scheduling = &appsv1.DeploymentSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
 		},
 	}
 	return d

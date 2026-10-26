@@ -87,7 +87,6 @@ func (rsc *ReplicaSetController) addSchedulingInformers(
 	rsc.workloadListerSynced = workloadInformer.Informer().HasSynced
 	rsc.podGroupLister = podGroupInformer.Lister()
 	rsc.podGroupListerSynced = podGroupInformer.Informer().HasSynced
-	rsc.schedulingEnabled = true
 
 	if _, err := workloadInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -105,7 +104,7 @@ func (rsc *ReplicaSetController) addSchedulingInformers(
 }
 
 func (rsc *ReplicaSetController) schedulingCachesSynced() []cache.InformerSynced {
-	if !rsc.schedulingEnabled {
+	if !rsc.controllerFeatures.EnableWorkloadScheduling || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
 		return nil
 	}
 	return []cache.InformerSynced{rsc.workloadListerSynced, rsc.podGroupListerSynced}
@@ -157,25 +156,32 @@ func (rsc *ReplicaSetController) findWorkloadForReplicaSet(rs *apps.ReplicaSet) 
 		return nil, nil
 	}
 
-	workloads, err := rsc.workloadIndexer.ByIndex(workloadByDeploymentNameIndex, cache.NewObjectName(rs.Namespace, owner.Name).String())
+	objs, err := rsc.workloadIndexer.ByIndex(workloadByDeploymentNameIndex, cache.NewObjectName(rs.Namespace, owner.Name).String())
 	if err != nil {
 		return nil, err
 	}
-	if len(workloads) == 0 {
+	if len(objs) == 0 {
 		return nil, nil
 	}
-	if len(workloads) > 1 {
-		return nil, fmt.Errorf("multiple Workloads found for Deployment %s/%s", rs.Namespace, owner.Name)
+
+	var matched *schedulingv1beta1.Workload
+	for _, obj := range objs {
+		workload, ok := obj.(*schedulingv1beta1.Workload)
+		if !ok {
+			return nil, fmt.Errorf("workload index returned %T", obj)
+		}
+		if !deploymentControllerOwnersMatch(owner, metav1.GetControllerOf(workload)) {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple Workloads controlled by Deployment %s/%s UID %q", rs.Namespace, owner.Name, owner.UID)
+		}
+		matched = workload
 	}
-	workload, ok := workloads[0].(*schedulingv1beta1.Workload)
-	if !ok {
-		return nil, fmt.Errorf("workload index returned %T", workloads[0])
+	if matched == nil {
+		return nil, fmt.Errorf("no Workload controlled by Deployment %s/%s with UID %q", rs.Namespace, owner.Name, owner.UID)
 	}
-	if !deploymentControllerOwnersMatch(owner, metav1.GetControllerOf(workload)) {
-		return nil, fmt.Errorf("workload %s/%s controller owner does not match Deployment %s/%s with UID %q",
-			workload.Namespace, workload.Name, rs.Namespace, owner.Name, owner.UID)
-	}
-	return workload, nil
+	return matched, nil
 }
 
 func replicaSetPodGroupOwner(rs *apps.ReplicaSet) metav1.OwnerReference {
@@ -205,7 +211,7 @@ func hasReplicaSetPodGroupFinalizer(rs *apps.ReplicaSet) bool {
 }
 
 func (rsc *ReplicaSetController) ensureReplicaSetPodGroupFinalizer(ctx context.Context, rs *apps.ReplicaSet) error {
-	if !rsc.schedulingEnabled || rsc.Kind != "ReplicaSet" || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) || rs.DeletionTimestamp != nil || hasReplicaSetPodGroupFinalizer(rs) {
+	if !rsc.controllerFeatures.EnableWorkloadScheduling || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) || rs.DeletionTimestamp != nil || hasReplicaSetPodGroupFinalizer(rs) {
 		return nil
 	}
 
@@ -309,7 +315,7 @@ func (rsc *ReplicaSetController) patchPodGroupMinCount(ctx context.Context, podG
 }
 
 func (rsc *ReplicaSetController) deletePodGroupForReplicaSet(ctx context.Context, rs *apps.ReplicaSet) error {
-	if !rsc.schedulingEnabled || rsc.Kind != "ReplicaSet" || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+	if !rsc.controllerFeatures.EnableWorkloadScheduling || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
 		return nil
 	}
 	return rsc.cleanupReplicaSetPodGroup(ctx, rs)
@@ -322,7 +328,7 @@ func (rsc *ReplicaSetController) deletePodGroupForReplicaSet(ctx context.Context
 func (rsc *ReplicaSetController) ensurePodGroupForReplicaSet(
 	ctx context.Context, rs *apps.ReplicaSet,
 ) (*schedulingv1beta1.PodGroup, error) {
-	if !rsc.schedulingEnabled || rsc.Kind != "ReplicaSet" || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) || rs.DeletionTimestamp != nil {
+	if !rsc.controllerFeatures.EnableWorkloadScheduling || !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) || rs.DeletionTimestamp != nil {
 		return nil, nil
 	}
 	if rs.Spec.Replicas == nil {
@@ -361,6 +367,9 @@ func (rsc *ReplicaSetController) ensurePodGroupForReplicaSet(
 			return nil, fmt.Errorf("failed to build PodGroup %s/%s: %w",
 				rs.Namespace, podGroupName, err)
 		}
+		// priorityClassName is per-revision, so source it from this ReplicaSet's
+		// template rather than the shared Workload template.
+		desired.Spec.PriorityClassName = rs.Spec.Template.Spec.PriorityClassName
 		desired.OwnerReferences = append(desired.OwnerReferences, workloadPodGroupOwner(workload))
 		created, err := rsc.kubeClient.SchedulingV1beta1().PodGroups(rs.Namespace).
 			Create(ctx, desired, metav1.CreateOptions{})

@@ -17,7 +17,7 @@ limitations under the License.
 package apps
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -461,20 +461,20 @@ type DeploymentSchedulingConfiguration struct {
 	// be omitted to derive it from replicas.
 	//
 	// +optional
-	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology)
 	// for the Deployment's pods.
 	//
 	// +optional
-	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints
 
 	// DisruptionMode defines the mode in which the Deployment's pods can be disrupted.
 	// One of Single or All.
 	// If omitted, standard per-pod disruption behavior is used.
 	//
 	// +optional
-	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode
 
 	// ResourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
@@ -488,7 +488,7 @@ type DeploymentSchedulingConfiguration struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

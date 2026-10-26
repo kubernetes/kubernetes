@@ -344,6 +344,15 @@ items:
     - update
     - watch
   - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - workloads
@@ -353,15 +362,6 @@ items:
     - list
     - patch
     - watch
-  - apiGroups:
-    - ""
-    - events.k8s.io
-    resources:
-    - events
-    verbs:
-    - create
-    - patch
-    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1435,6 +1435,15 @@ items:
     - patch
     - watch
   - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - workloads
@@ -1453,15 +1462,6 @@ items:
     - list
     - patch
     - watch
-  - apiGroups:
-    - ""
-    - events.k8s.io
-    resources:
-    - events
-    verbs:
-    - create
-    - patch
-    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

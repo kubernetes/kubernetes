@@ -673,43 +673,69 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 		}
 	}
 
-	allErrs = append(allErrs, validateDeploymentScheduling(spec, oldSpec, fldPath)...)
-	allErrs = append(allErrs, validateDeploymentSchedulingUpdate(spec, oldSpec, fldPath.Child("scheduling"))...)
-
-	if spec.Scheduling != nil && spec.Template.Spec.SchedulingGroup != nil {
-		allErrs = append(allErrs, field.Invalid(
-			fldPath.Child("template", "spec", "schedulingGroup"),
-			spec.Template.Spec.SchedulingGroup,
-			"cannot be set when spec.scheduling is configured because Pods must use either Deployment-managed scheduling or a user-managed PodGroup",
-		))
-	}
-
-	if spec.Scheduling != nil && spec.Scheduling.SchedulingPolicy != nil && spec.Scheduling.SchedulingPolicy.Gang != nil {
-		gangPath := fldPath.Child("scheduling", "schedulingPolicy", "gang")
-
-		if spec.Scheduling.SchedulingPolicy.Gang.MinCount != nil && spec.Replicas > 0 {
-			if *spec.Scheduling.SchedulingPolicy.Gang.MinCount > spec.Replicas {
-				allErrs = append(allErrs, field.Invalid(
-					gangPath.Child("minCount"),
-					*spec.Scheduling.SchedulingPolicy.Gang.MinCount,
-					fmt.Sprintf("minCount must not exceed replicas (%d)", spec.Replicas),
-				))
-			}
-		}
-
-		if spec.Strategy.Type != apps.RecreateDeploymentStrategyType {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("strategy", "type"),
-				spec.Strategy.Type,
-				"gang-scheduled Deployment requires strategy type Recreate",
-			))
-		}
-
-	}
+	allErrs = append(allErrs, validateGangMinCount(spec, fldPath.Child("scheduling"))...)
+	allErrs = append(allErrs, validateDeploymentScheduling(spec, oldSpec, fldPath.Child("scheduling"))...)
+	allErrs = append(allErrs, validateSchedulingGroupConflict(spec, fldPath)...)
+	allErrs = append(allErrs, validateGangRequiresRecreate(spec, fldPath)...)
 
 	return allErrs
 }
 
+// validateSchedulingGroupConflict rejects a Pod-level schedulingGroup when the
+// Deployment manages scheduling itself.
+func validateSchedulingGroupConflict(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if spec.Scheduling == nil || spec.Template.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("template", "spec", "schedulingGroup"),
+		spec.Template.Spec.SchedulingGroup,
+		"cannot be set when spec.scheduling is configured because Pods must use either Deployment-managed scheduling or a user-managed PodGroup")}
+}
+
+// validateGangRequiresRecreate requires strategy type Recreate for gang scheduling.
+func validateGangRequiresRecreate(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if spec.Scheduling == nil || spec.Scheduling.SchedulingPolicy == nil ||
+		spec.Scheduling.SchedulingPolicy.Gang == nil ||
+		spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("strategy", "type"),
+		spec.Strategy.Type,
+		"gang-scheduled Deployment requires strategy type Recreate")}
+}
+
+// gangMinCountExceedsReplicas reports whether a user-set gang minCount exceeds replicas.
+func gangMinCountExceedsReplicas(spec *apps.DeploymentSpec) bool {
+	if spec == nil || spec.Scheduling == nil ||
+		spec.Scheduling.SchedulingPolicy == nil ||
+		spec.Scheduling.SchedulingPolicy.Gang == nil {
+		return false
+	}
+	minCount := spec.Scheduling.SchedulingPolicy.Gang.MinCount
+	if minCount == nil {
+		return false
+	}
+	return spec.Replicas > 0 && *minCount > spec.Replicas
+}
+
+// validateGangMinCount rejects a gang minCount that exceeds the Deployment's replicas.
+func validateGangMinCount(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	if !gangMinCountExceedsReplicas(spec) {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("schedulingPolicy", "gang", "minCount"),
+		*spec.Scheduling.SchedulingPolicy.Gang.MinCount,
+		fmt.Sprintf("minCount must not exceed replicas (%d)", spec.Replicas))}
+}
+
+// validateDeploymentSchedulingUpdate enforces the spec.scheduling immutability
+// constraint that declarative validation cannot express: the basic/gang policy
+// variant is frozen after creation. Only schedulingPolicy.gang.minCount may change.
+// Adding or removing the scheduling or schedulingPolicy fields themselves is handled by
+// declarative validation, so this only guards an in-place variant switch.
 func validateDeploymentSchedulingUpdate(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	if spec.Scheduling == nil || oldSpec == nil || oldSpec.Scheduling == nil {
 		return nil
@@ -730,17 +756,16 @@ func validateDeploymentScheduling(spec, oldSpec *apps.DeploymentSpec, fldPath *f
 	if spec.Scheduling == nil {
 		return nil
 	}
-	schedulingPath := fldPath.Child("scheduling")
 	input := deploymentutil.WorkloadInputForDeploymentInternal(spec.Scheduling)
 	item := deploymentutil.WorkloadItemForDeployment(
-		"deployment", spec.Template.Spec.PriorityClassName, input, schedulingPath,
+		"deployment", spec.Template.Spec.PriorityClassName, &spec.Replicas, input, fldPath,
 	)
 
 	var oldItem *workloadbuilder.WorkloadItem
 	if oldSpec != nil {
 		oldInput := deploymentutil.WorkloadInputForDeploymentInternal(oldSpec.Scheduling)
 		oldItem = deploymentutil.WorkloadItemForDeployment( // +k8s:verify-mutation:reason=clone
-			"deployment", oldSpec.Template.Spec.PriorityClassName, oldInput, nil,
+			"deployment", oldSpec.Template.Spec.PriorityClassName, &oldSpec.Replicas, oldInput, nil,
 		)
 	}
 
@@ -799,6 +824,7 @@ func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.P
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+	allErrs = append(allErrs, validateDeploymentSchedulingUpdate(&update.Spec, &old.Spec, field.NewPath("spec").Child("scheduling"))...)
 	return allErrs
 }
 

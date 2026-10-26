@@ -19,7 +19,7 @@ package deployment
 import (
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -99,16 +99,16 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"valid with basic scheduling policy": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 					},
 				}),
 				enableWorkloadWithDeployment: true,
 			},
 			"valid with gang scheduling policy": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 					},
 				}),
 				enableWorkloadWithDeployment: true,
@@ -121,7 +121,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"scheduling policy with neither basic nor gang": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{},
 				}),
 				enableWorkloadWithDeployment: true,
 				expectedErrs: field.ErrorList{
@@ -130,8 +130,8 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"gang minCount zero": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(0))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(0))},
 					},
 				}),
 				enableWorkloadWithDeployment: true,
@@ -141,7 +141,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"disruption mode with neither single nor all": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{},
 				}),
 				enableWorkloadWithDeployment: true,
 				expectedErrs: field.ErrorList{
@@ -150,8 +150,8 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"topology constraints with too many entries": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{
 							{Key: "topology.kubernetes.io/zone"},
 							{Key: "topology.kubernetes.io/rack"},
 						},
@@ -164,8 +164,8 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"topology constraint with empty key": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: ""}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: ""}},
 					},
 				}),
 				enableWorkloadWithDeployment: true,
@@ -175,8 +175,8 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"topology constraint with invalid key": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "invalid key"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "invalid key"}},
 					},
 				}),
 				enableWorkloadWithDeployment: true,
@@ -186,7 +186,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"too many resource claims": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "c1", ResourceClaimName: new("rc1")},
 						{Name: "c2", ResourceClaimName: new("rc2")},
 						{Name: "c3", ResourceClaimName: new("rc3")},
@@ -201,7 +201,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with duplicate entries": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimName: new("rc-1")},
 						{Name: "claim", ResourceClaimName: new("rc-2")},
 					},
@@ -213,7 +213,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with neither name nor template": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "claim"}},
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{{Name: "claim"}},
 				}),
 				enableWorkloadWithDeployment: true,
 				expectedErrs: field.ErrorList{
@@ -222,7 +222,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with invalid short name": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "invalid name", ResourceClaimName: new("rc")},
 					},
 				}),
@@ -233,7 +233,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with empty name": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{ResourceClaimName: new("rc")},
 					},
 				}),
@@ -244,7 +244,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with invalid resourceClaimName": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimName: new("invalid name")},
 					},
 				}),
@@ -255,7 +255,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			},
 			"resource claim with invalid resourceClaimTemplateName": {
 				input: mkSchedulingDeployment(&apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimTemplateName: new("invalid name")},
 					},
 				}),
@@ -350,36 +350,60 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			continue
 		}
 		testCases := map[string]struct {
-			oldScheduling *apps.DeploymentSchedulingConfiguration
-			scheduling    *apps.DeploymentSchedulingConfiguration
-			expectedErrs  field.ErrorList
+			oldScheduling                *apps.DeploymentSchedulingConfiguration
+			scheduling                   *apps.DeploymentSchedulingConfiguration
+			enableWorkloadWithDeployment bool
+			expectedErrs                 field.ErrorList
 		}{
 			"adding scheduling after creation is immutable": {
-				scheduling: &apps.DeploymentSchedulingConfiguration{},
+				enableWorkloadWithDeployment: true,
+				scheduling:                   &apps.DeploymentSchedulingConfiguration{},
 				expectedErrs: field.ErrorList{
 					field.Invalid(schedulingPath, nil, "").WithOrigin("update"),
 				},
 			},
 			"adding policy is immutable": {
-				oldScheduling: &apps.DeploymentSchedulingConfiguration{},
+				enableWorkloadWithDeployment: true,
+				oldScheduling:                &apps.DeploymentSchedulingConfiguration{},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 					},
 				},
 				expectedErrs: field.ErrorList{
 					field.Invalid(schedulingPath.Child("schedulingPolicy"), nil, "").WithOrigin("update"),
 				},
 			},
-			"changing constraints is immutable": {
+			"removing scheduling after creation is immutable": {
+				enableWorkloadWithDeployment: true,
+				oldScheduling:                &apps.DeploymentSchedulingConfiguration{},
+				scheduling:                   nil,
+				expectedErrs: field.ErrorList{
+					field.Invalid(schedulingPath, nil, "").WithOrigin("update"),
+				},
+			},
+			"removing policy is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
+					},
+				},
+				scheduling: &apps.DeploymentSchedulingConfiguration{},
+				expectedErrs: field.ErrorList{
+					field.Invalid(schedulingPath.Child("schedulingPolicy"), nil, "").WithOrigin("update"),
+				},
+			},
+			"changing constraints is immutable": {
+				enableWorkloadWithDeployment: true,
+				oldScheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
 					},
 				},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
 					},
 				},
 				expectedErrs: field.ErrorList{
@@ -387,20 +411,21 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"switching disruption mode is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{},
 					},
 				},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
 				},
 				expectedErrs: field.ErrorList{
@@ -408,13 +433,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"changing a resource claim name is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimName: new("rc-a")},
 					},
 				},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
-					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+					ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimName: new("rc-b")},
 					},
 				},
@@ -423,14 +449,28 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"gang minCount change is valid": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 					},
 				},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(2))},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(2))},
+					},
+				},
+			},
+			"gang minCount change is valid when gate off and old already scheduled": {
+				enableWorkloadWithDeployment: false,
+				oldScheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					},
+				},
+				scheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(2))},
 					},
 				},
 			},
@@ -438,8 +478,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		for name, tc := range testCases {
 			t.Run(name, func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:        true,
-					features.WorkloadWithDeployment: true,
+					features.GenericWorkload:        tc.enableWorkloadWithDeployment,
+					features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
 				})
 				old := mkSchedulingDeployment(tc.oldScheduling)
 				old.ResourceVersion = "1"

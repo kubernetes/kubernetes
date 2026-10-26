@@ -18,10 +18,11 @@ package deployment
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/utils/ptr"
 )
 
 func WorkloadInputForDeploymentInternal(s *apps.DeploymentSchedulingConfiguration) workloadbuilder.WorkloadInput {
@@ -40,10 +41,10 @@ func WorkloadInputForDeploymentV1(s *appsv1.DeploymentSchedulingConfiguration) w
 
 // WorkloadInput maps Deployment scheduling building blocks into workloadbuilder input.
 func WorkloadInput(
-	policy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy,
-	constraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints,
-	disruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode,
-	resourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim,
+	policy *schedulingv1.WorkloadPodGroupSchedulingPolicy,
+	constraints *schedulingv1.WorkloadPodGroupSchedulingConstraints,
+	disruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode,
+	resourceClaims []schedulingv1.WorkloadPodGroupResourceClaim,
 ) workloadbuilder.WorkloadInput {
 	return workloadbuilder.WorkloadInput{
 		Policy: workloadbuilder.PolicyInput{
@@ -66,7 +67,7 @@ func WorkloadInput(
 }
 
 // WorkloadItemForDeployment assembles a Deployment scheduling item.
-func WorkloadItemForDeployment(name, priorityClassName string, input workloadbuilder.WorkloadInput, path *field.Path) *workloadbuilder.WorkloadItem {
+func WorkloadItemForDeployment(name, priorityClassName string, replicas *int32, input workloadbuilder.WorkloadInput, path *field.Path) *workloadbuilder.WorkloadItem {
 	return &workloadbuilder.WorkloadItem{
 		Name: name,
 		Path: path,
@@ -76,6 +77,21 @@ func WorkloadItemForDeployment(name, priorityClassName string, input workloadbui
 			},
 			PriorityClassName: priorityClassName,
 		},
-		Input: input,
+		Input:     input,
+		Callbacks: []workloadbuilder.SchedulingConfigFunc{defaultMinCountForDeployment(replicas)},
+	}
+}
+
+// defaultMinCountForDeployment returns a callback that defaults an unset gang
+// MinCount to the Deployment's replicas, clamped to a minimum of 1. It mutates
+// only the resolved config, never writing the derived value back onto the spec.
+func defaultMinCountForDeployment(replicas *int32) workloadbuilder.SchedulingConfigFunc {
+	return func(cfg *workloadbuilder.SchedulingConfig) {
+		if cfg == nil || cfg.Policy == nil || cfg.Policy.Gang == nil {
+			return
+		}
+		if cfg.Policy.Gang.MinCount == nil {
+			cfg.Policy.Gang.MinCount = new(max(int32(1), ptr.Deref(replicas, 1)))
+		}
 	}
 }

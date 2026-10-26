@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,8 +210,8 @@ func newGangDeployment(name, ns string, replicas int32, minCount *int32) *apps.D
 	d := newDeployment(name, ns, replicas)
 	d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
 	d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
 		},
 	}
 	return d
@@ -260,13 +260,13 @@ func TestDeploymentGangScheduling(t *testing.T) {
 
 			d := newGangDeployment("gang", ns.Name, tc.replicas, tc.minCount)
 			if tc.disruptionAll {
-				d.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-					All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+				d.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+					All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 				}
 			}
 			if tc.topologyKey != "" {
-				d.Spec.Scheduling.SchedulingConstraints = &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-					Topology: []schedulingv1alpha3.TopologyConstraint{{Key: tc.topologyKey}},
+				d.Spec.Scheduling.SchedulingConstraints = &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+					Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: tc.topologyKey}},
 				}
 			}
 

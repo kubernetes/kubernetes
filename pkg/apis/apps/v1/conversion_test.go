@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -420,8 +420,8 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 					},
 				},
 				Scheduling: &apps.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{
 							MinCount: new(int32(2)),
 						},
 					},
@@ -435,8 +435,8 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 					},
 				},
 				Scheduling: &appsv1.DeploymentSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{
 							MinCount: new(int32(2)),
 						},
 					},

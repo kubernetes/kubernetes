@@ -139,7 +139,6 @@ type ReplicaSetController struct {
 	workloadListerSynced cache.InformerSynced
 	podGroupLister       schedulinglisters.PodGroupLister
 	podGroupListerSynced cache.InformerSynced
-	schedulingEnabled    bool
 
 	clock clock.PassiveClock
 
@@ -153,11 +152,13 @@ type ReplicaSetController struct {
 // These do not have to correspond to FeatureGates, or their stability, nor do they have to undergo graduation.
 type ReplicaSetControllerFeatures struct {
 	EnableStatusTerminatingReplicas bool
+	EnableWorkloadScheduling        bool
 }
 
 func DefaultReplicaSetControllerFeatures() ReplicaSetControllerFeatures {
 	return ReplicaSetControllerFeatures{
 		EnableStatusTerminatingReplicas: true,
+		EnableWorkloadScheduling:        true,
 	}
 }
 

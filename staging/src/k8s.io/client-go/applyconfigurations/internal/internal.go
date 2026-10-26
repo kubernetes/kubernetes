@@ -1824,21 +1824,21 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: disruptionMode
       type:
-        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode
+        namedType: io.k8s.api.scheduling.v1.WorkloadPodGroupDisruptionMode
     - name: resourceClaims
       type:
         list:
           elementType:
-            namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim
+            namedType: io.k8s.api.scheduling.v1.WorkloadPodGroupResourceClaim
           elementRelationship: associative
           keys:
           - name
     - name: schedulingConstraints
       type:
-        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints
+        namedType: io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingConstraints
     - name: schedulingPolicy
       type:
-        namedType: io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy
+        namedType: io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingPolicy
 - name: io.k8s.api.apps.v1.DeploymentSpec
   map:
     fields:
