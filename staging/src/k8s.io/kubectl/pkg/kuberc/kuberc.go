@@ -484,7 +484,7 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 		// Because we know that "-abcvalue" is not valid. So that we need to be sure that if we find
 		// "b" it correctly refers to the shorthand "b" not arbitrary value "-cargb".
 		arbitraryFound := false
-		for _, runeValue := range shorthand {
+		for _, runeValue := range arg {
 			if _, ok := allShorthands[string(runeValue)]; !ok {
 				arbitraryFound = true
 				break

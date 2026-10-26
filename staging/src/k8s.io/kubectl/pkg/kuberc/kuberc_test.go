@@ -3291,3 +3291,30 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
 	}
 }
+
+func TestSearchInArgsAttachedValueDoesNotMatchOtherShorthand(t *testing.T) {
+	shorthands := map[string]struct{}{
+		"n": {},
+		"i": {},
+		"o": {},
+		"f": {},
+		"d": {},
+		"v": {},
+	}
+	args := []string{"delete", "pod", "foo", "-nmonitoring"}
+	if searchInArgs("interactive", "i", shorthands, args) {
+		t.Fatal("attached -nmonitoring counted as -i because the value contains i")
+	}
+	if !searchInArgs("namespace", "n", shorthands, args) {
+		t.Fatal("attached -nmonitoring should count as -n")
+	}
+	if !searchInArgs("output", "o", shorthands, []string{"get", "-oyaml"}) {
+		t.Fatal("-oyaml should count as -o")
+	}
+	if !searchInArgs("firstflag", "f", shorthands, []string{"command1", "-dfv"}) {
+		t.Fatal("combined -dfv should count as -f")
+	}
+	if searchInArgs("interactive", "i", shorthands, []string{"delete", "-n", "monitoring"}) {
+		t.Fatal("spaced -n monitoring should not count as -i")
+	}
+}
