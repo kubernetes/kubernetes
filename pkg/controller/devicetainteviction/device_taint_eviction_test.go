@@ -1532,6 +1532,32 @@ func testController(tCtx ktesting.TContext) {
 			},
 			process: []step{{pods: l(podWithClaimName)}},
 		},
+		"no-evict-pod-toleration-forever-any-effect": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(func() *resourceapi.ResourceClaim {
+					claim := inUseClaim.DeepCopy()
+					// An empty effect matches all taint effects, same as for node taints.
+					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
+						Operator: resourceapi.DeviceTolerationOpExists,
+					}}
+					return claim
+				}()),
+				add(podWithClaimName),
+			},
+			finalState: state{
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
+					claim := inUseClaim.DeepCopy()
+					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
+						Operator: resourceapi.DeviceTolerationOpExists,
+					}}
+					return claim
+				}())),
+			},
+			process: []step{{pods: l(podWithClaimName)}},
+		},
 		"no-evict-pod-toleration-forever-many": {
 			events: []any{
 				add(sliceTainted),
