@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -79,6 +80,16 @@ type SecureServingOptions struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// HTTP2ReadIdleTimeout is the timeout after which a health check using a ping
+	// frame will be carried out if no frame is received on the connection.
+	// If zero, no health check is performed.
+	HTTP2ReadIdleTimeout time.Duration
+
+	// HTTP2PingTimeout is the timeout after which the connection will be closed
+	// if a response to a ping is not received.
+	// If zero, a default of 15 seconds is used.
+	HTTP2PingTimeout time.Duration
 
 	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
 	// more than one instance to bind on the same address and port.
@@ -150,6 +161,16 @@ func (s *SecureServingOptions) Validate() []error {
 
 	if (len(s.ServerCert.CertKey.CertFile) != 0 || len(s.ServerCert.CertKey.KeyFile) != 0) && s.ServerCert.GeneratedCert != nil {
 		errors = append(errors, fmt.Errorf("cert/key file and in-memory certificate cannot both be set"))
+	}
+
+	if s.HTTP2ReadIdleTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--http2-read-idle-timeout can not be negative value"))
+	}
+	if s.HTTP2PingTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--http2-ping-timeout can not be negative value"))
+	}
+	if s.HTTP2PingTimeout > 0 && s.HTTP2ReadIdleTimeout == 0 {
+		errors = append(errors, fmt.Errorf("--http2-ping-timeout requires --http2-read-idle-timeout to be set"))
 	}
 
 	return errors
@@ -227,6 +248,16 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
 
+	fs.DurationVar(&s.HTTP2ReadIdleTimeout, "http2-read-idle-timeout", s.HTTP2ReadIdleTimeout,
+		"The timeout after which the server sends an HTTP/2 PING frame on a connection "+
+			"that has not received any frame, to detect broken connections. "+
+			"Zero disables the health check.")
+
+	fs.DurationVar(&s.HTTP2PingTimeout, "http2-ping-timeout", s.HTTP2PingTimeout,
+		"The timeout after which an HTTP/2 connection is closed if the client does not "+
+			"respond to a PING frame. Zero uses the Go HTTP/2 library default of 15 seconds. "+
+			"Requires --http2-read-idle-timeout to be set.")
+
 	fs.BoolVar(&s.PermitPortSharing, "permit-port-sharing", s.PermitPortSharing,
 		"If true, SO_REUSEPORT will be used when binding the port, which allows "+
 			"more than one instance to bind on the same address and port. [default=false]")
@@ -279,6 +310,8 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		Listener:                     s.Listener,
 		HTTP2MaxStreamsPerConnection: s.HTTP2MaxStreamsPerConnection,
 		DisableHTTP2:                 s.DisableHTTP2Serving,
+		HTTP2ReadIdleTimeout:         s.HTTP2ReadIdleTimeout,
+		HTTP2PingTimeout:             s.HTTP2PingTimeout,
 	}
 	c := *config
 
