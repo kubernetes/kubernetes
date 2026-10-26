@@ -3632,3 +3632,87 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 		})
 	}
 }
+
+// This test contains artificial pod-level cases, as pod-level resources do not
+// scale exclusive CPUs.
+func TestStaticPolicyVerifyPendingResize(t *testing.T) {
+	cpus := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	// c1 grows to {1,2,4} and the pod-level assignment to {1,2,3,4}.
+	containerResize := state.PendingResize{PodUID: "pod", ContainerCPUSets: map[string]cpuset.CPUSet{"c1": cpuset.New(1, 2, 4)}}
+	podResize := state.PendingResize{PodUID: "pod", PodCPUSet: new(cpuset.New(1, 2, 3, 4))}
+
+	tests := []struct {
+		name       string
+		pending    state.PendingResize
+		containers map[string]v1.ResourceRequirements
+		pod        *v1.ResourceRequirements
+		expectErr  bool
+	}{
+		{
+			name:       "the allocation includes the container resize",
+			pending:    containerResize,
+			containers: map[string]v1.ResourceRequirements{"c1": cpus("3")},
+		},
+		{
+			name:       "the allocation does not include the container resize",
+			pending:    containerResize,
+			containers: map[string]v1.ResourceRequirements{"c1": cpus("2")},
+			expectErr:  true,
+		},
+		{
+			name:       "a non-integral container allocation does not include the resize",
+			pending:    containerResize,
+			containers: map[string]v1.ResourceRequirements{"c1": cpus("2500m")},
+			expectErr:  true,
+		},
+		{
+			name:       "the resized container has no allocation",
+			pending:    containerResize,
+			containers: map[string]v1.ResourceRequirements{"c2": cpus("3")},
+			expectErr:  true,
+		},
+		{
+			name:      "the pod has no allocation",
+			pending:   containerResize,
+			expectErr: true,
+		},
+		{
+			name:    "the allocation includes the pod-level resize",
+			pending: podResize,
+			pod:     new(cpus("4")),
+		},
+		{
+			name:      "the allocation does not include the pod-level resize",
+			pending:   podResize,
+			pod:       new(cpus("3")),
+			expectErr: true,
+		},
+		{
+			name:      "a non-integral pod-level allocation does not include the resize",
+			pending:   podResize,
+			pod:       new(cpus("3500m")),
+			expectErr: true,
+		},
+		{
+			name:      "the pod has no pod-level allocation",
+			pending:   podResize,
+			expectErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := mockAllocationReader{}
+			if tc.containers != nil {
+				reader.containers = map[types.UID]map[string]v1.ResourceRequirements{"pod": tc.containers}
+			}
+			if tc.pod != nil {
+				reader.pods = map[types.UID]*v1.ResourceRequirements{"pod": tc.pod}
+			}
+
+			err := (&staticPolicy{}).VerifyPendingResize(tc.pending, reader)
+			require.Equal(t, tc.expectErr, err != nil, "unexpected result: %v", err)
+		})
+	}
+}

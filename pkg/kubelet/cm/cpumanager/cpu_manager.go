@@ -177,7 +177,9 @@ type manager struct {
 
 	// pendingResize is the resize admission in progress, if any. One is enough:
 	// the allocation manager admits one pod at a time and completes each
-	// admission before it starts the next one.
+	// admission before it starts the next one. The pending resize in the state
+	// always belongs to it, except for one left by a kubelet restart, which
+	// Start resolves before any admission.
 	pendingResize *resizeTransaction
 
 	// allCPUs is the set of online CPUs as reported by the system
@@ -278,6 +280,10 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	}
 	m.state = stateImpl
 
+	// Resolve a resize interrupted by a kubelet restart before the policy
+	// validates the state, so that the validation covers its outcome.
+	m.resolvePendingResize(logger)
+
 	err = m.policy.Start(logger, m.state)
 	if err != nil {
 		logger.Error(err, "Policy start error")
@@ -312,6 +318,9 @@ func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container, oper
 		logger.Error(err, "policy error")
 		return err
 	}
+	if operation == lifecycle.ResizeOperation {
+		m.recordPendingResizeLocked(p)
+	}
 
 	return nil
 }
@@ -327,6 +336,9 @@ func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecyc
 	if err := m.policy.AllocatePod(logger, m.admissionStateLocked(logger, pod, operation), pod, operation); err != nil {
 		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
 		return err
+	}
+	if operation == lifecycle.ResizeOperation {
+		m.recordPendingResizeLocked(pod)
 	}
 	return nil
 }

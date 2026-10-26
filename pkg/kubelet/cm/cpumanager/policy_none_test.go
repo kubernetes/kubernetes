@@ -108,3 +108,11 @@ func TestNonePolicyOptions(t *testing.T) {
 		t.Errorf("NewNonePolicy with (any) options failure. expected error but got none")
 	}
 }
+
+func TestNonePolicyVerifyPendingResize(t *testing.T) {
+	policy := &nonePolicy{}
+	pending := state.PendingResize{PodUID: "pod", ContainerCPUSets: map[string]cpuset.CPUSet{"c": cpuset.New(1)}}
+	if err := policy.VerifyPendingResize(pending, mockAllocationReader{}); err == nil {
+		t.Errorf("the none policy must not complete a pending resize")
+	}
+}

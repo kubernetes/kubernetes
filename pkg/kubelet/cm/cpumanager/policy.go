@@ -48,4 +48,10 @@ type Policy interface {
 	// CanAllocateExclusively reports whether this policy supports exclusive CPU
 	// assignment for eligible workloads, regardless of available capacity.
 	CanAllocateExclusively() bool
+	// VerifyPendingResize returns nil if the pod allocation persisted by the
+	// kubelet includes the pending resize recorded before a kubelet restart, and
+	// the reason why it does not otherwise. Only the policy knows how the CPU sets
+	// it assigns relate to the allocated resources. It is called on Start of the
+	// CPU manager, before Start of the policy.
+	VerifyPendingResize(pending state.PendingResize, allocationReader AllocationReader) error
 }

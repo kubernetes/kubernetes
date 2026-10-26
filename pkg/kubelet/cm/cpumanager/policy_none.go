@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"errors"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -83,4 +84,10 @@ func (p *nonePolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 
 func (p *nonePolicy) CanAllocateExclusively() bool {
 	return false
+}
+
+// VerifyPendingResize rejects every pending resize, since the none policy never
+// records one.
+func (p *nonePolicy) VerifyPendingResize(_ state.PendingResize, _ AllocationReader) error {
+	return errors.New("the none policy does not resize exclusive CPUs")
 }

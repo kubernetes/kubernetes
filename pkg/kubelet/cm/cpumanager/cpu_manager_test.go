@@ -197,6 +197,8 @@ func (s *mockState) DeletePendingResize() {
 
 type mockPolicy struct {
 	err error
+	// verifyPendingResizeErr is returned by VerifyPendingResize.
+	verifyPendingResizeErr error
 }
 
 func (p *mockPolicy) Name() string {
@@ -229,6 +231,10 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 
 func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) VerifyPendingResize(_ state.PendingResize, _ AllocationReader) error {
+	return p.verifyPendingResizeErr
 }
 
 func (p *mockPolicy) CanAllocateExclusively() bool {
