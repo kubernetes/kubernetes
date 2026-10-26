@@ -3059,3 +3059,129 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 		})
 	}
 }
+func TestValidateServiceCIDRStatusUpdateConditions(t *testing.T) {
+	now := metav1.Now()
+
+	validCondition := metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: 1,
+		LastTransitionTime: now,
+		Reason:             "ServiceCIDRReady",
+		Message:            "ServiceCIDR is ready",
+	}
+
+	tests := []struct {
+		name          string
+		conditions    []metav1.Condition
+		expectedError string
+	}{
+		{
+			name:       "valid condition",
+			conditions: []metav1.Condition{validCondition},
+		},
+		{
+			name: "invalid condition status",
+			conditions: []metav1.Condition{
+				{
+					Type:               "Ready",
+					Status:             "Invalid",
+					LastTransitionTime: now,
+					Reason:             "ServiceCIDRReady",
+					Message:            "ServiceCIDR is ready",
+				},
+			},
+			expectedError: "status.conditions[0].status",
+		},
+		{
+			name: "invalid condition type",
+			conditions: []metav1.Condition{
+				{
+					Type:               ":invalid",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: now,
+					Reason:             "ServiceCIDRReady",
+					Message:            "ServiceCIDR is ready",
+				},
+			},
+			expectedError: "status.conditions[0].type",
+		},
+		{
+			name: "invalid condition reason",
+			conditions: []metav1.Condition{
+				{
+					Type:               "Ready",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: now,
+					Reason:             "invalid;reason",
+					Message:            "ServiceCIDR is ready",
+				},
+			},
+			expectedError: "status.conditions[0].reason",
+		},
+		{
+			name: "missing transition time",
+			conditions: []metav1.Condition{
+				{
+					Type:    "Ready",
+					Status:  metav1.ConditionTrue,
+					Reason:  "ServiceCIDRReady",
+					Message: "ServiceCIDR is ready",
+				},
+			},
+			expectedError: "status.conditions[0].lastTransitionTime",
+		},
+		{
+			name: "duplicate condition types",
+			conditions: []metav1.Condition{
+				validCondition,
+				{
+					Type:               "Ready",
+					Status:             metav1.ConditionFalse,
+					LastTransitionTime: now,
+					Reason:             "ServiceCIDRNotReady",
+					Message:            "ServiceCIDR is not ready",
+				},
+			},
+			expectedError: "status.conditions[1]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldCIDR := &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-service-cidr",
+				},
+			}
+
+			newCIDR := oldCIDR.DeepCopy()
+			newCIDR.Status.Conditions = tc.conditions
+
+			errs := ValidateServiceCIDRStatusUpdate(newCIDR, oldCIDR)
+
+			if tc.expectedError == "" {
+				if len(errs) != 0 {
+					t.Fatalf("expected no validation errors, got: %v", errs)
+				}
+				return
+			}
+
+			for _, err := range errs {
+				if err.Field == tc.expectedError ||
+					(len(tc.expectedError) > 0 &&
+						len(err.Field) > len(tc.expectedError) &&
+						err.Field[:len(tc.expectedError)] == tc.expectedError) {
+					return
+				}
+			}
+
+			t.Errorf(
+				"expected an error for field %q, got: %v",
+				tc.expectedError,
+				errs,
+			)
+		})
+	}
+}
+		

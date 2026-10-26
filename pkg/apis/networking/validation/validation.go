@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -898,5 +899,13 @@ func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorL
 // ValidateServiceCIDRStatusUpdate tests if if an update to a ServiceCIDR Status is valid.
 func ValidateServiceCIDRStatusUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	// Validate standard metav1.Condition fields.
+	allErrs = append(
+		allErrs,
+		metav1validation.ValidateConditions(
+			update.Status.Conditions,
+			field.NewPath("status", "conditions"),
+		)...,
+	)
 	return allErrs
 }
