@@ -403,7 +403,7 @@ func (c *watchCache) waitUntilFreshAndListNonRecursive(ctx context.Context, key 
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
 	span := tracing.SpanFromContext(ctx)
-	snap, _, _, err := w.waitAndGetLatestSnapshot(ctx, false, resourceVersion, nil)
+	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, resourceVersion, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -496,17 +496,17 @@ func (w *watchCache) waitAndListConsistent(ctx context.Context, recursive bool, 
 }
 
 func (w *watchCache) waitAndListLatestRV(ctx context.Context, recursive bool, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, recursive, minResourceVersion, matchValues)
+	snap, index, err := w.waitAndGetLatestSnapshot(ctx, recursive, minResourceVersion, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, index, nil
+	return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, index, nil
 }
 
-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive bool, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
+func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive bool, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, index string, err error) {
 	if minResourceVersion == 0 {
 		snap, index := w.getLatestSnapshot(ctx, recursive, matchValues)
-		return snap, snap.ResourceVersion(), index, nil
+		return snap, index, nil
 	}
 
 	span := tracing.SpanFromContext(ctx)
@@ -515,12 +515,12 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive boo
 	defer w.RUnlock()
 	err = w.waitUntilFreshLocked(ctx, minResourceVersion)
 	if err != nil {
-		return nil, 0, "", err
+		return nil, "", err
 	}
 	span.AddEvent("watchCache fresh enough")
 	snap, index = w.getLatestSnapshot(ctx, recursive, matchValues)
 	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
-	return snap, w.resourceVersion, index, nil
+	return snap, index, nil
 }
 
 func (w *watchCache) getLatestSnapshot(ctx context.Context, recursive bool, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
@@ -575,7 +575,7 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion s
 	if err != nil {
 		return nil, false, 0, err
 	}
-	snap, readResourceVersion, _, err := w.waitAndGetLatestSnapshot(ctx, false, minResourceVersion, nil)
+	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, minResourceVersion, nil)
 	if err != nil {
 		return nil, false, 0, err
 	}
@@ -585,7 +585,7 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion s
 		return nil, false, 0, err
 	}
 	span.AddEvent("GetByKey success")
-	return value, exists, readResourceVersion, err
+	return value, exists, snap.ResourceVersion(), err
 }
 
 // Replace takes slice of runtime.Object as a parameter.
