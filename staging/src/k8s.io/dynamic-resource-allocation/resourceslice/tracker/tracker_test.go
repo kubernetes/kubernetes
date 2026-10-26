@@ -546,6 +546,21 @@ func testListPatchedResourceSlices(tCtx ktesting.TContext) {
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
+		"patch-one-of-multiple-devices": {
+			events: []any{[]any{
+				add(sliceWithDevices(slice1, threeDevices)),
+				add(taintDevice1Rule),
+				remove(taintDevice1Rule),
+			}},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				sliceWithDevices(slice1, threeDevices),
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: sliceWithDevices(slice1, threeDevices)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice1, threeDevices), newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice1, threeDevicesOneTainted), newObj: sliceWithDevices(slice1, threeDevices)},
+			},
+		},
 		"update-patched-slice": {
 			events: []any{
 				add(taintDevice1Rule),
@@ -752,6 +767,57 @@ func testListPatchedResourceSlices(tCtx ktesting.TContext) {
 			permutate(0)
 		})
 	}
+}
+
+func TestPatchChangedDeviceList(t *testing.T) {
+	testPatchChangedDeviceList(ktesting.Init(t))
+}
+
+func testPatchChangedDeviceList(tCtx ktesting.TContext) {
+	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+	tracker, err := newTracker(tCtx, Options{
+		EnableDeviceTaintRules: true,
+		SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+		TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
+		KubeClient:             kubeClient,
+	})
+	tCtx.ExpectNoError(err)
+
+	var handlerEvents []handlerEvent
+	_, err = tracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+		},
+		DeleteFunc: func(obj interface{}) {
+			handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+		},
+	})
+	tCtx.ExpectNoError(err)
+
+	// The tracker starts with a slice that has one device.
+	store := tracker.resourceSlices.GetStore()
+	tCtx.ExpectNoError(store.Add(slice1))
+	tracker.resourceSliceAdd(tCtx)(slice1)
+
+	// The slice then grows to three devices. Only the informer store is
+	// updated here, which is the state that other event handlers can see
+	// before the ResourceSlice handler runs.
+	tCtx.ExpectNoError(store.Update(sliceWithDevices(slice1, threeDevices)))
+	tCtx.ExpectNoError(tracker.deviceTaints.GetStore().Add(taintDevice1Rule))
+	tracker.deviceTaintAdd(tCtx)(taintDevice1Rule)
+
+	patchedSlices, err := tracker.ListPatchedResourceSlices()
+	tCtx.ExpectNoError(err)
+	tCtx.Expect(patchedSlices).To(g.Equal([]*resourceapi.ResourceSlice{sliceWithDevices(slice1, threeDevicesOneTainted)}))
+	// A changed device list must be reported to listeners.
+	tCtx.Expect(handlerEvents).To(g.Equal([]handlerEvent{
+		{event: handlerEventAdd, newObj: slice1},
+		{event: handlerEventUpdate, oldObj: slice1, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
+	}))
 }
 
 func BenchmarkEventHandlers(b *testing.B) { benchmarkEventHandlers(ktesting.Init(b)) }
