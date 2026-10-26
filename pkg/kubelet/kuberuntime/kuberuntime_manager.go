@@ -856,23 +856,46 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	}
 }
 
-// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources,
-// because those are all SetPod initializes in the actuated state (mounted volumes are
-// recorded via SetPodVolume and preserved by SetPod).
+// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources (and
+// container volume mounts when DynamicNodeLocalEphemeralVolumes is enabled), because those are
+// all SetPod initializes in the actuated state (mounted volumes are recorded via SetPodVolume
+// and preserved by SetPod).
 func KeepOnlyResourceValues(pod *v1.Pod) {
 	var spec v1.PodSpec
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		spec.Resources = pod.Spec.Resources
 	}
+	keepVolumeMounts := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(container, containerType) {
+		resizable := allocation.IsResizableContainer(container, containerType)
+		hasVolumeMounts := keepVolumeMounts && len(container.VolumeMounts) > 0
+		if !resizable && !hasVolumeMounts {
 			continue
 		}
-		actuated := v1.Container{Name: container.Name, Resources: container.Resources}
+		actuated := v1.Container{Name: container.Name}
+		if resizable {
+			actuated.Resources = container.Resources
+		}
+		if hasVolumeMounts {
+			actuated.VolumeMounts = container.VolumeMounts
+		}
 		if containerType == podutil.InitContainers {
 			spec.InitContainers = append(spec.InitContainers, actuated)
 		} else {
 			spec.Containers = append(spec.Containers, actuated)
+		}
+	}
+	if keepVolumeMounts {
+		for _, ec := range pod.Spec.EphemeralContainers {
+			if len(ec.VolumeMounts) == 0 {
+				continue
+			}
+			spec.EphemeralContainers = append(spec.EphemeralContainers, v1.EphemeralContainer{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					Name:         ec.Name,
+					VolumeMounts: ec.VolumeMounts,
+				},
+			})
 		}
 	}
 	pod.Spec = spec

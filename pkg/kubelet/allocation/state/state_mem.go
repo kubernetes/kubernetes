@@ -79,6 +79,30 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 	return v1.ResourceRequirements{}, false
 }
 
+func (s *stateMemory) GetContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pod, ok := s.pods[podUID]
+	if !ok {
+		return nil, false
+	}
+
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+		if c.Name == containerName {
+			if len(c.VolumeMounts) == 0 {
+				return nil, true
+			}
+			mounts := make([]v1.VolumeMount, len(c.VolumeMounts))
+			for i := range c.VolumeMounts {
+				mounts[i] = *c.VolumeMounts[i].DeepCopy()
+			}
+			return mounts, true
+		}
+	}
+	return nil, false
+}
+
 // GetPodVolumes returns current volumes information for a pod
 func (s *stateMemory) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
 	s.RLock()
@@ -181,18 +205,20 @@ func (s *stateMemory) updatePod(podUID types.UID, mutate func(pod *v1.Pod) error
 	return nil
 }
 
-func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
-	err := s.updatePod(podUID, func(pod *v1.Pod) error {
+func (s *stateMemory) updateContainer(podUID types.UID, containerName string, containerType podutil.ContainerType, mutate func(*v1.Container)) error {
+	return s.updatePod(podUID, func(pod *v1.Pod) error {
 		pod.Spec.InitContainers = slices.Clone(pod.Spec.InitContainers)
 		pod.Spec.Containers = slices.Clone(pod.Spec.Containers)
 		pod.Spec.EphemeralContainers = slices.Clone(pod.Spec.EphemeralContainers)
 
+		container := v1.Container{Name: containerName}
 		for c, existingType := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
 			if c.Name == containerName {
 				if existingType == containerType {
-					c.Resources = *resources.DeepCopy()
+					mutate(c)
 					return nil
 				}
+				container = *c
 				break
 			}
 		}
@@ -205,7 +231,7 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 			pod.Spec.EphemeralContainers = slices.DeleteFunc(pod.Spec.EphemeralContainers, func(c v1.EphemeralContainer) bool { return c.Name == containerName })
 		}
 
-		container := v1.Container{Name: containerName, Resources: *resources.DeepCopy()}
+		mutate(&container)
 		switch containerType {
 		case podutil.InitContainers:
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
@@ -218,6 +244,33 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 			return fmt.Errorf("cannot add container %q: unsupported container type %d", containerName, containerType)
 		}
 		return nil
+	})
+}
+
+func (s *stateMemory) SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error {
+	err := s.updateContainer(podUID, container.Name, containerType, func(c *v1.Container) {
+		c.Resources = *container.Resources.DeepCopy()
+		if len(container.VolumeMounts) == 0 {
+			c.VolumeMounts = nil
+			return
+		}
+		mounts := make([]v1.VolumeMount, len(container.VolumeMounts))
+		for i := range container.VolumeMounts {
+			mounts[i] = *container.VolumeMounts[i].DeepCopy()
+		}
+		c.VolumeMounts = mounts
+	})
+	if err != nil {
+		return err
+	}
+
+	logger.V(3).Info("Updated container information", "podUID", podUID, "containerName", container.Name, "resources", container.Resources, "volumeMounts", container.VolumeMounts)
+	return nil
+}
+
+func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
+	err := s.updateContainer(podUID, containerName, containerType, func(c *v1.Container) {
+		c.Resources = *resources.DeepCopy()
 	})
 	if err != nil {
 		return err

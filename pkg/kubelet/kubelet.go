@@ -819,6 +819,7 @@ func NewMainKubelet(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
+	klet.actuatedState = actuatedState
 
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
@@ -1340,6 +1341,9 @@ type Kubelet struct {
 
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
+
+	// actuatedState tracks actuated resources, volumes, and volume mounts for pods.
+	actuatedState state.State
 
 	// podCertificateManager is fed updates as pods are added and removed from
 	// the node, and requests certificates for them based on their configured
