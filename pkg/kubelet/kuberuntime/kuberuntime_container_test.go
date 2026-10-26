@@ -303,6 +303,48 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"running container with volume mounts": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Annotations: map[string]string{
+					containerVolumeMountsLabel: `[{"name":"vol1","mountPath":"/mnt/vol1","readOnly":true}]`,
+				},
+				Mounts: []*runtimeapi.Mount{
+					{
+						ContainerPath: "/mnt/vol1",
+						HostPath:      "/var/lib/kubelet/pods/12345/volumes/vol1",
+						Readonly:      true,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+						ReadOnly:  true,
+					},
+				},
+				Mounts: []kubecontainer.Mount{
+					{
+						Name:          "vol1",
+						ContainerPath: "/mnt/vol1",
+						HostPath:      "/var/lib/kubelet/pods/12345/volumes/vol1",
+						ReadOnly:      true,
+					},
+				},
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			actual := m.toKubeContainerStatus(tCtx, podUID, test.input, cid.Type)

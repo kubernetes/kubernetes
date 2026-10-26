@@ -39,6 +39,7 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerVolumeMountsLabel             = "io.kubernetes.container.volumeMounts"
 )
 
 type labeledPodSandboxInfo struct {
@@ -70,6 +71,7 @@ type annotatedContainerInfo struct {
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
 	PreStopHandler            *v1.LifecycleHandler
 	ContainerPorts            []v1.ContainerPort
+	VolumeMounts              []v1.VolumeMount
 }
 
 // newPodLabels creates pod labels from v1.Pod.
@@ -142,6 +144,15 @@ func newContainerAnnotations(ctx context.Context, container *v1.Container, pod *
 			logger.Error(err, "Unable to marshal container ports for container", "containerName", container.Name, "pod", klog.KObj(pod))
 		} else {
 			annotations[containerPortsLabel] = string(rawContainerPorts)
+		}
+	}
+
+	if len(container.VolumeMounts) > 0 {
+		rawVolumeMounts, err := json.Marshal(container.VolumeMounts)
+		if err != nil {
+			logger.Error(err, "Unable to marshal volume mounts for container", "containerName", container.Name, "pod", klog.KObj(pod))
+		} else {
+			annotations[containerVolumeMountsLabel] = string(rawVolumeMounts)
 		}
 	}
 
@@ -220,6 +231,13 @@ func getContainerInfoFromAnnotations(ctx context.Context, annotations map[string
 		logger.Error(err, "Unable to get label value from annotations", "label", containerPortsLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
+	}
+
+	volumeMounts := []v1.VolumeMount{}
+	if found, err := getJSONObjectFromLabel(annotations, containerVolumeMountsLabel, &volumeMounts); err != nil {
+		logger.Error(err, "Unable to get label value from annotations", "label", containerVolumeMountsLabel, "annotations", annotations)
+	} else if found {
+		containerInfo.VolumeMounts = volumeMounts
 	}
 
 	return containerInfo

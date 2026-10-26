@@ -411,8 +411,14 @@ type Status struct {
 	Resources *ContainerResources
 	// User identity information of the first process of this container
 	User *ContainerUser
-	// Mounts are the volume mounts of the container
+	// Mounts are the low-level filesystem mounts reported by the CRI runtime (including internal
+	// mounts such as /etc/hosts, /dev/termination-log, and device plugin mounts). CRI mounts do not
+	// natively carry Kubernetes volume names.
 	Mounts []Mount
+	// VolumeMounts are the Kubernetes API volume mounts configured in the container spec when the
+	// container was created, recovered from the container's runtime annotations. Unlike Mounts, this
+	// preserves Kubernetes volume names and excludes internal runtime/kubelet mounts.
+	VolumeMounts []v1.VolumeMount
 	// StopSignal is used to show the container's effective stop signal in the Status
 	StopSignal *v1.Signal
 }

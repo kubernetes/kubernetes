@@ -135,9 +135,22 @@ func TestContainerAnnotations(t *testing.T) {
 			Protocol:      v1.ProtocolTCP,
 		},
 	}
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      "vol1",
+			MountPath: "/mnt/vol1",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "vol2",
+			MountPath: "/mnt/vol2",
+			SubPath:   "sub",
+		},
+	}
 	container := &v1.Container{
 		Name:                   "test_container",
 		Ports:                  containerPorts,
+		VolumeMounts:           volumeMounts,
 		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
@@ -155,6 +168,7 @@ func TestContainerAnnotations(t *testing.T) {
 	}
 	expected := &annotatedContainerInfo{
 		ContainerPorts:            containerPorts,
+		VolumeMounts:              volumeMounts,
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Hash:                      kubecontainer.HashContainer(container),

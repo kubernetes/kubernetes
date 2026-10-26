@@ -762,6 +762,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,
 		User:                cStatusUser,
+		VolumeMounts:        annotatedInfo.VolumeMounts,
 		StopSignal:          cStatusStopSignal,
 	}
 
@@ -778,7 +779,15 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	}
 
 	for _, mount := range status.Mounts {
+		var name string
+		for _, vm := range annotatedInfo.VolumeMounts {
+			if vm.MountPath == mount.ContainerPath || volumeutil.MakeAbsolutePath(goruntime.GOOS, vm.MountPath) == mount.ContainerPath {
+				name = vm.Name
+				break
+			}
+		}
 		cStatus.Mounts = append(cStatus.Mounts, kubecontainer.Mount{
+			Name:              name,
 			HostPath:          mount.HostPath,
 			ContainerPath:     mount.ContainerPath,
 			ReadOnly:          mount.Readonly,
