@@ -17,8 +17,11 @@ limitations under the License.
 package podgroup
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -26,6 +29,7 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -63,8 +67,23 @@ func TestPodGroupPriorityClassPreemptionPolicy(t *testing.T) {
 			Value:      1000,
 		},
 	} {
-		if _, err := client.SchedulingV1().PriorityClasses().Create(ctx, pc, metav1.CreateOptions{}); err != nil {
+		created, err := client.SchedulingV1().PriorityClasses().Create(ctx, pc, metav1.CreateOptions{})
+		if err != nil {
 			t.Fatal(err)
+		}
+		// Probe admission's cache, not API storage. An explicit policy keeps this
+		// readiness check independent of the omitted-policy regression below.
+		probe := st.MakePodGroup().Name("priority-cache-probe").BasicPolicy().
+			PreemptionPolicy(schedulingv1beta1.PreemptionPolicy(*created.PreemptionPolicy)).Obj()
+		probe.Spec.PriorityClassName = created.Name
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			_, err := client.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Create(ctx, probe, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if apierrors.IsForbidden(err) && strings.Contains(err.Error(), fmt.Sprintf("no PriorityClass with name %s was found", created.Name)) {
+				return false, nil
+			}
+			return err == nil, err
+		}); err != nil {
+			t.Fatalf("waiting for PriorityClass %q in priority admission cache: %v", created.Name, err)
 		}
 	}
 
