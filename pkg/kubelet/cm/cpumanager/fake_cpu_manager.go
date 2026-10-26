@@ -36,7 +36,7 @@ type fakeManager struct {
 	state  state.State
 }
 
-func (m *fakeManager) Start(ctx context.Context, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ runtimeService, _ containermap.ContainerMap) error {
+func (m *fakeManager) Start(ctx context.Context, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ AllocationReader, _ runtimeService, _ containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Start()")
 	return nil

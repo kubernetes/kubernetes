@@ -252,6 +252,23 @@ func (psp mockPodStatusProvider) GetPodStatus(_ types.UID) (v1.PodStatus, bool) 
 	return psp.podStatus, psp.found
 }
 
+// mockAllocationReader returns the allocated resources it holds, by pod UID
+// and container name.
+type mockAllocationReader struct {
+	containers map[types.UID]map[string]v1.ResourceRequirements
+	pods       map[types.UID]*v1.ResourceRequirements
+}
+
+func (r mockAllocationReader) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
+	resources, ok := r.containers[podUID][containerName]
+	return resources, ok
+}
+
+func (r mockAllocationReader) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	resources, ok := r.pods[podUID]
+	return resources, ok
+}
+
 func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
@@ -2003,4 +2020,36 @@ func TestCPUManagerAddResize(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestStartRequiresAllocationReader(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
+	t.Run("without a reader", func(t *testing.T) {
+		sDir := t.TempDir()
+		logger, tCtx := ktesting.NewTestContext(t)
+		mgr, err := newRestoreTestManager(logger, 4, sDir)
+		require.NoError(t, err)
+
+		err = mgr.Start(tCtx, func() []*v1.Pod { return nil }, &sourcesReadyStub{}, mockPodStatusProvider{}, nil, mockRuntimeService{}, containermap.NewContainerMap())
+		require.Error(t, err)
+		require.Nil(t, mgr.(*manager).state, "the state must not be loaded")
+		entries, err := os.ReadDir(sDir)
+		require.NoError(t, err)
+		require.Empty(t, entries, "no checkpoint must be written")
+	})
+
+	t.Run("with a reader", func(t *testing.T) {
+		sDir := t.TempDir()
+		logger, tCtx := ktesting.NewTestContext(t)
+		mgr, err := newRestoreTestManager(logger, 4, sDir)
+		require.NoError(t, err)
+
+		reader := &mockAllocationReader{}
+		err = mgr.Start(tCtx, func() []*v1.Pod { return nil }, &sourcesReadyStub{}, mockPodStatusProvider{}, reader, mockRuntimeService{}, containermap.NewContainerMap())
+		require.NoError(t, err)
+		require.Same(t, reader, mgr.(*manager).allocationReader)
+	})
 }

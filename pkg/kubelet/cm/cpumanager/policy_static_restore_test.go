@@ -123,7 +123,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			pod.UID = types.UID("pod1")
 
 			// Start manager to initialize state and activePods
-			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
@@ -165,7 +165,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}
@@ -277,7 +277,7 @@ func TestPodLevelResourcesReallocationAfterRestart(t *testing.T) {
 			pod.UID = types.UID("test-pod")
 
 			// Start manager
-			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
@@ -319,7 +319,7 @@ func TestPodLevelResourcesReallocationAfterRestart(t *testing.T) {
 			}
 
 			// Start the new manager (should restore state from checkpoint)
-			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}
@@ -1139,7 +1139,7 @@ func TestPodLevelResourcesRestoreCPUIntegrity(t *testing.T) {
 		t.Fatalf("could not create manager: %v", err)
 	}
 
-	err = mgr.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+	err = mgr.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 	if err != nil {
 		t.Fatalf("could not start manager: %v", err)
 	}
@@ -1175,7 +1175,7 @@ func TestPodLevelResourcesRestoreCPUIntegrity(t *testing.T) {
 		t.Fatalf("could not create manager 2: %v", err)
 	}
 
-	err = mgr2.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+	err = mgr2.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 	if err != nil {
 		t.Fatalf("could not start manager 2: %v", err)
 	}
@@ -1254,7 +1254,7 @@ func TestMixedScopeRestoreCPUIntegrity(t *testing.T) {
 		t.Fatalf("could not create manager: %v", err)
 	}
 
-	err = mgr.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+	err = mgr.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 	if err != nil {
 		t.Fatalf("could not start manager: %v", err)
 	}
@@ -1291,7 +1291,7 @@ func TestMixedScopeRestoreCPUIntegrity(t *testing.T) {
 		t.Fatalf("could not create manager 2: %v", err)
 	}
 
-	err = mgr2.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+	err = mgr2.Start(tCtx, func() []*v1.Pod { return pods }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockAllocationReader{}, mockRuntimeService{}, containermap.NewContainerMap())
 	if err != nil {
 		t.Fatalf("could not start manager 2: %v", err)
 	}

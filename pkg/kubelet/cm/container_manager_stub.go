@@ -50,7 +50,7 @@ type containerManagerStub struct {
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ AllocationReader, _ internalapi.RuntimeService, _ bool) error {
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Starting stub container manager")
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
