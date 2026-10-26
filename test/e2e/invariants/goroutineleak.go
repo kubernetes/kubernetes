@@ -21,12 +21,15 @@ package invariants
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"regexp"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/invariants/goroutineleak"
 
@@ -155,6 +158,18 @@ func checkInvariantGoroutineLeaks(ctx context.Context) {
 }
 
 func checkControlPlanePods(ctx context.Context, c clientset.Interface, config *restclient.Config) []goroutineleak.Result {
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return []goroutineleak.Result{{Component: "control plane pods", Err: fmt.Errorf("listing pods in %s: %w", metav1.NamespaceSystem, err)}}
+	}
+
+	var targets []goroutineleak.ControlPlanePod
+	for _, pod := range pods.Items {
+		if _, port, ok := e2emetrics.MatchControlPlaneComponent(pod.Name); ok {
+			targets = append(targets, goroutineleak.ControlPlanePod{Namespace: pod.Namespace, Name: pod.Name, Port: port})
+		}
+	}
+
 	dialer := podDialer{dialer: e2epod.NewDialer(c, config)}
-	return goroutineleak.CheckControlPlanePods(ctx, c, config, dialer)
+	return goroutineleak.CheckControlPlanePods(ctx, config, dialer, targets)
 }

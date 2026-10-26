@@ -56,21 +56,15 @@ const (
 	// scrapeTimeout bounds a single component scrape so that one unresponsive
 	// component cannot stall the suite.
 	scrapeTimeout = 30 * time.Second
-
-	// kubeSchedulerPort and kubeControllerManagerPort are the default status
-	// server ports, the same values used by test/e2e/framework/metrics/metrics_grabber.go.
-	kubeSchedulerPort         = 10259
-	kubeControllerManagerPort = 10257
 )
 
-var (
-	// Control plane pods are matched by name, the same way the e2e metrics
-	// grabber discovers them, because kubeadm appends the node name to static
-	// pod names. There is no API for identifying control plane components,
-	// see https://github.com/kubernetes/enhancements/issues/5708.
-	regKubeScheduler         = regexp.MustCompile("kube-scheduler-.*")
-	regKubeControllerManager = regexp.MustCompile("kube-controller-manager-.*")
-)
+// ControlPlanePod identifies a control plane component pod and the port of its
+// secure status server.
+type ControlPlanePod struct {
+	Namespace string
+	Name      string
+	Port      int
+}
 
 // PodDialer establishes a connection to a port inside a pod. The e2e suite
 // provides an implementation backed by the pod portforward subresource, which
@@ -244,38 +238,24 @@ func checkKubelet(ctx context.Context, client clientset.Interface, nodeName stri
 	return result("kubelet/"+nodeName, body, err)
 }
 
-// CheckControlPlanePods collects the leak profile from kube-controller-manager
-// and kube-scheduler.
+// CheckControlPlanePods collects the leak profile from control plane component
+// pods such as kube-controller-manager and kube-scheduler.
 //
 // Those components bind to localhost and authorize with a delegating
 // authorizer, so the API server's pod proxy can neither reach them nor present
 // an accepted identity. Connecting through the pod portforward subresource
 // while keeping the suite's own credentials solves both, which is how the
 // metrics grabber reaches their metrics endpoints.
-func CheckControlPlanePods(ctx context.Context, client clientset.Interface, config *restclient.Config, dialer PodDialer) []Result {
-	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return []Result{{Component: "control plane pods", Err: fmt.Errorf("listing pods in %s: %w", metav1.NamespaceSystem, err)}}
-	}
-
+func CheckControlPlanePods(ctx context.Context, config *restclient.Config, dialer PodDialer, pods []ControlPlanePod) []Result {
 	var results []Result
-	for _, pod := range pods.Items {
-		var port int
-		switch {
-		case regKubeControllerManager.MatchString(pod.Name):
-			port = kubeControllerManagerPort
-		case regKubeScheduler.MatchString(pod.Name):
-			port = kubeSchedulerPort
-		default:
-			continue
-		}
-		results = append(results, checkControlPlanePod(ctx, config, dialer, pod.Namespace, pod.Name, port))
+	for _, pod := range pods {
+		results = append(results, checkControlPlanePod(ctx, config, dialer, pod))
 	}
 	return results
 }
 
-func checkControlPlanePod(ctx context.Context, config *restclient.Config, dialer PodDialer, namespace, name string, port int) Result {
-	component := namespace + "/" + name
+func checkControlPlanePod(ctx context.Context, config *restclient.Config, dialer PodDialer, pod ControlPlanePod) Result {
+	component := pod.Namespace + "/" + pod.Name
 
 	ctx, cancel := context.WithTimeout(ctx, scrapeTimeout)
 	defer cancel()
@@ -286,9 +266,9 @@ func checkControlPlanePod(ctx context.Context, config *restclient.Config, dialer
 	// verification is disabled, as the metrics grabber does.
 	profileConfig := restclient.CopyConfig(config)
 	profileConfig.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-		return dialer.DialPod(ctx, namespace, name, port)
+		return dialer.DialPod(ctx, pod.Namespace, pod.Name, pod.Port)
 	}
-	profileConfig.Host = fmt.Sprintf("%s.%s:%d", namespace, name, port)
+	profileConfig.Host = fmt.Sprintf("%s.%s:%d", pod.Namespace, pod.Name, pod.Port)
 	profileConfig.ServerName = "localhost"
 	profileConfig.Insecure = true
 	profileConfig.CAFile = ""

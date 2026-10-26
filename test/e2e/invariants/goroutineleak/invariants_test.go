@@ -18,13 +18,21 @@ package goroutineleak
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"runtime/pprof"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/pprof/profile"
+
+	restclient "k8s.io/client-go/rest"
 )
 
 // leakProfile encodes samples the way runtime/pprof writes the goroutineleak
@@ -196,23 +204,60 @@ func TestReportListsCheckedComponents(t *testing.T) {
 	}
 }
 
-// TestControlPlanePodMatching pins the pod name patterns used to find
-// kube-controller-manager and kube-scheduler static pods.
-func TestControlPlanePodMatching(t *testing.T) {
-	for name, want := range map[string]*struct{ kcm, sched bool }{
-		"kube-controller-manager-node-1": {kcm: true},
-		"kube-scheduler-node-1":          {sched: true},
-		"kube-apiserver-node-1":          {},
-		"etcd-node-1":                    {},
-		"coredns-abc-def":                {},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if got := regKubeControllerManager.MatchString(name); got != want.kcm {
-				t.Errorf("regKubeControllerManager.MatchString(%q) = %v, want %v", name, got, want.kcm)
-			}
-			if got := regKubeScheduler.MatchString(name); got != want.sched {
-				t.Errorf("regKubeScheduler.MatchString(%q) = %v, want %v", name, got, want.sched)
-			}
-		})
+// fakeDialer connects every pod to addr, except for unreachable ones.
+type fakeDialer struct {
+	addr string
+
+	mu    sync.Mutex
+	dials []ControlPlanePod
+}
+
+func (d *fakeDialer) DialPod(ctx context.Context, namespace, podName string, port int) (net.Conn, error) {
+	d.mu.Lock()
+	d.dials = append(d.dials, ControlPlanePod{Namespace: namespace, Name: podName, Port: port})
+	d.mu.Unlock()
+	if podName == "unreachable" {
+		return nil, errors.New("connection refused")
+	}
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, "tcp", d.addr)
+}
+
+func TestCheckControlPlanePods(t *testing.T) {
+	body := leakProfile(t, "goroutineleak",
+		sample{2, []string{"runtime.gopark", "main.leak", "runtime.goexit"}},
+	)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/"+profilePath {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	pods := []ControlPlanePod{
+		{Namespace: "kube-system", Name: "kube-scheduler-node-1", Port: 10259},
+		{Namespace: "kube-system", Name: "unreachable", Port: 10257},
+	}
+	dialer := &fakeDialer{addr: server.Listener.Addr().String()}
+	results := CheckControlPlanePods(context.Background(), &restclient.Config{}, dialer, pods)
+
+	if len(results) != len(pods) {
+		t.Fatalf("got %d results, want %d", len(results), len(pods))
+	}
+	if r := results[0]; r.Err != nil || r.Component != "kube-system/kube-scheduler-node-1" || r.Total != 2 {
+		t.Errorf("results[0] = %+v, want 2 leaked goroutines in kube-system/kube-scheduler-node-1", r)
+	}
+	if r := results[1]; r.Err == nil || r.Component != "kube-system/unreachable" {
+		t.Errorf("results[1] = %+v, want an error for kube-system/unreachable", r)
+	}
+
+	dialer.mu.Lock()
+	defer dialer.mu.Unlock()
+	for _, pod := range pods {
+		if !slices.Contains(dialer.dials, pod) {
+			t.Errorf("pod %+v was not dialed, dials: %+v", pod, dialer.dials)
+		}
 	}
 }
