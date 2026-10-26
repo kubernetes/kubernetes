@@ -547,13 +547,18 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	// event, we can avoid a costly DeepEqual-style comparison by checking
 	// the device taints. The informer store may already contain a newer
 	// device list when the DeviceTaintRule handler runs before the
-	// ResourceSlice handler.
+	// ResourceSlice handler, in which case we can't compare.
+	if oldPatchedSlice != nil && len(patchedSlice.Spec.Devices) != len(oldPatchedSlice.Spec.Devices) {
+		sendEvent = true
+	}
 	if !sendEvent && oldPatchedSlice != nil {
-		sendEvent = len(patchedSlice.Spec.Devices) != len(oldPatchedSlice.Spec.Devices)
-		for i := 0; !sendEvent && i < len(patchedSlice.Spec.Devices); i++ {
+		for i := range patchedSlice.Spec.Devices {
 			oldDevice := oldPatchedSlice.Spec.Devices[i]
 			newDevice := patchedSlice.Spec.Devices[i]
-			sendEvent = !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual)
+			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual) {
+				sendEvent = true
+				break
+			}
 		}
 	}
 

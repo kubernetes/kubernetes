@@ -546,6 +546,21 @@ func testListPatchedResourceSlices(tCtx ktesting.TContext) {
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
+		"patch-one-of-multiple-devices": {
+			events: []any{[]any{
+				add(sliceWithDevices(slice1, threeDevices)),
+				add(taintDevice1Rule),
+				remove(taintDevice1Rule),
+			}},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				sliceWithDevices(slice1, threeDevices),
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: sliceWithDevices(slice1, threeDevices)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice1, threeDevices), newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice1, threeDevicesOneTainted), newObj: sliceWithDevices(slice1, threeDevices)},
+			},
+		},
 		"update-patched-slice": {
 			events: []any{
 				add(taintDevice1Rule),
