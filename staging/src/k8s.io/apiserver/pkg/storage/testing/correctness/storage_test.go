@@ -106,3 +106,15 @@ func TestStorageCompactRevision(t *testing.T) {
 	}
 	storagetesting.RunTestCompactRevision(t.Context(), t, s, increaseRV, compact)
 }
+
+func TestStorageListContinuation(t *testing.T) {
+	storagetesting.RunTestListContinuation(t.Context(), t, newTestStorage(), nil)
+}
+
+func TestStorageListContinuationWithFilter(t *testing.T) {
+	storagetesting.RunTestListContinuationWithFilter(t.Context(), t, newTestStorage(), nil)
+}
+
+func TestStorageListPaginationRareObject(t *testing.T) {
+	storagetesting.RunTestListPaginationRareObject(t.Context(), t, newTestStorage(), nil)
+}

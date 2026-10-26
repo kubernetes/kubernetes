@@ -120,6 +120,12 @@ func (r Request) Describe(output Response) string {
 		if err != nil {
 			panic(err)
 		}
+		if r.List.Options.Predicate.Continue != "" {
+			if startKey, continueRV, err := storage.DecodeContinue(r.List.Options.Predicate.Continue, ""); err == nil {
+				return fmt.Sprintf("%s(%s, Continue=%q@%d, Limit=%d) -> RV: %s, Items: %d", r.Op, r.Key, startKey, continueRV, r.List.Options.Predicate.Limit, accessor.GetResourceVersion(), meta.LenList(output.Object))
+			}
+			return fmt.Sprintf("%s(%s, Continue=%q) -> RV: %s, Items: %d", r.Op, r.Key, r.List.Options.Predicate.Continue, accessor.GetResourceVersion(), meta.LenList(output.Object))
+		}
 		if r.List.Options.ResourceVersion != "" {
 			return fmt.Sprintf("%s(%s, RV=%s, Match=%s) -> RV: %s, Items: %d", r.Op, r.Key, r.List.Options.ResourceVersion, r.List.Options.ResourceVersionMatch, accessor.GetResourceVersion(), meta.LenList(output.Object))
 		}

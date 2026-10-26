@@ -261,7 +261,8 @@ func (s *Model) validCacherContinue(key string, opts storage.ListOptions, expCon
 		// full-range scans (etcd3, cacher without index) return a continue token if
 		// non-matching items follow the last match, whereas index-backed cacher scans
 		// only the matching index bucket and returns an empty continue token.
-		if opts.Predicate.Empty() {
+		// Cacher never uses an index when Continue is set.
+		if opts.Predicate.Empty() || opts.Predicate.Continue != "" {
 			return false
 		}
 		items, err := s.listItems(key, opts)
@@ -396,7 +397,7 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	if err != nil {
 		return Response{Err: err}
 	}
-	consistency, rv, _, err := ListReadConsistency("", s.Versioner, opts)
+	consistency, rv, continueKey, err := ListReadConsistency(preparedKey, s.Versioner, opts)
 	if err != nil {
 		return Response{Err: err}
 	}
@@ -404,8 +405,8 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 		// etcd3 and the cacher call methods on both selectors.
 		panic("nil label or field selector is not supported, use storage.Everything to match everything")
 	}
-	if opts.Predicate.Limit < 0 || opts.Predicate.Continue != "" {
-		panic("negative limit or continue is not supported")
+	if opts.Predicate.Limit < 0 {
+		panic("negative limit is not supported")
 	}
 	if opts.Predicate.Limit > 0 && opts.ResourceVersion == "0" {
 		panic("limit with resourceVersion 0 is not supported (#108003)")
@@ -420,6 +421,9 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 		return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
 	}
 	if consistency == ConsistencyExact && rv < s.CompactResourceVersion {
+		if continueKey != "" {
+			return Response{Err: compactedContinueError(continueKey, preparedKey)}
+		}
 		return Response{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")}
 	}
 	var items []runtime.Object
@@ -429,6 +433,9 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	limit := opts.Predicate.Limit
 	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
 		if !keyInScope(key, opts.Recursive, k) {
+			continue
+		}
+		if continueKey != "" && k < continueKey {
 			continue
 		}
 		totalCount++
@@ -458,6 +465,22 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 		return Response{Object: nil, Err: err}
 	}
 	return Response{Object: list, Err: nil}
+}
+
+func compactedContinueError(continueKey, keyPrefix string) error {
+	newToken, err := storage.EncodeContinue(continueKey, keyPrefix, -1)
+	if err != nil {
+		return apierrors.NewResourceExpired(
+			"The provided continue parameter is too old to display a consistent list result. " +
+				"You can start a new list without the continue parameter.")
+	}
+	statusError := apierrors.NewResourceExpired(
+		"The provided continue parameter is too old to display a consistent list result. " +
+			"You can start a new list without the continue parameter, or use the continue token in this response " +
+			"to retrieve the remainder of the results. Continuing with the provided token results in an inconsistent list - " +
+			"objects that were created, modified, or deleted between the time the first chunk was returned and now may show up in the list.")
+	statusError.ErrStatus.ListMeta.Continue = newToken
+	return statusError
 }
 
 func (s *Model) compact(rvStr string) Response {

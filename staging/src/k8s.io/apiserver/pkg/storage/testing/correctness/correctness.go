@@ -999,6 +999,9 @@ func readTestCases() []testStep {
 	pod4Key := mustGetKey(pod4)
 	pod5Key := mustGetKey(pod5)
 	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
+	_, _, malformedContinueErr := storage.DecodeContinue("not-base64!!!", "/pods/")
+	traversalContinue := mustEncodeContinue("/pods/ns1/../ns10/pod5", "/pods/ns1/", 18)
+	_, _, traversalContinueErr := storage.DecodeContinue(traversalContinue, "/pods/ns1/")
 	listRecursive := ListRequest{Options: storage.ListOptions{Recursive: true, Predicate: storage.Everything}}
 	listNonRecursive := ListRequest{Options: storage.ListOptions{Predicate: storage.Everything}}
 
@@ -2414,6 +2417,452 @@ func readTestCases() []testStep {
 				{Object: nil, Err: nil},
 			},
 		},
+		{
+			Name: "List pods with Continue from start at Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Limit:    1,
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(2)), withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", nil, withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod4 at Exact ResourceVersion=18 without Limit",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("22")},
+				{Object: newTestPodListWithContinue("18", new(int64(0)), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod4 at Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Limit:    1,
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("18", new(int64(0)), withRV(pod5, "18"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue inclusive at pod5 at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod5Key, "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod5 at Exact ResourceVersion=18 returns empty list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod5Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods without trailing slash with Continue after pod4 at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods in namespace ns1 with Continue from start at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/ns1/a", "/pods/ns1/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods in namespace ns1 with Continue after pod4 at Exact ResourceVersion=18 returns empty list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/ns1/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at Exact ResourceVersion=18 and ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue from start at Exact ResourceVersion=19, Limit=1, and field selector matching both pods",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermNotEqualSelector("metadata.namespace", "ns2"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 19),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", new(int64(1)), withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at compacted ResourceVersion=15 returns ResourceExpired with inconsistent continue token",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 15),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: compactedContinueError(pod4Key+"\x00", "/pods/"),
+			},
+			InvalidResponses: []Response{
+				{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Err: compactedContinueError(pod4Key, "/pods/")},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with inconsistent Continue (rv=-1) from start returns latest consistent list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/a", "/pods/", -1),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("20", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with inconsistent Continue (rv=-1) after pod4 returns empty consistent list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", -1),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 99),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: storage.NewTooLargeResourceVersionError(99, 22, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List single pod non-recursively ignores Continue token",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: "not-base64!!!",
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", malformedContinueErr))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with malformed Continue token returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: "not-base64!!!",
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", malformedContinueErr)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue token having rv=0 returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 0),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", storage.ErrInvalidStartRV)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue token escaping prefix returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: traversalContinue,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", traversalContinueErr)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue and non-zero ResourceVersion returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "18",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest("specifying resource version is not allowed when using continue"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
 	}
 }
 
@@ -2891,13 +3340,17 @@ func newTestPodListWithContinue(rv string, remaining *int64, pods ...*example.Po
 		panic(err)
 	}
 	lastPod := pods[len(pods)-1]
-	continueToken, err := storage.EncodeContinue(mustGetKey(lastPod)+"\x00", "/pods/", int64(parsedRV))
+	list.Continue = mustEncodeContinue(mustGetKey(lastPod)+"\x00", "/pods/", int64(parsedRV))
+	list.RemainingItemCount = remaining
+	return list
+}
+
+func mustEncodeContinue(key, keyPrefix string, rv int64) string {
+	token, err := storage.EncodeContinue(key, keyPrefix, rv)
 	if err != nil {
 		panic(err)
 	}
-	list.Continue = continueToken
-	list.RemainingItemCount = remaining
-	return list
+	return token
 }
 
 func mustGetKey(obj runtime.Object) string {
