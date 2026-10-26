@@ -121,7 +121,12 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func setup(t *testing.T) (context.Context, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	// Workload and PodGroup APIs require explicit runtime enablement.
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)
