@@ -32,7 +32,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -621,7 +625,382 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "locate deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
 		framework.Logf("Deployment %s has a patched status", dName)
 	})
+
+	f.It("should compile a Workload and a single PodGroup for a gang Deployment and wire its pods to the PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentWorkload(ctx, f)
+	})
+	f.It("should bind all gang Deployment replicas atomically or none when the gang cannot be satisfied", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentAtomicBind(ctx, f)
+	})
+	f.It("should reject invalid gang Deployment specs at admission", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentAdmission(ctx, f)
+	})
+	f.It("should propagate an elastic gang minCount change to the Workload and PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentElasticMinCount(ctx, f)
+	})
+	f.It("should delete the PodGroup on scale-to-zero and recreate it on scale-up while retaining the Workload", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentScaleToZero(ctx, f)
+	})
+	f.It("should not disturb running gang pods when scaling up", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentScaleUpNonDisruptive(ctx, f)
+	})
 })
+
+func newGangDeployment(name string, replicas int32, podLabels map[string]string, minCount *int32) *appsv1.Deployment {
+	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RecreateDeploymentStrategyType)
+	d.Spec.Scheduling = &appsv1.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		},
+	}
+	return d
+}
+
+func waitForDeploymentWorkload(ctx context.Context, c clientset.Interface, ns, deploymentName string) *schedulingv1beta1.Workload {
+	var workload *schedulingv1beta1.Workload
+	gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.Workload, error) {
+		list, err := c.SchedulingV1beta1().Workloads(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		for i := range list.Items {
+			if ref := list.Items[i].Spec.ControllerRef; ref != nil && ref.Kind == "Deployment" && ref.Name == deploymentName {
+				workload = &list.Items[i]
+				return workload, nil
+			}
+		}
+		return nil, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a Workload owned by Deployment %s", deploymentName)
+	return workload
+}
+
+func waitForDeploymentReplicaSetName(ctx context.Context, c clientset.Interface, ns string, podLabels map[string]string) string {
+	var rsName string
+	selector := labels.SelectorFromSet(podLabels).String()
+	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return "", err
+		}
+		for i := range rsList.Items {
+			if rsList.Items[i].DeletionTimestamp == nil {
+				rsName = rsList.Items[i].Name
+				return rsName, nil
+			}
+		}
+		return "", nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeEmpty(), "expected a ReplicaSet for pods %v", podLabels)
+	return rsName
+}
+
+func waitForReplicaSetPodGroup(ctx context.Context, c clientset.Interface, ns, rsName string) *schedulingv1beta1.PodGroup {
+	var podGroup *schedulingv1beta1.PodGroup
+	gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.PodGroup, error) {
+		got, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		podGroup = got
+		return podGroup, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a PodGroup named %s", rsName)
+	return podGroup
+}
+
+func expectGangMinCount(ctx context.Context, c clientset.Interface, ns, workloadName, podGroupName string, want int32) {
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		wl, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workloadName, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if len(wl.Spec.PodGroupTemplates) == 0 || wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(want), "workload %s gang minCount", workloadName)
+
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroupName, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if pg.Spec.SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return pg.Spec.SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(want), "podGroup %s gang minCount", podGroupName)
+}
+
+func scaleGangDeployment(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) {
+	scale := &autoscalingv1.Scale{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Spec:       autoscalingv1.ScaleSpec{Replicas: replicas},
+	}
+	_, err := c.AppsV1().Deployments(ns).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "scale Deployment %q to %d", name, replicas)
+}
+
+func testGangDeploymentWorkload(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-deployment"}
+	replicas := int32(3)
+
+	d := newGangDeployment("gang-deployment", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	ginkgo.By("waiting for the Workload compiled from the Deployment")
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	gomega.Expect(workload.Spec.PodGroupTemplates).To(gomega.HaveLen(1), "expected a single PodGroupTemplate")
+	gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "expected gang scheduling policy")
+	gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount).To(gomega.Equal(replicas), "workload gang minCount")
+
+	workloadOwner := metav1.GetControllerOf(workload)
+	gomega.Expect(workloadOwner).NotTo(gomega.BeNil(), "workload should have a controller owner")
+	gomega.Expect(workloadOwner.Kind).To(gomega.Equal("Deployment"), "workload controller owner kind")
+	gomega.Expect(workloadOwner.UID).To(gomega.Equal(deploy.UID), "workload should be owned by Deployment %s", deploy.Name)
+
+	ginkgo.By("waiting for the PodGroup created for the ReplicaSet")
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	gomega.Expect(podGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "podGroup workloadRef")
+	gomega.Expect(podGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "podGroup workloadRef name")
+	gomega.Expect(podGroup.Spec.SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "podGroup gang policy")
+	gomega.Expect(podGroup.Spec.SchedulingPolicy.Gang.MinCount).To(gomega.Equal(replicas), "podGroup gang minCount")
+
+	rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get ReplicaSet %q", rsName)
+	pgController := metav1.GetControllerOf(podGroup)
+	gomega.Expect(pgController).NotTo(gomega.BeNil(), "podGroup should have a controller owner")
+	gomega.Expect(pgController.Kind).To(gomega.Equal("ReplicaSet"), "podGroup controller owner kind")
+	gomega.Expect(pgController.UID).To(gomega.Equal(rs.UID), "podGroup should be controller-owned by ReplicaSet %s", rsName)
+	ownedByWorkload := false
+	for _, ref := range podGroup.OwnerReferences {
+		if ref.Kind == "Workload" && ref.UID == workload.UID {
+			ownedByWorkload = true
+		}
+	}
+	gomega.Expect(ownedByWorkload).To(gomega.BeTrueBecause("podGroup should also be owned by Workload %s", workload.Name))
+
+	ginkgo.By("waiting for the Deployment to complete")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "wait for gang Deployment %q to complete", deploy.Name)
+
+	ginkgo.By("verifying pods are wired to the PodGroup")
+	pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list pods for Deployment %q", deploy.Name)
+	gomega.Expect(pods.Items).To(gomega.HaveLen(int(replicas)))
+	for _, pod := range pods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(podGroup.Name)), "pod %s podGroupName", pod.Name)
+	}
+}
+
+func testGangDeploymentAtomicBind(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	replicas := int32(3)
+
+	ginkgo.By("a gang Deployment that fits binds all replicas")
+	fitLabels := map[string]string{"name": "gang-fit"}
+	fit := newGangDeployment("gang-fit", replicas, fitLabels, new(replicas))
+	fitDeploy, err := c.AppsV1().Deployments(ns).Create(ctx, fit, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", fit.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, fitDeploy), "all gang replicas should bind")
+
+	fitRS := waitForDeploymentReplicaSetName(ctx, c, ns, fitLabels)
+	fitPG := waitForReplicaSetPodGroup(ctx, c, ns, fitRS)
+	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+		pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, fitPG.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		for _, cond := range pg.Status.Conditions {
+			if cond.Type == schedulingv1beta1.PodGroupInitiallyScheduled {
+				return cond.Reason, nil
+			}
+		}
+		return "", nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(schedulingv1beta1.PodGroupReasonScheduled), "PodGroup should report Scheduled")
+
+	ginkgo.By("a gang Deployment that cannot fit binds none of its replicas")
+	nofitLabels := map[string]string{"name": "gang-nofit"}
+	// Each pod requests more CPU than any node has, so the gang can never be satisfied.
+	nofit := newGangDeployment("gang-nofit", replicas, nofitLabels, new(replicas))
+	nofit.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000")},
+	}
+	nofitDeploy, err := c.AppsV1().Deployments(ns).Create(ctx, nofit, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", nofit.Name)
+	nofitRS := waitForDeploymentReplicaSetName(ctx, c, ns, nofitLabels)
+	waitForReplicaSetPodGroup(ctx, c, ns, nofitRS)
+	gomega.Consistently(ctx, func(ctx context.Context) (int, error) {
+		pods, err := e2edeployment.GetPodsForDeployment(ctx, c, nofitDeploy)
+		if err != nil {
+			return 0, err
+		}
+		running := 0
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodRunning {
+				running++
+			}
+		}
+		return running, nil
+	}).WithTimeout(30*time.Second).WithPolling(3*time.Second).Should(gomega.Equal(0), "no gang pod should bind when the gang cannot be satisfied")
+}
+
+func testGangDeploymentAdmission(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-invalid"}
+
+	ginkgo.By("rejecting a gang Deployment with RollingUpdate strategy")
+	rolling := newGangDeployment("gang-rollingupdate", 3, podLabels, new(int32(3)))
+	rolling.Spec.Strategy = appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType}
+	_, err := c.AppsV1().Deployments(ns).Create(ctx, rolling, metav1.CreateOptions{})
+	gomega.Expect(err).To(gomega.HaveOccurred(), "RollingUpdate gang Deployment must be rejected")
+	gomega.Expect(err.Error()).To(gomega.ContainSubstring("gang-scheduled Deployment requires strategy type Recreate"))
+
+	ginkgo.By("rejecting a gang Deployment whose minCount exceeds replicas")
+	exceed := newGangDeployment("gang-mincount", 2, podLabels, new(int32(3)))
+	_, err = c.AppsV1().Deployments(ns).Create(ctx, exceed, metav1.CreateOptions{})
+	gomega.Expect(err).To(gomega.HaveOccurred(), "gang Deployment with minCount > replicas must be rejected")
+	gomega.Expect(err.Error()).To(gomega.ContainSubstring("minCount must not exceed replicas"))
+}
+
+func testGangDeploymentElasticMinCount(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-elastic"}
+	initial := int32(2)
+	updated := int32(3)
+
+	d := newGangDeployment("gang-elastic", 4, podLabels, new(initial))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	expectGangMinCount(ctx, c, ns, workload.Name, rsName, initial)
+
+	ginkgo.By("updating the gang minCount")
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cur, err := c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cur.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = new(updated)
+		_, err = c.AppsV1().Deployments(ns).Update(ctx, cur, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(err, "update gang minCount")
+
+	expectGangMinCount(ctx, c, ns, workload.Name, rsName, updated)
+}
+
+func testGangDeploymentScaleToZero(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-scale-zero"}
+	replicas := int32(2)
+
+	d := newGangDeployment("gang-scale-zero", replicas, podLabels, nil)
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	// minCount is derived from replicas when unset
+	expectGangMinCount(ctx, c, ns, workload.Name, rsName, replicas)
+
+	ginkgo.By("scaling the Deployment to zero deletes the PodGroup but retains the Workload")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, 0)
+	gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+		_, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, rsName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.BeTrueBecause("PodGroup should be deleted on scale-to-zero"))
+
+	// Workload is retained, but its minCount is reset to the default of 1
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		wl, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workload.Name, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if len(wl.Spec.PodGroupTemplates) == 0 || wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(int32(1)), "retained workload minCount should default to 1")
+
+	ginkgo.By("scaling the Deployment back up recreates the PodGroup")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, replicas)
+	newRSName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	waitForReplicaSetPodGroup(ctx, c, ns, newRSName)
+	expectGangMinCount(ctx, c, ns, workload.Name, newRSName, replicas)
+}
+
+func testGangDeploymentScaleUpNonDisruptive(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-scale-up"}
+	initial := int32(2)
+	scaled := int32(4)
+
+	d := newGangDeployment("gang-scale-up", initial, podLabels, new(initial))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "initial gang replicas should bind")
+
+	original, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list initial pods")
+	gomega.Expect(original.Items).NotTo(gomega.BeEmpty(), "expected initial gang pods")
+	originalUIDs := map[string]types.UID{}
+	for _, pod := range original.Items {
+		originalUIDs[pod.Name] = pod.UID
+	}
+	gomega.Expect(original.Items[0].Spec.SchedulingGroup).NotTo(gomega.BeNil(), "original pod missing schedulingGroup")
+	originalPodGroup := original.Items[0].Spec.SchedulingGroup.PodGroupName
+	gomega.Expect(originalPodGroup).NotTo(gomega.BeNil(), "original pod missing podGroupName")
+
+	ginkgo.By("scaling the Deployment up")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, scaled)
+	deploy, err = c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "scaled gang replicas should bind")
+
+	ginkgo.By("verifying all replicas share the original PodGroup")
+	scaledPods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list pods after scale-up")
+	gomega.Expect(scaledPods.Items).To(gomega.HaveLen(int(scaled)), "expected %d pods after scale-up", scaled)
+	for _, pod := range scaledPods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(*originalPodGroup)), "pod %s should share the original PodGroup", pod.Name)
+	}
+
+	ginkgo.By("verifying the original pods were not disturbed")
+	gomega.Consistently(ctx, func(ctx context.Context) error {
+		for name, uid := range originalUIDs {
+			pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if pod.UID != uid {
+				return fmt.Errorf("pod %s was recreated", name)
+			}
+			if pod.Status.Phase != v1.PodRunning {
+				return fmt.Errorf("pod %s no longer running: %s", name, pod.Status.Phase)
+			}
+		}
+		return nil
+	}).WithTimeout(30*time.Second).WithPolling(5*time.Second).Should(gomega.Succeed(), "original gang pods should keep running undisturbed")
+}
 
 func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	deployments, err := c.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
