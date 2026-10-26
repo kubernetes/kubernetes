@@ -1676,6 +1676,55 @@ func TestAddPodEnqueuesAllMatchingPDBs(t *testing.T) {
 	if diff := cmp.Diff(want, got, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
 		t.Fatalf("enqueued PDB keys mismatch (-want,+got):\n%s", diff)
 	}
+
+	// FakeRecorder is synchronous; the event is already on the channel after addPod.
+	wantEvent := fmt.Sprintf(
+		`%s %s Pod %q/%q matches multiple PodDisruptionBudgets %v. Overlapping PDBs are unsupported for eviction.`,
+		v1.EventTypeWarning, "MultiplePodDisruptionBudgets", pod.Namespace, pod.Name, []string{"pdb-a", "pdb-b"},
+	)
+	select {
+	case gotEvent := <-dc.recorder.(*record.FakeRecorder).Events:
+		if diff := cmp.Diff(wantEvent, gotEvent); diff != "" {
+			t.Fatalf("event mismatch (-want,+got):\n%s", diff)
+		}
+	default:
+		t.Fatal("expected MultiplePodDisruptionBudgets event, got none")
+	}
+}
+
+// Overlapping PDBs that only matched the pod's old labels must not emit
+// MultiplePodDisruptionBudgets (warn only for the current pod).
+func TestUpdatePodDoesNotWarnForOldPodMultiplePDBs(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	dc, _ := newFakeDisruptionController(ctx)
+
+	oldPDBa, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	oldPDBa.Name = "old-pdb-a"
+	oldPDBa.Spec.Selector = newSel(map[string]string{"app": "old"})
+
+	oldPDBb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	oldPDBb.Name = "old-pdb-b"
+	oldPDBb.Spec.Selector = newSel(map[string]string{"app": "old"})
+
+	newPDB, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	newPDB.Name = "new-pdb"
+	newPDB.Spec.Selector = newSel(map[string]string{"app": "new"})
+
+	add(t, dc.pdbStore, oldPDBa)
+	add(t, dc.pdbStore, oldPDBb)
+	add(t, dc.pdbStore, newPDB)
+
+	oldPod, _ := newPod(t, "pod")
+	oldPod.Labels = map[string]string{"app": "old"}
+	curPod := oldPod.DeepCopy()
+	curPod.Labels = map[string]string{"app": "new"}
+
+	dc.updatePod(logger, oldPod, curPod)
+
+	events := dc.recorder.(*record.FakeRecorder).Events
+	if len(events) != 0 {
+		t.Fatalf("unexpected event for old-pod overlap: %v", <-events)
+	}
 }
 
 // waitForCacheCount blocks until the given cache store has the desired number
