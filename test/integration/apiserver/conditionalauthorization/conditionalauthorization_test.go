@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/google/cel-go/cel"
+	"cel.dev/cel-go/cel"
 	"github.com/google/go-cmp/cmp"
 
 	admissionv1 "k8s.io/api/admission/v1"

@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	celtypes "github.com/google/cel-go/common/types"
+	celtypes "cel.dev/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
 	admissionv1 "k8s.io/api/admission/v1"

@@ -19,8 +19,8 @@ package common
 import (
 	"time"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types"
 
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/kube-openapi/pkg/validation/spec"

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	celtypes "github.com/google/cel-go/common/types"
+	celtypes "cel.dev/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"

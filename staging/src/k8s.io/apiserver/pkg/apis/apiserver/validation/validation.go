@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	celgo "github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/operators"
+	celgo "cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/operators"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	v1 "k8s.io/api/authorization/v1"

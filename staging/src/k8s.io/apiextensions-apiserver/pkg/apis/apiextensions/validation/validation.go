@@ -27,7 +27,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	celgo "github.com/google/cel-go/cel"
+	celgo "cel.dev/cel-go/cel"
 
 	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1beta1"
