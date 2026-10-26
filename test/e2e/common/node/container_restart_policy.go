@@ -146,6 +146,8 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 			})
 			framework.ExpectNoError(err, "wait for container restart and startup probe")
 			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "sleep 5; test -f /state/probe # sleep to allow probe to run"), "verify startup probe created /state/probe")
+
+			// to avoid test succeeding for the wrong reason
 			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "test -f /state/second-run"), "verify pod was restarted")
 		})
 
