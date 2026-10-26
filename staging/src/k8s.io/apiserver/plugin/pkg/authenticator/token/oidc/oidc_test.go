@@ -51,6 +51,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -5071,4 +5072,156 @@ func testContext(t *testing.T) context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	return ctx
+}
+
+func TestCacheTTL(t *testing.T) {
+	now := time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		header  http.Header
+		wantTTL time.Duration
+		wantOK  bool
+	}{
+		{name: "no headers"},
+		{
+			name:    "max-age",
+			header:  http.Header{"Cache-Control": {"public, max-age=3600"}},
+			wantTTL: time.Hour,
+			wantOK:  true,
+		},
+		{
+			name:    "max-age minus age",
+			header:  http.Header{"Cache-Control": {"max-age=3600"}, "Age": {"600"}},
+			wantTTL: 50 * time.Minute,
+			wantOK:  true,
+		},
+		{
+			name: "max-age wins over expires",
+			header: http.Header{
+				"Cache-Control": {"max-age=60"},
+				"Expires":       {now.Add(time.Hour).Format(http.TimeFormat)},
+			},
+			wantTTL: time.Minute,
+			wantOK:  true,
+		},
+		{
+			name:   "no-store",
+			header: http.Header{"Cache-Control": {"no-store"}},
+			wantOK: true,
+		},
+		{
+			name:   "no-cache with max-age",
+			header: http.Header{"Cache-Control": {"no-cache", "max-age=3600"}},
+			wantOK: true,
+		},
+		{
+			name:   "invalid max-age",
+			header: http.Header{"Cache-Control": {"max-age=soon"}},
+			wantOK: true,
+		},
+		{
+			name: "expires relative to date",
+			header: http.Header{
+				"Date":    {now.Add(-time.Minute).Format(http.TimeFormat)},
+				"Expires": {now.Add(time.Hour).Format(http.TimeFormat)},
+			},
+			wantTTL: time.Hour + time.Minute,
+			wantOK:  true,
+		},
+		{
+			name:    "expires without date",
+			header:  http.Header{"Expires": {now.Add(time.Hour).Format(http.TimeFormat)}},
+			wantTTL: time.Hour,
+			wantOK:  true,
+		},
+		{
+			name:   "invalid expires",
+			header: http.Header{"Expires": {"0"}},
+			wantOK: true,
+		},
+		{
+			name:    "cache-control without freshness",
+			header:  http.Header{"Cache-Control": {"public"}},
+			wantTTL: 0,
+			wantOK:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ttl, ok := cacheTTL(tt.header, now)
+			if ttl != tt.wantTTL || ok != tt.wantOK {
+				t.Errorf("cacheTTL() = %v, %v, want %v, %v", ttl, ok, tt.wantTTL, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestExpiringKeySet(t *testing.T) {
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: signingKey}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	jws, err := signer.Sign([]byte(`{"sub": "jane"}`))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	token, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+
+	var (
+		mu           sync.Mutex
+		keys         = toKeySet([]*jose.JSONWebKey{loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256)})
+		cacheControl = "max-age=600"
+		fetches      int
+	)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		fetches++
+		w.Header().Set("Cache-Control", cacheControl)
+		_ = json.NewEncoder(w).Encode(keys)
+	}))
+	defer ts.Close()
+
+	fakeClock := testingclock.NewFakePassiveClock(time.Now())
+	keySet := newExpiringKeySet(testContext(t), ts.Client(), ts.URL, fakeClock)
+
+	verify := func(wantFetches int, wantErr bool) {
+		t.Helper()
+		_, err := keySet.VerifySignature(testContext(t), token)
+		if (err != nil) != wantErr {
+			t.Fatalf("VerifySignature() error = %v, wantErr %v", err, wantErr)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if fetches != wantFetches {
+			t.Fatalf("got %d fetches, want %d", fetches, wantFetches)
+		}
+	}
+
+	verify(1, false)
+
+	// the key is rotated out, but the cached copy is still fresh
+	mu.Lock()
+	keys = toKeySet([]*jose.JSONWebKey{loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256)})
+	cacheControl = "max-age=1"
+	mu.Unlock()
+	fakeClock.SetTime(fakeClock.Now().Add(599 * time.Second))
+	verify(1, false)
+
+	// once stale the keys are fetched again and the old key is gone
+	fakeClock.SetTime(fakeClock.Now().Add(time.Second))
+	verify(2, true)
+
+	// max-age=1 is clamped to minJWKSCacheTTL
+	mu.Lock()
+	keys = toKeySet([]*jose.JSONWebKey{loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256)})
+	mu.Unlock()
+	fakeClock.SetTime(fakeClock.Now().Add(minJWKSCacheTTL))
+	verify(3, false)
+	fakeClock.SetTime(fakeClock.Now().Add(time.Second))
+	verify(3, false)
 }

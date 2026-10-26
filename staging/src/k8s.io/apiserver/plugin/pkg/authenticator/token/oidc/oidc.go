@@ -36,9 +36,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -68,6 +70,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // synchronizeTokenIDVerifierForTest should be set to true to force a
@@ -473,8 +476,8 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 						limiter: rate.NewLimiter(rate.Limit(0.1), 3), // 6 requests per minute with a burst of 3.
 					}
 
-					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, &clientWithJWKSRateLimiting), providerJSON.JWKSURL)
-					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, remoteKeySet, verifierConfig), audiences})
+					keySet := newExpiringKeySet(lifecycleCtx, &clientWithJWKSRateLimiting, providerJSON.JWKSURL, clock.RealClock{})
+					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, keySet, verifierConfig), audiences})
 					return true, nil
 				}
 
@@ -640,6 +643,109 @@ func (t *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 		tokenReservation.Cancel()
 	}
 	return resp, err
+}
+
+// minJWKSCacheTTL keeps short cache lifetimes from pushing JWKS fetches
+// into the rate limit above.
+const minJWKSCacheTTL = time.Minute
+
+// expiringKeySet drops cached keys once the cache headers of the last JWKS
+// response say they are stale. A RemoteKeySet on its own keeps keys forever
+// and only refetches when it sees an unknown key ID.
+type expiringKeySet struct {
+	ctx     context.Context
+	jwksURL string
+	clock   clock.PassiveClock
+
+	mu        sync.Mutex
+	keySet    *oidc.RemoteKeySet
+	expiresAt time.Time // zero when the response had no usable cache headers
+}
+
+func newExpiringKeySet(ctx context.Context, client *http.Client, jwksURL string, clock clock.PassiveClock) *expiringKeySet {
+	k := &expiringKeySet{jwksURL: jwksURL, clock: clock}
+	clientWithCacheHeaders := *client
+	clientWithCacheHeaders.Transport = &jwksCacheRoundTripper{base: client.Transport, keySet: k}
+	k.ctx = oidc.ClientContext(ctx, &clientWithCacheHeaders)
+	k.keySet = oidc.NewRemoteKeySet(k.ctx, jwksURL)
+	return k
+}
+
+func (k *expiringKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+	k.mu.Lock()
+	if !k.expiresAt.IsZero() && !k.clock.Now().Before(k.expiresAt) {
+		k.keySet = oidc.NewRemoteKeySet(k.ctx, k.jwksURL)
+		k.expiresAt = time.Time{}
+	}
+	keySet := k.keySet
+	k.mu.Unlock()
+	return keySet.VerifySignature(ctx, jwt)
+}
+
+func (k *expiringKeySet) setCacheHeaders(header http.Header) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	now := k.clock.Now()
+	ttl, ok := cacheTTL(header, now)
+	if !ok {
+		k.expiresAt = time.Time{}
+		return
+	}
+	k.expiresAt = now.Add(max(ttl, minJWKSCacheTTL))
+}
+
+// jwksCacheRoundTripper passes the cache headers of successful JWKS
+// responses to the key set.
+type jwksCacheRoundTripper struct {
+	base   http.RoundTripper
+	keySet *expiringKeySet
+}
+
+func (t *jwksCacheRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(req)
+	if err == nil && resp.StatusCode == http.StatusOK && req.Method == http.MethodGet && req.URL.String() == t.keySet.jwksURL {
+		t.keySet.setCacheHeaders(resp.Header)
+	}
+	return resp, err
+}
+
+// cacheTTL returns how long a response stays fresh based on its
+// Cache-Control, Expires, Date and Age headers (RFC 9111). It returns false
+// when the headers don't say.
+func cacheTTL(header http.Header, now time.Time) (time.Duration, bool) {
+	var age time.Duration
+	if seconds, err := strconv.ParseInt(header.Get("Age"), 10, 32); err == nil && seconds > 0 {
+		age = time.Duration(seconds) * time.Second
+	}
+
+	for _, directive := range strings.Split(strings.Join(header.Values("Cache-Control"), ","), ",") {
+		name, value, _ := strings.Cut(strings.TrimSpace(directive), "=")
+		switch strings.ToLower(name) {
+		case "no-store", "no-cache":
+			return 0, true
+		case "max-age":
+			seconds, err := strconv.ParseInt(strings.Trim(value, `"`), 10, 64)
+			if err != nil || seconds < 0 {
+				return 0, true
+			}
+			return time.Duration(min(seconds, math.MaxInt32))*time.Second - age, true
+		}
+	}
+
+	expiresHeader := header.Get("Expires")
+	if len(expiresHeader) == 0 {
+		return 0, false
+	}
+	expires, err := http.ParseTime(expiresHeader)
+	if err != nil {
+		// an invalid Expires value means the response is already stale
+		return 0, true
+	}
+	date, err := http.ParseTime(header.Get("Date"))
+	if err != nil {
+		date = now
+	}
+	return expires.Sub(date) - age, true
 }
 
 // untrustedIssuer extracts an untrusted "iss" claim from the given JWT token,
