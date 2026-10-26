@@ -34,7 +34,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFeatureGate(features.ContainerRestartRules), func() {
+var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -75,6 +75,74 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 			createAndValidateRestartableContainer(ctx, f, pod, podName, "main-container")
 		})
 
+		ginkgo.It("should continue probing on rule match", func(ctx context.Context) {
+			podName := "restart-rules-continue-probing-exit-code-" + string(uuid.NewUUID())
+			containerName := "container-restart-rules-continue-probing"
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  containerName,
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{
+											"/bin/sh", "-c", "touch /state/probe; test -f /state/second-run",
+										},
+									},
+								},
+								InitialDelaySeconds: 3,
+								PeriodSeconds:       2,
+								FailureThreshold:    10,
+							},
+							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 42; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
+							RestartPolicy: &containerRestartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{
+									Action: v1.ContainerRestartRuleActionRestart,
+									ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+										Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+										Values:   []int32{42},
+									},
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{Name: "state", MountPath: "/state"},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "state",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating the pod")
+			e2epod.NewPodClient(f).Create(ctx, pod)
+
+			ginkgo.By("Waiting for the container to restart")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "container restarted and startup probe succeeded", 10*time.Minute, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == containerName && status.RestartCount > 0 {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for container restart and startup probe")
+			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "sleep 5; test -f /state/probe # sleep to allow probe to run"), "verify startup probe created /state/probe")
+		})
+
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
 			podName := "restart-rules-no-restart-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
@@ -102,7 +170,6 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 					},
 				},
 			}
-
 			createAndValidateNonRestartableContainer(ctx, f, pod, podName, "main-container")
 		})
 
@@ -173,7 +240,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 	})
 })
 
-var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithSlow(), framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -253,8 +320,8 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-container", "regular"})
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "source-container", podName, f.Namespace.Name)
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "regular", podName, f.Namespace.Name)
 		})
 
 		ginkgo.It("should restart all containers on sidecar container exit", func(ctx context.Context) {
@@ -317,8 +384,8 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-sidecar", "regular"})
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-sidecar", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "regular", podName, f.Namespace.Name)
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-sidecar", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "source-sidecar", podName, f.Namespace.Name)
 		})
 
 		ginkgo.It("should restart init and sidecar containers on init container exit", func(ctx context.Context) {
@@ -381,7 +448,7 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-init"})
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "regular", podName, f.Namespace.Name)
 		})
 
 		ginkgo.It("should allow multiple RestartAllContainers actions and not introduce a loop", func(ctx context.Context) {
@@ -433,8 +500,8 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 			validateAllContainersRestarted(ctx, f, pod, []string{"source-container", "regular"})
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "source-container", podName, f.Namespace.Name)
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "regular", podName, f.Namespace.Name)
 		})
 
 		ginkgo.It("should restart all containers on a previously restarted regular container exit", func(ctx context.Context) {
@@ -483,8 +550,8 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 			validateAllContainersRestarted(ctx, f, pod, []string{"source-container", "regular"})
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "source-container", podName, f.Namespace.Name)
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "wait for container %q in Pod %q in namespace %q to run", "regular", podName, f.Namespace.Name)
 		})
 	})
 })
@@ -517,7 +584,7 @@ func validateAllContainersRestarted(ctx context.Context, f *framework.Framework,
 		framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
 		return restartedCount == len(containers), nil
 	})
-	framework.ExpectNoError(err, "failed to see all containers restart")
+	framework.ExpectNoError(err, "see all containers restart")
 }
 
 func createAndValidateRestartableContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, podName, containerName string) {
@@ -533,7 +600,7 @@ func createAndValidateRestartableContainer(ctx context.Context, f *framework.Fra
 		}
 		return false, nil
 	})
-	framework.ExpectNoError(err, "failed to see container restart")
+	framework.ExpectNoError(err, "see container restart")
 }
 
 func createAndValidateNonRestartableContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, podName, containerName string) {
@@ -542,11 +609,11 @@ func createAndValidateNonRestartableContainer(ctx context.Context, f *framework.
 
 	ginkgo.By("Waiting for the pod to terminate")
 	err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name, 10*time.Minute)
-	framework.ExpectNoError(err, "failed to wait for pod terminate")
+	framework.ExpectNoError(err, "wait for pod terminate")
 
 	ginkgo.By("Checking container restart count")
 	p, err := e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod")
+	framework.ExpectNoError(err, "get pod")
 	for _, status := range p.Status.ContainerStatuses {
 		if status.Name == containerName {
 			gomega.Expect(status.RestartCount).To(gomega.BeZero())
