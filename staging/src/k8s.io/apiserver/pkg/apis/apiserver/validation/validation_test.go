@@ -1116,7 +1116,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 			in: []api.ClaimValidationRule{
 				{Expression: "foo.bar"},
 			},
-			want: `issuer.claimValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.claimValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -1234,7 +1234,7 @@ func TestValidateClaimMappings(t *testing.T) {
 					Expression: "foo.bar",
 				},
 			},
-			want: `issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -1290,7 +1290,7 @@ func TestValidateClaimMappings(t *testing.T) {
 					Expression: "foo.bar",
 				},
 			},
-			want: `issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -1319,7 +1319,7 @@ func TestValidateClaimMappings(t *testing.T) {
 					Expression: "foo.bar",
 				},
 			},
-			want: `issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -1360,7 +1360,7 @@ func TestValidateClaimMappings(t *testing.T) {
 					{Key: "example.org/foo", ValueExpression: "foo.bar"},
 				},
 			},
-			want: `issuer.claimMappings.extra[0].valueExpression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.claimMappings.extra[0].valueExpression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -1642,7 +1642,7 @@ func TestValidateUserValidationRules(t *testing.T) {
 			in: []api.UserValidationRule{
 				{Expression: "foo.bar"},
 			},
-			want: `issuer.userValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `issuer.userValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo'
  | foo.bar
  | ^`,
 		},
@@ -2902,7 +2902,7 @@ func TestNewWebhookMatcher(t *testing.T) {
 					Expression: "test",
 				},
 			},
-			expectedErr: "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
+			expectedErr: "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test'\n | test\n | ^",
 		},
 		{
 			name: "match conditions with bad return type",

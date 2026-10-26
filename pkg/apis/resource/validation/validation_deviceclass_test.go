@@ -191,7 +191,7 @@ func TestValidateClass(t *testing.T) {
 		"selectors": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "selectors").Index(1).Child("cel"), ""),
-				field.Invalid(field.NewPath("spec", "selectors").Index(2).Child("cel", "expression"), "noSuchVar", "compilation failed: ERROR: <input>:1:1: undeclared reference to 'noSuchVar' (in container '')\n | noSuchVar\n | ^"),
+				field.Invalid(field.NewPath("spec", "selectors").Index(2).Child("cel", "expression"), "noSuchVar", "compilation failed: ERROR: <input>:1:1: undeclared reference to 'noSuchVar'\n | noSuchVar\n | ^"),
 			},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
