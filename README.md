@@ -89,7 +89,7 @@ The [User Case Studies](https://kubernetes.io/case-studies/) website has real-wo
 
 ## Governance 
 
-Kubernetes project is governed by a framework of principles, values, policies and processes to help our community and constituents towards our shared goals.
+The Kubernetes project is governed by a framework of principles, values, policies and processes to help our community and constituents towards our shared goals.
 
 The [Kubernetes Community](https://github.com/kubernetes/community/blob/master/governance.md) is the launching point for learning about how we organize ourselves.
 
