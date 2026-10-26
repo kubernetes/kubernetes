@@ -100,6 +100,11 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 								PeriodSeconds:       2,
 								FailureThreshold:    10,
 							},
+
+							// each time the startup probe runs it creates /state/probe marker.
+							// each time the container runs it removes said /state/probe marker.
+							// this to ensure that existence of "/state/probe" at the end of the test case
+							// neccesarily means the startup probe has run after the pod restarted
 							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 42; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
 							RestartPolicy: &containerRestartPolicyNever,
 							RestartPolicyRules: []v1.ContainerRestartRule{
@@ -141,6 +146,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 			})
 			framework.ExpectNoError(err, "wait for container restart and startup probe")
 			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "sleep 5; test -f /state/probe # sleep to allow probe to run"), "verify startup probe created /state/probe")
+			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "test -f /state/second-run"), "verify pod was restarted")
 		})
 
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
