@@ -93,37 +93,67 @@ func TestFindWorkloadForReplicaSetRequiresMatchingDeploymentOwner(t *testing.T) 
 		APIVersion: apps.SchemeGroupVersion.String(),
 		Kind:       "Deployment",
 		Name:       "inference",
-		UID:        "old-deployment-uid",
+		UID:        "new-deployment-uid",
 		Controller: new(true),
 	}
 	rs := newReplicaSet(1, map[string]string{"name": "foo"})
 	rs.OwnerReferences = []metav1.OwnerReference{deploymentOwner}
-	mismatchedOwner := deploymentOwner
-	mismatchedOwner.UID = "new-deployment-uid"
+	oldOwner := deploymentOwner
+	oldOwner.UID = "old-deployment-uid"
+	matching := newWorkload("inference-current", rs.Namespace, 1, deploymentOwner)
+	stale := newWorkload("inference-stale", rs.Namespace, 1, oldOwner)
+	duplicate := newWorkload("inference-duplicate", rs.Namespace, 1, deploymentOwner)
+	orphaned := newWorkload("inference-orphaned", rs.Namespace, 1, deploymentOwner)
+	orphaned.OwnerReferences = nil
 
 	for _, tc := range []struct {
-		name            string
-		ownerReferences []metav1.OwnerReference
+		name         string
+		workloads    []*schedulingv1beta1.Workload
+		wantWorkload *schedulingv1beta1.Workload
+		wantError    string
 	}{
 		{
-			name:            "mismatched Deployment UID",
-			ownerReferences: []metav1.OwnerReference{mismatchedOwner},
+			name: "no Workloads",
 		},
 		{
-			name: "orphaned Workload",
+			name:      "mismatched Deployment UID",
+			workloads: []*schedulingv1beta1.Workload{stale},
+			wantError: "no Workload controlled by Deployment",
+		},
+		{
+			name:      "orphaned Workload",
+			workloads: []*schedulingv1beta1.Workload{orphaned},
+			wantError: "no Workload controlled by Deployment",
+		},
+		{
+			name:         "same-name Deployment recreated",
+			workloads:    []*schedulingv1beta1.Workload{stale, matching},
+			wantWorkload: matching,
+		},
+		{
+			name:      "multiple Workloads for matching Deployment UID",
+			workloads: []*schedulingv1beta1.Workload{stale, matching, duplicate},
+			wantError: "multiple Workloads controlled by Deployment",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			workload := newWorkload("inference-workload", rs.Namespace, 1, deploymentOwner)
-			workload.OwnerReferences = tc.ownerReferences
 			rsc, sharedInformers := testNewReplicaSetControllerFromClient(t, fake.NewSimpleClientset(), nil, BurstReplicas)
-			if err := sharedInformers.Scheduling().V1beta1().Workloads().Informer().GetIndexer().Add(workload); err != nil {
-				t.Fatalf("adding Workload to informer: %v", err)
+			for _, workload := range tc.workloads {
+				if err := sharedInformers.Scheduling().V1beta1().Workloads().Informer().GetIndexer().Add(workload); err != nil {
+					t.Fatalf("adding Workload to informer: %v", err)
+				}
 			}
 
-			if _, err := rsc.findWorkloadForReplicaSet(rs); err == nil ||
-				!strings.Contains(err.Error(), "controller owner does not match Deployment") {
-				t.Fatalf("findWorkloadForReplicaSet() error = %v, want Deployment controller-owner mismatch", err)
+			workload, err := rsc.findWorkloadForReplicaSet(rs)
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("findWorkloadForReplicaSet() error = %v, want %q", err, tc.wantError)
+				}
+			} else if err != nil {
+				t.Fatalf("findWorkloadForReplicaSet() error = %v", err)
+			}
+			if !reflect.DeepEqual(workload, tc.wantWorkload) {
+				t.Errorf("findWorkloadForReplicaSet() = %#v, want %#v", workload, tc.wantWorkload)
 			}
 		})
 	}
@@ -506,6 +536,45 @@ func TestEnsurePodGroupForReplicaSetRecreatesOnScaleUp(t *testing.T) {
 	}
 	if !metav1.IsControlledBy(stored, rs) {
 		t.Fatalf("recreated PodGroup ownerReferences = %#v, want ReplicaSet %s/%s with UID %q", stored.OwnerReferences, rs.Namespace, rs.Name, rs.UID)
+	}
+}
+
+func TestSyncReplicaSetWaitsForMatchingWorkload(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:        true,
+		features.WorkloadWithDeployment: true,
+	})
+
+	deploymentOwner := metav1.OwnerReference{
+		APIVersion: apps.SchemeGroupVersion.String(),
+		Kind:       "Deployment",
+		Name:       "inference",
+		UID:        "new-deployment-uid",
+		Controller: new(true),
+	}
+	rs := newReplicaSet(1, map[string]string{"name": "foo"})
+	rs.OwnerReferences = []metav1.OwnerReference{deploymentOwner}
+	oldOwner := deploymentOwner
+	oldOwner.UID = "old-deployment-uid"
+	stale := newWorkload("inference-stale", rs.Namespace, 1, oldOwner)
+	matching := newWorkload("inference-current", rs.Namespace, 1, deploymentOwner)
+	client := fake.NewSimpleClientset(rs, stale, matching)
+	rsc, sharedInformers := testNewReplicaSetControllerFromClient(t, client, nil, BurstReplicas)
+	fakePodControl := &controller.FakePodControl{}
+	rsc.podControl = fakePodControl
+	if err := sharedInformers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs); err != nil {
+		t.Fatalf("adding ReplicaSet to informer: %v", err)
+	}
+	// Populate the informer cache with only the old Deployment's Workload
+	if err := sharedInformers.Scheduling().V1beta1().Workloads().Informer().GetIndexer().Add(stale); err != nil {
+		t.Fatalf("adding Workload to informer: %v", err)
+	}
+
+	if err := rsc.syncReplicaSet(context.Background(), rs.Namespace+"/"+rs.Name); err == nil {
+		t.Fatal("syncReplicaSet() succeeded without a matching Workload in the cache")
+	}
+	if len(fakePodControl.Templates) != 0 {
+		t.Fatalf("created Pod templates = %d, want 0 while the matching Workload is missing from the cache", len(fakePodControl.Templates))
 	}
 }
 

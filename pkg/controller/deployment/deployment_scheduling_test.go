@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -71,30 +72,6 @@ func newWorkload(name, namespace string, minCount int32, owners ...metav1.OwnerR
 		}
 	}
 	return workload
-}
-
-func TestWorkloadNameForDeployment(t *testing.T) {
-	d := &apps.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "inference-server",
-			Namespace: "default",
-			UID:       "uid-1",
-		},
-	}
-	got := workloadNameForDeployment(d)
-	if !strings.HasPrefix(got, "inference-server-") {
-		t.Errorf("workloadNameForDeployment() = %v, want prefix inference-server-", got)
-	}
-	// Stable: same UID produces the same name.
-	if got2 := workloadNameForDeployment(d); got2 != got {
-		t.Errorf("workloadNameForDeployment() not stable: %v != %v", got, got2)
-	}
-	// Different UID produces a different name.
-	d2 := d.DeepCopy()
-	d2.UID = "uid-2"
-	if got3 := workloadNameForDeployment(d2); got3 == got {
-		t.Errorf("different UID produced same workload name: %v", got)
-	}
 }
 
 func TestResolveMinCount(t *testing.T) {
@@ -149,7 +126,7 @@ func TestBuildWorkloadForDeployment(t *testing.T) {
 		t.Fatalf("buildWorkloadForDeployment() error = %v", err)
 	}
 
-	expectedName := workloadNameForDeployment(d)
+	expectedName := workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
 	if workload.Name != expectedName {
 		t.Errorf("Workload.Name = %v, want %v", workload.Name, expectedName)
 	}
@@ -168,6 +145,9 @@ func TestBuildWorkloadForDeployment(t *testing.T) {
 		t.Fatalf("Workload PodGroupTemplate count = %d, want 1", len(workload.Spec.PodGroupTemplates))
 	}
 	template := workload.Spec.PodGroupTemplates[0]
+	if want := podGroupTemplateName(d); template.Name != want {
+		t.Errorf("Workload template name = %q, want %q", template.Name, want)
+	}
 	if gang := template.SchedulingPolicy.Gang; gang == nil || gang.MinCount != 3 {
 		t.Errorf("Workload template gang = %#v, want minCount 3", gang)
 	}
@@ -189,6 +169,50 @@ func TestBuildWorkloadForDeployment(t *testing.T) {
 	}
 	if name := ptr.Deref(claim.ResourceClaimName, ""); name != "shared-gpu" {
 		t.Errorf("Workload template resourceClaimName = %q, want shared-gpu", name)
+	}
+}
+
+func TestPodGroupTemplateName(t *testing.T) {
+	tests := map[string]struct {
+		deploymentName string
+		want           string
+	}{
+		"short name is unchanged": {
+			deploymentName: "test-deployment",
+			want:           "test-deployment-pgt-0",
+		},
+		"name and suffix exactly fit the limit": {
+			deploymentName: strings.Repeat("a", 57),
+			want:           strings.Repeat("a", 57) + "-pgt-0",
+		},
+		"name and suffix exceed the limit by one": {
+			deploymentName: strings.Repeat("a", 58),
+			want:           strings.Repeat("a", 57) + "-pgt-0",
+		},
+		"maximum length name": {
+			deploymentName: strings.Repeat("a", 63),
+			want:           strings.Repeat("a", 57) + "-pgt-0",
+		},
+		"truncation preserves the name prefix": {
+			deploymentName: strings.Repeat("a", 56) + "bcdefgh",
+			want:           strings.Repeat("a", 56) + "b-pgt-0",
+		},
+		"trailing dash is trimmed after truncation": {
+			deploymentName: strings.Repeat("a", 56) + "-" + strings.Repeat("b", 20),
+			want:           strings.Repeat("a", 56) + "-pgt-0",
+		},
+		"trailing dot is trimmed after truncation": {
+			deploymentName: strings.Repeat("a", 56) + "." + strings.Repeat("b", 20),
+			want:           strings.Repeat("a", 56) + "-pgt-0",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			d := &apps.Deployment{ObjectMeta: metav1.ObjectMeta{Name: tc.deploymentName}}
+			if got := podGroupTemplateName(d); got != tc.want {
+				t.Errorf("podGroupTemplateName() = %q (len %d), want %q", got, len(got), tc.want)
+			}
+		})
 	}
 }
 
@@ -268,7 +292,7 @@ func TestSyncDeployment_CreatesWorkloadAtZeroReplicas(t *testing.T) {
 			if err := dc.syncDeployment(ctx, d.Namespace+"/"+d.Name); err != nil {
 				t.Fatalf("syncDeployment() error = %v", err)
 			}
-			workload, err := f.client.SchedulingV1beta1().Workloads(d.Namespace).Get(ctx, workloadNameForDeployment(d), metav1.GetOptions{})
+			workload, err := f.client.SchedulingV1beta1().Workloads(d.Namespace).Get(ctx, workloadbuilder.GenerateWorkloadName(d.Name, d.UID), metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("getting Workload created at zero replicas: %v", err)
 			}
@@ -330,7 +354,7 @@ func TestSyncDeployment_ReconcilesWorkloadMinCount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			d := newGangDeployment("test-deployment", 2, nil)
-			workload := newWorkload(workloadNameForDeployment(d), d.Namespace, tc.existingMinCount, *metav1.NewControllerRef(d, controllerKind))
+			workload := newWorkload(workloadbuilder.GenerateWorkloadName(d.Name, d.UID), d.Namespace, tc.existingMinCount, *metav1.NewControllerRef(d, controllerKind))
 			f := newFixture(t)
 			f.objects = []runtime.Object{d, workload}
 			f.dLister = []*apps.Deployment{d}
@@ -374,7 +398,7 @@ func TestEnsureWorkloadForDeploymentRetriesAfterAlreadyExists(t *testing.T) {
 
 	_, ctx := ktesting.NewTestContext(t)
 	d := newGangDeployment("test-deployment", 3, nil)
-	existing := newWorkload(workloadNameForDeployment(d), d.Namespace, 3, *metav1.NewControllerRef(d, controllerKind))
+	existing := newWorkload(workloadbuilder.GenerateWorkloadName(d.Name, d.UID), d.Namespace, 3, *metav1.NewControllerRef(d, controllerKind))
 	f := newFixture(t)
 	f.objects = []runtime.Object{existing}
 	dc, informers, err := f.newController(ctx)
@@ -435,7 +459,7 @@ func TestEnsureWorkloadForDeploymentRejectsWorkloadWithMismatchedOwnership(t *te
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			workload := newWorkload(workloadNameForDeployment(d), d.Namespace, 2, *metav1.NewControllerRef(tc.owner, controllerKind))
+			workload := newWorkload(workloadbuilder.GenerateWorkloadName(d.Name, d.UID), d.Namespace, 2, *metav1.NewControllerRef(tc.owner, controllerKind))
 			workload.Spec.ControllerRef = tc.controllerRef
 			f := newFixture(t)
 			f.objects = []runtime.Object{workload}
@@ -485,7 +509,7 @@ func TestEnsureWorkloadForDeploymentRejectsUnexpectedPodGroupTemplateCount(t *te
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			workload := newWorkload(workloadNameForDeployment(d), d.Namespace, 1, *metav1.NewControllerRef(d, controllerKind))
+			workload := newWorkload(workloadbuilder.GenerateWorkloadName(d.Name, d.UID), d.Namespace, 1, *metav1.NewControllerRef(d, controllerKind))
 			workload.Spec.PodGroupTemplates = tc.templates
 			f := newFixture(t)
 			f.objects = []runtime.Object{workload}

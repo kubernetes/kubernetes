@@ -157,25 +157,32 @@ func (rsc *ReplicaSetController) findWorkloadForReplicaSet(rs *apps.ReplicaSet) 
 		return nil, nil
 	}
 
-	workloads, err := rsc.workloadIndexer.ByIndex(workloadByDeploymentNameIndex, cache.NewObjectName(rs.Namespace, owner.Name).String())
+	objs, err := rsc.workloadIndexer.ByIndex(workloadByDeploymentNameIndex, cache.NewObjectName(rs.Namespace, owner.Name).String())
 	if err != nil {
 		return nil, err
 	}
-	if len(workloads) == 0 {
+	if len(objs) == 0 {
 		return nil, nil
 	}
-	if len(workloads) > 1 {
-		return nil, fmt.Errorf("multiple Workloads found for Deployment %s/%s", rs.Namespace, owner.Name)
+
+	var matched *schedulingv1beta1.Workload
+	for _, obj := range objs {
+		workload, ok := obj.(*schedulingv1beta1.Workload)
+		if !ok {
+			return nil, fmt.Errorf("workload index returned %T", obj)
+		}
+		if !deploymentControllerOwnersMatch(owner, metav1.GetControllerOf(workload)) {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple Workloads controlled by Deployment %s/%s UID %q", rs.Namespace, owner.Name, owner.UID)
+		}
+		matched = workload
 	}
-	workload, ok := workloads[0].(*schedulingv1beta1.Workload)
-	if !ok {
-		return nil, fmt.Errorf("workload index returned %T", workloads[0])
+	if matched == nil {
+		return nil, fmt.Errorf("no Workload controlled by Deployment %s/%s with UID %q", rs.Namespace, owner.Name, owner.UID)
 	}
-	if !deploymentControllerOwnersMatch(owner, metav1.GetControllerOf(workload)) {
-		return nil, fmt.Errorf("workload %s/%s controller owner does not match Deployment %s/%s with UID %q",
-			workload.Namespace, workload.Name, rs.Namespace, owner.Name, owner.UID)
-	}
-	return workload, nil
+	return matched, nil
 }
 
 func replicaSetPodGroupOwner(rs *apps.ReplicaSet) metav1.OwnerReference {

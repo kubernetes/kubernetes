@@ -20,14 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
+	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,25 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	deploymentutil "k8s.io/kubernetes/pkg/api/deployment"
 	"k8s.io/kubernetes/pkg/features"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
-
-// workloadNameForDeployment generates a deterministic name for a Workload associated with a Deployment.
-// The pattern is: <truncated-deployment-name>-<hash>
-// The hash is derived from the Deployment UID to ensure uniqueness and stability across restarts.
-func workloadNameForDeployment(d *apps.Deployment) string {
-	hasher := fnv.New32a()
-	hashutil.DeepHashObject(hasher, d.UID)
-	hash := rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
-
-	// Reserve space for the hash and separator in the DNS name.
-	maxPrefixLen := validation.DNS1123SubdomainMaxLength - len(hash) - 1
-	prefix := d.Name
-	if len(prefix) > maxPrefixLen {
-		prefix = prefix[:maxPrefixLen]
-	}
-	return fmt.Sprintf("%s-%s", prefix, hash)
-}
 
 // resolveMinCount returns the effective gang minCount for the Workload
 // template. If the user set minCount explicitly, that value is always used.
@@ -76,15 +57,26 @@ func shouldManageWorkloadForDeployment(d *apps.Deployment) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && d.Spec.Scheduling != nil
 }
 
+// podGroupTemplateName is a DNS label (63 bytes), tighter than the Workload name.
+func podGroupTemplateName(d *apps.Deployment) string {
+	const suffix = "-pgt-0"
+	prefix := d.Name
+	if max := validation.DNS1123LabelMaxLength - len(suffix); len(prefix) > max {
+		prefix = prefix[:max]
+	}
+	prefix = strings.TrimRight(prefix, ".-")
+	return prefix + suffix
+}
+
 // buildWorkloadForDeployment compiles the Deployment's scheduling configuration into a Workload.
 // For Gang scheduling, it stores the resolved minCount in the template so each ReplicaSet's PodGroup inherits it.
 func buildWorkloadForDeployment(d *apps.Deployment) (*schedulingv1beta1.Workload, error) {
 	minCount := resolveMinCount(d)
 	input := deploymentutil.WorkloadInputForDeploymentV1(d.Spec.Scheduling)
 
-	wlName := workloadNameForDeployment(d)
+	wlName := workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
 	item := deploymentutil.WorkloadItemForDeployment(
-		wlName, d.Spec.Template.Spec.PriorityClassName, input, nil,
+		podGroupTemplateName(d), d.Spec.Template.Spec.PriorityClassName, input, nil,
 	)
 	item.Callbacks = []workloadbuilder.SchedulingConfigFunc{
 		func(cfg *workloadbuilder.SchedulingConfig) {
@@ -107,7 +99,7 @@ func buildWorkloadForDeployment(d *apps.Deployment) (*schedulingv1beta1.Workload
 // Its template minCount is kept current so new PodGroups inherit the right value.
 func (dc *DeploymentController) ensureWorkloadForDeployment(ctx context.Context, d *apps.Deployment) (*schedulingv1beta1.Workload, error) {
 	logger := klog.FromContext(ctx)
-	wlName := workloadNameForDeployment(d)
+	wlName := workloadbuilder.GenerateWorkloadName(d.Name, d.UID)
 	minCount := resolveMinCount(d)
 
 	if dc.workloadLister == nil {
