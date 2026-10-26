@@ -50,11 +50,14 @@ func hasUnaryTimeoutError(ops []correctness.Operation) bool {
 	return false
 }
 
-// hasConsistentListFallback checks whether any consistent List (ResourceVersion == "")
-// waited for cacher's 3s blockTimeout before falling back to etcd and succeeding.
+// hasConsistentListFallback checks whether any consistent List waited for
+// cacher's 3s blockTimeout before falling back to etcd and succeeding.
 func hasConsistentListFallback(ops []correctness.Operation) bool {
 	for _, op := range ops {
-		if op.Request.Op == correctness.OpList && op.Request.List.Options.ResourceVersion == "" && op.Response.Err == nil && op.End.Sub(op.Start) >= 3*time.Second {
+		if op.Request.Op != correctness.OpList || op.Response.Err != nil || op.End.Sub(op.Start) < 3*time.Second {
+			continue
+		}
+		if consistency, _, _, err := correctness.ListReadConsistency("", storage.APIObjectVersioner{}, op.Request.List.Options); err == nil && consistency == correctness.ConsistencyConsistent {
 			return true
 		}
 	}

@@ -122,6 +122,31 @@ var (
 				{Choice: 1, Weight: 15},
 				{Choice: 2, Weight: 15},
 			},
+			Continue: ContinueDistribution{
+				Enabled: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 70},
+					{Choice: true, Weight: 30},
+				},
+				Start: []ChoiceWeight[ContinueStart]{
+					{Choice: ContinueStartFirst, Weight: 15},
+					{Choice: ContinueStartAtKey, Weight: 35},
+					{Choice: ContinueStartAfterKey, Weight: 35},
+					{Choice: ContinueStartEnd, Weight: 15},
+				},
+				KeyTarget: []ChoiceWeight[KeyTarget]{
+					{Choice: KeyExisting, Weight: 80},
+					{Choice: KeyNonExistingNS, Weight: 10},
+					{Choice: KeyNonExistingObject, Weight: 10},
+				},
+				ResourceVersion: []ChoiceWeight[RVType]{
+					{Choice: RVNegative, Weight: 25},
+					{Choice: RVOne, Weight: 15},
+					{Choice: RVCached, Weight: 20},
+					{Choice: RVCurrent, Weight: 18},
+					{Choice: RVPast, Weight: 20},
+					{Choice: RVFuture, Weight: 2},
+				},
+			},
 		},
 		Update: UpdateDistribution{
 			Preconditions: PreconditionsDistribution{

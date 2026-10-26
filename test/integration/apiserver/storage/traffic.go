@@ -62,13 +62,23 @@ const (
 type RVType string
 
 const (
-	RVEmpty   RVType = "Empty"
-	RVZero    RVType = "Zero"
-	RVOne     RVType = "One"
-	RVCached  RVType = "Cached"
-	RVCurrent RVType = "Current"
-	RVPast    RVType = "Past"
-	RVFuture  RVType = "Future"
+	RVEmpty    RVType = "Empty"
+	RVZero     RVType = "Zero"
+	RVNegative RVType = "Negative"
+	RVOne      RVType = "One"
+	RVCached   RVType = "Cached"
+	RVCurrent  RVType = "Current"
+	RVPast     RVType = "Past"
+	RVFuture   RVType = "Future"
+)
+
+type ContinueStart string
+
+const (
+	ContinueStartFirst    ContinueStart = "First"
+	ContinueStartAtKey    ContinueStart = "AtKey"
+	ContinueStartAfterKey ContinueStart = "AfterKey"
+	ContinueStartEnd      ContinueStart = "End"
 )
 
 type FieldSelector string
@@ -129,6 +139,14 @@ type ListDistribution struct {
 	ResourceVersion      []ChoiceWeight[RVType]
 	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
 	Limit                []ChoiceWeight[int64]
+	Continue             ContinueDistribution
+}
+
+type ContinueDistribution struct {
+	Enabled         []ChoiceWeight[bool]
+	Start           []ChoiceWeight[ContinueStart]
+	KeyTarget       []ChoiceWeight[KeyTarget]
+	ResourceVersion []ChoiceWeight[RVType]
 }
 
 type UpdateDistribution struct {
@@ -385,7 +403,8 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 			Predicate: pickPredicate(key, dist.List.FieldSelector, dist.List.LabelSelector),
 		}
 		var listKey string
-		switch scope := PickRandom(dist.List.Scope); scope {
+		scope := PickRandom(dist.List.Scope)
+		switch scope {
 		case ScopeCluster:
 			listKey, opts.Recursive = "/pods/", true
 		case ScopeNamespace:
@@ -398,6 +417,11 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 		if len(dist.List.Recursive) > 0 {
 			opts.Recursive = PickRandom(dist.List.Recursive)
 		}
+		continueToken, ok := pickContinueToken(ctx, store, scope, keys, dist.List.Continue, cached)
+		if !ok {
+			return nil
+		}
+		opts.Predicate.Continue = continueToken
 		rv, ok := resolveResourceVersion(ctx, store, PickRandom(dist.List.ResourceVersion), cached)
 		if !ok {
 			return nil
@@ -405,11 +429,15 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 		opts.ResourceVersion = rv
 		if rv != "" {
 			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
+			// API validation rejects these combinations before reaching storage.Interface.
 			if rv == "0" && opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 				return nil
 			}
+			if opts.Predicate.Continue != "" && opts.ResourceVersionMatch != "" {
+				return nil
+			}
 		}
-		if len(dist.List.Limit) > 0 && rv != "0" {
+		if len(dist.List.Limit) > 0 && opts.ResourceVersion != "0" {
 			opts.Predicate.Limit = PickRandom(dist.List.Limit)
 		}
 		return &correctness.Request{
@@ -457,6 +485,8 @@ func resolveResourceVersion(ctx context.Context, store storage.Interface, rvType
 		return "", true
 	case RVZero:
 		return "0", true
+	case RVNegative:
+		return "-1", true
 	case RVOne:
 		return "1", true
 	case RVCached:
@@ -477,6 +507,44 @@ func resolveResourceVersion(ctx context.Context, store storage.Interface, rvType
 	default:
 		panic(fmt.Sprintf("%v: unknown RVType", rvType))
 	}
+}
+
+func pickContinueToken(ctx context.Context, store storage.Interface, scope KeyScope, keys []types.NamespacedName, dist ContinueDistribution, cached runtime.Object) (string, bool) {
+	if len(dist.Enabled) == 0 || !PickRandom(dist.Enabled) {
+		return "", true
+	}
+	start := PickRandom(dist.Start)
+	rvStr, ok := resolveResourceVersion(ctx, store, PickRandom(dist.ResourceVersion), cached)
+	if !ok {
+		return "", false
+	}
+	continueRV, err := strconv.ParseInt(rvStr, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	target := pickKeyTarget(keys[rand.Intn(len(keys))], dist.KeyTarget)
+	relKey := target.Name
+	if scope == ScopeCluster {
+		relKey = target.String()
+	}
+	var startKey string
+	switch start {
+	case ContinueStartFirst:
+		startKey = "\x00"
+	case ContinueStartAtKey:
+		startKey = relKey
+	case ContinueStartAfterKey:
+		startKey = relKey + "\x00"
+	case ContinueStartEnd:
+		startKey = "zzz"
+	default:
+		panic(fmt.Sprintf("%v: unknown continue start", start))
+	}
+	token, err := storage.EncodeContinue("/"+startKey, "/", continueRV)
+	if err != nil {
+		panic(err)
+	}
+	return token, true
 }
 
 func pickPreconditions(dist PreconditionsDistribution, cached runtime.Object) (*storage.Preconditions, bool) {
@@ -562,7 +630,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || apierrors.IsResourceExpired(err) || apierrors.IsBadRequest(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
 			return correctness.Response{
 				Err: err,
 			}
