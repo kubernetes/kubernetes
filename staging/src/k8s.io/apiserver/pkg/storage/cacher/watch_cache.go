@@ -423,18 +423,21 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
 	// The RV semantic below is for Recursive List, non-recursive lists should use waitUntilFreshAndListNonRecursive.
 	recursive := true
+	var continueKey string
+	matchValues := opts.Predicate.MatcherIndex(ctx)
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return w.waitAndListExactRV(ctx, key, "", listRV)
+		return w.waitAndListExactRV(ctx, key, continueKey, listRV)
 	case metav1.ResourceVersionMatchNotOlderThan:
 	case "":
+		var continueRV int64
 		// Continue
 		if len(opts.Predicate.Continue) > 0 {
-			continueKey, continueRV, err := storage.DecodeContinue(opts.Predicate.Continue, key)
+			continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, key)
 			if err != nil {
 				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 			}
@@ -442,18 +445,19 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 				return w.waitAndListExactRV(ctx, key, continueKey, uint64(continueRV))
 			} else {
 				// Don't pass matchValues as they don't support continueKey
-				return w.waitAndListConsistent(ctx, recursive, key, continueKey, nil)
+				matchValues = nil
+				return w.waitAndListConsistent(ctx, recursive, key, continueKey, matchValues)
 			}
 		}
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return w.waitAndListExactRV(ctx, key, "", listRV)
+			return w.waitAndListExactRV(ctx, key, continueKey, listRV)
 		}
 		if opts.ResourceVersion == "" {
-			return w.waitAndListConsistent(ctx, recursive, key, "", opts.Predicate.MatcherIndex(ctx))
+			return w.waitAndListConsistent(ctx, recursive, key, continueKey, matchValues)
 		}
 	}
-	return w.waitAndListLatestRV(ctx, recursive, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
+	return w.waitAndListLatestRV(ctx, recursive, listRV, key, continueKey, matchValues)
 }
 
 func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
@@ -461,7 +465,8 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	if err != nil {
 		return listResp{}, "", err
 	}
-	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, "", nil
+	w.checkSnapshotResourceVersion(snap, resourceVersion)
+	return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, "", nil
 }
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
