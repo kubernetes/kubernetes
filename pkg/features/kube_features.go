@@ -496,12 +496,6 @@ const (
 	// Users observing regressions can disable this feature gate to restore the old behavior.
 	HugepageAwareEviction featuregate.Feature = "HugepageAwareEviction"
 
-	// owner: @haircommander
-	// kep: http://kep.k8s.io/4210
-	// ImageMaximumGCAge enables the Kubelet configuration field of the same name, allowing an admin
-	// to specify the age after which an image will be garbage collected.
-	ImageMaximumGCAge featuregate.Feature = "ImageMaximumGCAge"
-
 	// owner: @saschagrunert
 	// kep: https://kep.k8s.io/4639
 	//
@@ -1564,12 +1558,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	ImageMaximumGCAge: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
-	},
-
 	ImageVolume: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
@@ -2492,8 +2480,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HostnameOverride: {},
 
 	HugepageAwareEviction: {},
-
-	ImageMaximumGCAge: {},
 
 	ImageVolume: {},
 
