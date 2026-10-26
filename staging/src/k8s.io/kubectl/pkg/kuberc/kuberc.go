@@ -398,7 +398,7 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 	switch {
 	case preference != nil && runtime.IsStrictDecodingError(err):
 		// just warn about strict decoding errors if we got a usable Preference object back
-		fmt.Fprintf(errOut, "kuberc: ignoring strict decoding error in %s: %v", kubeRCFile, err) //nolint:errcheck
+		fmt.Fprintf(errOut, "kuberc: ignoring strict decoding error in %s: %v\n", kubeRCFile, err) //nolint:errcheck
 		return preference, nil
 
 	case explicitly && err != nil:
@@ -411,7 +411,7 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 
 	case !explicitly && err != nil:
 		// if not explicitly requested, only warn on any other error
-		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v", kubeRCFile, err) //nolint:errcheck
+		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v\n", kubeRCFile, err) //nolint:errcheck
 		return nil, nil
 
 	default:
