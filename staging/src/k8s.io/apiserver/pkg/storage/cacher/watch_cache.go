@@ -424,6 +424,7 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 	// The RV semantic below is for Recursive List, non-recursive lists should use waitUntilFreshAndListNonRecursive.
 	recursive := true
 	var continueKey string
+	var snap store.Snapshot
 	matchValues := opts.Predicate.MatcherIndex(ctx)
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
@@ -431,12 +432,9 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 	}
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		snap, err := w.waitAndGetExactSnapshot(ctx, listRV)
-		if err != nil {
-			return listResp{}, "", err
-		}
-		return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, "", nil
+		snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
 	case metav1.ResourceVersionMatchNotOlderThan:
+		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
 	case "":
 		var continueRV int64
 		// Continue
@@ -446,38 +444,23 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 			}
 			if continueRV > 0 {
-				snap, err := w.waitAndGetExactSnapshot(ctx, uint64(continueRV))
-				if err != nil {
-					return listResp{}, "", err
-				}
-				return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, "", nil
+				snap, err = w.waitAndGetExactSnapshot(ctx, uint64(continueRV))
 			} else {
 				// Don't pass matchValues as they don't support continueKey
 				matchValues = nil
-				snap, index, err := w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
-				if err != nil {
-					return listResp{}, "", err
-				}
-				return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, index, nil
+				snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
 			}
+		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			// Legacy exact match
+			snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
+		} else if opts.ResourceVersion == "" {
+			snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+		} else {
+			snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
 		}
-		// Legacy exact match
-		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			snap, err := w.waitAndGetExactSnapshot(ctx, listRV)
-			if err != nil {
-				return listResp{}, "", err
-			}
-			return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, "", nil
-		}
-		if opts.ResourceVersion == "" {
-			snap, index, err := w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
-			if err != nil {
-				return listResp{}, "", err
-			}
-			return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, index, nil
-		}
+	default:
+		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
 	}
-	snap, index, err := w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
