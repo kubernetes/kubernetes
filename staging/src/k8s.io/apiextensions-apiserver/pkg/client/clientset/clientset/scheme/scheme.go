@@ -21,8 +21,12 @@ import (
 )
 
 var (
-	AddToScheme    = scheme.AddToScheme
-	Codecs         = scheme.Codecs
+	// Deprecated: Use k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme.AddToScheme instead.
+	AddToScheme = scheme.AddToScheme
+	// Deprecated: Use k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme.Codecs instead.
+	Codecs = scheme.Codecs
+	// Deprecated: Use k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme.ParameterCodec instead.
 	ParameterCodec = scheme.ParameterCodec
-	Scheme         = scheme.Scheme
+	// Deprecated: Use k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme.Scheme instead.
+	Scheme = scheme.Scheme
 )

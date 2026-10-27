@@ -25,6 +25,7 @@ import (
 type Clientset = fake.Clientset
 
 var (
+	// Deprecated: Use k8s.io/apiextensions-api/pkg/client/clientset/clientset/fake.AddToScheme instead.
 	AddToScheme = fake.AddToScheme
 )
 
