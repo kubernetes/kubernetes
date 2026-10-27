@@ -15,6 +15,7 @@ go_library(
         "inlining.go",
         "io.go",
         "library.go",
+        "timestamp_legacy.go",
         "macro.go",
         "optimizer.go",
         "options.go",
@@ -65,6 +66,7 @@ go_test(
     srcs = [
         "cel_example_test.go",
         "cel_test.go",
+        "timestamp_legacy_test.go",
         "cost_test.go",
         "cost_k8s_test.go",
         "decls_test.go",

@@ -76,6 +76,11 @@ const (
 
 	// Enable accessing fields by JSON names within protobuf messages
 	featureJSONFieldNames
+
+	// Enable strict RFC 3339 validation of timestamp strings and strict range validation of
+	// numeric timezone offsets. Strict validation is the default; the feature only has an effect
+	// when it is explicitly disabled, see StrictTimestampParsing.
+	featureStrictTimestampParsing
 )
 
 var featureIDsToNames = map[int]string{
@@ -166,6 +171,9 @@ func ClearMacros() EnvOption {
 // Note: This option must be specified before the Types and TypeDescs options when used together.
 func CustomTypeAdapter(adapter types.Adapter) EnvOption {
 	return func(e *Env) (*Env, error) {
+		if adapter == nil {
+			return nil, errors.New("custom type adapter must not be nil")
+		}
 		e.adapter = adapter
 		return e, nil
 	}
@@ -178,6 +186,9 @@ func CustomTypeAdapter(adapter types.Adapter) EnvOption {
 // Note: This option must be specified before the Types and TypeDescs options when used together.
 func CustomTypeProvider(provider any) EnvOption {
 	return func(e *Env) (*Env, error) {
+		if provider == nil {
+			return nil, errors.New("custom type provider must not be nil")
+		}
 		var err error
 		e.provider, err = maybeInteropProvider(provider)
 		return e, err
@@ -1114,6 +1125,30 @@ func CrossTypeNumericComparisons(enabled bool) EnvOption {
 // input time's local timezone.
 func DefaultUTCTimeZone(enabled bool) EnvOption {
 	return features(featureDefaultUTCTimeZone, enabled)
+}
+
+// StrictTimestampParsing controls how strictly timestamp strings and numeric timezone offsets are
+// validated.
+//
+// Strict parsing is the default and is equivalent to StrictTimestampParsing(true):
+//
+//   - timestamp(string) accepts only RFC 3339 date-time strings. Inputs which time.Parse accepts
+//     but RFC 3339 forbids are rejected: a ',' fractional second separator, single-digit time
+//     fields, and numeric offsets whose hours exceed 23 or whose minutes exceed 59.
+//   - Numeric timezone offsets passed to the timestamp accessors, e.g. getHours('+05:30'), must
+//     have hours in [-23, 23] and minutes in [0, 59].
+//
+// StrictTimestampParsing(false) restores the parsing behavior of cel-go releases prior to v0.30.0
+// for the timestamp(string) conversion and prior to v0.31.0 for timezone offsets: timestamp
+// strings are accepted whenever time.Parse(time.RFC3339, ...) accepts them, and numeric offsets
+// are not range checked. Note that some of these inputs resolve to an instant other than the one
+// the string appears to describe; for example an offset of '+05:60' is treated as '+06:00'.
+//
+// Disabling strict parsing is intended as a compatibility aid for embedders which must keep
+// evaluating expressions, or data, that were accepted by earlier releases. The relaxed rules also
+// apply to timestamp literal validation (see ValidateTimestampLiterals).
+func StrictTimestampParsing(enabled bool) EnvOption {
+	return features(featureStrictTimestampParsing, enabled)
 }
 
 // features sets the given feature flags.  See list of Feature constants above.

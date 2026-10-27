@@ -985,6 +985,20 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 		}
 	}
 
+	// If strict timestamp parsing has been disabled, configure the legacy parsing overloads. This
+	// is applied after the legacy timezone overloads so that the relaxed offset parsing takes
+	// precedence when both features are disabled.
+	if strict, isSet := e.features[featureStrictTimestampParsing]; isSet && !strict {
+		if !e.appliedFeatures[featureStrictTimestampParsing] {
+			e.ensureMutableAppliedFeatures()
+			e.appliedFeatures[featureStrictTimestampParsing] = true
+			e, err = Lib(timestampLegacyParsingLibrary{})(e)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	e.costModel = e.costConfig.build()
 
 	// Configure the parser.

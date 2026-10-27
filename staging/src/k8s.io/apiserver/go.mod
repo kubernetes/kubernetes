@@ -7,7 +7,7 @@ go 1.27.0
 godebug default=go1.27
 
 require (
-	cel.dev/cel-go v0.33.0
+	cel.dev/cel-go v0.33.1
 	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/coreos/go-systemd/v22 v22.7.0

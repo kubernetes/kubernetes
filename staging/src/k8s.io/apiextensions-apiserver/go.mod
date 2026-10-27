@@ -7,7 +7,7 @@ go 1.27.0
 godebug default=go1.27
 
 require (
-	cel.dev/cel-go v0.33.0
+	cel.dev/cel-go v0.33.1
 	github.com/emicklei/go-restful/v3 v3.14.0
 	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-cmp v0.7.0

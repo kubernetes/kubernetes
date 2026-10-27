@@ -12,7 +12,7 @@ godebug default=go1.27
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
-	cel.dev/cel-go v0.33.0
+	cel.dev/cel-go v0.33.1
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/Microsoft/hnslib v0.1.3

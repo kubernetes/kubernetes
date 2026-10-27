@@ -141,7 +141,12 @@ func EnableErrorOnBadPresenceTest(value bool) AttrFactoryOption {
 // NewAttributeFactory returns a default AttributeFactory which is produces Attribute values
 // capable of resolving types by simple names and qualify the values using the supported qualifier
 // types: bool, int, string, and uint.
+//
+// If the adapter is nil, types.DefaultTypeAdapter is used.
 func NewAttributeFactory(cont *containers.Container, a types.Adapter, p types.Provider, opts ...AttrFactoryOption) AttributeFactory {
+	if a == nil {
+		a = types.DefaultTypeAdapter
+	}
 	fac := &attrFactory{
 		container: cont,
 		adapter:   a,
@@ -937,6 +942,12 @@ func newQualifier(adapter types.Adapter, id int64, v any, opt, errorOnBadPresenc
 	default:
 		if q, ok := v.(Qualifier); ok {
 			return q, nil
+		}
+		// Values resolved from comprehension variables may be raw native values, such as the
+		// *structpb.Value elements of a *structpb.ListValue. Adapt them to CEL values and retry.
+		// Since NativeToValue always returns a ref.Val, at most one retry occurs.
+		if _, isVal := v.(ref.Val); !isVal {
+			return newQualifier(adapter, id, adapter.NativeToValue(v), opt, errorOnBadPresenceTest)
 		}
 		return nil, fmt.Errorf("invalid qualifier type: %T", v)
 	}
