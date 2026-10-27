@@ -411,9 +411,13 @@ func (o *EditOptions) Run() error {
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
 				if o.ServerSideApply {
-					fmt.Fprintf(o.ErrOut, "Your changes have been saved to %q.\n", file)
+					if _, err := fmt.Fprintf(o.ErrOut, "Your changes have been saved to %q.\n", file); err != nil {
+						return nil
+					}
 				} else {
-					fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+					if _, err := fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file); err != nil {
+						return nil
+					}
 				}
 				return cmdutil.ErrExit
 			}
@@ -688,8 +692,8 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			if err != nil {
 				return err
 			}
-			if o.OutputPatch {
-				fmt.Fprintf(o.Out, "Patch: %s\n", string(data))
+			if _, err := fmt.Fprintf(o.Out, "Patch: %s\n", string(data)); err != nil {
+				return err
 			}
 
 			options := metav1.PatchOptions{Force: &o.ForceConflicts}
@@ -699,12 +703,21 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 				WithFieldValidation(o.ValidationDirective).
 				WithSubresource(o.Subresource).
 				Patch(info.Namespace, info.Name, types.ApplyPatchType, data, &options)
+
 			if err != nil {
-				if apierrors.HasStatusCause(err, metav1.CauseTypeFieldManagerConflict) {
-					err = fmt.Errorf(`%w
-If you intend to take ownership of the conflicting fields, re-run the edit command with the `+"`--force-conflicts`"+` flag.`, err)
+				if _, writeErr := fmt.Fprintln(o.ErrOut, results.addError(err, info)); writeErr != nil {
+					return writeErr
 				}
-				fmt.Fprintln(o.ErrOut, results.addError(err, info))
+
+				if apierrors.HasStatusCause(err, metav1.CauseTypeFieldManagerConflict) {
+					if _, writeErr := fmt.Fprintln(
+						o.ErrOut,
+						"If you intend to take ownership of the conflicting fields, re-run the edit command with the `--force-conflicts` flag.",
+					); writeErr != nil {
+						return writeErr
+					}
+				}
+
 				return nil
 			}
 		} else {
@@ -756,7 +769,9 @@ If you intend to take ownership of the conflicting fields, re-run the edit comma
 			}
 
 			if o.OutputPatch {
-				fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
+				if _, err := fmt.Fprintf(o.Out, "Patch: %s\n", string(patch)); err != nil {
+					return err
+				}
 			}
 
 			patched, err = resource.NewHelper(info.Client, info.Mapping).
@@ -765,7 +780,9 @@ If you intend to take ownership of the conflicting fields, re-run the edit comma
 				WithSubresource(o.Subresource).
 				Patch(info.Namespace, info.Name, patchType, patch, nil)
 			if err != nil {
-				fmt.Fprintln(o.ErrOut, results.addError(err, info))
+				if _, writeErr := fmt.Fprintln(o.ErrOut, results.addError(err, info)); writeErr != nil {
+					return writeErr
+				}
 				return nil
 			}
 		}

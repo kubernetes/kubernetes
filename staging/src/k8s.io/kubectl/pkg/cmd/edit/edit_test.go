@@ -264,10 +264,14 @@ func TestEdit(t *testing.T) {
 				cmd.Flags().Set("subresource", testcase.Subresource)
 			}
 			if len(testcase.ServerSide) > 0 {
-				cmd.Flags().Set("server-side", testcase.ServerSide)
+				if err := cmd.Flags().Set("server-side", testcase.ServerSide); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if len(testcase.ForceConflicts) > 0 {
-				cmd.Flags().Set("force-conflicts", testcase.ForceConflicts)
+				if err := cmd.Flags().Set("force-conflicts", testcase.ForceConflicts); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
