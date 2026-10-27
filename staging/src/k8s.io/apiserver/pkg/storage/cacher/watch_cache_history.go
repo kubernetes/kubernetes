@@ -187,12 +187,9 @@ const (
 	// We keep that set to 1000 for "backward compatibility", until we
 	// convinced ourselves based on some metrics that decreasing is safe.
 	maxWatchChanSizeWithIndexWithoutTrigger = 1000
-	// maxWatchChanSizeWithoutIndex is the max size of the channel
-	// used by the watch not using the index.
-	maxWatchChanSizeWithoutIndex = 100
 )
 
-func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
+func (w *watchCacheHistory) suggestedWatchChannelSize(triggerUsed bool) int {
 	// To estimate the channel size we use a heuristic that a channel
 	// should roughly be able to keep one second of history.
 	// We don't have an exact data, but given we store updates from
@@ -203,16 +200,10 @@ func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed b
 	// Finally we adjust the size to avoid ending with too low or
 	// to large values.
 	chanSize = max(chanSize, minWatchChanSize)
-	var maxChanSize int
-	switch {
-	case indexExists && triggerUsed:
-		maxChanSize = maxWatchChanSizeWithIndexAndTrigger
-	case indexExists && !triggerUsed:
-		maxChanSize = maxWatchChanSizeWithIndexWithoutTrigger
-	case !indexExists:
-		maxChanSize = maxWatchChanSizeWithoutIndex
+	if triggerUsed {
+		return min(chanSize, maxWatchChanSizeWithIndexAndTrigger)
 	}
-	return min(chanSize, maxChanSize)
+	return min(chanSize, maxWatchChanSizeWithIndexWithoutTrigger)
 }
 
 // GetIntervalLocked returns a watchCacheInterval that can be used to

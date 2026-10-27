@@ -654,10 +654,10 @@ func (w *watchCache) getListResourceVersion() uint64 {
 	return w.history.listResourceVersion
 }
 
-func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
+func (w *watchCache) suggestedWatchChannelSize(triggerUsed bool) int {
 	w.RLock()
 	defer w.RUnlock()
-	return w.history.suggestedWatchChannelSize(indexExists, triggerUsed)
+	return w.history.suggestedWatchChannelSize(triggerUsed)
 }
 
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to

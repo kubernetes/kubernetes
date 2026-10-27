@@ -1005,154 +1005,93 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	testCases := []struct {
 		name                string
 		capacity            int
-		indexExists         bool
 		triggerUsed         bool
 		eventsFreshDuration time.Duration
 		expected            int
 	}{
 		{
-			name:                "capacity=100, indexExists, triggerUsed",
+			name:                "capacity=100, triggerUsed",
 			capacity:            100,
-			indexExists:         true,
 			triggerUsed:         true,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=100, indexExists, !triggerUsed",
+			name:                "capacity=100, !triggerUsed",
 			capacity:            100,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=100, !indexExists",
-			capacity:            100,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: DefaultEventFreshDuration,
-			expected:            10,
-		},
-		{
-			name:                "capacity=750, indexExists, triggerUsed",
+			name:                "capacity=750, triggerUsed",
 			capacity:            750,
-			indexExists:         true,
 			triggerUsed:         true,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=750, indexExists, !triggerUsed",
+			name:                "capacity=750, !triggerUsed",
 			capacity:            750,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=750, !indexExists",
-			capacity:            750,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: DefaultEventFreshDuration,
-			expected:            10,
-		},
-		{
-			name:                "capacity=7500, indexExists, triggerUsed",
+			name:                "capacity=7500, triggerUsed",
 			capacity:            7500,
-			indexExists:         true,
 			triggerUsed:         true,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=7500, indexExists, !triggerUsed",
+			name:                "capacity=7500, !triggerUsed",
 			capacity:            7500,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            100,
 		},
 		{
-			name:                "capacity=7500, indexExists, !triggerUsed, eventsFreshDuration=2m30s",
+			name:                "capacity=7500, !triggerUsed, eventsFreshDuration=2m30s",
 			capacity:            7500,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: 2 * DefaultEventFreshDuration,
 			expected:            50,
 		},
 		{
-			name:                "capacity=7500, !indexExists",
-			capacity:            7500,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: DefaultEventFreshDuration,
-			expected:            100,
-		},
-		{
-			name:                "capacity=7500, !indexExists, eventsFreshDuration=2m30s",
-			capacity:            7500,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: 2 * DefaultEventFreshDuration,
-			expected:            50,
-		},
-		{
-			name:                "capacity=75000, indexExists, triggerUsed",
+			name:                "capacity=75000, triggerUsed",
 			capacity:            75000,
-			indexExists:         true,
 			triggerUsed:         true,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=75000, indexExists, !triggerUsed",
+			name:                "capacity=75000, !triggerUsed",
 			capacity:            75000,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            1000,
 		},
 		{
-			name:                "capacity=75000, indexExists, !triggerUsed, eventsFreshDuration=2m30s",
+			name:                "capacity=75000, !triggerUsed, eventsFreshDuration=2m30s",
 			capacity:            75000,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: 2 * DefaultEventFreshDuration,
 			expected:            500,
 		},
 		{
-			name:                "capacity=75000, !indexExists",
-			capacity:            75000,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: DefaultEventFreshDuration,
-			expected:            100,
-		},
-		{
-			name:                "capacity=750000, indexExists, triggerUsed",
+			name:                "capacity=750000, triggerUsed",
 			capacity:            750000,
-			indexExists:         true,
 			triggerUsed:         true,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            10,
 		},
 		{
-			name:                "capacity=750000, indexExists, !triggerUsed",
+			name:                "capacity=750000, !triggerUsed",
 			capacity:            750000,
-			indexExists:         true,
 			triggerUsed:         false,
 			eventsFreshDuration: DefaultEventFreshDuration,
 			expected:            1000,
-		},
-		{
-			name:                "capacity=750000, !indexExists",
-			capacity:            750000,
-			indexExists:         false,
-			triggerUsed:         false,
-			eventsFreshDuration: DefaultEventFreshDuration,
-			expected:            100,
 		},
 	}
 
@@ -1160,7 +1099,7 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			store := newTestWatchCache(test.capacity, test.eventsFreshDuration, &cache.Indexers{})
 			defer store.Stop()
-			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
+			got := store.suggestedWatchChannelSize(test.triggerUsed)
 			if got != test.expected {
 				t.Errorf("unexpected channel size got: %v, expected: %v", got, test.expected)
 			}
