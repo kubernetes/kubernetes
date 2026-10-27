@@ -190,10 +190,10 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		// This function triggers merging the persistent flags in the parent commands.
 		_ = cmd.InheritedFlags()
 
-		allShorthands := make(map[string]struct{})
+		allShorthands := make(map[string]bool)
 		cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 			if flag.Shorthand != "" {
-				allShorthands[flag.Shorthand] = struct{}{}
+				allShorthands[flag.Shorthand] = flag.NoOptDefVal == ""
 			}
 		})
 
@@ -296,10 +296,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		// This function triggers merging the persistent flags in the parent commands.
 		_ = foundAliasCmd.InheritedFlags()
 
-		allShorthands := make(map[string]struct{})
+		allShorthands := make(map[string]bool)
 		foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
 			if flag.Shorthand != "" {
-				allShorthands[flag.Shorthand] = struct{}{}
+				allShorthands[flag.Shorthand] = flag.NoOptDefVal == ""
 			}
 		})
 
@@ -456,7 +456,9 @@ func getExplicitKuberc(args []string) (string, error) {
 
 // searchInArgs searches the given key in the args and returns
 // true, if it finds. Otherwise, it returns false.
-func searchInArgs(flagName string, shorthand string, allShorthands map[string]struct{}, args []string) bool {
+// allShorthands maps every shorthand of the command to whether the flag
+// requires a value.
+func searchInArgs(flagName string, shorthand string, allShorthands map[string]bool, args []string) bool {
 	for _, arg := range args {
 		// if flag is set in args in "--flag value" or "--flag=value" format,
 		// we should return it as found
@@ -477,25 +479,19 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 			continue
 		}
 
-		// remove prefix "-"
-		arg = arg[1:]
-		// short hands can be in a combined "-abc" format.
-		// First we need to ensure that all the values are shorthand to safely search ours.
-		// Because we know that "-abcvalue" is not valid. So that we need to be sure that if we find
-		// "b" it correctly refers to the shorthand "b" not arbitrary value "-cargb".
-		arbitraryFound := false
-		for _, runeValue := range arg {
-			if _, ok := allShorthands[string(runeValue)]; !ok {
-				arbitraryFound = true
+		// short hands can be in a combined "-abc" format. Walk them the same
+		// way pflag does: once a shorthand that requires a value is reached,
+		// the rest of the argument is its value, so "-ni" is "-n i" and does
+		// not set "-i".
+		for _, runeValue := range arg[1:] {
+			s := string(runeValue)
+			if s == shorthand {
+				return true
+			}
+			needsValue, ok := allShorthands[s]
+			if !ok || needsValue {
 				break
 			}
-		}
-		if arbitraryFound {
-			continue
-		}
-		// verified that all values are short hand. Now search ours
-		if strings.Contains(arg, shorthand) {
-			return true
 		}
 	}
 	return false
