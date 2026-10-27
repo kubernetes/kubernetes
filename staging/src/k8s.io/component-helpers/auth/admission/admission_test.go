@@ -599,7 +599,7 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("do request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -904,7 +904,7 @@ func testJWKS(t *testing.T, server *httptest.Server, path string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("JWKS fixture = (%d, %v)", resp.StatusCode, err)
@@ -1230,6 +1230,7 @@ func TestVerifierErrorsAreGeneric(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := v.Verify(context.Background(), tc.req, tc.token)
+			//nolint:errorlint // Wrapped errors must fail this identity assertion.
 			if err == nil || err != generic || err.Error() != "webhook token verification failed" {
 				t.Fatalf("verification error = %v, want the same generic failure", err)
 			}
@@ -1240,6 +1241,7 @@ func TestVerifierErrorsAreGeneric(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
+	//nolint:errorlint // Wrapped errors must fail this identity assertion.
 	if err := v.Verify(ctx, admissionReview(testGroup).Request, good); err != generic {
 		t.Fatalf("cancelled verification = %v, want generic failure", err)
 	}
@@ -1443,7 +1445,7 @@ func Example_rawHTTPWebhook() {
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var out admissionv1.AdmissionReview
 	_ = json.NewDecoder(resp.Body).Decode(&out)
@@ -1559,7 +1561,7 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 			if err != nil {
 				t.Fatalf("do request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tc.wantStatus {
 				t.Errorf("status = %d, want %d", resp.StatusCode, tc.wantStatus)
@@ -1617,7 +1619,7 @@ func TestExampleEndToEnd_InClusterExplicitAudience(t *testing.T) {
 	}
 
 	response := request(token)
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	var review admissionv1.AdmissionReview
 	if err := json.NewDecoder(response.Body).Decode(&review); err != nil {
 		t.Fatalf("decode verified AdmissionReview: %v", err)
@@ -1628,7 +1630,7 @@ func TestExampleEndToEnd_InClusterExplicitAudience(t *testing.T) {
 
 	reached = false
 	missing := request("")
-	defer missing.Body.Close()
+	defer func() { _ = missing.Body.Close() }()
 	if missing.StatusCode != http.StatusUnauthorized || reached {
 		t.Fatalf("missing bearer: HTTP %d reached %t, want 401 without admission", missing.StatusCode, reached)
 	}
@@ -1667,7 +1669,7 @@ func TestExampleEndToEnd_InClusterSpoofedHostCannotChooseAudience(t *testing.T) 
 		if err != nil {
 			t.Fatalf("send admission request: %v", err)
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		if response.StatusCode != wantStatus {
 			t.Fatalf("admission status = %d, want %d", response.StatusCode, wantStatus)
 		}
@@ -2438,7 +2440,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					if err != nil {
 						t.Fatalf("execute request: %v", err)
 					}
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 					rawBytes, err := io.ReadAll(resp.Body)
 					if err != nil {
 						t.Fatalf("read response body: %v", err)
@@ -2736,7 +2738,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					if err != nil {
 						t.Fatalf("execute request: %v", err)
 					}
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 					rawBytes, err := io.ReadAll(resp.Body)
 					if err != nil {
 						t.Fatalf("read response body: %v", err)
@@ -2889,7 +2891,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					if err != nil {
 						t.Fatalf("execute request: %v", err)
 					}
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 					if resp.StatusCode != http.StatusOK {
 						t.Fatalf("status = %d, want 200", resp.StatusCode)
 					}
@@ -2950,7 +2952,7 @@ func TestTokenReuseDoesNotSkipRequestChecks(t *testing.T) {
 		if err != nil {
 			t.Fatalf("do request: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var out admissionv1.AdmissionReview
 		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 			t.Fatalf("decode response: %v", err)

@@ -176,6 +176,7 @@ func TestAdmissionRequestPresenceDiagnostics(t *testing.T) {
 				}
 				return
 			}
+			//nolint:errorlint // Wrapped errors must fail this identity assertion.
 			if err != errVerificationFailed || err.Error() != genericDenyMessage {
 				t.Fatalf("caller error = %v, want generic verification failure", err)
 			}
