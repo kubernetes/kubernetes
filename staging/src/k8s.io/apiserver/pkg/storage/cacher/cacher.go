@@ -667,8 +667,8 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 
 	var bookmarkAfterResourceVersion uint64
 	if isListWatchRequest(opts) {
-		c.setInitialEventsEndBookmark(cacheInterval, c.watchCache.resourceVersion)
-		bookmarkAfterResourceVersion = c.getBookmarkAfterResourceVersionLocked(requestedWatchRV, requiredResourceVersion, opts)
+		c.setInitialEventsEndBookmark(cacheInterval)
+		bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(requestedWatchRV, requiredResourceVersion, cacheInterval.resourceVersion, opts)
 	}
 	// Update the bookMarkAfterResourceVersion
 	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
@@ -1338,17 +1338,14 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	return c.versioner.ParseResourceVersion(resourceVersion)
 }
 
-// getBookmarkAfterResourceVersionLocked returns a ResourceVersion after which
+// getBookmarkAfterResourceVersion returns a ResourceVersion after which
 // the bookmark event will be delivered.
-//
-// Must be called under the watchCache lock.
-func (c *Cacher) getBookmarkAfterResourceVersionLocked(parsedResourceVersion, requiredResourceVersion uint64, opts storage.ListOptions) uint64 {
+func getBookmarkAfterResourceVersion(parsedResourceVersion, requiredResourceVersion, watchCacheResourceVersion uint64, opts storage.ListOptions) uint64 {
 	switch {
 	case len(opts.ResourceVersion) == 0:
 		return requiredResourceVersion
 	case parsedResourceVersion == 0:
-		// here we assume that watchCache locked is already held
-		return c.watchCache.resourceVersion
+		return watchCacheResourceVersion
 	default:
 		return parsedResourceVersion
 	}
@@ -1388,13 +1385,13 @@ func (c *Cacher) Wait(ctx context.Context) error {
 }
 
 // setInitialEventsEndBookmark sets initialEventsEndBookmark field in watchCacheInterval for watchlist request
-func (c *Cacher) setInitialEventsEndBookmark(cacheInterval *watchCacheInterval, currentResourceVersion uint64) {
+func (c *Cacher) setInitialEventsEndBookmark(cacheInterval *watchCacheInterval) {
 	// We don't need to set the InitialEventsAnnotation for this bookmark event,
 	// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
 	initialEventsEndBookmark := &watchCacheEvent{
 		Type:            watch.Bookmark,
 		Object:          c.newFunc(),
-		ResourceVersion: currentResourceVersion,
+		ResourceVersion: cacheInterval.resourceVersion,
 	}
 
 	if err := c.versioner.UpdateObject(initialEventsEndBookmark.Object, initialEventsEndBookmark.ResourceVersion); err != nil {

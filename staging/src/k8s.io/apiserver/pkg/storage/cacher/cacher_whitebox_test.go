@@ -2885,7 +2885,7 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 	}
 }
 
-func TestGetBookmarkAfterResourceVersionLocked(t *testing.T) {
+func TestGetBookmarkAfterResourceVersion(t *testing.T) {
 	listOptions := func(rv string) storage.ListOptions {
 		p := storage.Everything
 
@@ -2927,22 +2927,14 @@ func TestGetBookmarkAfterResourceVersionLocked(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			backingStorage := &cachertesting.MockStorage{}
-			cacher, _, err := newTestCacher(backingStorage)
-			require.NoError(t, err, "couldn't create cacher")
-
-			defer cacher.Stop()
-
-			cacher.watchCache.UpdateResourceVersion(fmt.Sprintf("%d", scenario.watchCacheResourceVersion))
 			parsedResourceVersion := 0
 			if len(scenario.opts.ResourceVersion) > 0 {
+				var err error
 				parsedResourceVersion, err = strconv.Atoi(scenario.opts.ResourceVersion)
 				require.NoError(t, err)
 			}
 
-			cacher.watchCache.RLock()
-			defer cacher.watchCache.RUnlock()
-			getBookMarkResourceVersion := cacher.getBookmarkAfterResourceVersionLocked(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
+			getBookMarkResourceVersion := getBookmarkAfterResourceVersion(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), uint64(scenario.watchCacheResourceVersion), scenario.opts)
 			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
