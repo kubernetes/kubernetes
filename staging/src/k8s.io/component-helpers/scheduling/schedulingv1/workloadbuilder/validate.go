@@ -82,7 +82,7 @@ func (b *Builder) Validate(ctx context.Context, input ValidationInput) field.Err
 		op = operation.Operation{Type: operation.Update}
 	}
 
-	allErrs := b.validateItem(ctx, op, b.root, input.OldRoot, nil)
+	allErrs := b.validateItem(ctx, op, b.root, input.OldRoot, itemValidationOpts{})
 	allErrs = append(allErrs, b.validatePriorityClassName(b.root)...)
 	return allErrs
 }
@@ -170,11 +170,16 @@ func validateItemInputUnion(item *WorkloadItem) error {
 	return nil
 }
 
+type itemValidationOpts struct {
+	requireGangSchedulingPolicy bool
+	requireAllDisruptionMode    bool
+}
+
 // validateItem runs declarative and controller-policy validation on a single
 // WorkloadItem and recurses into its children. Each node reports its
 // building-block errors relative to its own Path, and controllers map the errors
 // onto their own API fields.
-func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, parentResolvedConfig *SchedulingConfig) field.ErrorList {
+func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, opts itemValidationOpts) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if !b.opts.DisableDeclarativeValidation {
@@ -185,8 +190,8 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 	allErrs = append(allErrs, b.validateAllowedSchedulingPolicies(item, resolvedConfig)...)
 	allErrs = append(allErrs, b.validateAllowedDisruptionModes(item, resolvedConfig)...)
 	allErrs = append(allErrs, b.validateDisruptionModeCompatibleWithSchedulingPolicy(item, resolvedConfig)...)
-	allErrs = append(allErrs, b.validateParentChildSchedulingPolicy(item, resolvedConfig, parentResolvedConfig)...)
-	allErrs = append(allErrs, b.validateParentChildDisruptionMode(item, resolvedConfig, parentResolvedConfig)...)
+	allErrs = append(allErrs, b.validateParentChildSchedulingPolicy(item, resolvedConfig, opts.requireGangSchedulingPolicy)...)
+	allErrs = append(allErrs, b.validateParentChildDisruptionMode(item, resolvedConfig, opts.requireAllDisruptionMode)...)
 
 	// oldItem is the previous counterpart of item (or nil for a create or a node
 	// that is new in this update). Children are correlated with their previous
@@ -200,14 +205,22 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 		}
 	}
 
+	if hasGangPolicy(resolvedConfig) {
+		opts.requireGangSchedulingPolicy = true
+	}
+	if hasAllDisruptionMode(resolvedConfig) {
+		opts.requireAllDisruptionMode = true
+	}
 	for _, child := range item.Children {
-		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name], resolvedConfig)...)
+		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name], opts)...)
 	}
 	return allErrs
 }
 
 // validatePriorityClassName ensures all items in the tree resolve to the same
 // PriorityClassName, reporting a single error at the root path if any diverge.
+// Keep in sync with validateWorkloadPriority in
+// k8s.io/kubernetes/pkg/apis/scheduling/validation.
 func (b *Builder) validatePriorityClassName(root *WorkloadItem) field.ErrorList {
 	rootPriority := resolveSchedulingConfig(root).PriorityClassName
 
@@ -397,9 +410,9 @@ func (b *Builder) validateDisruptionModeCompatibleWithSchedulingPolicy(item *Wor
 
 // validateParentChildSchedulingPolicy rejects a child group that resolves to a
 // non-gang scheduling policy (including an unset policy, which compiles to
-// Basic) when its parent composite group uses Gang scheduling.
-func (b *Builder) validateParentChildSchedulingPolicy(item *WorkloadItem, resolvedConfig, parentResolvedConfig *SchedulingConfig) field.ErrorList {
-	if !hasGangPolicy(parentResolvedConfig) || hasGangPolicy(resolvedConfig) {
+// Basic) when an ancestor composite group uses Gang scheduling.
+func (b *Builder) validateParentChildSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig, requireGang bool) field.ErrorList {
+	if !requireGang || hasGangPolicy(resolvedConfig) {
 		return nil
 	}
 
@@ -425,9 +438,9 @@ func hasBasicPolicy(cfg *SchedulingConfig) bool {
 
 // validateParentChildDisruptionMode rejects a child group that resolves to a
 // non-All disruption mode (including an unset mode, which defaults to Single)
-// when its parent composite group uses the All disruption mode.
-func (b *Builder) validateParentChildDisruptionMode(item *WorkloadItem, resolvedConfig, parentResolvedConfig *SchedulingConfig) field.ErrorList {
-	if !hasAllDisruptionMode(parentResolvedConfig) || hasAllDisruptionMode(resolvedConfig) {
+// when an ancestor composite group uses the All disruption mode.
+func (b *Builder) validateParentChildDisruptionMode(item *WorkloadItem, resolvedConfig *SchedulingConfig, requireAll bool) field.ErrorList {
+	if !requireAll || hasAllDisruptionMode(resolvedConfig) {
 		return nil
 	}
 
