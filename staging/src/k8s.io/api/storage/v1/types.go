@@ -677,6 +677,7 @@ type CSINodeList struct {
 // node.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:",inline"`
+	]metav1.TypeMeta `json:",inline"`
 
 	// Standard object's metadata.
 	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
