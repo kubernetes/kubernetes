@@ -121,7 +121,9 @@ func (b *recvBuffer) put(r recvMsg) {
 	if b.err != nil {
 		// drop the buffer on the floor. Since b.err is not nil, any subsequent reads
 		// will always return an error, making this buffer inaccessible.
-		r.buffer.Free()
+		if r.buffer != nil {
+			r.buffer.Free()
+		}
 		// An error had occurred earlier, don't accept more
 		// data or errors.
 		return
