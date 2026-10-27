@@ -26,7 +26,6 @@ import (
 )
 
 // ## Resize Operations
-//
 // For resize operations, the goal is to allocate new CPUs as close as possible
 // to the retained CPUs in the topology hierarchy (same NUMA node, same socket, and same core).
 // When sorting topology elements (NUMA nodes, sockets, or cores), prioritize elements that already
@@ -39,8 +38,25 @@ import (
 //
 // TODO: For beta, refactor and unify the add/resize code paths. (Tracking issue: https://github.com/kubernetes/kubernetes/issues/143218)
 
-type numaFirstForResize struct{ acc *cpuAccumulatorForResize }
-type socketsFirstForResize struct{ acc *cpuAccumulatorForResize }
+type numaFirstForResize struct {
+	acc *cpuAccumulatorForResize
+	resizeTakeOrder
+}
+
+type socketsFirstForResize struct {
+	acc *cpuAccumulatorForResize
+	resizeTakeOrder
+}
+
+// resizeTakeOrder adapts the resize accumulator's take methods to the shared
+// topology interface. Functions are meant to be bound in the constructor.
+type resizeTakeOrder struct {
+	first  func()
+	second func()
+}
+
+func (o resizeTakeOrder) takeFullFirstLevel()  { o.first() }
+func (o resizeTakeOrder) takeFullSecondLevel() { o.second() }
 
 var _ numaOrSocketsFirstFuncs = (*numaFirstForResize)(nil)
 var _ numaOrSocketsFirstFuncs = (*socketsFirstForResize)(nil)
@@ -71,18 +87,6 @@ func (a *cpuAccumulatorForResize) sortAvailableUncoreCaches() []int {
 		result = append(result, availableUncoreCaches...)
 	}
 	return result
-}
-
-// If NUMA nodes are higher in the memory hierarchy than sockets, then we take
-// from the set of NUMA Nodes as the first level for resize.
-func (n *numaFirstForResize) takeFullFirstLevel() {
-	n.acc.takeFullNUMANodes()
-}
-
-// If NUMA nodes are higher in the memory hierarchy than sockets, then we take
-// from the set of sockets as the second level for resize.
-func (n *numaFirstForResize) takeFullSecondLevel() {
-	n.acc.takeFullSockets()
 }
 
 // Sort available NUMA nodes for resize when NUMA nodes are higher than sockets in the memory hierarchy.
@@ -140,7 +144,7 @@ func (n *numaFirstForResize) sortAvailableSockets() []int {
 func (n *numaFirstForResize) sortAvailableCores() []int {
 	var result []int
 
-	for _, socket := range n.acc.sortAvailableSockets() {
+	for _, socket := range n.sortAvailableSockets() {
 		allocatedCoresSet := n.acc.resultDetails.CoresInSockets(socket)
 		availableCoresSet := n.acc.details.CoresInSockets(socket)
 
@@ -155,18 +159,6 @@ func (n *numaFirstForResize) sortAvailableCores() []int {
 		result = append(result, availableCores...)
 	}
 	return result
-}
-
-// If sockets are higher in the memory hierarchy than NUMA nodes, then we take
-// from the set of NUMA Nodes as the first level for resize.
-func (s *socketsFirstForResize) takeFullFirstLevel() {
-	s.acc.takeFullSockets()
-}
-
-// If sockets are higher in the memory hierarchy than NUMA nodes, then we take
-// from the set of sockets as the second level for resize.
-func (s *socketsFirstForResize) takeFullSecondLevel() {
-	s.acc.takeFullNUMANodes()
 }
 
 // Sort available NUMA nodes for resize when sockets are higher than NUMA nodes in the memory hierarchy.
@@ -225,7 +217,7 @@ func (s *socketsFirstForResize) sortAvailableSockets() []int {
 func (s *socketsFirstForResize) sortAvailableCores() []int {
 	var result []int
 
-	for _, numa := range s.acc.sortAvailableNUMANodes() {
+	for _, numa := range s.sortAvailableNUMANodes() {
 		allocatedCoresSet := s.acc.resultDetails.CoresInNUMANodes(numa)
 		availableCoresSet := s.acc.details.CoresInNUMANodes(numa)
 
@@ -242,19 +234,14 @@ func (s *socketsFirstForResize) sortAvailableCores() []int {
 	return result
 }
 
-type sortCPUsPackedForResize struct{ acc *cpuAccumulatorForResize }
-type sortCPUsSpreadForResize struct{ acc *cpuAccumulatorForResize }
+// resizeCPUSortFunc adapts the selected resize CPU ordering method to the
+// shared sorter interface without separate packed and spread forwarding types.
+type resizeCPUSortFunc func() []int
 
-var _ availableCPUSorter = (*sortCPUsPackedForResize)(nil)
-var _ availableCPUSorter = (*sortCPUsSpreadForResize)(nil)
+var _ availableCPUSorter = resizeCPUSortFunc(nil)
 
-func (s sortCPUsPackedForResize) sort() []int {
-	return s.acc.sortAvailableCPUsPacked()
-}
-
-func (s sortCPUsSpreadForResize) sort() []int {
-	return s.acc.sortAvailableCPUsSpread()
-}
+// The bound method retains the packed or spread choice made by the resize constructor.
+func (f resizeCPUSortFunc) sort() []int { return f() }
 
 // cpuAccumulatorForResize shares allocation state with cpuAccumulator while
 // keeping retained CPU ordering and taking rules on a separate method set.
@@ -326,15 +313,27 @@ func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, 
 	}
 
 	if topo.NumSockets >= topo.NumNUMANodes {
-		acc.numaOrSocketsFirst = &numaFirstForResize{acc}
+		acc.numaOrSocketsFirst = &numaFirstForResize{
+			acc: acc,
+			resizeTakeOrder: resizeTakeOrder{
+				first:  acc.takeFullNUMANodes,
+				second: acc.takeFullSockets,
+			},
+		}
 	} else {
-		acc.numaOrSocketsFirst = &socketsFirstForResize{acc}
+		acc.numaOrSocketsFirst = &socketsFirstForResize{
+			acc: acc,
+			resizeTakeOrder: resizeTakeOrder{
+				first:  acc.takeFullSockets,
+				second: acc.takeFullNUMANodes,
+			},
+		}
 	}
 
 	if cpuSortingStrategy == CPUSortingStrategyPacked {
-		acc.availableCPUSorter = &sortCPUsPackedForResize{acc}
+		acc.availableCPUSorter = resizeCPUSortFunc(acc.sortAvailableCPUsPacked)
 	} else {
-		acc.availableCPUSorter = &sortCPUsSpreadForResize{acc}
+		acc.availableCPUSorter = resizeCPUSortFunc(acc.sortAvailableCPUsSpread)
 	}
 
 	return acc
@@ -358,54 +357,6 @@ func (a *cpuAccumulatorForResize) isFullCore(coreID int) bool {
 // Returns true if this UncoreCache can be fully claimed by this Container (no CPUs in this UncoreCache are allocated to other containers).
 func (a *cpuAccumulatorForResize) isFullUncoreCache(uncoreID int) bool {
 	return a.resultDetails.CPUsInUncoreCaches(uncoreID).Size()+a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
-}
-
-// Sort all NUMA nodes with at least one free CPU for resize.
-//
-// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
-// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
-//
-// If NUMA nodes are higher than sockets in the memory hierarchy (each NUMA node contains more than one socket),
-// the NUMA nodes are sorted directly: NUMA nodes with retained CPUs first, then other NUMA nodes.
-//
-// If instead sockets are higher in the memory hierarchy than NUMA nodes (each socket contains more than one NUMA node),
-//  1. First, sort sockets: sockets with retained CPUs first, then other sockets.
-//  2. Within each socket, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
-func (a *cpuAccumulatorForResize) sortAvailableNUMANodes() []int {
-	return a.numaOrSocketsFirst.sortAvailableNUMANodes()
-}
-
-// Sort all sockets with at least one free CPU for resize.
-//
-// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
-// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
-//
-// If NUMA nodes are higher in the memory hierarchy than sockets (each NUMA node contains more than one socket),
-//  1. First, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
-//  2. Within each NUMA node, sort sockets: sockets with retained CPUs first, then other sockets.
-//
-// If instead sockets are higher than NUMA nodes in the memory hierarchy (each socket contains more than one NUMA node),
-// the sockets are sorted directly: sockets with retained CPUs first, then other sockets.
-func (a *cpuAccumulatorForResize) sortAvailableSockets() []int {
-	return a.numaOrSocketsFirst.sortAvailableSockets()
-}
-
-// Sort all cores with at least one free CPU for resize.
-//
-// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
-// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
-//
-// If NUMA nodes are higher in the memory hierarchy than sockets (each NUMA node contains more than one socket),
-//  1. First, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
-//  2. Within each NUMA node, sort sockets: sockets with retained CPUs first, then other sockets.
-//  3. Within each socket, sort cores: cores with retained CPUs first, then other cores.
-//
-// If instead sockets are higher in the memory hierarchy than NUMA nodes (each socket contains more than one NUMA node),
-//  1. First, sort sockets: sockets with retained CPUs first, then other sockets.
-//  2. Within each socket, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
-//  3. Within each NUMA node, sort cores: cores with retained CPUs first, then other cores.
-func (a *cpuAccumulatorForResize) sortAvailableCores() []int {
-	return a.numaOrSocketsFirst.sortAvailableCores()
 }
 
 // Sort all free CPUs for resize.
@@ -475,7 +426,7 @@ func (a *cpuAccumulatorForResize) takeFullUncore() {
 			if !a.needsAtLeast(cpusInUncore.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeFullUncore ForResize: claiming uncore", "uncore", uncore)
+			a.logger.V(4).Info("takeFullUncore for resize opration: claiming uncore", "uncore", uncore)
 			a.take(cpusInUncore)
 		}
 	}
@@ -501,7 +452,7 @@ func (a *cpuAccumulatorForResize) takePartialUncore(uncoreID int) {
 				if !a.needsAtLeast(cpusInCore.Size()) {
 					continue
 				}
-				a.logger.V(4).Info("takePartialUncore ForResize: claiming Core", "core", core, "cpusInCore", cpusInCore)
+				a.logger.V(4).Info("takePartialUncore for resize opration: claiming Core", "core", core, "cpusInCore", cpusInCore)
 				a.take(cpusInCore)
 			}
 		}
@@ -535,7 +486,7 @@ func (a *cpuAccumulatorForResize) takePartialUncore(uncoreID int) {
 
 	// claim the cpus if the free cpus within the UncoreCache can satisfy the needed cpus
 	claimed := (a.numCPUsNeeded == freeCPUs.Size())
-	a.logger.V(4).Info("takePartialUncore: trying to claim partial uncore",
+	a.logger.V(4).Info("takePartialUncore for resize opration: trying to claim partial uncore",
 		"uncore", uncoreID,
 		"claimed", claimed,
 		"needed", a.numCPUsNeeded,
@@ -577,7 +528,7 @@ func (a *cpuAccumulatorForResize) takeFullNUMANodes() {
 			if !a.needsAtLeast(cpusInNUMANode.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeFullNUMANodes ForResize: claiming NUMA node", "numa", numa, "cpusInNUMANode", cpusInNUMANode)
+			a.logger.V(4).Info("takeFullNUMANodes for resize opration: claiming NUMA node", "numa", numa, "cpusInNUMANode", cpusInNUMANode)
 			a.take(cpusInNUMANode)
 		}
 	}
@@ -593,7 +544,7 @@ func (a *cpuAccumulatorForResize) takeFullSockets() {
 			if !a.needsAtLeast(cpusInSocket.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeFullSockets ForResize: claiming Socket", "socket", socket, "cpusInSocket", cpusInSocket)
+			a.logger.V(4).Info("takeFullSockets for resize opration: claiming Socket", "socket", socket, "cpusInSocket", cpusInSocket)
 			a.take(cpusInSocket)
 		}
 	}
@@ -609,7 +560,7 @@ func (a *cpuAccumulatorForResize) takeFullCores() {
 			if !a.needsAtLeast(cpusInCore.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeFullCores: claiming Core", "core", core, "cpusInCore", cpusInCore)
+			a.logger.V(4).Info("takeFullCores for resize opration: claiming Core", "core", core, "cpusInCore", cpusInCore)
 			a.take(cpusInCore)
 		}
 	}
@@ -619,7 +570,7 @@ func (a *cpuAccumulatorForResize) takeFullCores() {
 // Algorithm structure is identical, but calls the resize sorter selected at construction.
 func (a *cpuAccumulatorForResize) takeRemainingCPUs() {
 	for _, cpu := range a.availableCPUSorter.sort() {
-		a.logger.V(4).Info("takeRemainingCPUs: claiming CPU", "cpu", cpu)
+		a.logger.V(4).Info("takeRemainingCPUs for resize opration: claiming CPU", "cpu", cpu)
 		a.take(cpuset.New(cpu))
 		if a.isSatisfied() {
 			return
@@ -675,7 +626,7 @@ func (a *cpuAccumulatorForResize) rangeNUMANodesNeededToSatisfy(cpuGroupSize int
 		if minNumNUMAsFromHint > minNumNUMAs && minNumNUMAsFromHint <= maxNumNUMAs {
 			minNumNUMAs = minNumNUMAsFromHint
 		} else if minNumNUMAsFromHint > maxNumNUMAs {
-			a.logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count, ignoring", "minNumNUMAsFromHint", minNumNUMAsFromHint, "maxNumNUMAs", maxNumNUMAs)
+			a.logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count for resize opration, ignoring", "minNumNUMAsFromHint", minNumNUMAsFromHint, "maxNumNUMAs", maxNumNUMAs)
 		}
 	}
 	return
@@ -738,7 +689,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
-	// For resize operations, use sortAvailableNUMANodes to prioritize NUMA nodes with retained CPUs,
+	// For resize operations, prioritize NUMA nodes with retained CPUs,
 	// ensuring topology continuity during resize operations.
 	numas := acc.sortAvailableNUMANodes()
 
