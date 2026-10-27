@@ -38,6 +38,69 @@ type decodedWatchEventResult struct {
 	err   error
 }
 
+const (
+	defaultDecodedResultQueueSize = 100
+	defaultRawResultQueueSize     = 100
+	defaultDecodingConcurrency    = 10
+)
+
+// ConcurrentWatchEventDecoder decodes watch events concurrently while
+// returning them in the order they were read.
+type ConcurrentWatchEventDecoder struct {
+	eventDecoder   *bufferedWatchEventDecoder
+	eventProcessor *bufferedConcurrentWatchEventProcessor
+	waitGroup      sync.WaitGroup
+}
+
+func NewConcurrentWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) *ConcurrentWatchEventDecoder {
+	return newConcurrentWatchEventDecoder(streamDecoder, objectDecoder, defaultRawResultQueueSize, defaultDecodedResultQueueSize, defaultDecodingConcurrency)
+}
+
+func newConcurrentWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder, rawResultQueueSize, decodedResultQueueSize, decodingConcurrency int) *ConcurrentWatchEventDecoder {
+	d := &ConcurrentWatchEventDecoder{
+		eventDecoder: &bufferedWatchEventDecoder{
+			streamDecoder: streamDecoder,
+			rawResultsCh:  make(chan rawWatchEventResult, rawResultQueueSize),
+			doneCh:        make(chan struct{}),
+		},
+	}
+	d.eventProcessor = &bufferedConcurrentWatchEventProcessor{
+		rawResultsCh:     d.eventDecoder.rawResultsCh,
+		objectDecoder:    objectDecoder,
+		decodedResultsCh: make(chan *decodedWatchEventResult, decodedResultQueueSize),
+		pendingResultsCh: make(chan chan *decodedWatchEventResult, decodingConcurrency-1),
+		doneCh:           make(chan struct{}),
+	}
+	d.waitGroup.Add(3)
+	go func() {
+		defer d.waitGroup.Done()
+		d.eventDecoder.read()
+	}()
+	go func() {
+		defer d.waitGroup.Done()
+		d.eventProcessor.scheduleDecoding(&d.waitGroup)
+	}()
+	go func() {
+		defer d.waitGroup.Done()
+		d.eventProcessor.collectResults()
+	}()
+	return d
+}
+
+func (d *ConcurrentWatchEventDecoder) Decode() (watch.EventType, runtime.Object, error) {
+	result := d.eventProcessor.nextResult()
+	if result.err != nil {
+		return "", nil, result.err
+	}
+	return result.event.Type, result.event.Object, nil
+}
+
+func (d *ConcurrentWatchEventDecoder) Close() {
+	d.eventProcessor.close()
+	d.eventDecoder.close()
+	d.waitGroup.Wait()
+}
+
 type bufferedConcurrentWatchEventProcessor struct {
 	rawResultsCh     <-chan rawWatchEventResult
 	objectDecoder    runtime.Decoder
@@ -100,16 +163,17 @@ func (p *bufferedConcurrentWatchEventProcessor) collectResults() {
 
 func (p *bufferedConcurrentWatchEventProcessor) scheduleDecoding(waitGroup *sync.WaitGroup) {
 	defer close(p.pendingResultsCh)
+	var eventResult rawWatchEventResult
+	var ok bool
+
 	for {
-		var eventResult rawWatchEventResult
 		select {
 		case <-p.doneCh:
 			return
-		case result, ok := <-p.rawResultsCh:
+		case eventResult, ok = <-p.rawResultsCh:
 			if !ok {
 				return
 			}
-			eventResult = result
 		}
 		resultCh := make(chan *decodedWatchEventResult, 1)
 		select {
