@@ -32,6 +32,7 @@ import (
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
 	evictionrequestconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/evictionrequest/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
+	imperativeevictionresponderv1alpha1 "k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
 	nodeipamconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/nodeipam/config/v1alpha1"
@@ -95,6 +96,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	evictionrequestconfigv1alpha1.RecommendedDefaultEvictionRequestControllerConfiguration(&obj.EvictionRequestController)
 	// Use the default RecommendedDefaultGarbageCollectorControllerConfiguration options
 	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
+	// Use the default RecommendedDefaultImperativeEvictionResponderControllerConfiguration options
+	imperativeevictionresponderv1alpha1.RecommendedDefaultImperativeEvictionResponderControllerConfiguration(&obj.ImperativeEvictionResponderController)
 	// Use the default RecommendedDefaultJobControllerConfiguration options
 	jobconfigv1alpha1.RecommendedDefaultJobControllerConfiguration(&obj.JobController)
 	// Use the default RecommendedDefaultCronJobControllerConfiguration options

@@ -22,6 +22,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/evictionrequest"
+	"k8s.io/kubernetes/pkg/controller/imperativeevictionresponder"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -55,5 +56,37 @@ func newEvictionRequestController(ctx context.Context, controllerContext Control
 
 	return newControllerLoop(func(ctx context.Context) {
 		evictionRequestController.Run(ctx, int(controllerContext.ComponentConfig.EvictionRequestController.ConcurrentEvictionRequestSyncs))
+	}, controllerName), nil
+}
+
+func newImperativeEvictionResponderControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:        names.ImperativeEvictionResponderController,
+		constructor: newImperativeEvictionResponderController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.EvictionRequestAPI,
+		},
+	}
+}
+
+func newImperativeEvictionResponderController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient(controllerName)
+	if err != nil {
+		return nil, err
+	}
+
+	imperativeEvictionResponderController, err := imperativeevictionresponder.NewController(
+		ctx,
+		controllerName,
+		controllerContext.InformerFactory.Lifecycle().V1alpha1().Evictions(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		client,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return newControllerLoop(func(ctx context.Context) {
+		imperativeEvictionResponderController.Run(ctx, int(controllerContext.ComponentConfig.ImperativeEvictionResponderController.ConcurrentImperativeEvictionResponderSyncs))
 	}, controllerName), nil
 }
