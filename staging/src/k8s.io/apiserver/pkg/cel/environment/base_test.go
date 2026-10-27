@@ -157,3 +157,30 @@ type versionTracker struct {
 	added   *version.Version
 	removed *version.Version
 }
+
+// TestExpressionNodeLimitDisabled verifies that the AST node limit introduced in cel-go v0.33.0
+// (100,000 nodes by default) is disabled, so expressions that parsed with earlier cel-go releases
+// still parse, while the parser's code point limit continues to bound expression size.
+func TestExpressionNodeLimitDisabled(t *testing.T) {
+	// Three-argument map() expands to more AST nodes than source characters, so this expression
+	// exceeds 100,000 nodes while staying under the 100,000 code point limit.
+	const unit = "a.map(b,b,b)"
+	n := 99000 / (len(unit) + 1)
+	withinCodePointLimit := "[" + strings.Repeat(unit+",", n-1) + unit + "]"
+	overCodePointLimit := "[" + strings.Repeat("a,", 50000) + "a]"
+
+	envSet := MustBaseEnvSet(DefaultCompatibilityVersion())
+	for _, envType := range []Type{NewExpressions, StoredExpressions} {
+		env, err := envSet.Env(envType)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, iss := env.Parse(withinCodePointLimit); iss.Err() != nil {
+			t.Errorf("%s: expected expression with more than 100,000 nodes to parse, got: %v",
+				envType, strings.SplitN(iss.Err().Error(), "\n", 2)[0])
+		}
+		if _, iss := env.Parse(overCodePointLimit); iss.Err() == nil {
+			t.Errorf("%s: expected expression over the code point limit to be rejected", envType)
+		}
+	}
+}

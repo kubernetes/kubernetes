@@ -67,6 +67,11 @@ var baseOpts = []VersionedOptions{
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
 			cel.CostModelVersion(0),
+			// cel-go v0.33.0 introduced a default limit of 100,000 AST nodes (including nodes
+			// created by macro expansion). Disable it to keep parsing behavior unchanged for
+			// existing expressions; expression size remains bounded by the parser's 100,000
+			// code point limit.
+			cel.ExpressionNodeLimit(-1),
 
 			UnversionedLib(library.URLs),
 			UnversionedLib(library.Regex),
