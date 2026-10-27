@@ -136,8 +136,8 @@ func TestWithWatchTerminationDuringShutdown(t *testing.T) {
 
 type fakeServerShutdownSignal struct{}
 
-func (fakeServerShutdownSignal) ShuttingDown() <-chan struct{} { return nil }
-func (fakeServerShutdownSignal) Draining() <-chan struct{}     { return nil }
+func (fakeServerShutdownSignal) ShuttingDown() <-chan struct{}    { return nil }
+func (fakeServerShutdownSignal) DrainingWatches() <-chan struct{} { return nil }
 
 type fakeRequestWaitGroup struct {
 	waiting           bool

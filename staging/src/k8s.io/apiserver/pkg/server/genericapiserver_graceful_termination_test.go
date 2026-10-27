@@ -584,7 +584,7 @@ func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		<-signals.Draining()
+		<-signals.DrainingWatches()
 
 		// After observing draining, a positive Add should be rejected.
 		// Success means the watch wait group has not yet entered waiting mode.
@@ -598,12 +598,12 @@ func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
 	}))
 
 	signals := &s.lifecycleSignals
-	signals.InFlightRequestsDraining = wrapLifecycleSignal(t, signals.InFlightRequestsDraining, func(_ lifecycleSignal) {
+	signals.WatchRequestsDraining = wrapLifecycleSignal(t, signals.WatchRequestsDraining, func(_ lifecycleSignal) {
 		// NOTE: this is invoked with WatchRequestWaitGroup locked
 		select {
 		case <-signals.ShuttingDown():
 		default:
-			t.Errorf("Expected ShuttingDown() to be signaled before %s", signals.InFlightRequestsDraining.Name())
+			t.Errorf("Expected ShuttingDown() to be signaled before %s", signals.WatchRequestsDraining.Name())
 		}
 	}, nil)
 
@@ -838,7 +838,7 @@ func setupInFlightWatchRequestHandler(s *GenericAPIServer) *inFlightRequest {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		<-signals.Draining()
+		<-signals.DrainingWatches()
 		w.WriteHeader(http.StatusOK)
 	})
 	s.Handler.NonGoRestfulMux.Handle("/apis/watches.group/v1/namespaces/foo/bar", handler)

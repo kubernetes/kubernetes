@@ -129,11 +129,11 @@ type lifecycleSignals struct {
 	// request will receive an error.
 	NotAcceptingNewRequest lifecycleSignal
 
-	// InFlightRequestsDraining event is signaled when active watch
+	// WatchRequestsDraining event is signaled when active watch
 	// request(s) should start returning, once the rate limiter that
 	// paces them is in effect. If ShutdownWatchTerminationGracePeriod
 	// is not positive, it is signaled right after NotAcceptingNewRequest.
-	InFlightRequestsDraining lifecycleSignal
+	WatchRequestsDraining lifecycleSignal
 
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
@@ -160,9 +160,9 @@ func (s lifecycleSignals) ShuttingDown() <-chan struct{} {
 	return s.NotAcceptingNewRequest.Signaled()
 }
 
-// Draining returns the lifecycle signal that starts draining in-flight requests.
-func (s lifecycleSignals) Draining() <-chan struct{} {
-	return s.InFlightRequestsDraining.Signaled()
+// DrainingWatches returns the lifecycle signal that starts draining active watch requests.
+func (s lifecycleSignals) DrainingWatches() <-chan struct{} {
+	return s.WatchRequestsDraining.Signaled()
 }
 
 // newLifecycleSignals returns an instance of lifecycleSignals interface to be used
@@ -173,7 +173,7 @@ func newLifecycleSignals() lifecycleSignals {
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
 		PreShutdownHooksStopped:    newNamedChannelWrapper("PreShutdownHooksStopped"),
 		NotAcceptingNewRequest:     newNamedChannelWrapper("NotAcceptingNewRequest"),
-		InFlightRequestsDraining:   newNamedChannelWrapper("InFlightRequestsDraining"),
+		WatchRequestsDraining:      newNamedChannelWrapper("WatchRequestsDraining"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),

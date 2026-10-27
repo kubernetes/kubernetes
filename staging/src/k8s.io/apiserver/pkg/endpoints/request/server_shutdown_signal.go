@@ -34,8 +34,8 @@ type ServerShutdownSignal interface {
 	// Signaled when the apiserver is not receiving any new request
 	ShuttingDown() <-chan struct{}
 
-	// Signaled when in-flight requests should start draining.
-	Draining() <-chan struct{}
+	// Signaled when active watch requests should start draining.
+	DrainingWatches() <-chan struct{}
 }
 
 // ServerShutdownSignalFrom returns the ServerShutdownSignal instance
