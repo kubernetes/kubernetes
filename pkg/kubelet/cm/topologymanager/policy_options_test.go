@@ -241,7 +241,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 		},
 		{
-			description:       "an empty NUMAScoreWeights means no weights",
+			description:       "an empty NUMAScoreWeights gets defaults (NodeResourcesFit pattern)",
 			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: true,
 			policyOptions: map[string]string{
@@ -250,7 +250,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			expectedOptions: PolicyOptions{
 				MaxAllowableNUMANodes:  8,
 				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
-				NUMAScoreWeights:       map[string]int{},
+				NUMAScoreWeights:       map[string]int{"cpu": 1, "memory": 1},
 			},
 		},
 		{

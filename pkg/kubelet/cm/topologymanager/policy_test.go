@@ -1882,7 +1882,16 @@ func TestAggregateHintScores(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			score, ok := mergerForPermutation(nil, tc.permutation, nil).aggregateHintScores(tc.permutation)
+			// Provide resource names matching the default weights so hints participate in scoring
+			resources := make([]string, len(tc.permutation))
+			for i := range resources {
+				if i%2 == 0 {
+					resources[i] = "cpu"
+				} else {
+					resources[i] = "memory"
+				}
+			}
+			score, ok := mergerForPermutation(resources, tc.permutation, nil).aggregateHintScores(tc.permutation)
 			if score != tc.expectedScore {
 				t.Errorf("expected score %d, got %d", tc.expectedScore, score)
 			}
@@ -1938,7 +1947,16 @@ func TestMergePermutationCarriesScore(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			merged := mergerForPermutation(nil, tc.permutation, nil).mergePermutation(logger, defaultAffinity, tc.permutation)
+			// Provide resource names matching the default weights
+			resources := make([]string, len(tc.permutation))
+			for i := range resources {
+				if i%2 == 0 {
+					resources[i] = "cpu"
+				} else {
+					resources[i] = "memory"
+				}
+			}
+			merged := mergerForPermutation(resources, tc.permutation, nil).mergePermutation(logger, defaultAffinity, tc.permutation)
 			if merged.Score != tc.expectedScore {
 				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, merged.Score)
 			}
@@ -2363,8 +2381,16 @@ func TestHintMergerWithAllocationStrategy(t *testing.T) {
 			opts := PolicyOptions{
 				NUMAAllocationStrategy: tc.strategy,
 				PreferClosestNUMA:      tc.preferClosest,
+				NUMAScoreWeights:       defaultNUMAScoreWeights(),
 			}
-			merger := NewHintMerger(numaInfo, unnamedHintLists(tc.hints), policyName, opts)
+			// Give each hint list a resource name from the defaults so the
+			// opt-in pattern includes them. "cpu" for all is sufficient since
+			// these tests verify the allocation strategy, not the weights.
+			resources := make([]string, len(tc.hints))
+			for i := range resources {
+				resources[i] = "cpu"
+			}
+			merger := NewHintMerger(numaInfo, namedHintLists(resources, tc.hints), policyName, opts)
 
 			result := merger.Merge(logger)
 			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
@@ -2397,15 +2423,15 @@ func TestAggregateHintScoresWithWeights(t *testing.T) {
 			expectedOk:    true,
 		},
 		{
-			description: "empty weights give the equal-weight average",
+			description: "empty weights exclude all resources (opt-in pattern)",
 			permutation: []TopologyHint{
 				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
 				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
 			},
 			resourceNames: []string{"cpu", "memory"},
 			weights:       map[string]int{},
-			expectedScore: 70,
-			expectedOk:    true,
+			expectedScore: 0,
+			expectedOk:    false,
 		},
 		{
 			// The lookup is case-sensitive, so a weight whose case does not
@@ -2425,7 +2451,8 @@ func TestAggregateHintScoresWithWeights(t *testing.T) {
 		},
 		{
 			// Conversely, a name that does match exactly is applied, including
-			// the mixed case hugepages resources carry.
+			// the mixed case hugepages resources carry. With opt-in pattern, cpu
+			// is excluded since it's not in the weights map.
 			description: "a mixed-case resource name matches when the case is exact",
 			permutation: []TopologyHint{
 				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
@@ -2433,8 +2460,8 @@ func TestAggregateHintScoresWithWeights(t *testing.T) {
 			},
 			resourceNames: []string{"cpu", "hugepages-2Mi"},
 			weights:       map[string]int{"hugepages-2Mi": 3},
-			// (80*1 + 60*3) / 4
-			expectedScore: 65,
+			// cpu not in weights → excluded. Only hugepages: (60*3) / 3
+			expectedScore: 60,
 			expectedOk:    true,
 		},
 		{
@@ -2722,6 +2749,10 @@ func TestAggregateHintScoresKEPWorkedExamples(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error parsing %q: %v", tc.weights, err)
 				}
+				// Apply defaults if empty, matching NewPolicyOptions behavior
+				if len(weights) == 0 {
+					weights = defaultNUMAScoreWeights()
+				}
 
 				score0, ok0 := mergerForPermutation(resourceNames, numa0, weights).aggregateHintScores(numa0)
 				score1, ok1 := mergerForPermutation(resourceNames, numa1, weights).aggregateHintScores(numa1)
@@ -2793,6 +2824,10 @@ func TestAggregateHintScoresKEPWorkedExamples(t *testing.T) {
 				weights, err := parseNUMAScoreWeights(tc.weights)
 				if err != nil {
 					t.Fatalf("unexpected error parsing %q: %v", tc.weights, err)
+				}
+				// Apply defaults if empty, matching NewPolicyOptions behavior
+				if len(weights) == 0 {
+					weights = defaultNUMAScoreWeights()
 				}
 
 				var scored []TopologyHint

@@ -36,6 +36,10 @@ func (p *restrictedPolicy) Name() string {
 	return PolicyRestricted
 }
 
+func (p *restrictedPolicy) UsesHintScores() bool {
+	return usesHintScores(p.opts)
+}
+
 func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
