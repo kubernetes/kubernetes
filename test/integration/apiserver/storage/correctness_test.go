@@ -18,8 +18,10 @@ package storage
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -188,7 +190,7 @@ var (
 
 	unaryCfg = UnaryConfig{
 		Concurrency:         8,
-		MaxOperations:       10000,
+		SucceededOperations: 5000,
 		RequestDistribution: requestDistribution,
 	}
 
@@ -405,12 +407,14 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	})
 	wg.Wait()
 	require.NoError(t, err)
-	watchEvents := 0
-	for _, w := range watches {
-		watchEvents += len(w.Response.Events)
+	unaryTotal, unaryByOp := summarizeUnaryOperations(operations)
+	watchTotal, watchEvents := summarizeWatchOperations(watches)
+	t.Logf("Unary operations: %s", unaryTotal)
+	for _, op := range slices.Sorted(maps.Keys(unaryByOp)) {
+		t.Logf("  %-7s %s", op+":", *unaryByOp[op])
 	}
-	t.Logf("Collected %d unary operations and %d watches with %d events",
-		len(operations), len(watches), watchEvents)
+	t.Logf("Watches: %s events=%d", watchTotal, watchEvents)
+	require.GreaterOrEqual(t, unaryTotal.succeeded, unaryCfg.SucceededOperations, "expected at least %d succeeded unary operations", unaryCfg.SucceededOperations)
 
 	model := ToPorcupineModel(initialState)
 	res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)

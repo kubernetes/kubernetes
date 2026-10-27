@@ -191,7 +191,7 @@ type WatchDistribution struct {
 
 type UnaryConfig struct {
 	Concurrency         int
-	MaxOperations       int
+	SucceededOperations int
 	RequestDistribution RequestDistribution
 }
 
@@ -220,7 +220,8 @@ func pickKeyTarget(key types.NamespacedName, dist []ChoiceWeight[KeyTarget]) typ
 	}
 }
 
-// RunUnaryTraffic drives concurrent storage operations and records all invocations.
+// RunUnaryTraffic drives concurrent storage operations until cfg.SucceededOperations
+// requests succeed and records all invocations.
 func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg UnaryConfig) ([]correctness.Operation, error) {
 	if cfg.Concurrency <= 0 {
 		return nil, fmt.Errorf("concurrency must be positive")
@@ -231,16 +232,16 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []typ
 	if len(cfg.RequestDistribution.Op) == 0 {
 		return nil, fmt.Errorf("operations must be non-empty")
 	}
-	if cfg.MaxOperations <= 0 {
-		return nil, fmt.Errorf("MaxOperations must be positive")
+	if cfg.SucceededOperations <= 0 {
+		return nil, fmt.Errorf("SucceededOperations must be positive")
 	}
 
-	var requestCounter atomic.Int64
+	var succeeded atomic.Int64
 	var mu sync.Mutex
 	var operations []correctness.Operation
 
 	var wg sync.WaitGroup
-	for clientID := 0; clientID < cfg.Concurrency; clientID++ {
+	for clientID := range cfg.Concurrency {
 		wg.Add(1)
 		go func(cid int) {
 			defer wg.Done()
@@ -251,12 +252,14 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []typ
 					return
 				default:
 				}
+				if succeeded.Load() >= int64(cfg.SucceededOperations) {
+					return
+				}
 				request := randomRequest(ctx, store, objects, cfg.RequestDistribution, cachedObj)
 				if request == nil {
 					continue
 				}
-				requestNumber := requestCounter.Add(1)
-				if cfg.MaxOperations > 0 && requestNumber > int64(cfg.MaxOperations) {
+				if succeeded.Load() >= int64(cfg.SucceededOperations) {
 					return
 				}
 				start := time.Now()
@@ -277,6 +280,10 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []typ
 				mu.Lock()
 				operations = append(operations, op)
 				mu.Unlock()
+
+				if response.Err == nil && succeeded.Add(1) >= int64(cfg.SucceededOperations) {
+					return
+				}
 			}
 		}(clientID)
 	}
