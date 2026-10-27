@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
@@ -851,11 +852,18 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
+}
+
+func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) && r.params.Get("sendInitialEvents") == "true" {
+		return restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
+	}
+	return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
