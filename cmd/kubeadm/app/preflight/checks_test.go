@@ -729,6 +729,7 @@ func TestHTTPProxyCheck(t *testing.T) {
 		name           string
 		check          HTTPProxyCheck
 		expectWarnings bool
+		expectErrors   bool
 	}{
 		{
 			name: "Loopback address",
@@ -786,12 +787,20 @@ func TestHTTPProxyCheck(t *testing.T) {
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			name: "Invalid host",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "invalid host",
+			},
+			expectErrors: true,
+		},
 	}
 
 	resetProxyEnv(t)
 
 	for _, rt := range tests {
-		warning, _ := rt.check.Check()
+		warning, errs := rt.check.Check()
 		if (warning != nil) != rt.expectWarnings {
 			t.Errorf(
 				"%s failed HTTPProxyCheck:\n\texpected: %t\n\t  actual: %t (Host:%s). Warnings: %v",
@@ -800,6 +809,15 @@ func TestHTTPProxyCheck(t *testing.T) {
 				(warning != nil),
 				rt.check.Host,
 				warning,
+			)
+		}
+		if (len(errs) > 0) != rt.expectErrors {
+			t.Errorf(
+				"%s failed HTTPProxyCheck:\n\texpected errors: %t\n\t  actual: %v (Host:%s)",
+				rt.name,
+				rt.expectErrors,
+				errs,
+				rt.check.Host,
 			)
 		}
 	}
@@ -1240,13 +1258,6 @@ func TestHostnameCheck(t *testing.T) {
 	}
 }
 
-func TestHTTPProxyCheckInvalidHost(t *testing.T) {
-	_, errs := HTTPProxyCheck{Proto: "https", Host: "invalid host"}.Check()
-	if len(errs) == 0 {
-		t.Error("expected an error for an invalid host, got none")
-	}
-}
-
 func TestHTTPProxyCIDRCheckInvalidCIDR(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1355,47 +1366,47 @@ func TestExternalEtcdVersionCheck(t *testing.T) {
 			}
 		})
 	}
-}
 
-func TestGetHTTPClient(t *testing.T) {
-	check := ExternalEtcdVersionCheck{}
+	t.Run("getHTTPClient", func(t *testing.T) {
+		etcdCheck := ExternalEtcdVersionCheck{}
 
-	client := check.getHTTPClient(nil)
-	if client == nil || client.Timeout != externalEtcdRequestTimeout {
-		t.Errorf("expected a client with timeout %v, got %v", externalEtcdRequestTimeout, client)
-	}
+		client := etcdCheck.getHTTPClient(nil)
+		if client == nil || client.Timeout != externalEtcdRequestTimeout {
+			t.Errorf("expected a client with timeout %v, got %v", externalEtcdRequestTimeout, client)
+		}
 
-	config := &tls.Config{}
-	client = check.getHTTPClient(config)
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok || transport.TLSClientConfig != config {
-		t.Error("expected the provided TLS config to be used by the client transport")
-	}
-}
+		config := &tls.Config{}
+		client = etcdCheck.getHTTPClient(config)
+		transport, ok := client.Transport.(*http.Transport)
+		if !ok || transport.TLSClientConfig != config {
+			t.Error("expected the provided TLS config to be used by the client transport")
+		}
+	})
 
-func TestNormalizeURLString(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     string
-		expected  string
-		expectErr bool
-	}{
-		{name: "no path", input: "https://127.0.0.1:2379", expected: "https://127.0.0.1:2379"},
-		{name: "duplicate slashes in path", input: "https://127.0.0.1:2379//version//", expected: "https://127.0.0.1:2379/version/"},
-		{name: "unparsable URL", input: "://bad", expectErr: true},
-	}
+	t.Run("normalizeURLString", func(t *testing.T) {
+		urlTests := []struct {
+			name      string
+			input     string
+			expected  string
+			expectErr bool
+		}{
+			{name: "no path", input: "https://127.0.0.1:2379", expected: "https://127.0.0.1:2379"},
+			{name: "duplicate slashes in path", input: "https://127.0.0.1:2379//version//", expected: "https://127.0.0.1:2379/version/"},
+			{name: "unparsable URL", input: "://bad", expectErr: true},
+		}
 
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			got, err := normalizeURLString(rt.input)
-			if (err != nil) != rt.expectErr {
-				t.Fatalf("expected error=%t, got %v", rt.expectErr, err)
-			}
-			if got != rt.expected {
-				t.Errorf("expected %q, got %q", rt.expected, got)
-			}
-		})
-	}
+		for _, rt := range urlTests {
+			t.Run(rt.name, func(t *testing.T) {
+				got, err := normalizeURLString(rt.input)
+				if (err != nil) != rt.expectErr {
+					t.Fatalf("expected error=%t, got %v", rt.expectErr, err)
+				}
+				if got != rt.expected {
+					t.Errorf("expected %q, got %q", rt.expected, got)
+				}
+			})
+		}
+	})
 }
 
 func TestImagePullCheck(t *testing.T) {
@@ -1545,7 +1556,7 @@ func TestInitNodeChecks(t *testing.T) {
 			mutate: func(cfg *kubeadmapi.InitConfiguration) {},
 			want: append(append([]string{},
 				"NumCPU", "Mem", "KubernetesVersion", "Firewalld", "HTTPProxy", "HTTPProxyCIDR",
-				fmt.Sprintf("Port-%d", 6443),
+				fmt.Sprintf("Port-%d", kubeadmconstants.KubeAPIServerPort),
 				fmt.Sprintf("Port-%d", kubeadmconstants.KubeSchedulerPort),
 				fmt.Sprintf("Port-%d", kubeadmconstants.KubeControllerManagerPort),
 				fmt.Sprintf("Port-%d", kubeadmconstants.EtcdListenClientPort),
