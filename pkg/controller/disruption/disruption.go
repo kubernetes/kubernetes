@@ -19,6 +19,7 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -521,7 +522,8 @@ func (dc *DisruptionController) removeDB(logger klog.Logger, obj interface{}) {
 func (dc *DisruptionController) addPod(logger klog.Logger, obj interface{}) {
 	pod := obj.(*v1.Pod)
 	logger.V(4).Info("AddPod called on pod", "pod", klog.KObj(pod))
-	pdbs := dc.getPdbsForPod(logger, pod, true)
+	pdbs := dc.getPdbsForPod(logger, pod)
+	dc.warnMultiplePodDisruptionBudgets(logger, pod, pdbs)
 	if len(pdbs) == 0 {
 		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(pod))
 	}
@@ -534,20 +536,22 @@ func (dc *DisruptionController) addPod(logger klog.Logger, obj interface{}) {
 	}
 }
 
-func (dc *DisruptionController) updatePod(logger klog.Logger, old interface{}, cur interface{}) {
+func (dc *DisruptionController) updatePod(logger klog.Logger, old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	syncPdbs := map[string]*policy.PodDisruptionBudget{}
 
 	logger.V(4).Info("UpdatePod called on pod", "pod", klog.KObj(curPod))
 
-	if !apiequality.Semantic.DeepEqual(oldPod.Labels, curPod.Labels) {
-		// Warn only for curPod. Old labels are no longer on the live pod.
-		for _, pdb := range dc.getPdbsForPod(logger, oldPod, false) {
+	if !reflect.DeepEqual(oldPod.Labels, curPod.Labels) {
+		for _, pdb := range dc.getPdbsForPod(logger, oldPod) {
 			syncPdbs[pdb.Name] = pdb
 		}
 	}
-	for _, pdb := range dc.getPdbsForPod(logger, curPod, true) {
+	curPdbs := dc.getPdbsForPod(logger, curPod)
+	// Warn only for curPod. Old labels are no longer on the live pod.
+	dc.warnMultiplePodDisruptionBudgets(logger, curPod, curPdbs)
+	for _, pdb := range curPdbs {
 		syncPdbs[pdb.Name] = pdb
 	}
 	if len(syncPdbs) == 0 {
@@ -582,7 +586,8 @@ func (dc *DisruptionController) deletePod(logger klog.Logger, obj interface{}) {
 		}
 	}
 	logger.V(4).Info("DeletePod called on pod", "pod", klog.KObj(pod))
-	pdbs := dc.getPdbsForPod(logger, pod, true)
+	pdbs := dc.getPdbsForPod(logger, pod)
+	dc.warnMultiplePodDisruptionBudgets(logger, pod, pdbs)
 	if len(pdbs) == 0 {
 		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(pod))
 		return
@@ -621,7 +626,7 @@ func (dc *DisruptionController) enqueueStalePodDisruptionCleanup(logger klog.Log
 	logger.V(4).Info("Enqueued pod to cleanup stale DisruptionTarget condition", "pod", klog.KObj(pod))
 }
 
-func (dc *DisruptionController) getPdbsForPod(logger klog.Logger, pod *v1.Pod, warn bool) []*policy.PodDisruptionBudget {
+func (dc *DisruptionController) getPdbsForPod(logger klog.Logger, pod *v1.Pod) []*policy.PodDisruptionBudget {
 	// GetPodPodDisruptionBudgets returns an error only if no
 	// PodDisruptionBudgets are found.  We don't return that as an error to the
 	// caller.
@@ -630,18 +635,21 @@ func (dc *DisruptionController) getPdbsForPod(logger klog.Logger, pod *v1.Pod, w
 		logger.V(4).Info("No PodDisruptionBudgets found for pod, PodDisruptionBudget controller will avoid syncing.", "pod", klog.KObj(pod))
 		return nil
 	}
-
-	if warn && len(pdbs) > 1 {
-		names := make([]string, len(pdbs))
-		for i, pdb := range pdbs {
-			names[i] = pdb.Name
-		}
-		slices.Sort(names)
-		msg := fmt.Sprintf("Pod %q/%q matches multiple PodDisruptionBudgets %v. Overlapping PDBs are unsupported for eviction.", pod.Namespace, pod.Name, names)
-		logger.Info(msg)
-		dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
-	}
 	return pdbs
+}
+
+func (dc *DisruptionController) warnMultiplePodDisruptionBudgets(logger klog.Logger, pod *v1.Pod, pdbs []*policy.PodDisruptionBudget) {
+	if len(pdbs) <= 1 {
+		return
+	}
+	names := make([]string, len(pdbs))
+	for i, pdb := range pdbs {
+		names[i] = pdb.Name
+	}
+	slices.Sort(names)
+	msg := fmt.Sprintf("Pod %q/%q matches multiple PodDisruptionBudgets %q. Overlapping PDBs are unsupported for eviction.", pod.Namespace, pod.Name, names)
+	logger.Info(msg)
+	dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
 }
 
 // This function returns pods using the PodDisruptionBudget object.

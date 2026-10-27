@@ -1679,7 +1679,7 @@ func TestAddPodEnqueuesAllMatchingPDBs(t *testing.T) {
 
 	// FakeRecorder is synchronous; the event is already on the channel after addPod.
 	wantEvent := fmt.Sprintf(
-		`%s %s Pod %q/%q matches multiple PodDisruptionBudgets %v. Overlapping PDBs are unsupported for eviction.`,
+		`%s %s Pod %q/%q matches multiple PodDisruptionBudgets %q. Overlapping PDBs are unsupported for eviction.`,
 		v1.EventTypeWarning, "MultiplePodDisruptionBudgets", pod.Namespace, pod.Name, []string{"pdb-a", "pdb-b"},
 	)
 	select {
