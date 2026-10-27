@@ -60375,7 +60375,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 bytes.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -60383,7 +60383,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -62089,7 +62089,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 bytes.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -62097,7 +62097,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
