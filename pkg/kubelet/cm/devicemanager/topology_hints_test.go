@@ -43,8 +43,24 @@ func (m *mockAffinityStore) GetAffinity(_ klog.Logger, _ string, _ string) topol
 	return m.hint
 }
 
+// GetPolicy returns a policy which reads hint scores, so the hint generation
+// under test computes them. Providers skip scoring when the configured policy
+// has no NUMA allocation strategy; scoringDisabledAffinityStore covers that.
 func (m *mockAffinityStore) GetPolicy() topologymanager.Policy {
-	return nil
+	return topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{
+		NUMAAllocationStrategy: topologymanager.NUMAAllocationStrategyMostAllocated,
+	})
+}
+
+// scoringDisabledAffinityStore is a store whose policy selects no NUMA
+// allocation strategy, which is the default and means hint scores are never
+// read.
+type scoringDisabledAffinityStore struct {
+	mockAffinityStore
+}
+
+func (m *scoringDisabledAffinityStore) GetPolicy() topologymanager.Policy {
+	return topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{})
 }
 
 func (m *mockAffinityStore) Name() string {
@@ -77,6 +93,8 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
 			numaNodes:        []int{0, 1},
+
+			topologyAffinityStore: &mockAffinityStore{},
 		}
 
 		for r := range tc.devices {
@@ -944,6 +962,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}} },
 			numaNodes:        []int{0, 1},
+
+			topologyAffinityStore: &mockAffinityStore{},
 		}
 
 		for r := range tc.devices {
@@ -998,8 +1018,9 @@ func TestDeviceNUMANodes(t *testing.T) {
 
 	t.Run("collects NUMA nodes from all devices", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 3, 5, 7},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 3, 5, 7},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": deviceOnNode("a", 3),
@@ -1015,8 +1036,9 @@ func TestDeviceNUMANodes(t *testing.T) {
 
 	t.Run("device without topology is ignored", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 4},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 4},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": deviceOnNode("a", 4),
@@ -1032,7 +1054,8 @@ func TestDeviceNUMANodes(t *testing.T) {
 
 	t.Run("returns empty when no device has topology", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": {ID: "a", Topology: nil},
@@ -1047,8 +1070,9 @@ func TestDeviceNUMANodes(t *testing.T) {
 
 	t.Run("unknown NUMA IDs from device plugin are dropped", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 1},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 1},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": deviceOnNode("a", 0),
@@ -1069,8 +1093,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 
 	t.Run("two node machine, device on one node", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 1},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 1},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": {
@@ -1099,8 +1124,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 		}
 
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  allNUMA,
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             allNUMA,
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"gpu0": {
@@ -1134,8 +1160,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 
 	t.Run("devices span all NUMA nodes", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 1},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 1},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": {
@@ -1165,8 +1192,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 
 	t.Run("reusable device on filtered node", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 1, 2, 3},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 1, 2, 3},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": {
@@ -1188,8 +1216,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 
 	t.Run("reusable and available on different nodes", func(t *testing.T) {
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  []int{0, 1, 2, 3},
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             []int{0, 1, 2, 3},
 		}
 		m.allDevices[resource] = DeviceInstances{
 			"a": {
@@ -1227,8 +1256,9 @@ func TestFilteredDeviceHintsMergeWithOtherProviders(t *testing.T) {
 		}
 
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  numaNodes,
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             numaNodes,
 		}
 		m.allDevices["gpu"] = DeviceInstances{
 			"gpu0": {
@@ -1262,8 +1292,9 @@ func TestFilteredDeviceHintsMergeWithOtherProviders(t *testing.T) {
 		}
 
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  numaNodes,
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             numaNodes,
 		}
 		m.allDevices["gpu"] = DeviceInstances{
 			"gpu0": {
@@ -1297,8 +1328,9 @@ func TestFilteredDeviceHintsMergeWithOtherProviders(t *testing.T) {
 		}
 
 		m := ManagerImpl{
-			allDevices: NewResourceDeviceInstances(),
-			numaNodes:  numaNodes,
+			allDevices:            NewResourceDeviceInstances(),
+			topologyAffinityStore: &mockAffinityStore{},
+			numaNodes:             numaNodes,
 		}
 		m.allDevices["gpu"] = DeviceInstances{
 			"gpu0": {

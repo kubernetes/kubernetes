@@ -165,6 +165,12 @@ func (m *ManagerImpl) generateDeviceTopologyHints(logger klog.Logger, resource s
 	// consideration; it will be narrowed as satisfying masks are found.
 	minAffinitySize := len(numaNodes)
 
+	// Resolve once rather than per mask: the answer is a property of the
+	// topology manager policy, which does not change while we iterate.
+	// calculateDeviceScore walks every device of the resource, so skipping it
+	// when nothing reads the score matters most here.
+	scoreHints := topologymanager.HintScoresNeeded(m.topologyAffinityStore)
+
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(numaNodes, func(mask bitmask.BitMask) {
@@ -210,7 +216,10 @@ func (m *ManagerImpl) generateDeviceTopologyHints(logger klog.Logger, resource s
 		// in this NUMA mask are already allocated.  This provides a packing signal
 		// for utilization-aware policies.  We use a simple count-based approach:
 		// all devices are treated equally regardless of capability differences.
-		score := m.calculateDeviceScore(resource, mask)
+		var score int64
+		if scoreHints {
+			score = m.calculateDeviceScore(resource, mask)
+		}
 
 		// Otherwise, create a new hint from the NUMA mask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first

@@ -38,6 +38,10 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
+func (p *bestEffortPolicy) UsesHintScores() bool {
+	return usesHintScores(p.opts)
+}
+
 func (p *bestEffortPolicy) canAdmitPodResult(_ *TopologyHint) bool {
 	return true
 }

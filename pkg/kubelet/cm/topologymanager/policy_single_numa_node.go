@@ -38,6 +38,10 @@ func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
+func (p *singleNumaNodePolicy) UsesHintScores() bool {
+	return usesHintScores(p.opts)
+}
+
 func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
