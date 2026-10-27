@@ -22,6 +22,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 
@@ -110,6 +111,7 @@ var AllOrderedPlugins = []string{
 	mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
 	mutatingwebhook.PluginName,           // MutatingAdmissionWebhook
 	validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
+	conditionsenforcer.PluginName,        // AuthorizationConditionsEnforcer; this is after VAP to avoid having to send webhooks unless needed.
 	validatingwebhook.PluginName,         // ValidatingAdmissionWebhook
 	resourcequota.PluginName,             // ResourceQuota
 	deny.PluginName,                      // AlwaysDeny
@@ -188,6 +190,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
 		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
+		conditionsenforcer.PluginName,           // AuthorizationConditionsEnforcer, only active when feature gate ConditionalAuthorization is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
