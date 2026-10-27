@@ -2885,57 +2885,62 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 	}
 }
 
-func TestGetBookmarkAfterResourceVersion(t *testing.T) {
-	listOptions := func(rv string) storage.ListOptions {
-		p := storage.Everything
+func TestBookmarkAfterResourceVersion(t *testing.T) {
+	forceRequestWatchProgressSupport(t)
 
-		opts := storage.ListOptions{}
-		opts.Predicate = p
-		opts.ResourceVersion = rv
-		return opts
+	listOptions := func(sendInitialEvents *bool, rv string) storage.ListOptions {
+		p := storage.Everything
+		p.AllowWatchBookmarks = true
+		return storage.ListOptions{
+			Predicate:         p,
+			SendInitialEvents: sendInitialEvents,
+			ResourceVersion:   rv,
+			Recursive:         true,
+		}
 	}
 
 	scenarios := []struct {
-		name                      string
-		opts                      storage.ListOptions
-		requiredResourceVersion   int
-		watchCacheResourceVersion int
-
-		expectedBookmarkResourceVersion int
+		name                            string
+		opts                            storage.ListOptions
+		expectedBookmarkResourceVersion uint64
 	}{
 		{
 			name:                            "RV=unset",
-			opts:                            listOptions(""),
-			requiredResourceVersion:         100,
-			watchCacheResourceVersion:       99,
+			opts:                            listOptions(ptr.To(true), ""),
 			expectedBookmarkResourceVersion: 100,
 		},
 		{
 			name:                            "RV=0",
-			opts:                            listOptions("0"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
-			expectedBookmarkResourceVersion: 99,
+			opts:                            listOptions(ptr.To(true), "0"),
+			expectedBookmarkResourceVersion: 105,
 		},
 		{
 			name:                            "RV=95",
-			opts:                            listOptions("95"),
-			requiredResourceVersion:         0,
-			watchCacheResourceVersion:       99,
+			opts:                            listOptions(ptr.To(true), "95"),
 			expectedBookmarkResourceVersion: 95,
+		},
+		{
+			name:                            "sendInitialEvents=false, RV=0",
+			opts:                            listOptions(ptr.To(false), "0"),
+			expectedBookmarkResourceVersion: 0,
 		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			parsedResourceVersion := 0
-			if len(scenario.opts.ResourceVersion) > 0 {
-				var err error
-				parsedResourceVersion, err = strconv.Atoi(scenario.opts.ResourceVersion)
-				require.NoError(t, err)
-			}
+			backingStorage := &cachertesting.MockStorage{}
+			cacher, _, err := newTestCacher(backingStorage)
+			require.NoError(t, err, "couldn't create cacher")
+			defer cacher.Stop()
 
-			getBookMarkResourceVersion := getBookmarkAfterResourceVersion(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), uint64(scenario.watchCacheResourceVersion), scenario.opts)
-			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
+			cacher.watchCache.UpdateResourceVersion("105")
+
+			w, err := cacher.Watch(context.Background(), "/pods/ns", scenario.opts)
+			require.NoError(t, err)
+			defer w.Stop()
+
+			cw, ok := w.(*cacheWatcher)
+			require.True(t, ok, "expected *cacheWatcher, got %T", w)
+			require.Equal(t, scenario.expectedBookmarkResourceVersion, cw.bookmarkAfterResourceVersion, "received unexpected ResourceVersion")
 		})
 	}
 }

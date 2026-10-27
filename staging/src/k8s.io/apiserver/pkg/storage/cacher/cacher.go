@@ -597,8 +597,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 		span.AddEvent("watchCache fresh enough")
 	}
+	if requiredResourceVersion == 0 && opts.SendInitialEvents != nil && !*opts.SendInitialEvents {
+		requiredResourceVersion = c.watchCache.resourceVersion
+	}
 
-	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher, requestedWatchRV, requiredResourceVersion)
+	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher, requiredResourceVersion)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -652,7 +655,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	return watcher, nil
 }
 
-func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher, requestedWatchRV, requiredResourceVersion uint64) (*watchCacheInterval, error) {
+func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher, requiredResourceVersion uint64) (*watchCacheInterval, error) {
 	opts := watcher.filter.opts
 	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, watcher.filter.prefix, opts)
 	if err != nil {
@@ -668,7 +671,10 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 	var bookmarkAfterResourceVersion uint64
 	if isListWatchRequest(opts) {
 		c.setInitialEventsEndBookmark(cacheInterval)
-		bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(requestedWatchRV, requiredResourceVersion, cacheInterval.resourceVersion, opts)
+		bookmarkAfterResourceVersion = requiredResourceVersion
+		if bookmarkAfterResourceVersion == 0 {
+			bookmarkAfterResourceVersion = cacheInterval.resourceVersion
+		}
 	}
 	// Update the bookMarkAfterResourceVersion
 	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
@@ -1336,19 +1342,6 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
-}
-
-// getBookmarkAfterResourceVersion returns a ResourceVersion after which
-// the bookmark event will be delivered.
-func getBookmarkAfterResourceVersion(parsedResourceVersion, requiredResourceVersion, watchCacheResourceVersion uint64, opts storage.ListOptions) uint64 {
-	switch {
-	case len(opts.ResourceVersion) == 0:
-		return requiredResourceVersion
-	case parsedResourceVersion == 0:
-		return watchCacheResourceVersion
-	default:
-		return parsedResourceVersion
-	}
 }
 
 // isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/endpoints/handlers/get.go
