@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
@@ -84,19 +85,27 @@ const (
 type FieldSelector string
 
 const (
-	FieldEverything  FieldSelector = "Everything"
-	FieldByName      FieldSelector = "ByName"
-	FieldByNamespace FieldSelector = "ByNamespace"
-	FieldByNode      FieldSelector = "ByNode"
-	FieldByEmptyNode FieldSelector = "ByEmptyNode"
-	FieldCombined    FieldSelector = "Combined"
+	FieldEverything     FieldSelector = "Everything"
+	FieldByName         FieldSelector = "ByName"
+	FieldNotByName      FieldSelector = "NotByName"
+	FieldByNamespace    FieldSelector = "ByNamespace"
+	FieldNotByNamespace FieldSelector = "NotByNamespace"
+	FieldByNode         FieldSelector = "ByNode"
+	FieldNotByNode      FieldSelector = "NotByNode"
+	FieldByEmptyNode    FieldSelector = "ByEmptyNode"
+	FieldCombined       FieldSelector = "Combined"
 )
 
 type LabelSelector string
 
 const (
-	LabelEverything LabelSelector = "Everything"
-	LabelByApp      LabelSelector = "ByApp"
+	LabelEverything      LabelSelector = "Everything"
+	LabelByApp           LabelSelector = "ByApp"
+	LabelNotByApp        LabelSelector = "NotByApp"
+	LabelAppIn           LabelSelector = "AppIn"
+	LabelAppNotIn        LabelSelector = "AppNotIn"
+	LabelAppExists       LabelSelector = "AppExists"
+	LabelAppDoesNotExist LabelSelector = "AppDoesNotExist"
 )
 
 type WatcherBehavior string
@@ -111,8 +120,8 @@ const (
 var (
 	nodeNames     = []string{"", "node-1", "node-2"}
 	nonEmptyNodes = []string{"node-1", "node-2"}
-	appLabels     = []string{"", "app-a", "app-b"}
-	nonEmptyApps  = []string{"app-a", "app-b"}
+	appLabels     = []string{"", "app-a", "app-b", "app-c"}
+	nonEmptyApps  = []string{"app-a", "app-b", "app-c"}
 
 	errDeleteRejected = errors.New("delete rejected by validateDeletion")
 	errUpdateRejected = errors.New("update rejected by tryUpdate")
@@ -696,30 +705,34 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, keys []typ
 
 func pickPredicate(key types.NamespacedName, fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWeight[LabelSelector]) storage.SelectionPredicate {
 	node := nonEmptyNodes[rand.Intn(len(nonEmptyNodes))]
-	app := nonEmptyApps[rand.Intn(len(nonEmptyApps))]
+	appIdx := rand.Intn(len(nonEmptyApps))
+	app := nonEmptyApps[appIdx]
+	otherApp := nonEmptyApps[(appIdx+1)%len(nonEmptyApps)]
 
 	fieldSel := fields.Everything()
-	var indexFields []string
 	if len(fieldDist) > 0 {
 		switch fs := PickRandom(fieldDist); fs {
 		case FieldEverything:
 			fieldSel = fields.Everything()
 		case FieldByName:
 			fieldSel = fields.OneTermEqualSelector("metadata.name", key.Name)
+		case FieldNotByName:
+			fieldSel = fields.OneTermNotEqualSelector("metadata.name", key.Name)
 		case FieldByNamespace:
 			fieldSel = fields.OneTermEqualSelector("metadata.namespace", key.Namespace)
+		case FieldNotByNamespace:
+			fieldSel = fields.OneTermNotEqualSelector("metadata.namespace", key.Namespace)
 		case FieldByNode:
 			fieldSel = fields.OneTermEqualSelector("spec.nodeName", node)
-			indexFields = []string{"spec.nodeName"}
+		case FieldNotByNode:
+			fieldSel = fields.OneTermNotEqualSelector("spec.nodeName", node)
 		case FieldByEmptyNode:
 			fieldSel = fields.OneTermEqualSelector("spec.nodeName", "")
-			indexFields = []string{"spec.nodeName"}
 		case FieldCombined:
 			fieldSel = fields.AndSelectors(
 				fields.OneTermEqualSelector("metadata.namespace", key.Namespace),
 				fields.OneTermEqualSelector("spec.nodeName", node),
 			)
-			indexFields = []string{"spec.nodeName"}
 		default:
 			panic(fmt.Sprintf("%v: unknown field selector", fs))
 		}
@@ -732,17 +745,30 @@ func pickPredicate(key types.NamespacedName, fieldDist []ChoiceWeight[FieldSelec
 			labelSel = labels.Everything()
 		case LabelByApp:
 			labelSel = labels.SelectorFromSet(labels.Set{"app": app})
+		case LabelNotByApp:
+			labelSel = mustLabelSelector("app", selection.NotEquals, app)
+		case LabelAppIn:
+			labelSel = mustLabelSelector("app", selection.In, app, otherApp)
+		case LabelAppNotIn:
+			labelSel = mustLabelSelector("app", selection.NotIn, app, otherApp)
+		case LabelAppExists:
+			labelSel = mustLabelSelector("app", selection.Exists)
+		case LabelAppDoesNotExist:
+			labelSel = mustLabelSelector("app", selection.DoesNotExist)
 		default:
 			panic(fmt.Sprintf("%v: unknown label selector", ls))
 		}
 	}
 
-	return storage.SelectionPredicate{
-		Label:       labelSel,
-		Field:       fieldSel,
-		GetAttrs:    registrypod.GetAttrs,
-		IndexFields: indexFields,
+	return registrypod.MatchPod(labelSel, fieldSel)
+}
+
+func mustLabelSelector(key string, op selection.Operator, vals ...string) labels.Selector {
+	req, err := labels.NewRequirement(key, op, vals)
+	if err != nil {
+		panic(err)
 	}
+	return labels.NewSelector().Add(*req)
 }
 
 func relativeRV(ctx context.Context, store storage.Interface, offset int64) string {
