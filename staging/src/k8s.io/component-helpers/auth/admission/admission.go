@@ -220,6 +220,7 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 }
 
 func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+	// Bootstrap the expected issuer from our projected credential, never the incoming token.
 	token, err := jwt.ParseSigned(strings.TrimSpace(config.BearerToken), serviceAccountSigningAlgs)
 	if err != nil {
 		return nil, fmt.Errorf("admission: parsing projected ServiceAccount token: %w", err)
@@ -380,10 +381,12 @@ func checkOperationObjectPresence(operation admissionv1.Operation, objectPresent
 			return fmt.Errorf("UPDATE requires object and oldObject (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
 		}
 	case admissionv1.Delete:
+		// The API server supplies the deleted object as oldObject.
 		if objectPresent || !oldObjectPresent {
 			return fmt.Errorf("DELETE requires oldObject and no object (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
 		}
 	case admissionv1.Connect:
+		// Some REST connect handlers have no options object.
 		if oldObjectPresent {
 			return fmt.Errorf("CONNECT must not carry oldObject (objectPresent=%t, oldObjectPresent=%t)", objectPresent, oldObjectPresent)
 		}
@@ -447,6 +450,7 @@ func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, g
 		if err != nil {
 			return false, err
 		}
+		// Inspect the original fields; malformed apiVersion can yield an empty GVK.
 		if unknown.APIVersion != "" || unknown.Kind != "" {
 			if !present {
 				return false, fmt.Errorf("%s has type metadata without an object", name)
@@ -531,6 +535,7 @@ func (v *Verifier) authenticateToken(ctx context.Context, rawToken string) ([]st
 	if ctx.Err() != nil {
 		return nil, errVerificationFailed
 	}
+	// JWTs use compact serialization; the JOSE parser also accepts JSON JWS.
 	if strings.HasPrefix(strings.TrimSpace(rawToken), "{") {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token is not compact JWT")
 		return nil, errVerificationFailed
