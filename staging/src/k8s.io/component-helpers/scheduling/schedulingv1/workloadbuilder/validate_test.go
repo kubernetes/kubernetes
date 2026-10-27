@@ -17,6 +17,7 @@ limitations under the License.
 package workloadbuilder
 
 import (
+	"strings"
 	"testing"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -55,6 +56,7 @@ func TestBuilderValidate(t *testing.T) {
 		wantErrs         int
 		wantType         field.ErrorType
 		wantErrFieldPath string
+		wantErrDetail    string
 	}{
 		{
 			name:          "nil tree fails to compile",
@@ -78,10 +80,19 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "workload item name cannot be empty",
 		},
 		{
 			name:          "basic forbidden when not allow-listed",
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: basic()}},
+			allowPolicies: []SchedulingPolicyOption{GangPolicy},
+			allowModes:    allModes,
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
+		},
+		{
+			name:          "unset policy (defaulting to basic) forbidden when basic not allow-listed",
+			root:          &WorkloadItem{Name: "job"},
 			allowPolicies: []SchedulingPolicyOption{GangPolicy},
 			allowModes:    allModes,
 			wantErrs:      1,
@@ -108,6 +119,22 @@ func TestBuilderValidate(t *testing.T) {
 			allowModes:    []DisruptionModeOption{SingleMode},
 		},
 		{
+			name:          "single disruption forbidden when not allow-listed",
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: singleDisruption()}},
+			allowPolicies: allPolicies,
+			allowModes:    []DisruptionModeOption{AllMode},
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
+		},
+		{
+			name:          "unset disruption (defaulting to single) forbidden when single not allow-listed",
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
+			allowPolicies: allPolicies,
+			allowModes:    []DisruptionModeOption{AllMode},
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
+		},
+		{
 			name:          "all disruption forbidden when not allow-listed",
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: allDisruption()}},
 			allowPolicies: allPolicies,
@@ -118,6 +145,14 @@ func TestBuilderValidate(t *testing.T) {
 		{
 			name:          "basic with all disruption is rejected by cross-field rule",
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: basic(), DisruptionMode: allDisruption()}},
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+			wantErrs:      1,
+			wantType:      field.ErrorTypeInvalid,
+		},
+		{
+			name:          "unset policy (defaulting to basic) with all disruption is rejected by cross-field rule",
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{DisruptionMode: allDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    allModes,
 			wantErrs:      1,
@@ -257,6 +292,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: policy",
 		},
 		{
 			name: "composite policy set with a leaf disruptionMode fails the input union",
@@ -272,6 +308,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: disruptionMode",
 		},
 		{
 			name: "input union is enforced even when declarative validation is disabled",
@@ -286,6 +323,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "sets leaf building block: policy",
 		},
 		{
 			name: "invalid leaf child in a composite tree is validated recursively",
@@ -313,6 +351,7 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrs:         1,
 			wantType:         field.ErrorTypeInternal,
 			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "does not match new root name",
 		},
 		{
 			name:          "update clearing policy skips declarative validation for the new nil policy",
@@ -368,6 +407,222 @@ func TestBuilderValidate(t *testing.T) {
 			wantType:         field.ErrorTypeInvalid,
 			wantErrFieldPath: "spec.scheduling.schedulingPolicy.gang.minCount",
 		},
+		{
+			name: "tree at max allowed depth is accepted",
+			root: newWorkloadItem("cpg1", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("cpg2", withPath(schedulingPath), withCompositeGang(1),
+					withChildren(newWorkloadItem("cpg3", withPath(schedulingPath), withCompositeGang(1),
+						withChildren(newWorkloadItem("leaf", withPath(schedulingPath), withGang(2)))))))),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			name: "tree exceeding max allowed depth is rejected",
+			root: newWorkloadItem("cpg1", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("cpg2", withPath(schedulingPath), withCompositeGang(1),
+					withChildren(newWorkloadItem("cpg3", withPath(schedulingPath), withCompositeGang(1),
+						withChildren(newWorkloadItem("cpg4", withPath(schedulingPath), withCompositeGang(1),
+							withChildren(newWorkloadItem("leaf", withPath(schedulingPath), withGang(2)))))))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "exceeds maximum allowed tree depth",
+		},
+		{
+			name: "composite item exceeding max allowed leaf children is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath), withInput(WorkloadInput{Policy: compositeBasic()}),
+				withChildren(
+					newWorkloadItem("leaf-1", withBasic()),
+					newWorkloadItem("leaf-2", withBasic()),
+					newWorkloadItem("leaf-3", withBasic()),
+					newWorkloadItem("leaf-4", withBasic()),
+					newWorkloadItem("leaf-5", withBasic()),
+					newWorkloadItem("leaf-6", withBasic()),
+					newWorkloadItem("leaf-7", withBasic()),
+					newWorkloadItem("leaf-8", withBasic()),
+					newWorkloadItem("leaf-9", withBasic()),
+				)),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "leaf children, exceeding maximum allowed",
+		},
+		{
+			name: "composite item exceeding max allowed composite children is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath), withInput(WorkloadInput{Policy: compositeBasic()}),
+				withChildren(
+					newWorkloadItem("cpg-1", withChildren(newWorkloadItem("leaf-1", withBasic()))),
+					newWorkloadItem("cpg-2", withChildren(newWorkloadItem("leaf-2", withBasic()))),
+					newWorkloadItem("cpg-3", withChildren(newWorkloadItem("leaf-3", withBasic()))),
+					newWorkloadItem("cpg-4", withChildren(newWorkloadItem("leaf-4", withBasic()))),
+					newWorkloadItem("cpg-5", withChildren(newWorkloadItem("leaf-5", withBasic()))),
+					newWorkloadItem("cpg-6", withChildren(newWorkloadItem("leaf-6", withBasic()))),
+					newWorkloadItem("cpg-7", withChildren(newWorkloadItem("leaf-7", withBasic()))),
+					newWorkloadItem("cpg-8", withChildren(newWorkloadItem("leaf-8", withBasic()))),
+					newWorkloadItem("cpg-9", withChildren(newWorkloadItem("leaf-9", withBasic()))),
+				)),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+			wantErrDetail:    "composite children, exceeding maximum allowed",
+		},
+		{
+			name: "composite basic parent with basic and gang children is valid",
+			root: newWorkloadItem("root", withPath(schedulingPath), withInput(WorkloadInput{Policy: compositeBasic()}),
+				withChildren(
+					newWorkloadItem("basic-child", withPath(schedulingPath), withBasic()),
+					newWorkloadItem("gang-child", withPath(schedulingPath), withGang(2)),
+				)),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			name: "composite gang parent with basic leaf child is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("child", withPath(field.NewPath("spec", "childScheduling")), withBasic()))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.childScheduling.schedulingPolicy",
+		},
+		{
+			name: "composite gang parent with unset leaf child policy (defaulting to basic) is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("child", withPath(field.NewPath("spec", "childScheduling")),
+					withInput(WorkloadInput{Policy: PolicyInput{PathElements: []string{"schedulingPolicy"}}})))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.childScheduling.schedulingPolicy",
+		},
+		{
+			name: "composite gang parent with basic composite child is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("mid", withPath(field.NewPath("spec", "midScheduling")),
+					withInput(WorkloadInput{Policy: PolicyInput{PathElements: []string{"schedulingPolicy"}, CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}}),
+					withChildren(newWorkloadItem("leaf", withPath(field.NewPath("spec", "leafScheduling")), withGang(2)))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.midScheduling.schedulingPolicy",
+		},
+		{
+			name: "composite gang parent with basic composite child and basic leaf grandchild rejects both",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("mid", withPath(field.NewPath("spec", "midScheduling")),
+					withInput(WorkloadInput{Policy: PolicyInput{PathElements: []string{"schedulingPolicy"}, CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}}),
+					withChildren(newWorkloadItem("leaf", withPath(field.NewPath("spec", "leafScheduling")), withBasic()))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         2,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.midScheduling.schedulingPolicy",
+		},
+		{
+			name: "composite gang parent with gang composite child and basic leaf grandchild is rejected at grandchild",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
+				withChildren(newWorkloadItem("mid", withPath(schedulingPath), withCompositeGang(1),
+					withChildren(newWorkloadItem("leaf", withPath(field.NewPath("spec", "leafScheduling")), withBasic()))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.leafScheduling.schedulingPolicy",
+		},
+		{
+			name: "composite single disruption parent with single and all disruption children is valid",
+			root: newWorkloadItem("root", withPath(schedulingPath),
+				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeSingleDisruption()}),
+				withChildren(
+					newWorkloadItem("single-child", withPath(schedulingPath), withGang(2), withLeafDisruption(singleDisruption())),
+					newWorkloadItem("all-child", withPath(schedulingPath), withGang(2), withLeafDisruption(allDisruption())),
+				)),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			name: "composite all disruption parent with all disruption child is valid",
+			root: newWorkloadItem("root", withPath(schedulingPath),
+				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeAllDisruption()}),
+				withChildren(newWorkloadItem("child", withPath(schedulingPath), withGang(2), withLeafDisruption(allDisruption())))),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			name: "composite all disruption parent with single disruption leaf child is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath),
+				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeAllDisruption()}),
+				withChildren(newWorkloadItem("child", withPath(field.NewPath("spec", "childScheduling")),
+					withGang(2), withLeafDisruption(singleDisruption())))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.childScheduling.disruptionMode",
+		},
+		{
+			name: "composite all disruption parent with unset disruption leaf child is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath),
+				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeAllDisruption()}),
+				withChildren(newWorkloadItem("child", withPath(field.NewPath("spec", "childScheduling")),
+					withGang(2), withLeafDisruption(DisruptionModeInput{PathElements: []string{"disruptionMode"}})))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.childScheduling.disruptionMode",
+		},
+		{
+			name: "composite all disruption parent with single disruption composite child is rejected",
+			root: newWorkloadItem("root", withPath(schedulingPath),
+				withInput(WorkloadInput{Policy: compositeGang(), DisruptionMode: compositeAllDisruption()}),
+				withChildren(newWorkloadItem("mid", withPath(field.NewPath("spec", "midScheduling")),
+					withInput(WorkloadInput{
+						Policy: compositeGang(),
+						DisruptionMode: DisruptionModeInput{
+							PathElements:          []string{"disruptionMode"},
+							CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}},
+						},
+					}),
+					withChildren(newWorkloadItem("leaf", withPath(schedulingPath), withGang(2), withLeafDisruption(allDisruption())))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.midScheduling.disruptionMode",
+		},
+		{
+			name: "matching priorityClassName across the tree is valid",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1), withPriorityClassName("high-priority"),
+				withChildren(
+					newWorkloadItem("child-1", withPath(schedulingPath), withGang(2), withPriorityClassName("high-priority")),
+					newWorkloadItem("child-2", withPath(schedulingPath), withGang(2), withPriorityClassName("high-priority")),
+				)),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			name: "mismatched priorityClassName across the tree reports a single error at the root path",
+			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1), withPriorityClassName("high-priority"),
+				withChildren(
+					newWorkloadItem("child-1", withPath(field.NewPath("spec", "child1")), withGang(2), withPriorityClassName("low-priority")),
+					newWorkloadItem("child-2", withPath(field.NewPath("spec", "child2")), withGang(2), withPriorityClassName("other-priority")),
+				)),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.scheduling",
+		},
 	}
 
 	for _, tt := range tests {
@@ -387,6 +642,9 @@ func TestBuilderValidate(t *testing.T) {
 			}
 			if tt.wantErrFieldPath != "" && errs[0].Field != tt.wantErrFieldPath {
 				t.Errorf("expected error field %q, got %q", tt.wantErrFieldPath, errs[0].Field)
+			}
+			if tt.wantErrDetail != "" && !strings.Contains(errs[0].Detail, tt.wantErrDetail) {
+				t.Errorf("expected error detail containing %q, got %q", tt.wantErrDetail, errs[0].Detail)
 			}
 		})
 	}
@@ -423,6 +681,42 @@ func withGang(minCount int32) itemOption {
 	}
 }
 
+func withBasic() itemOption {
+	return func(i *WorkloadItem) {
+		i.Input.Policy = PolicyInput{
+			PathElements: []string{"schedulingPolicy"},
+			PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			},
+		}
+	}
+}
+
+func withCompositeGang(minGroupCount int32) itemOption {
+	return func(i *WorkloadItem) {
+		i.Input.Policy = PolicyInput{
+			PathElements:          []string{"schedulingPolicy"},
+			CompositePodGroupData: compositeGangData(minGroupCount),
+		}
+	}
+}
+
+func withLeafDisruption(dm DisruptionModeInput) itemOption {
+	return func(i *WorkloadItem) {
+		dm.PathElements = []string{"disruptionMode"}
+		i.Input.DisruptionMode = dm
+	}
+}
+
+func withPriorityClassName(name string) itemOption {
+	return func(i *WorkloadItem) {
+		if i.DefaultConfig == nil {
+			i.DefaultConfig = &SchedulingConfig{}
+		}
+		i.DefaultConfig.PriorityClassName = name
+	}
+}
+
 func withChildren(children ...*WorkloadItem) itemOption {
 	return func(i *WorkloadItem) {
 		i.Children = children
@@ -446,6 +740,22 @@ func allDisruption() DisruptionModeInput {
 	return DisruptionModeInput{
 		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
 			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		},
+	}
+}
+
+func compositeSingleDisruption() DisruptionModeInput {
+	return DisruptionModeInput{
+		CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+			Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{},
+		},
+	}
+}
+
+func compositeAllDisruption() DisruptionModeInput {
+	return DisruptionModeInput{
+		CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+			All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
 		},
 	}
 }

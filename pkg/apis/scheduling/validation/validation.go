@@ -199,6 +199,10 @@ func validateWorkloadTemplatesDepth(spec *scheduling.WorkloadSpec, fldPath *fiel
 	return allErrs
 }
 
+// validateWorkloadPriority checks that all templates in the Workload hierarchy
+// share the same priorityClassName and priority values.
+// Keep in sync with Builder.validatePriorityClassName in
+// k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder.
 func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
 	var firstClassName *string
 	var firstPriority *int32
