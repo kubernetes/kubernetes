@@ -29,6 +29,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -76,8 +77,8 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 		})
 
 		ginkgo.It("should continue probing on rule match", func(ctx context.Context) {
-			podName := "restart-rules-continue-probing-exit-code-" + string(uuid.NewUUID())
-			containerName := "container-restart-rules-continue-probing"
+			podName := "restart-rules-probing-" + string(uuid.NewUUID())
+			containerName := "main-container"
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -86,26 +87,9 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Name:  containerName,
-							Image: imageutils.GetE2EImage(imageutils.BusyBox),
-							StartupProbe: &v1.Probe{
-								ProbeHandler: v1.ProbeHandler{
-									Exec: &v1.ExecAction{
-										Command: []string{
-											"/bin/sh", "-c", "touch /state/probe; test -f /state/second-run",
-										},
-									},
-								},
-								InitialDelaySeconds: 3,
-								PeriodSeconds:       2,
-								FailureThreshold:    10,
-							},
-
-							// each time the startup probe runs it creates /state/probe marker.
-							// each time the container runs it removes said /state/probe marker.
-							// this to ensure that existence of "/state/probe" at the end of the test case
-							// neccesarily means the startup probe has run after the pod restarted
-							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 42; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
+							Name:          containerName,
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "if [ -f /mnt/restart-complete ]; then sleep 10000; else touch /mnt/restart-complete; exit 42; fi"},
 							RestartPolicy: &containerRestartPolicyNever,
 							RestartPolicyRules: []v1.ContainerRestartRule{
 								{
@@ -116,14 +100,35 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 									},
 								},
 							},
+							// The container exits before InitialDelaySeconds elapses, so the
+							// probes can only succeed against the restarted container.
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+								},
+								InitialDelaySeconds: 3,
+								PeriodSeconds:       2,
+								FailureThreshold:    10,
+							},
+							// Readiness is only probed once the startup probe has succeeded, so
+							// Ready also covers the readiness probe worker surviving the restart.
+							ReadinessProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+								},
+								PeriodSeconds: 2,
+							},
 							VolumeMounts: []v1.VolumeMount{
-								{Name: "state", MountPath: "/state"},
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
 							},
 						},
 					},
 					Volumes: []v1.Volume{
 						{
-							Name: "state",
+							Name: "workdir",
 							VolumeSource: v1.VolumeSource{
 								EmptyDir: &v1.EmptyDirVolumeSource{},
 							},
@@ -132,23 +137,36 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 				},
 			}
 
-			ginkgo.By("Creating the pod")
-			e2epod.NewPodClient(f).Create(ctx, pod)
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
 
-			ginkgo.By("Waiting for the container to restart")
-			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "container restarted and startup probe succeeded", 10*time.Minute, func(pod *v1.Pod) (bool, error) {
+			ginkgo.By("Waiting for the container to be restarted by the matching rule")
+			framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "container restarted by rule", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
 				for _, status := range pod.Status.ContainerStatuses {
-					if status.Name == containerName && status.RestartCount > 0 {
-						return true, nil
+					if status.Name != containerName || status.RestartCount == 0 {
+						continue
+					}
+					if status.LastTerminationState.Terminated == nil || status.LastTerminationState.Terminated.ExitCode != 42 {
+						return false, fmt.Errorf("container %q restarted without exiting with code 42: %+v", containerName, status.LastTerminationState)
+					}
+					return true, nil
+				}
+				return false, nil
+			}), "wait for container %q in Pod %q to be restarted", containerName, podName)
+
+			ginkgo.By("Waiting for the restarted container to pass its startup and readiness probes")
+			framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "restarted container started and ready", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == containerName {
+						return status.RestartCount > 0 && status.Started != nil && *status.Started && status.Ready, nil
 					}
 				}
 				return false, nil
-			})
-			framework.ExpectNoError(err, "wait for container restart and startup probe")
-			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "sleep 5; test -f /state/probe # sleep to allow probe to run"), "verify startup probe created /state/probe")
-
-			// to avoid test succeeding for the wrong reason
-			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "test -f /state/second-run"), "verify pod was restarted")
+			}), "wait for restarted container %q in Pod %q to be started and ready", containerName, podName)
 		})
 
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
@@ -561,6 +579,148 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 			validateAllContainersRestarted(ctx, f, pod, []string{"source-container", "regular"})
 			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
 			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+
+		ginkgo.It("should not carry liveness probe failures over to a restarted container that terminated on rule mismatch", func(ctx context.Context) {
+			podName := "restart-rules-probe-state-" + string(uuid.NewUUID())
+			// Fails once per container, which only reaches FailureThreshold if the probe
+			// worker carried the old container's failure over the restart.
+			livenessCommand := "[ -f /tmp/probed ] || { touch /tmp/probed; exit 1; }"
+			probePeriodSeconds := int32(3)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					// Without a SIGTERM handler, a liveness kill would take the full 30s grace period.
+					TerminationGracePeriodSeconds: ptr.To[int64](1),
+					Containers: []v1.Container{
+						{
+							Name:          "target",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "if [ -f /mnt/target-started ]; then sleep 10000; else touch /mnt/target-started; until [ -f /tmp/probed ]; do sleep 0.1; done; sleep 1; exit 1; fi"},
+							RestartPolicy: &containerRestartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{
+									Action: v1.ContainerRestartRuleActionRestart,
+									ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+										Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+										Values:   []int32{42},
+									},
+								},
+							},
+							LivenessProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{Command: []string{"/bin/sh", "-c", livenessCommand}},
+								},
+								PeriodSeconds:    probePeriodSeconds,
+								FailureThreshold: 2,
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							// Restarts every container once the test signals that the probe
+							// worker has had time to observe the terminated target.
+							Name:               "trigger",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/restart-complete ]; then sleep 10000; else until [ -f /mnt/restart-trigger ]; do sleep 0.1; done; touch /mnt/restart-complete; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			ginkgo.By("Waiting for the target container to terminate without a matching rule")
+			framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "target terminated", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == "target" && status.State.Terminated != nil {
+						if status.State.Terminated.ExitCode != 1 {
+							return false, fmt.Errorf("target exited with code %d, expected 1", status.State.Terminated.ExitCode)
+						}
+						return true, nil
+					}
+				}
+				return false, nil
+			}))
+
+			// Whether the probe worker stopped is not visible through the API. It reads the
+			// same status that is reported to the API server, though, so it sees the
+			// termination within one probe period from here. Two periods leave some margin.
+			ginkgo.By("Verifying the target container is not restarted without a matching rule")
+			gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
+				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == "target" {
+						return status.State.Terminated != nil && status.RestartCount == 0, nil
+					}
+				}
+				return false, nil
+			}).WithTimeout(2 * time.Duration(probePeriodSeconds) * time.Second).WithPolling(time.Second).Should(gomega.BeTrueBecause("the target container should stay terminated without a matching rule"))
+
+			ginkgo.By("Restarting all containers")
+			e2epod.ExecCommandInContainer(f, podName, "trigger", "touch", "/mnt/restart-trigger")
+
+			validateAllContainersRestarted(ctx, f, pod, []string{"target", "trigger"})
+
+			ginkgo.By("Waiting for the liveness probe to fail once in the restarted target container")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == "target" && status.State.Terminated != nil {
+						return gomega.StopTrying(fmt.Sprintf("restarted target container terminated with exit code %d after a single liveness probe failure", status.State.Terminated.ExitCode))
+					}
+				}
+				_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, podName, "target", "test", "-f", "/tmp/probed")
+				return err
+			}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying the restarted target container is not killed by its first liveness probe failure")
+			gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
+				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == "target" {
+						return status.State.Running != nil, nil
+					}
+				}
+				return false, nil
+			}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(gomega.BeTrueBecause("the restarted target container should survive a single liveness probe failure"))
 		})
 	})
 })
