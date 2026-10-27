@@ -522,6 +522,16 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.computeBatchablePlugins()
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		for _, pl := range f.postFilterPlugins {
+			if !slices.ContainsFunc(f.podGroupPostFilterPlugins, func(pgpl fwk.PodGroupPostFilterPlugin) bool {
+				return pgpl.Name() == pl.Name()
+			}) {
+				logger.Error(nil, "PostFilter plugin does not implement PodGroupPostFilterPlugin; it will not be run for PodGroups or CompositePodGroups", "plugin", pl.Name(), "profile", f.profileName)
+			}
+		}
+	}
+
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
 			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {

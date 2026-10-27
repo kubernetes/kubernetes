@@ -40,6 +40,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -72,6 +73,9 @@ const (
 	placementGeneratePlugin           = "placement-generate-plugin"
 	placementGeneratePlugin2          = "placement-generate-plugin-2"
 	defaultPreemptionPlugin           = names.DefaultPreemption
+	postFilterOnlyPlugin1             = "post-filter-only-plugin-1"
+	postFilterOnlyPlugin2             = "post-filter-only-plugin-2"
+	filterAndPostFilterPlugin         = "filter-and-post-filter-plugin"
 
 	testProfileName                   = "test-profile"
 	testPercentageOfNodesToScore      = 35
@@ -492,6 +496,9 @@ var registry = func() Registry {
 	r.Register(placementGeneratePlugin2, newTestPlacementGeneratePlugin2)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
 	r.Register(defaultPreemptionPlugin, newMockDefaultPreemptionPlugin)
+	r.Register(postFilterOnlyPlugin1, newPostFilterOnlyPluginFactory(postFilterOnlyPlugin1))
+	r.Register(postFilterOnlyPlugin2, newPostFilterOnlyPluginFactory(postFilterOnlyPlugin2))
+	r.Register(filterAndPostFilterPlugin, newFilterAndPostFilterPlugin)
 	return r
 }()
 
@@ -796,6 +803,171 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPostFilterWithoutPodGroupPostFilterWarning(t *testing.T) {
+	const wantMsg = "PostFilter plugin does not implement PodGroupPostFilterPlugin; it will not be run for PodGroups or CompositePodGroups"
+	tests := []struct {
+		name                      string
+		genericWorkloadEnabled    bool
+		filterPlugins             []config.Plugin
+		postFilterPlugins         []config.Plugin
+		podGroupPostFilterPlugins []config.Plugin
+		wantErrorLogs             []ktesting.LogEntry
+	}{
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin is also enabled at PodGroupPostFilter",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin implementing PodGroupPostFilterPlugin is enabled only at PostFilter",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantMsg, ParameterKVList: []any{"plugin", defaultPreemptionPlugin, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin does not implement PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: postFilterOnlyPlugin1},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin1, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, multiple PostFilter plugins with and without PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+				{Name: postFilterOnlyPlugin1},
+				{Name: postFilterOnlyPlugin2},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin1, "profile", testProfileName}},
+				{Type: ktesting.LogError, Message: wantMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin2, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin is also enabled at PodGroupPostFilter",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin implementing PodGroupPostFilterPlugin is enabled only at PostFilter",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin does not implement PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: postFilterOnlyPlugin1},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, plugin implementing PostFilter is enabled only at Filter",
+			genericWorkloadEnabled: true,
+			filterPlugins: []config.Plugin{
+				{Name: filterAndPostFilterPlugin},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.genericWorkloadEnabled)
+
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			ctx, cancel := context.WithCancel(klog.NewContext(context.Background(), logger))
+			defer cancel()
+
+			profile := config.KubeSchedulerProfile{
+				SchedulerName: testProfileName,
+				Plugins: &config.Plugins{
+					Filter: config.PluginSet{
+						Enabled: tc.filterPlugins,
+					},
+					PostFilter: config.PluginSet{
+						Enabled: tc.postFilterPlugins,
+					},
+					PodGroupPostFilter: config.PluginSet{
+						Enabled: tc.podGroupPostFilterPlugins,
+					},
+				},
+			}
+			if _, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile); err != nil {
+				t.Fatalf("Unexpected framework initialization error: %v", err)
+			}
+			var gotErrorLogs []ktesting.LogEntry
+			for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+				if entry.Type == ktesting.LogError {
+					gotErrorLogs = append(gotErrorLogs, entry)
+				}
+			}
+			if diff := cmp.Diff(tc.wantErrorLogs, gotErrorLogs, cmpopts.IgnoreFields(ktesting.LogEntry{}, "Timestamp")); diff != "" {
+				t.Errorf("Unexpected error logs (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type testPostFilterOnlyPlugin struct {
+	name string
+}
+
+func (pl *testPostFilterOnlyPlugin) Name() string {
+	return pl.name
+}
+
+func (pl *testPostFilterOnlyPlugin) PostFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+var _ fwk.PostFilterPlugin = &testPostFilterOnlyPlugin{}
+
+func newPostFilterOnlyPluginFactory(name string) func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+	return func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+		return &testPostFilterOnlyPlugin{name: name}, nil
+	}
+}
+
+// testFilterAndPostFilterPlugin implements FilterPlugin and PostFilterPlugin, but not PodGroupPostFilterPlugin.
+type testFilterAndPostFilterPlugin struct {
+	testPostFilterOnlyPlugin
+}
+
+func (pl *testFilterAndPostFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+var (
+	_ fwk.FilterPlugin     = &testFilterAndPostFilterPlugin{}
+	_ fwk.PostFilterPlugin = &testFilterAndPostFilterPlugin{}
+)
+
+func newFilterAndPostFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &testFilterAndPostFilterPlugin{testPostFilterOnlyPlugin: testPostFilterOnlyPlugin{name: filterAndPostFilterPlugin}}, nil
 }
 
 // mockDefaultPreemptionPlugin is used to simulate a default preemption plugin that implements PodGroupPostFilterPlugin
