@@ -21,8 +21,10 @@ ARG SETCAP_IMAGE
 FROM --platform=linux/$BUILDARCH ${SETCAP_IMAGE}
 ARG BINARY
 COPY --chmod=755 ${BINARY} /binary_to_set
-# We apply cap_net_bind_service so that kube-apiserver can be run as
-# non-root and still listen on port less than 1024
+# This lets kube-apiserver run as non-root while listening on a port below 1024.
+# The effective file capability also means Linux refuses to execute the binary
+# when NET_BIND_SERVICE is absent from the capability bounding set, even when
+# kube-apiserver is configured to listen on an unprivileged port such as 6443.
 RUN ["setcap", "cap_net_bind_service=+ep", "/binary_to_set"]
 
 FROM --platform=linux/$TARGETARCH ${BASEIMAGE}
