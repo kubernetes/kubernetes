@@ -545,14 +545,24 @@ func (dc *DisruptionController) updatePod(logger klog.Logger, old, cur interface
 
 	if !reflect.DeepEqual(oldPod.Labels, curPod.Labels) {
 		for _, pdb := range dc.getPdbsForPod(logger, oldPod) {
-			syncPdbs[pdb.Name] = pdb
+			key, err := controller.KeyFunc(pdb)
+			if err != nil {
+				logger.Error(err, "Couldn't get key for PodDisruptionBudget", "podDisruptionBudget", klog.KObj(pdb))
+				continue
+			}
+			syncPdbs[key] = pdb
 		}
 	}
 	curPdbs := dc.getPdbsForPod(logger, curPod)
 	// Warn only for curPod. Old labels are no longer on the live pod.
 	dc.warnMultiplePodDisruptionBudgets(logger, curPod, curPdbs)
 	for _, pdb := range curPdbs {
-		syncPdbs[pdb.Name] = pdb
+		key, err := controller.KeyFunc(pdb)
+		if err != nil {
+			logger.Error(err, "Couldn't get key for PodDisruptionBudget", "podDisruptionBudget", klog.KObj(pdb))
+			continue
+		}
+		syncPdbs[key] = pdb
 	}
 	if len(syncPdbs) == 0 {
 		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(curPod))
