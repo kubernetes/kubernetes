@@ -368,7 +368,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				if err != nil {
 					t.Fatalf("send webhook request: %v", err)
 				}
-				defer response.Body.Close()
+				defer func() { _ = response.Body.Close() }()
 				if response.StatusCode != http.StatusOK {
 					return nil, response.StatusCode
 				}
@@ -450,7 +450,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetch live apiserver JWKS: %v", err)
 	}
-	defer jwksResp.Body.Close()
+	defer func() { _ = jwksResp.Body.Close() }()
 	if err := json.NewDecoder(jwksResp.Body).Decode(&jwksDoc); err != nil || len(jwksDoc.Keys) == 0 {
 		t.Fatalf("decode live apiserver JWKS: %v (keys=%d)", err, len(jwksDoc.Keys))
 	}
@@ -504,7 +504,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		lastWebhookStatus.Store(int32(resp.StatusCode))
 		for k, vals := range resp.Header {
 			for _, v := range vals {

@@ -589,7 +589,7 @@ func (v *Verifier) healthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("admission: signing-key endpoint is unavailable: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("admission: signing-key endpoint returned %s", resp.Status)
 	}
