@@ -184,3 +184,59 @@ func TestExpressionNodeLimitDisabled(t *testing.T) {
 		}
 	}
 }
+
+// TestTimestampParsingCompatibility verifies that timestamp strings and timezone offsets accepted
+// by cel-go releases before v0.30.0 are still accepted, so stored expressions (and the data they
+// evaluate) keep working after the cel-go upgrade. See cel.StrictTimestampParsing.
+func TestTimestampParsingCompatibility(t *testing.T) {
+	cases := []struct {
+		name string
+		expr string
+	}{
+		// Checked at compile time by cel.ValidateTimestampLiterals.
+		{name: "literal with single-digit hour", expr: "timestamp('2024-01-02T3:04:05Z') == timestamp('2024-01-02T03:04:05Z')"},
+		{name: "literal with comma fraction", expr: "timestamp('2024-01-02T03:04:05,5Z') == timestamp('2024-01-02T03:04:05.5Z')"},
+		{name: "literal with offset hours over 23", expr: "timestamp('2024-01-02T03:04:05+24:00') == timestamp('2024-01-01T03:04:05Z')"},
+		// Built at runtime, like strings read from an object.
+		{name: "runtime string with single-digit hour", expr: "timestamp('2024-01-02T' + '3:04:05Z') == timestamp('2024-01-02T03:04:05Z')"},
+		{name: "runtime string with offset minutes over 59", expr: "timestamp('2024-01-02T03:04:05' + '+05:60') == timestamp('2024-01-01T21:04:05Z')"},
+		// Numeric timezone offsets passed to the timestamp accessors.
+		{name: "accessor offset hours over 23", expr: "timestamp('2024-01-02T03:04:05Z').getHours('+24:00') == 3"},
+		{name: "accessor offset minutes over 59", expr: "timestamp('2024-01-02T03:04:05Z').getHours('+00:99') == 4"},
+		// Strings that were never valid remain errors.
+		{name: "space separator still rejected", expr: "timestamp('2024-01-02 ' + '03:04:05Z') == timestamp('2024-01-02T03:04:05Z')"},
+	}
+	envSet := MustBaseEnvSet(DefaultCompatibilityVersion())
+	for _, envType := range []Type{NewExpressions, StoredExpressions} {
+		env, err := envSet.Env(envType)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tc := range cases {
+			t.Run(string(envType)+"/"+tc.name, func(t *testing.T) {
+				wantErr := strings.Contains(tc.name, "still rejected")
+				ast, iss := env.Compile(tc.expr)
+				if iss.Err() != nil {
+					t.Fatalf("unexpected compile error: %v", iss.Err())
+				}
+				prg, err := env.Program(ast)
+				if err != nil {
+					t.Fatalf("unexpected program error: %v", err)
+				}
+				out, _, err := prg.Eval(cel.NoVars())
+				if wantErr {
+					if err == nil {
+						t.Fatalf("expected evaluation error, got %v", out)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected evaluation error: %v", err)
+				}
+				if out.Value() != true {
+					t.Errorf("expected true, got %v", out)
+				}
+			})
+		}
+	}
+}

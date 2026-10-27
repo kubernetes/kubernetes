@@ -72,6 +72,12 @@ var baseOpts = []VersionedOptions{
 			// existing expressions; expression size remains bounded by the parser's 100,000
 			// code point limit.
 			cel.ExpressionNodeLimit(-1),
+			// cel-go v0.30.0 made timestamp(string) accept only strict RFC 3339 strings, and v0.31.0
+			// started range checking numeric timezone offsets in the timestamp accessors. Restore the
+			// earlier parsing so that stored expressions with such timestamp literals still compile
+			// (ValidateTimestampLiterals applies to stored expressions) and previously accepted
+			// data keeps evaluating.
+			cel.StrictTimestampParsing(false),
 
 			UnversionedLib(library.URLs),
 			UnversionedLib(library.Regex),
