@@ -727,6 +727,20 @@ func (a semverAdapter) NativeToValue(value any) ref.Val {
 	return a.Adapter.NativeToValue(value)
 }
 
+// semverList wraps the traits.Lister returned by types.NewDynamicList for
+// []semver.Version attributes. Embedding only the traits.Lister interface
+// hides the optional fast paths of the underlying cel-go list implementation
+// (traits.Foldable and raw index access), which hand the raw semver.Version
+// struct to the interpreter and thereby bypass semverAdapter. Without them,
+// every element access goes through Get and is boxed by semverAdapter.
+type semverList struct {
+	traits.Lister
+}
+
+func newSemverList(adapter types.Adapter, value []semver.Version) traits.Lister {
+	return semverList{Lister: types.NewDynamicList(semverAdapter{Adapter: adapter}, value)}
+}
+
 type nameToAttributes struct {
 	typesFromEnv
 	adapter              types.Adapter
@@ -765,7 +779,7 @@ func (m *nameToAttributes) Find(key ref.Val) (ref.Val, bool) {
 		// building a []ref.Val of boxed apiservercel.Semver values up front,
 		// which would box every element even if the CEL expression never
 		// looks at most of them (e.g. a short-circuiting exists()).
-		return types.NewDynamicList(semverAdapter{Adapter: m.adapter}, value), true
+		return newSemverList(m.adapter, value), true
 	case nil:
 		return types.NewErr("attribute %s: value is invalid or its type is not supported by this version", strKey), false
 	default:
