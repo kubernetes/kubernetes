@@ -1009,3 +1009,87 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 		}
 	}
 }
+
+// mockCmd implements utilexec.Cmd for testing blkid exit code behaviors.
+type mockCmd struct {
+	utilexec.Cmd
+	exitStatus int
+}
+
+func (m *mockCmd) CombinedOutput() ([]byte, error) {
+	if m.exitStatus != 0 {
+		return nil, &mockExitError{status: m.exitStatus}
+	}
+	return nil, nil
+}
+
+// mockExitError implements utilexec.ExitError.
+type mockExitError struct {
+	status int
+}
+
+func (m *mockExitError) Error() string   { return "exit status error" }
+func (m *mockExitError) ExitStatus() int { return m.status }
+func (m *mockExitError) Exited() bool    { return true }
+func (m *mockExitError) String() string  { return "exit status error" }
+
+// mockExec implements utilexec.Interface returning mockCmd.
+type mockExec struct {
+	utilexec.Interface
+	exitStatus int
+}
+
+func (m *mockExec) Command(cmd string, args ...string) utilexec.Cmd {
+	return &mockCmd{exitStatus: m.exitStatus}
+}
+
+func TestGetDiskFormatDevicePresence(t *testing.T) {
+	// Create a temporary file to simulate an existing device path in tests.
+	tmpFile, err := os.CreateTemp("", "mount_utils_test_device_*")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	tests := []struct {
+		name        string
+		disk        string
+		exitStatus  int
+		expectError bool
+		expectFmt   string
+	}{
+		{
+			name:        "device does not exist and blkid returns exit code 2",
+			disk:        "/dev/nonexistent_device_test_12345",
+			exitStatus:  2,
+			expectError: true,
+			expectFmt:   "",
+		},
+		{
+			name:        "device exists and blkid returns exit code 2 (unformatted)",
+			disk:        tmpFile.Name(),
+			exitStatus:  2,
+			expectError: false,
+			expectFmt:   "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			exec := &mockExec{exitStatus: tc.exitStatus}
+
+			format, err := getDiskFormat(exec, tc.disk)
+
+			if tc.expectError && err == nil {
+				t.Fatalf("expected error, got nil (format: %q)", format)
+			}
+			if !tc.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if format != tc.expectFmt {
+				t.Fatalf("expected format %q, got %q", tc.expectFmt, format)
+			}
+		})
+	}
+}
