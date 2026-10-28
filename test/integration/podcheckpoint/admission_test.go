@@ -255,6 +255,7 @@ func TestRestoreAuthorizationAndNodeAffinity(t *testing.T) {
 
 func TestCheckpointNamespaceAuthorization(t *testing.T) {
 	const username = "checkpoint-namespace-user"
+	const foreignImage = "registry.example/foreign-private-image:latest"
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
 	tCtx := ktesting.Init(t)
 	client, config, closeFn := startAPIServer(tCtx, t, true, func(opts *options.ServerRunOptions) { opts.Authorization.Modes = []string{"RBAC"} })
@@ -263,12 +264,16 @@ func TestCheckpointNamespaceAuthorization(t *testing.T) {
 	foreignNamespace := framework.CreateNamespaceOrDie(client, "checkpoint-foreign", t)
 	ownSource := createCheckpointSource(tCtx, t, client, ownNamespace.Name, "source")
 	foreignSource := createCheckpointSource(tCtx, t, client, foreignNamespace.Name, ownSource.Name)
+	foreignSource.Spec.Containers[0].Image = foreignImage
+	foreignSource, err := client.CoreV1().Pods(foreignNamespace.Name).Update(tCtx, foreignSource, metav1.UpdateOptions{})
+	require.NoError(t, err)
 	require.NotEqual(t, ownSource.UID, foreignSource.UID)
 
-	_, err := client.RbacV1().Roles(ownNamespace.Name).Create(tCtx, &rbacv1.Role{
+	_, err = client.RbacV1().Roles(ownNamespace.Name).Create(tCtx, &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-user"},
 		Rules: []rbacv1.PolicyRule{
-			{APIGroups: []string{"node.k8s.io"}, Resources: []string{"podcheckpoints"}, Verbs: []string{"create", "get"}},
+			{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"create"}},
+			{APIGroups: []string{"node.k8s.io"}, Resources: []string{"podcheckpoints"}, Verbs: []string{"create", "get", "restore"}},
 		},
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
@@ -280,7 +285,9 @@ func TestCheckpointNamespaceAuthorization(t *testing.T) {
 	require.NoError(t, err)
 	podResource := schema.GroupResource{Resource: "pods"}
 	checkpointResource := schema.GroupResource{Group: "node.k8s.io", Resource: "podcheckpoints"}
+	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "create", "", podResource, true)
 	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "create", "", checkpointResource, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "restore", "checkpoint", checkpointResource, true)
 	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "get", ownSource.Name, podResource, false)
 	userConfig := rest.CopyConfig(config)
 	userConfig.Impersonate = rest.ImpersonationConfig{UserName: username}
@@ -294,6 +301,23 @@ func TestCheckpointNamespaceAuthorization(t *testing.T) {
 	require.NoError(t, err, "create permission must allow checkpointing a source in the same namespace")
 	foreignCheckpoint, err := client.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Create(tCtx, newPodCheckpoint(foreignNamespace.Name, ownCheckpoint.Name, foreignSource.Name), metav1.CreateOptions{})
 	require.NoError(t, err)
+	for _, pair := range []struct {
+		source     *v1.Pod
+		checkpoint *nodev1alpha1.PodCheckpoint
+	}{{ownSource, ownCheckpoint}, {foreignSource, foreignCheckpoint}} {
+		pair.checkpoint.Status.NodeName = new(pair.source.Spec.NodeName)
+		pair.checkpoint.Status.SourcePodUID = new(pair.source.UID)
+		pair.checkpoint.Status.CheckpointedPodTemplate = checkpointutil.SanitizePodTemplate(pair.source)
+		pair.checkpoint.Status.Conditions = []metav1.Condition{{Type: nodev1alpha1.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: "Completed", LastTransitionTime: metav1.Now()}}
+		_, err := client.NodeV1alpha1().PodCheckpoints(pair.source.Namespace).UpdateStatus(tCtx, pair.checkpoint, metav1.UpdateOptions{})
+		require.NoError(t, err)
+	}
+	ownCheckpoint, err = userClient.NodeV1alpha1().PodCheckpoints(ownNamespace.Name).Get(tCtx, ownCheckpoint.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	ownSpec := ownCheckpoint.Status.CheckpointedPodTemplate.Spec.DeepCopy()
+	ownSpec.RestoreFrom = &v1.CheckpointReference{Name: ownCheckpoint.Name}
+	_, err = userClient.CoreV1().Pods(ownNamespace.Name).Create(tCtx, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "own-restore"}, Spec: *ownSpec}, metav1.CreateOptions{})
+	require.NoError(t, err, "restore permission must allow using the local checkpoint")
 
 	t.Run("foreign checkpoint read", func(t *testing.T) {
 		_, err := userClient.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Get(tCtx, foreignCheckpoint.Name, metav1.GetOptions{})
@@ -305,6 +329,14 @@ func TestCheckpointNamespaceAuthorization(t *testing.T) {
 		_, err = client.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Get(tCtx, "forbidden-checkpoint", metav1.GetOptions{})
 		require.True(t, apierrors.IsNotFound(err))
 	})
+	t.Run("foreign restore Pod creation", func(t *testing.T) {
+		spec := foreignCheckpoint.Status.CheckpointedPodTemplate.Spec.DeepCopy()
+		spec.RestoreFrom = &v1.CheckpointReference{Name: foreignCheckpoint.Name}
+		_, err := userClient.CoreV1().Pods(foreignNamespace.Name).Create(tCtx, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "forbidden-restore"}, Spec: *spec}, metav1.CreateOptions{})
+		require.True(t, apierrors.IsForbidden(err), "foreign restore Pod create: %v", err)
+		_, err = client.CoreV1().Pods(foreignNamespace.Name).Get(tCtx, "forbidden-restore", metav1.GetOptions{})
+		require.True(t, apierrors.IsNotFound(err))
+	})
 	t.Run("source UID resolves in request namespace", func(t *testing.T) {
 		request := newPodCheckpoint(ownNamespace.Name, "foreign-source-uid", ownSource.Name)
 		request.Spec.SourcePod.UID = new(foreignSource.UID)
@@ -312,6 +344,16 @@ func TestCheckpointNamespaceAuthorization(t *testing.T) {
 		require.True(t, apierrors.IsForbidden(err), "foreign source UID must not resolve across namespaces: %v", err)
 		require.ErrorContains(t, err, "not requested UID")
 		_, err = client.NodeV1alpha1().PodCheckpoints(ownNamespace.Name).Get(tCtx, request.Name, metav1.GetOptions{})
+		require.True(t, apierrors.IsNotFound(err))
+	})
+	t.Run("checkpoint template resolves in request namespace", func(t *testing.T) {
+		spec := foreignCheckpoint.Status.CheckpointedPodTemplate.Spec.DeepCopy()
+		spec.RestoreFrom = &v1.CheckpointReference{Name: ownCheckpoint.Name}
+		_, err := userClient.CoreV1().Pods(ownNamespace.Name).Create(tCtx, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foreign-template"}, Spec: *spec}, metav1.CreateOptions{})
+		require.True(t, apierrors.IsInvalid(err), "the local checkpoint must reject a foreign template: %v", err)
+		require.ErrorContains(t, err, "spec.containers[0].image")
+		require.NotContains(t, err.Error(), foreignImage)
+		_, err = client.CoreV1().Pods(ownNamespace.Name).Get(tCtx, "foreign-template", metav1.GetOptions{})
 		require.True(t, apierrors.IsNotFound(err))
 	})
 }
