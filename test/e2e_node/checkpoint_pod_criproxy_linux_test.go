@@ -87,6 +87,64 @@ var _ = SIGDescribe("Checkpoint Pod with CRI proxy", feature.PodLevelCheckpointR
 		gomega.Expect(condition.Message).To(gomega.Or(gomega.ContainSubstring("DeadlineExceeded"), gomega.ContainSubstring("deadline exceeded")))
 	})
 
+	ginkgo.It("should suspend all Pod probes until a failed checkpoint returns", func(ctx context.Context) {
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, podCheckpointSource(f.Namespace.Name, "checkpoint-probes"))
+		for _, container := range pod.Spec.Containers {
+			gomega.Eventually(ctx, func() error {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				if counts[0] == 0 || counts[1] == 0 {
+					return fmt.Errorf("both probe types must run in container %q before checkpoint", container.Name)
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Succeed())
+		}
+
+		entered, release := holdPodCheckpointRPC(ctx)
+		checkpoint := createPodCheckpoint(ctx, f, newPodCheckpoint(pod, "checkpoint-probes-cp"))
+		gomega.Eventually(ctx, entered, 30*time.Second).Should(gomega.BeClosed(), "checkpoint must reach the runtime after draining probes")
+		before := map[string][2]int{}
+		for _, container := range pod.Spec.Containers {
+			counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+			framework.ExpectNoError(err)
+			before[container.Name] = counts
+		}
+
+		ginkgo.By("checking multiple probe periods while the checkpoint RPC is held")
+		gomega.Consistently(ctx, func() error {
+			for _, container := range pod.Spec.Containers {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				if counts != before[container.Name] {
+					return fmt.Errorf("probes ran in container %q during checkpoint: got %v, want %v", container.Name, counts, before[container.Name])
+				}
+			}
+			return nil
+		}, 3*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
+
+		ginkgo.By("returning the injected failure and checking that all probes resume")
+		release()
+		checkpoint = waitForPodCheckpoint(ctx, f, checkpoint.Name)
+		condition := expectPodCheckpointFailed(ctx, f, pod, checkpoint)
+		gomega.Expect(condition.Message).To(gomega.ContainSubstring("injected checkpoint failure"))
+		for _, container := range pod.Spec.Containers {
+			gomega.Eventually(ctx, func() error {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				initial := before[container.Name]
+				if counts[0] <= initial[0] || counts[1] <= initial[1] {
+					return fmt.Errorf("both probes have not resumed in container %q: got %v, previous %v", container.Name, counts, initial)
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Succeed())
+		}
+	})
 })
 
 // The proxy injector has no RPC context. Release it explicitly on every exit so
