@@ -989,11 +989,17 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 		case v1.ResourceMemory:
 			if !setLimitValue {
-				// Memory requests aren't written to cgroups.
-				return nil
+				// Memory requests don't set memory.max, but MemoryQoS derives
+				// pod-level memory.low/memory.min from the request, so a
+				// request-only resize must still rewrite the Unified settings.
+				if len(podResources.Unified) == 0 {
+					return nil
+				}
+				resizedResources.Unified = podResources.Unified
+			} else {
+				resizedResources.Memory = podResources.Memory
+				resizedResources.Unified = podResources.Unified
 			}
-			resizedResources.Memory = podResources.Memory
-			resizedResources.Unified = podResources.Unified
 		}
 
 		// Notify the runtime first. If this fails, the runtime has rejected the resize.
@@ -1100,6 +1106,16 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
 			// TODO(#128675): This does not support removing limits.
 			podResources.Memory = currentPodMemoryConfig.Memory
+		}
+		// Pod-level memory protection (memory.low/memory.min under TieredReservation)
+		// derives from the request, so a request-only resize leaves the limit-driven
+		// update below with nothing to do. Rewrite the Unified settings directly;
+		// limit changes already carry Unified through resizeContainers.
+		if *podResources.Memory == *currentPodMemoryConfig.Memory && len(podResources.Unified) > 0 {
+			if err := setPodCgroupConfig(logger, v1.ResourceMemory, false); err != nil {
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
 		}
 		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
