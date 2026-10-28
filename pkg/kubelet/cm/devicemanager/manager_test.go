@@ -1740,132 +1740,139 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 }
 
 func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
-	// Requesting to create a pod that requests resourceName1 in restartable
-	// init containers and normal containers should succeed with devices
-	// allocated to init containers not reallocated to normal containers.
-	oneDevice := resource.NewQuantity(int64(1), resource.DecimalSI)
-	twoDevice := resource.NewQuantity(int64(2), resource.DecimalSI)
-	threeDevice := resource.NewQuantity(int64(3), resource.DecimalSI)
-	res1 := TestResource{
-		resourceName:     "domain1.com/resource1",
-		resourceQuantity: *resource.NewQuantity(int64(6), resource.DecimalSI),
-		devs: checkpoint.DevicesPerNUMA{
-			0: []string{"dev1", "dev2", "dev3", "dev4", "dev5", "dev6"},
-		},
-		topology: false,
-	}
-	testResources := []TestResource{
-		res1,
-	}
-	as := require.New(t)
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
-	}
-	tmpDir, err := os.MkdirTemp("", "checkpoint")
-	as.NoError(err)
-	t.Cleanup(func() {
-		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
-	})
+	for _, entryPoint := range []string{"Allocate", "AllocatePod"} {
+		t.Run(entryPoint, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			// Requesting to create a pod that requests resourceName1 in restartable
+			// init containers and normal containers should succeed with devices
+			// allocated to init containers not reallocated to normal containers.
+			oneDevice := resource.NewQuantity(int64(1), resource.DecimalSI)
+			twoDevice := resource.NewQuantity(int64(2), resource.DecimalSI)
+			threeDevice := resource.NewQuantity(int64(3), resource.DecimalSI)
+			res1 := TestResource{
+				resourceName:     "domain1.com/resource1",
+				resourceQuantity: *resource.NewQuantity(int64(6), resource.DecimalSI),
+				devs: checkpoint.DevicesPerNUMA{
+					0: []string{"dev1", "dev2", "dev3", "dev4", "dev5", "dev6"},
+				},
+				topology: false,
+			}
+			testResources := []TestResource{
+				res1,
+			}
+			as := require.New(t)
+			podsStub := activePodsStub{
+				activePods: []*v1.Pod{},
+			}
+			tmpDir, err := os.MkdirTemp("", "checkpoint")
+			as.NoError(err)
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+			})
 
-	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
-	as.NoError(err)
+			testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
+			as.NoError(err)
 
-	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
-	podWithPluginResourcesInRestartableInitContainers := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): *threeDevice,
+			containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+			podWithPluginResourcesInRestartableInitContainers := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(res1.resourceName): *threeDevice,
+								},
+							},
+						},
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(res1.resourceName): *oneDevice,
+								},
+							},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(res1.resourceName): *twoDevice,
+								},
+							},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(res1.resourceName): *oneDevice,
+								},
+							},
+						},
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(res1.resourceName): *twoDevice,
+								},
+							},
 						},
 					},
 				},
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): *oneDevice,
-						},
-					},
-					RestartPolicy: &containerRestartPolicyAlways,
-				},
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): *twoDevice,
-						},
-					},
-					RestartPolicy: &containerRestartPolicyAlways,
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): *oneDevice,
-						},
-					},
-				},
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): *twoDevice,
-						},
-					},
-				},
-			},
-		},
-	}
-	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
-	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
-	}
-	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
-		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
-	}
-	as.NoError(err)
-	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
-	regularInitCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[0].Name
-	restartableInitCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[1].Name
-	restartableInitCont3 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[2].Name
-	normalCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[0].Name
-	normalCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[1].Name
-	regularInitCont1Devices := testManager.podDevices.containerDevices(podUID, regularInitCont1, res1.resourceName)
-	restartableInitCont2Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont2, res1.resourceName)
-	restartableInitCont3Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont3, res1.resourceName)
-	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
-	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
-	as.Equal(3, regularInitCont1Devices.Len())
-	as.Equal(1, restartableInitCont2Devices.Len())
-	as.Equal(2, restartableInitCont3Devices.Len())
-	as.Equal(1, normalCont1Devices.Len())
-	as.Equal(2, normalCont2Devices.Len())
-	as.True(regularInitCont1Devices.IsSuperset(restartableInitCont2Devices))
-	as.True(regularInitCont1Devices.IsSuperset(restartableInitCont3Devices))
-	// regularInitCont1Devices are sharable with other containers
+			}
+			podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
+			if entryPoint == "AllocatePod" {
+				as.NoError(testManager.AllocatePod(logger, podWithPluginResourcesInRestartableInitContainers, lifecycle.AddOperation))
+			} else {
+				for i := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
+					as.NoError(testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[i], lifecycle.AddOperation))
+				}
+				for i := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
+					as.NoError(testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &podWithPluginResourcesInRestartableInitContainers.Spec.Containers[i], lifecycle.AddOperation))
+				}
+			}
+			podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
+			regularInitCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[0].Name
+			restartableInitCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[1].Name
+			restartableInitCont3 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[2].Name
+			normalCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[0].Name
+			normalCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[1].Name
+			regularInitCont1Devices := testManager.podDevices.containerDevices(podUID, regularInitCont1, res1.resourceName)
+			restartableInitCont2Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont2, res1.resourceName)
+			restartableInitCont3Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont3, res1.resourceName)
+			normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
+			normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+			as.Equal(3, regularInitCont1Devices.Len())
+			as.Equal(1, restartableInitCont2Devices.Len())
+			as.Equal(2, restartableInitCont3Devices.Len())
+			as.Equal(1, normalCont1Devices.Len())
+			as.Equal(2, normalCont2Devices.Len())
+			as.True(regularInitCont1Devices.IsSuperset(restartableInitCont2Devices))
+			as.True(regularInitCont1Devices.IsSuperset(restartableInitCont3Devices))
+			// regularInitCont1Devices are sharable with other containers
 
-	dedicatedContainerDevices := []sets.Set[string]{
-		restartableInitCont2Devices,
-		restartableInitCont3Devices,
-		normalCont1Devices,
-		normalCont2Devices,
-	}
+			dedicatedContainerDevices := []sets.Set[string]{
+				restartableInitCont2Devices,
+				restartableInitCont3Devices,
+				normalCont1Devices,
+				normalCont2Devices,
+			}
 
-	for i := 0; i < len(dedicatedContainerDevices)-1; i++ {
-		for j := i + 1; j < len(dedicatedContainerDevices); j++ {
-			t.Logf("containerDevices[%d] = %v", i, dedicatedContainerDevices[i])
-			t.Logf("containerDevices[%d] = %v", j, dedicatedContainerDevices[j])
-			as.Empty(dedicatedContainerDevices[i].Intersection(dedicatedContainerDevices[j]))
-		}
+			for i := 0; i < len(dedicatedContainerDevices)-1; i++ {
+				for j := i + 1; j < len(dedicatedContainerDevices); j++ {
+					t.Logf("containerDevices[%d] = %v", i, dedicatedContainerDevices[i])
+					t.Logf("containerDevices[%d] = %v", j, dedicatedContainerDevices[j])
+					as.Empty(dedicatedContainerDevices[i].Intersection(dedicatedContainerDevices[j]))
+				}
+			}
+		})
 	}
 }
 
@@ -2795,9 +2802,9 @@ func TestLifecycleAllocatePod(t *testing.T) {
 		skipped     bool
 	}{
 		{
-			description: "DeviceManager skips all pod-level operations including AddOperation",
+			description: "DeviceManager processes pod-level AddOperation",
 			operation:   lifecycle.AddOperation,
-			skipped:     true,
+			skipped:     false,
 		},
 		{
 			description: "DeviceManager skips all pod-level operations including ResizeOperation",
@@ -2849,7 +2856,7 @@ func TestLifecycleAllocatePod(t *testing.T) {
 				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 			}
 			logs := underlier.GetBuffer().String()
-			expectedLog := "Device Manager does not support pod level resource allocation"
+			expectedLog := "Container-level device allocation for pod skipped, Device Manager supports only add operation"
 			if testCase.skipped {
 				if !strings.Contains(logs, expectedLog) {
 					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
@@ -2858,9 +2865,186 @@ func TestLifecycleAllocatePod(t *testing.T) {
 				if strings.Contains(logs, expectedLog) {
 					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
 				}
+				devices := testManager.podDevices.containerDevices(string(pod.UID), pod.Spec.Containers[0].Name, res.resourceName)
+				require.Len(t, devices, 2)
 			}
 		})
 	}
+}
+
+// --- Pod-level admission vs container-start ordering tests ---
+//
+// https://github.com/kubernetes/kubernetes/issues/143490: with
+// PodLevelResourceManagers and topologyManagerScope=pod, admission only calls
+// AllocatePod. PreStartContainer takes the allocated device IDs as its
+// argument, so allocation must happen before the container start path runs
+// callPreStartContainerIfNeeded — and that check precedes the start-time
+// re-allocation branch. When AllocatePod was a no-op, a plugin advertising
+// PreStartRequired therefore failed every container start with
+// "no devices found allocated in local cache" and the plugin's Allocate was
+// never reached.
+
+func getAdmissionOrderingTestManager(t *testing.T, logger klog.Logger, preStartRequired bool) (*wrappedManagerImpl, *MockEndpoint, *int32, *activePodsStub) {
+	res := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         false,
+	}
+	podsStub := &activePodsStub{}
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir) })
+
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res})
+	require.NoError(t, err)
+
+	// getTestManager installs an endpoint without PreStartRequired and without
+	// a way to observe PreStartContainer calls; replace it with one that counts
+	// Allocate calls and records the device IDs PreStartContainer receives.
+	var allocateCalls int32
+	allocateStub := allocateStubFunc()
+	endpoint := &MockEndpoint{
+		allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+			atomic.AddInt32(&allocateCalls, 1)
+			return allocateStub(devs)
+		},
+		initChan: make(chan []string, 1),
+	}
+	testManager.endpoints[res.resourceName] = endpointInfo{
+		e:    endpoint,
+		opts: &pluginapi.DevicePluginOptions{PreStartRequired: preStartRequired},
+	}
+	return testManager, endpoint, &allocateCalls, podsStub
+}
+
+// TestAllocatePodPreStartRequiredContainerStart verifies that AllocatePod
+// allocates during admission, so a plugin advertising PreStartRequired finds
+// the devices when the container start path issues PreStartContainer, and the
+// start does not trigger a second Allocate.
+func TestAllocatePodPreStartRequiredContainerStart(t *testing.T) {
+	ktesting.SetDefaultVerbosity(2)
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	logger := tCtx.Logger()
+
+	testManager, endpoint, allocateCalls, podsStub := getAdmissionOrderingTestManager(t, logger, true)
+
+	pod := makePod(v1.ResourceList{v1.ResourceName("domain1.com/resource1"): *resource.NewQuantity(1, resource.DecimalSI)})
+	podsStub.updateActivePods([]*v1.Pod{pod})
+
+	require.NoError(t, testManager.AllocatePod(logger, pod, lifecycle.AddOperation))
+
+	opts, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
+	require.NoError(t, err, "container start must succeed after admission-time allocation")
+	require.NotNil(t, opts)
+
+	select {
+	case devs := <-endpoint.initChan:
+		require.Len(t, devs, 1, "PreStartContainer must receive exactly the allocated device")
+	case <-time.After(10 * time.Second):
+		t.Fatal("PreStartContainer was never called")
+	}
+	require.Equal(t, int32(1), atomic.LoadInt32(allocateCalls), "container start must not re-allocate after admission")
+}
+
+// TestAllocatePodNoPreStartContainerStart is the control for the test above:
+// without PreStartRequired the same flow succeeds through the re-allocation
+// path as well, isolating PreStartRequired as the option that makes
+// admission-time allocation necessary.
+func TestAllocatePodNoPreStartContainerStart(t *testing.T) {
+	ktesting.SetDefaultVerbosity(2)
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	logger := tCtx.Logger()
+
+	testManager, _, allocateCalls, podsStub := getAdmissionOrderingTestManager(t, logger, false)
+
+	pod := makePod(v1.ResourceList{v1.ResourceName("domain1.com/resource1"): *resource.NewQuantity(1, resource.DecimalSI)})
+	podsStub.updateActivePods([]*v1.Pod{pod})
+
+	require.NoError(t, testManager.AllocatePod(logger, pod, lifecycle.AddOperation))
+
+	opts, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
+	require.NoError(t, err)
+	require.NotNil(t, opts)
+	require.Equal(t, int32(1), atomic.LoadInt32(allocateCalls), "container start must not re-allocate after admission")
+}
+
+// TestAllocatePodReservesNUMADevicesAcrossAdmissions verifies that the
+// admission-time reservation performed by AllocatePod is visible to the
+// topology hints of a pod admitted before the first pod's containers start
+// (https://github.com/kubernetes/kubernetes/pull/143494#issuecomment-6647302884).
+// GetPodTopologyHints derives available devices from allocatedDevices, so if
+// AllocatePod did not reserve anything, a second admission would still offer
+// an exhausted NUMA node as preferred, and the container would later fall
+// back to a device on a different node than the one it was admitted with.
+func TestAllocatePodReservesNUMADevicesAcrossAdmissions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	// One device on NUMA node 0, three devices on node 1: a second pod can
+	// only be served from node 0 if the first pod's device is not reserved.
+	res := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1"}, 1: []string{"dev2", "dev3", "dev4"}},
+		topology:         true,
+	}
+	podsStub := &activePodsStub{}
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir) })
+
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res})
+	require.NoError(t, err)
+	testManager.numaNodes = []int{0, 1}
+
+	// The topology manager stores a container's best hint before AllocatePod
+	// runs (scope_pod stores hints, then allocates). Mirror that with a node 0
+	// affinity for pod1 so its reservation deterministically takes the node 0
+	// device; with a nil affinity the allocation order within the available
+	// set is unspecified.
+	node0, err := bitmask.NewBitMask(0)
+	require.NoError(t, err)
+	node1, err := bitmask.NewBitMask(1)
+	require.NoError(t, err)
+	testManager.topologyAffinityStore = topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{
+		NUMANodeAffinity: node0,
+		Preferred:        true,
+	})
+
+	pod1 := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
+	pod2 := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
+	podsStub.updateActivePods([]*v1.Pod{pod1, pod2})
+
+	// pod1 admission reserves its device immediately.
+	require.NoError(t, testManager.AllocatePod(logger, pod1, lifecycle.AddOperation))
+	require.Equal(t, sets.New[string]("dev1"), testManager.podDevices.podDevices(string(pod1.UID), res.resourceName))
+
+	// pod2 is admitted while pod1 is admitted but not started: no container
+	// start runs in between, so only the admission-time reservation can make
+	// NUMA node 0 disappear from pod2's hints.
+	hints := testManager.GetPodTopologyHints(logger, pod2, lifecycle.AddOperation)
+	deviceHints, ok := hints[res.resourceName]
+	require.True(t, ok, "expected hints for %s, got %v", res.resourceName, hints)
+
+	node1Preferred := false
+	for _, hint := range deviceHints {
+		if hint.NUMANodeAffinity == nil {
+			continue
+		}
+		require.Falsef(t, hint.NUMANodeAffinity.IsEqual(node0),
+			"NUMA node 0 is exhausted by pod1's admission-time reservation but is still offered: %v", deviceHints)
+		if hint.NUMANodeAffinity.IsEqual(node1) && hint.Preferred {
+			node1Preferred = true
+		}
+	}
+	require.True(t, node1Preferred, "NUMA node 1 must be the preferred hint, got %v", deviceHints)
+
+	// pod2 admission takes a node 1 device; pod1 keeps the node 0 device.
+	require.NoError(t, testManager.AllocatePod(logger, pod2, lifecycle.AddOperation))
+	require.Equal(t, sets.New[string]("dev1"), testManager.podDevices.podDevices(string(pod1.UID), res.resourceName))
+	pod2Devices := testManager.podDevices.podDevices(string(pod2.UID), res.resourceName)
+	require.Len(t, pod2Devices, 1)
+	require.Subset(t, sets.New[string]("dev2", "dev3", "dev4"), pod2Devices)
 }
 
 // --- Socket-level endpoint lifecycle tests ---
@@ -3356,4 +3540,69 @@ func TestPluginConnectedDuplicateRejectionIsDetectable(t *testing.T) {
 		"the detection log must report whether the incumbent endpoint is already draining")
 	require.Contains(t, logs, "incumbentStopped=false",
 		"a live incumbent (the stuck-takeover shape) must be reported as not stopped")
+}
+
+// TestAllocatePodCachesDevicesBeforeContainerStart verifies that pod-level admission caches
+// device allocations so concurrent container starts do not trigger fallback re-allocation.
+func TestAllocatePodCachesDevicesBeforeContainerStart(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	const podCount = 4
+
+	devs := make([]string, podCount)
+	for i := range devs {
+		devs[i] = fmt.Sprintf("dev%d", i)
+	}
+	res := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(1, resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: devs},
+		topology:         true,
+	}
+
+	podsStub := activePodsStub{}
+	tmpDir := t.TempDir()
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res})
+	require.NoError(t, err)
+
+	// Count Allocate RPCs to distinguish admission-time allocation from the
+	// fallback re-allocation in GetDeviceRunContainerOptions.
+	var allocateCalls atomic.Int32
+	allocate := allocateStubFunc()
+	testManager.endpoints[res.resourceName] = endpointInfo{
+		e: &MockEndpoint{allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+			allocateCalls.Add(1)
+			return allocate(devs)
+		}},
+	}
+
+	pods := make([]*v1.Pod, 0, podCount)
+	for range podCount {
+		pod := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
+		pods = append(pods, pod)
+		// HandlePodAdditions adds each pod to podManager before admitting it.
+		podsStub.updateActivePods(pods)
+		require.NoError(t, testManager.AllocatePod(logger, pod, lifecycle.AddOperation))
+	}
+	require.Equal(t, int32(podCount), allocateCalls.Load())
+
+	// Pod workers can start containers concurrently. Each start should use the
+	// allocation cached during admission instead of issuing another Allocate RPC.
+	errCh := make(chan error, podCount)
+	var wg sync.WaitGroup
+	for _, pod := range pods {
+		wg.Go(func() {
+			options, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
+			if err == nil && options == nil {
+				err = fmt.Errorf("device run container options are nil for pod %s", pod.UID)
+			}
+			errCh <- err
+		})
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, int32(podCount), allocateCalls.Load(), "container start should use the cached device allocation")
 }
