@@ -276,6 +276,51 @@ func TestCheckpointOperationRequiresRuntimeCapability(t *testing.T) {
 	}
 }
 
+func TestCheckpointOperationHoldsProbesUntilAcknowledgement(t *testing.T) {
+	var ctx context.Context = ktesting.Init(t)
+	kl, runtime, pod, pc := checkpointOperationFixture(t)
+	kl.checkpointOperationContext.Store(&ctx)
+	kl.podWorkers.(*checkpointPodWorkers).async = true
+	probes := &checkpointProbeManager{resumed: make(chan types.UID, 8), suspend: func(context.Context, types.UID) error { return nil }}
+	kl.probeManager = probes
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var cancelCalls atomic.Int32
+	runtime.CancelPodOperationFunc = func(cancelCtx context.Context, _ *runtimeapi.CancelPodOperationRequest) error {
+		if cancelCalls.Add(1) == 1 {
+			close(entered)
+		}
+		select {
+		case <-release:
+			return nil
+		case <-cancelCtx.Done():
+			return cancelCtx.Err()
+		}
+	}
+	defer close(release)
+	kl.containerRuntime = &checkpointRuntime{Runtime: runtime, checkpointPod: func(_ context.Context, request *runtimeapi.CheckpointPodRequest) error {
+		require.NoError(t, os.WriteFile(filepath.Join(request.OutputPath, "partial"), []byte("runtime owns output"), 0600))
+		return context.DeadlineExceeded
+	}}
+	require.NoError(t, checkpointPod(ctx, kl, pod, pc.Name, pc.UID, 0))
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("completion request did not reach runtime")
+	}
+	_, output, err := kl.podCheckpointOutputPath(pc.UID)
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(output, "partial"))
+	require.Empty(t, probes.resumed)
+	// The orphan worker must not become a second owner of an active capture.
+	kl.recoverPodCheckpointOperations(ctx)
+	require.EqualValues(t, 1, cancelCalls.Load())
+	release <- struct{}{}
+	require.Eventually(t, func() bool { return !kl.podCheckpointInFlight(pod.UID) }, 5*time.Second, time.Millisecond)
+	require.NotEmpty(t, probes.resumed)
+	require.NoDirExists(t, output)
+}
+
 func TestCheckpointOperationPublishesCompletedDataAfterRestart(t *testing.T) {
 	var ctx context.Context = ktesting.Init(t)
 	kl, runtime, pod, pc := checkpointOperationFixture(t)
