@@ -175,6 +175,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"pod group disruption mode": {
 			input: mkValidPodGroup(setDisruptionModeAll()),
 		},
+		"basic policy with disruption mode all": {
+			input: mkValidPodGroup(setBasicPolicy(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
+		"both basic and gang policy with disruption mode all": {
+			input: mkValidPodGroup(setBothPolicies(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
 		"disruption mode with neither single nor all": {
 			input:        mkValidPodGroup(setDisruptionModeNeither()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), nil, "").WithOrigin("union")},
@@ -389,6 +402,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1")),
+		},
+		"valid update with existing basic policy and disruption mode all": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll()),
 		},
 		"valid update minCount": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
