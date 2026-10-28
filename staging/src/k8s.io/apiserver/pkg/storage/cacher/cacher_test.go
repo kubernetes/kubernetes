@@ -54,6 +54,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func init() {
@@ -585,6 +586,15 @@ func TestWatch(t *testing.T) {
 		t.Cleanup(terminate)
 		storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
 	})
+	t.Run("WatchResync", func(t *testing.T) {
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withClock(fakeClock))
+		t.Cleanup(terminate)
+		store := &createWrapper{CacheDelegator: cacher}
+		storagetesting.RunTestWatchResync(ctx, t, store, compactWatch(cacher, server.V3Client.Client), func() {
+			fakeClock.Step(100 * time.Millisecond)
+		})
+	})
 }
 
 func TestOptimisticConcurrency(t *testing.T) {
@@ -660,6 +670,12 @@ func withCodec(codec runtime.Codec) setupOption {
 func withTransformer(transformer value.Transformer) setupOption {
 	return func(options *setupOptions) {
 		options.transformer = transformer
+	}
+}
+
+func withClock(c clock.WithTicker) setupOption {
+	return func(options *setupOptions) {
+		options.clock = c
 	}
 }
 

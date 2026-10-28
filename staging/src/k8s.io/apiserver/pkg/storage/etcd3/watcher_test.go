@@ -153,6 +153,10 @@ func TestWatch(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunWatchErrorIsBlockingFurtherEvents(ctx, t, &storeWithPrefixTransformer{store})
 	})
+	t.Run("WatchResync", func(t *testing.T) {
+		ctx, store, client := testSetup(t)
+		storagetesting.RunTestWatchResync(ctx, t, store, compactStorage(store, client.Client), nil)
+	})
 }
 
 // =======================================================================
