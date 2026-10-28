@@ -577,6 +577,7 @@ aliases:
     - eddiezane # CLI
     - elmiko # Cloud Provider
     - enj # Auth
+    - gnufied # Storage
     - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
@@ -596,7 +597,6 @@ aliases:
     - omerap12 # Autoscaling
     - pohly # Instrumentation
     - richabanker # Instrumentation
-    - saad-ali # Storage
     - sanposhiho # Scheduling
     - sergeykanzhelev # Node
     - shaneutt # Network
