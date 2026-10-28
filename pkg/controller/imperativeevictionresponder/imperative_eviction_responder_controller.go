@@ -107,7 +107,8 @@ func NewController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: controllerName,
+				Name:   controllerName,
+				Logger: &logger,
 			},
 		),
 		heartbeatMinDurationBetweenUpdates: 5 * time.Second,
@@ -218,7 +219,7 @@ func (c *ImperativeEvictionResponderController) deletePod(logger klog.Logger, po
 }
 
 func (c *ImperativeEvictionResponderController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", c.controllerName)

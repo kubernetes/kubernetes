@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
@@ -285,7 +286,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 		// Start the informers.
 		stopCh := ctx.Done()
-		controllerContext.InformerFactory.Start(stopCh)
+		controllerContext.InformerFactory.StartWithContext(ctx)
 		defer controllerContext.InformerFactory.Shutdown()
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
@@ -589,8 +590,8 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
-	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
+	cachedClient := cacheddiscovery.NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(discoveryClient))
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapperWithContext(cachedClient)
 	go wait.Until(func() {
 		restMapper.Reset()
 	}, 30*time.Second, ctx.Done())
