@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
@@ -92,6 +93,7 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.MutationInterface = &Plugin{}
 var _ initializer.WantsManifestLoaders = &Plugin{}
+var _ initializer.WantsAdmissionCoverage = &Plugin{}
 
 // SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
 func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
@@ -113,6 +115,9 @@ func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
 			},
 			func(b *v1.MutatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
 			metrics.MAPManifestType,
+			source.WithCoverageGapsFunc(func(p *v1.MutatingAdmissionPolicy, b *v1.MutatingAdmissionPolicyBinding) *coverage.Gaps {
+				return coverage.ForPolicyBinding(a.GetAdmissionCoverage(), p.Spec.MatchConstraints, b.Spec.MatchResources)
+			}),
 		)
 		if err := staticSource.LoadInitial(); err != nil {
 			return nil, err
@@ -145,6 +150,7 @@ func NewPlugin(configFile io.Reader) (*Plugin, error) {
 				f,
 				dynamicClient,
 				restMapper,
+				generic.WithCoverageRequirements(res.GetAdmissionCoverage()),
 			)
 		},
 		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {

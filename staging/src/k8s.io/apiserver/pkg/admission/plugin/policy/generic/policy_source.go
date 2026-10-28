@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/internal/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -72,6 +73,23 @@ type policySource[P runtime.Object, B runtime.Object, E Evaluator] struct {
 
 	// Temporary until we use the dynamic informer factory
 	paramsCRDControllers map[schema.GroupVersionKind]*paramInfo
+
+	policySourceOptions
+}
+
+// PolicySourceOption configures optional behavior of a policy source.
+type PolicySourceOption func(*policySourceOptions)
+
+type policySourceOptions struct {
+	coverageRequirements []coverage.Requirement
+}
+
+// WithCoverageRequirements makes the source build PolicyHook.CoverageGaps with
+// reqs. Empty reqs builds no gaps.
+func WithCoverageRequirements(reqs []coverage.Requirement) PolicySourceOption {
+	return func(o *policySourceOptions) {
+		o.coverageRequirements = reqs
+	}
 }
 
 type paramInfo struct {
@@ -106,6 +124,19 @@ type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
 
 	Evaluator          E
 	ConfigurationError error
+
+	// CoverageGaps is parallel to Bindings. A nil entry, or an index beyond
+	// the slice, means that binding can never be in coverage violation.
+	CoverageGaps []*coverage.Gaps
+}
+
+// CoverageGapsAt returns the coverage gaps of Bindings[i], or nil if that
+// binding can never be in coverage violation.
+func (h *PolicyHook[P, B, E]) CoverageGapsAt(i int) *coverage.Gaps {
+	if i < len(h.CoverageGaps) {
+		return h.CoverageGaps[i]
+	}
+	return nil
 }
 
 var _ Source[PolicyHook[runtime.Object, runtime.Object, Evaluator]] = &policySource[runtime.Object, runtime.Object, Evaluator]{}
@@ -119,6 +150,7 @@ func NewPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
 	paramInformerFactory informers.SharedInformerFactory,
 	dynamicClient dynamic.Interface,
 	restMapper meta.RESTMapper,
+	opts ...PolicySourceOption,
 ) Source[PolicyHook[P, B, E]] {
 	res := &policySource[P, B, E]{
 		compiler:             compiler,
@@ -131,6 +163,9 @@ func NewPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
 		informerFactory:      paramInformerFactory,
 		dynamicClient:        dynamicClient,
 		restMapper:           restMapper,
+	}
+	for _, opt := range opts {
+		opt(&res.policySourceOptions)
 	}
 	return res
 }
@@ -360,6 +395,7 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			DynamicClient:      s.dynamicClient,
 			RESTMapper:         s.restMapper,
 			ConfigurationError: configurationError,
+			CoverageGaps:       s.coverageGaps(policyAccessor, bindingSpecs),
 		})
 
 		// Should queue a re-sync for policy sync error. If our shared param
@@ -391,6 +427,20 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 		err = goerrors.Join(errs...)
 	}
 	return result, err
+}
+
+// coverageGaps builds the coverage gaps parallel to bindings, or
+// returns nil if no coverage requirements are configured. Construction is
+// cheap, so they're rebuilt on every refresh rather than cached.
+func (s *policySource[P, B, E]) coverageGaps(policy PolicyAccessor, bindings []B) []*coverage.Gaps {
+	if len(s.coverageRequirements) == 0 {
+		return nil
+	}
+	gaps := make([]*coverage.Gaps, len(bindings))
+	for i, binding := range bindings {
+		gaps[i] = coverage.ForPolicyBinding(s.coverageRequirements, policy.GetMatchConstraints(), s.newBindingAccessor(binding).GetMatchResources())
+	}
+	return gaps
 }
 
 // ensureParamsForPolicyLocked ensures that the informer for the paramKind is

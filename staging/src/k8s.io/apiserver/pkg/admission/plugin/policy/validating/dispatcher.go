@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
@@ -40,11 +41,16 @@ import (
 )
 
 type dispatcher struct {
-	matcher generic.PolicyMatcher
-	authz   authorizer.UnconditionalAuthorizer
+	matcher         generic.PolicyMatcher
+	authz           authorizer.UnconditionalAuthorizer
+	coverageChecker *generic.CoverageChecker[*Policy, *PolicyBinding, PolicyEvaluator]
 }
 
 var _ generic.Dispatcher[PolicyHook] = &dispatcher{}
+
+// validationFailedWarning formats a Warn action's warning from the policy
+// name, binding name and failure message.
+const validationFailedWarning = "Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s"
 
 func NewDispatcher(
 	authorizer authorizer.UnconditionalAuthorizer,
@@ -53,6 +59,8 @@ func NewDispatcher(
 	return &dispatcher{
 		matcher: matcher,
 		authz:   authorizer,
+		coverageChecker: generic.NewCoverageChecker[*Policy, *PolicyBinding, PolicyEvaluator](
+			matcher, NewValidatingAdmissionPolicyAccessor, NewValidatingAdmissionPolicyBindingAccessor),
 	}
 }
 
@@ -113,6 +121,45 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 			})
 		}
 	}
+
+	// A coverage violation is handled per the binding's validationActions, since
+	// a binding without Deny couldn't have rejected the source request either.
+	// The actions apply unconditionally: the binding's validations and
+	// matchConditions are not evaluated.
+	coverageViolations := c.coverageChecker.Check(a, o, hooks)
+	for _, v := range coverageViolations {
+		definition, binding := policyOf(v.Policy), bindingOf(v.Binding)
+		for _, action := range binding.Spec.ValidationActions {
+			switch action {
+			case admissionregistrationv1.Deny:
+				deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+					Definition: definition,
+					Binding:    binding,
+					PolicyDecision: PolicyDecision{
+						Action: ActionDeny,
+						Reason: metav1.StatusReasonForbidden,
+						// The denial message built below already names the policy and binding.
+						Message: v.Reason(),
+					},
+				})
+				celmetrics.Metrics.ObserveRejection(ctx, 0, definition.Name, binding.Name, celmetrics.ValidationCoverageViolation)
+			case admissionregistrationv1.Audit:
+				validationFailures = append(validationFailures, ValidationFailureValue{
+					// No validation expression is involved.
+					ExpressionIndex:   -1,
+					Message:           v.Reason(),
+					ValidationActions: binding.Spec.ValidationActions,
+					Binding:           binding.Name,
+					Policy:            binding.Spec.PolicyName,
+				})
+				celmetrics.Metrics.ObserveAudit(ctx, 0, definition.Name, binding.Name, celmetrics.ValidationCoverageViolation)
+			case admissionregistrationv1.Warn:
+				warning.AddWarning(ctx, "", fmt.Sprintf(validationFailedWarning, definition.Name, binding.Name, v.Reason()))
+				celmetrics.Metrics.ObserveWarn(ctx, 0, definition.Name, binding.Name, celmetrics.ValidationCoverageViolation)
+			}
+		}
+	}
+	generic.RecordCoverageViolations(ctx, a, coverage.PolicyValidating, coverageViolations)
 
 	authz := admissionauthorizer.NewCachingAuthorizer(c.authz)
 	versionedAttrs := map[schema.GroupVersionKind]*admission.VersionedAttributes{}
@@ -251,7 +298,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 								})
 								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							case admissionregistrationv1.Warn:
-								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
+								warning.AddWarning(ctx, "", fmt.Sprintf(validationFailedWarning, definition.Name, binding.Name, decision.Message))
 								celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							}
 						}
