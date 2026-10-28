@@ -57,7 +57,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// imported from testutils
 var (
 	initRegistryAndConfig = func(t *testing.T, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
 		return schedulerutils.InitRegistryAndConfig(t, newPlugin, plugins...)

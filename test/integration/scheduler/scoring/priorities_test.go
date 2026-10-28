@@ -48,7 +48,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// imported from testutils
 var (
 	runPausePod                  = schedulerutils.RunPausePod
 	createAndWaitForNodesInCache = schedulerutils.CreateAndWaitForNodesInCache
@@ -905,7 +904,7 @@ func TestImageLocalityScoring(t *testing.T) {
 
 	// Create a pod with containers each having the specified image.
 	podName := "pod-using-large-image"
-	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &schedulerutils.PodWithContainersConfig{
+	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(&schedulerutils.PodWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
 		Containers: makeContainersWithImages([]string{imageName}),
