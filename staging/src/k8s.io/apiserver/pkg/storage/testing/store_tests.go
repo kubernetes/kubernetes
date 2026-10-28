@@ -5992,3 +5992,255 @@ func mustParseResourceVersion(t *testing.T, resourceVersion string) int64 {
 	}
 	return int64(rv)
 }
+
+type optimisticCallbackAction int
+
+const (
+	actionMutate optimisticCallbackAction = iota
+	actionNoop
+	actionReject
+	actionConflictUpdate
+	actionConflictDelete
+)
+
+type optimisticConcurrencyTestCase struct {
+	name              string
+	missingKey        bool
+	ignoreNotFound    bool
+	action            optimisticCallbackAction
+	preconditions     func(current *example.Pod) *storage.Preconditions
+	expectStatsCacher KubernetesRequestStats
+	expectStatsEtcd   KubernetesRequestStats
+	expectErr         func(error) bool
+}
+
+func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool, recorder *KubernetesRecorder) {
+	matchCurrent := func(cur *example.Pod) *storage.Preconditions {
+		return &storage.Preconditions{UID: &cur.UID, ResourceVersion: &cur.ResourceVersion}
+	}
+	wrongUID := func(_ *example.Pod) *storage.Preconditions {
+		return storage.NewUIDPreconditions("wrong-uid")
+	}
+	wrongRV := func(_ *example.Pod) *storage.Preconditions {
+		return &storage.Preconditions{ResourceVersion: ptr.To("999999999")}
+	}
+
+	testCases := []optimisticConcurrencyTestCase{
+		{
+			name:              "existing object commits in single transaction",
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "noop update short-circuits without writing",
+			action:            actionNoop,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+		},
+		{
+			name:              "missing key returns NotFound",
+			missingKey:        true,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
+			name:              "missing key with ignoreNotFound creates object",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "matching preconditions commit in single transaction",
+			preconditions:     matchCurrent,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "UID precondition mismatch fails without retry",
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "ResourceVersion precondition mismatch fails without retry",
+			preconditions:     wrongRV,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "callback error fails without retry",
+			action:            actionReject,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         apierrors.IsConflict,
+		},
+		{
+			name:              "concurrent update conflict refreshes and retries",
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+		{
+			name:              "concurrent update conflict fails preconditions on retry",
+			preconditions:     matchCurrent,
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "concurrent delete conflict returns NotFound",
+			action:            actionConflictDelete,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
+			name:              "concurrent delete conflict with ignoreNotFound recreates object",
+			ignoreNotFound:    true,
+			action:            actionConflictDelete,
+			expectStatsCacher: KubernetesRequestStats{Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+		{
+			name:              "missing key with ignoreNotFound and concurrent create refreshes and retries",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ignoreNotFound && tc.action != actionNoop {
+				t.Run("Delete", func(t *testing.T) {
+					runOptimisticConcurrencyOp(ctx, t, store, watchCacheEnabled, recorder, fmt.Sprintf("pod-%d-delete", i), tc, true)
+				})
+			}
+			t.Run("GuaranteedUpdate", func(t *testing.T) {
+				runOptimisticConcurrencyOp(ctx, t, store, watchCacheEnabled, recorder, fmt.Sprintf("pod-%d-update", i), tc, false)
+			})
+		})
+	}
+}
+
+func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool, recorder *KubernetesRecorder, podName string, tc optimisticConcurrencyTestCase, isDelete bool) {
+	key := "/pods/test-ns/" + podName
+
+	var current *example.Pod
+	if !tc.missingKey {
+		seed := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-ns",
+				Name:      podName,
+				UID:       "uid-1",
+				Labels:    map[string]string{"rev": "initial"},
+			},
+		}
+		current = &example.Pod{}
+		require.NoError(t, store.Create(ctx, key, seed, current, 0))
+		if watchCacheEnabled {
+			require.NoError(t, store.Get(ctx, key, storage.GetOptions{ResourceVersion: current.ResourceVersion}, &example.Pod{}))
+		}
+	}
+
+	var precond *storage.Preconditions
+	if tc.preconditions != nil {
+		precond = tc.preconditions(current)
+	}
+
+	var conflictInjected bool
+	onCallback := func() error {
+		switch tc.action {
+		case actionReject:
+			return apierrors.NewConflict(example.Resource("pods"), podName, errors.New("rejected"))
+		case actionConflictUpdate:
+			if !conflictInjected {
+				conflictInjected = true
+				updated := &example.Pod{}
+				require.NoError(t, store.GuaranteedUpdate(ctx, key, updated, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+					p := in.(*example.Pod)
+					if p.Name == "" {
+						p.Namespace = "test-ns"
+						p.Name = podName
+						p.Labels = map[string]string{}
+					}
+					p.Labels["rev"] = "conflict"
+					return p, nil
+				}), nil))
+				current = updated
+			}
+		case actionConflictDelete:
+			if !conflictInjected {
+				conflictInjected = true
+				require.NoError(t, store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}))
+				current = nil
+			}
+		}
+		return nil
+	}
+
+	recorderKey := t.Name()
+	opCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
+	out := &example.Pod{}
+	var err error
+	if isDelete {
+		err = store.Delete(opCtx, key, out, precond, func(_ context.Context, _ runtime.Object) error {
+			return onCallback()
+		}, nil, storage.DeleteOptions{})
+	} else {
+		err = store.GuaranteedUpdate(opCtx, key, out, tc.ignoreNotFound, precond, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			if err := onCallback(); err != nil {
+				return nil, err
+			}
+			pod := obj.(*example.Pod)
+			if pod.Name == "" {
+				pod.Namespace = "test-ns"
+				pod.Name = podName
+			}
+			if tc.action != actionNoop {
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				pod.Annotations["mutated"] = "updated"
+			}
+			return pod, nil
+		}), nil)
+	}
+
+	if tc.expectErr != nil {
+		require.True(t, tc.expectErr(err), "unexpected error: %v", err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	wantStats := tc.expectStatsEtcd
+	if watchCacheEnabled {
+		wantStats = tc.expectStatsCacher
+	}
+	require.Equal(t, wantStats, recorder.StatsForKey(recorderKey))
+
+	if tc.expectErr != nil {
+		return
+	}
+
+	expectOut := &example.Pod{}
+	if isDelete {
+		expectOut = current.DeepCopy()
+		expectOut.ResourceVersion = out.ResourceVersion
+		require.True(t, storage.IsNotFound(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+	} else {
+		if tc.action != actionNoop {
+			require.Equal(t, "updated", out.Annotations["mutated"])
+		}
+		require.NoError(t, store.Get(ctx, key, storage.GetOptions{}, expectOut))
+	}
+
+	require.Equal(t, expectOut, out)
+}
