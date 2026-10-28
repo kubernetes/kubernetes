@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -43,7 +44,10 @@ type cgroupTestParam struct {
 	expectReconcileOnRestart  bool
 	expectReconcilePeriodic   bool
 	expectReconcileOnPodChurn bool
-	comment                   string
+	// expectReconcileOnPodCountTransition covers the node going from N pods
+	// to 0, which is distinct from steady-state churn (see getCgroupParams).
+	expectReconcileOnPodCountTransition bool
+	comment                             string
 }
 
 // reconcileTrigger describes how a batch of manually-set cgroup values is
@@ -51,6 +55,13 @@ type cgroupTestParam struct {
 // expectation applies to each property under that trigger.
 type reconcileTrigger struct {
 	label string
+	// zeroPodBaseline skips the long-lived sentinel pods, so pod churn moves
+	// the node between 0 and N pods. Real nodes always run system pods, so
+	// only the transition test wants this.
+	zeroPodBaseline bool
+	// expectSubtreeControlChange is whether the trigger is expected to change
+	// the pod root's enabled controller set (cgroup.subtree_control).
+	expectSubtreeControlChange bool
 	// setup runs before the manual values are written. Used to bring pods up
 	// so that their later deletion is what fires reconciliation. May be nil.
 	setup func(ctx context.Context)
@@ -98,11 +109,41 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 		}).WithTimeout(f.Timeouts.PodDelete).WithPolling(2*time.Second).Should(gomega.BeEmpty(),
 			"pod cgroups from other tests must be gone before verifying root cgroup reconciliation")
 
-		// 0b. Run any trigger-specific setup (e.g. bring pods up so that a later
+		// 0b. Real nodes always run system pods, so the pod root's enabled
+		// controller set is stable under churn. Keep one pod per QoS class
+		// running for the whole test so we measure that steady state rather
+		// than the 0 <-> N transition, which changes cgroup.subtree_control
+		// and makes systemd re-realize (and rewrite) the slice.
+		if !trigger.zeroPodBaseline {
+			sentinels := createQoSPods(ctx, f, "cgroup-sentinel")
+			ginkgo.DeferCleanup(deleteQoSPods, f, sentinels)
+
+			sentinelUIDs := sets.New[string]()
+			for _, p := range sentinels {
+				sentinelUIDs.Insert(string(p.UID))
+			}
+			ginkgo.By("Waiting for exactly the sentinel pod cgroups to be present")
+			gomega.Eventually(ctx, func() ([]string, error) {
+				uids, err := podCgroupUIDs(cgroupPath)
+				return sets.List(uids), err
+			}).WithTimeout(f.Timeouts.PodStart).WithPolling(2*time.Second).Should(gomega.Equal(sets.List(sentinelUIDs)),
+				"only the sentinel pods may have cgroups under the pod root before capturing the baseline")
+		}
+
+		// 0c. Run any trigger-specific setup (e.g. bring pods up so that a later
 		// deletion is what fires reconciliation) before capturing the baseline.
 		if trigger.setup != nil {
 			trigger.setup(ctx)
 		}
+
+		subtreeControlPath := filepath.Join(cgroupPath, "cgroup.subtree_control")
+		readSubtreeControl := func() (string, error) {
+			b, err := os.ReadFile(subtreeControlPath)
+			return strings.TrimSpace(string(b)), err
+		}
+		subtreeControlBefore, err := readSubtreeControl()
+		framework.ExpectNoError(err, "reading %s", subtreeControlPath)
+		framework.Logf("%s before trigger: %q", subtreeControlPath, subtreeControlBefore)
 
 		type testState struct {
 			filename        string
@@ -215,13 +256,26 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 						continue
 					}
 					currentValue := strings.TrimSpace(string(currentValueBytes))
-					if !strings.Contains(currentValue, s.effectiveManual) {
+					// Exact match: a reset cpuset.cpus of "0-7" contains a manual "0".
+					if currentValue != s.effectiveManual {
 						failures = append(failures, fmt.Sprintf("%s (was reset! got %s, expected %s)", s.filename, currentValue, s.effectiveManual))
 					}
 				}
 				return failures
 			}).WithTimeout(70*time.Second).WithPolling(2*time.Second).Should(gomega.BeEmpty(),
 				"The following cgroups were unexpectedly reconciled (reset to defaults)")
+		}
+
+		// 6. Guard against measuring the wrong mechanism: a controller set
+		// change re-realizes the slice regardless of what the trigger did.
+		if trigger.expectSubtreeControlChange {
+			gomega.Eventually(ctx, readSubtreeControl).WithTimeout(f.Timeouts.PodDelete).WithPolling(2*time.Second).ShouldNot(gomega.Equal(subtreeControlBefore),
+				"%s was expected to change under trigger %q; without it this test no longer exercises the 0 <-> N pod transition", subtreeControlPath, trigger.label)
+		} else {
+			subtreeControlAfter, err := readSubtreeControl()
+			framework.ExpectNoError(err, "reading %s", subtreeControlPath)
+			gomega.Expect(subtreeControlAfter).To(gomega.Equal(subtreeControlBefore),
+				"%s changed under trigger %q; systemd re-realized the slice, so reconciliation results above do not reflect the trigger itself", subtreeControlPath, trigger.label)
 		}
 	}
 
@@ -249,20 +303,17 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 		testCgroups(ctx, getPodRootCgroupPath(), getCgroupParams(), trigger)
 	})
 
-	// Pod lifecycle events funnel through killPod -> UpdateQOSCgroups (pod
-	// deletion) and pod admission -> UpdateQOSCgroups, both of which call
-	// cgroupManager.Update on the pod root cgroup. On the systemd driver that
-	// Update issues SetUnitProperties, which resets every unspecified property
-	// on the slice; on cgroupfs the (empty) Update writes no files and is a
-	// no-op. This test creates one pod per QoS class, then deletes all of them,
-	// so pod churn is what deterministically fires reconciliation instead of a
-	// stray leftover pod terminating mid-verification.
+	// Pod lifecycle events funnel through UpdateQOSCgroups, which calls
+	// cgroupManager.Update on the pod root cgroup. With the sentinel pods
+	// keeping the node at >= 1 pod (as on any real node), the pod root's
+	// controller set never changes, systemd never re-realizes the slice, and
+	// manually written values survive churn.
 	ginkgo.It("should follow reconciliation rules (Pod Churn)", func(ctx context.Context) {
 		var churnPods []*v1.Pod
 		trigger := reconcileTrigger{
-			label: "pod churn (create+delete guaranteed/burstable/besteffort pods)",
+			label: "pod churn (create+delete guaranteed/burstable/besteffort pods on top of sentinels)",
 			setup: func(ctx context.Context) {
-				churnPods = createQoSPods(ctx, f)
+				churnPods = createQoSPods(ctx, f, "cgroup-churn")
 			},
 			fire: func(ctx context.Context) {
 				deleteQoSPods(ctx, f, churnPods)
@@ -271,12 +322,33 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 		}
 		testCgroups(ctx, getPodRootCgroupPath(), getCgroupParams(), trigger)
 	})
+
+	// Going from N pods to 0 empties the pod root, which changes its enabled
+	// controller set (cgroup.subtree_control). systemd then re-realizes
+	// kubepods.slice from its stored unit properties, overwriting anything
+	// written directly to cgroupfs. This only happens on an otherwise empty
+	// node; it is not what normal churn does.
+	ginkgo.It("should follow reconciliation rules (Pod Count Transition N -> 0)", func(ctx context.Context) {
+		var churnPods []*v1.Pod
+		trigger := reconcileTrigger{
+			label:                      "pod count transition (delete the only guaranteed/burstable/besteffort pods)",
+			zeroPodBaseline:            true,
+			expectSubtreeControlChange: true,
+			setup: func(ctx context.Context) {
+				churnPods = createQoSPods(ctx, f, "cgroup-transition")
+			},
+			fire: func(ctx context.Context) {
+				deleteQoSPods(ctx, f, churnPods)
+			},
+			shouldReconcile: func(p cgroupTestParam) bool { return p.expectReconcileOnPodCountTransition },
+		}
+		testCgroups(ctx, getPodRootCgroupPath(), getCgroupParams(), trigger)
+	})
 })
 
 // createQoSPods creates one running pause pod for each QoS class (Guaranteed,
-// Burstable, BestEffort) and returns them so a later deletion can drive Kubelet
-// QoS cgroup reconciliation.
-func createQoSPods(ctx context.Context, f *framework.Framework) []*v1.Pod {
+// Burstable, BestEffort), named with the given prefix.
+func createQoSPods(ctx context.Context, f *framework.Framework, namePrefix string) []*v1.Pod {
 	podClient := e2epod.NewPodClient(f)
 	specs := []struct {
 		qos       string
@@ -294,7 +366,7 @@ func createQoSPods(ctx context.Context, f *framework.Framework) []*v1.Pod {
 	for _, s := range specs {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("cgroup-churn-%s-%s", s.qos, string(uuid.NewUUID())),
+				Name: fmt.Sprintf("%s-%s-%s", namePrefix, s.qos, string(uuid.NewUUID())),
 			},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyNever,
@@ -365,96 +437,134 @@ func isPodCgroupName(name string) bool {
 	return strings.HasPrefix(name, "pod")
 }
 
+// podUIDFromCgroupName extracts the pod UID from a name accepted by
+// isPodCgroupName.
+func podUIDFromCgroupName(name string) string {
+	if base, ok := strings.CutSuffix(name, ".slice"); ok {
+		// systemd escapes '-' in the UID as '_'.
+		uid := base[strings.LastIndex(base, "-pod")+len("-pod"):]
+		return strings.ReplaceAll(uid, "_", "-")
+	}
+	return strings.TrimPrefix(name, "pod")
+}
+
+// podCgroupUIDs returns the UIDs of all pods that have a cgroup under cgroupRoot.
+func podCgroupUIDs(cgroupRoot string) (sets.Set[string], error) {
+	dirs, err := podCgroupDirs(cgroupRoot)
+	if err != nil {
+		return nil, err
+	}
+	uids := sets.New[string]()
+	for _, d := range dirs {
+		uids.Insert(podUIDFromCgroupName(filepath.Base(d)))
+	}
+	return uids, nil
+}
+
 func getCgroupParams() []cgroupTestParam {
 	isSystemd := getCgroupDriver() == "systemd"
 	// Pod churn drives UpdateQOSCgroups, which calls cgroupManager.Update on the
-	// pod root cgroup with an (essentially empty) config. On cgroupfs that Update
-	// writes no files, so nothing is reset. On systemd it issues SetUnitProperties,
-	// which resets every unspecified property on the slice. Unlike a Kubelet
-	// restart, pod churn does NOT re-run Node Allocatable enforcement, so even the
-	// Kubelet-managed properties (cpu.weight, memory.max, pids.max, cpuset.cpus)
-	// are only reset under systemd (as a side-effect), never on cgroupfs.
+	// pod root cgroup. That alone does not rewrite the root's attributes. They
+	// are only rewritten when the pod count crosses 0 <-> N: that changes the
+	// pod root's enabled controller set (cgroup.subtree_control), and systemd
+	// re-realizes kubepods.slice from its stored unit properties, discarding
+	// anything written directly to cgroupfs. Real nodes always run system pods,
+	// so steady-state churn leaves manual values in place. The transition does
+	// NOT re-run Node Allocatable enforcement either, so even Kubelet-managed
+	// properties (cpu.weight, memory.max, pids.max, cpuset.cpus) are only reset
+	// as a systemd side-effect.
 	return []cgroupTestParam{
 		{
-			filename:                  "cpu.max",
-			manualValue:               "max 100000",
-			altManualValue:            "100000 100000",
-			expectReconcileOnRestart:  isSystemd,
-			expectReconcilePeriodic:   false,
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Kubelet does not set a limit here; reconciliation on restart is a side-effect of systemd resetting unspecified properties to unbounded.",
+			filename:                            "cpu.max",
+			manualValue:                         "max 100000",
+			altManualValue:                      "100000 100000",
+			expectReconcileOnRestart:            isSystemd,
+			expectReconcilePeriodic:             false,
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Kubelet does not set a limit here; reconciliation on restart is a side-effect of systemd resetting unspecified properties to unbounded.",
 		},
 		{
-			filename:                  "cpu.weight",
-			manualValue:               "100",
-			altManualValue:            "512",
-			expectReconcileOnRestart:  true,
-			expectReconcilePeriodic:   false, // Root cgroup management is not truly periodic (startup-only)
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Node Allocatable enforcement sets this (via shares) to ensure the pod hierarchy gets its fair share of CPU.",
+			filename:                            "cpu.weight",
+			manualValue:                         "100",
+			altManualValue:                      "512",
+			expectReconcileOnRestart:            true,
+			expectReconcilePeriodic:             false, // Root cgroup management is not truly periodic (startup-only)
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Node Allocatable enforcement sets this (via shares) to ensure the pod hierarchy gets its fair share of CPU.",
 		},
 		{
-			filename:                  "memory.max",
-			manualValue:               "1073741824", // 1Gi
-			altManualValue:            "536870912",  // 512Mi
-			expectReconcileOnRestart:  true,
-			expectReconcilePeriodic:   false, // Root cgroup management is not truly periodic (startup-only)
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Node Allocatable enforcement sets this to the Node Allocatable value to protect the host from pod aggregate usage.",
+			filename:                            "memory.max",
+			manualValue:                         "1073741824", // 1Gi
+			altManualValue:                      "536870912",  // 512Mi
+			expectReconcileOnRestart:            true,
+			expectReconcilePeriodic:             false, // Root cgroup management is not truly periodic (startup-only)
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Node Allocatable enforcement sets this to the Node Allocatable value to protect the host from pod aggregate usage.",
 		},
 		{
-			filename:                  "pids.max",
-			manualValue:               "1000",
-			altManualValue:            "1234",
-			expectReconcileOnRestart:  true,
-			expectReconcilePeriodic:   false, // Root cgroup management is not truly periodic (startup-only)
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Node Allocatable enforcement sets this to protect the node from PID exhaustion across all pods.",
+			filename:                            "pids.max",
+			manualValue:                         "1000",
+			altManualValue:                      "1234",
+			expectReconcileOnRestart:            true,
+			expectReconcilePeriodic:             false, // Root cgroup management is not truly periodic (startup-only)
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Node Allocatable enforcement sets this to protect the node from PID exhaustion across all pods.",
 		},
 		{
-			filename:                  "cpuset.cpus",
-			manualValue:               "0",
-			altManualValue:            "0-0", // More robust alternative for various environments
-			expectReconcileOnRestart:  true,
-			expectReconcilePeriodic:   false, // Root cgroup management is not truly periodic (startup-only)
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Node Allocatable enforcement sets this to restrict pods to the designated allocatable CPUs.",
+			filename:                            "cpuset.cpus",
+			manualValue:                         "0",
+			altManualValue:                      "0-0", // More robust alternative for various environments
+			expectReconcileOnRestart:            true,
+			expectReconcilePeriodic:             false, // Root cgroup management is not truly periodic (startup-only)
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Node Allocatable enforcement sets this to restrict pods to the designated allocatable CPUs.",
 		},
 		{
-			filename:                  "memory.min",
-			manualValue:               "115343360", // 110Mi (page aligned)
-			altManualValue:            "209715200", // 200Mi (page aligned)
-			expectReconcileOnRestart:  isSystemd,
-			expectReconcilePeriodic:   false,
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Kubelet skips memory.min management when MemoryQoS is disabled, but it is reconciled on systemd restart as a side-effect.",
+			filename:                            "memory.min",
+			manualValue:                         "115343360", // 110Mi (page aligned)
+			altManualValue:                      "209715200", // 200Mi (page aligned)
+			expectReconcileOnRestart:            isSystemd,
+			expectReconcilePeriodic:             false,
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Kubelet skips memory.min management when MemoryQoS is disabled, but it is reconciled on systemd restart as a side-effect.",
 		},
 		{
-			filename:                  "memory.high",
-			manualValue:               "1073741824", // 1Gi
-			altManualValue:            "536870912",  // 512Mi
-			expectReconcileOnRestart:  isSystemd,
-			expectReconcilePeriodic:   false,
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Not managed by Kubelet at the root level; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
+			filename:                            "memory.high",
+			manualValue:                         "1073741824", // 1Gi
+			altManualValue:                      "536870912",  // 512Mi
+			expectReconcileOnRestart:            isSystemd,
+			expectReconcilePeriodic:             false,
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Not managed by Kubelet at the root level; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
 		},
 		{
-			filename:                  "memory.oom.group",
-			manualValue:               "1",
-			altManualValue:            "0",
-			expectReconcileOnRestart:  isSystemd,
-			expectReconcilePeriodic:   false,
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Not managed by Kubelet at the root level; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
+			filename:                            "memory.oom.group",
+			manualValue:                         "1",
+			altManualValue:                      "0",
+			expectReconcileOnRestart:            isSystemd,
+			expectReconcilePeriodic:             false,
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Not managed by Kubelet at the root level; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
 		},
 		{
-			filename:                  "io.weight",
-			manualValue:               "200",
-			altManualValue:            "150",
-			expectReconcileOnRestart:  isSystemd,
-			expectReconcilePeriodic:   false,
-			expectReconcileOnPodChurn: isSystemd,
-			comment:                   "Not managed by Kubelet; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
+			filename: "io.weight",
+			// Keyed format: the kernel reads back "default N" even when "N"
+			// is written, so write the read-back form for exact comparison.
+			manualValue:                         "default 200",
+			altManualValue:                      "default 150",
+			expectReconcileOnRestart:            isSystemd,
+			expectReconcilePeriodic:             false,
+			expectReconcileOnPodChurn:           false,
+			expectReconcileOnPodCountTransition: isSystemd,
+			comment:                             "Not managed by Kubelet; reconciliation on restart is a side-effect of systemd resetting unspecified properties.",
 		},
 	}
 }
