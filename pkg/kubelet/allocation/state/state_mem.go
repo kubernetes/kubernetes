@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -76,6 +77,23 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 		}
 	}
 	return v1.ResourceRequirements{}, false
+}
+
+// GetPodVolumes returns current volumes information for a pod
+func (s *stateMemory) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pod, ok := s.pods[podUID]
+	if !ok || len(pod.Spec.Volumes) == 0 {
+		return nil, false
+	}
+
+	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	for i := range pod.Spec.Volumes {
+		volumes[i] = *pod.Spec.Volumes[i].DeepCopy()
+	}
+	return volumes, true
 }
 
 // GetPodLevelResources returns current resources information at pod-level
@@ -247,6 +265,78 @@ func (s *stateMemory) SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UI
 	return nil
 }
 
+func (s *stateMemory) SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error {
+	_, err := s.setPodVolume(logger, podUID, volume)
+	return err
+}
+
+func (s *stateMemory) setPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) (bool, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	volCopy := *volume.DeepCopy()
+	stored, ok := s.pods[podUID]
+	if !ok {
+		s.pods[podUID] = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: podUID},
+			Spec:       v1.PodSpec{Volumes: []v1.Volume{volCopy}},
+		}
+		logger.V(3).Info("Updated pod volume information", "podUID", podUID, "volumeName", volume.Name)
+		return true, nil
+	}
+
+	for i := range stored.Spec.Volumes {
+		if stored.Spec.Volumes[i].Name == volume.Name {
+			// Preserve an already-actuated EmptyDir.SizeLimit, which is updated via SetEmptyDirVolumeLimit.
+			if stored.Spec.Volumes[i].EmptyDir != nil && stored.Spec.Volumes[i].EmptyDir.SizeLimit != nil && volCopy.EmptyDir != nil {
+				sizeLimitCopy := *stored.Spec.Volumes[i].EmptyDir.SizeLimit
+				volCopy.EmptyDir.SizeLimit = &sizeLimitCopy
+			}
+			if apiequality.Semantic.DeepEqual(stored.Spec.Volumes[i], volCopy) {
+				return false, nil
+			}
+			pod := *stored
+			pod.Spec.Volumes = slices.Clone(stored.Spec.Volumes)
+			pod.Spec.Volumes[i] = volCopy
+			s.pods[podUID] = &pod
+			logger.V(3).Info("Updated pod volume information", "podUID", podUID, "volumeName", volume.Name)
+			return true, nil
+		}
+	}
+
+	pod := *stored
+	pod.Spec.Volumes = append(slices.Clone(stored.Spec.Volumes), volCopy)
+	s.pods[podUID] = &pod
+	logger.V(3).Info("Updated pod volume information", "podUID", podUID, "volumeName", volume.Name)
+	return true, nil
+}
+
+func (s *stateMemory) RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error {
+	_, err := s.removePodVolume(logger, podUID, volumeName)
+	return err
+}
+
+func (s *stateMemory) removePodVolume(logger klog.Logger, podUID types.UID, volumeName string) (bool, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	stored, ok := s.pods[podUID]
+	if !ok {
+		return false, nil
+	}
+
+	idx := slices.IndexFunc(stored.Spec.Volumes, func(v v1.Volume) bool { return v.Name == volumeName })
+	if idx == -1 {
+		return false, nil
+	}
+
+	pod := *stored
+	pod.Spec.Volumes = slices.Delete(slices.Clone(pod.Spec.Volumes), idx, idx+1)
+	s.pods[podUID] = &pod
+	logger.V(3).Info("Removed pod volume information", "podUID", podUID, "volumeName", volumeName)
+	return true, nil
+}
+
 func (s *stateMemory) SetPod(logger klog.Logger, pod *v1.Pod) error {
 	// Only the identity and the spec of the pod are kept. The spec is copied because the caller owns the pod.
 	stored := &v1.Pod{
@@ -259,6 +349,12 @@ func (s *stateMemory) SetPod(logger klog.Logger, pod *v1.Pod) error {
 
 	s.Lock()
 	defer s.Unlock()
+
+	if s.maskFn != nil && len(stored.Spec.Volumes) == 0 {
+		if existing, ok := s.pods[pod.UID]; ok && len(existing.Spec.Volumes) > 0 {
+			stored.Spec.Volumes = slices.Clone(existing.Spec.Volumes)
+		}
+	}
 
 	s.pods[pod.UID] = stored
 	logger.V(3).Info("Updated pod resource information", "podUID", pod.UID)

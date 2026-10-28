@@ -222,6 +222,9 @@ func updateContainerResourcesFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated 
 
 func updatePodLevelResourcesFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) {
 	pAlloc := stored.Spec.Resources
+	if pAlloc == nil {
+		return pod, false
+	}
 	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
 		pod = pod.DeepCopy()
 		pod.Spec.Resources = pAlloc.DeepCopy()
