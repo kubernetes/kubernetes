@@ -48,6 +48,9 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -688,6 +691,53 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			if err == nil || allocated {
 				framework.Fail(fmt.Sprintf("stale device assignment after pod deletion while kubelet was down allocated=%v error=%v", allocated, err))
 			}
+		})
+
+		f.Context("with pod-level resource managers", feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+			tempSetCurrentKubeletConfig(f, func(_ context.Context, cfg *kubeletconfig.KubeletConfiguration) {
+				if cfg.FeatureGates == nil {
+					cfg.FeatureGates = map[string]bool{}
+				}
+				cfg.FeatureGates[string(features.PodLevelResources)] = true
+				cfg.FeatureGates[string(features.PodLevelResourceManagers)] = true
+				cfg.TopologyManagerScope = topologymanager.PodTopologyScope
+			})
+
+			ginkgo.It("Can allocate a container device for a pod with pod-level resources", func(ctx context.Context) {
+				ginkgo.By("Waiting for devices after reconfiguring the kubelet")
+				gomega.Eventually(ctx, func(ctx context.Context) bool {
+					node, ready := getLocalTestNode(ctx, f)
+					return ready && e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
+				}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be available on local node"))
+
+				podCommand := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+				pod := makeBusyboxPod(e2enode.SampleDeviceResourceName, podCommand)
+				podResources := v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("10m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				}
+				pod.Spec.Resources = &v1.ResourceRequirements{Requests: podResources, Limits: podResources}
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+				deviceID, err := parseLog(ctx, f, pod.Name, pod.Spec.Containers[0].Name, "stub devices: (Dev-[0-9]+)")
+				framework.ExpectNoError(err, "getting logs for pod %q", pod.Name)
+
+				ginkgo.By("Verifying the device assignment using podresources API")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					podResources, err := getV1NodeDevices(ctx)
+					if err != nil {
+						return err
+					}
+					err, found := checkPodResourcesAssignment(podResources, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, e2enode.SampleDeviceResourceName, []string{deviceID})
+					if err != nil {
+						return err
+					}
+					if !found {
+						return fmt.Errorf("device assignment for pod %s/%s not found", pod.Namespace, pod.Name)
+					}
+					return nil
+				}, 30*time.Second, framework.Poll).Should(gomega.Succeed())
+			})
 		})
 
 		f.It("Can schedule a pod with a restartable init container", framework.WithNodeConformance(), func(ctx context.Context) {
