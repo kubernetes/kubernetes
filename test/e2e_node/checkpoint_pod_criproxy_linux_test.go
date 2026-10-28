@@ -93,6 +93,114 @@ var _ = SIGDescribe("Checkpoint Pod with CRI proxy", feature.PodLevelCheckpointR
 		gomega.Expect(condition.Message).To(gomega.Or(gomega.ContainSubstring("DeadlineExceeded"), gomega.ContainSubstring("deadline exceeded")))
 	})
 
+	ginkgo.It("should suspend all Pod probes until failed checkpoint cleanup is acknowledged", func(ctx context.Context) {
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, podCheckpointSource(f.Namespace.Name, "checkpoint-probes"))
+		for _, container := range pod.Spec.Containers {
+			gomega.Eventually(ctx, func() error {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				if counts[0] == 0 || counts[1] == 0 {
+					return fmt.Errorf("both probe types must run in container %q before checkpoint", container.Name)
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Succeed())
+		}
+
+		entered, release := holdPodOperationRPC(ctx, criproxy.CheckpointPod, fmt.Errorf("injected checkpoint failure"))
+		cleanupEntered, releaseCleanup := holdPodOperationRPC(ctx, criproxy.CancelPodOperation, nil)
+		checkpoint := createPodCheckpoint(ctx, f, newPodCheckpoint(pod, "checkpoint-probes-cp"))
+		gomega.Eventually(ctx, entered, 30*time.Second).Should(gomega.BeClosed(), "checkpoint must reach the runtime after draining probes")
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "checkpoint condition set", 10*time.Second, func(current *v1.Pod) (bool, error) {
+			for _, condition := range current.Status.Conditions {
+				if condition.Type == v1.PodCheckpointing && condition.Status == v1.ConditionTrue {
+					return true, nil
+				}
+			}
+			return false, nil
+		}))
+		before := map[string][2]int{}
+		for _, container := range pod.Spec.Containers {
+			counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+			framework.ExpectNoError(err)
+			before[container.Name] = counts
+		}
+
+		ginkgo.By("checking multiple probe periods while the checkpoint RPC is held")
+		gomega.Consistently(ctx, func() error {
+			for _, container := range pod.Spec.Containers {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				if counts != before[container.Name] {
+					return fmt.Errorf("probes ran in container %q during checkpoint: got %v, want %v", container.Name, counts, before[container.Name])
+				}
+			}
+			return nil
+		}, 3*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
+
+		ginkgo.By("returning the capture failure while withholding cleanup acknowledgment")
+		release()
+		gomega.Eventually(ctx, cleanupEntered, 10*time.Second).Should(gomega.BeClosed())
+		checkpointPath := filepath.Join(framework.TestContext.KubeletRootDir, kubeletconfigpaths.DefaultKubeletPodCheckpointsDirName, "checkpoint-"+string(checkpoint.UID))
+		gomega.Consistently(ctx, func() error {
+			if _, err := os.Stat(checkpointPath); err != nil {
+				return fmt.Errorf("checkpoint output was removed before cleanup acknowledgment: %w", err)
+			}
+			current, err := f.ClientSet.NodeV1alpha1().PodCheckpoints(checkpoint.Namespace).Get(ctx, checkpoint.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			condition := apimeta.FindStatusCondition(current.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+			if condition == nil || condition.Status != metav1.ConditionFalse || condition.Reason != nodev1alpha1.PodCheckpointReasonInProgress {
+				return fmt.Errorf("checkpoint stopped reporting in progress before cleanup acknowledgment: %v", condition)
+			}
+			source, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			checkpointing := false
+			for _, condition := range source.Status.Conditions {
+				if condition.Type == v1.PodCheckpointing && condition.Status == v1.ConditionTrue {
+					checkpointing = true
+				}
+			}
+			if !checkpointing {
+				return fmt.Errorf("source Pod stopped reporting Checkpointing before cleanup acknowledgment")
+			}
+			for _, container := range pod.Spec.Containers {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				if counts != before[container.Name] {
+					return fmt.Errorf("probes resumed in container %q before cleanup acknowledgment: got %v, want %v", container.Name, counts, before[container.Name])
+				}
+			}
+			return nil
+		}, 3*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
+
+		ginkgo.By("acknowledging runtime cleanup and checking that all probes resume")
+		releaseCleanup()
+		checkpoint = waitForPodCheckpoint(ctx, f, checkpoint.Name)
+		condition := expectPodCheckpointFailed(ctx, f, pod, checkpoint)
+		gomega.Expect(condition.Message).To(gomega.ContainSubstring("injected checkpoint failure"))
+		for _, container := range pod.Spec.Containers {
+			gomega.Eventually(ctx, func() error {
+				counts, err := podCheckpointProbeCounts(f, pod, container.Name)
+				if err != nil {
+					return err
+				}
+				initial := before[container.Name]
+				if counts[0] <= initial[0] || counts[1] <= initial[1] {
+					return fmt.Errorf("both probes have not resumed in container %q: got %v, previous %v", container.Name, counts, initial)
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Succeed())
+		}
+	})
 })
 
 // The proxy injector has no RPC context. Release it explicitly on every exit so
