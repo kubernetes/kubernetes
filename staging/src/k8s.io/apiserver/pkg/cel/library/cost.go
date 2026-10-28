@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/ast"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"cel.dev/cel-go/common/ast"
+	celcost "cel.dev/cel-go/common/cost"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 
 	"k8s.io/apiserver/pkg/cel"
 )
@@ -57,25 +56,25 @@ var knownUnhandledFunctions = map[string]bool{
 	"_-_":                 true,
 }
 
-// CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
+// CostEstimator implements CEL's interpretable.ActualCostEstimator and cost.Estimator.
 type CostEstimator struct {
 	// SizeEstimator provides a CostEstimator.EstimateSize that this CostEstimator will delegate size estimation
 	// calculations to if the size is not well known (i.e. a constant).
-	SizeEstimator checker.CostEstimator
+	SizeEstimator celcost.Estimator
 }
 
 const (
 	// shortest repeatable selector requirement that allocates a values slice is 2 characters: k,
 	selectorLengthToRequirementCount = float64(.5)
 	// the expensive parts to represent each requirement are a struct and a values slice
-	costPerRequirement = float64(common.ListCreateBaseCost + common.StructCreateBaseCost)
+	costPerRequirement = float64(celcost.ListCreateBaseCost + celcost.StructCreateBaseCost)
 )
 
 // a selector consists of a list of requirements held in a slice
-var baseSelectorCost = checker.CostEstimate{Min: common.ListCreateBaseCost, Max: common.ListCreateBaseCost}
+var baseSelectorCost = celcost.Estimate{Min: celcost.ListCreateBaseCost, Max: celcost.ListCreateBaseCost}
 
-func selectorCostEstimate(selectorLength checker.SizeEstimate) checker.CostEstimate {
-	parseCost := selectorLength.MultiplyByCostFactor(common.StringTraversalCostFactor)
+func selectorCostEstimate(selectorLength celcost.SizeEstimate) celcost.Estimate {
+	parseCost := selectorLength.MultiplyByCostFactor(celcost.StringTraversalCostFactor)
 
 	requirementCount := selectorLength.MultiplyByCostFactor(selectorLengthToRequirementCount)
 	requirementCost := requirementCount.MultiplyByCostFactor(costPerRequirement)
@@ -83,7 +82,7 @@ func selectorCostEstimate(selectorLength checker.SizeEstimate) checker.CostEstim
 	return baseSelectorCost.Add(parseCost).Add(requirementCost)
 }
 
-func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, result ref.Val) *uint64 {
+func (l *CostEstimator) CallCost(function, overloadID string, args []ref.Val, result ref.Val) *uint64 {
 	switch function {
 	case "check":
 		// An authorization check has a fixed cost
@@ -98,7 +97,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// field and label selector parse is a string parse into a structured set of requirements
 		if len(args) >= 2 {
 			selectorLength := actualSize(args[1])
-			cost := selectorCostEstimate(checker.SizeEstimate{Min: selectorLength, Max: selectorLength})
+			cost := selectorCostEstimate(celcost.SizeEstimate{Min: selectorLength, Max: selectorLength})
 			return &cost.Max
 		}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
@@ -109,56 +108,56 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		return &cost
 	case "url", "lowerAscii", "upperAscii", "substring", "trim", "jsonpatch.escapeKey":
 		if len(args) >= 1 {
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "replace", "split":
 		if len(args) >= 1 {
 			// cost is the traversal plus the construction of the result
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * 2 * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * 2 * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "join":
 		if len(args) >= 1 {
-			cost := uint64(math.Ceil(float64(actualSize(result)) * 2 * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(result)) * 2 * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "find", "findAll":
 		if len(args) >= 2 {
-			strCost := uint64(math.Ceil((1.0 + float64(actualSize(args[0]))) * common.StringTraversalCostFactor))
+			strCost := uint64(math.Ceil((1.0 + float64(actualSize(args[0]))) * celcost.StringTraversalCostFactor))
 			// We don't know how many expressions are in the regex, just the string length (a huge
 			// improvement here would be to somehow get a count the number of expressions in the regex or
 			// how many states are in the regex state machine and use that to measure regex cost).
 			// For now, we're making a guess that each expression in a regex is typically at least 4 chars
 			// in length.
-			regexCost := uint64(math.Ceil(float64(actualSize(args[1])) * common.RegexStringLengthCostFactor))
+			regexCost := uint64(math.Ceil(float64(actualSize(args[1])) * celcost.RegexStringLengthCostFactor))
 			cost := strCost * regexCost
 			return &cost
 		}
 	case "cidr", "isIP", "isCIDR":
 		// IP and CIDR parsing is a string traversal.
 		if len(args) >= 1 {
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "ip":
 		// IP and CIDR parsing is a string traversal.
 		if len(args) >= 1 {
-			if overloadId == "cidr_ip" {
+			if overloadID == "cidr_ip" {
 				// The IP member of the CIDR object is just accessing a field.
 				// Nominal cost.
 				cost := uint64(1)
 				return &cost
 			}
 
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "ip.isCanonical":
 		if len(args) >= 1 {
 			// We have to parse the string and then compare the parsed string to the original string.
 			// So we double the cost of parsing the string.
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * 2 * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * 2 * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "masked", "isMask", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
@@ -172,11 +171,11 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			// This is the base cost of comparing two byte lists.
 			// We will compare only up to the length of the CIDR prefix in bytes, so use the cidrSize twice.
-			cost := uint64(math.Ceil(float64(cidrSize+cidrSize) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(cidrSize+cidrSize) * celcost.StringTraversalCostFactor))
 
-			if overloadId == "cidr_contains_ip_string" {
+			if overloadID == "cidr_contains_ip_string" {
 				// If we are comparing a string, we must parse the string to into the right type, so add the cost of traversing the string again.
-				cost += uint64(math.Ceil(float64(otherSize) * common.StringTraversalCostFactor))
+				cost += uint64(math.Ceil(float64(otherSize) * celcost.StringTraversalCostFactor))
 
 			}
 
@@ -189,23 +188,23 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			// This is the base cost of comparing two byte lists.
 			// We will compare only up to the length of the CIDR prefix in bytes, so use the cidrSize twice.
-			cost := uint64(math.Ceil(float64(cidrSize+cidrSize) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(cidrSize+cidrSize) * celcost.StringTraversalCostFactor))
 
 			// As we are comparing if a CIDR is within another CIDR, we first mask the base CIDR and
 			// also compare the CIDR bits.
 			// This has an additional cost of the length of the IP being traversed again, plus 1.
-			cost += uint64(math.Ceil(float64(cidrSize)*common.StringTraversalCostFactor)) + 1
+			cost += uint64(math.Ceil(float64(cidrSize)*celcost.StringTraversalCostFactor)) + 1
 
-			if overloadId == "cidr_contains_cidr_string" {
+			if overloadID == "cidr_contains_cidr_string" {
 				// If we are comparing a string, we must parse the string to into the right type, so add the cost of traversing the string again.
-				cost += uint64(math.Ceil(float64(otherSize) * common.StringTraversalCostFactor))
+				cost += uint64(math.Ceil(float64(otherSize) * celcost.StringTraversalCostFactor))
 			}
 
 			return &cost
 		}
 	case "quantity", "isQuantity", "semver", "isSemver":
 		if len(args) >= 1 {
-			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * celcost.StringTraversalCostFactor))
 			return &cost
 		}
 	case "validate":
@@ -222,13 +221,13 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 				// https://swtch.com/~rsc/regexp/regexp1.html applies to RE2 implementation supported by CEL
 				// Add one to string length for purposes of cost calculation to prevent product of string and regex to be 0
 				// in case where string is empty but regex is still expensive.
-				strCost := uint64(math.Ceil((1.0 + float64(strSize)) * common.StringTraversalCostFactor))
+				strCost := uint64(math.Ceil((1.0 + float64(strSize)) * celcost.StringTraversalCostFactor))
 				// We don't know how many expressions are in the regex, just the string length (a huge
 				// improvement here would be to somehow get a count the number of expressions in the regex or
 				// how many states are in the regex state machine and use that to measure regex cost).
 				// For now, we're making a guess that each expression in a regex is typically at least 4 chars
 				// in length.
-				regexCost := uint64(math.Ceil(float64(regexSize) * common.RegexStringLengthCostFactor))
+				regexCost := uint64(math.Ceil(float64(regexSize) * celcost.RegexStringLengthCostFactor))
 				cost := strCost * regexCost
 				return &cost
 			}
@@ -271,53 +270,53 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 	return nil
 }
 
-func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+func (l *CostEstimator) EstimateCallCost(function, overloadID string, target *celcost.AstNode, args []celcost.AstNode) *celcost.CallEstimate {
 	// WARNING: Any changes to this code impact API compatibility! The estimated cost is used to determine which CEL rules may be written to a
 	// CRD and any change (cost increases and cost decreases) are breaking.
 	switch function {
 	case "check":
 		// An authorization check has a fixed cost
 		// This cost is set to allow for only two authorization checks per expression
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 350000, Max: 350000}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 350000, Max: 350000}}
 	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 	case "fieldSelector", "labelSelector":
 		// field and label selector parse is a string parse into a structured set of requirements
 		if len(args) == 1 {
-			return &checker.CallEstimate{CostEstimate: selectorCostEstimate(l.sizeEstimate(args[0]))}
+			return &celcost.CallEstimate{CostEstimate: selectorCostEstimate(l.sizeEstimate(args[0]))}
 		}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
 		if target != nil {
 			// Charge 1 cost for comparing each element in the list
-			elCost := checker.CostEstimate{Min: 1, Max: 1}
+			elCost := celcost.Estimate{Min: 1, Max: 1}
 			// If the list contains strings or bytes, add the cost of traversing all the strings/bytes as a way
 			// of estimating the additional comparison cost.
 			if elNode := l.listElementNode(*target); elNode != nil {
 				k := elNode.Type().Kind()
 				if k == types.StringKind || k == types.BytesKind {
 					sz := l.sizeEstimate(elNode)
-					elCost = elCost.Add(sz.MultiplyByCostFactor(common.StringTraversalCostFactor))
+					elCost = elCost.Add(sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor))
 				}
-				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
+				return &celcost.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
 			} else if function == "includes" {
 				// Since target can be a list under DynType, the worst case is a list comparison of size n,
 				// where each comparison costs 1.
-				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
+				return &celcost.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
 			} else {
 				// the target is a string, which is supported by indexOf and lastIndexOf
-				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
+				return &celcost.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 			}
 		}
 	case "url", "jsonpatch.escapeKey":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor), ResultSize: &sz}
 		}
 	case "lowerAscii", "upperAscii", "substring", "trim":
 		if target != nil {
 			sz := l.sizeEstimate(*target)
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor), ResultSize: &sz}
 		}
 	case "replace":
 		if target != nil && len(args) >= 2 {
@@ -325,7 +324,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			toReplaceSz := l.sizeEstimate(args[0])
 			replaceWithSz := l.sizeEstimate(args[1])
 
-			var replaceCount, retainedSz checker.SizeEstimate
+			var replaceCount, retainedSz celcost.SizeEstimate
 			// find the longest replacement:
 			if toReplaceSz.Min == 0 {
 				// if the string being replaced is empty, replace surrounds all characters in the input string with the replacement.
@@ -368,7 +367,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			size := replaceCount.Multiply(replaceWithSz).Add(retainedSz)
 
 			// cost is the traversal plus the construction of the result
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor), ResultSize: &size}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * celcost.StringTraversalCostFactor), ResultSize: &size}
 		}
 	case "split":
 		if target != nil {
@@ -384,11 +383,11 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				}
 			}
 			// Cost is the traversal plus the construction of the result.
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor), ResultSize: &checker.SizeEstimate{Min: 0, Max: max}}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * celcost.StringTraversalCostFactor), ResultSize: &celcost.SizeEstimate{Min: 0, Max: max}}
 		}
 	case "join":
 		if target != nil {
-			var sz checker.SizeEstimate
+			var sz celcost.SizeEstimate
 			listSize := l.sizeEstimate(*target)
 			if elNode := l.listElementNode(*target); elNode != nil {
 				elemSize := l.sizeEstimate(elNode)
@@ -405,103 +404,103 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				if listSize.Max > 0 {
 					maxSeparators = listSize.Max - 1
 				}
-				sz = sz.Add(sepSize.Multiply(checker.SizeEstimate{Min: minSeparators, Max: maxSeparators}))
+				sz = sz.Add(sepSize.Multiply(celcost.SizeEstimate{Min: minSeparators, Max: maxSeparators}))
 			}
 
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor), ResultSize: &sz}
 		}
 	case "find", "findAll":
 		if target != nil && len(args) >= 1 {
 			sz := l.sizeEstimate(*target)
 			// Add one to string length for purposes of cost calculation to prevent product of string and regex to be 0
 			// in case where string is empty but regex is still expensive.
-			strCost := sz.Add(checker.SizeEstimate{Min: 1, Max: 1}).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			strCost := sz.Add(celcost.SizeEstimate{Min: 1, Max: 1}).MultiplyByCostFactor(celcost.StringTraversalCostFactor)
 			// We don't know how many expressions are in the regex, just the string length (a huge
 			// improvement here would be to somehow get a count the number of expressions in the regex or
 			// how many states are in the regex state machine and use that to measure regex cost).
 			// For now, we're making a guess that each expression in a regex is typically at least 4 chars
 			// in length.
-			regexCost := l.sizeEstimate(args[0]).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
+			regexCost := l.sizeEstimate(args[0]).MultiplyByCostFactor(celcost.RegexStringLengthCostFactor)
 			// worst case size of result is that every char is returned as separate find result.
-			return &checker.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &checker.SizeEstimate{Min: 0, Max: sz.Max}}
+			return &celcost.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &celcost.SizeEstimate{Min: 0, Max: sz.Max}}
 		}
 	case "cidr", "isIP", "isCIDR":
 		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 		}
 	case "ip":
-		if overloadId == "cidr_ip" {
+		if overloadID == "cidr_ip" {
 			// The IP member of the CIDR object is just accessing a field.
 			// Nominal cost.
-			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+			return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 		}
 		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 		}
 	case "ip.isCanonical":
 		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			// We have to parse the string and then compare the parsed string to the original string.
 			// So we double the cost of parsing the string.
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor)}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * celcost.StringTraversalCostFactor)}
 		}
 	case "masked", "isMask", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
 		// IP and CIDR accessors are nominal cost.
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 	case "containsIP":
 		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
-			sz := checker.SizeEstimate{Min: 4, Max: 16}
+			sz := celcost.SizeEstimate{Min: 4, Max: 16}
 
 			// We have to compare the two strings to determine if the CIDR/IP is in the other CIDR.
-			ipCompCost := sz.Add(sz).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			ipCompCost := sz.Add(sz).MultiplyByCostFactor(celcost.StringTraversalCostFactor)
 
-			if overloadId == "cidr_contains_ip_string" {
+			if overloadID == "cidr_contains_ip_string" {
 				// If we are comparing a string, we must parse the string to into the right type, so add the cost of traversing the string again.
-				ipCompCost = ipCompCost.Add(checker.CostEstimate(l.sizeEstimate(args[0])).MultiplyByCostFactor(common.StringTraversalCostFactor))
+				ipCompCost = ipCompCost.Add(l.sizeEstimate(args[0]).MultiplyByCostFactor(celcost.StringTraversalCostFactor))
 			}
 
-			return &checker.CallEstimate{CostEstimate: ipCompCost}
+			return &celcost.CallEstimate{CostEstimate: ipCompCost}
 		}
 	case "containsCIDR":
 		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
-			sz := checker.SizeEstimate{Min: 4, Max: 16}
+			sz := celcost.SizeEstimate{Min: 4, Max: 16}
 
 			// We have to compare the two strings to determine if the CIDR/IP is in the other CIDR.
-			ipCompCost := sz.Add(sz).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			ipCompCost := sz.Add(sz).MultiplyByCostFactor(celcost.StringTraversalCostFactor)
 
 			// As we are comparing if a CIDR is within another CIDR, we first mask the base CIDR and
 			// also compare the CIDR bits.
 			// This has an additional cost of the length of the IP being traversed again, plus 1.
-			ipCompCost = ipCompCost.Add(sz.MultiplyByCostFactor(common.StringTraversalCostFactor))
-			ipCompCost = ipCompCost.Add(checker.CostEstimate{Min: 1, Max: 1})
+			ipCompCost = ipCompCost.Add(sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor))
+			ipCompCost = ipCompCost.Add(celcost.Estimate{Min: 1, Max: 1})
 
-			if overloadId == "cidr_contains_cidr_string" {
+			if overloadID == "cidr_contains_cidr_string" {
 				// If we are comparing a string, we must parse the string to into the right type, so add the cost of traversing the string again.
-				ipCompCost = ipCompCost.Add(checker.CostEstimate(l.sizeEstimate(args[0])).MultiplyByCostFactor(common.StringTraversalCostFactor))
+				ipCompCost = ipCompCost.Add(l.sizeEstimate(args[0]).MultiplyByCostFactor(celcost.StringTraversalCostFactor))
 			}
 
-			return &checker.CallEstimate{CostEstimate: ipCompCost}
+			return &celcost.CallEstimate{CostEstimate: ipCompCost}
 		}
 	case "quantity", "isQuantity", "semver", "isSemver":
 		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 		}
 	case "validate":
 		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).MultiplyByCostFactor(cel.MaxNameFormatRegexSize * common.RegexStringLengthCostFactor)}
+			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(celcost.StringTraversalCostFactor).MultiplyByCostFactor(cel.MaxNameFormatRegexSize * celcost.RegexStringLengthCostFactor)}
 		}
 	case "format.named":
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// URL accessors return values derived from components of the URL.
 		// Propagate the target's size estimate so downstream string operations
@@ -510,11 +509,11 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		if target != nil {
 			sz := l.sizeEstimate(*target)
 			if function == "getEscapedPath" {
-				sz = sz.Multiply(checker.SizeEstimate{Min: 1, Max: 3})
+				sz = sz.Multiply(celcost.SizeEstimate{Min: 1, Max: 3})
 			}
-			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}, ResultSize: &sz}
+			return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}, ResultSize: &sz}
 		}
-		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+		return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 	case "_==_":
 		if len(args) == 2 {
 			lhs := args[0]
@@ -524,24 +523,24 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				if t.Kind() == types.OpaqueKind {
 					switch t.TypeName() {
 					case cel.IPType.TypeName(), cel.CIDRType.TypeName():
-						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+						return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 					}
 				}
 				if t.Kind() == types.StructKind {
 					switch t {
 					case cel.QuantityType, AuthorizerType, PathCheckType, // O(1) cost equality checks
 						GroupCheckType, ResourceCheckType, DecisionType, cel.SemverType:
-						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+						return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 					case cel.FormatType:
-						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+						return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 					case cel.URLType:
-						size := checker.SizeEstimate{Min: 1, Max: 1}
+						size := celcost.SizeEstimate{Min: 1, Max: 1}
 						rhSize := rhs.ComputedSize()
 						lhSize := rhs.ComputedSize()
 						if rhSize != nil && lhSize != nil {
 							size = rhSize.Union(*lhSize)
 						}
-						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+						return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(celcost.StringTraversalCostFactor)}
 					}
 				}
 				if panicOnUnknown && isRegisteredType(t.TypeName()) {
@@ -567,17 +566,17 @@ func actualSize(value ref.Val) uint64 {
 	return 1
 }
 
-func (l *CostEstimator) sizeEstimate(t checker.AstNode) checker.SizeEstimate {
+func (l *CostEstimator) sizeEstimate(t celcost.AstNode) celcost.SizeEstimate {
 	if sz := t.ComputedSize(); sz != nil {
 		return *sz
 	}
 	if sz := l.EstimateSize(t); sz != nil {
 		return *sz
 	}
-	return checker.SizeEstimate{Min: 0, Max: math.MaxUint64}
+	return celcost.SizeEstimate{Min: 0, Max: math.MaxUint64}
 }
 
-func (l *CostEstimator) listElementNode(list checker.AstNode) checker.AstNode {
+func (l *CostEstimator) listElementNode(list celcost.AstNode) celcost.AstNode {
 	if params := list.Type().Parameters(); len(params) > 0 {
 		lt := params[0]
 		nodePath := list.Path()
@@ -596,7 +595,7 @@ func (l *CostEstimator) listElementNode(list checker.AstNode) checker.AstNode {
 	return nil
 }
 
-func (l *CostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
+func (l *CostEstimator) EstimateSize(element celcost.AstNode) *celcost.SizeEstimate {
 	if l.SizeEstimator != nil {
 		return l.SizeEstimator.EstimateSize(element)
 	}
@@ -621,20 +620,20 @@ func (i *itemsNode) Expr() ast.Expr {
 	return i.expr
 }
 
-func (i *itemsNode) ComputedSize() *checker.SizeEstimate {
+func (i *itemsNode) ComputedSize() *celcost.SizeEstimate {
 	return nil
 }
 
-var _ checker.AstNode = (*itemsNode)(nil)
+var _ celcost.AstNode = (*itemsNode)(nil)
 
 // traversalCost computes the cost of traversing a ref.Val as a data tree.
 func traversalCost(v ref.Val) uint64 {
 	// TODO: This could potentially be optimized by sampling maps and lists instead of traversing.
 	switch vt := v.(type) {
 	case types.String:
-		return uint64(float64(len(string(vt))) * common.StringTraversalCostFactor)
+		return uint64(float64(len(string(vt))) * celcost.StringTraversalCostFactor)
 	case types.Bytes:
-		return uint64(float64(len([]byte(vt))) * common.StringTraversalCostFactor)
+		return uint64(float64(len([]byte(vt))) * celcost.StringTraversalCostFactor)
 	case traits.Lister:
 		cost := uint64(0)
 		for it := vt.Iterator(); it.HasNext() == types.True; {

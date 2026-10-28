@@ -166,8 +166,8 @@
         "google.golang.org/grpc"
       ],
       "golang.org/x/exp": [
+        "cel.dev/cel-go",
         "github.com/antlr4-go/antlr/v4",
-        "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
       "gopkg.in/yaml.v3": [

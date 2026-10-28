@@ -20,9 +20,9 @@ package cel
 import (
 	"context"
 
-	celgo "github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	celgo "cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 )
 
 // ExpressionAccessor is an interface that provides access to a CEL expression.

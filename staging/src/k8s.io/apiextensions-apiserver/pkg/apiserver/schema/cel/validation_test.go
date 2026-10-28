@@ -3219,7 +3219,7 @@ func TestMessageExpression(t *testing.T) {
 			costBudget:              50,
 			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "message not messageExpression",
-			expectedRemainingBudget: 47,
+			expectedRemainingBudget: 48,
 		},
 		{
 			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
@@ -3227,7 +3227,7 @@ func TestMessageExpression(t *testing.T) {
 			costBudget:              50,
 			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "failed rule",
-			expectedRemainingBudget: 47,
+			expectedRemainingBudget: 48,
 		},
 		{
 			name:                    "per-call limit exceeded during messageExpression execution",

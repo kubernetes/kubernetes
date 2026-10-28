@@ -1959,8 +1959,8 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				// we do not expose a stable type for the self variable, even when it is an object that CEL
 				// considers a named type. The only operation developers should be able to perform on the type is
 				// equality checking.
-				"type(self) == type(self)":                                     uint64(1844674407370955268),
-				"type(self.nestedInMap['k1']) == type(self.nestedInMap['k2'])": uint64(1844674407370955272),
+				"type(self) == type(self)":                                     5,
+				"type(self.nestedInMap['k1']) == type(self.nestedInMap['k2'])": 9,
 			},
 		},
 		{name: "listMaps with unsupported identity characters in property names",

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	celparser "github.com/google/cel-go/parser"
+	celparser "cel.dev/cel-go/parser"
 
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/ast"
-	"github.com/google/cel-go/common/operators"
+	"cel.dev/cel-go/common"
+	"cel.dev/cel-go/common/ast"
+	"cel.dev/cel-go/common/operators"
 
 	apisharding "k8s.io/apimachinery/pkg/sharding"
 )
