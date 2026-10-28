@@ -193,6 +193,41 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			},
 			expectErr: `--storage-media-type "foo/bar" invalid, allowed values: application/json, application/vnd.kubernetes.protobuf, application/yaml`,
 		},
+		{
+			name: "watch-cache-max-events at minimum",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+					WatchCacheMaxEvents: 100,
+				},
+			},
+		},
+		{
+			name: "watch-cache-max-events below minimum",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+					WatchCacheMaxEvents: 99,
+				},
+			},
+			expectErr: "--watch-cache-max-events must be 0 or at least 100, got 99",
+		},
+		{
+			name: "negative watch-cache-max-events",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+					WatchCacheMaxEvents: -1,
+				},
+			},
+			expectErr: "--watch-cache-max-events must be 0 or at least 100, got -1",
+		},
 	}
 
 	for _, testcase := range testCases {

@@ -40,6 +40,7 @@ import (
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	encryptionconfigmetrics "k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -118,6 +119,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-media-type %q invalid, allowed values: %s", s.DefaultStorageMediaType, strings.Join(sets.List(storageMediaTypes), ", ")))
 	}
 
+	if m := s.StorageConfig.WatchCacheMaxEvents; m != 0 && m < cacherstorage.MinWatchCacheMaxEvents {
+		allErrors = append(allErrors, fmt.Errorf("--watch-cache-max-events must be 0 or at least %d, got %d", cacherstorage.MinWatchCacheMaxEvents, m))
+	}
+
 	return allErrors
 }
 
@@ -163,6 +168,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
 		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
 		"to not disable watch caching for that resource")
+
+	fs.IntVar(&s.StorageConfig.WatchCacheMaxEvents, "watch-cache-max-events", s.StorageConfig.WatchCacheMaxEvents, ""+
+		"Maximum number of events the watch cache keeps in its history per resource. "+
+		"The history still starts small and grows on demand up to this limit. "+
+		"If zero, the limit is derived from the events history window.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
