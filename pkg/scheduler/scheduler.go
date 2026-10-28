@@ -100,12 +100,6 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
-	percentageOfPlacementsToScore int32
-
-	// shufflePlacements randomizes candidate placement order so the placement limit picks a fair
-	// subset. Set via New; nil disables shuffling to keep tests deterministic.
-	shufflePlacements func(placements []*fwk.Placement)
-
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -424,8 +418,6 @@ func New(ctx context.Context,
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
-		percentageOfPlacementsToScore:          options.percentageOfPlacementsToScore,
-		shufflePlacements:                      randShufflePlacements,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
