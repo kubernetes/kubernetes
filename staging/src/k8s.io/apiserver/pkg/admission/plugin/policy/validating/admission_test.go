@@ -395,6 +395,7 @@ func setupTestCommon(
 				Scope:            meta.RESTScopeRoot,
 			},
 		},
+		nil,
 	)
 	require.NoError(t, err)
 	t.Cleanup(testContextCancel)
