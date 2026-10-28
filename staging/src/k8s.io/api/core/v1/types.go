@@ -3731,7 +3731,6 @@ type ContainerStatus struct {
 	// +listMapKey=mountPath
 	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
 	// user represents user identity information initially attached to the first process of the container
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser `json:"user,omitempty" protobuf:"bytes,13,opt,name=user,casttype=ContainerUser"`
 	// allocatedResourcesStatus represents the status of various resources
@@ -5306,11 +5305,8 @@ type PodSecurityContext struct {
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
 	// supplementalGroupsPolicy defines how supplemental groups of the first container processes are calculated.
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
-	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
-	// and the container runtime must implement support for this feature.
+	// The container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
-	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	SupplementalGroupsPolicy *SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty" protobuf:"bytes,12,opt,name=supplementalGroupsPolicy"`
 	// fsGroup is a special supplemental group that applies to all containers in a pod.
@@ -7302,7 +7298,6 @@ type NodeStatus struct {
 	// +listType=atomic
 	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
 	// Features describes the set of features implemented by the CRI implementation.
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures `json:"features,omitempty" protobuf:"bytes,13,rep,name=features"`
 	// DeclaredFeatures represents the features related to feature gates that are declared by the node.

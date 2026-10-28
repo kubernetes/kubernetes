@@ -107,33 +107,16 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, 
 	if err != nil {
 		return fwk.Queue, err
 	}
-
-	if pod.Spec.SchedulingGroup == nil {
-		return fwk.QueueSkip, nil
-	}
-
-	oldPolicy := oldPodGroup.Spec.SchedulingPolicy
-	newPolicy := newPodGroup.Spec.SchedulingPolicy
-
 	// Updates to non-gang policies will not make the waiting pods schedulable.
-	if newPolicy.Gang == nil || oldPolicy.Gang == nil {
+	if pod.Spec.SchedulingGroup == nil || newPodGroup.Spec.SchedulingPolicy.Gang == nil {
 		return fwk.QueueSkip, nil
 	}
-
-	// If the gang scheduling policy minCount did not decrease, it will not make the waiting pods schedulable.
-	if newPolicy.Gang.MinCount >= oldPolicy.Gang.MinCount {
-		logger.V(5).Info("PodGroup minCount did not decrease, skipping", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup), "oldMinCount", oldPolicy.Gang.MinCount, "newMinCount", newPolicy.Gang.MinCount)
-		return fwk.QueueSkip, nil
-	}
-
-	updatedPodGroupKey := fwk.PodGroupKey(newPodGroup.Namespace, newPodGroup.Name)
-	if !pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, updatedPodGroupKey) {
-		logger.V(5).Info("pod group was updated, but not in the same hierarchy, skipping", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup))
-		return fwk.QueueSkip, nil
-	}
-
-	logger.V(5).Info("pod group was updated and minCount decreased, enqueuing pod", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup), "oldMinCount", oldPolicy.Gang.MinCount, "newMinCount", newPolicy.Gang.MinCount)
-	return fwk.Queue, nil
+	return pl.isSchedulableAfterGenericPodGroupUpdated(
+		logger, pod,
+		fwk.PodGroupKey(newPodGroup.Namespace, newPodGroup.Name),
+		oldPodGroup.Spec.SchedulingPolicy.Gang.MinCount,
+		newPodGroup.Spec.SchedulingPolicy.Gang.MinCount,
+	)
 }
 
 func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
@@ -141,16 +124,10 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, po
 	if err != nil {
 		return fwk.Queue, err
 	}
-
 	if pod.Spec.SchedulingGroup == nil {
 		return fwk.QueueSkip, nil
 	}
-
-	addedPodGroupKey := fwk.PodGroupKey(addedPodGroup.Namespace, addedPodGroup.Name)
-	if pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, addedPodGroupKey) {
-		return fwk.Queue, nil
-	}
-	return fwk.QueueSkip, nil
+	return pl.isSchedulableAfterGenericPodGroupAdded(logger, pod, fwk.PodGroupKey(addedPodGroup.Namespace, addedPodGroup.Name))
 }
 
 func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
@@ -158,16 +135,10 @@ func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.L
 	if err != nil {
 		return fwk.Queue, err
 	}
-
 	if pod.Spec.SchedulingGroup == nil {
 		return fwk.QueueSkip, nil
 	}
-
-	compositePodGroupKey := fwk.CompositePodGroupKey(addedCPG.Namespace, addedCPG.Name)
-	if pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, compositePodGroupKey) {
-		return fwk.Queue, nil
-	}
-	return fwk.QueueSkip, nil
+	return pl.isSchedulableAfterGenericPodGroupAdded(logger, pod, fwk.CompositePodGroupKey(addedCPG.Namespace, addedCPG.Name))
 }
 
 // isSchedulableAfterCompositePodGroupUpdated triggers re-enqueueing of the group's pods if the minGroupCount requirement has decreased.
@@ -176,32 +147,38 @@ func (pl *GangScheduling) isSchedulableAfterCompositePodGroupUpdated(logger klog
 	if err != nil {
 		return fwk.Queue, err
 	}
-
-	if pod.Spec.SchedulingGroup == nil {
-		return fwk.QueueSkip, nil
-	}
-
-	oldPolicy := oldCPG.Spec.SchedulingPolicy
-	newPolicy := newCPG.Spec.SchedulingPolicy
-
 	// Updates to non-gang policies will not make the waiting pods schedulable.
-	if newPolicy.Gang == nil || oldPolicy.Gang == nil {
+	if pod.Spec.SchedulingGroup == nil || newCPG.Spec.SchedulingPolicy.Gang == nil {
+		return fwk.QueueSkip, nil
+	}
+	return pl.isSchedulableAfterGenericPodGroupUpdated(
+		logger, pod,
+		fwk.CompositePodGroupKey(newCPG.Namespace, newCPG.Name),
+		oldCPG.Spec.SchedulingPolicy.Gang.MinGroupCount,
+		newCPG.Spec.SchedulingPolicy.Gang.MinGroupCount,
+	)
+}
+
+func (pl *GangScheduling) isSchedulableAfterGenericPodGroupAdded(logger klog.Logger, pod *v1.Pod, addedGroupKey fwk.EntityKey) (fwk.QueueingHint, error) {
+	if pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, addedGroupKey) {
+		return fwk.Queue, nil
+	}
+	return fwk.QueueSkip, nil
+}
+
+func (pl *GangScheduling) isSchedulableAfterGenericPodGroupUpdated(logger klog.Logger, pod *v1.Pod, groupKey fwk.EntityKey, oldMinCount, newMinCount int32) (fwk.QueueingHint, error) {
+	// If the gang scheduling policy minCount/minGroupCount did not decrease, it will not make the waiting pods schedulable.
+	if newMinCount >= oldMinCount {
+		logger.V(5).Info("Group minCount did not decrease, skipping", "pod", klog.KObj(pod), "groupType", groupKey.GetType(), "group", klog.KRef(groupKey.GetNamespace(), groupKey.GetName()), "oldMinCount", oldMinCount, "newMinCount", newMinCount)
 		return fwk.QueueSkip, nil
 	}
 
-	// If the gang scheduling policy minGroupCount did not decrease, it will not make the waiting pods schedulable.
-	if newPolicy.Gang.MinGroupCount >= oldPolicy.Gang.MinGroupCount {
-		logger.V(5).Info("CompositePodGroup minGroupCount did not decrease, skipping", "pod", klog.KObj(pod), "compositePodGroup", klog.KObj(newCPG), "oldMinGroupCount", oldPolicy.Gang.MinGroupCount, "newMinGroupCount", newPolicy.Gang.MinGroupCount)
+	if !pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, groupKey) {
+		logger.V(5).Info("Group was updated, but not in the same hierarchy, skipping", "pod", klog.KObj(pod), "groupType", groupKey.GetType(), "group", klog.KRef(groupKey.GetNamespace(), groupKey.GetName()))
 		return fwk.QueueSkip, nil
 	}
 
-	updatedCPGKey := fwk.CompositePodGroupKey(newCPG.Namespace, newCPG.Name)
-	if !pl.areSameHierarchy(logger, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName, updatedCPGKey) {
-		logger.V(5).Info("composite pod group was updated, but not in the same hierarchy, skipping", "pod", klog.KObj(pod), "compositePodGroup", klog.KObj(newCPG))
-		return fwk.QueueSkip, nil
-	}
-
-	logger.V(5).Info("composite pod group was updated and minGroupCount decreased, enqueuing pod", "pod", klog.KObj(pod), "compositePodGroup", klog.KObj(newCPG), "oldMinGroupCount", oldPolicy.Gang.MinGroupCount, "newMinGroupCount", newPolicy.Gang.MinGroupCount)
+	logger.V(5).Info("Group was updated and minCount decreased, enqueuing pod", "pod", klog.KObj(pod), "groupType", groupKey.GetType(), "group", klog.KRef(groupKey.GetNamespace(), groupKey.GetName()), "oldMinCount", oldMinCount, "newMinCount", newMinCount)
 	return fwk.Queue, nil
 }
 

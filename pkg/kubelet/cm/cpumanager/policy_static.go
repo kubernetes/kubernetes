@@ -477,7 +477,11 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	}
 
 	// 4. Allocate the entire CPU "bubble" for the pod using the hint from the Topology Manager.
-	hint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	firstContainerName := pod.Spec.Containers[0].Name
+	if len(pod.Spec.InitContainers) > 0 {
+		firstContainerName = pod.Spec.InitContainers[0].Name
+	}
+	hint := p.affinity.GetAffinity(logger, podUID, firstContainerName)
 	numaHintCount := 0
 	if hint.NUMANodeAffinity != nil {
 		numaHintCount = hint.NUMANodeAffinity.Count()
@@ -661,7 +665,7 @@ func (p *staticPolicy) partitionPodCPUs(logger klog.Logger, pod *v1.Pod, podCPUS
 // freshly allocated ones). If restored is nil (allocatePodForAdd path),
 // metrics are incremented for every container.
 func (p *staticPolicy) savePodContainerAssignments(s state.State, podUID string, pod *v1.Pod, result *podPartitionResult, restored map[string]cpuset.CPUSet) {
-	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if cset, isExclusive := result.exclusiveCPUs[c.Name]; isExclusive {
 			s.SetCPUSet(podUID, c.Name, cset)
 		} else {
@@ -714,7 +718,11 @@ func (p *staticPolicy) restorePodAllocation(logger klog.Logger, s state.State, p
 	}()
 
 	// Acquire hints for whole pod - same as during regular pod allocation.
-	hint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	firstContainerName := pod.Spec.Containers[0].Name
+	if len(pod.Spec.InitContainers) > 0 {
+		firstContainerName = pod.Spec.InitContainers[0].Name
+	}
+	hint := p.affinity.GetAffinity(logger, podUID, firstContainerName)
 	numaHintCount := 0
 	if hint.NUMANodeAffinity != nil {
 		numaHintCount = hint.NUMANodeAffinity.Count()

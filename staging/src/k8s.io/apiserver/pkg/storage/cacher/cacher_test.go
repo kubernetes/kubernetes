@@ -587,6 +587,13 @@ func TestWatch(t *testing.T) {
 	})
 }
 
+func TestOptimisticConcurrency(t *testing.T) {
+	ctx, delegator, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+	storagetesting.RunTestOptimisticConcurrency(ctx, t, delegator, true, recorder)
+}
+
 // ===================================================
 // Test-setup related function are following.
 // ===================================================

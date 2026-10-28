@@ -745,9 +745,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,
-		klet.syncPodNow,
-		klet.GetActivePods,
-		klet.podManager.GetPodByUID,
+		klet,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
 		logger,
@@ -2119,7 +2117,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Generate final API pod status with pod and status manager status
-	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, false)
+	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
 	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
 	// set pod IP to hostIP directly in runtime.GetPodStatus
@@ -2373,7 +2371,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		logger.V(4).Info("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}()
 
-	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, false)
+	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, TerminatingPod)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
 	}
@@ -2461,7 +2459,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// The computation is done here to ensure the pod status used for it contains
 	// information about the container end states (including exit codes) - when
 	// SyncTerminatedPod is called the containers may already be removed.
-	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, true)
+	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, TerminatedPod)
 	// Re-apply the caller's status override to the status generated after the
 	// containers have stopped: this is the update the status manager is
 	// allowed to publish as terminal, so the override must be part of it.
@@ -2544,7 +2542,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
-	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, true)
+	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, TerminatedPod)
 
 	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 
@@ -2974,6 +2972,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		kl.statusManager.BackfillPodResizeConditions(pods)
+		// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingResizes
+		// clears any backfilled PodResizePending condition with DeferredResizeResolutionTerminated.
 		for _, uid := range pendingResizes {
 			kl.allocationManager.PushPendingResize(logger, uid)
 		}
@@ -3013,7 +3013,9 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			recordResizeOperations(oldPod, pod)
 			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 			if updatedFromAllocation {
-				kl.allocationManager.PushPendingResize(logger, pod.UID)
+				if !kl.IsPodTerminatingOrTerminal(pod) {
+					kl.allocationManager.PushPendingResize(logger, pod.UID)
+				}
 				// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
 				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
 				kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
@@ -3624,7 +3626,10 @@ func (kl *Kubelet) RequestPodRelist(logger klog.Logger, podUID types.UID) {
 	kl.pleg.RequestRelist(logger, podUID)
 }
 
-func (kl *Kubelet) syncPodNow(ctx context.Context, pod *v1.Pod) {
+var _ allocation.PodProvider = &Kubelet{}
+
+// SyncPodNow triggers an immediate pod sync and on-demand PLEG relist.
+func (kl *Kubelet) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 	kl.HandlePodSyncs(ctx, []*v1.Pod{pod})
 	kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)
 }

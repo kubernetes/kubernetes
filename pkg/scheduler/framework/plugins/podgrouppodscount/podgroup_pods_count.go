@@ -30,7 +30,6 @@ import (
 // PodGroupPodsCount is a placement score plugin that favors placements that can accommodate more pods from the considered PodGroup.
 type PodGroupPodsCount struct {
 	handle fwk.Handle
-	fts    feature.Features
 }
 
 var _ fwk.PlacementScorePlugin = &PodGroupPodsCount{}
@@ -38,8 +37,8 @@ var _ fwk.PlacementScorePlugin = &PodGroupPodsCount{}
 const Name = names.PodGroupPodsCount
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
-	return &PodGroupPodsCount{handle: h, fts: fts}, nil
+func New(_ context.Context, _ runtime.Object, h fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
+	return &PodGroupPodsCount{handle: h}, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -91,19 +90,12 @@ func (pl *PodGroupPodsCount) NormalizePlacementScore(ctx context.Context, state 
 }
 
 func (pl *PodGroupPodsCount) getScheduledPodsCount(podGroup fwk.PodGroupInfo) (int, error) {
-	if pl.fts.EnableCompositePodGroup {
-		count := 0
-		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
-			if err != nil {
-				return 0, err
-			}
-			count += podGroupState.ScheduledPodsCount()
+	count := 0
+	for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
+		if err != nil {
+			return 0, err
 		}
-		return count, nil
+		count += podGroupState.ScheduledPodsCount()
 	}
-	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
-	if err != nil {
-		return 0, err
-	}
-	return pgState.ScheduledPodsCount(), nil
+	return count, nil
 }

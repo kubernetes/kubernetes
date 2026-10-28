@@ -340,6 +340,11 @@ func TestTransformationFailure(t *testing.T) {
 	storagetesting.RunTestTransformationFailure(ctx, t, &storeWithPrefixTransformer{store})
 }
 
+func TestOptimisticConcurrency(t *testing.T) {
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestOptimisticConcurrency(ctx, t, store, false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+}
+
 func TestList(t *testing.T) {
 	for _, rangeStream := range []bool{false, true} {
 		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {

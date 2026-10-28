@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
@@ -127,7 +128,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedState AllocatedState,
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (Allocator, error) {
 	// The actual implementation may vary depending on which features are enabled.
@@ -192,7 +193,7 @@ var availableAllocators = []struct {
 		features Features,
 		allocatedState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
 	nodeMatches func(node *v1.Node,
@@ -209,7 +210,7 @@ var availableAllocators = []struct {
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
@@ -223,7 +224,7 @@ var availableAllocators = []struct {
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
@@ -237,7 +238,7 @@ var availableAllocators = []struct {
 			features Features,
 			allocateState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)

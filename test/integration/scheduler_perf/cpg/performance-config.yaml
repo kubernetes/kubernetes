@@ -511,6 +511,9 @@
   - opcode: createNodes
     countParam: $initNodes
     nodeTemplatePath: templates/tas-node.yaml
+    templateParams:
+      nodesPerZone: $nodesPerZone
+      nodesPerRack: $nodesPerRack
   - opcode: createNamespaces
     prefix: cpg-tas-ns
     count: 1
@@ -545,58 +548,72 @@
     templateParams:
       podsPerGroup: $podsPerGroup
   workloads:
-  - name: 10Nodes_2Trees_2Level_4PodGroups_12Pods
+  - name: 12Nodes_2Zones_6Racks_2Trees_2Level_4PodGroups_12Pods
     labels: [integration-test, short]
     params:
-      initNodes: 10
+      initNodes: 12
+      nodesPerZone: 6
+      nodesPerRack: 2
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 2
       minCount: 3
       podsPerGroup: 3
-  - name: 5000Nodes_2Trees_2Level_8PodGroups_4000Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_8PodGroups_4000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 4
       minCount: 500
       podsPerGroup: 500
-  - name: 5000Nodes_2Trees_2Level_8PodGroups_6000Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_8PodGroups_6000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 4
       minCount: 750
       podsPerGroup: 750
-  - name: 5000Nodes_2Trees_2Level_8PodGroups_8000Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_8PodGroups_8000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 4
       minCount: 1000
       podsPerGroup: 1000
-  - name: 5000Nodes_2Trees_2Level_64PodGroups_6400Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_64PodGroups_6400Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 32
       minCount: 100
       podsPerGroup: 100
-  - name: 5000Nodes_2Trees_2Level_128PodGroups_12800Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_128PodGroups_12800Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 64
       minCount: 100
       podsPerGroup: 100
-  - name: 5000Nodes_2Trees_2Level_256PodGroups_25600Pods
+  - name: 5000Nodes_5Zones_50Racks_2Trees_2Level_256PodGroups_25600Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerZone: 1000
+      nodesPerRack: 100
       initRootCompositePodGroups: 2
       childrenPodGroupsPerCPG: 128
       minCount: 100

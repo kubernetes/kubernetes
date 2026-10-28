@@ -59,18 +59,71 @@ func (r *KVRecorder) GetStreamReadsAndReset() uint64 {
 	return atomic.SwapUint64(&r.streamReads, 0)
 }
 
+type KubernetesRequestStats struct {
+	Lists     []RecordedList
+	Gets      uint64
+	Writes    uint64
+	Conflicts uint64
+}
+
 type KubernetesRecorder struct {
 	kubernetes.Interface
 
 	mux         sync.Mutex
-	listsPerKey map[string][]RecordedList
+	statsPerKey map[string]KubernetesRequestStats
 }
 
 func NewKubernetesRecorder(client kubernetes.Interface) *KubernetesRecorder {
 	return &KubernetesRecorder{
-		listsPerKey: make(map[string][]RecordedList),
+		statsPerKey: make(map[string]KubernetesRequestStats),
 		Interface:   client,
 	}
+}
+
+func (r *KubernetesRecorder) Get(ctx context.Context, key string, opts kubernetes.GetOptions) (kubernetes.GetResponse, error) {
+	r.recordStats(ctx, KubernetesRequestStats{Gets: 1})
+	return r.Interface.Get(ctx, key, opts)
+}
+
+func (r *KubernetesRecorder) OptimisticPut(ctx context.Context, key string, value []byte, expectedRevision int64, opts kubernetes.PutOptions) (kubernetes.PutResponse, error) {
+	resp, err := r.Interface.OptimisticPut(ctx, key, value, expectedRevision, opts)
+	stats := KubernetesRequestStats{Writes: 1}
+	if err == nil && !resp.Succeeded {
+		stats.Conflicts = 1
+	}
+	r.recordStats(ctx, stats)
+	return resp, err
+}
+
+func (r *KubernetesRecorder) OptimisticDelete(ctx context.Context, key string, expectedRevision int64, opts kubernetes.DeleteOptions) (kubernetes.DeleteResponse, error) {
+	resp, err := r.Interface.OptimisticDelete(ctx, key, expectedRevision, opts)
+	stats := KubernetesRequestStats{Writes: 1}
+	if err == nil && !resp.Succeeded {
+		stats.Conflicts = 1
+	}
+	r.recordStats(ctx, stats)
+	return resp, err
+}
+
+func (r *KubernetesRecorder) recordStats(ctx context.Context, delta KubernetesRequestStats) {
+	recorderKey, ok := ctx.Value(RecorderContextKey).(string)
+	if !ok {
+		return
+	}
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	s := r.statsPerKey[recorderKey]
+	s.Gets += delta.Gets
+	s.Writes += delta.Writes
+	s.Conflicts += delta.Conflicts
+	s.Lists = append(s.Lists, delta.Lists...)
+	r.statsPerKey[recorderKey] = s
+}
+
+func (r *KubernetesRecorder) StatsForKey(key string) KubernetesRequestStats {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	return r.statsPerKey[key]
 }
 
 func (r *KubernetesRecorder) List(ctx context.Context, key string, opts kubernetes.ListOptions) (kubernetes.ListResponse, error) {
@@ -84,19 +137,11 @@ func (r *KubernetesRecorder) List(ctx context.Context, key string, opts kubernet
 }
 
 func (r *KubernetesRecorder) record(ctx context.Context, list RecordedList) {
-	recorderKey, ok := ctx.Value(RecorderContextKey).(string)
-	if !ok {
-		return
-	}
-	r.mux.Lock()
-	defer r.mux.Unlock()
-	r.listsPerKey[recorderKey] = append(r.listsPerKey[recorderKey], list)
+	r.recordStats(ctx, KubernetesRequestStats{Lists: []RecordedList{list}})
 }
 
 func (r *KubernetesRecorder) ListRequestForKey(key string) []RecordedList {
-	r.mux.Lock()
-	defer r.mux.Unlock()
-	return r.listsPerKey[key]
+	return r.StatsForKey(key).Lists
 }
 
 // RecordedList is a list request captured by the recorder. Paged and streamed

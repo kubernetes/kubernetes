@@ -580,7 +580,7 @@ func TestPostFilter(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+				pgInformer := informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 				for i := range tt.podGroups {
 					if err := pgInformer.GetStore().Add(tt.podGroups[i]); err != nil {
 						t.Fatal(err)
@@ -2028,7 +2028,7 @@ func TestCustomSelection(t *testing.T) {
 			}
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -2358,7 +2358,7 @@ func TestCustomOrdering(t *testing.T) {
 			}
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
@@ -2545,7 +2545,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			}
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
@@ -3753,7 +3753,7 @@ func TestPreEnqueue(t *testing.T) {
 				allCpgs = append(allCpgs, cpgs...)
 			}
 
-			pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			pgInformer := informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			for _, pg := range allPgs {
 				if err := pgInformer.GetStore().Add(pg); err != nil {
 					t.Fatal(err)

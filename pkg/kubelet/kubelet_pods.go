@@ -1205,6 +1205,15 @@ func (kl *Kubelet) isPodInactive(p *v1.Pod) bool {
 	return false
 }
 
+// IsPodTerminatingOrTerminal returns true if the pod is currently terminating
+// or has already reached a terminal state.
+func (kl *Kubelet) IsPodTerminatingOrTerminal(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil ||
+		kl.podWorkers.IsPodTerminationRequested(pod.UID) ||
+		kl.podWorkers.IsPodKnownTerminated(pod.UID) ||
+		kl.isAdmittedPodTerminal(pod)
+}
+
 // isAdmittedPodTerminal returns true if the provided config source pod is in
 // a terminal phase, or if the Kubelet has already indicated the pod has reached
 // a terminal phase but the config source has not accepted it yet. This method
@@ -1915,12 +1924,16 @@ func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsT
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal bool) []*v1.PodCondition {
-	// If pod is terminal, clear the resize status.
-	if podIsTerminal {
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podState PodWorkerState) []*v1.PodCondition {
+	switch podState {
+	case TerminatedPod:
+		// If pod is terminal, clear the resize status.
 		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
+	case TerminatingPod:
+		// PodResizeInProgress is cleared once the pod reaches TerminatedPod.
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 	}
 
 	resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
@@ -1929,9 +1942,10 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
-func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
+func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podState PodWorkerState) v1.PodStatus {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Generating pod status", "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
+	podIsTerminal := podState == TerminatedPod
+	logger.V(3).Info("Generating pod status", "podState", podState, "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
@@ -2011,7 +2025,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
+		resizeStatus := kl.determinePodResizeStatus(pod, podState)
 		for _, c := range resizeStatus {
 			// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
 			// observed generation is not already set. We avoid overwriting the condition's observedGeneration
@@ -2753,9 +2767,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			status.User = convertContainerStatusUser(cStatus)
-		}
+		status.User = convertContainerStatusUser(cStatus)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 			status.StopSignal = cStatus.StopSignal
 		}
