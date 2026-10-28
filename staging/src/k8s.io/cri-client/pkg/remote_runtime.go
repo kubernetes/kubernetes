@@ -1153,15 +1153,16 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 
 // CheckpointPod triggers a checkpoint of the given CheckpointPodRequest
 func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
-	logger := klog.FromContext(ctx)
-	logger.V(10).Info(
-		"[RemoteRuntimeService] CheckpointPod",
-		"options",
-		options,
-	)
 	if options == nil {
 		return errors.New("CheckpointPod requires non-nil CheckpointPodRequest parameter")
 	}
+
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info(
+		"[RemoteRuntimeService] CheckpointPod",
+		"podSandboxID", options.PodSandboxId,
+		"containerCount", len(options.ContainerIds),
+	)
 
 	// The checkpoint is bounded by the caller's context deadline (the kubelet
 	// sets it from PodCheckpoint.spec.timeoutSeconds, clamped to its configured
@@ -1198,15 +1199,16 @@ func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runti
 
 // RestorePod restores a pod sandbox from a checkpoint
 func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(10).Info(
-		"[RemoteRuntimeService] RestorePod",
-		"options",
-		options,
-	)
 	if options == nil {
 		return nil, errors.New("RestorePod requires non-nil RestorePodRequest parameter")
 	}
+
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info(
+		"[RemoteRuntimeService] RestorePod",
+		"runtimeHandler", options.RuntimeHandler,
+		"containerCount", len(options.ContainerConfigs),
+	)
 
 	// As with CheckpointPod, the restore is bounded by the caller's context
 	// deadline rather than a request field (KEP-5823). The default runtime
