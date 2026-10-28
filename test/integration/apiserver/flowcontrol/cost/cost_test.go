@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -38,9 +39,10 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// BenchmarkRequestCost measures per-request heap allocations (B/op and allocs/op)
-// and HTTP request/response sizes for kube-apiserver operations using the 10KB exemplar pod
-// across request methods, options, and wire formats.
+// BenchmarkRequestCost measures per-request heap allocations (B/op and allocs/op),
+// request duration, HTTP request/response sizes, server setup allocations, and
+// post-GC retained heap/runtime memory for kube-apiserver operations using the
+// 10KB exemplar pod across request methods, options, and wire formats.
 func BenchmarkRequestCost(b *testing.B) {
 	framework.FixBenchmarkJSONOutput(b)
 	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -558,7 +560,12 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 			b.ReportAllocs()
 			tCtx := ktesting.Init(b)
 
+			var beforeSetupMem, afterSetupMem runtime.MemStats
+			runtime.ReadMemStats(&beforeSetupMem)
 			tCtx, server := setupAPIServer(tCtx)
+			runtime.ReadMemStats(&afterSetupMem)
+			setupAllocBytes := float64(afterSetupMem.TotalAlloc - beforeSetupMem.TotalAlloc)
+
 			ensureDefaultServiceAccount(tCtx)
 			pods := seedPods(tCtx, sc.seedPods)
 
@@ -576,7 +583,7 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 				payload = sc.body(wf.accept, pod)
 			}
 
-			var startMem, endMem runtime.MemStats
+			var startMem, endMem, postGCMem runtime.MemStats
 			var responseBytes int
 			for i := 0; b.Loop(); i++ {
 				if i == 0 {
@@ -585,13 +592,28 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 				responseBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
 			}
 			runtime.ReadMemStats(&endMem)
+			debug.FreeOSMemory()
+			runtime.ReadMemStats(&postGCMem)
+
+			heapInuseBytes := float64(postGCMem.HeapInuse)
+			heapAllocBytes := float64(postGCMem.HeapAlloc)
+			runtimeInuseBytes := float64(postGCMem.Sys - postGCMem.HeapReleased)
+			heapReleasedBytes := float64(postGCMem.HeapReleased)
+			heapFragBytes := float64(postGCMem.HeapInuse - postGCMem.HeapAlloc)
 
 			b.ReportMetric(float64(len(payload)), "request-B/op")
 			b.ReportMetric(float64(responseBytes), "response-B/op")
+			b.ReportMetric(setupAllocBytes, "setup-alloc-B")
+			b.ReportMetric(heapInuseBytes, "heap-inuse-B")
+			b.ReportMetric(heapAllocBytes, "heap-alloc-B")
+			b.ReportMetric(runtimeInuseBytes, "runtime-inuse-B")
+			b.ReportMetric(heapReleasedBytes, "heap-released-B")
+			b.ReportMetric(heapFragBytes, "heap-frag-B")
 
 			if b.N > 0 {
 				allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
 				allocs := float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
+				durationNs := float64(b.Elapsed().Nanoseconds()) / float64(b.N)
 				items = append(items,
 					dataItem{
 						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocated bytes per operation"},
@@ -604,6 +626,11 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 						Data:   map[string]float64{wf.name: allocs},
 					},
 					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Duration per operation"},
+						Unit:   "ns",
+						Data:   map[string]float64{wf.name: durationNs},
+					},
+					dataItem{
 						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Request body bytes per operation"},
 						Unit:   "B",
 						Data:   map[string]float64{wf.name: float64(len(payload))},
@@ -612,6 +639,36 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Response body bytes per operation"},
 						Unit:   "B",
 						Data:   map[string]float64{wf.name: float64(responseBytes)},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Server setup allocated bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: setupAllocBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained heap inuse bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: heapInuseBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained heap alloc bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: heapAllocBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained runtime inuse bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: runtimeInuseBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Heap released bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: heapReleasedBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Heap span fragmentation bytes"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: heapFragBytes},
 					},
 				)
 			}
