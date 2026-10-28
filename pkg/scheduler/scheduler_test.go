@@ -29,7 +29,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -1535,7 +1534,9 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(t, cs.Tracker().Add(pd))
+	if err := cs.Tracker().Add(pd); err != nil {
+		t.Fatalf("unexpected error adding pod: %v", err)
+	}
 
 	informerFactory := NewInformerFactory(cs, 0, nil)
 	lister := informerFactory.Core().V1().Pods().Lister()
@@ -1546,8 +1547,12 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	p, err := lister.Pods("default").Get("test")
-	require.NoError(t, err)
-	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+	if err != nil {
+		t.Fatalf("unexpected error getting pod: %v", err)
+	}
+	if len(p.GetManagedFields()) != 0 {
+		t.Errorf("expected managedFields to be trimmed by the transform, got: %v", p.GetManagedFields())
+	}
 }
 
 func TestNewInformerFactoryMetrics(t *testing.T) {
@@ -1555,7 +1560,9 @@ func TestNewInformerFactoryMetrics(t *testing.T) {
 	fifometrics.Register()
 
 	informerName, err := cache.NewInformerName("kube-scheduler")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error creating informer name: %v", err)
+	}
 	defer informerName.Release()
 
 	cs := fake.NewClientset()

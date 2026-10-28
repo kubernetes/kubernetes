@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1259,8 +1258,12 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: call PreFilter and check status")
 			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod, nil)
-			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
-			assert.Equal(t, item.wantPreFilterResult, gotPreFilterResult)
+			if diff := cmp.Diff(item.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
+				t.Errorf("PreFilter status does not match (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(item.wantPreFilterResult, gotPreFilterResult); diff != "" {
+				t.Errorf("PreFilter result does not match (-want,+got):\n%s", diff)
+			}
 
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
@@ -1290,7 +1293,9 @@ func TestVolumeBinding(t *testing.T) {
 			t.Logf("Verify: call Filter and check status")
 			for i, nodeInfo := range nodeInfos {
 				gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
-				assert.Equal(t, item.wantFilterStatus[i], gotStatus)
+				if diff := cmp.Diff(item.wantFilterStatus[i], gotStatus); diff != "" {
+					t.Errorf("Filter status for node %q does not match (-want,+got):\n%s", nodeInfo.Node().Name, diff)
+				}
 			}
 
 			t.Logf("Verify: call PreScore and check status")
@@ -1371,7 +1376,10 @@ func Test_PreBindPreFlight(t *testing.T) {
 			if !status.Equal(item.wantStatus) {
 				t.Errorf("PreBindPreFlight failed - got: %v, want: %v", status, item.wantStatus)
 			}
-			assert.Equal(t, &fwk.PreBindPreFlightResult{AllowParallel: true}, result)
+			wantResult := &fwk.PreBindPreFlightResult{AllowParallel: true}
+			if diff := cmp.Diff(wantResult, result); diff != "" {
+				t.Errorf("PreBindPreFlight result does not match (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }

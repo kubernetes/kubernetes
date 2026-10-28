@@ -32,8 +32,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -91,8 +89,12 @@ func TestPostFilterNoOpStatusHasNoUserVisibleReason(t *testing.T) {
 
 		_, status := (&DynamicResources{}).PostFilter(context.Background(), state, pod, nil)
 
-		require.Equal(t, fwk.Unschedulable, status.Code())
-		assert.Empty(t, status.Reasons())
+		if got, want := status.Code(), fwk.Unschedulable; got != want {
+			t.Fatalf("unexpected status code: got %v, want %v", got, want)
+		}
+		if len(status.Reasons()) != 0 {
+			t.Errorf("expected empty reasons, got %v", status.Reasons())
+		}
 	})
 }
 
@@ -1424,11 +1426,17 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 	}()
 
 	status := testCtx.p.Filter(context.Background(), testCtx.state, groupedPodWithClaimName, nodeInfo)
-	assert.Equal(t, fwk.UnschedulableAndUnresolvable, status.Code())
-	assert.Equal(t, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(allocatedClaim)), status.Message())
+	if got, want := status.Code(), fwk.UnschedulableAndUnresolvable; got != want {
+		t.Errorf("Filter status code: got %v, want %v", got, want)
+	}
+	if got, want := status.Message(), fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(allocatedClaim)); got != want {
+		t.Errorf("Filter status message: got %q, want %q", got, want)
+	}
 
 	statusWithFeature := testCtx.p.Filter(context.Background(), testCtx.state, groupedPodWithClaimName, nodeInfoWithFeature)
-	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
+	if !statusWithFeature.IsSuccess() {
+		t.Errorf("expected success when node has DRAOptionalNodeOperations feature, got %v", statusWithFeature)
+	}
 }
 
 func testPlugin(tCtx ktesting.TContext) {
@@ -2455,7 +2463,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			want:                      want{},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(tCtx, err, "not found")
+				if err == nil || !strings.Contains(err.Error(), "not found") {
+					tCtx.Fatalf("expected error containing 'not found', got %v", err)
+				}
 			},
 		},
 		"extended-resource-one-device-plugin-one-dra": {
@@ -2525,7 +2535,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(tCtx, err, "not found")
+				if err == nil || !strings.Contains(err.Error(), "not found") {
+					tCtx.Fatalf("expected error containing 'not found', got %v", err)
+				}
 			},
 		},
 		"extended-resource-name-with-resources": {
@@ -2547,8 +2559,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"implicit-extended-resource-name-with-resources": {
@@ -2570,8 +2586,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
@@ -2593,8 +2613,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
@@ -2619,8 +2643,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
@@ -2642,7 +2670,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(tCtx, err, "not found")
+				if err == nil || !strings.Contains(err.Error(), "not found") {
+					tCtx.Fatalf("expected error containing 'not found', got %v", err)
+				}
 			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
@@ -2664,7 +2694,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.ErrorContains(tCtx, err, "not found")
+				if err == nil || !strings.Contains(err.Error(), "not found") {
+					tCtx.Fatalf("expected error containing 'not found', got %v", err)
+				}
 			},
 		},
 		"extended-resource-name-bind-failure": {
@@ -2686,8 +2718,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"extended-resource-name-skip-bind": {
@@ -2703,8 +2739,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["success"]), 1; got != want {
+					tCtx.Fatalf("metric[success]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"extended-resource-name-claim-creation-failure": {
@@ -2735,8 +2775,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["failure"]))
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := int(metric["failure"]), 1; got != want {
+					tCtx.Fatalf("metric[failure]: got %d, want %d", got, want)
+				}
 			},
 		},
 		"canceled": {
@@ -2994,13 +3038,17 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 					"driver", // group by driver label
 				)
-				require.NoError(tCtx, err)
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
 
 				var totalAllocs float64
 				for _, v := range allocs {
 					totalAllocs += v
 				}
-				require.InEpsilon(tCtx, float64(1), totalAllocs, 0.1, "expected exactly one successful allocation with BindingConditions")
+				if math.Abs(totalAllocs-1) > 0.1 {
+					tCtx.Fatalf("expected exactly one successful allocation with BindingConditions, got %v", totalAllocs)
+				}
 
 				// Histogram: one success sample with requires_bindingconditions=true
 				hist, err := testutil.GetHistogramVecFromGatherer(
@@ -3010,8 +3058,12 @@ func testPlugin(tCtx ktesting.TContext) {
 						"status": "success",
 					},
 				)
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, uint64(1), hist.GetAggregatedSampleCount(), "expected one success sample in wait duration histogram")
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := hist.GetAggregatedSampleCount(), uint64(1); got != want {
+					tCtx.Fatalf("expected one success sample in wait duration histogram: got %v, want %v", got, want)
+				}
 			},
 		},
 		"bound-claim-with-failed-binding": {
@@ -3138,13 +3190,17 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 					"driver",
 				)
-				require.NoError(tCtx, err)
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
 
 				var totalTimeouts float64
 				for _, v := range timeouts {
 					totalTimeouts += v
 				}
-				require.InEpsilon(tCtx, float64(1), totalTimeouts, 0.1, "expected exactly one timeout with BindingConditions")
+				if math.Abs(totalTimeouts-1) > 0.1 {
+					tCtx.Fatalf("expected exactly one timeout with BindingConditions, got %v", totalTimeouts)
+				}
 
 				// Histogram: one timeout sample with requires_bindingconditions=true
 				hist, err := testutil.GetHistogramVecFromGatherer(
@@ -3154,8 +3210,12 @@ func testPlugin(tCtx ktesting.TContext) {
 						"status": "timeout",
 					},
 				)
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, uint64(1), hist.GetAggregatedSampleCount(), "expected one timeout sample in wait duration histogram")
+				if err != nil {
+					tCtx.Fatalf("unexpected error: %v", err)
+				}
+				if got, want := hist.GetAggregatedSampleCount(), uint64(1); got != want {
+					tCtx.Fatalf("expected one timeout sample in wait duration histogram: got %v, want %v", got, want)
+				}
 			},
 		},
 		"bound-claim-with-mixed-binding-conditions": {
@@ -4137,7 +4197,9 @@ func testPlugin(tCtx ktesting.TContext) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
 
-				require.False(tCtx, tc.enableDRAWorkloadResourceClaims, "DRAWorkloadResourceClaims cannot be enabled when DRAAdminAccess is disabled")
+				if tc.enableDRAWorkloadResourceClaims {
+					tCtx.Fatal("DRAWorkloadResourceClaims cannot be enabled when DRAAdminAccess is disabled")
+				}
 			} else {
 				// These features can't be set with pre-1.36 emulation
 				featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -4182,7 +4244,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			nodeInfo := framework.NewNodeInfo()
 			result, status := testCtx.p.PreFilter(tCtx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
 			tCtx.Run("prefilter", func(tCtx ktesting.TContext) {
-				assert.Equal(tCtx, tc.want.preFilterResult, result)
+				if diff := cmp.Diff(tc.want.preFilterResult, result); diff != "" {
+					tCtx.Errorf("preFilterResult mismatch (-want +got):\n%s", diff)
+				}
 				testCtx.verify(tCtx, tc.want.prefilter, initialObjects, tc.pod, result, status)
 			})
 			unschedulable := status.IsRejected()
@@ -4229,7 +4293,9 @@ func testPlugin(tCtx ktesting.TContext) {
 					score, status := testCtx.p.Score(tCtx, testCtx.state, tc.pod, potentialNode)
 					nodeName := potentialNode.Node().Name
 					tCtx.Run(fmt.Sprintf("score/%s", nodeName), func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.scoreResult.forNode(nodeName), score)
+						if got, want := score, tc.want.scoreResult.forNode(nodeName); got != want {
+							tCtx.Errorf("score mismatch: got %d, want %d", got, want)
+						}
 						testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, tc.pod, nil, status)
 					})
 					scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
@@ -4238,7 +4304,9 @@ func testPlugin(tCtx ktesting.TContext) {
 				initialObjects = testCtx.listAll(tCtx)
 				status := testCtx.p.NormalizeScore(tCtx, testCtx.state, tc.pod, scores)
 				tCtx.Run("normalizeScore", func(tCtx ktesting.TContext) {
-					assert.Equal(tCtx, tc.want.normalizeScoreResult, scores)
+					if diff := cmp.Diff(tc.want.normalizeScoreResult, scores); diff != "" {
+						tCtx.Errorf("normalizeScoreResult mismatch (-want +got):\n%s", diff)
+					}
 					testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, tc.pod, nil, status)
 				})
 			}
@@ -4292,11 +4360,16 @@ func testPlugin(tCtx ktesting.TContext) {
 					initialObjects = testCtx.listAll(tCtx)
 					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prebind)
 					preBindPreFlightResult, preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
-					tCtx.Run("preBindPreFlightStatus", func(tContext ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.preBindPreFlightStatus, preBindPreFlightStatus)
+					tCtx.Run("preBindPreFlightStatus", func(tCtx ktesting.TContext) {
+						if diff := cmp.Diff(tc.want.preBindPreFlightStatus, preBindPreFlightStatus); diff != "" {
+							tCtx.Errorf("preBindPreFlightStatus mismatch (-want +got):\n%s", diff)
+						}
 					})
-					tCtx.Run("preBindPreFlightResult", func(tContext ktesting.TContext) {
-						assert.Equal(tCtx, &fwk.PreBindPreFlightResult{AllowParallel: true}, preBindPreFlightResult)
+					tCtx.Run("preBindPreFlightResult", func(tCtx ktesting.TContext) {
+						want := &fwk.PreBindPreFlightResult{AllowParallel: true}
+						if diff := cmp.Diff(want, preBindPreFlightResult); diff != "" {
+							tCtx.Errorf("preBindPreFlightResult mismatch (-want +got):\n%s", diff)
+						}
 					})
 					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
@@ -4327,13 +4400,17 @@ func testPlugin(tCtx ktesting.TContext) {
 					podGroupCycleState := testCtx.state.GetPodGroupCycleState()
 					result, status := testCtx.p.PodGroupPostFilter(tCtx, podGroupCycleState, pgInfo, mockSchedulingFunc)
 					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.podGroupPostFilterResult, result)
+						if diff := cmp.Diff(tc.want.podGroupPostFilterResult, result); diff != "" {
+							tCtx.Errorf("podGroupPostFilterResult mismatch (-want +got):\n%s", diff)
+						}
 						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
 					})
 				} else {
 					result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.postFilterResult, result)
+						if diff := cmp.Diff(tc.want.postFilterResult, result); diff != "" {
+							tCtx.Errorf("postFilterResult mismatch (-want +got):\n%s", diff)
+						}
 						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
 					})
 				}
@@ -4377,12 +4454,18 @@ type testContext struct {
 func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialObjects []metav1.Object, testPod *v1.Pod, result interface{}, status *fwk.Status) {
 	tCtx.Helper()
 	if expected.status == nil {
-		assert.Nil(tCtx, status, status.AsError())
+		if status != nil {
+			tCtx.Errorf("unexpected status: %v", status.AsError())
+		}
 	} else if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
-		assert.ErrorContains(tCtx, actualErr, expected.status.AsError().Error())
+		if !strings.Contains(actualErr.Error(), expected.status.AsError().Error()) {
+			tCtx.Errorf("expected error to contain %q, got %q", expected.status.AsError().Error(), actualErr.Error())
+		}
 	} else {
-		assert.Equal(tCtx, expected.status, status)
+		if diff := cmp.Diff(expected.status, status); diff != "" {
+			tCtx.Errorf("status mismatch (-want +got):\n%s", diff)
+		}
 	}
 	objects := tc.listAll(tCtx)
 	wantObjects := update(initialObjects, expected.changes)
@@ -4627,7 +4710,9 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		KubeClient:             tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
-	require.NoError(tCtx, err, "couldn't start resource slice tracker")
+	if err != nil {
+		tCtx.Fatalf("couldn't start resource slice tracker: %v", err)
+	}
 	doneCheckers = append(doneCheckers, resourceSliceTracker.HasSyncedChecker())
 
 	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
@@ -4647,7 +4732,9 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	if features.EnableDRAExtendedResource {
 		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
 		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
-		require.NoError(tCtx, err, "failed to add device class informer event handler")
+		if err != nil {
+			tCtx.Fatalf("failed to add device class informer event handler: %v", err)
+		}
 		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
 
@@ -5295,7 +5382,9 @@ func Test_allocationResultRequiresDRAOptionalNodeOperations(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			got := allocationResultRequiresDRAOptionalNodeOperations(tc.alloc)
-			assert.Equal(t, tc.want, got)
+			if got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
 		})
 	}
 }
@@ -5564,7 +5653,9 @@ func Test_computesScore(t *testing.T) {
 			if tc.expectErr {
 				t.Fatal("expected error, got none")
 			}
-			assert.Equal(t, tc.expectedScore, score)
+			if score != tc.expectedScore {
+				t.Errorf("score: got %d, want %d", score, tc.expectedScore)
+			}
 		})
 	}
 }
@@ -5733,7 +5824,9 @@ func TestNormalizeScore(t *testing.T) {
 			pl := &DynamicResources{}
 			scores := tc.scores
 			_ = pl.NormalizeScore(context.Background(), nil, nil, scores)
-			assert.Equal(t, tc.expectedScores, scores)
+			if diff := cmp.Diff(tc.expectedScores, scores); diff != "" {
+				t.Errorf("scores mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -6007,9 +6100,15 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "deallocation and deletion of ResourceClaims completed"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaim.Namespace).Get(tCtx, inUseClaim.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Nil(tCtx, claim.Status.Allocation)
-				assert.Nil(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if claim.Status.Allocation != nil {
+					tCtx.Errorf("expected claim.Status.Allocation to be nil, got: %v", claim.Status.Allocation)
+				}
+				if claim.Status.ReservedFor != nil {
+					tCtx.Errorf("expected claim.Status.ReservedFor to be nil, got: %v", claim.Status.ReservedFor)
+				}
 			},
 		},
 		"deallocate-podgroup-level-claim": {
@@ -6022,9 +6121,15 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Nil(tCtx, claim.Status.Allocation)
-				assert.Nil(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if claim.Status.Allocation != nil {
+					tCtx.Errorf("expected claim.Status.Allocation to be nil, got: %v", claim.Status.Allocation)
+				}
+				if claim.Status.ReservedFor != nil {
+					tCtx.Errorf("expected claim.Status.ReservedFor to be nil, got: %v", claim.Status.ReservedFor)
+				}
 			},
 		},
 		"delete-pod-level-extended-claim": {
@@ -6054,8 +6159,9 @@ func TestPodGroupPostFilter(t *testing.T) {
 			unavailableClaimNames: []string{"pod-extended-resources"},
 			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "deallocation and deletion of ResourceClaims completed"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
-				_, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaim.Namespace).Get(tCtx, "pod-extended-resources", metav1.GetOptions{})
-				assert.Error(tCtx, err) // Should be deleted!
+				if _, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaim.Namespace).Get(tCtx, "pod-extended-resources", metav1.GetOptions{}); err == nil {
+					tCtx.Error("expected error getting deleted claim, got nil")
+				}
 			},
 		},
 		"unreserve-podgroup-claim": {
@@ -6067,8 +6173,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Empty(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if len(claim.Status.ReservedFor) != 0 {
+					tCtx.Errorf("expected claim.Status.ReservedFor to be empty, got: %v", claim.Status.ReservedFor)
+				}
 			},
 		},
 		"unreserve-podgroup-multiple-unscheduled-pods": {
@@ -6080,8 +6190,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Empty(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if len(claim.Status.ReservedFor) != 0 {
+					tCtx.Errorf("expected claim.Status.ReservedFor to be empty, got: %v", claim.Status.ReservedFor)
+				}
 			},
 		},
 		"mixed-pod-level-and-podgroup-claims": {
@@ -6094,14 +6208,26 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claimByPG, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.NotNil(tCtx, claimByPG.Status.Allocation)
-				assert.Empty(tCtx, claimByPG.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if claimByPG.Status.Allocation == nil {
+					tCtx.Error("expected claimByPG.Status.Allocation to not be nil")
+				}
+				if len(claimByPG.Status.ReservedFor) != 0 {
+					tCtx.Errorf("expected claimByPG.Status.ReservedFor to be empty, got: %v", claimByPG.Status.ReservedFor)
+				}
 
 				claim2, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimForPodLevel.Namespace).Get(tCtx, inUseClaimForPodLevel.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Nil(tCtx, claim2.Status.Allocation)
-				assert.Nil(tCtx, claim2.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if claim2.Status.Allocation != nil {
+					tCtx.Errorf("expected claim2.Status.Allocation to be nil, got: %v", claim2.Status.Allocation)
+				}
+				if claim2.Status.ReservedFor != nil {
+					tCtx.Errorf("expected claim2.Status.ReservedFor to be nil, got: %v", claim2.Status.ReservedFor)
+				}
 			},
 		},
 		"skip-deallocate-feature-disabled": {
@@ -6113,8 +6239,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                      fwk.NewStatus(fwk.Unschedulable),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.NotEmpty(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if len(claim.Status.ReservedFor) == 0 {
+					tCtx.Error("expected claim.Status.ReservedFor to not be empty")
+				}
 			},
 		},
 		"skip-deallocate-topology-aware-podgroup": {
@@ -6127,8 +6257,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 			wantStatus:                            fwk.NewStatus(fwk.Unschedulable),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.NotEmpty(tCtx, claim.Status.ReservedFor)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting claim: %v", err)
+				}
+				if len(claim.Status.ReservedFor) == 0 {
+					tCtx.Error("expected claim.Status.ReservedFor to not be empty")
+				}
 			},
 		},
 	}
@@ -6161,7 +6295,9 @@ func TestPodGroupPostFilter(t *testing.T) {
 			podGroupCycleState.Write(stateKey, podGroupState)
 
 			claimsList, err := testCtx.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
-			require.NoError(tCtx, err)
+			if err != nil {
+				tCtx.Fatalf("unexpected error listing claims: %v", err)
+			}
 			var testClaims []*resourceapi.ResourceClaim
 			for i := range claimsList.Items {
 				testClaims = append(testClaims, &claimsList.Items[i])
@@ -6171,7 +6307,9 @@ func TestPodGroupPostFilter(t *testing.T) {
 				// Initialize the stateData of the pod with unavailable claims
 				s := &stateData{}
 				userClaims, err := testCtx.p.podResourceClaims(pod)
-				require.NoError(tCtx, err)
+				if err != nil {
+					tCtx.Fatalf("unexpected error getting pod resource claims: %v", err)
+				}
 				extendedResourceClaim := findExtendedResourceClaim(pod, testClaims)
 				s.claims = newClaimStore(userClaims, extendedResourceClaim, nil)
 
@@ -6200,9 +6338,13 @@ func TestPodGroupPostFilter(t *testing.T) {
 			_, gotStatus := testCtx.p.PodGroupPostFilter(tCtx, podGroupCycleState, pgInfo, mockSchedulingFunc)
 
 			if tc.wantStatus.AsError() != nil {
-				require.ErrorContains(tCtx, gotStatus.AsError(), tc.wantStatus.AsError().Error())
+				if gotStatus == nil || !strings.Contains(gotStatus.AsError().Error(), tc.wantStatus.AsError().Error()) {
+					tCtx.Fatalf("expected error containing %q, got %v", tc.wantStatus.AsError().Error(), gotStatus.AsError())
+				}
 			} else {
-				assert.Equal(tCtx, tc.wantStatus, gotStatus)
+				if diff := cmp.Diff(tc.wantStatus, gotStatus); diff != "" {
+					tCtx.Errorf("status mismatch (-want +got):\n%s", diff)
+				}
 			}
 
 			if tc.verifyClaims != nil {
