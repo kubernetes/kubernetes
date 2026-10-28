@@ -6000,6 +6000,7 @@ const (
 	actionNoop
 	actionReject
 	actionConflictUpdate
+	actionConflictReject
 	actionConflictDelete
 )
 
@@ -6045,11 +6046,28 @@ func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store stora
 			expectErr:         storage.IsNotFound,
 		},
 		{
+			name:              "missing key with preconditions returns NotFound",
+			missingKey:        true,
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
 			name:              "missing key with ignoreNotFound creates object",
 			missingKey:        true,
 			ignoreNotFound:    true,
 			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 1},
 			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "missing key with ignoreNotFound fails preconditions without retry",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
 		},
 		{
 			name:              "matching preconditions commit in single transaction",
@@ -6091,6 +6109,13 @@ func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store stora
 			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
 			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
 			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "concurrent update conflict fails callback on retry",
+			action:            actionConflictReject,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         apierrors.IsConflict,
 		},
 		{
 			name:              "concurrent delete conflict returns NotFound",
@@ -6155,12 +6180,23 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 		precond = tc.preconditions(current)
 	}
 
+	rejectWithDirtyMutation := func(obj runtime.Object) error {
+		// Mutate input in place before failing so missing DeepCopy on cached objects is caught.
+		if p, ok := obj.(*example.Pod); ok && p != nil {
+			if p.Labels == nil {
+				p.Labels = map[string]string{}
+			}
+			p.Labels["rejected"] = "dirty"
+		}
+		return apierrors.NewConflict(example.Resource("pods"), podName, errors.New("rejected"))
+	}
+
 	var conflictInjected bool
-	onCallback := func() error {
+	onCallback := func(obj runtime.Object) error {
 		switch tc.action {
 		case actionReject:
-			return apierrors.NewConflict(example.Resource("pods"), podName, errors.New("rejected"))
-		case actionConflictUpdate:
+			return rejectWithDirtyMutation(obj)
+		case actionConflictUpdate, actionConflictReject:
 			if !conflictInjected {
 				conflictInjected = true
 				updated := &example.Pod{}
@@ -6175,6 +6211,10 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 					return p, nil
 				}), nil))
 				current = updated
+				return nil
+			}
+			if tc.action == actionConflictReject {
+				return rejectWithDirtyMutation(obj)
 			}
 		case actionConflictDelete:
 			if !conflictInjected {
@@ -6191,16 +6231,17 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 	out := &example.Pod{}
 	var err error
 	if isDelete {
-		err = store.Delete(opCtx, key, out, precond, func(_ context.Context, _ runtime.Object) error {
-			return onCallback()
+		err = store.Delete(opCtx, key, out, precond, func(_ context.Context, obj runtime.Object) error {
+			return onCallback(obj)
 		}, nil, storage.DeleteOptions{})
 	} else {
 		err = store.GuaranteedUpdate(opCtx, key, out, tc.ignoreNotFound, precond, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-			if err := onCallback(); err != nil {
+			if err := onCallback(obj); err != nil {
 				return nil, err
 			}
 			pod := obj.(*example.Pod)
 			if pod.Name == "" {
+				require.Equal(t, &example.Pod{}, pod)
 				pod.Namespace = "test-ns"
 				pod.Name = podName
 			}
@@ -6227,6 +6268,11 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 	require.Equal(t, wantStats, recorder.StatsForKey(recorderKey))
 
 	if tc.expectErr != nil {
+		if current != nil && (tc.action == actionReject || tc.action == actionConflictReject) {
+			cached := &example.Pod{}
+			require.NoError(t, store.Get(ctx, key, storage.GetOptions{ResourceVersion: current.ResourceVersion}, cached))
+			require.Equal(t, current, cached)
+		}
 		return
 	}
 
@@ -6236,7 +6282,9 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 		expectOut.ResourceVersion = out.ResourceVersion
 		require.True(t, storage.IsNotFound(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
 	} else {
-		if tc.action != actionNoop {
+		if tc.action == actionNoop {
+			require.Equal(t, current.ResourceVersion, out.ResourceVersion)
+		} else {
 			require.Equal(t, "updated", out.Annotations["mutated"])
 		}
 		require.NoError(t, store.Get(ctx, key, storage.GetOptions{}, expectOut))
