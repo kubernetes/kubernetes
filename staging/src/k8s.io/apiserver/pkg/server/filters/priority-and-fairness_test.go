@@ -690,6 +690,51 @@ func TestApfWithRequestDigest(t *testing.T) {
 	}
 }
 
+type fakeFilterClassification struct {
+	*fakeApfFilter
+}
+
+func (f *fakeFilterClassification) Handle(ctx context.Context,
+	_ utilflowcontrol.RequestDigest,
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	_ func() fcrequest.WorkEstimate,
+	_ fq.QueueNoteFn, execFn func(),
+) {
+	noteFn(bootstrap.SuggestedFlowSchemaServiceAccounts, bootstrap.SuggestedPriorityLevelConfigurationWorkloadLow, "")
+	execFn()
+}
+
+func TestApfRecordsClassificationInLatencyTrackers(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
+	longRunningFunc := func(_ *http.Request, _ *apirequest.RequestInfo) bool { return false }
+
+	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
+		longRunningFunc,
+		&fakeFilterClassification{},
+		defaultRequestWorkEstimator,
+		time.Minute/4,
+	)
+
+	req, err := http.NewRequest(http.MethodGet, "/bar", nil)
+	if err != nil {
+		t.Fatalf("Failed to create new http request - %v", err)
+	}
+	ctx := apirequest.WithLatencyTrackers(req.Context())
+	ctx = apirequest.WithRequestInfo(ctx, &apirequest.RequestInfo{Verb: "get"})
+	ctx = apirequest.WithUser(ctx, &user.DefaultInfo{Name: "foo"})
+
+	handler.ServeHTTP(httptest.NewRecorder(), req.WithContext(ctx))
+
+	annotations := apirequest.AuditAnnotationsFromLatencyTrackers(ctx)
+	if got, want := annotations["apiserver.latency.k8s.io/apf-flow-schema"], bootstrap.SuggestedFlowSchemaServiceAccounts.Name; got != want {
+		t.Errorf("Expected flow schema annotation %q, got %q", want, got)
+	}
+	if got, want := annotations["apiserver.latency.k8s.io/apf-priority-level"], bootstrap.SuggestedPriorityLevelConfigurationWorkloadLow.Name; got != want {
+		t.Errorf("Expected priority level annotation %q, got %q", want, got)
+	}
+}
+
 func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 	epmetrics.Register()
 	fcmetrics.Register()
