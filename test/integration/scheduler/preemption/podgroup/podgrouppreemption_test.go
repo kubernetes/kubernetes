@@ -4053,7 +4053,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 				v1.ResourceCPU:    "500m",
 				v1.ResourceMemory: "500",
 			}
-			_, err := schedulerutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+			_, err := schedulerutils.CreateNode(testCtx.Ctx, cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 			if err != nil {
 				t.Fatalf("Error creating nodes: %v", err)
 			}
@@ -4068,7 +4068,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			})
-			_, err = schedulerutils.RunPausePod(cs, existingPod)
+			_, err = schedulerutils.RunPausePod(testCtx.Ctx, cs, existingPod)
 			if err != nil {
 				t.Fatalf("TestDisablePodGroupPreemption (Async preemption enabled: %v): Error running pause pod: %v", asyncPreemptionEnabled, err)
 			}

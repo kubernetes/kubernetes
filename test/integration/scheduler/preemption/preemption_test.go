@@ -49,13 +49,16 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-// imported from testutils
 var (
-	initPausePod        = testutils.InitPausePod
-	createNode          = schedulerutils.CreateNode
-	createPausePod      = testutils.CreatePausePod
-	runPausePod         = schedulerutils.RunPausePod
-	podIsGettingEvicted = testutils.PodIsGettingEvicted
+	initPausePod             = testutils.InitPausePod
+	createNode               = schedulerutils.CreateNode
+	createPausePod           = testutils.CreatePausePod
+	runPausePod              = schedulerutils.RunPausePod
+	podIsGettingEvicted      = testutils.PodIsGettingEvicted
+	podScheduled             = schedulerutils.PodScheduled
+	waitForNominatedNodeName = schedulerutils.WaitForNominatedNodeName
+	podDeleted               = testutils.PodDeleted
+	cleanupPods              = testutils.CleanupPods
 )
 
 const filterPluginName = "filter-plugin"
@@ -1140,7 +1143,7 @@ func TestPreemption(t *testing.T) {
 							go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 							defer testCtx.SchedulerCloseFn()
 
-							if _, err := createNode(testCtx.ClientSet, nodeObject); err != nil {
+							if _, err := createNode(testCtx.Ctx, testCtx.ClientSet, nodeObject); err != nil {
 								t.Fatalf("Error creating node: %v", err)
 							}
 							t.Cleanup(func() {
@@ -1149,7 +1152,7 @@ func TestPreemption(t *testing.T) {
 								}
 							})
 							for _, n := range test.extraNodes {
-								if _, err := createNode(testCtx.ClientSet, n); err != nil {
+								if _, err := createNode(testCtx.Ctx, testCtx.ClientSet, n); err != nil {
 									t.Fatalf("Error creating extra node %s: %v", n.Name, err)
 								}
 								n := n
@@ -1184,7 +1187,7 @@ func TestPreemption(t *testing.T) {
 							// Create and run existingPods.
 							for i, p := range test.existingPods {
 								p.Namespace = ns
-								pods[i], err = runPausePod(cs, p)
+								pods[i], err = runPausePod(testCtx.Ctx, cs, p)
 								if err != nil {
 									t.Fatalf("Error running pause pod: %v", err)
 								}
@@ -1223,14 +1226,14 @@ func TestPreemption(t *testing.T) {
 							}
 							// Also check that the preemptor pod gets the NominatedNodeName field set.
 							if len(test.preemptedPodIndexes) > 0 && !clearingNominatedNodeNameAfterBinding {
-								if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+								if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 									t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 								}
 							}
 
 							// Cleanup
 							pods = append(pods, preemptor)
-							testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+							cleanupPods(testCtx.Ctx, cs, t, pods)
 						})
 					}
 				}
@@ -2008,7 +2011,7 @@ func TestAsyncPreemption(t *testing.T) {
 
 			createdPods := []*v1.Pod{}
 			defer func() {
-				testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+				cleanupPods(testCtx.Ctx, cs, t, createdPods)
 			}()
 
 			config := asyncframework.AsyncPreemptionStepRunnerConfig{
@@ -2085,7 +2088,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 
 	cs := testCtx.ClientSet
 
-	if _, err := createNode(cs, node); err != nil {
+	if _, err := createNode(testCtx.Ctx, cs, node); err != nil {
 		t.Fatalf("Error creating node: %v", err)
 	}
 
@@ -2113,7 +2116,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 		v1.ResourceMemory: "1Gi",
 	}
 	smallNode := st.MakeNode().Name("small-node").Capacity(smallNodeRes).Obj()
-	if _, err := createNode(cs, smallNode); err != nil {
+	if _, err := createNode(testCtx.Ctx, cs, smallNode); err != nil {
 		t.Fatalf("Error creating node: %v", err)
 	}
 
@@ -2299,7 +2302,7 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 
 	cs := testCtx.ClientSet
 
-	if _, err := createNode(cs, bigNode); err != nil {
+	if _, err := createNode(testCtx.Ctx, cs, bigNode); err != nil {
 		t.Fatalf("Error creating node: %v", err)
 	}
 
@@ -2324,7 +2327,7 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 		v1.ResourceCPU:    "1",
 		v1.ResourceMemory: "1Gi",
 	}).Obj()
-	if _, err := createNode(cs, smallNode); err != nil {
+	if _, err := createNode(testCtx.Ctx, cs, smallNode); err != nil {
 		t.Fatalf("Error creating node: %v", err)
 	}
 
@@ -2733,7 +2736,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 
 							var createdPods []*v1.Pod
 							defer func() {
-								testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+								cleanupPods(testCtx.Ctx, cs, t, createdPods)
 							}()
 
 							for _, scenario := range test.scenarios {
@@ -2777,7 +2780,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 									testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 									if scenario.schedulePod.expectSuccess {
-										if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
+										if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, podScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
 											t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
 										}
 									} else if scenario.schedulePod.expectUnschedulable {
@@ -2786,7 +2789,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 										}
 									}
 								case scenario.verifyPodDeleted != "":
-									if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, scenario.verifyPodDeleted)); err != nil {
+									if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, podDeleted(testCtx.Ctx, cs, testCtx.NS.Name, scenario.verifyPodDeleted)); err != nil {
 										t.Fatalf("Failed to wait for pod %s to be deleted: %v", scenario.verifyPodDeleted, err)
 									}
 								case scenario.verifyPodNotDeleted != "":
@@ -2809,7 +2812,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 										if err != nil {
 											t.Fatalf("Failed to get preemptor pod: %v", err)
 										}
-										if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+										if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 											t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 										}
 									}
