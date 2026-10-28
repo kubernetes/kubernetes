@@ -5305,7 +5305,6 @@ type PodSecurityContext struct {
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
 	// The container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
-	// TODO: update the default value to "Merge" when spec.os.name is not windows
 	// +optional
 	SupplementalGroupsPolicy *SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty" protobuf:"bytes,12,opt,name=supplementalGroupsPolicy"`
 	// fsGroup is a special supplemental group that applies to all containers in a pod.
