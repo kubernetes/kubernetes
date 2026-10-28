@@ -2617,6 +2617,63 @@ func (_c *MockPodContainerManager_ReduceCPULimits_Call) RunAndReturn(run func(lo
 	return _c
 }
 
+// RescaleCPUWeight provides a mock function for the type MockPodContainerManager
+func (_mock *MockPodContainerManager) RescaleCPUWeight(logger klog.Logger, pod *v1.Pod) error {
+	ret := _mock.Called(logger, pod)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RescaleCPUWeight")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v1.Pod) error); ok {
+		r0 = returnFunc(logger, pod)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPodContainerManager_RescaleCPUWeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RescaleCPUWeight'
+type MockPodContainerManager_RescaleCPUWeight_Call struct {
+	*mock.Call
+}
+
+// RescaleCPUWeight is a helper method to define mock.On call
+//   - logger klog.Logger
+//   - pod *v1.Pod
+func (_e *MockPodContainerManager_Expecter) RescaleCPUWeight(logger any, pod any) *MockPodContainerManager_RescaleCPUWeight_Call {
+	return &MockPodContainerManager_RescaleCPUWeight_Call{Call: _e.mock.On("RescaleCPUWeight", logger, pod)}
+}
+
+func (_c *MockPodContainerManager_RescaleCPUWeight_Call) Run(run func(logger klog.Logger, pod *v1.Pod)) *MockPodContainerManager_RescaleCPUWeight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v1.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v1.Pod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPodContainerManager_RescaleCPUWeight_Call) Return(err error) *MockPodContainerManager_RescaleCPUWeight_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPodContainerManager_RescaleCPUWeight_Call) RunAndReturn(run func(logger klog.Logger, pod *v1.Pod) error) *MockPodContainerManager_RescaleCPUWeight_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetPodCgroupConfig provides a mock function for the type MockPodContainerManager
 func (_mock *MockPodContainerManager) SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *cm.ResourceConfig) error {
 	ret := _mock.Called(logger, pod, resourceConfig)

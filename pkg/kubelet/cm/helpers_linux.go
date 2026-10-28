@@ -465,6 +465,20 @@ func CPUSharesEqualAfterV2RoundTrip(allocatedShares, readbackShares uint64) bool
 	return cpuWeightToCPUShares(getCPUWeight(&allocatedShares)) == readbackShares
 }
 
+// cpuSharesWrittenAtLegacyV2Scale reports whether readbackShares is what the
+// kubelet reads back from a cgroup whose cpu.weight was written for
+// allocatedShares with the fixed [2, MaxShares] range, as kubelets did before
+// SetCgroupV2CPUCapacity existed. The readback is converted at the current
+// scale, and that conversion is one-to-one over cpu.weight, so this matches
+// exactly one weight.
+func cpuSharesWrittenAtLegacyV2Scale(allocatedShares, readbackShares uint64) bool {
+	legacyWeight := uint64(10000)
+	if allocatedShares < MaxShares {
+		legacyWeight = 1 + ((max(allocatedShares, MinShares)-2)*9999)/(MaxShares-2)
+	}
+	return cpuWeightToCPUShares(legacyWeight) == readbackShares
+}
+
 func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	var cpuLimit *resource.Quantity
 

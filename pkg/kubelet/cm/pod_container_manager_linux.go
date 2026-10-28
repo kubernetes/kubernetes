@@ -162,6 +162,34 @@ func (m *podContainerManagerImpl) SetPodCgroupConfig(logger klog.Logger, pod *v1
 	return m.cgroupManager.SetCgroupConfig(logger, podCgroupName, resourceConfig)
 }
 
+// RescaleCPUWeight rewrites the pod cgroup's cpu.weight when it still holds the
+// value that a kubelet using the fixed [2, MaxShares] range wrote for the pod's
+// CPU request. Pods keep running across a kubelet upgrade, and on nodes where
+// SetCgroupV2CPUCapacity raised the scale their old weight reads back as a
+// larger CPU request, which is then reported in status.resources and counted
+// by the scheduler. Cgroups holding any other value are left alone, so pods
+// created by this kubelet and resizes in progress are not affected.
+func (m *podContainerManagerImpl) RescaleCPUWeight(logger klog.Logger, pod *v1.Pod) error {
+	if cgroupV2MaxShares.Load() == MaxShares || !m.Exists(pod) {
+		return nil
+	}
+	current, err := m.GetPodCgroupConfig(pod, v1.ResourceCPU)
+	if err != nil {
+		return err
+	}
+	desired := ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, false, m.memoryReservationPolicy)
+	if current == nil || current.CPUShares == nil || desired == nil || desired.CPUShares == nil {
+		return nil
+	}
+	if CPUSharesEqualAfterV2RoundTrip(*desired.CPUShares, *current.CPUShares) ||
+		!cpuSharesWrittenAtLegacyV2Scale(*desired.CPUShares, *current.CPUShares) {
+		return nil
+	}
+	logger.V(2).Info("Rescaling pod cgroup cpu.weight to node CPU capacity", "pod", klog.KObj(pod),
+		"cpuShares", *desired.CPUShares, "readbackShares", *current.CPUShares)
+	return m.SetPodCgroupConfig(logger, pod, &ResourceConfig{CPUShares: desired.CPUShares})
+}
+
 // Kill one process ID
 func (m *podContainerManagerImpl) killOnePid(logger klog.Logger, pid int) error {
 	// os.FindProcess never returns an error on POSIX
@@ -374,5 +402,9 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 }
 
 func (m *podContainerManagerNoop) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
+	return nil
+}
+
+func (m *podContainerManagerNoop) RescaleCPUWeight(_ klog.Logger, _ *v1.Pod) error {
 	return nil
 }

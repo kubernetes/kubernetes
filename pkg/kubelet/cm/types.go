@@ -138,4 +138,9 @@ type PodContainerManager interface {
 
 	// Set resource config values for the specified resource type on the pod cgroup
 	SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error
+
+	// RescaleCPUWeight rewrites the pod cgroup's cpu.weight if it was written at
+	// the fixed cgroup v2 shares scale used before the kubelet scaled cpu.weight
+	// to node capacity. It is a no-op when the scale was not raised.
+	RescaleCPUWeight(logger klog.Logger, pod *v1.Pod) error
 }
