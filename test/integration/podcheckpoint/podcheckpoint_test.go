@@ -100,7 +100,7 @@ func TestPodCheckpointControllerReconciles(t *testing.T) {
 		t.Fatal(err)
 	}
 	informerFactory.Start(tCtx.Done())
-	go controller.Run(tCtx)
+	go controller.Run(tCtx, 1)
 
 	checkpoint := newPodCheckpoint(ns.Name, "cp-1", "source-pod")
 	if _, err := checkpoints.Create(tCtx, checkpoint, metav1.CreateOptions{}); err != nil {
@@ -164,7 +164,7 @@ func TestPodCheckpointNodeReadIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	informerFactory.Start(tCtx.Done())
-	go controller.Run(tCtx)
+	go controller.Run(tCtx, 1)
 
 	sources := make([]*v1.Pod, 2)
 	nodeClients := make([]clientset.Interface, 2)
