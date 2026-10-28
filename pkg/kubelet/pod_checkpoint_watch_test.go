@@ -24,11 +24,15 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	nodelisters "k8s.io/client-go/listers/node/v1alpha1"
@@ -46,8 +51,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -847,6 +855,228 @@ func TestCheckpointWorkersRecoverFromStalledAPIRequests(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatal("API request did not time out")
 		}
+	}
+}
+
+// In-flight and terminal syncs need not write API status. Queue notifications
+// let the test wait for processing instead of only observing the informer cache.
+type checkpointWatchQueue struct {
+	workqueue.TypedRateLimitingInterface[string]
+	deferred  chan string
+	processed chan string
+}
+
+func (q *checkpointWatchQueue) AddAfter(key string, duration time.Duration) {
+	q.TypedRateLimitingInterface.AddAfter(key, duration)
+	select {
+	case q.deferred <- key:
+	default:
+	}
+}
+
+func (q *checkpointWatchQueue) Done(key string) {
+	q.TypedRateLimitingInterface.Done(key)
+	select {
+	case q.processed <- key:
+	default:
+	}
+}
+
+func TestPodCheckpointWatchExecution(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		disabled    bool
+		expire      bool
+		runtimeErr  error
+		wantReason  string
+		wantMessage string
+	}{
+		{name: "gate disabled does not start recovery or watch", disabled: true},
+		{name: "CRI deadline expiry fails the checkpoint", expire: true, wantReason: nodev1alpha1.PodCheckpointReasonFailed, wantMessage: context.DeadlineExceeded.Error()},
+		{name: "unimplemented CRI fails without replay", runtimeErr: status.Error(codes.Unimplemented, "checkpoint not supported"), wantReason: nodev1alpha1.PodCheckpointReasonFailed, wantMessage: "Unimplemented"},
+		{name: "reobserved object does not repeat capture", wantReason: nodev1alpha1.PodCheckpointReasonCompleted},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.disabled)
+			testKubelet := newTestKubelet(t, false)
+			t.Cleanup(testKubelet.Cleanup)
+			kl := testKubelet.kubelet
+			kl.nodeName = "node"
+			kl.kubeletConfiguration.PodCheckpointTimeout.Duration = time.Minute
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "ns", UID: "source-uid"},
+				Spec: v1.PodSpec{
+					NodeName:   "node",
+					Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			// Like a pod worker, capture in another goroutine so the watch
+			// worker can observe the object again during capture.
+			kl.podWorkers = &checkpointPodWorkers{PodWorkers: kl.podWorkers, kubelet: kl, async: true}
+			fakeRuntime := testKubelet.fakeRuntime
+			fakeRuntime.PodList = []*containertest.FakePod{{Pod: &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}}}
+			fakeRuntime.PodStatus = kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{{Id: "sandbox", State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+				ContainerStatuses: []*kubecontainer.Status{{
+					ID: kubecontainer.ContainerID{Type: "test", ID: "app-id"}, Name: "app", State: kubecontainer.ContainerStateRunning, ImageRef: pod.Spec.Containers[0].Image,
+				}},
+			}
+			pc := &nodev1alpha1.PodCheckpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: pod.Namespace, UID: "checkpoint-uid"},
+				Spec: nodev1alpha1.PodCheckpointSpec{
+					SourcePod: &nodev1alpha1.PodReference{Name: pod.Name, UID: &pod.UID},
+				},
+				Status: nodev1alpha1.PodCheckpointStatus{NodeName: new("node"), SourcePodUID: &pod.UID},
+			}
+			if tc.expire {
+				pc.Spec.TimeoutSeconds = new(int32(1))
+			}
+			client := fake.NewClientset(pc)
+			kl.kubeClient = client
+			observedQueue := &checkpointWatchQueue{deferred: make(chan string, 8), processed: make(chan string, 8)}
+			client.PrependReactor("list", "podcheckpoints", func(clienttesting.Action) (bool, runtime.Object, error) {
+				// The recovery list has no watch state. The initial informer list
+				// runs before its handlers and workers can access the queue.
+				if state := kl.podCheckpointWatch.Load(); state != nil && observedQueue.TypedRateLimitingInterface == nil {
+					observedQueue.TypedRateLimitingInterface = state.queue
+					state.queue = observedQueue
+				}
+				return false, nil, nil
+			})
+			probes := &checkpointProbeManager{
+				suspend: func(context.Context, types.UID) error { return nil },
+				resumed: make(chan types.UID, 4),
+			}
+			kl.probeManager = probes
+			var calls atomic.Int32
+			started := make(chan *runtimeapi.CheckpointPodRequest, 1)
+			finish := make(chan struct{})
+			kl.containerRuntime = &checkpointRuntime{Runtime: fakeRuntime, checkpointPod: func(ctx context.Context, request *runtimeapi.CheckpointPodRequest) error {
+				call := calls.Add(1)
+				if err := os.WriteFile(filepath.Join(request.OutputPath, "artifact"), []byte("checkpoint"), 0o600); err != nil {
+					return err
+				}
+				if call == 1 {
+					started <- request
+				}
+				if tc.expire {
+					<-ctx.Done()
+					return ctx.Err()
+				}
+				select {
+				case <-finish:
+					return tc.runtimeErr
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}}
+			ctx, cancel := context.WithCancel(ktesting.Init(t))
+			done := make(chan struct{})
+			go func() { kl.runPodCheckpointWatch(ctx); close(done) }()
+			t.Cleanup(func() {
+				cancel()
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+					t.Error("checkpoint watch did not stop")
+				}
+				require.Eventually(t, func() bool { return !kl.podCheckpointInFlight(pod.UID) }, 5*time.Second, time.Millisecond)
+			})
+			if tc.disabled {
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+					t.Fatal("disabled checkpoint startup did not return")
+				}
+				require.Empty(t, client.Actions())
+				require.Nil(t, kl.podCheckpointWatch.Load())
+				require.Zero(t, calls.Load())
+				return
+			}
+
+			var request *runtimeapi.CheckpointPodRequest
+			select {
+			case request = <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("checkpoint informer did not start the CRI capture")
+			}
+			state := kl.podCheckpointWatch.Load()
+			require.NotNil(t, state)
+			if !tc.expire {
+				observed, err := client.NodeV1alpha1().PodCheckpoints(pod.Namespace).Get(ctx, pc.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+				observed.Annotations = map[string]string{"reobserved": "during-capture"}
+				_, err = client.NodeV1alpha1().PodCheckpoints(pod.Namespace).Update(ctx, observed, metav1.UpdateOptions{})
+				require.NoError(t, err)
+				require.Eventually(t, func() bool {
+					cached, err := state.lister.PodCheckpoints(pod.Namespace).Get(pc.Name)
+					return err == nil && cached.Annotations["reobserved"] == "during-capture"
+				}, 5*time.Second, time.Millisecond)
+				for len(observedQueue.deferred) > 0 {
+					<-observedQueue.deferred
+				}
+				select {
+				case key := <-observedQueue.deferred:
+					require.Equal(t, "ns/checkpoint", key)
+				case <-time.After(5 * time.Second):
+					t.Fatal("reobserved checkpoint was not deferred during capture")
+				}
+				require.EqualValues(t, 1, calls.Load())
+				close(finish)
+			}
+			require.Eventually(t, func() bool {
+				stored, err := client.NodeV1alpha1().PodCheckpoints(pod.Namespace).Get(ctx, pc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				condition := apimeta.FindStatusCondition(stored.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+				return condition != nil && condition.Reason == tc.wantReason
+			}, 5*time.Second, time.Millisecond)
+			require.Eventually(t, func() bool {
+				cached, err := state.lister.PodCheckpoints(pod.Namespace).Get(pc.Name)
+				return err == nil && podCheckpointTerminal(cached) && !kl.podCheckpointInFlight(pod.UID)
+			}, 5*time.Second, time.Millisecond)
+			for len(observedQueue.processed) > 0 {
+				<-observedQueue.processed
+			}
+			state.queue.Add("ns/checkpoint")
+			select {
+			case key := <-observedQueue.processed:
+				require.Equal(t, "ns/checkpoint", key)
+			case <-time.After(5 * time.Second):
+				t.Fatal("terminal checkpoint was not processed again")
+			}
+			stored, err := client.NodeV1alpha1().PodCheckpoints(pod.Namespace).Get(ctx, pc.Name, metav1.GetOptions{})
+			require.NoError(t, err)
+			condition := apimeta.FindStatusCondition(stored.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+			wantStatus := metav1.ConditionTrue
+			if tc.wantReason == nodev1alpha1.PodCheckpointReasonFailed {
+				wantStatus = metav1.ConditionFalse
+				require.Nil(t, stored.Status.CheckpointLocation)
+				_, err = os.Stat(request.OutputPath)
+				require.ErrorIs(t, err, os.ErrNotExist)
+			} else {
+				data, err := os.ReadFile(filepath.Join(request.OutputPath, "artifact"))
+				require.NoError(t, err)
+				require.Equal(t, "checkpoint", string(data))
+			}
+			require.Equal(t, wantStatus, condition.Status)
+			if tc.wantMessage != "" {
+				require.Contains(t, condition.Message, tc.wantMessage)
+			}
+			require.EqualValues(t, 1, calls.Load())
+			select {
+			case uid := <-probes.resumed:
+				require.Equal(t, pod.UID, uid)
+			case <-time.After(5 * time.Second):
+				t.Fatal("checkpoint probes did not resume")
+			}
+			cachedStatus, _ := kl.statusManager.GetPodStatus(pod.UID)
+			_, checkpointing := podutil.GetPodCondition(&cachedStatus, v1.PodCheckpointing)
+			require.Nil(t, checkpointing)
+		})
 	}
 }
 

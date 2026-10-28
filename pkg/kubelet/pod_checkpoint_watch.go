@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	nodeinformers "k8s.io/client-go/informers/node/v1alpha1"
 	nodelisters "k8s.io/client-go/listers/node/v1alpha1"
 	"k8s.io/client-go/tools/cache"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -150,6 +152,18 @@ func podCheckpointSourceIndexFunc(obj interface{}) ([]string, error) {
 		return nil, nil
 	}
 	return []string{checkpoint.Namespace + "/" + checkpoint.Spec.SourcePod.Name}, nil
+}
+
+func (kl *Kubelet) runPodCheckpointWatch(ctx context.Context) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		return
+	}
+	// Complete recovery before starting the informer. Otherwise an interrupted
+	// object can be observed and restarted while recovery is still marking it failed.
+	if !kl.finalizeInterruptedCheckpoints(ctx) {
+		return
+	}
+	kl.startPodCheckpointWatch(ctx)
 }
 
 // startPodCheckpointWatch executes checkpoints assigned to this node by the

@@ -1999,26 +1999,7 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		// propagating logging values for contextual logging.
 		go kl.fastStatusUpdateOnce(context.WithoutCancel(ctx))
 
-		// A CRI checkpoint is not resumable, so finalize any PodCheckpoint left
-		// CheckpointInProgress on this node by a checkpoint that was running when
-		// the kubelet stopped, marking it failed rather than leaving it hanging
-		// (KEP-5823). Startup recovery retries its initial list until it succeeds
-		// or the kubelet context is canceled; the normal watch starts only after
-		// that recovery pass completes.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
-			go func() {
-				// Complete recovery before starting the informer. Otherwise an
-				// interrupted object can be observed and restarted while the startup
-				// finalizer is still marking it failed.
-				if !kl.finalizeInterruptedCheckpoints(ctx) {
-					return
-				}
-				// Watch PodCheckpoint objects and execute checkpoints for pods this
-				// kubelet runs (KEP-5823). The kubelet, not a controller, performs the
-				// checkpoint; see startPodCheckpointWatch.
-				kl.startPodCheckpointWatch(ctx)
-			}()
-		}
+		go kl.runPodCheckpointWatch(ctx)
 
 		// Keep renewing the node lease until the kubelet exits.
 		// This intentionally does not use the kubelet context so lease renewal can

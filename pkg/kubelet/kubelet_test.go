@@ -1908,19 +1908,28 @@ func (m *checkpointProbeManager) ResumeProbes(uid types.UID) {
 
 // checkpointPodWorkers stands in for the pod workers in checkpoint tests. A
 // sync runs only the step of SyncPod that captures a requested checkpoint,
-// with the status that the runtime reports.
+// with the status that the runtime reports. It runs before UpdatePod returns
+// unless async is set.
 type checkpointPodWorkers struct {
 	PodWorkers
 	kubelet *Kubelet
+	async   bool
 }
 
 func (w *checkpointPodWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
-	pod := options.Pod
-	podStatus, err := w.kubelet.containerRuntime.GetPodStatus(ctx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
-	if err != nil {
+	syncPod := func() {
+		pod := options.Pod
+		podStatus, err := w.kubelet.containerRuntime.GetPodStatus(ctx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
+		if err != nil {
+			return
+		}
+		w.kubelet.syncPodCheckpointRequest(ctx, pod, podStatus)
+	}
+	if w.async {
+		go syncPod()
 		return
 	}
-	w.kubelet.syncPodCheckpointRequest(ctx, pod, podStatus)
+	syncPod()
 }
 
 func useCheckpointPodWorkers(kl *Kubelet) {
