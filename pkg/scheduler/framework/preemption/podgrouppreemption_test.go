@@ -108,12 +108,7 @@ func makePodGroupPreemptorWithPreemptionPolicy(pg *schedulingv1beta1.PodGroup, p
 	pgCopy := pg.DeepCopy()
 	pgPolicy := schedulingv1beta1.PreemptionPolicy(policy)
 	pgCopy.Spec.PreemptionPolicy = &pgPolicy
-	return &framework.PodGroupInfo{
-		GenericPodGroup: &fwk.GenericPodGroup{
-			PodGroup: pgCopy,
-		},
-		UnscheduledPods: pods,
-	}
+	return tf.MakePodGroupInfo(pgCopy, pods...)
 }
 
 type mockPreemptionManager struct {
@@ -1751,7 +1746,7 @@ func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 
 	p1 := st.MakePod().Name("p1").UID("p1").Obj()
 	p2 := st.MakePod().Name("p2").UID("p2").Obj()
-	preemptorPGInfo := newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{p1, p2})
+	preemptorPGInfo := tf.MakePodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), p1, p2)
 
 	node1 := st.MakeNode().Name("node1").Obj()
 	// Add a low priority pod as a potential victim to satisfy the check
@@ -1992,10 +1987,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				return nil, fwk.NewStatus(fwk.Error)
 			}
 
-			pgInfo := &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(tt.preemptorPodGroup),
-				UnscheduledPods: tt.preemptorPods,
-			}
+			pgInfo := tf.MakePodGroupInfo(tt.preemptorPodGroup, tt.preemptorPods...)
 
 			gotResult, gotStatus := pl.Preempt(ctx, pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
@@ -2087,9 +2079,15 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 
 			var preemptorPGInfo fwk.PodGroupInfo
 			if tt.isCPG {
-				preemptorPGInfo = newTestPodGroupInfo(nil, st.MakeCompositePodGroup().Name("preemptor-cpg").Priority(highPriority).Obj(), []*v1.Pod{preemptorPod})
+				preemptorPGInfo = tf.MakeCompositePodGroupInfo(
+					st.MakeCompositePodGroup().Name("preemptor-cpg").Priority(highPriority).Obj(),
+					tf.MakePodGroupInfo("child-pg", preemptorPod),
+				)
 			} else {
-				preemptorPGInfo = newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
+				preemptorPGInfo = tf.MakePodGroupInfo(
+					st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+					preemptorPod,
+				)
 			}
 
 			node := st.MakeNode().Name(nodeName).Obj()

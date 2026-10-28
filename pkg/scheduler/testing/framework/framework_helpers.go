@@ -20,6 +20,8 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -198,4 +200,52 @@ func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
 		res[i].SetNode(nodes[i])
 	}
 	return res
+}
+
+// MakePodGroupInfo creates a leaf PodGroupInfo from an existing PodGroup or a given name in the default namespace
+// and populates its UnscheduledPods with the given pods.
+func MakePodGroupInfo[T string | *schedulingv1beta1.PodGroup](pg T, pods ...*v1.Pod) *framework.PodGroupInfo {
+	var podGroup *schedulingv1beta1.PodGroup
+	switch v := any(pg).(type) {
+	case string:
+		podGroup = &schedulingv1beta1.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      v,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+	case *schedulingv1beta1.PodGroup:
+		podGroup = v
+	}
+	return &framework.PodGroupInfo{
+		GenericPodGroup: fwk.NewGenericPodGroup(podGroup),
+		UnscheduledPods: pods,
+	}
+}
+
+// MakeCompositePodGroupInfo creates a PodGroupInfo from an existing CompositePodGroup or a given name in the default namespace
+// and the given children PodGroupInfos.
+func MakeCompositePodGroupInfo[T string | *schedulingv1beta1.CompositePodGroup](cpg T, children ...*framework.PodGroupInfo) *framework.PodGroupInfo {
+	var compositePodGroup *schedulingv1beta1.CompositePodGroup
+	switch v := any(cpg).(type) {
+	case string:
+		compositePodGroup = &schedulingv1beta1.CompositePodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      v,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+	case *schedulingv1beta1.CompositePodGroup:
+		compositePodGroup = v
+	}
+	return framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(compositePodGroup), children...)
+}
+
+// MakeQueuedPodGroupInfo creates a QueuedPodGroupInfo for the given root PodGroupInfo and adds all given QueuedPodInfos to it.
+func MakeQueuedPodGroupInfo(root *framework.PodGroupInfo, pInfos ...*framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
+	qpgi := &framework.QueuedPodGroupInfo{PodGroupInfo: root}
+	for _, pInfo := range pInfos {
+		qpgi.AddPod(pInfo)
+	}
+	return qpgi
 }
