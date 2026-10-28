@@ -57,7 +57,7 @@ import (
 func TestWatch(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t, withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
-		storagetesting.RunTestWatch(ctx, t, store, false)
+		storagetesting.RunTestWatch(ctx, t, store)
 	})
 	t.Run("WatchWithoutPrevKVRootPrefix", func(t *testing.T) {
 		ctx, store, client := testSetup(t, withPrefix("/"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))

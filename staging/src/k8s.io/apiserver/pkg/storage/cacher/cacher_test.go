@@ -555,7 +555,7 @@ func TestWatch(t *testing.T) {
 				t.Parallel()
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestWatch(ctx, t, cacher, true)
+				storagetesting.RunTestWatch(ctx, t, cacher)
 			})
 			t.Run("WatchFromZero", func(t *testing.T) {
 				t.Parallel()

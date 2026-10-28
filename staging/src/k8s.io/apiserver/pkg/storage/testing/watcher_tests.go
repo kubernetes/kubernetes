@@ -48,16 +48,16 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool) {
-	testWatch(ctx, t, store, false, watchCacheEnabled)
-	testWatch(ctx, t, store, true, watchCacheEnabled)
+func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
+	testWatch(ctx, t, store, false)
+	testWatch(ctx, t, store, true)
 }
 
 // It tests that
 // - first occurrence of objects should notify Add event
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
-func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recursive, watchCacheEnabled bool) {
+func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recursive bool) {
 	basePod := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec:       example.PodSpec{NodeName: ""},
@@ -147,19 +147,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		name:               "watch without previous values with a field selector",
 		namespace:          fmt.Sprintf("test-ns-7-%t", recursive),
 		watchWithoutPrevKV: true,
-		expectedWatchError: func() error {
-			if watchCacheEnabled {
-				return nil
-			}
-			return errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate"))
-		}(),
-		watchTests: []*testWatchStruct{
-			{basePod, false, ""},
-			{basePodAssigned, true, watch.Added},
-			{selectedPod(basePodAssigned), true, watch.Modified},
-			{basePod, true, watch.Deleted},
-			{nil, false, ""},
-		},
+		expectedWatchError: errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate")),
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.OneTermEqualSelector("spec.nodeName", "bar"),
@@ -171,19 +159,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		name:               "watch without previous values with a label selector",
 		namespace:          fmt.Sprintf("test-ns-8-%t", recursive),
 		watchWithoutPrevKV: true,
-		expectedWatchError: func() error {
-			if watchCacheEnabled {
-				return nil
-			}
-			return errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate"))
-		}(),
-		watchTests: []*testWatchStruct{
-			{selectedPod(basePod), true, watch.Added},
-			{basePod, true, watch.Deleted},
-			{selectedPod(basePod), true, watch.Added},
-			{selectedPod(basePodAssigned), true, watch.Modified},
-			{nil, true, watch.Deleted},
-		},
+		expectedWatchError: errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate")),
 		pred: storage.SelectionPredicate{
 			Label: labels.SelectorFromSet(labels.Set{"select": "true"}),
 			Field: fields.Everything(),
