@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 // setupVictims enables the DRAPreemption feature gate so NewDRAManager
@@ -745,7 +746,7 @@ func testPodGroupPostFilterDeallocatesVictimClaim(tCtx ktesting.TContext) {
 			{Namespace: namespace, Name: victim.Name}: {claims: newClaimStore(userClaims, nil, nil)},
 		},
 	})
-	pgInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(podGroup), UnscheduledPods: []*v1.Pod{victim}}
+	pgInfo := tf.NewLeafPodGroupInfo(podGroup, victim)
 	_, status := testCtx.p.PodGroupPostFilter(tCtx, podGroupCycleState, pgInfo, nil)
 	require.Equal(tCtx, fwk.Unschedulable, status.Code(), "PodGroupPostFilter: %v", status)
 	claim, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, "victim-claim", metav1.GetOptions{})

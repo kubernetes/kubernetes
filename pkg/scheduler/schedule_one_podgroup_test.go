@@ -224,23 +224,6 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 	return nil
 }
 
-// newPGInfo builds a leaf PodGroupInfo. Pods are kept in the given order.
-func newPGInfo(pg *schedulingv1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
-	copiedPods := make([]*v1.Pod, len(pods))
-	for i, pod := range pods {
-		copiedPods[i] = pod.DeepCopy()
-	}
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericPodGroup(pg.DeepCopy()),
-		UnscheduledPods: copiedPods,
-	}
-}
-
-// newCPGInfo builds a CompositePodGroup PodGroupInfo node with the given children.
-func newCPGInfo(cpg *schedulingv1beta1.CompositePodGroup, children ...*framework.PodGroupInfo) *framework.PodGroupInfo {
-	return framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg.DeepCopy()), children...)
-}
-
 func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 	podGroup := st.MakePodGroup().Name("pg").MinCount(2).Obj()
 	podGroupUpdated := st.MakePodGroup().Name("pg").MinCount(5).Obj()
@@ -287,73 +270,73 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 	}{
 		{
 			name:                    "root podgroup update",
-			queued:                  newPGInfo(podGroup, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroup, podGroupPods...),
 			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupUpdated},
 			enableCompositePodGroup: true,
-			want:                    newPGInfo(podGroupUpdated, podGroupPods...),
+			want:                    tf.NewLeafPodGroupInfo(podGroupUpdated, podGroupPods...),
 		},
 		{
 			name:                    "root podgroup update with CompositePodGroup feature disabled",
-			queued:                  newPGInfo(podGroup, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroup, podGroupPods...),
 			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupUpdated},
 			enableCompositePodGroup: false,
-			want:                    newPGInfo(podGroupUpdated, podGroupPods...),
+			want:                    tf.NewLeafPodGroupInfo(podGroupUpdated, podGroupPods...),
 		},
 		{
 			name:                    "root podgroup is missing from the snapshot",
-			queued:                  newPGInfo(podGroup, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroup, podGroupPods...),
 			snapshotPodGroups:       nil,
 			enableCompositePodGroup: true,
 			wantErr:                 "pod group state not found for pod group podgroup//pg",
 		},
 		{
 			name:                    "root podgroup is missing from the snapshot with CompositePodGroup feature disabled",
-			queued:                  newPGInfo(podGroup, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroup, podGroupPods...),
 			snapshotPodGroups:       nil,
 			enableCompositePodGroup: false,
 			wantErr:                 "pod group state not found for pod group podgroup//pg",
 		},
 		{
 			name:                    "root podgroup gained a parent in the snapshot",
-			queued:                  newPGInfo(podGroup, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroup, podGroupPods...),
 			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupWithOtherParent},
 			enableCompositePodGroup: true,
 			wantErr:                 "different parent in pod group between snapshot (cpg-new) and queued entity ([unset])",
 		},
 		{
 			name:                    "podgroup parent mismatch but CompositePodGroup feature disabled",
-			queued:                  newPGInfo(podGroupWithParent, podGroupPods...),
+			queued:                  tf.NewLeafPodGroupInfo(podGroupWithParent, podGroupPods...),
 			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupWithOtherParent},
 			enableCompositePodGroup: false,
-			want:                    newPGInfo(podGroupWithOtherParent, podGroupPods...),
+			want:                    tf.NewLeafPodGroupInfo(podGroupWithOtherParent, podGroupPods...),
 		},
 		{
 			name: "multi-level hierarchy composite podgroup update",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup2Updated},
 			enableCompositePodGroup:    true,
-			want: newCPGInfo(compositePodGroupUpdated,
-				newCPGInfo(childCompositePodGroupUpdated,
-					newPGInfo(childPodGroup1Updated, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2Updated, childPodGroup2Pods...))),
+			want: tf.NewCompositePodGroupInfo(compositePodGroupUpdated,
+				tf.NewCompositePodGroupInfo(childCompositePodGroupUpdated,
+					tf.NewLeafPodGroupInfo(childPodGroup1Updated, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2Updated, childPodGroup2Pods...))),
 		},
 		{
 			name:                       "root composite podgroup is missing from the snapshot",
-			queued:                     newCPGInfo(compositePodGroup),
+			queued:                     tf.NewCompositePodGroupInfo(compositePodGroup),
 			snapshotCompositePodGroups: nil,
 			enableCompositePodGroup:    true,
 			wantErr:                    "composite pod group not found in snapshot: compositepodgroup//cpg-root",
 		},
 		{
 			name: "child composite podgroup in a multi-level hierarchy is missing from the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, otherChildCompositePodGroup},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup2Updated},
 			enableCompositePodGroup:    true,
@@ -361,10 +344,10 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "root composite podgroup gained a parent in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupWithParent, childCompositePodGroup},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
 			enableCompositePodGroup:    true,
@@ -372,9 +355,9 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "composite podgroup child count mismatch within hierarchy - a new child appeared in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
 			enableCompositePodGroup:    true,
@@ -382,10 +365,10 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "composite podgroup child count mismatch within hierarchy - a child was removed from the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1},
 			enableCompositePodGroup:    true,
@@ -393,26 +376,26 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "composite podgroup parent mismatch within hierarchy - a child changed its parent in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup)),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup)),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupWithOtherParent, otherChildCompositePodGroup},
 			enableCompositePodGroup:    true,
 			wantErr:                    "different parent in composite pod group between snapshot (cpg-other) and queued entity (cpg-root)",
 		},
 		{
 			name: "composite podgroup parent mismatch within hierarchy - a child lost its parent in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup)),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup)),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupWithoutParent, otherChildCompositePodGroup},
 			enableCompositePodGroup:    true,
 			wantErr:                    "different parent in composite pod group between snapshot ([unset]) and queued entity (cpg-root)",
 		},
 		{
 			name: "leaf podgroup parent mismatch within hierarchy - a child changed its parent in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup2WithOtherParent, childPodGroup3},
 			enableCompositePodGroup:    true,
@@ -420,10 +403,10 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "leaf podgroup parent mismatch within hierarchy - a child lost its parent in the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup2WithoutParent, childPodGroup3},
 			enableCompositePodGroup:    true,
@@ -431,10 +414,10 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		},
 		{
 			name: "leaf podgroup is missing from the snapshot",
-			queued: newCPGInfo(compositePodGroup,
-				newCPGInfo(childCompositePodGroup,
-					newPGInfo(childPodGroup1, childPodGroup1Pods...),
-					newPGInfo(childPodGroup2, childPodGroup2Pods...))),
+			queued: tf.NewCompositePodGroupInfo(compositePodGroup,
+				tf.NewCompositePodGroupInfo(childCompositePodGroup,
+					tf.NewLeafPodGroupInfo(childPodGroup1, childPodGroup1Pods...),
+					tf.NewLeafPodGroupInfo(childPodGroup2, childPodGroup2Pods...))),
 			snapshotCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{compositePodGroupUpdated, childCompositePodGroupUpdated},
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup3},
 			enableCompositePodGroup:    true,
@@ -1236,12 +1219,11 @@ func TestValidatePodGroup(t *testing.T) {
 				podGroupInfo = buildHierarchicalQueuedPodGroupInfo(tt.compositePodGroup, tt.compositePodGroups, tt.podGroups, tt.pods)
 			} else {
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1beta1.PodGroup{tt.podGroup}, nil)
-				podGroupInfo = &framework.QueuedPodGroupInfo{
-					PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(tt.podGroup)},
-				}
+				pInfos := make([]*framework.QueuedPodInfo, 0, len(tt.pods))
 				for _, pod := range tt.pods {
-					podGroupInfo.AddPod(&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
+					pInfos = append(pInfos, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
 				}
+				podGroupInfo = tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(tt.podGroup), pInfos...)
 			}
 			profiles := tt.profiles
 			if profiles == nil {
@@ -1266,17 +1248,6 @@ func TestValidatePodGroup(t *testing.T) {
 	}
 }
 
-// newQueuedPodGroupInfo builds a QueuedPodGroupInfo on top of an existing pod group tree, adding
-// the pods through AddPod so that the queued pods and their ordering stay consistent.
-// The tree must not carry UnscheduledPods, as AddPod fills them in for the leaf each pod belongs to.
-func newQueuedPodGroupInfo(root *framework.PodGroupInfo, pInfos ...*framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
-	pgqi := &framework.QueuedPodGroupInfo{PodGroupInfo: root}
-	for _, pInfo := range pInfos {
-		pgqi.AddPod(pInfo)
-	}
-	return pgqi
-}
-
 func TestSkipPodGroupPodSchedule(t *testing.T) {
 	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").Obj()
 	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").Terminating().Obj()
@@ -1286,11 +1257,7 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
 
-	testPodGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-	}
-
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2, qInfo3)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg").Namespace("default").Obj()), qInfo1, qInfo2, qInfo3)
 
 	logger, ctx := ktesting.NewTestContext(t)
 
@@ -1454,11 +1421,9 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 
-	testPodGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-	}
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), qInfo1, qInfo2)
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1537,7 +1502,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
 	queuedPodInfos := []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3}
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), queuedPodInfos...)
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1690,7 +1655,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 			qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 
-			podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2)
+			podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), qInfo1, qInfo2)
 
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -1826,7 +1791,7 @@ func TestApplyPodGroupPostFilterResult(t *testing.T) {
 			}
 		}
 		return &PodGroupScheduledResult{
-			podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+			podGroupInfo: tf.NewLeafPodGroupInfo(pg),
 			podResults:   podResults,
 			status:       status,
 		}
@@ -1885,7 +1850,7 @@ func TestApplyPodGroupPostFilterResult(t *testing.T) {
 		{
 			name: "Success on CompositePodGroup skips composite node and updates leaf pods",
 			results: func() map[fwk.EntityKey]*PodGroupScheduledResult {
-				cpgInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg)}
+				cpgInfo := tf.NewCompositePodGroupInfo(cpg)
 				cpgRes := &PodGroupScheduledResult{
 					podGroupInfo: cpgInfo,
 					status:       fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
@@ -1978,9 +1943,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
-	testPodGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-	}
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 
 	tests := []struct {
 		name             string
@@ -2815,10 +2778,7 @@ func TestUpdatePodGroupInitiallyScheduledCondition(t *testing.T) {
 				existingLTT = existing.LastTransitionTime
 			}
 
-			podGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: gpg},
-			}
-			sched.updateInitiallyScheduledCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition.Status, tt.condition.Reason, tt.condition.Message)
+			sched.updateInitiallyScheduledCondition(ctx, tf.NewLeafPodGroupInfo(tt.existingPodGroup), tt.condition.Status, tt.condition.Reason, tt.condition.Message)
 
 			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -2943,7 +2903,7 @@ func TestUpdatePodGroupInitiallyScheduledConditionStaleCache(t *testing.T) {
 						current = recreatedPodGroup
 					}
 				}
-				sched.updateInitiallyScheduledCondition(ctx, newPGInfo(current), condition.Status, condition.Reason, condition.Message)
+				sched.updateInitiallyScheduledCondition(ctx, tf.NewLeafPodGroupInfo(current), condition.Status, condition.Reason, condition.Message)
 			}
 
 			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Get(ctx, podGroup.Name, metav1.GetOptions{})
@@ -3435,7 +3395,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 				for i, pod := range tt.pods {
 					qInfos[i] = &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}
 				}
-				podGroupInfo = newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(tt.podGroups[0])}, qInfos...)
+				podGroupInfo = tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(tt.podGroups[0]), qInfos...)
 			}
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
@@ -3624,8 +3584,8 @@ func TestPodGroupCycle_PartialSuccessPreservesOngoingPreemption(t *testing.T) {
 	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 		t.Fatalf("Failed to update snapshot for cycle 1: %v", err)
 	}
-	cycle1Group := newQueuedPodGroupInfo(
-		&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+	cycle1Group := tf.NewQueuedPodGroupInfo(
+		tf.NewLeafPodGroupInfo(pg),
 		&framework.QueuedPodInfo{PodInfo: pInfo1},
 		&framework.QueuedPodInfo{PodInfo: pInfo2},
 	)
@@ -3655,8 +3615,8 @@ func TestPodGroupCycle_PartialSuccessPreservesOngoingPreemption(t *testing.T) {
 	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 		t.Fatalf("Failed to update snapshot for cycle 2: %v", err)
 	}
-	cycle2Group := newQueuedPodGroupInfo(
-		&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+	cycle2Group := tf.NewQueuedPodGroupInfo(
+		tf.NewLeafPodGroupInfo(pg),
 		&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2Cycle2}},
 	)
 	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), cycle2Group, time.Now())
@@ -3683,13 +3643,12 @@ func TestPodGroupCycle_PartialSuccessPreservesOngoingPreemption(t *testing.T) {
 func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 
-	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg").Namespace("default").Obj()), qInfo1, qInfo2)
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -3762,8 +3721,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").UID("pg").Obj()
-	gpg := fwk.NewGenericPodGroup(testPodGroup)
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: gpg}, qInfo1, qInfo2)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), qInfo1, qInfo2)
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -3801,7 +3759,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 
 	client := clientsetfake.NewClientset(testPodGroup)
 	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
-	cache.AddGenericPodGroup(gpg)
+	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	informerFactory.StartWithContext(ctx)
@@ -3982,7 +3940,7 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 			qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 			qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").MinCount(2).Obj()
-			podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2)
+			podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), qInfo1, qInfo2)
 
 			trackerPlugin := &podGroupStateTrackerPlugin{
 				name:             "podgroup-state-tracker",
@@ -4866,9 +4824,9 @@ func buildHierarchicalQueuedPodGroupInfo(
 			children = append(children, buildTree(childCPG))
 		}
 		for _, childPG := range pgChildren[cpg.Name] {
-			children = append(children, &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(childPG)})
+			children = append(children, tf.NewLeafPodGroupInfo(childPG))
 		}
-		return framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
+		return tf.NewCompositePodGroupInfo(cpg, children...)
 	}
 
 	var queuedPodInfos []*framework.QueuedPodInfo
@@ -4878,7 +4836,7 @@ func buildHierarchicalQueuedPodGroupInfo(
 		}
 	}
 
-	return newQueuedPodGroupInfo(buildTree(rootCPG), queuedPodInfos...)
+	return tf.NewQueuedPodGroupInfo(buildTree(rootCPG), queuedPodInfos...)
 }
 
 func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
@@ -4902,12 +4860,12 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 	pg3 := st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg").Obj()
 	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)}, qInfo1, qInfo2, qInfo3)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg1), qInfo1, qInfo2, qInfo3)
 
-	compositePodGroupInfo := newQueuedPodGroupInfo(
-		framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg),
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
-			&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg3)},
+	compositePodGroupInfo := tf.NewQueuedPodGroupInfo(
+		tf.NewCompositePodGroupInfo(cpg,
+			tf.NewLeafPodGroupInfo(pg2),
+			tf.NewLeafPodGroupInfo(pg3),
 		),
 		qInfo4, qInfo5)
 
@@ -6257,12 +6215,7 @@ func TestUpdateCompositePodGroupInitiallyScheduledCondition(t *testing.T) {
 				existingLTT = existing.LastTransitionTime
 			}
 
-			podGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(tt.existingPodGroup),
-				},
-			}
-			sched.updateInitiallyScheduledCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition.Status, tt.condition.Reason, tt.condition.Message)
+			sched.updateInitiallyScheduledCondition(ctx, tf.NewCompositePodGroupInfo(tt.existingPodGroup), tt.condition.Status, tt.condition.Reason, tt.condition.Message)
 
 			updatedPodGroup, err := client.SchedulingV1beta1().CompositePodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -6387,7 +6340,7 @@ func TestUpdateCompositePodGroupInitiallyScheduledConditionStaleCache(t *testing
 						current = recreatedCompositePodGroup
 					}
 				}
-				sched.updateInitiallyScheduledCondition(ctx, newCPGInfo(current), condition.Status, condition.Reason, condition.Message)
+				sched.updateInitiallyScheduledCondition(ctx, tf.NewCompositePodGroupInfo(current), condition.Status, condition.Reason, condition.Message)
 			}
 
 			updatedCompositePodGroup, err := client.SchedulingV1beta1().CompositePodGroups(compositePodGroup.Namespace).Get(ctx, compositePodGroup.Name, metav1.GetOptions{})
@@ -6433,15 +6386,15 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			algorithmResults: map[fwk.EntityKey]*PodGroupScheduledResult{
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All child pods have been scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All pods scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg1),
 				},
 				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All pods scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg2),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6474,15 +6427,15 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			algorithmResults: map[fwk.EntityKey]*PodGroupScheduledResult{
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg1),
 				},
 				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
 					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg2),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6515,23 +6468,23 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			algorithmResults: map[fwk.EntityKey]*PodGroupScheduledResult{
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All child pods have been scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.CompositePodGroupKey(cpgSub.Namespace, cpgSub.Name): {
 					status:       fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpgSub)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpgSub),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:       fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg1),
 				},
 				fwk.CompositePodGroupKey(cpgSub2.Namespace, cpgSub2.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All child pods have been scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpgSub2)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpgSub2),
 				},
 				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
 					status:       fwk.NewStatus(fwk.Success, "All pods scheduled"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg2),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6577,17 +6530,17 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
 					waitingOnPreemption: true,
-					podGroupInfo:        &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo:        tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
 					waitingOnPreemption: true,
-					podGroupInfo:        &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo:        tf.NewLeafPodGroupInfo(pg1),
 				},
 				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
 					status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
 					waitingOnPreemption: true,
-					podGroupInfo:        &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+					podGroupInfo:        tf.NewLeafPodGroupInfo(pg2),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6620,11 +6573,11 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			algorithmResults: map[fwk.EntityKey]*PodGroupScheduledResult{
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:       fwk.NewStatus(fwk.Error, "internal error"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:       fwk.NewStatus(fwk.Error, "internal error"),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg1),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6651,11 +6604,11 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			algorithmResults: map[fwk.EntityKey]*PodGroupScheduledResult{
 				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
 					status:       fwk.NewStatus(fwk.Error, "reason 1").WithError(fmt.Errorf("root error")),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)},
+					podGroupInfo: tf.NewCompositePodGroupInfo(cpg1),
 				},
 				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
 					status:       fwk.NewStatus(fwk.Error, "reason 1").WithError(fmt.Errorf("root error")),
-					podGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+					podGroupInfo: tf.NewLeafPodGroupInfo(pg1),
 				},
 			},
 			expectCPGConditions: map[string]*metav1.Condition{
@@ -6728,11 +6681,7 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 			}
 
 			// Define a dummy rootPodGroupInfo for the submitPodGroupAlgorithmResult argument
-			rootPodGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				},
-			}
+			rootPodGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewCompositePodGroupInfo(cpg1))
 
 			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo, tt.algorithmResults, time.Now(), tt.algorithmResults[fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name)].status)
 
@@ -6762,22 +6711,22 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 }
 
 func TestCompleteCompositePodGroupAlgorithmResultMap(t *testing.T) {
-	pgInfo1 := newPGInfo(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg-sub1").Obj())
-	pgInfo2 := newPGInfo(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg-sub1").Obj())
-	pgInfo3 := newPGInfo(st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg-sub2").Obj())
-	pgInfo4 := newPGInfo(st.MakePodGroup().Name("pg4").Namespace("default").ParentCompositePodGroup("cpg-sub2").Obj())
-	pgInfo5 := newPGInfo(st.MakePodGroup().Name("pg5").Namespace("default").ParentCompositePodGroup("cpg-sub3").Obj())
+	pgInfo1 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg1").Obj())
+	pgInfo2 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg2").Obj())
+	pgInfo3 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg3").Obj())
+	pgInfo4 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg4").Obj())
+	pgInfo5 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg5").Obj())
 
-	subInfo1 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub1").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo1, pgInfo2)
-	subInfo2 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub2").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo3, pgInfo4)
-	subInfo3 := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-sub3").Namespace("default").ParentCompositePodGroup("cpg-root").Obj(), pgInfo5)
+	subInfo1 := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-sub1").Obj(), pgInfo1, pgInfo2)
+	subInfo2 := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-sub2").Obj(), pgInfo3, pgInfo4)
+	subInfo3 := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-sub3").Obj(), pgInfo5)
 
-	rootInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-root").Namespace("default").Obj(), subInfo1, subInfo2, subInfo3)
+	rootInfo := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-root").Obj(), subInfo1, subInfo2, subInfo3)
 
-	singleSubtreePGInfo1 := newPGInfo(st.MakePodGroup().Name("single-pg1").Namespace("default").ParentCompositePodGroup("cpg-single-sub").Obj())
-	singleSubtreePGInfo2 := newPGInfo(st.MakePodGroup().Name("single-pg2").Namespace("default").ParentCompositePodGroup("cpg-single-sub").Obj())
-	singleSubtreeCPGInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-single-sub").Namespace("default").ParentCompositePodGroup("cpg-single-root").Obj(), singleSubtreePGInfo1, singleSubtreePGInfo2)
-	singleSubtreeRootInfo := newCPGInfo(st.MakeCompositePodGroup().Name("cpg-single-root").Namespace("default").Obj(), singleSubtreeCPGInfo)
+	singleSubtreePGInfo1 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("single-pg1").Obj())
+	singleSubtreePGInfo2 := tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("single-pg2").Obj())
+	singleSubtreeCPGInfo := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-single-sub").Obj(), singleSubtreePGInfo1, singleSubtreePGInfo2)
+	singleSubtreeRootInfo := tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg-single-root").Obj(), singleSubtreeCPGInfo)
 
 	newStatusWithFitError := func(code fwk.Code, msg, unschedPlugin, pendingPlugin string) *fwk.Status {
 		fitErr := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, msg))
@@ -7161,20 +7110,18 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 
 					var qpgi *framework.QueuedPodGroupInfo
 					if tt.isCPG {
-						cpg := st.MakeCompositePodGroup().Name("root-cpg").Namespace("default").Obj()
-						pg := st.MakePodGroup().Name("child-pg").Namespace("default").ParentCompositePodGroup("root-cpg").Obj()
-						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pg.Name}
-						qpgi = newQueuedPodGroupInfo(
-							framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg),
-								&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg), UnscheduledPods: []*v1.Pod{p1}},
+						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new("child-pg")}
+						qpgi = tf.NewQueuedPodGroupInfo(
+							tf.NewCompositePodGroupInfo(
+								st.MakeCompositePodGroup().Name("root-cpg").Namespace("default").Obj(),
+								tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("child-pg").Namespace("default").Obj()),
 							),
 							&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}},
 						)
 					} else {
-						pg := st.MakePodGroup().Name("pg").Namespace("default").Obj()
-						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pg.Name}
-						qpgi = newQueuedPodGroupInfo(
-							&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg), UnscheduledPods: []*v1.Pod{p1}},
+						p1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new("pg")}
+						qpgi = tf.NewQueuedPodGroupInfo(
+							tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg").Namespace("default").Obj()),
 							&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}},
 						)
 					}

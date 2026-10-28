@@ -76,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/ptr"
 )
@@ -5531,10 +5532,7 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				initialObjects = testCtx.listAll(tCtx)
 				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postfilter)
 				if len(tc.podGroups) > 0 {
-					pgInfo := &framework.PodGroupInfo{
-						GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
-						UnscheduledPods: []*v1.Pod{tc.pod},
-					}
+					pgInfo := tf.NewLeafPodGroupInfo(tc.podGroups[0], tc.pod)
 					mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 						return nil, fwk.NewStatus(fwk.Unschedulable)
 					}
@@ -7549,10 +7547,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 				podGroupState.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}] = s
 			}
 
-			pgInfo := &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
-				UnscheduledPods: tc.unscheduledPods,
-			}
+			pgInfo := tf.NewLeafPodGroupInfo(tc.podGroups[0], tc.unscheduledPods...)
 
 			mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return nil, fwk.NewStatus(fwk.Unschedulable)
