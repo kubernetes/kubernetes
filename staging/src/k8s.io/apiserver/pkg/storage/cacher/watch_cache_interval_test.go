@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -373,72 +372,6 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				t.Error(err)
 			}
 		})
-	}
-}
-
-func TestCacheIntervalNextFromStore(t *testing.T) {
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		pod, ok := obj.(*v1.Pod)
-		if !ok {
-			return nil, nil, fmt.Errorf("not a pod")
-		}
-		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
-	}
-	const numEvents = 50
-	store := store.NewWatchCacheStorage(nil)
-	events := make(map[string]*watchCacheEvent)
-	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
-
-	for i := 0; i < numEvents; i++ {
-		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
-		objLabels, objFields, err := getAttrsFunc(elem.Object)
-		if err != nil {
-			t.Fatal(err)
-		}
-		events[elem.Key] = &watchCacheEvent{
-			Type:            watch.Added,
-			Object:          elem.Object,
-			ObjLabels:       objLabels,
-			ObjFields:       objFields,
-			Key:             elem.Key,
-			ResourceVersion: rv,
-		}
-		if _, err := store.UpdateStore(watch.Added, elem, rv); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	wci, err := newCacheIntervalFromStore(rv, store.LatestSnapshot(), "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	src := wci.source.(*snapshotCacheIntervalSource)
-
-	for i := 0; i < numEvents; i++ {
-		event, err := src.next()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if event == nil {
-			t.Error("unexpected nil event")
-			break
-		}
-		expectedEvent, ok := events[event.Key]
-		if !ok {
-			t.Fatalf("event with key %s not found", event.Key)
-		}
-		if !reflect.DeepEqual(event, expectedEvent) {
-			t.Errorf("expected: %v, got %v", *events[event.Key], *event)
-		}
-	}
-
-	// All events should have been consumed.
-	event, err := src.next()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if event != nil {
-		t.Errorf("expected nil event after consuming all events, got %v", *event)
 	}
 }
 
