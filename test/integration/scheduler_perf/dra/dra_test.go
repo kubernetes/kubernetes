@@ -72,6 +72,11 @@ func TestSchedulerPerf(t *testing.T) {
 						overrides[features.DRAConsumableCapacity] = false
 						overrides[features.DRADeviceBindingConditions] = false
 					}
+					// Introduced in 1.37. The stable allocator does not support it,
+					// so leaving it on makes NewAllocator fail.
+					if gate.EmulationVersion().AtLeast(version.MustParse("1.37")) {
+						overrides[features.DRADerivedAttributes] = false
+					}
 					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
 					return nil, nil
 				}))
