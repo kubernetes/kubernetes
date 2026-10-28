@@ -175,6 +175,8 @@ type GCEImageConfig struct {
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageRegex string `json:"image_regex,omitempty"`
+	// ImageExcludeRegex drops matching names unless Image is set.
+	ImageExcludeRegex string `json:"image_exclude_regex,omitempty"`
 	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
 	ImageFamily     string    `json:"image_family,omitempty"`
 	ImageDesc       string    `json:"image_description,omitempty"`
@@ -185,9 +187,27 @@ type GCEImage struct {
 	Resources       Resources `json:"resources,omitempty"`
 }
 
-// Returns an image name based on regex and given GCE project.
-func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject("compute", "images", "list",
+// gceImageLister lets tests stub gcloud.
+var gceImageLister = runGCPCommandNoProject
+
+// getGCEImage returns the newest image matching the filters.
+func (g *GCERunner) getGCEImage(imageRegex, imageExcludeRegex, imageFamily string, project string) (string, error) {
+	var include, exclude *regexp.Regexp
+	var err error
+	if imageRegex != "" {
+		include, err = regexp.Compile(imageRegex)
+		if err != nil {
+			return "", fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+		}
+	}
+	if imageExcludeRegex != "" {
+		exclude, err = regexp.Compile(imageExcludeRegex)
+		if err != nil {
+			return "", fmt.Errorf("failed to compile image_exclude_regex %q: %w", imageExcludeRegex, err)
+		}
+	}
+
+	data, err := gceImageLister("compute", "images", "list",
 		"--format=json", "--project="+project)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
@@ -199,9 +219,11 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	}
 
 	imageObjs := []imageObj{}
-	imageRe := regexp.MustCompile(imageRegex)
 	for _, instance := range images {
-		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
+		if include != nil && !include.MatchString(instance.Name) {
+			continue
+		}
+		if exclude != nil && exclude.MatchString(instance.Name) {
 			continue
 		}
 		if imageFamily != "" && instance.Family != imageFamily {
@@ -221,10 +243,10 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	// Pick the latest image after sorting.
 	sort.Sort(byCreationTime(imageObjs))
 	if len(imageObjs) > 0 {
-		klog.V(4).Infof("found images %+v based on regex %q and family %q in project %q", imageObjs, imageRegex, imageFamily, project)
+		klog.V(4).Infof("found images %+v based on regex %q, exclude regex %q and family %q in project %q", imageObjs, imageRegex, imageExcludeRegex, imageFamily, project)
 		return imageObjs[0].name, nil
 	}
-	return "", fmt.Errorf("found zero images based on regex %q and family %q in project %q", imageRegex, imageFamily, project)
+	return "", fmt.Errorf("found zero images based on regex %q, exclude regex %q and family %q in project %q", imageRegex, imageExcludeRegex, imageFamily, project)
 }
 
 func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
@@ -252,12 +274,15 @@ func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
+			if imageConfig.Image == "" && imageConfig.ImageExcludeRegex != "" && imageConfig.ImageRegex == "" && imageConfig.ImageFamily == "" {
+				return nil, fmt.Errorf("invalid config for %q: image_exclude_regex requires image_regex or image_family", shortName)
+			}
 			var image string
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
-				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
+				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					return nil, fmt.Errorf("Could not retrieve a image based on image regex %q and family %q: %v",
-						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
+					return nil, fmt.Errorf("could not retrieve an image based on image regex %q, exclude regex %q and family %q: %w",
+						imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
 				image = imageConfig.Image
