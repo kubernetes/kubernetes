@@ -556,6 +556,12 @@ const (
 	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
 	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
 
+	// owner: @MartinForReal
+	// kep: https://kep.k8s.io/6303
+	//
+	// Enables in-place pod vertical scaling for Windows containers.
+	WindowsInPlacePodResize featuregate.Feature = "WindowsInPlacePodResize"
+
 	// owner: @adrianmoisey @danwinship
 	// kep: https://kep.k8s.io/5495
 	//
@@ -1601,6 +1607,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	WindowsInPlacePodResize: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeProxyIPVS: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2490,6 +2500,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
 
 	InterPodAffinityHostnameFastPath: {},
+
+	WindowsInPlacePodResize: {},
 
 	KubeProxyIPVS: {},
 
