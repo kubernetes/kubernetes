@@ -326,7 +326,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
-	allocated, revision := c.allocatedDevices.Get()
+	allocated, revision := c.allocatedDevices.get()
 
 	// Whatever is in flight also has to be checked.
 	for _, inFlight := range c.allInFlightAllocationsRLocked() {
@@ -337,7 +337,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 		}, false, func(structured.SharedDeviceID) {}, func(structured.DeviceConsumedCapacity) {})
 	}
 
-	if revision == c.allocatedDevices.Revision() {
+	if revision == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return allocated, nil
 	}
@@ -378,9 +378,12 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 
-	allocated, revision1 := c.allocatedDevices.Get()
-	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.GetSharedDeviceIDs()
-	aggregatedCapacity, revision3 := c.allocatedDevices.Capacities()
+	allocated, revision1 := c.allocatedDevices.get()
+	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
+	aggregatedCapacity, revision3, err := c.allocatedDevices.getCapacities()
+	if err != nil {
+		return nil, err
+	}
 
 	if revision1 != revision2 || revision2 != revision3 {
 		// Already not consistent. Try again.
@@ -403,6 +406,11 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Whatever is in flight also has to be checked.
 	for _, inFlight := range c.allInFlightAllocationsRLocked() {
 		claim := inFlight.claim
+		if enabledConsumableCapacity {
+			if err = consumedCapacityError(claim); err != nil {
+				return nil, err
+			}
+		}
 		foreachAllocatedDevice(claim,
 			func(deviceID structured.DeviceID) { // dedicatedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -418,7 +426,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 				aggregatedCapacity.Insert(capacity)
 			})
 	}
-	if revision1 == c.allocatedDevices.Revision() {
+	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
 			AllocatedDevices:         allocated,
