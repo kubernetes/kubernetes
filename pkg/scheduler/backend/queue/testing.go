@@ -58,7 +58,7 @@ func NewTestQueueWithInformerFactory(
 	opts ...Option,
 ) *PriorityQueue {
 	pq := NewPriorityQueue(lessFn, informerFactory, opts...)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	return pq
 }

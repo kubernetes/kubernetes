@@ -4648,8 +4648,10 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 
 	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
 	if features.EnableDRAExtendedResource {
+		logger := tCtx.Logger()
+		handlerOptions := cache.HandlerOptions{Logger: &logger}
 		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
 		require.NoError(tCtx, err, "failed to add device class informer event handler")
 		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
@@ -4701,10 +4703,10 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		tCtx.ExpectNoError(err, "create pod group")
 	}
 
-	tc.informerFactory.Start(tCtx.Done())
+	tc.informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(tc.informerFactory.Shutdown)
 
-	tc.informerFactory.WaitForCacheSync(tCtx.Done())
+	tc.informerFactory.WaitForCacheSyncWithContext(tCtx)
 	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
 	// are synced, we need to wait until the event handlers confirm that they are synced.
 	// This ensures that the assume cache is in sync with the informer's

@@ -1630,8 +1630,8 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			// mockSchedulingFunc is used to simulate the scheduling of the preemptor pod group.
 			// For each of the Pod it goes through each node and if there is enough capacity it assigns the pod to the node.
@@ -1779,8 +1779,8 @@ func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		cs1 := framework.NewCycleState()
@@ -1975,8 +1975,8 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			podGroups := make(map[string]*schedulingv1beta1.PodGroup)
 			for _, pg := range tt.initPodGroups {
@@ -2117,8 +2117,8 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			pl := &PodGroupEvaluator{
 				Handle: fh,
