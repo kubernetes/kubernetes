@@ -50,6 +50,8 @@ var (
 //	device-a {0,1} and device-b {1,2} intersect in {1}
 //	device-a {0,1} and device-c {3,4} are disjoint
 //	device-s {1}   and device-a {0,1} intersect in {1}
+//	device-a {0,1}, device-b {1,2} and device-d {0,2} intersect pairwise,
+//	but have no element in common
 var listAttributeDevices = []struct {
 	name       string
 	attrValues resourceapi.DeviceAttribute
@@ -57,6 +59,7 @@ var listAttributeDevices = []struct {
 	{"device-a", resourceapi.DeviceAttribute{IntValues: []int64{0, 1}}},
 	{"device-b", resourceapi.DeviceAttribute{IntValues: []int64{1, 2}}},
 	{"device-c", resourceapi.DeviceAttribute{IntValues: []int64{3, 4}}},
+	{"device-d", resourceapi.DeviceAttribute{IntValues: []int64{0, 2}}},
 	{"device-s", resourceapi.DeviceAttribute{IntValue: new(int64(1))}},
 }
 
@@ -116,6 +119,12 @@ func testListTypeAttributes(tCtx ktesting.TContext) {
 	})
 	tCtx.Run("MatchAttributeDisjointLists", func(tCtx ktesting.TContext) {
 		testListTypeAttributesConstraint(tCtx, matchAttrValues, []string{"device-a", "device-c"}, false)
+	})
+	// matchAttribute narrows one intersection across all devices instead of
+	// comparing them pairwise, so devices which only overlap pairwise must not
+	// be allocated together.
+	tCtx.Run("MatchAttributePairwiseOverlappingLists", func(tCtx ktesting.TContext) {
+		testListTypeAttributesConstraint(tCtx, matchAttrValues, []string{"device-a", "device-b", "device-d"}, false)
 	})
 	tCtx.Run("MatchAttributeScalarAndList", func(tCtx ktesting.TContext) {
 		testListTypeAttributesConstraint(tCtx, matchAttrValues, []string{"device-s", "device-a"}, true)

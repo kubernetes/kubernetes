@@ -2645,6 +2645,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			//	device-a {0,1} and device-b {1,2} intersect in {1}
 			//	device-a {0,1} and device-c {3,4} are disjoint
 			//	device-s {1}   and device-a {0,1} intersect in {1}
+			//	device-a {0,1}, device-b {1,2} and device-d {0,2} intersect
+			//	pairwise, but have no element in common
 			attrValuesAttribute := resourceapi.QualifiedName(attributeDomain + "/attrValues")
 			attrValuesConstraintAttribute := resourceapi.FullyQualifiedName(attrValuesAttribute)
 
@@ -2653,6 +2655,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"device-a": {IntValues: []int64{0, 1}},
 				"device-b": {IntValues: []int64{1, 2}},
 				"device-c": {IntValues: []int64{3, 4}},
+				"device-d": {IntValues: []int64{0, 2}},
 				"device-s": {IntValue: new(int64(1))},
 			} {
 				devicesPerNode[name] = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
@@ -2727,6 +2730,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			ginkgo.It("keeps pod pending for matchAttribute with disjoint lists", func(ctx context.Context) {
 				tCtx := f.TContext(ctx)
 				claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-a", "device-c")
+				pod := b.PodExternal(claim.Name)
+				b.Create(tCtx, claim, pod)
+				expectUnschedulable(ctx, claim, pod)
+			})
+
+			// matchAttribute narrows one intersection across all devices
+			// instead of comparing them pairwise, so devices which only
+			// overlap pairwise must not be allocated together.
+			ginkgo.It("keeps pod pending for matchAttribute with pairwise overlapping lists", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-a", "device-b", "device-d")
 				pod := b.PodExternal(claim.Name)
 				b.Create(tCtx, claim, pod)
 				expectUnschedulable(ctx, claim, pod)
