@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -117,11 +119,14 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				objGV := gvk.GroupVersion()
 				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, apihelpers.GetMetaInternalVersionCodecs())
 				span.AddEvent("Recorded the audit event")
-			} else {
-				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
-					err = errors.NewBadRequest(err.Error())
-					scope.err(err, w, req)
-					return
+			} else if req.URL.RawQuery != "" {
+				if scope.MetaGroupVersion != metav1.SchemeGroupVersion || !tryFastDecodeDeleteOptions(req.URL.RawQuery, options, false) {
+					*options = metav1.DeleteOptions{}
+					if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+						err = errors.NewBadRequest(err.Error())
+						scope.err(err, w, req)
+						return
+					}
 				}
 			}
 		}
@@ -232,15 +237,22 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
+		watchListEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WatchList)
 		listOptions := metainternalversion.ListOptions{}
-		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
-			err = errors.NewBadRequest(err.Error())
-			scope.err(err, w, req)
-			return
+		if scope.MetaGroupVersion == metav1.SchemeGroupVersion && tryFastDecodeListOptions(req.URL.RawQuery, &listOptions, true) {
+			listOptions.LabelSelector = labels.Everything()
+			listOptions.FieldSelector = fields.Everything()
+			metainternalversion.SetListOptionsDefaults(&listOptions, watchListEnabled)
+		} else {
+			listOptions = metainternalversion.ListOptions{}
+			if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
+				err = errors.NewBadRequest(err.Error())
+				scope.err(err, w, req)
+				return
+			}
+			metainternalversion.SetListOptionsDefaults(&listOptions, watchListEnabled)
 		}
-
-		metainternalversion.SetListOptionsDefaults(&listOptions, utilfeature.DefaultFeatureGate.Enabled(features.WatchList))
-		if errs := metainternalversionvalidation.ValidateListOptions(&listOptions, utilfeature.DefaultFeatureGate.Enabled(features.WatchList)); len(errs) > 0 {
+		if errs := metainternalversionvalidation.ValidateListOptions(&listOptions, watchListEnabled); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
@@ -248,7 +260,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 
 		// transform fields
 		// TODO: DecodeParametersInto should do this.
-		if listOptions.FieldSelector != nil {
+		if listOptions.FieldSelector != nil && !listOptions.FieldSelector.Empty() {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
 				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
 			}
@@ -292,11 +304,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 
 				objGV := gvk.GroupVersion()
 				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, apihelpers.GetMetaInternalVersionCodecs())
-			} else {
-				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
-					err = errors.NewBadRequest(err.Error())
-					scope.err(err, w, req)
-					return
+			} else if req.URL.RawQuery != "" {
+				if scope.MetaGroupVersion != metav1.SchemeGroupVersion || !tryFastDecodeDeleteOptions(req.URL.RawQuery, options, true) {
+					*options = metav1.DeleteOptions{}
+					if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+						err = errors.NewBadRequest(err.Error())
+						scope.err(err, w, req)
+						return
+					}
 				}
 			}
 		}
@@ -421,4 +436,192 @@ func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz
 	}
 
 	return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", record.Verb, reason))
+}
+
+func tryFastDecodeDeleteOptions(rawQuery string, opts *metav1.DeleteOptions, ignoreListParams bool) bool {
+	if rawQuery == "" {
+		return true
+	}
+	if strings.ContainsAny(rawQuery, "%+;") {
+		return false
+	}
+	var seen uint8
+	rem := rawQuery
+	for rem != "" {
+		var part string
+		if idx := strings.IndexByte(rem, '&'); idx >= 0 {
+			part = rem[:idx]
+			rem = rem[idx+1:]
+		} else {
+			part = rem
+			rem = ""
+		}
+		if part == "" {
+			continue
+		}
+		eq := strings.IndexByte(part, '=')
+		if eq < 0 {
+			return false
+		}
+		k, v := part[:eq], part[eq+1:]
+		switch k {
+		case "gracePeriodSeconds":
+			if seen&(1<<0) != 0 {
+				return false
+			}
+			seen |= 1 << 0
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return false
+			}
+			opts.GracePeriodSeconds = &n
+		case "orphanDependents":
+			if seen&(1<<1) != 0 {
+				return false
+			}
+			seen |= 1 << 1
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return false
+			}
+			opts.OrphanDependents = &b
+		case "propagationPolicy":
+			if seen&(1<<2) != 0 {
+				return false
+			}
+			seen |= 1 << 2
+			p := metav1.DeletionPropagation(v)
+			opts.PropagationPolicy = &p
+		case "dryRun":
+			if v == "" {
+				return false
+			}
+			opts.DryRun = append(opts.DryRun, v)
+		case "ignoreStoreReadErrorWithClusterBreakingPotential":
+			if seen&(1<<3) != 0 {
+				return false
+			}
+			seen |= 1 << 3
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return false
+			}
+			opts.IgnoreStoreReadErrorWithClusterBreakingPotential = &b
+		case "pretty":
+		case "resourceVersion", "resourceVersionMatch", "continue", "limit", "timeoutSeconds", "watch", "allowWatchBookmarks", "sendInitialEvents":
+			if !ignoreListParams {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func tryFastDecodeListOptions(rawQuery string, opts *metainternalversion.ListOptions, ignoreDeleteParams bool) bool {
+	if rawQuery == "" {
+		return true
+	}
+	if strings.ContainsAny(rawQuery, "%+;") {
+		return false
+	}
+	var seen uint16
+	rem := rawQuery
+	for rem != "" {
+		var part string
+		if idx := strings.IndexByte(rem, '&'); idx >= 0 {
+			part = rem[:idx]
+			rem = rem[idx+1:]
+		} else {
+			part = rem
+			rem = ""
+		}
+		if part == "" {
+			continue
+		}
+		eq := strings.IndexByte(part, '=')
+		if eq < 0 {
+			return false
+		}
+		k, v := part[:eq], part[eq+1:]
+		switch k {
+		case "resourceVersion":
+			if seen&(1<<0) != 0 {
+				return false
+			}
+			seen |= 1 << 0
+			opts.ResourceVersion = v
+		case "resourceVersionMatch":
+			if seen&(1<<1) != 0 {
+				return false
+			}
+			seen |= 1 << 1
+			opts.ResourceVersionMatch = metav1.ResourceVersionMatch(v)
+		case "continue":
+			if seen&(1<<2) != 0 {
+				return false
+			}
+			seen |= 1 << 2
+			opts.Continue = v
+		case "limit":
+			if seen&(1<<3) != 0 {
+				return false
+			}
+			seen |= 1 << 3
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return false
+			}
+			opts.Limit = n
+		case "watch":
+			if seen&(1<<4) != 0 {
+				return false
+			}
+			seen |= 1 << 4
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return false
+			}
+			opts.Watch = b
+		case "allowWatchBookmarks":
+			if seen&(1<<5) != 0 {
+				return false
+			}
+			seen |= 1 << 5
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return false
+			}
+			opts.AllowWatchBookmarks = b
+		case "sendInitialEvents":
+			if seen&(1<<6) != 0 {
+				return false
+			}
+			seen |= 1 << 6
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return false
+			}
+			opts.SendInitialEvents = &b
+		case "timeoutSeconds":
+			if seen&(1<<7) != 0 {
+				return false
+			}
+			seen |= 1 << 7
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return false
+			}
+			opts.TimeoutSeconds = &n
+		case "pretty":
+		case "gracePeriodSeconds", "orphanDependents", "propagationPolicy", "dryRun", "ignoreStoreReadErrorWithClusterBreakingPotential":
+			if !ignoreDeleteParams {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
