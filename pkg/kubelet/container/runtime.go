@@ -147,6 +147,8 @@ type Runtime interface {
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// TODO: Move IsPodResizeInProgress, UpdateActuatedPodLevelResources, and InitializeActuatedPod
+	// out of the Runtime interface now that actuatedState is owned by the Kubelet.
 	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool

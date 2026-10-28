@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -201,14 +202,15 @@ func NewVolumeManager(
 	recorder record.EventRecorder,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler,
 	volumeHealthStatusUpdater volumehealth.StatusUpdater,
-	volumeHealthProbeInterval time.Duration) VolumeManager {
+	volumeHealthProbeInterval time.Duration,
+	actuatedState state.State) VolumeManager {
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr, actuatedState),
 		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
 			volumePluginMgr,
@@ -245,7 +247,7 @@ func NewVolumeManager(
 		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir,
-		nil)
+		actuatedState)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		vm.volumeHealthManager = volumehealth.NewManager(
