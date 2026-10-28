@@ -109,6 +109,11 @@ func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackC
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Max != nil {
+		in, out := &in.Max, &out.Max
+		*out = new(int32)
+		**out = **in
+	}
 	if in.TCPEstablishedTimeout != nil {
 		in, out := &in.TCPEstablishedTimeout, &out.TCPEstablishedTimeout
 		*out = new(v1.Duration)

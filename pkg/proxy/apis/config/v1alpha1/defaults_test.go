@@ -34,6 +34,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 	oomScore := int32(-999)
 	ctMaxPerCore := int32(32768)
 	ctMin := int32(131072)
+	ctMax := int32(1048576)
 	testCases := []struct {
 		name     string
 		original *kubeproxyconfigv1alpha1.KubeProxyConfiguration
@@ -72,6 +73,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            &ctMaxPerCore,
 					Min:                   &ctMin,
+					Max:                   &ctMax,
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 24 * time.Hour},
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
@@ -118,6 +120,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            &ctMaxPerCore,
 					Min:                   &ctMin,
+					Max:                   &ctMax,
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 24 * time.Hour},
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
@@ -134,6 +137,26 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 			SetDefaults_KubeProxyConfiguration(tc.original)
 			if diff := cmp.Diff(tc.expected, tc.original); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestConntrackMaxDefaulting(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		configured *int32
+		want       int32
+	}{
+		{"omitted", nil, 1048576},
+		{"disabled cap", ptr.To[int32](0), 0},
+		{"custom cap", ptr.To[int32](8388608), 8388608},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{Max: tc.configured}}
+			SetDefaults_KubeProxyConfiguration(config)
+			if config.Conntrack.Max == nil || *config.Conntrack.Max != tc.want {
+				t.Fatalf("max = %v, want %d", config.Conntrack.Max, tc.want)
 			}
 		})
 	}
