@@ -185,7 +185,7 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 				}
 
 				if test.expectNominatedNodeName {
-					err := testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, time.Second)
+					err := schedulerutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, time.Second)
 					if nnnForExpectationEnabled {
 						if err != nil {
 							t.Errorf(".status.nominatedNodeName was not set in pod %v/%v: %v", pod.Namespace, pod.Name, err)
@@ -197,7 +197,7 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 						}
 					}
 				} else {
-					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+					if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 						t.Errorf("Pod %v/%v was not scheduled: %v", pod.Namespace, pod.Name, err)
 					}
 				}
@@ -968,7 +968,7 @@ func initializeAndRunTestScenarios(t *testing.T, sharedAPICtx *testutils.TestCon
 	// We manually trigger the scheduling cycle.
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		// Create a fresh namespace for each test case to prevent tests from interfering with each other.
-		testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
+		schedulerutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -1325,7 +1325,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	nodeOther := st.MakeNode().Name("node-other").Taints([]v1.Taint{{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule}}).Obj()
 
 	for _, n := range []*v1.Node{nodePreferred, nodeOther} {
-		if _, err := testutils.CreateNode(cs, n); err != nil {
+		if _, err := schedulerutils.CreateNode(cs, n); err != nil {
 			t.Fatalf("Failed to create node %s: %v", n.Name, err)
 		}
 	}
@@ -1347,7 +1347,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	// Ensures NNN is set
 	mockPreBind := &mockPreBindPlugin{}
 
-	initSched := func(additionalPlugins ...fwk.Plugin) (*testutils.TestContext, testutils.ShutdownFunc) {
+	initSched := func(additionalPlugins ...fwk.Plugin) (*testutils.TestContext, schedulerutils.ShutdownFunc) {
 		var pls []fwk.Plugin
 		pls = append(pls, mockQueueSort, mockPreBind)
 		pls = append(pls, additionalPlugins...)
@@ -1358,7 +1358,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 			scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		)
 		// Ensure both nodes are in the cache before proceeding
-		if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+		if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
 			t.Fatalf("Failed to wait for nodes in cache: %v", err)
 		}
 		return testCtx, teardown
@@ -1383,7 +1383,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	// We expect the scheduler will stop due to SchedulerCloseFn being called in bind
 	<-testCtx.SchedulerCtx.Done()
 
-	podA, err := testutils.GetPod(cs, podA.Name, podA.Namespace)
+	podA, err := schedulerutils.GetPod(cs, podA.Name, podA.Namespace)
 	if err != nil {
 		t.Fatalf("Failed to get pod %s: %v", podA.Name, err)
 	}
@@ -1408,14 +1408,14 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
 	for _, pod := range []*v1.Pod{podA, podB} {
-		if err := testutils.WaitForPodToSchedule(ctx, cs, pod); err != nil {
+		if err := schedulerutils.WaitForPodToSchedule(ctx, cs, pod); err != nil {
 			t.Errorf("Failed waiting for pod %s: %v", pod.Name, err)
 		}
 	}
 
 	checkNode := func(pod *v1.Pod, expected string) {
 		t.Helper()
-		p, _ := testutils.GetPod(cs, pod.Name, pod.Namespace)
+		p, _ := schedulerutils.GetPod(cs, pod.Name, pod.Namespace)
 		if p.Spec.NodeName != expected {
 			t.Errorf("%s scheduled on %s, wanted %s", pod.Name, p.Spec.NodeName, expected)
 		}

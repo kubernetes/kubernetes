@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func makeNodeWithLabels(nodeName string, labels map[string]string) *v1.Node {
@@ -2867,7 +2867,7 @@ func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0),
 	}, opts...)
-	testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-tas", opts...)
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-tas", opts...)
 	ns := testCtx.NS.Name
 
 	if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {

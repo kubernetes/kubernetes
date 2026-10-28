@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
@@ -49,15 +50,15 @@ import (
 
 // imported from testutils
 var (
-	runPausePod                  = testutils.RunPausePod
-	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
-	createNode                   = testutils.CreateNode
-	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
-	runPodWithContainers         = testutils.RunPodWithContainers
+	runPausePod                  = schedulerutils.RunPausePod
+	createAndWaitForNodesInCache = schedulerutils.CreateAndWaitForNodesInCache
+	createNode                   = schedulerutils.CreateNode
+	createNamespacesWithLabels   = schedulerutils.CreateNamespacesWithLabels
+	runPodWithContainers         = schedulerutils.RunPodWithContainers
 	initPausePod                 = testutils.InitPausePod
-	initPodWithContainers        = testutils.InitPodWithContainers
-	podScheduledIn               = testutils.PodScheduledIn
-	podUnschedulable             = testutils.PodUnschedulable
+	initPodWithContainers        = schedulerutils.InitPodWithContainers
+	podScheduledIn               = schedulerutils.PodScheduledIn
+	podUnschedulable             = schedulerutils.PodUnschedulable
 )
 
 var (
@@ -269,7 +270,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 				}
 			}
 
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("failed to wait for nodes in cache: %v", err)
 			}
 
@@ -310,7 +311,7 @@ func TestNodeAffinityScoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot create labeled node: %v", err)
 	}
-	if err = testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
+	if err = schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
 		t.Fatalf("failed to wait for nodes in cache: %v", err)
 	}
 
@@ -742,7 +743,7 @@ func TestPodAffinityScoring(t *testing.T) {
 						t.Fatalf("failed to create node: %v", err)
 					}
 				}
-				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 					t.Fatalf("failed to wait for nodes in cache: %v", err)
 				}
 
@@ -860,7 +861,7 @@ func TestTaintTolerationScoring(t *testing.T) {
 					t.Fatalf("Failed to create node: %v", err)
 				}
 			}
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 			pod, err := runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
@@ -904,7 +905,7 @@ func TestImageLocalityScoring(t *testing.T) {
 
 	// Create a pod with containers each having the specified image.
 	podName := "pod-using-large-image"
-	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &testutils.PodWithContainersConfig{
+	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &schedulerutils.PodWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
 		Containers: makeContainersWithImages([]string{imageName}),
@@ -1119,7 +1120,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 					t.Fatalf("Cannot create node: %v", err)
 				}
 			}
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 
@@ -1137,7 +1138,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					schedulerutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
 				}
@@ -1181,7 +1182,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			t.Fatalf("Cannot create node: %v", err)
 		}
 	}
-	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
+	if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
 		t.Fatalf("Failed to wait for nodes in cache: %v", err)
 	}
 

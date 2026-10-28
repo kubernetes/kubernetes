@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -1205,7 +1206,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 				// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
 				testCtx := testutils.InitTestSchedulerWithOptions(t,
-					testutils.WithNewNamespace(t, sharedAPICtx, "podgroup-preemption"),
+					schedulerutils.WithNewNamespace(t, sharedAPICtx, "podgroup-preemption"),
 					0,
 					scheduler.WithProfiles(cfg.Profiles...),
 					scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -1254,7 +1255,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 3. Wait for initial pods to be scheduled
 				for _, p := range tt.initialPods {
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+						schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 						t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 					}
 				}
@@ -1270,7 +1271,7 @@ func TestPodGroupPreemption(t *testing.T) {
 						t.Fatalf("Failed to create unscheduled pod %s: %v", p.Name, err)
 					}
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodUnschedulable(cs, ns, p.Name)); err != nil {
+						schedulerutils.PodUnschedulable(cs, ns, p.Name)); err != nil {
 						t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
 					}
 					if nnn != "" {
@@ -1326,7 +1327,7 @@ func TestPodGroupPreemption(t *testing.T) {
 						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 					}
 					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
-						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
+						podScheduledFn := schedulerutils.PodScheduled(cs, ns, p.Name)
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, ns, p.Spec.SchedulingGroup)
 							if ok {
@@ -1391,7 +1392,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 6. Verify unschedulable pods
 				for _, podName := range tt.expectedUnschedulable {
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodUnschedulable(cs, ns, podName)); err != nil {
+						schedulerutils.PodUnschedulable(cs, ns, podName)); err != nil {
 						t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
 					}
 				}
@@ -1399,7 +1400,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 7. Verify scheduled pods
 				for _, podName := range tt.expectedScheduled {
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodScheduled(cs, ns, podName)); err != nil {
+						schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 						t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
 					}
 				}
@@ -1598,7 +1599,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: cpgEnabled,
 				features.CompositePodGroup:               cpgEnabled,
 			})
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
 
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
@@ -1615,7 +1616,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 			}
 			// Wait for low-priority pod to be scheduled
 			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-				testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+				schedulerutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
 				t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
 			}
 			// Create a high-priority pod high-1 belonging to pg1 (priority=100)
@@ -1694,7 +1695,7 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
@@ -1734,7 +1735,7 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 
 			// Wait for initial pods to be scheduled
 			for _, pod := range initialPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, pod.Name)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, pod.Name)); err != nil {
 					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
 				}
 			}
@@ -2746,7 +2747,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 			// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
 			testCtx := testutils.InitTestSchedulerWithOptions(t,
-				testutils.WithNewNamespace(t, sharedAPICtx, "cpg-preemption"),
+				schedulerutils.WithNewNamespace(t, sharedAPICtx, "cpg-preemption"),
 				0,
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -2801,7 +2802,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			}
 			for _, p := range tt.initialPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -2905,7 +2906,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 7. Verify unschedulable pods
 			for _, podName := range tt.expectedUnschedulable {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodUnschedulable(cs, ns, podName)); err != nil {
+					schedulerutils.PodUnschedulable(cs, ns, podName)); err != nil {
 					t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
 				}
 			}
@@ -2913,7 +2914,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 8. Verify scheduled pods
 			for _, podName := range tt.expectedScheduled {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, podName)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
 				}
 			}
@@ -3056,7 +3057,7 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "state-preserved",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "state-preserved",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
@@ -3082,7 +3083,7 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 
 			// Wait for initial pods to be scheduled
 			for _, p := range []*v1.Pod{highPod, lowPod} {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", p.Name, err)
 				}
 			}
@@ -4027,7 +4028,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 			})
 
 			// Initialize scheduler, and disable preemption.
-			testCtx := testutils.InitTestDisablePreemption(t, "disable-preemption")
+			testCtx := schedulerutils.InitTestDisablePreemption(t, "disable-preemption")
 			cs := testCtx.ClientSet
 
 			// Create a node with some resources
@@ -4036,7 +4037,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 				v1.ResourceCPU:    "500m",
 				v1.ResourceMemory: "500",
 			}
-			_, err := testutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+			_, err := schedulerutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 			if err != nil {
 				t.Fatalf("Error creating nodes: %v", err)
 			}
@@ -4051,7 +4052,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			})
-			_, err = testutils.RunPausePod(cs, existingPod)
+			_, err = schedulerutils.RunPausePod(cs, existingPod)
 			if err != nil {
 				t.Fatalf("TestDisablePodGroupPreemption (Async preemption enabled: %v): Error running pause pod: %v", asyncPreemptionEnabled, err)
 			}
@@ -4080,10 +4081,10 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 			// Ensure preemption did not happened.
 			// For preemption to happened, preemptor should be scheduled or unscheduled with nominated node name.
 			// So if the preemptor is unscheduled and does not have nominated node name, it means preemption did not happened.
-			if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
+			if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
 				t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
 			}
-			if err := testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
+			if err := schedulerutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
 				t.Errorf("Preemptor %v should not be nominated to any node", preemptor.Name)
 			}
 		})
@@ -4188,7 +4189,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(0),
@@ -4251,7 +4252,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 			}
 
 			t.Logf("Waiting for preemptor to be scheduled")
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, testutils.PodScheduled(cs, ns, preemptor.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, schedulerutils.PodScheduled(cs, ns, preemptor.Name))
 			if err != nil {
 				t.Fatalf("Failed waiting for preemptor to schedule: %v", err)
 			}
@@ -4675,7 +4676,7 @@ func TestCompositePodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 		}},
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-preemption-nnn",
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-preemption-nnn",
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithPodMaxBackoffSeconds(1),
@@ -4720,7 +4721,7 @@ func TestCompositePodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 
 	// Wait for initial pods to be scheduled
 	for _, pod := range initialPods {
-		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, pod.Name)); err != nil {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, pod.Name)); err != nil {
 			t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
 		}
 	}
@@ -4789,7 +4790,7 @@ func TestCompositePodGroupPreemptionStatus(t *testing.T) {
 		features.CompositePodGroup:               true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})
-	testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-preemption-status")
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-preemption-status")
 
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
@@ -4806,7 +4807,7 @@ func TestCompositePodGroupPreemptionStatus(t *testing.T) {
 	}
 	// Wait for low-priority pod to be scheduled
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-		testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+		schedulerutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
 		t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
 	}
 	// Create a CompositePodGroup and child PodGroup (priority=100)

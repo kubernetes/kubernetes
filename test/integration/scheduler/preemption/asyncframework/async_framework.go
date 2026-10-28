@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	utiltesting "k8s.io/kubernetes/test/utils"
 )
@@ -466,7 +467,7 @@ func schedulePod(testCtx *testutils.TestContext, t utiltesting.TB, schedulePodSt
 	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 	if schedulePodStep.ExpectSuccess {
-		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, schedulePodStep.PodName)); err != nil {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, testCtx.NS.Name, schedulePodStep.PodName)); err != nil {
 			t.Fatalf("Expected the pod %s to be scheduled", schedulePodStep.PodName)
 		}
 	} else if schedulePodStep.ExpectUnschedulable {
@@ -535,7 +536,7 @@ func schedulePodGroup(testCtx *testutils.TestContext, t utiltesting.TB, schedule
 
 	if schedulePodGroupStep.ExpectSuccess {
 		for _, pod := range pgPods {
-			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, pod.Name)); err != nil {
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, testCtx.NS.Name, pod.Name)); err != nil {
 				t.Fatalf("Expected the pod %s to be scheduled", pod.Name)
 			}
 		}

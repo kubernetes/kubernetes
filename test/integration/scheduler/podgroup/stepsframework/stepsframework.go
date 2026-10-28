@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	utiltesting "k8s.io/kubernetes/test/utils"
 )
@@ -669,7 +670,7 @@ func waitForPodsUnschedulable(testCtx *testutils.TestContext, ns string, podName
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			testutils.PodUnschedulable(cs, ns, podName))
+			schedulerutils.PodUnschedulable(cs, ns, podName))
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to be unschedulable: %w", podName, err)
 		}
@@ -681,7 +682,7 @@ func waitForPodsSchedulingError(testCtx *testutils.TestContext, ns string, podNa
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			testutils.PodSchedulingError(cs, ns, podName))
+			schedulerutils.PodSchedulingError(cs, ns, podName))
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to get scheduling error: %w", podName, err)
 		}
@@ -693,7 +694,7 @@ func waitForPodsScheduled(testCtx *testutils.TestContext, ns string, podNames []
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			testutils.PodScheduled(cs, ns, podName))
+			schedulerutils.PodScheduled(cs, ns, podName))
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to be scheduled: %w", podName, err)
 		}
@@ -720,13 +721,13 @@ func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny 
 			scheduledCount := 0
 			unschedulableCount := 0
 			for _, pod := range waitAny.Pods {
-				if ok, err := testutils.PodScheduled(cs, ns, pod.Name)(ctx); err != nil {
+				if ok, err := schedulerutils.PodScheduled(cs, ns, pod.Name)(ctx); err != nil {
 					return false, err
 				} else if ok {
 					scheduledCount++
 					continue
 				}
-				if ok, err := testutils.PodUnschedulable(cs, ns, pod.Name)(ctx); err != nil {
+				if ok, err := schedulerutils.PodUnschedulable(cs, ns, pod.Name)(ctx); err != nil {
 					return false, err
 				} else if ok {
 					unschedulableCount++
