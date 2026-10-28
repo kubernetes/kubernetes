@@ -95,6 +95,10 @@ type Config struct {
 	// If lower than DefaultEventFreshDuration, the cache creation will fail.
 	EventsHistoryWindow time.Duration
 
+	// WatchCacheMaxEvents, if positive, overrides the upper bound of the
+	// watch cache event history capacity derived from EventsHistoryWindow.
+	WatchCacheMaxEvents int
+
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
 	ResourcePrefix string
@@ -440,11 +444,14 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	if eventFreshDuration < DefaultEventFreshDuration {
 		return nil, fmt.Errorf("config.EventsHistoryWindow (%v) must not be below %v", eventFreshDuration, DefaultEventFreshDuration)
 	}
+	if config.WatchCacheMaxEvents != 0 && config.WatchCacheMaxEvents < MinWatchCacheMaxEvents {
+		return nil, fmt.Errorf("config.WatchCacheMaxEvents (%d) must be 0 or at least %d", config.WatchCacheMaxEvents, MinWatchCacheMaxEvents)
+	}
 
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+		config.Clock, eventFreshDuration, config.WatchCacheMaxEvents, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 

@@ -136,6 +136,7 @@ func newWatchCache(
 	indexers *cache.Indexers,
 	clock clock.WithTicker,
 	eventFreshDuration time.Duration,
+	maxEvents int,
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
@@ -154,7 +155,7 @@ func newWatchCache(
 	wc := &watchCache{
 		resourceVersion: 0,
 		config:          config,
-		history:         newWatchCacheHistory(config, eventFreshDuration),
+		history:         newWatchCacheHistory(config, eventFreshDuration, maxEvents),
 		storage:         store.NewWatchCacheStorage(indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())

@@ -116,6 +116,31 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	return cacher, versioner, nil
 }
 
+func TestNewCacherFromConfigRejectsInvalidWatchCacheMaxEvents(t *testing.T) {
+	for _, maxEvents := range []int{-1, MinWatchCacheMaxEvents - 1} {
+		t.Run(fmt.Sprintf("maxEvents=%d", maxEvents), func(t *testing.T) {
+			config := Config{
+				Versioner:           storage.APIObjectVersioner{},
+				GroupResource:       schema.GroupResource{Resource: "pods"},
+				EventsHistoryWindow: DefaultEventFreshDuration,
+				WatchCacheMaxEvents: maxEvents,
+				ResourcePrefix:      "/pods/",
+				NewFunc:             func() runtime.Object { return &example.Pod{} },
+				NewListFunc:         func() runtime.Object { return &example.PodList{} },
+				Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+			}
+
+			_, err := NewCacherFromConfig(config)
+			if err == nil {
+				t.Fatalf("expected an error for WatchCacheMaxEvents=%d, got nil", maxEvents)
+			}
+			if !strings.Contains(err.Error(), "WatchCacheMaxEvents") {
+				t.Errorf("expected error about WatchCacheMaxEvents, got: %v", err)
+			}
+		})
+	}
+}
+
 func TestShouldDelegateList(t *testing.T) {
 	type opts struct {
 		Recursive            bool
