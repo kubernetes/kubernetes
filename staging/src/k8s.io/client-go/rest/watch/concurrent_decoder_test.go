@@ -235,8 +235,8 @@ func TestConcurrentWatchEventDecoderShutdown(t *testing.T) {
 				// Let the pipeline block before checking the shutdown preconditions.
 				synctest.Wait()
 				require.Len(t, decoder.eventDecoder.rawResultsCh, tt.wantQueueLen)
-				require.Len(t, decoder.eventProcessor.pendingResultsCh, tt.wantQueueLen)
-				require.Len(t, decoder.eventProcessor.decodedResultsCh, tt.wantQueueLen)
+				require.Len(t, decoder.pendingResultsCh, tt.wantQueueLen)
+				require.Len(t, decoder.decodedResultsCh, tt.wantQueueLen)
 				if tt.input == "" {
 					go func() {
 						// Close only after the test goroutine blocks in Decode.
