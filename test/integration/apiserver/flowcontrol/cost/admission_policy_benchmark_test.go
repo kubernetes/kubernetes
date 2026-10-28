@@ -23,184 +23,136 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"runtime"
 	"testing"
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/ktesting"
-	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
 
 const (
 	admissionPolicyScenarioKey  = "bench.k8s.io/scenario"
-	admissionPolicyDeployPath   = "/apis/apps/v1/namespaces/" + metav1.NamespaceDefault + "/deployments"
+	admissionPolicyPodsPath     = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods"
 	admissionPolicyVAPPath      = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies"
 	admissionPolicyMAPPath      = "/apis/admissionregistration.k8s.io/v1/mutatingadmissionpolicies"
-	admissionPolicyDryRunQuery  = "?dryRun=All&fieldManager=bench"
+	admissionPolicyDryRunQuery  = "dryRun=All&fieldManager=bench"
 	admissionPolicyReadyTimeout = time.Minute
 
 	// The package defaults to -benchtime=1x and allocations are measured
 	// process-wide, so a single request is easily dominated by background
-	// apiserver work. A fixed batch of requests is sent per iteration and the
-	// per-request average is reported.
+	// apiserver work. All admission policy requests are dry-run, so a fixed
+	// batch of them is sent per iteration and the per-request average is
+	// reported.
 	admissionPolicyRequestsPerOp = 50
+
+	admissionPolicyNone         = "none"
+	admissionPolicyVAP          = "vap"
+	admissionPolicyMAPApply     = "map-apply"
+	admissionPolicyMAPJSONPatch = "map-jsonpatch"
 )
 
+// CEL evaluation cost does not depend on the wire format, so only JSON is
+// measured to keep the number of apiserver instances started low.
+var admissionPolicyFormats = []contentType{{name: "json", accept: acceptJSON}}
+
 // BenchmarkAdmissionPolicyRequestCost measures per-request heap allocations
-// for kube-apiserver requests evaluated by CEL-based admission policies:
+// for kube-apiserver requests evaluated by CEL-based admission policies,
+// using the same harness as BenchmarkRequestCost:
 //
-//   - create of a Deployment validated by a ValidatingAdmissionPolicy or
+//   - create of the exemplar Pod validated by a ValidatingAdmissionPolicy or
 //     mutated by a MutatingAdmissionPolicy (applyConfiguration and JSONPatch),
-//     with an unmatched Deployment as baseline, scaled by the number of
-//     containers iterated by the policy expressions (CEL evaluation);
+//     with an unmatched Pod as baseline, scaled by the number of containers
+//     iterated by the policy expressions (CEL evaluation);
 //   - create of a ValidatingAdmissionPolicy / MutatingAdmissionPolicy, whose
 //     validation parses, type-checks and cost-estimates every expression
 //     (CEL compilation).
 //
-// Requests run against the same in-process kube-apiserver handler as
-// BenchmarkRequestCost. All requests are dry-run so the same request can be
-// repeated without changing cluster state. Results are written to $ARTIFACTS
-// in the perf-dash GenericPrometheusQuery format with the same labels as
-// BenchmarkRequestCost.
+// All requests are dry-run so the same request can be repeated without
+// changing cluster state.
 func BenchmarkAdmissionPolicyRequestCost(b *testing.B) {
-	framework.FixBenchmarkJSONOutput(b)
-	tCtx := ktesting.Init(b)
-	tCtx, server := setupAPIServer(tCtx)
-	setupAdmissionPolicyFixtures(tCtx, server)
-
-	var scenarios []admissionPolicyScenario
+	var scenarios []requestScenario
 	for _, n := range []int{1, 10, 100} {
-		for _, policy := range []string{"none", "vap", "map-apply", "map-jsonpatch"} {
-			scenarios = append(scenarios, admissionPolicyScenario{
-				request: fmt.Sprintf("POST Deployment policy=%s containers=%d", policy, n),
-				path:    admissionPolicyDeployPath + admissionPolicyDryRunQuery,
-				body:    mustJSON(tCtx, admissionPolicyDeployment(policy, n, 3)),
-			})
+		for _, policy := range []string{admissionPolicyNone, admissionPolicyVAP, admissionPolicyMAPApply, admissionPolicyMAPJSONPatch} {
+			scenarios = append(scenarios, admissionPolicyScenario(b,
+				fmt.Sprintf("create policy=%s containers=%d", policy, n),
+				admissionPolicyPodsPath, admissionPolicyPod(policy, n), setupAdmissionPolicy(policy)))
 		}
 	}
 	scenarios = append(scenarios,
-		admissionPolicyScenario{
-			request: "POST ValidatingAdmissionPolicy",
-			path:    admissionPolicyVAPPath + admissionPolicyDryRunQuery,
-			body:    mustJSON(tCtx, benchVAP("bench-vap-dryrun")),
-		},
-		admissionPolicyScenario{
-			request: "POST MutatingAdmissionPolicy applyConfiguration",
-			path:    admissionPolicyMAPPath + admissionPolicyDryRunQuery,
-			body:    mustJSON(tCtx, benchMAPApply("bench-map-apply-dryrun")),
-		},
-		admissionPolicyScenario{
-			request: "POST MutatingAdmissionPolicy jsonPatch",
-			path:    admissionPolicyMAPPath + admissionPolicyDryRunQuery,
-			body:    mustJSON(tCtx, benchMAPJSONPatch("bench-map-jsonpatch-dryrun")),
-		},
+		admissionPolicyScenario(b, "ValidatingAdmissionPolicy",
+			admissionPolicyVAPPath, benchVAP("bench-vap-dryrun"), nil),
+		admissionPolicyScenario(b, "MutatingAdmissionPolicy applyConfiguration",
+			admissionPolicyMAPPath, benchMAPApply("bench-map-apply-dryrun"), nil),
+		admissionPolicyScenario(b, "MutatingAdmissionPolicy jsonPatch",
+			admissionPolicyMAPPath, benchMAPJSONPatch("bench-map-jsonpatch-dryrun"), nil),
 	)
+	benchmarkRequestScenarios(b, scenarios)
+}
 
-	report := perfData{Version: "v1"}
-	for _, sc := range scenarios {
-		b.Run("Request="+sc.request, func(b *testing.B) {
-			framework.FixBenchmarkJSONOutput(b)
-			report.DataItems = append(report.DataItems, benchmarkAdmissionPolicyScenario(b, server, sc)...)
-		})
-	}
-	if artifacts := os.Getenv("ARTIFACTS"); artifacts != "" && len(report.DataItems) > 0 {
-		writePerfData(b, artifacts, report)
+// admissionPolicyScenario returns a dry-run POST of obj to path. setup, if
+// set, installs fixtures before the shared harness warms up and measures.
+func admissionPolicyScenario(b *testing.B, options, path string, obj kruntime.Object, setup func(ktesting.TContext, http.Handler)) requestScenario {
+	return requestScenario{
+		method:             "POST",
+		options:            options,
+		httpMethod:         http.MethodPost,
+		path:               path,
+		query:              admissionPolicyDryRunQuery,
+		acceptContentTypes: admissionPolicyFormats,
+		body:               staticObjectBody(b, obj),
+		requestsPerOp:      admissionPolicyRequestsPerOp,
+		setup:              setup,
 	}
 }
 
-type admissionPolicyScenario struct {
-	request string
-	path    string
-	body    []byte
-}
-
-func benchmarkAdmissionPolicyScenario(b *testing.B, server http.Handler, sc admissionPolicyScenario) []dataItem {
-	const format = "json"
-	b.ReportAllocs()
-
-	// Warm up once so lazily initialized state (type converters, CEL
-	// environments, caches) is not attributed to the measured requests.
-	runHTTP(b, server, http.MethodPost, sc.path, acceptJSON, acceptJSON, sc.body)
-
-	var startMem, endMem runtime.MemStats
-	var responseBytes int
-	for i := 0; b.Loop(); i++ {
-		if i == 0 {
-			runtime.ReadMemStats(&startMem)
+// setupAdmissionPolicy returns a setup function that creates the admission
+// policy and binding for the given scenario and waits until it is enforced.
+func setupAdmissionPolicy(policy string) func(ktesting.TContext, http.Handler) {
+	return func(tCtx ktesting.TContext, server http.Handler) {
+		tCtx.Helper()
+		client := tCtx.Client().AdmissionregistrationV1()
+		switch policy {
+		case admissionPolicyNone:
+		case admissionPolicyVAP:
+			if _, err := client.ValidatingAdmissionPolicies().Create(tCtx, benchVAP("bench-vap"), metav1.CreateOptions{}); err != nil {
+				tCtx.Fatalf("failed to create ValidatingAdmissionPolicy: %v", err)
+			}
+			if _, err := client.ValidatingAdmissionPolicyBindings().Create(tCtx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "bench-vap"},
+				Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+					PolicyName:        "bench-vap",
+					ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+				},
+			}, metav1.CreateOptions{}); err != nil {
+				tCtx.Fatalf("failed to create ValidatingAdmissionPolicyBinding: %v", err)
+			}
+			// The policy rejects ':latest' images once it is enforced.
+			denied := admissionPolicyPod(policy, 1)
+			denied.Spec.Containers[0].Image = "registry.k8s.io/pause:latest"
+			waitForDenial(tCtx, server, encodeObject(tCtx, acceptJSON, denied))
+		case admissionPolicyMAPApply, admissionPolicyMAPJSONPatch:
+			p := benchMAPApply("bench-" + policy)
+			if policy == admissionPolicyMAPJSONPatch {
+				p = benchMAPJSONPatch("bench-" + policy)
+			}
+			if _, err := client.MutatingAdmissionPolicies().Create(tCtx, p, metav1.CreateOptions{}); err != nil {
+				tCtx.Fatalf("failed to create MutatingAdmissionPolicy %s: %v", p.Name, err)
+			}
+			if _, err := client.MutatingAdmissionPolicyBindings().Create(tCtx, &admissionregistrationv1.MutatingAdmissionPolicyBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: p.Name},
+				Spec:       admissionregistrationv1.MutatingAdmissionPolicyBindingSpec{PolicyName: p.Name},
+			}, metav1.CreateOptions{}); err != nil {
+				tCtx.Fatalf("failed to create MutatingAdmissionPolicyBinding %s: %v", p.Name, err)
+			}
+			waitForMutation(tCtx, server, encodeObject(tCtx, acceptJSON, admissionPolicyPod(policy, 1)))
+		default:
+			tCtx.Fatalf("unknown admission policy scenario %q", policy)
 		}
-		for range admissionPolicyRequestsPerOp {
-			responseBytes = runHTTP(b, server, http.MethodPost, sc.path, acceptJSON, acceptJSON, sc.body)
-		}
-	}
-	runtime.ReadMemStats(&endMem)
-
-	b.ReportMetric(float64(len(sc.body)), "request-B/op")
-	b.ReportMetric(float64(responseBytes), "response-B/op")
-	if b.N == 0 {
-		return nil
-	}
-	requests := float64(b.N * admissionPolicyRequestsPerOp)
-	allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / requests
-	allocs := float64(endMem.Mallocs-startMem.Mallocs) / requests
-	b.ReportMetric(allocBytes, "alloc-B/request")
-	b.ReportMetric(allocs, "allocs/request")
-
-	labels := func(metric string) map[string]string {
-		return map[string]string{"Request": sc.request, "Format": format, "Metric": metric}
-	}
-	return []dataItem{
-		{Labels: labels("Allocated bytes per operation"), Unit: "B", Data: map[string]float64{format: allocBytes}},
-		{Labels: labels("Allocations per operation"), Unit: "1", Data: map[string]float64{format: allocs}},
-		{Labels: labels("Request body bytes per operation"), Unit: "B", Data: map[string]float64{format: float64(len(sc.body))}},
-		{Labels: labels("Response body bytes per operation"), Unit: "B", Data: map[string]float64{format: float64(responseBytes)}},
-	}
-}
-
-// setupAdmissionPolicyFixtures creates the admission policies used by the
-// benchmark and waits until each of them is enforced.
-func setupAdmissionPolicyFixtures(tCtx ktesting.TContext, server http.Handler) {
-	tCtx.Helper()
-	client := tCtx.Client().AdmissionregistrationV1()
-	if _, err := client.ValidatingAdmissionPolicies().Create(tCtx, benchVAP("bench-vap"), metav1.CreateOptions{}); err != nil {
-		tCtx.Fatalf("failed to create ValidatingAdmissionPolicy: %v", err)
-	}
-	if _, err := client.ValidatingAdmissionPolicyBindings().Create(tCtx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "bench-vap"},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName:        "bench-vap",
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
-		},
-	}, metav1.CreateOptions{}); err != nil {
-		tCtx.Fatalf("failed to create ValidatingAdmissionPolicyBinding: %v", err)
-	}
-	// The policy rejects more than 50 replicas once it is enforced.
-	waitForStatus(tCtx, server, admissionPolicyDeployPath+admissionPolicyDryRunQuery,
-		mustJSON(tCtx, admissionPolicyDeployment("vap", 1, 100)), http.StatusUnprocessableEntity)
-
-	for _, p := range []*admissionregistrationv1.MutatingAdmissionPolicy{
-		benchMAPApply("bench-map-apply"),
-		benchMAPJSONPatch("bench-map-jsonpatch"),
-	} {
-		if _, err := client.MutatingAdmissionPolicies().Create(tCtx, p, metav1.CreateOptions{}); err != nil {
-			tCtx.Fatalf("failed to create MutatingAdmissionPolicy %s: %v", p.Name, err)
-		}
-		if _, err := client.MutatingAdmissionPolicyBindings().Create(tCtx, &admissionregistrationv1.MutatingAdmissionPolicyBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: p.Name},
-			Spec:       admissionregistrationv1.MutatingAdmissionPolicyBindingSpec{PolicyName: p.Name},
-		}, metav1.CreateOptions{}); err != nil {
-			tCtx.Fatalf("failed to create MutatingAdmissionPolicyBinding %s: %v", p.Name, err)
-		}
-	}
-	for _, policy := range []string{"map-apply", "map-jsonpatch"} {
-		waitForMutation(tCtx, server, mustJSON(tCtx, admissionPolicyDeployment(policy, 1, 3)))
 	}
 }
 
@@ -213,16 +165,16 @@ func postRecorded(server http.Handler, path string, body []byte) *httptest.Respo
 	return rec
 }
 
-func waitForStatus(tCtx ktesting.TContext, server http.Handler, path string, body []byte, want int) {
+func waitForDenial(tCtx ktesting.TContext, server http.Handler, body []byte) {
 	tCtx.Helper()
 	var lastCode int
 	var lastBody string
 	if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, admissionPolicyReadyTimeout, true, func(_ context.Context) (bool, error) {
-		rec := postRecorded(server, path, body)
+		rec := postRecorded(server, admissionPolicyPodsPath+"?"+admissionPolicyDryRunQuery, body)
 		lastCode, lastBody = rec.Code, rec.Body.String()
-		return lastCode == want, nil
+		return lastCode == http.StatusUnprocessableEntity, nil
 	}); err != nil {
-		tCtx.Fatalf("POST %s: waiting for HTTP %d, last got HTTP %d: %s", path, want, lastCode, lastBody)
+		tCtx.Fatalf("waiting for ValidatingAdmissionPolicy to deny, last got HTTP %d: %s", lastCode, lastBody)
 	}
 }
 
@@ -230,12 +182,12 @@ func waitForMutation(tCtx ktesting.TContext, server http.Handler, body []byte) {
 	tCtx.Helper()
 	var lastBody string
 	if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, admissionPolicyReadyTimeout, true, func(_ context.Context) (bool, error) {
-		rec := postRecorded(server, admissionPolicyDeployPath+admissionPolicyDryRunQuery, body)
+		rec := postRecorded(server, admissionPolicyPodsPath+"?"+admissionPolicyDryRunQuery, body)
 		lastBody = rec.Body.String()
 		if rec.Code != http.StatusCreated {
 			return false, nil
 		}
-		var out appsv1.Deployment
+		var out v1.Pod
 		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 			return false, err
 		}
@@ -245,60 +197,38 @@ func waitForMutation(tCtx ktesting.TContext, server http.Handler, body []byte) {
 	}
 }
 
-func mustJSON(tCtx ktesting.TContext, obj interface{}) []byte {
-	tCtx.Helper()
-	data, err := json.Marshal(obj)
-	if err != nil {
-		tCtx.Fatalf("failed to marshal %T: %v", obj, err)
-	}
-	return data
-}
-
-func admissionPolicyDeployment(policy string, containers int, replicas int32) *appsv1.Deployment {
-	cs := make([]corev1.Container, containers)
-	for i := range containers {
-		cs[i] = corev1.Container{
-			Name:  fmt.Sprintf("c-%d", i),
-			Image: fmt.Sprintf("registry.example.com/app-%d:v1", i),
-			Resources: corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceMemory: resource.MustParse("128Mi"),
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-				},
-			},
+// admissionPolicyPod returns the exemplar pod labeled for the given policy
+// scenario, with its containers replaced by the given number of copies of the
+// exemplar's main container.
+func admissionPolicyPod(policy string, containers int) *v1.Pod {
+	pod := exemplarPod.DeepCopy()
+	pod.Namespace = metav1.NamespaceDefault
+	pod.Name = "pod-new"
+	pod.Labels[admissionPolicyScenarioKey] = policy
+	main := pod.Spec.Containers[0]
+	cs := make([]v1.Container, containers)
+	for i := range cs {
+		cs[i] = *main.DeepCopy()
+		if i > 0 {
+			cs[i].Name = fmt.Sprintf("c-%d", i)
 		}
 	}
-	podLabels := map[string]string{"app": "bench"}
-	return &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bench-deploy",
-			Namespace: metav1.NamespaceDefault,
-			Labels:    map[string]string{"app": "bench", admissionPolicyScenarioKey: policy},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(replicas),
-			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: podLabels},
-				Spec:       corev1.PodSpec{Containers: cs},
-			},
-		},
-	}
+	pod.Spec.Containers = cs
+	return pod
 }
 
-// matchBenchDeployments matches Deployments labeled with the given scenario,
-// so each policy only applies to its own requests.
-func matchBenchDeployments(policy string) *admissionregistrationv1.MatchResources {
+// matchBenchPods matches Pods labeled with the given scenario, so each policy
+// only applies to its own requests.
+func matchBenchPods(policy string) *admissionregistrationv1.MatchResources {
 	return &admissionregistrationv1.MatchResources{
 		ObjectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{admissionPolicyScenarioKey: policy}},
 		ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{{
 			RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 				Rule: admissionregistrationv1.Rule{
-					APIGroups:   []string{"apps"},
+					APIGroups:   []string{""},
 					APIVersions: []string{"v1"},
-					Resources:   []string{"deployments"},
+					Resources:   []string{"pods"},
 				},
 			},
 		}},
@@ -306,27 +236,26 @@ func matchBenchDeployments(policy string) *admissionregistrationv1.MatchResource
 }
 
 // benchVAP is a ValidatingAdmissionPolicy shaped like policies seen in
-// practice: composition variables, several validations iterating over the pod
-// template's containers, a messageExpression, a regex check and an audit
+// practice: composition variables, several validations iterating over the
+// pod's containers, a messageExpression, a regex check and an audit
 // annotation.
 func benchVAP(name string) *admissionregistrationv1.ValidatingAdmissionPolicy {
 	return &admissionregistrationv1.ValidatingAdmissionPolicy{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingAdmissionPolicy"},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
 			FailurePolicy:    ptr.To(admissionregistrationv1.Fail),
-			MatchConstraints: matchBenchDeployments("vap"),
+			MatchConstraints: matchBenchPods(admissionPolicyVAP),
 			Variables: []admissionregistrationv1.Variable{
-				{Name: "containers", Expression: "object.spec.template.spec.containers"},
+				{Name: "containers", Expression: "object.spec.containers"},
 				{Name: "images", Expression: "variables.containers.map(c, c.image)"},
 			},
 			Validations: []admissionregistrationv1.Validation{
 				{
-					Expression:        "object.spec.replicas <= 50",
-					MessageExpression: "'replicas ' + string(object.spec.replicas) + ' exceeds 50'",
+					Expression:        "size(variables.containers) <= 200",
+					MessageExpression: "'pod has ' + string(size(variables.containers)) + ' containers, more than 200'",
 				},
-				{Expression: "variables.containers.all(c, c.image.startsWith('registry.example.com/'))"},
-				{Expression: "variables.containers.all(c, has(c.resources) && has(c.resources.limits) && 'memory' in c.resources.limits)"},
+				{Expression: "variables.containers.all(c, c.image.startsWith('registry.k8s.io/'))"},
+				{Expression: "variables.containers.all(c, has(c.resources) && has(c.resources.requests) && 'memory' in c.resources.requests)"},
 				{Expression: "!variables.images.exists(i, i.endsWith(':latest'))"},
 				{Expression: "object.metadata.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')"},
 			},
@@ -339,12 +268,11 @@ func benchVAP(name string) *admissionregistrationv1.ValidatingAdmissionPolicy {
 
 func benchMAP(name, policy string, mutation admissionregistrationv1.Mutation) *admissionregistrationv1.MutatingAdmissionPolicy {
 	return &admissionregistrationv1.MutatingAdmissionPolicy{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "admissionregistration.k8s.io/v1", Kind: "MutatingAdmissionPolicy"},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: admissionregistrationv1.MutatingAdmissionPolicySpec{
 			FailurePolicy:      ptr.To(admissionregistrationv1.Fail),
 			ReinvocationPolicy: admissionregistrationv1.NeverReinvocationPolicy,
-			MatchConstraints:   matchBenchDeployments(policy),
+			MatchConstraints:   matchBenchPods(policy),
 			Mutations:          []admissionregistrationv1.Mutation{mutation},
 		},
 	}
@@ -353,14 +281,14 @@ func benchMAP(name, policy string, mutation admissionregistrationv1.Mutation) *a
 // benchMAPApply mutates every container with a server-side-apply style
 // mutation built from typed objects in CEL.
 func benchMAPApply(name string) *admissionregistrationv1.MutatingAdmissionPolicy {
-	return benchMAP(name, "map-apply", admissionregistrationv1.Mutation{
+	return benchMAP(name, admissionPolicyMAPApply, admissionregistrationv1.Mutation{
 		PatchType: admissionregistrationv1.PatchTypeApplyConfiguration,
 		ApplyConfiguration: &admissionregistrationv1.ApplyConfiguration{Expression: `Object{
 			metadata: Object.metadata{labels: {"mutated-by": "map-bench"}},
-			spec: Object.spec{template: Object.spec.template{spec: Object.spec.template.spec{
-				containers: object.spec.template.spec.containers.map(c,
-					Object.spec.template.spec.containers{name: c.name, imagePullPolicy: "IfNotPresent"})
-			}}}
+			spec: Object.spec{
+				containers: object.spec.containers.map(c,
+					Object.spec.containers{name: c.name, imagePullPolicy: "Always"})
+			}
 		}`},
 	})
 }
@@ -368,13 +296,13 @@ func benchMAPApply(name string) *admissionregistrationv1.MutatingAdmissionPolicy
 // benchMAPJSONPatch mutates every container with JSON patch operations built
 // in CEL.
 func benchMAPJSONPatch(name string) *admissionregistrationv1.MutatingAdmissionPolicy {
-	return benchMAP(name, "map-jsonpatch", admissionregistrationv1.Mutation{
+	return benchMAP(name, admissionPolicyMAPJSONPatch, admissionregistrationv1.Mutation{
 		PatchType: admissionregistrationv1.PatchTypeJSONPatch,
 		JSONPatch: &admissionregistrationv1.JSONPatch{Expression: `[
 			JSONPatch{op: "add", path: "/metadata/labels/mutated-by", value: "map-bench"},
-			JSONPatch{op: "replace", path: "/spec/template/spec/containers",
-				value: object.spec.template.spec.containers.map(c,
-					Object.spec.template.spec.containers{name: c.name, image: c.image, imagePullPolicy: "IfNotPresent"})}
+			JSONPatch{op: "replace", path: "/spec/containers",
+				value: object.spec.containers.map(c,
+					Object.spec.containers{name: c.name, image: c.image, imagePullPolicy: "Always"})}
 		]`},
 	})
 }
