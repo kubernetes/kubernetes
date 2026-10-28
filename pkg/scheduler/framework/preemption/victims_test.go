@@ -251,7 +251,24 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").MinCount(2).DisruptionModeAll().Priority(50).Obj(),
+			},
+			wantVictims: []expectedVictim{
+				{pods: sets.New("p1", "p2"), priority: 50},
+			},
+		},
+		{
+			name: "pods with basic pod group (DisruptionModeAll)",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
+			},
+			podGroups: map[string]*schedulingv1beta1.PodGroup{
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").BasicPolicy().DisruptionModeAll().Priority(50).Obj(),
 			},
 			wantVictims: []expectedVictim{
 				{pods: sets.New("p1", "p2"), priority: 50},

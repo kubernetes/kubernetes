@@ -183,11 +183,11 @@ func TestHierarchyValidation(t *testing.T) {
 			steps: []stepsframework.Step{
 				{
 					Name:                    "Create root composite pod group with All disruption mode",
-					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl", "root-t").BasicPolicy().DisruptionModeAll().Priority(100).Obj(),
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl", "root-t").MinGroupCount(1).DisruptionModeAll().Priority(100).Obj(),
 				},
 				{
 					Name:           "Create child pod group with Single disruption mode",
-					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(100).Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg-root").MinCount(1).DisruptionModeSingle().Priority(100).Obj(),
 				},
 				{
 					Name:       "Create pod for pg1",

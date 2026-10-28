@@ -174,6 +174,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"pod group disruption mode": {
 			input: mkValidPodGroup(setDisruptionModeAll()),
 		},
+		"basic policy with disruption mode all": {
+			input: mkValidPodGroup(setBasicPolicy(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is other than "gang"`).MarkFromImperative(),
+			},
+		},
+		"neither basic nor gang policy with disruption mode all": {
+			input: mkValidPodGroup(clearPodGroupPolicy(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is other than "gang"`).MarkFromImperative(),
+			},
+		},
+		"both basic and gang policy with disruption mode all": {
+			input: mkValidPodGroup(setBothPolicies(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
 		"disruption mode with neither single nor all": {
 			input:        mkValidPodGroup(setDisruptionModeNeither()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), nil, "").WithOrigin("union")},
@@ -378,7 +397,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}{
 		"valid update": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setLabel("foo", "bar")),
+		},
+		"valid update with existing basic policy and disruption mode all": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll(), setLabel("foo", "bar")),
 		},
 		"valid update minCount": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
@@ -476,11 +499,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"valid update with unchanged scheduling constraints and TAS disabled": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo"), setLabel("foo", "bar")),
 		},
 		"valid update with unchanged scheduling constraints": {
 			oldObj:                        mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
-			updateObj:                     mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo"), setLabel("foo", "bar")),
 			enableTopologyAwareScheduling: true,
 		},
 		"invalid update to scheduling constraints": {
@@ -945,5 +968,14 @@ func clearPreemptionPolicy() func(obj *scheduling.PodGroup) {
 func setParentCompositePodGroupName(name string) func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.ParentCompositePodGroupName = &name
+	}
+}
+
+func setLabel(k, v string) func(obj *scheduling.PodGroup) {
+	return func(obj *scheduling.PodGroup) {
+		if obj.Labels == nil {
+			obj.Labels = make(map[string]string)
+		}
+		obj.Labels[k] = v
 	}
 }
