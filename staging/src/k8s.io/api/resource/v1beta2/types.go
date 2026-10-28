@@ -707,7 +707,10 @@ type DeviceCapacity struct {
 type Counter struct {
 	// value defines how much of a certain device counter is available.
 	//
+	// Must be greater than or equal to zero.
+	//
 	// +required
+	// +k8s:minimum=0
 	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 }
 

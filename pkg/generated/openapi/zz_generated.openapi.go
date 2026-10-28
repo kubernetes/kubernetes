@@ -48314,7 +48314,7 @@ func schema_k8sio_api_resource_v1_Counter(ref common.ReferenceCallback) common.O
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "value defines how much of a certain device counter is available.",
+							Description: "value defines how much of a certain device counter is available.\n\nMust be greater than or equal to zero.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -51886,7 +51886,7 @@ func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "value defines how much of a certain device counter is available.",
+							Description: "value defines how much of a certain device counter is available.\n\nMust be greater than or equal to zero.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -54184,7 +54184,7 @@ func schema_k8sio_api_resource_v1beta2_Counter(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "value defines how much of a certain device counter is available.",
+							Description: "value defines how much of a certain device counter is available.\n\nMust be greater than or equal to zero.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},

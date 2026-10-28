@@ -99,6 +99,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.devices[*].consumesCounters[*].counters[*].value": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.devices[*].nodeAllocatableResources[*].mapping": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -126,6 +129,9 @@ func init() {
 			"spec.sharedCounters[*].counters": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.sharedCounters[*].counters[*].value": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.sharedCounters[*].name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
