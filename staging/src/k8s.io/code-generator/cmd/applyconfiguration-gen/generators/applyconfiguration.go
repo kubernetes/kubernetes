@@ -156,7 +156,7 @@ func blocklisted(t *types.Type, member types.Member) bool {
 
 func needsGetter(t *types.Type, member types.Member) bool {
 	// Needed when applying an ApplyConfiguration
-	return (objectMeta.Name == t.Name && (member.Name == "Name" || member.Name == "Namespace")) ||
+	return (objectMeta.Name == t.Name && (member.Name == "Name" || member.Name == "Namespace" || member.Name == "ResourceVersion")) ||
 		(typeMeta.Name == t.Name && (member.Name == "Kind" || member.Name == "APIVersion"))
 }
 
