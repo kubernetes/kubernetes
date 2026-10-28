@@ -331,14 +331,8 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
-		podGroupPreemptor = &schedulingv1beta1.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"},
-			Spec:       schedulingv1beta1.PodGroupSpec{Priority: &highPriority},
-		}
-		compositePodGroupPreemptor = &schedulingv1beta1.CompositePodGroup{
-			ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"},
-			Spec:       schedulingv1beta1.CompositePodGroupSpec{Priority: &highPriority},
-		}
+		podGroupPreemptor          = st.MakePodGroup().Name("pg1").Namespace("default").UID("pg1").Priority(highPriority).Obj()
+		compositePodGroupPreemptor = st.MakeCompositePodGroup().Name("cpg1").Namespace("default").UID("cpg1").Priority(highPriority).Obj()
 
 		errDeletePodFailed   = errors.New("delete pod failed")
 		errPatchStatusFailed = errors.New("patch pod status failed")
@@ -351,12 +345,12 @@ func TestPrepareCandidate(t *testing.T) {
 	victimWithDeletionTimestamp.Finalizers = []string{"test"}
 
 	tests := []struct {
-		name                     string
-		nodeNames                []string
-		candidate                fwk.PreemptionCandidate
-		preemptor                *v1.Pod
-		preemptorGenericPodGroup *fwk.GenericPodGroup
-		testPods                 []*v1.Pod
+		name                  string
+		nodeNames             []string
+		candidate             fwk.PreemptionCandidate
+		preemptor             *v1.Pod
+		preemptorPodGroupInfo *framework.PodGroupInfo
+		testPods              []*v1.Pod
 		// expectedDeletedPod is the pod name that is expected to be deleted.
 		//
 		// You can set multiple pod name if there're multiple possibilities.
@@ -413,8 +407,8 @@ func TestPrepareCandidate(t *testing.T) {
 					victim1,
 				},
 			}, node1Name, nil, node1Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(podGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -431,8 +425,8 @@ func TestPrepareCandidate(t *testing.T) {
 					victim1,
 				},
 			}, node1Name, nil, node1Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewCompositePodGroupInfo(compositePodGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -527,14 +521,14 @@ func TestPrepareCandidate(t *testing.T) {
 					failVictim1WithMatchingPodGroupCondition,
 				},
 			}, node1Name, nil, node1Name),
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
-			preemptor:                preemptor,
-			testPods:                 []*v1.Pod{},
-			expectedDeletionError:    true,
-			nodeNames:                []string{node1Name},
-			expectedStatus:           fwk.AsStatus(errDeletePodFailed),
-			expectedPreemptingMap:    sets.New(types.UID("pg1")),
-			expectedActivatedPods:    map[string]*v1.Pod{preemptor.Name: preemptor},
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(podGroupPreemptor),
+			preemptor:             preemptor,
+			testPods:              []*v1.Pod{},
+			expectedDeletionError: true,
+			nodeNames:             []string{node1Name},
+			expectedStatus:        fwk.AsStatus(errDeletePodFailed),
+			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, not-found victim error is ignored when deleting",
@@ -599,8 +593,8 @@ func TestPrepareCandidate(t *testing.T) {
 					victim1,
 				},
 			}, node1Name, map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 2}, node1Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(podGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -612,7 +606,7 @@ func TestPrepareCandidate(t *testing.T) {
 		},
 		{
 			name: "metrics: pod preemptor with PDB violations",
-			// The preemptor is a pod (no preemptorGenericPodGroup), so preemption_workload_disruptions
+			// The preemptor is a pod (no preemptorPodGroupInfo), so preemption_workload_disruptions
 			// must not be recorded even though the candidate carries disruptions.
 			candidate: newCandidate(&extenderv1.Victims{
 				Pods: []*v1.Pod{
@@ -637,8 +631,8 @@ func TestPrepareCandidate(t *testing.T) {
 				},
 				NumPDBViolations: 1,
 			}, node1Name, map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1}, node1Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(podGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -656,8 +650,8 @@ func TestPrepareCandidate(t *testing.T) {
 				},
 				NumPDBViolations: 1,
 			}, node1Name, map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1}, node1Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewCompositePodGroupInfo(compositePodGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -674,8 +668,8 @@ func TestPrepareCandidate(t *testing.T) {
 					victim1,
 				},
 			}, "cluster", nil, node1Name, node2Name),
-			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
+			preemptor:             preemptor,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(podGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 				nomPod1Node1,
@@ -845,9 +839,8 @@ func TestPrepareCandidate(t *testing.T) {
 					executor := NewExecutor(schedFramework, feature.Features{EnableAsyncPreemption: asyncPreemptionEnabled})
 
 					var preemptor ExecutorPreemptor
-					if tt.preemptorGenericPodGroup != nil {
-						pgInfo := &framework.PodGroupInfo{GenericPodGroup: tt.preemptorGenericPodGroup}
-						preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{tt.preemptor}}
+					if tt.preemptorPodGroupInfo != nil {
+						preemptor = &podGroupExecutorPreemptor{PodGroupInfo: tt.preemptorPodGroupInfo, pods: []*v1.Pod{tt.preemptor}}
 					} else {
 						preemptor = &podExecutorPreemptor{Pod: tt.preemptor}
 					}
@@ -985,9 +978,9 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 				SchedulerName(defaultSchedulerName).Priority(highPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
-		preemptorPodGroups = map[fwk.EntityKeyType]*fwk.GenericPodGroup{
-			fwk.PodGroupKeyType:          fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}),
-			fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+		preemptorPodGroups = map[fwk.EntityKeyType]*framework.PodGroupInfo{
+			fwk.PodGroupKeyType:          tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("default").UID("pg1").Obj()),
+			fwk.CompositePodGroupKeyType: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").UID("cpg1").Obj()),
 		}
 		testPods = []*v1.Pod{
 			victim1,
@@ -1098,8 +1091,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					executor := NewExecutor(schedFramework, feature.Features{EnableAsyncPreemption: true})
 
 					var preemptor ExecutorPreemptor
-					if gpg, ok := preemptorPodGroups[preemptorType]; ok {
-						pgInfo := &framework.PodGroupInfo{GenericPodGroup: gpg}
+					if pgInfo, ok := preemptorPodGroups[preemptorType]; ok {
 						preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{tt.preemptor}}
 					} else {
 						preemptor = &podExecutorPreemptor{Pod: tt.preemptor}
@@ -1204,7 +1196,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 	tests := []struct {
 		name                                 string
 		victims                              []*v1.Pod
-		preemptorGenericPodGroup             *fwk.GenericPodGroup
+		preemptorPodGroupInfo                *framework.PodGroupInfo
 		preemptorPods                        []*v1.Pod
 		expectSuccessfulPreemption           bool
 		expectPreemptionAttemptForLastVictim bool
@@ -1280,7 +1272,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			victims: []*v1.Pod{
 				makeVictim(failVictimNamePrefix),
 			},
-			preemptorGenericPodGroup:             fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"}}),
+			preemptorPodGroupInfo:                tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("default").Obj()),
 			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
 			expectSuccessfulPreemption:           false,
 			expectPreemptionAttemptForLastVictim: true,
@@ -1290,7 +1282,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			victims: []*v1.Pod{
 				makeVictim(failVictimNamePrefix),
 			},
-			preemptorGenericPodGroup:             fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"}}),
+			preemptorPodGroupInfo:                tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Obj()),
 			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
 			expectSuccessfulPreemption:           false,
 			expectPreemptionAttemptForLastVictim: true,
@@ -1368,9 +1360,8 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			executor := NewExecutor(schedFramework, feature.Features{EnableAsyncPreemption: true})
 
 			var preemptor ExecutorPreemptor
-			if tt.preemptorGenericPodGroup != nil {
-				pgInfo := &framework.PodGroupInfo{GenericPodGroup: tt.preemptorGenericPodGroup}
-				preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: tt.preemptorPods}
+			if tt.preemptorPodGroupInfo != nil {
+				preemptor = &podGroupExecutorPreemptor{PodGroupInfo: tt.preemptorPodGroupInfo, pods: tt.preemptorPods}
 			} else {
 				preemptor = &podExecutorPreemptor{Pod: preemptorPod}
 			}
@@ -1407,7 +1398,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			}
 
 			// Verify that the preemptor is activated if and only if the async preemption fails.
-			if tt.preemptorGenericPodGroup != nil {
+			if tt.preemptorPodGroupInfo != nil {
 				if len(fakeActivator.activatedPods) != len(tt.preemptorPods) {
 					t.Errorf("Expected %d pods to be activated, but got %v", len(tt.preemptorPods), fakeActivator.activatedPods)
 				}
@@ -1514,9 +1505,9 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 
 func TestPreemptPod(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
-	preemptorPodGroups := map[fwk.EntityKeyType]*fwk.GenericPodGroup{
-		fwk.PodGroupKeyType:          fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}),
-		fwk.CompositePodGroupKeyType: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}),
+	preemptorPodGroups := map[fwk.EntityKeyType]*framework.PodGroupInfo{
+		fwk.PodGroupKeyType:          tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg").Namespace("default").Obj()),
+		fwk.CompositePodGroupKeyType: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()),
 	}
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(), st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()}
 
@@ -1603,8 +1594,7 @@ func TestPreemptPod(t *testing.T) {
 				pe := NewExecutor(schedFramework, feature.Features{})
 
 				var preemptor ExecutorPreemptor
-				if gpg, ok := preemptorPodGroups[preemptorType]; ok {
-					pgInfo := &framework.PodGroupInfo{GenericPodGroup: gpg}
+				if pgInfo, ok := preemptorPodGroups[preemptorType]; ok {
 					preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: preemptorPods}
 				} else {
 					preemptor = &podExecutorPreemptor{Pod: preemptorPod}
@@ -1645,8 +1635,8 @@ func TestPreemptPod(t *testing.T) {
 func TestPrepareCandidateAsyncActivatesPreemptor(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
-	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
-	preemptorCompositePodGroup := &schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", UID: "cpg"}}
+	preemptorPodGroup := st.MakePodGroup().Name("pg").UID("pg").Obj()
+	preemptorCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").UID("cpg").Obj()
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
@@ -1661,7 +1651,7 @@ func TestPrepareCandidateAsyncActivatesPreemptor(t *testing.T) {
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
-		preemptorGenericPodGroup    *fwk.GenericPodGroup
+		preemptorPodGroupInfo       *framework.PodGroupInfo
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool
 	}{
@@ -1694,22 +1684,22 @@ func TestPrepareCandidateAsyncActivatesPreemptor(t *testing.T) {
 			wantPreemptorActivate: true,
 		},
 		{
-			name:                     "last waiting pod for pod group",
-			victimPods:               []*v1.Pod{waitingVictim.DeepCopy()},
-			inMemoryVictim:           waitingVictim.DeepCopy(),
-			addVictimToWaiting:       true,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(preemptorPodGroup),
-			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
-			wantPreemptorActivate:    true,
+			name:                  "last waiting pod for pod group",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(preemptorPodGroup),
+			preemptorPods:         []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate: true,
 		},
 		{
-			name:                     "last waiting pod for composite pod group",
-			victimPods:               []*v1.Pod{waitingVictim.DeepCopy()},
-			inMemoryVictim:           waitingVictim.DeepCopy(),
-			addVictimToWaiting:       true,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
-			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
-			wantPreemptorActivate:    true,
+			name:                  "last waiting pod for composite pod group",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			preemptorPodGroupInfo: tf.NewCompositePodGroupInfo(preemptorCompositePodGroup),
+			preemptorPods:         []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate: true,
 		},
 		{
 			name:                  "last victim already deleted on patch",
@@ -1769,9 +1759,8 @@ func TestPrepareCandidateAsyncActivatesPreemptor(t *testing.T) {
 				preemptorPods = []*v1.Pod{preemptorPod.DeepCopy()}
 			}
 			var preemptor ExecutorPreemptor
-			if tt.preemptorGenericPodGroup != nil {
-				pgInfo := &framework.PodGroupInfo{GenericPodGroup: tt.preemptorGenericPodGroup}
-				preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: preemptorPods}
+			if tt.preemptorPodGroupInfo != nil {
+				preemptor = &podGroupExecutorPreemptor{PodGroupInfo: tt.preemptorPodGroupInfo, pods: preemptorPods}
 			} else {
 				preemptor = &podExecutorPreemptor{Pod: preemptorPods[0]}
 			}
@@ -2154,19 +2143,19 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 	preemptor := st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Obj()
 
 	preemptors := []struct {
-		name                     string
-		preemptorGenericPodGroup *fwk.GenericPodGroup
+		name                  string
+		preemptorPodGroupInfo *framework.PodGroupInfo
 	}{
 		{
 			name: metrics.Pod,
 		},
 		{
-			name:                     metrics.PodGroup,
-			preemptorGenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}),
+			name:                  metrics.PodGroup,
+			preemptorPodGroupInfo: tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("default").UID("pg1").Obj()),
 		},
 		{
-			name:                     metrics.CompositePodGroup,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+			name:                  metrics.CompositePodGroup,
+			preemptorPodGroupInfo: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").UID("cpg1").Obj()),
 		},
 	}
 
@@ -2231,9 +2220,8 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 
 					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: async})
 					var execPreemptor ExecutorPreemptor
-					if p.preemptorGenericPodGroup != nil {
-						pgInfo := &framework.PodGroupInfo{GenericPodGroup: p.preemptorGenericPodGroup}
-						execPreemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{preemptor}}
+					if p.preemptorPodGroupInfo != nil {
+						execPreemptor = &podGroupExecutorPreemptor{PodGroupInfo: p.preemptorPodGroupInfo, pods: []*v1.Pod{preemptor}}
 					} else {
 						execPreemptor = &podExecutorPreemptor{Pod: preemptor}
 					}
@@ -2308,10 +2296,9 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			}
 			pods = append(pods, p.Obj())
 		}
-		return newTestPodGroupInfo(
+		return tf.NewLeafPodGroupInfo(
 			st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(priority).Obj(),
-			nil,
-			pods,
+			pods...,
 		)
 	}
 

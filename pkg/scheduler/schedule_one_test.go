@@ -5632,22 +5632,10 @@ func TestGetDifferentUIDPreCheck(t *testing.T) {
 	otherPodInfo3 := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, otherPod3)}
 
 	pgWithTarget := st.MakePodGroup().Name("pg-with-target").Obj()
-	pgWithTargetPod := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(pgWithTarget),
-		},
-	}
-	pgWithTargetPod.AddPod(otherPodInfo1)
-	pgWithTargetPod.AddPod(targetPodInfo)
+	pgWithTargetPod := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pgWithTarget), otherPodInfo1, targetPodInfo)
 
 	pgWithoutTarget := st.MakePodGroup().Name("pg-without-target").Obj()
-	pgWithoutTargetPod := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(pgWithoutTarget),
-		},
-	}
-	pgWithoutTargetPod.AddPod(otherPodInfo2)
-	pgWithoutTargetPod.AddPod(otherPodInfo3)
+	pgWithoutTargetPod := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pgWithoutTarget), otherPodInfo2, otherPodInfo3)
 
 	tests := []struct {
 		name     string
