@@ -27,7 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -35,9 +35,10 @@ import (
 
 // CoreDNSCheck validates installed kubelet version
 type CoreDNSCheck struct {
-	name   string
-	client clientset.Interface
-	f      func(clientset.Interface) error
+	name          string
+	client        clientset.Interface
+	targetVersion string
+	f             func(clientset.Interface, string) error
 }
 
 // Name is part of the preflight.Checker interface
@@ -47,24 +48,27 @@ func (c CoreDNSCheck) Name() string {
 
 // Check is part of the preflight.Checker interface
 func (c CoreDNSCheck) Check() (warnings, errors []error) {
-	if err := c.f(c.client); err != nil {
+	if err := c.f(c.client, c.targetVersion); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration) error {
+	targetCoreDNSVersion := dns.GetCoreDNSMigrationVersion(cfg)
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
-			name:   "CoreDNSUnsupportedPlugins",
-			client: client,
-			f:      checkUnsupportedPlugins,
+			name:          "CoreDNSUnsupportedPlugins",
+			client:        client,
+			targetVersion: targetCoreDNSVersion,
+			f:             checkUnsupportedPlugins,
 		},
 		&CoreDNSCheck{
-			name:   "CoreDNSMigration",
-			client: client,
-			f:      checkMigration,
+			name:          "CoreDNSMigration",
+			client:        client,
+			targetVersion: targetCoreDNSVersion,
+			f:             checkMigration,
 		},
 	}
 
@@ -73,7 +77,7 @@ func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors 
 
 // checkUnsupportedPlugins checks if there are any plugins included in the current configuration
 // that are unsupported for migration.
-func checkUnsupportedPlugins(client clientset.Interface) error {
+func checkUnsupportedPlugins(client clientset.Interface, targetCoreDNSVersion string) error {
 	klog.V(1).Infoln("validating if there are any unsupported CoreDNS plugins in the Corefile")
 	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(client)
 	if err != nil {
@@ -81,7 +85,6 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	}
 
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
-	targetCoreDNSVersion := strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v")
 	if currentInstalledCoreDNSversion == targetCoreDNSVersion {
 		return nil
 	}
@@ -105,7 +108,7 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 }
 
 // checkMigration validates if migration of the current CoreDNS ConfigMap is possible.
-func checkMigration(client clientset.Interface) error {
+func checkMigration(client clientset.Interface, targetCoreDNSVersion string) error {
 	klog.V(1).Infoln("validating if migration can be done for the current CoreDNS release.")
 	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(client)
 	if err != nil {
@@ -113,6 +116,6 @@ func checkMigration(client clientset.Interface) error {
 	}
 
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
-	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
+	_, err = migration.Migrate(currentInstalledCoreDNSversion, targetCoreDNSVersion, corefile, false)
 	return errors.Wrap(err, "CoreDNS will not be upgraded")
 }

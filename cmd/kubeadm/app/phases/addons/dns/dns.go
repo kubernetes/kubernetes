@@ -162,14 +162,20 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return nil
 	}
 
-	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
+	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client, GetCoreDNSMigrationVersion(cfg)); err != nil {
 		return err
 	}
 	fmt.Fprintln(out, "[addons] Applied essential addon: CoreDNS")
 	return nil
 }
 
-func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface) error {
+// GetCoreDNSMigrationVersion returns the target CoreDNS version in the form expected by corefile-migration,
+// i.e. the image tag (which honors cfg.DNS.ImageTag) without the "v" prefix.
+func GetCoreDNSMigrationVersion(cfg *kubeadmapi.ClusterConfiguration) string {
+	return strings.TrimPrefix(images.GetDNSImageTag(cfg), "v")
+}
+
+func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface, targetCoreDNSVersion string) error {
 	coreDNSConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configBytes, coreDNSConfigMap); err != nil {
 		return errors.Wrapf(err, "%s ConfigMap", unableToDecodeCoreDNS)
@@ -181,7 +187,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 		return errors.Wrap(err, "unable to fetch CoreDNS current installed version and ConfigMap.")
 	}
 
-	corefileMigrationRequired, err := isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion)
+	corefileMigrationRequired, err := isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion, targetCoreDNSVersion)
 	if err != nil {
 		return err
 	}
@@ -198,7 +204,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 		}
 	} else if corefileMigrationRequired {
 		// If migration is required, try and migrate the Corefile
-		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
+		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion, targetCoreDNSVersion); err != nil {
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
 			canMigrateCorefile = false
@@ -288,7 +294,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 }
 
 // isCoreDNSConfigMapMigrationRequired checks if a migration of the CoreDNS ConfigMap is required.
-func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion string) (bool, error) {
+func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion, targetCoreDNSVersion string) (bool, error) {
 	var isMigrationRequired bool
 
 	// Current installed version is expected to be empty for init
@@ -296,13 +302,17 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 		return isMigrationRequired, nil
 	}
 	currentInstalledCoreDNSVersion = strings.TrimLeft(currentInstalledCoreDNSVersion, "v")
-	targetCoreDNSVersion := strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v")
 	if currentInstalledCoreDNSVersion == targetCoreDNSVersion {
 		return isMigrationRequired, nil
 	}
 	deprecated, err := migration.Deprecated(currentInstalledCoreDNSVersion, targetCoreDNSVersion, corefile)
 	if err != nil {
-		return isMigrationRequired, errors.Wrap(err, "unable to get list of changes to the configuration.")
+		// A target tag unknown to corefile-migration (e.g. a custom dns.imageTag) must not fail the upgrade
+		// after the control plane is already upgraded. Report migration as required so that
+		// migrateCoreDNSCorefile fails into the retain-ConfigMap fallback with a warning.
+		klog.Warningf("unable to get list of changes to the CoreDNS configuration between %q and %q: %v",
+			currentInstalledCoreDNSVersion, targetCoreDNSVersion, err)
+		return true, nil
 	}
 
 	// Check if there are any plugins/options which needs to be removed or is a new default
@@ -315,9 +325,9 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	return isMigrationRequired, nil
 }
 
-func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion string) error {
+func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion, targetCoreDNSVersion string) error {
 	// Since the current configuration present is not the default version, try and migrate it.
-	updatedCorefile, err := migration.Migrate(currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
+	updatedCorefile, err := migration.Migrate(currentInstalledCoreDNSVersion, targetCoreDNSVersion, corefile, false)
 	if err != nil {
 		return errors.Wrap(err, "unable to migrate CoreDNS ConfigMap")
 	}
@@ -342,7 +352,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 	}
 
 	fmt.Println("[addons] Migrating CoreDNS Corefile")
-	changes, err := migration.Deprecated(currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile)
+	changes, err := migration.Deprecated(currentInstalledCoreDNSVersion, targetCoreDNSVersion, corefile)
 	if err != nil {
 		return errors.Wrap(err, "unable to get list of changes to the configuration.")
 	}
