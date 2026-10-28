@@ -74,10 +74,8 @@ type PodSecurityContextApplyConfiguration struct {
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 	// supplementalGroupsPolicy defines how supplemental groups of the first container processes are calculated.
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
-	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
-	// and the container runtime must implement support for this feature.
+	// The container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
-	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
 	SupplementalGroupsPolicy *corev1.SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty"`
 	// fsGroup is a special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
