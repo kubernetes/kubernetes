@@ -414,11 +414,11 @@ func TestEmptyCAFileRotationLifecycle(t *testing.T) {
 	// Verify the initial state: RootCAs should be non-nil but empty
 	initialTransport := holder.getTransport(context.Background())
 
-	if initialTransport.TLSClientConfig == nil || initialTransport.TLSClientConfig.RootCAs == nil {
+	if initialTransport.GetRootCAs() == nil {
 		t.Fatal("Expected RootCAs to be non-nil for an empty CA file (should be an empty CertPool)")
 	}
 	emptyPool := x509.NewCertPool()
-	if !initialTransport.TLSClientConfig.RootCAs.Equal(emptyPool) {
+	if !initialTransport.GetRootCAs().Equal(emptyPool) {
 		t.Fatal("Expected initially empty RootCAs")
 	}
 
@@ -435,7 +435,7 @@ func TestEmptyCAFileRotationLifecycle(t *testing.T) {
 	refreshedTransport := holder.getTransport(context.Background())
 
 	// Verify the refresh succeeded and the cert pool is now populated
-	if refreshedTransport.TLSClientConfig.RootCAs.Equal(emptyPool) {
+	if refreshedTransport.GetRootCAs().Equal(emptyPool) {
 		t.Fatal("Expected RootCAs to be populated after writing valid cert data and refreshing")
 	}
 }
