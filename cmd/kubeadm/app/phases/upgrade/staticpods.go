@@ -25,6 +25,7 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -287,6 +288,12 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Add etcd static pod spec only if external etcd is not configured
 	if cfg.Etcd.External != nil {
 		return false, errors.New("external etcd detected, won't try to change any etcd state")
+	}
+
+	// Stop before the backup and manifest rewrite. Callers can skip the preflight
+	// phase and invoke this upgrade directly, so the same check runs here.
+	if err := RunEtcdDataDirCheck(pathMgr.RealManifestDir(), &cfg.ClusterConfiguration, sets.New(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+		return true, err
 	}
 
 	// Checking health state of etcd before proceeding with the upgrade

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -77,6 +78,15 @@ func runPreflight(c workflow.RunData) error {
 	// Run CoreDNS migration check.
 	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors); err != nil {
 		return err
+	}
+
+	// Stacked etcd is rewritten from ClusterConfiguration. Catch a restored data
+	// directory before that rewrite. External etcd and --etcd-upgrade=false skip it.
+	// --dry-run does not rewrite the manifest, and is valid before a cluster exists.
+	if data.EtcdUpgrade() && !data.DryRun() {
+		if err := upgrade.RunEtcdDataDirCheck(constants.GetStaticPodDirectory(), &initCfg.ClusterConfiguration, ignorePreflightErrors); err != nil {
+			return err
+		}
 	}
 
 	// Run healthchecks against the cluster.

@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
@@ -59,9 +61,16 @@ func runPreflight(c workflow.RunData) error {
 
 	// If this is a control-plane node, pull the basic images.
 	if data.IsControlPlaneNode() {
+		initConfig := data.InitCfg()
+		// The same manifest rewrite happens on every control-plane node.
+		// --dry-run does not rewrite the manifest, and is valid before a cluster exists.
+		if data.EtcdUpgrade() && !data.DryRun() {
+			if err := upgrade.RunEtcdDataDirCheck(constants.GetStaticPodDirectory(), &initConfig.ClusterConfiguration, data.IgnorePreflightErrors()); err != nil {
+				return err
+			}
+		}
 		// Update the InitConfiguration used for RunPullImagesCheck with ImagePullPolicy and ImagePullSerial
 		// that come from UpgradeNodeConfiguration.
-		initConfig := data.InitCfg()
 		initConfig.NodeRegistration.ImagePullPolicy = data.Cfg().Node.ImagePullPolicy
 		initConfig.NodeRegistration.ImagePullSerial = data.Cfg().Node.ImagePullSerial
 
