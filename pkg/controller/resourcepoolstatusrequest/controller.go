@@ -98,8 +98,8 @@ type Controller struct {
 	// requestLister can list/get ResourcePoolStatusRequests from the shared informer's store
 	requestLister resourcev1alpha3listers.ResourcePoolStatusRequestLister
 
-	// sliceLister can list/get ResourceSlices from the shared informer's store
-	sliceLister resourcev1listers.ResourceSliceLister
+	// sliceIndexer is the shared ResourceSlice store, indexed by driver.
+	sliceIndexer cache.Indexer
 
 	// claimLister can list/get ResourceClaims from the shared informer's store
 	claimLister resourcev1listers.ResourceClaimLister
@@ -144,7 +144,7 @@ func NewController(
 	c := &Controller{
 		client:        client,
 		requestLister: requestInformer.Lister(),
-		sliceLister:   sliceInformer.Lister(),
+		sliceIndexer:  sliceInformer.Informer().GetIndexer(),
 		claimLister:   claimInformer.Lister(),
 		requestSynced: requestInformer.Informer().HasSynced,
 		sliceSynced:   sliceInformer.Informer().HasSynced,
@@ -164,6 +164,10 @@ func NewController(
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 		c.taintRuleLister = taintRuleInformer.Lister()
 		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
+	}
+
+	if err := sliceInformer.Informer().AddIndexers(cache.Indexers{sliceDriverIndex: sliceDriverIndexFunc}); err != nil {
+		return nil, fmt.Errorf("adding ResourceSlice driver index: %w", err)
 	}
 
 	// Register metrics
@@ -352,16 +356,35 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 // metricDriver returns driver if it publishes ResourceSlices, otherwise
 // metrics.UnknownDriver, so arbitrary spec.driver values can't create series.
 func (c *Controller) metricDriver(driver string) string {
-	slices, err := c.sliceLister.List(labels.Everything())
-	if err != nil {
+	if slices, err := c.sliceIndexer.ByIndex(sliceDriverIndex, driver); err != nil || len(slices) == 0 {
 		return metrics.UnknownDriver
 	}
-	for _, slice := range slices {
-		if slice.Spec.Driver == driver {
-			return driver
+	return driver
+}
+
+const sliceDriverIndex = "resourcepoolstatusrequest-driver"
+
+func sliceDriverIndexFunc(obj interface{}) ([]string, error) {
+	slice, ok := obj.(*resourcev1.ResourceSlice)
+	if !ok {
+		return nil, nil
+	}
+	return []string{slice.Spec.Driver}, nil
+}
+
+// slicesForDriver returns the driver's ResourceSlices from the shared store.
+func (c *Controller) slicesForDriver(driver string) ([]*resourcev1.ResourceSlice, error) {
+	objs, err := c.sliceIndexer.ByIndex(sliceDriverIndex, driver)
+	if err != nil {
+		return nil, err
+	}
+	slices := make([]*resourcev1.ResourceSlice, 0, len(objs))
+	for _, obj := range objs {
+		if slice, ok := obj.(*resourcev1.ResourceSlice); ok {
+			slices = append(slices, slice)
 		}
 	}
-	return metrics.UnknownDriver
+	return slices, nil
 }
 
 // forgetRequest resets the retry count, so a request recreated with the same
@@ -461,7 +484,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		sharedCounters []resourcev1.CounterSet
 	}
 
-	slices, err := c.sliceLister.List(labels.Everything())
+	slices, err := c.slicesForDriver(driver)
 	if err != nil {
 		logger.Error(err, "Failed to list ResourceSlices")
 		return errorStatus("Failed to list ResourceSlices: " + err.Error())

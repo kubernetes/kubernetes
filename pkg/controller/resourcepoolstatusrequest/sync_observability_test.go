@@ -26,13 +26,11 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -42,18 +40,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
 )
 
-// failingSliceLister forces the CalculationFailed path.
-type failingSliceLister struct{}
+// failingSliceIndexer forces the CalculationFailed path.
+type failingSliceIndexer struct{ cache.Indexer }
 
-func (failingSliceLister) List(labels.Selector) ([]*resourcev1.ResourceSlice, error) {
+func (failingSliceIndexer) ByIndex(string, string) ([]interface{}, error) {
 	return nil, errors.New("injected list failure")
 }
-
-func (failingSliceLister) Get(string) (*resourcev1.ResourceSlice, error) {
-	return nil, errors.New("injected get failure")
-}
-
-var _ resourcev1listers.ResourceSliceLister = failingSliceLister{}
 
 // TestSyncRequestObservability checks the metrics and events of each sync outcome.
 func TestSyncRequestObservability(t *testing.T) {
@@ -144,7 +136,7 @@ func TestSyncRequestObservability(t *testing.T) {
 			addToStore(t, informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore(), request)
 			addToStore(t, informerFactory.Resource().V1().ResourceSlices().Informer().GetStore(), tc.slice)
 			if tc.failListing {
-				controller.sliceLister = failingSliceLister{}
+				controller.sliceIndexer = failingSliceIndexer{controller.sliceIndexer}
 			}
 
 			durationSum, err := testutil.GetHistogramMetricValue(metrics.RequestProcessingDuration.WithLabelValues(label))
