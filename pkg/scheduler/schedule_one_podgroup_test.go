@@ -1079,13 +1079,74 @@ func TestValidatePodGroup(t *testing.T) {
 			wantErr:                 `gang parent "compositepodgroup//cpg-root" cannot have basic child "compositepodgroup//cpg-child"`,
 		},
 		{
-			name:              "CPG failure when parent group with All disruption mode has PG child group with Single disruption mode",
+			name:     "success when basic PodGroup has All disruption mode",
+			podGroup: st.MakePodGroup().Name("pg").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
+			},
+		},
+		{
+			name:     "success when basic PodGroup has All disruption mode with CompositePodGroup enabled",
+			podGroup: st.MakePodGroup().Name("pg").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+		},
+		{
+			name:              "CPG failure when basic root CompositePodGroup has All disruption mode",
 			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").MinCount(1).DisruptionModeAll().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `basic pod group "compositepodgroup//cpg-root" cannot have All disruption mode`,
+		},
+		{
+			name:              "CPG failure when basic child CompositePodGroup has All disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").MinCount(1).DisruptionModeAll().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `basic pod group "compositepodgroup//cpg-child" cannot have All disruption mode`,
+		},
+		{
+			name:              "CPG failure when basic child PodGroup has All disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `basic pod group "podgroup//pg1" cannot have All disruption mode`,
+		},
+		{
+			name:              "CPG failure when parent group with All disruption mode has PG child group with Single disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").MinCount(1).DisruptionModeSingle().Priority(10).Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
@@ -1095,13 +1156,13 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:              "CPG failure when parent non-root group with All disruption mode has child group with Single disruption mode",
-			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").MinCount(1).DisruptionModeSingle().Priority(10).Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
@@ -1111,13 +1172,13 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:              "CPG failure when parent group with All disruption mode has CPG child group with Single disruption mode",
-			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").MinGroupCount(1).DisruptionModeSingle().Priority(10).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").MinCount(1).DisruptionModeAll().Priority(10).Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
@@ -1127,12 +1188,12 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:              "CPG success when parent group with All disruption mode has child group with All disruption mode",
-			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).DisruptionModeAll().Priority(10).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").MinCount(1).DisruptionModeAll().Priority(10).Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
