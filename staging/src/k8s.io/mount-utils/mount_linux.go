@@ -665,6 +665,16 @@ func (mounter *SafeFormatAndMount) format(fstype string, args []string) ([]byte,
 }
 
 func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
+	// Open the device before running blkid to ensure it exists and is accessible;
+	// otherwise blkid returns exit code 2 for missing devices just like unformatted ones.
+	f, err := os.Open(disk)
+	if err != nil {
+		return "", fmt.Errorf("failed to open disk %q: %w", disk, err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := exec.Command("blkid", args...).CombinedOutput()

@@ -1297,7 +1297,10 @@ func TestUnmounterTeardown(t *testing.T) {
 
 	// do a fake local mount
 	diskMounter := mount.NewSafeFormatAndMount(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
-	device := "/fake/device"
+	device := filepath.Join(tmpDir, "fake-device")
+	if err := os.WriteFile(device, nil, 0600); err != nil {
+		t.Fatalf("failed to create fake device file: %v", err)
+	}
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.
 		device = "1"
@@ -1354,7 +1357,10 @@ func TestUnmounterTeardownNoClientError(t *testing.T) {
 
 	// do a fake local mount
 	diskMounter := mount.NewSafeFormatAndMount(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
-	device := "/fake/device"
+	device := filepath.Join(tmpDir, "fake-device")
+	if err := os.WriteFile(device, nil, 0600); err != nil {
+		t.Fatalf("failed to create fake device file: %v", err)
+	}
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.
 		device = "1"

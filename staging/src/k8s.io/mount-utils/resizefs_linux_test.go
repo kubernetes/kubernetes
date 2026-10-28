@@ -20,6 +20,8 @@ package mount
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -375,6 +377,12 @@ func TestNeedResize(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			devicePath := filepath.Join(t.TempDir(), "test1")
+			if err := os.WriteFile(devicePath, []byte{}, 0600); err != nil {
+				t.Fatalf("failed to create fake device file: %v", err)
+			}
+			test.devicePath = devicePath
+
 			fcmd := fakeexec.FakeCmd{
 				CombinedOutputScript: []fakeexec.FakeAction{
 					func() ([]byte, []byte, error) { return []byte(test.readonly), nil, nil },
