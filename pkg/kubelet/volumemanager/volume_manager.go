@@ -208,7 +208,7 @@ func NewVolumeManager(
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil),
 		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
 			volumePluginMgr,
@@ -244,7 +244,8 @@ func NewVolumeManager(
 		mounter,
 		hostutil,
 		volumePluginMgr,
-		kubeletPodsDir)
+		kubeletPodsDir,
+		nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		vm.volumeHealthManager = volumehealth.NewManager(
