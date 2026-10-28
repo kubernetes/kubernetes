@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -553,9 +552,6 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig[schedulingapiv1beta1.SchemeGroupVersion.String()] = "true"
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-				options.APIEnablement.RuntimeConfig[schedulingapiv1alpha3.SchemeGroupVersion.String()] = "true"
 			}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {

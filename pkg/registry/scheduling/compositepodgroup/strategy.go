@@ -51,6 +51,9 @@ func (*compositePodGroupStrategy) NamespaceScoped() bool {
 
 func (*compositePodGroupStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"scheduling.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
@@ -120,6 +123,10 @@ func NewStatusStrategy(strategy *compositePodGroupStrategy) *compositePodGroupSt
 
 func (*compositePodGroupStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"scheduling.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
 		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),

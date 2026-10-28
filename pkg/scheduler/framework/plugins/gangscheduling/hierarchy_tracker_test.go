@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -58,7 +57,7 @@ func toGenericPodGroup(obj any) *fwk.GenericPodGroup {
 			return nil
 		}
 		return fwk.NewGenericPodGroup(o)
-	case *schedulingv1alpha3.CompositePodGroup:
+	case *schedulingv1beta1.CompositePodGroup:
 		if o == nil {
 			return nil
 		}

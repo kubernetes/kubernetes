@@ -1994,10 +1994,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1beta1.CompositeDisruptionModeApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositeGangSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1beta1.CompositeGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupStatusApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupTemplateApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("DisruptionMode"):

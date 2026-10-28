@@ -119,3 +119,61 @@ func TestSetDefaultsPodGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestSetDefaultsCompositePodGroup(t *testing.T) {
+	preemptNever := v1beta1.PreemptNever
+
+	tests := []struct {
+		name                           string
+		enablePodGroupPreemptionPolicy bool
+		cpg                            *v1beta1.CompositePodGroup
+		expectedPolicy                 *v1beta1.PreemptionPolicy
+	}{
+		{
+			name:                           "feature gate disabled, policy is nil",
+			cpg:                            &v1beta1.CompositePodGroup{},
+			enablePodGroupPreemptionPolicy: false,
+			expectedPolicy:                 nil,
+		},
+		{
+			name: "feature gate disabled, policy is set",
+			cpg: &v1beta1.CompositePodGroup{
+				Spec: v1beta1.CompositePodGroupSpec{
+					PreemptionPolicy: &preemptNever,
+				},
+			},
+			enablePodGroupPreemptionPolicy: false,
+			expectedPolicy:                 &preemptNever,
+		},
+		{
+			name:                           "feature gate enabled, nil policy is left for priority admission",
+			cpg:                            &v1beta1.CompositePodGroup{},
+			enablePodGroupPreemptionPolicy: true,
+			expectedPolicy:                 nil,
+		},
+		{
+			name: "feature gate enabled, policy is set",
+			cpg: &v1beta1.CompositePodGroup{
+				Spec: v1beta1.CompositePodGroupSpec{
+					PreemptionPolicy: &preemptNever,
+				},
+			},
+			enablePodGroupPreemptionPolicy: true,
+			expectedPolicy:                 &preemptNever,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
+				features.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
+			})
+
+			output := roundTrip(t, runtime.Object(tc.cpg)).(*v1beta1.CompositePodGroup)
+			if !reflect.DeepEqual(output.Spec.PreemptionPolicy, tc.expectedPolicy) {
+				t.Errorf("Expected PreemptionPolicy: %v, got: %v", tc.expectedPolicy, output.Spec.PreemptionPolicy)
+			}
+		})
+	}
+}

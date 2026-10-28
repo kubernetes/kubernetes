@@ -32,7 +32,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,9 +93,6 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	var runtimeConfig []string
 	if enabledFeatures[features.GenericWorkload] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1beta1.SchemeGroupVersion))
-	}
-	if enabledFeatures[features.CompositePodGroup] {
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1alpha3.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.

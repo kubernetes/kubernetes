@@ -16177,6 +16177,27 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1beta1.CompositePodGroup
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositePodGroupSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositePodGroupStatus
+      default: {}
 - name: io.k8s.api.scheduling.v1beta1.CompositePodGroupSchedulingConstraints
   map:
     fields:
@@ -16201,6 +16222,47 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: Basic
       - fieldName: gang
         discriminatorValue: Gang
+- name: io.k8s.api.scheduling.v1beta1.CompositePodGroupSpec
+  map:
+    fields:
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositeDisruptionMode
+      default:
+        single: {}
+    - name: parentCompositePodGroupName
+      type:
+        scalar: string
+    - name: preemptionPolicy
+      type:
+        scalar: string
+    - name: priority
+      type:
+        scalar: numeric
+    - name: priorityClassName
+      type:
+        scalar: string
+    - name: schedulingConstraints
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositePodGroupSchedulingConstraints
+    - name: schedulingPolicy
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositePodGroupSchedulingPolicy
+      default: {}
+    - name: workloadRef
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.WorkloadReference
+- name: io.k8s.api.scheduling.v1beta1.CompositePodGroupStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.scheduling.v1beta1.CompositePodGroupTemplate
   map:
     fields:

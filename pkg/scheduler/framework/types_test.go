@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -5154,7 +5153,7 @@ func newPodGroupInfoForTest(pg *schedulingv1beta1.PodGroup, pods ...*v1.Pod) *Po
 	}
 }
 
-func newCompositePodGroupInfoForTest(cpg *schedulingv1alpha3.CompositePodGroup, children ...*PodGroupInfo) *PodGroupInfo {
+func newCompositePodGroupInfoForTest(cpg *schedulingv1beta1.CompositePodGroup, children ...*PodGroupInfo) *PodGroupInfo {
 	return &PodGroupInfo{
 		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
 		children:        children,

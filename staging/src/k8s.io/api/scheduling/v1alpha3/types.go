@@ -1178,6 +1178,7 @@ type WorkloadCompositePodGroupAllDisruptionMode struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.37
 // +k8s:supportsSubresource="/status"
 
 // CompositePodGroup represents a runtime instance of pod groups grouped together.
@@ -1205,6 +1206,7 @@ type CompositePodGroup struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.37
 
 // CompositePodGroupList contains a list of CompositePodGroup resources.
 type CompositePodGroupList struct {

@@ -28,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -731,7 +730,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 		nodes                   []*v1.Node
 		pods                    []*v1.Pod
 		podGroups               []*schedulingv1beta1.PodGroup
-		compositePodGroups      []*schedulingv1alpha3.CompositePodGroup
+		compositePodGroups      []*schedulingv1beta1.CompositePodGroup
 		targetNode              string
 		expectedVictims         []*DomainVictim
 	}{
@@ -932,7 +931,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(midPriority).DisruptionModeAll().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
@@ -965,7 +964,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(midPriority).DisruptionModeSingle().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
@@ -997,7 +996,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
@@ -1083,7 +1082,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 			}
 
 			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
-			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())

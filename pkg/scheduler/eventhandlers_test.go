@@ -29,8 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -395,7 +394,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
-				reflect.TypeFor[*schedulingapi.PodGroup]():      true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():  true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -417,7 +416,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
-				reflect.TypeFor[*schedulingapi.PodGroup]():      true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():  true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -432,15 +431,15 @@ func TestAddAllEventHandlers(t *testing.T) {
 				fwk.CompositePodGroup: fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeFor[*v1.Pod]():                               true,
-				reflect.TypeFor[*v1.Node]():                              true,
-				reflect.TypeFor[*v1.Namespace]():                         true,
-				reflect.TypeFor[*resourceapi.ResourceClaim]():            true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():            true,
-				reflect.TypeFor[*resourceapi.DeviceTaintRule]():          true,
-				reflect.TypeFor[*resourceapi.DeviceClass]():              true,
-				reflect.TypeFor[*schedulingapi.PodGroup]():               true,
-				reflect.TypeFor[*schedulingv1alpha3.CompositePodGroup](): true,
+				reflect.TypeFor[*v1.Pod]():                              true,
+				reflect.TypeFor[*v1.Node]():                             true,
+				reflect.TypeFor[*v1.Namespace]():                        true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():           true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():           true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule]():         true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():             true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():          true,
+				reflect.TypeFor[*schedulingv1beta1.CompositePodGroup](): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -1451,7 +1450,7 @@ func TestUpdatePodGroup(t *testing.T) {
 		name           string
 		oldPodGroup    any
 		newPodGroup    any
-		expectPodGroup *schedulingapi.PodGroup
+		expectPodGroup *schedulingv1beta1.PodGroup
 		wantHint       queueingHintTracker
 	}{
 		{
@@ -1660,7 +1659,7 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 		name      string
 		oldCPG    any
 		newCPG    any
-		expectCPG *schedulingv1alpha3.CompositePodGroup
+		expectCPG *schedulingv1beta1.CompositePodGroup
 		wantHint  queueingHintTracker
 	}{
 		{
@@ -1999,12 +1998,12 @@ func TestRecreatedPodGroupQueueingHints(t *testing.T) {
 		{
 			name:     "PodGroup",
 			resource: fwk.PodGroup,
-			oldObj: func() *schedulingapi.PodGroup {
+			oldObj: func() *schedulingv1beta1.PodGroup {
 				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("old-uid").Obj()
 				obj.ResourceVersion = "1"
 				return obj
 			}(),
-			newObj: func() *schedulingapi.PodGroup {
+			newObj: func() *schedulingv1beta1.PodGroup {
 				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("new-uid").Obj()
 				obj.ResourceVersion = "2"
 				return obj
@@ -2016,12 +2015,12 @@ func TestRecreatedPodGroupQueueingHints(t *testing.T) {
 		{
 			name:     "CompositePodGroup",
 			resource: fwk.CompositePodGroup,
-			oldObj: func() *schedulingv1alpha3.CompositePodGroup {
+			oldObj: func() *schedulingv1beta1.CompositePodGroup {
 				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("old-uid").Obj()
 				obj.ResourceVersion = "1"
 				return obj
 			}(),
-			newObj: func() *schedulingv1alpha3.CompositePodGroup {
+			newObj: func() *schedulingv1beta1.CompositePodGroup {
 				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("new-uid").Obj()
 				obj.ResourceVersion = "2"
 				return obj

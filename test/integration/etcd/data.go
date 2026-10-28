@@ -628,6 +628,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.37",
 			RemovedVersion:    "1.43",
 		},
+		gvr("scheduling.k8s.io", "v1beta1", "compositepodgroups"): {
+			Stub:              `{"metadata": {"name": "cpg2"}, "spec": {"workloadRef": {"workloadName": "w", "templateName": "t"}, "schedulingPolicy": {"basic": {}}}}`,
+			ExpectedEtcdPath:  "/registry/compositepodgroups/" + namespace + "/cpg2",
+			IntroducedVersion: "1.38",
+			RemovedVersion:    "1.43",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3
@@ -648,6 +654,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("scheduling.k8s.io", "v1alpha3", "compositepodgroups"): {
 			Stub:              `{"metadata": {"name": "cpg1"}, "spec": {"workloadRef": {"templateName": "t", "workloadName": "w"}, "schedulingPolicy": {"basic": {}}}}`,
 			ExpectedEtcdPath:  "/registry/compositepodgroups/" + namespace + "/cpg1",
+			ExpectedGVK:       gvkP("scheduling.k8s.io", "v1beta1", "CompositePodGroup"),
 			IntroducedVersion: "1.37",
 			RemovedVersion:    "1.42",
 		},
