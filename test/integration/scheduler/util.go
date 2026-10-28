@@ -98,7 +98,7 @@ func InitTestSchedulerForFrameworkTest(t ktesting.TB, testCtx *testutils.TestCon
 		// Wait for all pods to be deleted, or will failed to create same name pods
 		// required in other test cases.
 		err = wait.PollUntilContextTimeout(testCtx.SchedulerCtx, time.Millisecond, wait.ForeverTestTimeout, true,
-			PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name))
+			PodsCleanedUp(testCtx.ClientSet, testCtx.NS.Name))
 		if err != nil {
 			t.Errorf("error while waiting for all pods to be deleted: %v", err)
 		}
@@ -175,8 +175,8 @@ func InitRegistryAndConfig(t utiltesting.TB, factory func(plugin fwk.Plugin) fra
 }
 
 // PodsCleanedUp returns true if all pods are deleted in the specific namespace.
-func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string) wait.ConditionWithContextFunc {
-	return func(context.Context) (bool, error) {
+func PodsCleanedUp(c clientset.Interface, namespace string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		list, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -344,7 +344,7 @@ func InitTestSchedulerWithNS(t ktesting.TB, nsPrefix string, opts ...scheduler.O
 func InitTestDisablePreemption(t ktesting.TB, nsPrefix string) *testutils.TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: new(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Disabled: []configv1.Plugin{
@@ -442,8 +442,8 @@ func CreateAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string,
 	return nodes, WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, numNodes+existingNodes)
 }
 
-// WaitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
-// within 30 seconds; otherwise returns false.
+// WaitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache;
+// otherwise returns an error after timeout.
 func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCount int) error {
 	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
 		return sched.Cache.NodeCount() >= nodeCount, nil
@@ -479,24 +479,24 @@ func CreatePausePodWithResource(cs clientset.Interface, podName string,
 
 // CreatePVC creates a PersistentVolumeClaim with the given config and returns
 // its pointer and error status.
-func CreatePVC(cs clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	return cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+func CreatePVC(ctx context.Context, cs clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	return cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 }
 
 // CreatePV creates a PersistentVolume with the given config and returns its
 // pointer and error status.
-func CreatePV(cs clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	return cs.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
+func CreatePV(ctx context.Context, cs clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return cs.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 }
 
 // DeletePVC deletes the given PVC in the given namespace.
-func DeletePVC(cs clientset.Interface, pvcName string, nsName string) error {
-	return cs.CoreV1().PersistentVolumeClaims(nsName).Delete(context.TODO(), pvcName, *metav1.NewDeleteOptions(0))
+func DeletePVC(ctx context.Context, cs clientset.Interface, pvcName string, nsName string) error {
+	return cs.CoreV1().PersistentVolumeClaims(nsName).Delete(ctx, pvcName, *metav1.NewDeleteOptions(0))
 }
 
-// DeletePV deletes the given PV in the given namespace.
-func DeletePV(cs clientset.Interface, pvName string) error {
-	return cs.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, *metav1.NewDeleteOptions(0))
+// DeletePV deletes the given PV.
+func DeletePV(ctx context.Context, cs clientset.Interface, pvName string) error {
+	return cs.CoreV1().PersistentVolumes().Delete(ctx, pvName, *metav1.NewDeleteOptions(0))
 }
 
 // RunPausePod creates a pod with "Pause" image and the given config and waits
@@ -523,7 +523,7 @@ type PodWithContainersConfig struct {
 
 // InitPodWithContainers initializes a pod API object from the given config. This is used primarily for generating
 // pods with containers each having a specific image.
-func InitPodWithContainers(cs clientset.Interface, conf *PodWithContainersConfig) *v1.Pod {
+func InitPodWithContainers(conf *PodWithContainersConfig) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      conf.Name,
@@ -600,8 +600,8 @@ func PodSchedulingError(c clientset.Interface, podNamespace, podName string) wai
 
 // PodSchedulingGated returns a condition function that returns true if the given pod
 // gets unschedulable status of reason 'SchedulingGated'.
-func PodSchedulingGated(ctx context.Context, c clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
-	return func(context.Context) (bool, error) {
+func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
@@ -628,14 +628,14 @@ func WaitForPodUnschedulable(ctx context.Context, cs clientset.Interface, pod *v
 // WaitForPodSchedulingGated waits for a pod to be in scheduling gated state
 // and returns an error if it does not fall into this state within the given timeout.
 func WaitForPodSchedulingGated(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, PodSchedulingGated(ctx, cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, PodSchedulingGated(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func WaitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
-	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 60*time.Second, false, func(context.Context) (bool, error) {
-		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(testCtx.Ctx, metav1.ListOptions{})
+func WaitForPDBsStable(ctx context.Context, cs clientset.Interface, namespace string, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
+		pdbList, err := cs.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -661,9 +661,9 @@ func WaitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisrupt
 }
 
 // WaitCachedPodsStable waits until scheduler cache has the given pods.
-func WaitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error {
-	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 30*time.Second, false, func(context.Context) (bool, error) {
-		cachedPods, err := testCtx.Scheduler.Cache.PodCount()
+func WaitCachedPodsStable(ctx context.Context, cs clientset.Interface, sched *scheduler.Scheduler, pods []*v1.Pod) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+		cachedPods, err := sched.Cache.PodCount()
 		if err != nil {
 			return false, err
 		}
@@ -671,11 +671,11 @@ func WaitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error 
 			return false, nil
 		}
 		for _, p := range pods {
-			actualPod, err1 := testCtx.ClientSet.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+			actualPod, err1 := cs.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
 			if err1 != nil {
 				return false, err1
 			}
-			cachedPod, err2 := testCtx.Scheduler.Cache.GetPod(actualPod)
+			cachedPod, err2 := sched.Cache.GetPod(actualPod)
 			if err2 != nil || cachedPod == nil {
 				return false, err2
 			}

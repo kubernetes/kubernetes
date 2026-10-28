@@ -41,11 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// imported from testutils
-var (
-	createNode = schedulerutils.CreateNode
-)
-
 const (
 	filter               = "filter"
 	prioritize           = "prioritize"
@@ -384,7 +379,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := range 5 {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := createNode(cs, node); err != nil {
+		if _, err := schedulerutils.CreateNode(cs, node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
