@@ -383,10 +383,6 @@ var (
 	// Marks tests of the asynchronous preemption (KEP-4832) that require the `SchedulerAsyncPreemption` feature gate.
 	SchedulerAsyncPreemption = framework.WithFeature(framework.ValidFeatures.Add("SchedulerAsyncPreemption"))
 
-	// Owner: sig-node
-	// TODO: document the feature (when to use this feature for a test)
-	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
-
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314
 	// Tests marked with this feature require:
