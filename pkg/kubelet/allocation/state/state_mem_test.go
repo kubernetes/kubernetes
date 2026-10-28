@@ -420,6 +420,81 @@ func TestStateMemory_RemoveOrphanedPods(t *testing.T) {
 	assert.Equal(t, []types.UID{"pod-2"}, state.GetPodUIDs())
 }
 
+func TestStateMemory_PodVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	vols, found := state.GetPodVolumes(podUID)
+	assert.Nil(t, vols)
+	assert.False(t, found)
+
+	size100 := resource.MustParse("100Mi")
+	size200 := resource.MustParse("200Mi")
+	vol1 := v1.Volume{
+		Name: "secret-vol",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{SecretName: "my-secret"},
+		},
+	}
+	vol2 := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &size100,
+			},
+		},
+	}
+
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol1))
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol2))
+
+	// Mutating input does not affect stored state.
+	vol1.Secret.SecretName = "mutated"
+	gotVols, found := state.GetPodVolumes(podUID)
+	require.True(t, found)
+	require.Len(t, gotVols, 2)
+	assert.Equal(t, "my-secret", gotVols[0].Secret.SecretName)
+	assert.True(t, size100.Equal(*gotVols[1].EmptyDir.SizeLimit))
+
+	// Re-setting an existing memory-backed emptyDir volume preserves an already-actuated SizeLimit.
+	vol2Updated := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &size200,
+			},
+		},
+	}
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol2Updated))
+	limit, found := state.GetEmptyDirVolumeLimit(podUID, "mem-vol")
+	require.True(t, found)
+	assert.True(t, size100.Equal(*limit))
+
+	// SetEmptyDirVolumeLimit updates the actuated SizeLimit.
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, "mem-vol", &v1.EmptyDirVolumeSource{
+		Medium:    v1.StorageMediumMemory,
+		SizeLimit: &size200,
+	}))
+	limit, found = state.GetEmptyDirVolumeLimit(podUID, "mem-vol")
+	require.True(t, found)
+	assert.True(t, size200.Equal(*limit))
+
+	// RemovePodVolume removes only the target volume.
+	require.NoError(t, state.RemovePodVolume(logger, podUID, "secret-vol"))
+	gotVols, found = state.GetPodVolumes(podUID)
+	require.True(t, found)
+	require.Len(t, gotVols, 1)
+	assert.Equal(t, "mem-vol", gotVols[0].Name)
+
+	require.NoError(t, state.RemovePodVolume(logger, podUID, "mem-vol"))
+	gotVols, found = state.GetPodVolumes(podUID)
+	assert.Nil(t, gotVols)
+	assert.False(t, found)
+}
+
 func TestStateMemory_ToPodList(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	sm := newStateMemory(logger, PodMap{}, nil)
