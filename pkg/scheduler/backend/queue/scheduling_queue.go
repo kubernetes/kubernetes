@@ -1584,7 +1584,7 @@ func (p *PriorityQueue) AddGenericPodGroup(logger klog.Logger, gpg *fwk.GenericP
 
 	p.workloadForest.addGenericPodGroup(gpg)
 
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg.GetKey())
 	if !hasRoot {
 		// If the root does not exist, then pods should stay in the incompletePodGroupPods.
 		return
@@ -1623,7 +1623,7 @@ func (p *PriorityQueue) UpdateGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 	defer p.lock.Unlock()
 
 	p.workloadForest.updateGenericPodGroup(gpg)
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg.GetKey())
 	if !hasRoot {
 		return
 	}
@@ -1644,7 +1644,7 @@ func (p *PriorityQueue) DeleteGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
+	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(logger, gpg.GetKey())
 	if !hadRoot {
 		p.workloadForest.deleteGenericPodGroup(gpg)
 		return
@@ -1916,7 +1916,16 @@ func (p *PriorityQueue) GetPodGroup(name, namespace string) (*framework.QueuedPo
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	pgInfo := newPodGroupInfoForLookup(namespace, name)
+	pgInfo := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+			}),
+		},
+	}
 	var foundPGInfo *framework.QueuedPodGroupInfo
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		entity := p.getEntityFromAnyQueue(unlockedActiveQ, pgInfo)
@@ -2199,30 +2208,4 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 		return nil
 	}
 	return result
-}
-
-func newPodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
-	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespace,
-					Name:      name,
-				},
-			}),
-		},
-	}
-}
-
-func newCompositePodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
-	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespace,
-					Name:      name,
-				},
-			}),
-		},
-	}
 }

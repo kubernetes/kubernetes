@@ -1633,7 +1633,7 @@ func TestPriorityQueue_QueuedPodGroupInfoChildrenSorted(t *testing.T) {
 				tt.actions(t, ctx, q)
 			}
 
-			rootLookup := newCompositePodGroupInfoForLookup("ns1", "cpg-root")
+			rootLookup := newQueuedPodGroupInfoForLookup("ns1", "cpg-root", fwk.CompositePodGroupKeyType)
 			var gotOrderedChildren []fwk.EntityKey
 			q.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 				entity := q.getEntityFromAnyQueue(unlockedActiveQ, rootLookup)
@@ -8836,7 +8836,7 @@ func TestAddPodGroup(t *testing.T) {
 
 			q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(podGroup))
 
-			pgLookup := newPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name)
+			pgLookup := newQueuedPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name, fwk.PodGroupKeyType)
 			gotGPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
@@ -8968,7 +8968,7 @@ func TestUpdatePodGroup(t *testing.T) {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 
-			pgLookup := newPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name)
+			pgLookup := newQueuedPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name, fwk.PodGroupKeyType)
 			if inActive := q.activeQ.has(pgLookup); inActive != tt.expectedInActiveQ {
 				t.Errorf("Expected target pod group in activeQ: %v, got %v", tt.expectedInActiveQ, inActive)
 			}
@@ -10263,9 +10263,17 @@ func findPodGroupInfoInActiveQ(q *PriorityQueue, namespace, name string, entityT
 // newQueuedPodGroupInfoForLookup builds a QueuedPodGroupInfo object for a lookup in the queue.
 func newQueuedPodGroupInfoForLookup(namespace, name string, entityType fwk.EntityKeyType) *framework.QueuedPodGroupInfo {
 	if entityType == fwk.CompositePodGroupKeyType {
-		return newCompositePodGroupInfoForLookup(namespace, name)
+		return &framework.QueuedPodGroupInfo{
+			PodGroupInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace(namespace).Name(name).Obj()),
+			},
+		}
 	}
-	return newPodGroupInfoForLookup(namespace, name)
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace(namespace).Name(name).Obj()),
+		},
+	}
 }
 
 func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1beta1.PodGroup) *framework.QueuedPodGroupInfo {
