@@ -6010,12 +6010,13 @@ type optimisticConcurrencyTestCase struct {
 	ignoreNotFound    bool
 	action            optimisticCallbackAction
 	preconditions     func(current *example.Pod) *storage.Preconditions
+	transformer       PrefixTransformerModifier
 	expectStatsCacher KubernetesRequestStats
 	expectStatsEtcd   KubernetesRequestStats
 	expectErr         func(error) bool
 }
 
-func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool, recorder *KubernetesRecorder) {
+func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	matchCurrent := func(cur *example.Pod) *storage.Preconditions {
 		return &storage.Preconditions{UID: &cur.UID, ResourceVersion: &cur.ResourceVersion}
 	}
@@ -6025,6 +6026,16 @@ func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store stora
 	wrongRV := func(_ *example.Pod) *storage.Preconditions {
 		return &storage.Preconditions{ResourceVersion: ptr.To("999999999")}
 	}
+	rotatedTransformer := func(previous *PrefixTransformer) value.Transformer {
+		prevCopy := *previous
+		return value.NewPrefixTransformers(nil,
+			value.PrefixTransformer{Prefix: []byte("rotated!"), Transformer: NewPrefixTransformer([]byte{}, false)},
+			value.PrefixTransformer{Prefix: []byte{}, Transformer: &prevCopy},
+		)
+	}
+	incompatibleTransformer := func(_ *PrefixTransformer) value.Transformer {
+		return NewPrefixTransformer([]byte("otherprefix!"), false)
+	}
 
 	testCases := []optimisticConcurrencyTestCase{
 		{
@@ -6033,10 +6044,31 @@ func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store stora
 			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
 		},
 		{
+			name:              "existing object with rotated transformer commits in single transaction",
+			transformer:       rotatedTransformer,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
 			name:              "noop update short-circuits without writing",
 			action:            actionNoop,
 			expectStatsCacher: KubernetesRequestStats{Gets: 1},
 			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+		},
+		{
+			name:              "noop update with rotated transformer rewrites object",
+			action:            actionNoop,
+			transformer:       rotatedTransformer,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "noop update with incompatible transformer fails",
+			action:            actionNoop,
+			transformer:       incompatibleTransformer,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInternalError,
 		},
 		{
 			name:              "missing key returns NotFound",
@@ -6155,8 +6187,9 @@ func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store stora
 	}
 }
 
-func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool, recorder *KubernetesRecorder, podName string, tc optimisticConcurrencyTestCase, isDelete bool) {
+func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, watchCacheEnabled bool, recorder *KubernetesRecorder, podName string, tc optimisticConcurrencyTestCase, isDelete bool) {
 	key := "/pods/test-ns/" + podName
+	out := &example.Pod{}
 
 	var current *example.Pod
 	if !tc.missingKey {
@@ -6173,6 +6206,24 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 		if watchCacheEnabled {
 			require.NoError(t, store.Get(ctx, key, storage.GetOptions{ResourceVersion: current.ResourceVersion}, &example.Pod{}))
 		}
+	}
+
+	var revertTransformer func()
+	if tc.transformer != nil {
+		revertFn := store.UpdatePrefixTransformer(tc.transformer)
+		var reverted bool
+		revertTransformer = func() {
+			if reverted {
+				return
+			}
+			if watchCacheEnabled && out.ResourceVersion != "" {
+				// Ensure the background watch transforms the event at out.ResourceVersion before restoring the old prefix.
+				_ = store.Get(ctx, key, storage.GetOptions{IgnoreNotFound: true, ResourceVersion: out.ResourceVersion}, &example.Pod{})
+			}
+			revertFn()
+			reverted = true
+		}
+		defer revertTransformer()
 	}
 
 	var precond *storage.Preconditions
@@ -6228,7 +6279,6 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 
 	recorderKey := t.Name()
 	opCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
-	out := &example.Pod{}
 	var err error
 	if isDelete {
 		err = store.Delete(opCtx, key, out, precond, func(_ context.Context, obj runtime.Object) error {
@@ -6283,7 +6333,11 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 		require.True(t, storage.IsNotFound(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
 	} else {
 		if tc.action == actionNoop {
-			require.Equal(t, current.ResourceVersion, out.ResourceVersion)
+			if tc.transformer != nil {
+				require.NotEqual(t, current.ResourceVersion, out.ResourceVersion)
+			} else {
+				require.Equal(t, current.ResourceVersion, out.ResourceVersion)
+			}
 		} else {
 			require.Equal(t, "updated", out.Annotations["mutated"])
 		}
@@ -6291,4 +6345,12 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store storage
 	}
 
 	require.Equal(t, expectOut, out)
+
+	if revertTransformer != nil {
+		revertTransformer()
+		if !isDelete {
+			// Stored bytes now carry the rotated prefix and cannot be read with the original prefix alone.
+			require.True(t, storage.IsInternalError(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+		}
+	}
 }
