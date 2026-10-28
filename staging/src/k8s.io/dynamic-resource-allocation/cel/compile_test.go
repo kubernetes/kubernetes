@@ -1170,6 +1170,38 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 			device:          mockDevice,
 			expectEvalError: "unsupported CEL return type: structpb.NullValue",
 		},
+		{
+			name:       "has-guard-returns-string-attribute",
+			expression: `has(device.attributes["dra.example.com"].numa) ? device.attributes["dra.example.com"].numa : "none"`,
+			device: Device{
+				Driver: "test-driver.cdi.k8s.io",
+				Attributes: draapi.DeviceAttributes{
+					Nested: map[draapi.UniqueString]map[draapi.UniqueString]any{
+						draapi.MakeUniqueString("dra.example.com"): {
+							draapi.MakeUniqueString("numa"):     "numa-0",
+							draapi.MakeUniqueString("topology"): "pci-locality=numa-0",
+						},
+					},
+				},
+			},
+			expectAttr: "numa-0",
+		},
+		{
+			name:       "has-guard-on-topology-and-numa",
+			expression: `has(device.attributes["dra.example.com"].topology) && has(device.attributes["dra.example.com"].numa) ? device.attributes["dra.example.com"].numa : "none"`,
+			device: Device{
+				Driver: "test-driver.cdi.k8s.io",
+				Attributes: draapi.DeviceAttributes{
+					Nested: map[draapi.UniqueString]map[draapi.UniqueString]any{
+						draapi.MakeUniqueString("dra.example.com"): {
+							draapi.MakeUniqueString("numa"):     "numa-1",
+							draapi.MakeUniqueString("topology"): "pci-locality=numa-1",
+						},
+					},
+				},
+			},
+			expectAttr: "numa-1",
+		},
 	}
 
 	for _, tc := range testCases {

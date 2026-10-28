@@ -1,0 +1,52 @@
+#
+# SchedulingWithDerivedAttributes measures MatchAttribute when the grouping
+# key is computed by derivedAttributes instead of published as a static
+# attribute. Each device embeds a NUMA id in a topology string. Two requests
+# extract that id with CEL and must land on the same value.
+#
+# fast is the correctness case (integration). many_devices is the latency
+# case: one node, a large device list, repeated scheduling.
+- name: SchedulingWithDerivedAttributes
+  featureGates:
+    DRADerivedAttributes: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-derived-attributes.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: $numDevices|64
+      numNuma: $numNuma|4
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-derived-attributes.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      measurePods: 1
+      steadyState: false
+      duration: 0s
+      numDevices: 32
+      numNuma: 4
+  - name: many_devices
+    labels: [performance]
+    params:
+      nodesWithDRA: 1
+      measurePods: 20
+      steadyState: true
+      duration: 10s
+      numDevices: 256
+      numNuma: 8

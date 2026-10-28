@@ -1,0 +1,23 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: test-claim-template
+spec:
+  spec:
+    devices:
+      constraints:
+      - requests: ["gpu", "nic"]
+        matchAttribute: derived/numa
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: test-class
+          derivedAttributes:
+          - name: derived/numa
+            expression: 'has(device.attributes["dra.example.com"].numa) ? device.attributes["dra.example.com"].numa : "none"'
+      - name: nic
+        exactly:
+          deviceClassName: test-class
+          derivedAttributes:
+          - name: derived/numa
+            expression: 'has(device.attributes["dra.example.com"].topology) && has(device.attributes["dra.example.com"].numa) ? device.attributes["dra.example.com"].numa : "none"'
