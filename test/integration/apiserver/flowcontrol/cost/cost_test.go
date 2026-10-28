@@ -583,6 +583,15 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 				payload = sc.body(wf.accept, pod)
 			}
 
+			// Warm lazy schema, converter, and per-namespace admission caches
+			// before measurements; dryRun=All prevents mutating seeded state so
+			// measured writes still execute against the intended precondition.
+			warmupPath := fullPath
+			if sc.httpMethod != http.MethodGet {
+				warmupPath = withDryRun(fullPath)
+			}
+			runHTTP(b, server, sc.httpMethod, warmupPath, reqContentType, wf.accept, payload)
+
 			var startMem, endMem, postGCMem runtime.MemStats
 			var responseBytes int
 			for i := 0; b.Loop(); i++ {
@@ -706,4 +715,11 @@ func buildRequestPath(sc requestScenario, pods []*v1.Pod) string {
 		query = strings.NewReplacer("FIRST_RV", initialRV, "LATEST_RV", latestRV).Replace(query)
 	}
 	return sc.path + "?" + query
+}
+
+func withDryRun(path string) string {
+	if strings.Contains(path, "?") {
+		return path + "&dryRun=All"
+	}
+	return path + "?dryRun=All"
 }
