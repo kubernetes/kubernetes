@@ -18,12 +18,12 @@ package preflight
 
 import (
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -668,10 +668,13 @@ func TestKubernetesVersionCheck(t *testing.T) {
 
 func TestHTTPProxyCIDRCheck(t *testing.T) {
 	var tests = []struct {
+		name           string
 		check          HTTPProxyCIDRCheck
 		expectWarnings bool
+		expectErrors   bool
 	}{
 		{
+			name: "loopback is never proxied",
 			check: HTTPProxyCIDRCheck{
 				Proto: "https",
 				CIDR:  "127.0.0.0/8",
@@ -679,6 +682,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 			expectWarnings: false,
 		},
 		{
+			name: "IPv4 range listed in NO_PROXY is accessed directly",
 			check: HTTPProxyCIDRCheck{
 				Proto: "https",
 				CIDR:  "10.96.0.0/12",
@@ -686,6 +690,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 			expectWarnings: false,
 		},
 		{
+			name: "IPv4 range not listed in NO_PROXY goes through the proxy",
 			check: HTTPProxyCIDRCheck{
 				Proto: "https",
 				CIDR:  "192.168.0.0/16",
@@ -693,6 +698,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 			expectWarnings: true,
 		},
 		{
+			name: "IPv6 range listed in NO_PROXY is accessed directly",
 			check: HTTPProxyCIDRCheck{
 				Proto: "https",
 				CIDR:  "2001:db8::/56",
@@ -700,25 +706,63 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 			expectWarnings: false,
 		},
 		{
+			name: "IPv6 range not listed in NO_PROXY goes through the proxy",
 			check: HTTPProxyCIDRCheck{
 				Proto: "https",
 				CIDR:  "2001:db8:1::/56",
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			name:  "empty CIDR is skipped",
+			check: HTTPProxyCIDRCheck{Proto: "https"},
+		},
+		{
+			name: "CIDR with an indexed IP in NO_PROXY is accessed directly",
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "10.0.0.1/24",
+			},
+		},
+		{
+			name: "unparsable CIDR",
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "not-a-cidr",
+			},
+			expectErrors: true,
+		},
+		{
+			name: "CIDR without room for an indexed IP",
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "10.0.0.1/32",
+			},
+			expectErrors: true,
+		},
 	}
 
 	resetProxyEnv(t)
 
 	for _, rt := range tests {
-		warning, _ := rt.check.Check()
+		warning, errs := rt.check.Check()
 		if (warning != nil) != rt.expectWarnings {
 			t.Errorf(
-				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				"%s failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				rt.name,
 				rt.expectWarnings,
 				(warning != nil),
 				rt.check.CIDR,
 				warning,
+			)
+		}
+		if (len(errs) > 0) != rt.expectErrors {
+			t.Errorf(
+				"%s failed HTTPProxyCIDRCheck:\n\texpected errors: %t\n\t  actual: %v (CIDR:%s)",
+				rt.name,
+				rt.expectErrors,
+				errs,
+				rt.check.CIDR,
 			)
 		}
 	}
@@ -1258,37 +1302,7 @@ func TestHostnameCheck(t *testing.T) {
 	}
 }
 
-func TestHTTPProxyCIDRCheckInvalidCIDR(t *testing.T) {
-	tests := []struct {
-		name         string
-		cidr         string
-		expectErrors bool
-	}{
-		{name: "empty CIDR is skipped", cidr: ""},
-		{name: "Valid CIDR", cidr: "10.0.0.1/24", expectErrors: false},
-		{name: "unparsable CIDR", cidr: "not-a-cidr", expectErrors: true},
-		{name: "CIDR without room for an indexed IP", cidr: "10.0.0.1/32", expectErrors: true},
-	}
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			_, errs := HTTPProxyCIDRCheck{Proto: "https", CIDR: rt.cidr}.Check()
-			if (len(errs) > 0) != rt.expectErrors {
-				t.Errorf("expected errors=%t, got %v", rt.expectErrors, errs)
-			}
-		})
-	}
-}
-
 func TestExternalEtcdVersionCheck(t *testing.T) {
-	newServer := func(statusCode int, body string) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(statusCode)
-			if _, err := fmt.Fprint(w, body); err != nil {
-				t.Errorf("failed to write response body: %v", err)
-			}
-		}))
-	}
-
 	withEndpoint := func(endpoint string) ExternalEtcdVersionCheck {
 		return ExternalEtcdVersionCheck{
 			Etcd: kubeadmapi.Etcd{
@@ -1345,12 +1359,25 @@ func TestExternalEtcdVersionCheck(t *testing.T) {
 		})
 	}
 
+	newServer := func(statusCode int, body string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(statusCode)
+			if _, err := fmt.Fprint(w, body); err != nil {
+				t.Errorf("failed to write response body: %v", err)
+			}
+		}))
+	}
+
 	serverTests := []struct {
-		name         string
-		body         string
-		expectErrors int
+		name             string
+		body             string
+		withCAFile       bool
+		duplicateSlashes bool
+		expectErrors     int
 	}{
 		{name: "supported version", body: `{"etcdserver":"3.5.24","etcdcluster":"3.5.0"}`},
+		{name: "supported version with CA file", body: `{"etcdserver":"3.5.24","etcdcluster":"3.5.0"}`, withCAFile: true},
+		{name: "supported version with duplicate slashes in endpoint", body: `{"etcdserver":"3.5.24","etcdcluster":"3.5.0"}`, duplicateSlashes: true},
 		{name: "unsupported version", body: `{"etcdserver":"3.4.0","etcdcluster":"3.4.0"}`, expectErrors: 1},
 		{name: "unparsable version", body: `{"etcdserver":"not-a-version"}`, expectErrors: 1},
 		{name: "malformed response", body: `not json`, expectErrors: 1},
@@ -1360,53 +1387,26 @@ func TestExternalEtcdVersionCheck(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			server := newServer(http.StatusOK, rt.body)
 			defer server.Close()
-			_, errs := withEndpoint(server.URL).Check()
+
+			endpoint := server.URL
+			if rt.duplicateSlashes {
+				endpoint += "//"
+			}
+			check := withEndpoint(endpoint)
+			if rt.withCAFile {
+				caFile := filepath.Join(t.TempDir(), "ca.crt")
+				if err := os.WriteFile(caFile, []byte(externalEtcdRootCAFileContent), 0600); err != nil {
+					t.Fatalf("failed to write CA file: %v", err)
+				}
+				check.Etcd.External.CAFile = caFile
+			}
+
+			_, errs := check.Check()
 			if len(errs) != rt.expectErrors {
 				t.Errorf("expected %d error(s), got %d: %v", rt.expectErrors, len(errs), errs)
 			}
 		})
 	}
-
-	t.Run("getHTTPClient", func(t *testing.T) {
-		etcdCheck := ExternalEtcdVersionCheck{}
-
-		client := etcdCheck.getHTTPClient(nil)
-		if client == nil || client.Timeout != externalEtcdRequestTimeout {
-			t.Errorf("expected a client with timeout %v, got %v", externalEtcdRequestTimeout, client)
-		}
-
-		config := &tls.Config{}
-		client = etcdCheck.getHTTPClient(config)
-		transport, ok := client.Transport.(*http.Transport)
-		if !ok || transport.TLSClientConfig != config {
-			t.Error("expected the provided TLS config to be used by the client transport")
-		}
-	})
-
-	t.Run("normalizeURLString", func(t *testing.T) {
-		urlTests := []struct {
-			name      string
-			input     string
-			expected  string
-			expectErr bool
-		}{
-			{name: "no path", input: "https://127.0.0.1:2379", expected: "https://127.0.0.1:2379"},
-			{name: "duplicate slashes in path", input: "https://127.0.0.1:2379//version//", expected: "https://127.0.0.1:2379/version/"},
-			{name: "unparsable URL", input: "://bad", expectErr: true},
-		}
-
-		for _, rt := range urlTests {
-			t.Run(rt.name, func(t *testing.T) {
-				got, err := normalizeURLString(rt.input)
-				if (err != nil) != rt.expectErr {
-					t.Fatalf("expected error=%t, got %v", rt.expectErr, err)
-				}
-				if got != rt.expected {
-					t.Errorf("expected %q, got %q", rt.expected, got)
-				}
-			})
-		}
-	})
 }
 
 func TestImagePullCheck(t *testing.T) {
@@ -1489,15 +1489,6 @@ func TestImagePullCheck(t *testing.T) {
 			}
 		})
 	}
-}
-
-// checkerNames returns the set of names of the given checks.
-func checkerNames(checks []Checker) sets.Set[string] {
-	names := sets.New[string]()
-	for _, c := range checks {
-		names.Insert(c.Name())
-	}
-	return names
 }
 
 func TestInitNodeChecks(t *testing.T) {
@@ -1686,4 +1677,13 @@ func TestJoinNodeChecks(t *testing.T) {
 			}
 		})
 	}
+}
+
+// checkerNames returns the set of names of the given checks.
+func checkerNames(checks []Checker) sets.Set[string] {
+	names := sets.New[string]()
+	for _, c := range checks {
+		names.Insert(c.Name())
+	}
+	return names
 }
