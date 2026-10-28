@@ -35,21 +35,33 @@ const (
 
 	// defaultUpperBoundCapacity should be able to keep the required history.
 	defaultUpperBoundCapacity = 100 * 1024
+
+	// MinWatchCacheMaxEvents is the smallest allowed explicit override of the
+	// capacity upper bound; it cannot be below the initial capacity.
+	MinWatchCacheMaxEvents = defaultLowerBoundCapacity
 )
 
-func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration) *watchCacheHistory {
+func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration, maxEvents int) (*watchCacheHistory, error) {
+	upperBoundCapacity := capacityUpperBound(eventFreshDuration)
+	if maxEvents != 0 {
+		upperBoundCapacity = maxEvents
+	}
+	if upperBoundCapacity < defaultLowerBoundCapacity {
+		return nil, fmt.Errorf("watch cache capacity upper bound (%d) must not be below the lower bound (%d)", upperBoundCapacity, defaultLowerBoundCapacity)
+	}
+
 	h := &watchCacheHistory{
 		config:             config,
 		capacity:           defaultLowerBoundCapacity,
 		cache:              make([]*watchCacheEvent, defaultLowerBoundCapacity),
 		lowerBoundCapacity: defaultLowerBoundCapacity,
-		upperBoundCapacity: capacityUpperBound(eventFreshDuration),
+		upperBoundCapacity: upperBoundCapacity,
 		startIndex:         0,
 		endIndex:           0,
 		eventFreshDuration: eventFreshDuration,
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(config.groupResource.Group, config.groupResource.Resource).Set(float64(h.capacity))
-	return h
+	return h, nil
 }
 
 // capacityUpperBound denotes the maximum possible capacity of the watch cache
