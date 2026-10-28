@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -4272,6 +4273,116 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
 			}
 		})
+	}
+}
+
+func TestConvertToAPIContainerStatusesAfterClockRollback(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		restartCounts    []int
+		sameCreationTime bool
+		latestState      kubecontainer.State
+		expectedCurrent  int
+		expectedPrevious int
+	}{
+		{
+			name:             "running replacement has an earlier creation time",
+			restartCounts:    []int{1, 2, 3},
+			latestState:      kubecontainer.ContainerStateRunning,
+			expectedCurrent:  2,
+			expectedPrevious: 1,
+		},
+		{
+			name:             "terminated replacement has an earlier creation time",
+			restartCounts:    []int{1, 2, 3},
+			latestState:      kubecontainer.ContainerStateExited,
+			expectedCurrent:  2,
+			expectedPrevious: 1,
+		},
+		{
+			name:             "equal restart counts use creation time",
+			restartCounts:    []int{2, 2, 2},
+			latestState:      kubecontainer.ContainerStateExited,
+			expectedCurrent:  0,
+			expectedPrevious: 1,
+		},
+		{
+			name:             "zero restart counts use creation time",
+			restartCounts:    []int{0, 0, 0},
+			latestState:      kubecontainer.ContainerStateExited,
+			expectedCurrent:  0,
+			expectedPrevious: 1,
+		},
+		{
+			name:             "equal restart counts and creation times use container ID",
+			restartCounts:    []int{2, 2, 2},
+			sameCreationTime: true,
+			latestState:      kubecontainer.ContainerStateExited,
+			expectedCurrent:  0,
+			expectedPrevious: 1,
+		},
+	} {
+		for _, isInitContainer := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/init=%t", tc.name, isInitContainer), func(t *testing.T) {
+				tCtx := ktesting.Init(t)
+				testKubelet := newTestKubelet(t, false)
+				defer testKubelet.Cleanup()
+
+				containers := []v1.Container{{Name: "app", Image: "image"}}
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default", UID: "pod-uid"},
+					Spec:       v1.PodSpec{RestartPolicy: v1.RestartPolicyAlways},
+				}
+				if isInitContainer {
+					pod.Spec.InitContainers = containers
+				} else {
+					pod.Spec.Containers = containers
+				}
+
+				instances := make([]*kubecontainer.Status, 3)
+				for i := range instances {
+					instances[i] = &kubecontainer.Status{
+						ID:           kubecontainer.ContainerID{Type: "test", ID: fmt.Sprintf("instance-%d", i)},
+						Name:         "app",
+						Image:        "image",
+						State:        kubecontainer.ContainerStateExited,
+						CreatedAt:    time.Unix(int64(30-i*10), 0),
+						RestartCount: tc.restartCounts[i],
+						ExitCode:     1,
+					}
+					if tc.sameCreationTime {
+						instances[i].CreatedAt = time.Unix(30, 0)
+					}
+				}
+				instances[2].State = tc.latestState
+				for _, order := range [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+					t.Run(fmt.Sprint(order), func(t *testing.T) {
+						podStatus := &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{
+							instances[order[0]],
+							{Name: "unrelated", RestartCount: 100, CreatedAt: time.Unix(25, 0)},
+							instances[order[1]],
+							instances[order[2]],
+						}}
+						originalOrder := slices.Clone(podStatus.ContainerStatuses)
+						statuses := testKubelet.kubelet.convertToAPIContainerStatuses(
+							tCtx, pod, podStatus, nil, containers, nil, isInitContainer, isInitContainer, false,
+						)
+						require.Len(t, statuses, 1)
+						current := instances[tc.expectedCurrent]
+						assert.Equal(t, current.ID.String(), statuses[0].ContainerID)
+						assert.Equal(t, int32(current.RestartCount), statuses[0].RestartCount)
+						if current.State == kubecontainer.ContainerStateRunning {
+							assert.NotNil(t, statuses[0].State.Running)
+						} else {
+							assert.NotNil(t, statuses[0].State.Terminated)
+						}
+						require.NotNil(t, statuses[0].LastTerminationState.Terminated)
+						assert.Equal(t, instances[tc.expectedPrevious].ID.String(), statuses[0].LastTerminationState.Terminated.ContainerID)
+						assert.Equal(t, originalOrder, podStatus.ContainerStatuses)
+					})
+				}
+			})
+		}
 	}
 }
 

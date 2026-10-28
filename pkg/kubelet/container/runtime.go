@@ -810,13 +810,20 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // completely optional settings.
 type Option func(Runtime)
 
-// SortContainerStatusesByCreationTime sorts the container statuses by creation time.
-type SortContainerStatusesByCreationTime []*Status
+// SortContainerStatusesByRestartCount sorts the container statuses by restart count
+// and creation time, newest first, using the container ID to break ties.
+type SortContainerStatusesByRestartCount []*Status
 
-func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
-func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s SortContainerStatusesByCreationTime) Less(i, j int) bool {
-	return s[i].CreatedAt.Before(s[j].CreatedAt)
+func (s SortContainerStatusesByRestartCount) Len() int      { return len(s) }
+func (s SortContainerStatusesByRestartCount) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortContainerStatusesByRestartCount) Less(i, j int) bool {
+	if s[i].RestartCount != s[j].RestartCount {
+		return s[i].RestartCount > s[j].RestartCount
+	}
+	if !s[i].CreatedAt.Equal(s[j].CreatedAt) {
+		return s[i].CreatedAt.After(s[j].CreatedAt)
+	}
+	return s[i].ID.ID < s[j].ID.ID
 }
 
 const (
