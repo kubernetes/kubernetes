@@ -233,14 +233,14 @@ func updatePodLevelResourcesFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) 
 func updateEmptyDirVolumeLimitsFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated bool) (*v1.Pod, bool) {
 	updated := alreadyUpdated
 	for i, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir == nil || vol.EmptyDir.Medium != v1.StorageMediumMemory || vol.EmptyDir.SizeLimit == nil || vol.EmptyDir.SizeLimit.IsZero() {
+		if vol.EmptyDir == nil || vol.EmptyDir.Medium != v1.StorageMediumMemory {
 			continue
 		}
 		for _, storedVol := range stored.Spec.Volumes {
-			if storedVol.Name != vol.Name || storedVol.EmptyDir == nil || storedVol.EmptyDir.SizeLimit == nil {
+			if storedVol.Name != vol.Name || storedVol.EmptyDir == nil || storedVol.EmptyDir.Medium != v1.StorageMediumMemory || storedVol.EmptyDir.SizeLimit == nil {
 				continue
 			}
-			if alloc := storedVol.EmptyDir.SizeLimit; alloc.Cmp(*vol.EmptyDir.SizeLimit) != 0 {
+			if alloc := storedVol.EmptyDir.SizeLimit; vol.EmptyDir.SizeLimit == nil || !alloc.Equal(*vol.EmptyDir.SizeLimit) {
 				if !updated {
 					pod = pod.DeepCopy()
 					updated = true

@@ -125,7 +125,10 @@ func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
-func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
+// CalculateEmptyDirMemorySize calculates the effective memory size limit for a memory-backed
+// emptyDir volume as the minimum of node allocatable memory, pod memory limit, and the volume's
+// sizeLimit.
+func CalculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, pod *v1.Pod, emptyDir *v1.EmptyDirVolumeSource) *resource.Quantity {
 	// size limit defaults to node allocatable (pods can't consume more memory than all pods)
 	sizeLimit := nodeAllocatableMemory
 	zero := resource.MustParse("0")
@@ -137,16 +140,16 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	if podResourceConfig != nil && podResourceConfig.Memory != nil {
 		podMemoryLimit := resource.NewQuantity(*(podResourceConfig.Memory), resource.BinarySI)
 		// ensure 0 < value < size
-		if podMemoryLimit.Cmp(zero) > 0 && podMemoryLimit.Cmp(*sizeLimit) < 1 {
+		if podMemoryLimit.Cmp(zero) > 0 && (sizeLimit == nil || podMemoryLimit.Cmp(*sizeLimit) < 1) {
 			sizeLimit = podMemoryLimit
 		}
 	}
 
 	// volume local size is  used if and only if less than what pod could consume
-	if spec.Volume.EmptyDir.SizeLimit != nil {
-		volumeSizeLimit := spec.Volume.EmptyDir.SizeLimit
+	if emptyDir != nil && emptyDir.SizeLimit != nil {
+		volumeSizeLimit := emptyDir.SizeLimit
 		// ensure 0 < value < size
-		if volumeSizeLimit.Cmp(zero) > 0 && volumeSizeLimit.Cmp(*sizeLimit) < 1 {
+		if volumeSizeLimit.Cmp(zero) > 0 && (sizeLimit == nil || volumeSizeLimit.Cmp(*sizeLimit) < 1) {
 			sizeLimit = volumeSizeLimit
 		}
 	}
@@ -164,7 +167,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			if err != nil {
 				return nil, err
 			}
-			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
+			sizeLimit = CalculateEmptyDirMemorySize(nodeAllocatable.Memory(), pod, spec.Volume.EmptyDir)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) {
 			mode = spec.Volume.EmptyDir.Mode

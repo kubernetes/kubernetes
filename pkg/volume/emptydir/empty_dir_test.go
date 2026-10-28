@@ -1142,16 +1142,11 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			spec := &volume.Spec{
-				Volume: &v1.Volume{
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &testCase.emptyDirSizeLimit,
-						},
-					},
-				}}
-			result := calculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, spec, testCase.pod)
+			emptyDir := &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &testCase.emptyDirSizeLimit,
+			}
+			result := CalculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, testCase.pod, emptyDir)
 			if result.Cmp(testCase.expectedResult) != 0 {
 				t.Errorf("%s: Unexpected result.  Expected %v, got %v", testCaseName, testCase.expectedResult.String(), result.String())
 			}
@@ -1266,20 +1261,26 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			expectedMountOpts:    nil,
 		},
 		{
-			name:                 "resize memory volume with nil newSize (error path)",
+			name:                 "resize memory volume with nil newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              nil,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is nil
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 		{
-			name:                 "resize memory volume with zero newSize (error path)",
+			name:                 "resize memory volume with zero newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              &quantity0,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is zero
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 	}
 
@@ -1319,7 +1320,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			resizablePlugin, ok := plug.(volume.ResizableEphemeralVolumePlugin)
 			require.True(t, ok, "plugin does not implement ResizableEphemeralVolumePlugin")
 
-			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, tt.newSize)
+			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod)
 			if tt.expectError {
 				require.Error(t, err)
 				return

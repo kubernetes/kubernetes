@@ -115,8 +115,8 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:         logs.NewStubContainerLogManager(),
 		podLogsDirectory:   fakePodLogsDirectory,
-		actuatedState:      state.NewStateMemory(logger, nil, keepOnlyResourceValues),
 	}
+	kubeRuntimeManager.actuatedState = state.NewStateMemory(logger, nil, kubeRuntimeManager.keepOnlyResourceValues)
 
 	// Initialize swap controller availability check (always false for tests)
 	kubeRuntimeManager.getSwapControllerAvailable = func() bool { return false }
