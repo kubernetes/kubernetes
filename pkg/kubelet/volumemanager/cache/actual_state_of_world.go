@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -225,7 +226,11 @@ func (av AttachedVolume) DeviceMayBeMounted() bool {
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(
 	nodeName types.NodeName,
-	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
+	volumePluginMgr *volume.VolumePluginMgr,
+	actuatedState state.State) ActualStateOfWorld {
+	if actuatedState == nil {
+		actuatedState = state.NewNoopStateCheckpoint()
+	}
 	return &actualStateOfWorld{
 		nodeName:                        nodeName,
 		attachedVolumes:                 make(map[v1.UniqueVolumeName]attachedVolume),
@@ -233,6 +238,7 @@ func NewActualStateOfWorld(
 		attemptedMounts:                 make(map[volumetypes.UniquePodName]sets.Set[v1.UniqueVolumeName]),
 		volumePluginMgr:                 volumePluginMgr,
 		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
+		actuatedState:                   actuatedState,
 	}
 }
 
@@ -275,6 +281,9 @@ type actualStateOfWorld struct {
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
+
+	// actuatedState stores the checkpointed state of actuated pods and volumes.
+	actuatedState state.State
 	sync.RWMutex
 }
 
@@ -847,6 +856,12 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	// if volume is mounted successfully, then it should be removed from foundDuringReconstruction map
 	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted {
 		delete(asw.foundDuringReconstruction[volumeName], podName)
+		if volumeSpec != nil && volumeSpec.Volume != nil {
+			logger := klog.TODO()
+			if err := asw.actuatedState.SetPodVolume(logger, podUID, *volumeSpec.Volume); err != nil {
+				logger.Error(err, "Failed to record pod volume in actuated state", "podUID", podUID, "volumeName", volumeSpec.Name())
+			}
+		}
 	}
 	if mounter != nil {
 		// The mounter stored in the object may have old information,
@@ -965,9 +980,15 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 			volumeName)
 	}
 
-	_, podExists := volumeObj.mountedPods[podName]
+	podObj, podExists := volumeObj.mountedPods[podName]
 	if podExists {
 		delete(asw.attachedVolumes[volumeName].mountedPods, podName)
+		if podObj.volumeSpec != nil && podObj.volumeSpec.Volume != nil {
+			logger := klog.TODO()
+			if err := asw.actuatedState.RemovePodVolume(logger, podObj.podUID, podObj.volumeSpec.Name()); err != nil {
+				logger.Error(err, "Failed to remove pod volume from actuated state", "podUID", podObj.podUID, "volumeName", podObj.volumeSpec.Name())
+			}
+		}
 	}
 
 	// if there were reconstructed volumes, we should remove them
