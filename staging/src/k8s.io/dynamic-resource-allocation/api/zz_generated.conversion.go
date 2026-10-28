@@ -58,6 +58,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*DeviceCapacity)(nil), (*v1.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_DeviceCapacity_To_v1_DeviceCapacity(a.(*DeviceCapacity), b.(*v1.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeviceCapacity)(nil), (*DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceCapacity_To_api_DeviceCapacity(a.(*v1.DeviceCapacity), b.(*DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*DeviceCounterConsumption)(nil), (*v1.DeviceCounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_api_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(a.(*DeviceCounterConsumption), b.(*v1.DeviceCounterConsumption), scope)
 	}); err != nil {
@@ -78,13 +88,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ResourceSlice)(nil), (*v1.ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_api_ResourceSlice_To_v1_ResourceSlice(a.(*ResourceSlice), b.(*v1.ResourceSlice), scope)
+	if err := s.AddGeneratedConversionFunc((*ResourceSliceList)(nil), (*v1.ResourceSliceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_ResourceSliceList_To_v1_ResourceSliceList(a.(*ResourceSliceList), b.(*v1.ResourceSliceList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ResourceSlice)(nil), (*ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ResourceSlice_To_api_ResourceSlice(a.(*v1.ResourceSlice), b.(*ResourceSlice), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ResourceSliceList)(nil), (*ResourceSliceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ResourceSliceList_To_api_ResourceSliceList(a.(*v1.ResourceSliceList), b.(*ResourceSliceList), scope)
 	}); err != nil {
 		return err
 	}
@@ -98,6 +108,31 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*map[v1.QualifiedName]v1.DeviceAttribute)(nil), (*DeviceAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Map_v1_QualifiedName_To_v1_DeviceAttribute_To_api_DeviceAttributes(a.(*map[v1.QualifiedName]v1.DeviceAttribute), b.(*DeviceAttributes), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*map[v1.QualifiedName]v1.DeviceCapacity)(nil), (*DeviceCapacities)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Map_v1_QualifiedName_To_v1_DeviceCapacity_To_api_DeviceCapacities(a.(*map[v1.QualifiedName]v1.DeviceCapacity), b.(*DeviceCapacities), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*DeviceAttributes)(nil), (*map[v1.QualifiedName]v1.DeviceAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_DeviceAttributes_To_Map_v1_QualifiedName_To_v1_DeviceAttribute(a.(*DeviceAttributes), b.(*map[v1.QualifiedName]v1.DeviceAttribute), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*DeviceCapacities)(nil), (*map[v1.QualifiedName]v1.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_DeviceCapacities_To_Map_v1_QualifiedName_To_v1_DeviceCapacity(a.(*DeviceCapacities), b.(*map[v1.QualifiedName]v1.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ResourceSlice)(nil), (*v1.ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_ResourceSlice_To_v1_ResourceSlice(a.(*ResourceSlice), b.(*v1.ResourceSlice), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*UniqueString)(nil), (*string)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_api_UniqueString_To_string(a.(*UniqueString), b.(*string), scope)
 	}); err != nil {
@@ -105,6 +140,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*string)(nil), (*UniqueString)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_string_To_api_UniqueString(a.(*string), b.(*UniqueString), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ResourceSlice)(nil), (*ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ResourceSlice_To_api_ResourceSlice(a.(*v1.ResourceSlice), b.(*ResourceSlice), scope)
 	}); err != nil {
 		return err
 	}
@@ -141,8 +181,12 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 	if err := Convert_api_UniqueString_To_string(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacity = *(*map[v1.QualifiedName]v1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if err := Convert_api_DeviceAttributes_To_Map_v1_QualifiedName_To_v1_DeviceAttribute(&in.Attributes, &out.Attributes, s); err != nil {
+		return err
+	}
+	if err := Convert_api_DeviceCapacities_To_Map_v1_QualifiedName_To_v1_DeviceCapacity(&in.Capacity, &out.Capacity, s); err != nil {
+		return err
+	}
 	if in.ConsumesCounters != nil {
 		in, out := &in.ConsumesCounters, &out.ConsumesCounters
 		*out = make([]v1.DeviceCounterConsumption, len(*in))
@@ -177,8 +221,12 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 	if err := Convert_string_To_api_UniqueString(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacity = *(*map[v1.QualifiedName]v1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if err := Convert_Map_v1_QualifiedName_To_v1_DeviceAttribute_To_api_DeviceAttributes(&in.Attributes, &out.Attributes, s); err != nil {
+		return err
+	}
+	if err := Convert_Map_v1_QualifiedName_To_v1_DeviceCapacity_To_api_DeviceCapacities(&in.Capacity, &out.Capacity, s); err != nil {
+		return err
+	}
 	if in.ConsumesCounters != nil {
 		in, out := &in.ConsumesCounters, &out.ConsumesCounters
 		*out = make([]DeviceCounterConsumption, len(*in))
@@ -207,6 +255,26 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 // Convert_v1_Device_To_api_Device is an autogenerated conversion function.
 func Convert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversion.Scope) error {
 	return autoConvert_v1_Device_To_api_Device(in, out, s)
+}
+
+func autoConvert_api_DeviceCapacity_To_v1_DeviceCapacity(in *DeviceCapacity, out *v1.DeviceCapacity, s conversion.Scope) error {
+	*out = *(*v1.DeviceCapacity)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_api_DeviceCapacity_To_v1_DeviceCapacity is an autogenerated conversion function.
+func Convert_api_DeviceCapacity_To_v1_DeviceCapacity(in *DeviceCapacity, out *v1.DeviceCapacity, s conversion.Scope) error {
+	return autoConvert_api_DeviceCapacity_To_v1_DeviceCapacity(in, out, s)
+}
+
+func autoConvert_v1_DeviceCapacity_To_api_DeviceCapacity(in *v1.DeviceCapacity, out *DeviceCapacity, s conversion.Scope) error {
+	*out = *(*DeviceCapacity)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_DeviceCapacity_To_api_DeviceCapacity is an autogenerated conversion function.
+func Convert_v1_DeviceCapacity_To_api_DeviceCapacity(in *v1.DeviceCapacity, out *DeviceCapacity, s conversion.Scope) error {
+	return autoConvert_v1_DeviceCapacity_To_api_DeviceCapacity(in, out, s)
 }
 
 func autoConvert_api_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in *DeviceCounterConsumption, out *v1.DeviceCounterConsumption, s conversion.Scope) error {
@@ -270,12 +338,8 @@ func autoConvert_api_ResourceSlice_To_v1_ResourceSlice(in *ResourceSlice, out *v
 	if err := Convert_api_ResourceSliceSpec_To_v1_ResourceSliceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
+	// WARNING: in.uniqueStringMap requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_api_ResourceSlice_To_v1_ResourceSlice is an autogenerated conversion function.
-func Convert_api_ResourceSlice_To_v1_ResourceSlice(in *ResourceSlice, out *v1.ResourceSlice, s conversion.Scope) error {
-	return autoConvert_api_ResourceSlice_To_v1_ResourceSlice(in, out, s)
 }
 
 func autoConvert_v1_ResourceSlice_To_api_ResourceSlice(in *v1.ResourceSlice, out *ResourceSlice, s conversion.Scope) error {
@@ -286,9 +350,46 @@ func autoConvert_v1_ResourceSlice_To_api_ResourceSlice(in *v1.ResourceSlice, out
 	return nil
 }
 
-// Convert_v1_ResourceSlice_To_api_ResourceSlice is an autogenerated conversion function.
-func Convert_v1_ResourceSlice_To_api_ResourceSlice(in *v1.ResourceSlice, out *ResourceSlice, s conversion.Scope) error {
-	return autoConvert_v1_ResourceSlice_To_api_ResourceSlice(in, out, s)
+func autoConvert_api_ResourceSliceList_To_v1_ResourceSliceList(in *ResourceSliceList, out *v1.ResourceSliceList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ResourceSlice, len(*in))
+		for i := range *in {
+			if err := Convert_api_ResourceSlice_To_v1_ResourceSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_api_ResourceSliceList_To_v1_ResourceSliceList is an autogenerated conversion function.
+func Convert_api_ResourceSliceList_To_v1_ResourceSliceList(in *ResourceSliceList, out *v1.ResourceSliceList, s conversion.Scope) error {
+	return autoConvert_api_ResourceSliceList_To_v1_ResourceSliceList(in, out, s)
+}
+
+func autoConvert_v1_ResourceSliceList_To_api_ResourceSliceList(in *v1.ResourceSliceList, out *ResourceSliceList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ResourceSlice, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ResourceSlice_To_api_ResourceSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_v1_ResourceSliceList_To_api_ResourceSliceList is an autogenerated conversion function.
+func Convert_v1_ResourceSliceList_To_api_ResourceSliceList(in *v1.ResourceSliceList, out *ResourceSliceList, s conversion.Scope) error {
+	return autoConvert_v1_ResourceSliceList_To_api_ResourceSliceList(in, out, s)
 }
 
 func autoConvert_api_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *ResourceSliceSpec, out *v1.ResourceSliceSpec, s conversion.Scope) error {

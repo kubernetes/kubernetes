@@ -17,8 +17,8 @@ limitations under the License.
 package experimental
 
 import (
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 // compatibilityGroupIntersection is the rolling state of the
@@ -111,7 +111,7 @@ func compatibilityGroupSet(groups []string) sets.Set[string] {
 // order. This lets the feature be enabled later without deleting pods.
 // Enforcement (feature on) uses checkAndConsumeCompatibilityGroups and the
 // per-pool baseline instead.
-func sliceUsesCompatibilityGroups(slice *resourceapi.ResourceSlice) bool {
+func sliceUsesCompatibilityGroups(slice *draapi.ResourceSlice) bool {
 	for _, device := range slice.Spec.Devices {
 		for _, deviceCounterConsumption := range device.ConsumesCounters {
 			if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
@@ -124,8 +124,8 @@ func sliceUsesCompatibilityGroups(slice *resourceapi.ResourceSlice) bool {
 
 // slicesWithoutCompatibilityGroups returns the slices which do not match
 // sliceUsesCompatibilityGroups, preserving their order.
-func slicesWithoutCompatibilityGroups(slices []*resourceapi.ResourceSlice) []*resourceapi.ResourceSlice {
-	filtered := make([]*resourceapi.ResourceSlice, 0, len(slices))
+func slicesWithoutCompatibilityGroups(slices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	filtered := make([]*draapi.ResourceSlice, 0, len(slices))
 	for _, slice := range slices {
 		if sliceUsesCompatibilityGroups(slice) {
 			continue

@@ -31,6 +31,7 @@ func TestNewDeviceConsumedCapacity(t *testing.T) {
 	one := resource.MustParse("1")
 	two := resource.MustParse("2")
 	four := resource.MustParse("4")
+	u := draapi.MakeUniqueString
 
 	tests := map[string]struct {
 		consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
@@ -42,15 +43,15 @@ func TestNewDeviceConsumedCapacity(t *testing.T) {
 		},
 		"unqualified-only": {
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"cap": one},
-			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver.String(), Identifier: "cap"}: &one}},
+			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver, Identifier: u("cap")}: &one}},
 		},
 		"driver-qualified-only": {
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"driver-a/cap": one},
-			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver.String(), Identifier: "cap"}: &one}},
+			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver, Identifier: u("cap")}: &one}},
 		},
 		"foreign-domain-qualified": {
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"example.com/cap": one},
-			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: "example.com", Identifier: "cap"}: &one}},
+			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: u("example.com"), Identifier: u("cap")}: &one}},
 		},
 		"unqualified-and-driver-qualified-same-identifier-deterministic": {
 			// A 1.37 allocator could have persisted both spellings for the same
@@ -58,20 +59,20 @@ func TestNewDeviceConsumedCapacity(t *testing.T) {
 			// regardless of map iteration order, matching buildCapacity in
 			// k8s.io/dynamic-resource-allocation/cel.
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"cap": one, "driver-a/cap": two},
-			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver.String(), Identifier: "cap"}: &two}},
+			want:             DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{{Domain: deviceID.Driver, Identifier: u("cap")}: &two}},
 		},
 		"unrelated-unqualified-and-qualified-identifiers-do-not-interfere": {
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"cap": one, "driver-a/other-cap": four},
 			want: DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{
-				{Domain: deviceID.Driver.String(), Identifier: "cap"}:       &one,
-				{Domain: deviceID.Driver.String(), Identifier: "other-cap"}: &four,
+				{Domain: deviceID.Driver, Identifier: u("cap")}:       &one,
+				{Domain: deviceID.Driver, Identifier: u("other-cap")}: &four,
 			}},
 		},
 		"unqualified-and-foreign-domain-same-identifier-do-not-collide": {
 			consumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"cap": one, "example.com/cap": two},
 			want: DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: ConsumedCapacity{
-				{Domain: deviceID.Driver.String(), Identifier: "cap"}: &one,
-				{Domain: "example.com", Identifier: "cap"}:            &two,
+				{Domain: deviceID.Driver, Identifier: u("cap")}:  &one,
+				{Domain: u("example.com"), Identifier: u("cap")}: &two,
 			}},
 		},
 	}

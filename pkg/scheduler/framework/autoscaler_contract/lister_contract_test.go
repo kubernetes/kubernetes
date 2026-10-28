@@ -26,6 +26,7 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	fwk "k8s.io/kube-scheduler/framework"
 )
@@ -161,7 +162,7 @@ func (c *compositePodGroupStateContract) GetChildren() []fwk.EntityKey {
 
 type resourceSliceListerContract struct{}
 
-func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return nil, nil
 }
 
