@@ -27,9 +27,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
@@ -82,6 +85,69 @@ func TestCheckpointRequiresRunningSourcePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckpointNamespaceAuthorization(t *testing.T) {
+	const username = "checkpoint-namespace-user"
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	tCtx := ktesting.Init(t)
+	client, config, closeFn := startAPIServer(tCtx, t, true, func(opts *options.ServerRunOptions) { opts.Authorization.Modes = []string{"RBAC"} })
+	defer closeFn()
+	ownNamespace := framework.CreateNamespaceOrDie(client, "checkpoint-own", t)
+	foreignNamespace := framework.CreateNamespaceOrDie(client, "checkpoint-foreign", t)
+	ownSource := createCheckpointSource(tCtx, t, client, ownNamespace.Name, "source")
+	foreignSource := createCheckpointSource(tCtx, t, client, foreignNamespace.Name, ownSource.Name)
+	require.NotEqual(t, ownSource.UID, foreignSource.UID)
+
+	_, err := client.RbacV1().Roles(ownNamespace.Name).Create(tCtx, &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-user"},
+		Rules: []rbacv1.PolicyRule{
+			{APIGroups: []string{"node.k8s.io"}, Resources: []string{"podcheckpoints"}, Verbs: []string{"create", "get"}},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = client.RbacV1().RoleBindings(ownNamespace.Name).Create(tCtx, &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-user"},
+		Subjects:   []rbacv1.Subject{{Kind: "User", APIGroup: rbacv1.GroupName, Name: username}},
+		RoleRef:    rbacv1.RoleRef{Kind: "Role", APIGroup: rbacv1.GroupName, Name: "checkpoint-user"},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	podResource := schema.GroupResource{Resource: "pods"}
+	checkpointResource := schema.GroupResource{Group: "node.k8s.io", Resource: "podcheckpoints"}
+	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "create", "", checkpointResource, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, tCtx, client.AuthorizationV1(), username, ownNamespace.Name, "get", ownSource.Name, podResource, false)
+	userConfig := rest.CopyConfig(config)
+	userConfig.Impersonate = rest.ImpersonationConfig{UserName: username}
+	userClient := clientset.NewForConfigOrDie(userConfig)
+	_, err = userClient.CoreV1().Pods(ownNamespace.Name).Get(tCtx, ownSource.Name, metav1.GetOptions{})
+	require.True(t, apierrors.IsForbidden(err), "checkpoint creation must not depend on source Pod read permission: %v", err)
+
+	request := newPodCheckpoint(ownNamespace.Name, "checkpoint", ownSource.Name)
+	request.Spec.SourcePod.UID = new(ownSource.UID)
+	ownCheckpoint, err := userClient.NodeV1alpha1().PodCheckpoints(ownNamespace.Name).Create(tCtx, request, metav1.CreateOptions{})
+	require.NoError(t, err, "create permission must allow checkpointing a source in the same namespace")
+	foreignCheckpoint, err := client.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Create(tCtx, newPodCheckpoint(foreignNamespace.Name, ownCheckpoint.Name, foreignSource.Name), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	t.Run("foreign checkpoint read", func(t *testing.T) {
+		_, err := userClient.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Get(tCtx, foreignCheckpoint.Name, metav1.GetOptions{})
+		require.True(t, apierrors.IsForbidden(err), "foreign checkpoint GET: %v", err)
+	})
+	t.Run("foreign checkpoint creation", func(t *testing.T) {
+		_, err := userClient.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Create(tCtx, newPodCheckpoint(foreignNamespace.Name, "forbidden-checkpoint", foreignSource.Name), metav1.CreateOptions{})
+		require.True(t, apierrors.IsForbidden(err), "foreign checkpoint create: %v", err)
+		_, err = client.NodeV1alpha1().PodCheckpoints(foreignNamespace.Name).Get(tCtx, "forbidden-checkpoint", metav1.GetOptions{})
+		require.True(t, apierrors.IsNotFound(err))
+	})
+	t.Run("source UID resolves in request namespace", func(t *testing.T) {
+		request := newPodCheckpoint(ownNamespace.Name, "foreign-source-uid", ownSource.Name)
+		request.Spec.SourcePod.UID = new(foreignSource.UID)
+		_, err := userClient.NodeV1alpha1().PodCheckpoints(ownNamespace.Name).Create(tCtx, request, metav1.CreateOptions{})
+		require.True(t, apierrors.IsForbidden(err), "foreign source UID must not resolve across namespaces: %v", err)
+		require.ErrorContains(t, err, "not requested UID")
+		_, err = client.NodeV1alpha1().PodCheckpoints(ownNamespace.Name).Get(tCtx, request.Name, metav1.GetOptions{})
+		require.True(t, apierrors.IsNotFound(err))
+	})
 }
 
 func TestCheckpointSourceUpdates(t *testing.T) {
