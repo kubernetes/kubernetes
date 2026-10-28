@@ -24,11 +24,11 @@
     childrenPodGroupsPerCPGParam: $childrenPodGroupsPerCPG
     namespace: cpg-basic-ns-0
     templatePath: templates/composite-podgroup.yaml
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         # Create pods belonging to child pod groups according to their indices.
         podTemplatePath: templates/pod.yaml
         collectMetrics: true
@@ -113,14 +113,14 @@
     templateParams:
       gang: true
       priority: 1000
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         minCount: $minCount
         priority: 1000
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         # Create pods with reference to the child pod groups according to their indices.
         podTemplatePath: templates/pod.yaml
         collectMetrics: true
@@ -225,14 +225,14 @@
     templateParams:
       gang: true
       priority: 1000
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         priority: 1000
         minCount: $minCount
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         collectMetrics: true
         podTemplatePath: templates/pod.yaml
         templateParams:
@@ -296,14 +296,14 @@
     templateParams:
       gang: true
       priority: 1000
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         priority: 1000
         minCount: $minCount
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         podTemplatePath: templates/pod.yaml
         templateParams:
           cpuRequest: $lowPriorityCpuRequest
@@ -318,14 +318,14 @@
     templateParams:
       gang: true
       priority: 10000
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         priority: 10000
         minCount: $minCount
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         collectMetrics: true
         podTemplatePath: templates/pod.yaml
         templateParams:
@@ -407,14 +407,14 @@
     templateParams:
       gang: true
       priority: 10000
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         priority: 10000
         minCount: $minCount
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         collectMetrics: true
         podTemplatePath: templates/pod-gang-affinity.yaml
         templateParams:
@@ -477,14 +477,14 @@
     templateParams:
       gang: true
       topologyKey: topology.kubernetes.io/zone
-    podGroups:
+    createPodGroupsOp:
       # Level 2 represents leaf podgroups children of the root composite podgroup.
       templatePath: templates/podgroup.yaml
       templateParams:
         minCount: $minCount
         topologyKey: topology.kubernetes.io/rack
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         # Create pods with reference to the child pod groups according to their indices.
         podTemplatePath: templates/pod.yaml
         collectMetrics: true
@@ -585,14 +585,14 @@
     templateParams:
       gang: true
       priority: 1000
-    podGroups:
+    createPodGroupsOp:
       # Level 3 represents leaf podgroups children of composite podgroups in level 2.
       templatePath: templates/podgroup.yaml
       templateParams:
         minCount: $minCount
         priority: 1000
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         # Pods belonging to leaf PodGroups
         podTemplatePath: templates/pod.yaml
         collectMetrics: true
@@ -689,14 +689,14 @@
     templateParams:
       gang: true
       priority: 1000
-    podGroups:
+    createPodGroupsOp:
       # Level 4 represents leaf podgroups children of the composite podgroups in level 3.
       templatePath: templates/podgroup.yaml
       templateParams:
         minCount: $minCount
         priority: 1000
       podsPerGroupParam: $podsPerGroup
-      pods:
+      createPodsOp:
         # Pods belonging to leaf PodGroups
         podTemplatePath: templates/pod.yaml
         collectMetrics: true

@@ -23,7 +23,7 @@
     templateParams:
       podsPerGroup: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       # Create pods with reference to the pod groups (gangs) according to their indices (e.g., pods 0-2 → gang-0, pods 3-5 → gang-1, etc.).
       podTemplatePath: templates/gang-pod.yaml
       collectMetrics: true

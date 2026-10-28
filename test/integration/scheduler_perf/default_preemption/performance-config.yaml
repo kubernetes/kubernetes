@@ -254,7 +254,7 @@
       priority: 1000
       disruptionMode: $disruptionMode
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
         cpuRequest: $lowPriorityCpuRequest

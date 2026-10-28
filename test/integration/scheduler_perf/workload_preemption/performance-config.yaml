@@ -25,7 +25,7 @@
     templateParams:
       podsPerGroup: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       collectMetrics: true
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
@@ -107,7 +107,7 @@
       podsPerGroup: $podsPerGroup
       priority: 1000
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
         cpuRequest: $lowPriorityCpuRequest
@@ -121,7 +121,7 @@
       podsPerGroup: $podsPerGroup
       priority: 10000
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       collectMetrics: true
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
@@ -244,7 +244,7 @@
     templateParams:
       podsPerGroup: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       collectMetrics: true
       podTemplatePath: templates/pod-gang-affinity.yaml
 
@@ -328,7 +328,7 @@
       podsPerGroup: $podsPerGroup
       priority: 10000
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       collectMetrics: true
       podTemplatePath: templates/gang-pod-with-topology-spreading.yaml
       templateParams:
@@ -380,7 +380,7 @@
       priority: $trainingPriority|10000
       disruptionMode: $disruptionMode
     podsPerGroupParam: $trainingPodsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
         cpuRequest: 2800m
@@ -396,7 +396,7 @@
       priority: 100
       disruptionMode: $disruptionMode
     podsPerGroupParam: $largeBatchPodsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
         cpuRequest: 2800m
@@ -412,7 +412,7 @@
       priority: 100
       disruptionMode: $disruptionMode
     podsPerGroupParam: $smallBatchPodsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/gang-pod.yaml
       templateParams:
         cpuRequest: 2800m

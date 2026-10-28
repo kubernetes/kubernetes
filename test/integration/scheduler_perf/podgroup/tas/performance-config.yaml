@@ -27,7 +27,7 @@
     templateParams:
       minCount: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
       podTemplatePath: templates/pod.yaml
       collectMetrics: true
@@ -193,7 +193,7 @@
     templateParams:
       minCount: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/pod.yaml
       collectMetrics: true
   workloads:
@@ -270,7 +270,7 @@
     templateParams:
       minCount: $podsPerGroup
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       podTemplatePath: templates/pod.yaml
       collectMetrics: true
   workloads:
@@ -324,7 +324,7 @@
     namespace: tas-ns-0
     templatePath: templates/podgroup.yaml
     podsPerGroupParam: $podsPerGroup
-    pods:
+    createPodsOp:
       # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
       podTemplatePath: templates/pod.yaml
       collectMetrics: true

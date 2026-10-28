@@ -520,7 +520,7 @@ func TestRunOp(t *testing.T) {
 				TemplatePath:      *newPodGroupTemplateFile(t, "namespace-0"),
 				Count:             2,
 				PodsPerGroupParam: "$podsPerGroup",
-				Pods: &createPodsOp{
+				CreatePodsOp: &createPodsOp{
 					PodTemplatePath:      newPodInGroupTemplateFile(t, "namespace-0"),
 					SkipWaitToCompletion: true,
 				},
@@ -550,8 +550,23 @@ func TestRunOp(t *testing.T) {
 				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
 				Count:        2,
 				PodsPerGroup: 3,
-				Pods: &createPodsOp{
+				CreatePodsOp: &createPodsOp{
 					Count:                6,
+					SkipWaitToCompletion: true,
+				},
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with Pods with CountMultiplierParam",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        2,
+				PodsPerGroup: 3,
+				CreatePodsOp: &createPodsOp{
+					CountMultiplierParam: "$podsPerGroup",
 					SkipWaitToCompletion: true,
 				},
 			},
@@ -566,11 +581,13 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 2,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(1),
 				verifyNamespaceCreated("namespace-0"),
 				verifyObj(st.MakeCompositePodGroup().Namespace("namespace-0").MinGroupCount(2).Obj()),
+				onPodGroups(verifyCount(2)),
 			},
 		},
 		{
@@ -583,6 +600,7 @@ func TestRunOp(t *testing.T) {
 				Depth:                            3,
 				ChildrenCompositePodGroupsPerCPG: 2,
 				ChildrenPodGroupsPerCPG:          2,
+				CreatePodGroupsOp:                &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(3),
@@ -614,6 +632,7 @@ func TestRunOp(t *testing.T) {
 				Depth:                                 4,
 				ChildrenCompositePodGroupsPerCPGParam: "$childrenCPGs",
 				ChildrenPodGroupsPerCPGParam:          "$childrenPGs",
+				CreatePodGroupsOp:                     &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(7),
@@ -638,6 +657,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 2,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			expectedFailure: true,
 		},
@@ -650,6 +670,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 2,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "")},
 			},
 			expectedFailure: true,
 		},
@@ -662,6 +683,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               0,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 2,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			expectedFailure: true,
 		},
@@ -674,6 +696,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 0,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			expectedFailure: true,
 		},
@@ -686,6 +709,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   1,
 				ChildrenPodGroupsPerCPG: 2,
+				CreatePodGroupsOp:       &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			expectedFailure: true,
 		},
@@ -699,6 +723,7 @@ func TestRunOp(t *testing.T) {
 				Depth:                            5,
 				ChildrenCompositePodGroupsPerCPG: 2,
 				ChildrenPodGroupsPerCPG:          2,
+				CreatePodGroupsOp:                &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
 			},
 			expectedFailure: true,
 		},
@@ -712,6 +737,19 @@ func TestRunOp(t *testing.T) {
 				Depth:                            2,
 				ChildrenCompositePodGroupsPerCPG: 2,
 				ChildrenPodGroupsPerCPG:          2,
+				CreatePodGroupsOp:                &createPodGroups{TemplatePath: *newPodGroupTemplateFile(t, "namespace-0")},
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create CompositePodGroups without CreatePodGroupsOp",
+			op: &createCompositePodGroups{
+				Opcode:                  createCompositePodGroupsOpcode,
+				Namespace:               "namespace-0",
+				TemplatePath:            *newCompositePodGroupTemplateFile(t, "namespace-0"),
+				RootCount:               1,
+				Depth:                   2,
+				ChildrenPodGroupsPerCPG: 2,
 			},
 			expectedFailure: true,
 		},
@@ -733,7 +771,7 @@ func TestRunOp(t *testing.T) {
 				Depth:                            3,
 				ChildrenCompositePodGroupsPerCPG: 2,
 				ChildrenPodGroupsPerCPG:          2,
-				PodGroups: &createPodGroups{
+				CreatePodGroupsOp: &createPodGroups{
 					TemplatePath: *createObjTemplateFile(t,
 						st.MakePodGroup().
 							Name("gang-{{.Index}}").
@@ -743,7 +781,7 @@ func TestRunOp(t *testing.T) {
 							Obj(),
 					),
 					PodsPerGroupParam: "$podsPerGroup",
-					Pods: &createPodsOp{
+					CreatePodsOp: &createPodsOp{
 						PodTemplatePath:      newPodInGroupTemplateFile(t, "namespace-0"),
 						SkipWaitToCompletion: true,
 					},
@@ -769,7 +807,7 @@ func TestRunOp(t *testing.T) {
 				RootCount:               1,
 				Depth:                   2,
 				ChildrenPodGroupsPerCPG: 2,
-				PodGroups: &createPodGroups{
+				CreatePodGroupsOp: &createPodGroups{
 					Namespace:    "namespace-1",
 					TemplatePath: *newPodGroupTemplateFile(t, "namespace-1"),
 				},
@@ -1035,14 +1073,14 @@ func verifyCount(expectedCount int) verifyFunc {
 // onPods runs vf against the pods created by a createPodGroups op.
 func onPods(vf verifyFunc) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
-		return vf(t, tCtx, op.(*createPodGroups).Pods, opIndex)
+		return vf(t, tCtx, op.(*createPodGroups).CreatePodsOp, opIndex)
 	}
 }
 
 // onPodGroups runs vf against the PodGroups created by a createCompositePodGroups op.
 func onPodGroups(vf verifyFunc) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
-		return vf(t, tCtx, op.(*createCompositePodGroups).PodGroups, opIndex)
+		return vf(t, tCtx, op.(*createCompositePodGroups).CreatePodGroupsOp, opIndex)
 	}
 }
 

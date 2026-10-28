@@ -201,9 +201,9 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 // runCreatePodGroupsOp executes the createPodGroups operation.
 // It creates the configured number of PodGroups from a template and
 // then waits for them to be visible in the scheduler's informer cache.
-// This ensures that the pods referencing these pod groups won't fail due to cache lag.
+// This ensures that dependent operations (like creating pods that reference these pod groups) won't fail due to cache lag.
 // It timeouts after 10 seconds if the condition is not met.
-// If op.Pods is set, it then creates the pods.
+// If op.CreatePodsOp is set, it then creates the pods.
 func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, opIndex int, op *createPodGroups) error {
 	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
 		return err
@@ -243,8 +243,8 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, opIndex 
 		return fmt.Errorf("timed out waiting for PodGroups to be cached: %w", err)
 	}
 
-	if op.Pods != nil {
-		return e.runCreatePodsOp(tCtx, opIndex, op.Pods)
+	if op.CreatePodsOp != nil {
+		return e.runCreatePodsOp(tCtx, opIndex, op.CreatePodsOp)
 	}
 	return nil
 }
@@ -277,8 +277,8 @@ func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *
 
 // runCreateCompositePodGroupsOp executes the createCompositePodGroups operation.
 // It creates the configured CompositePodGroups from a template and then waits for them to be visible in the scheduler's informer cache.
-// This ensures that the PodGroups referencing these CompositePodGroups won't fail due to cache lag.
-// If op.PodGroups is set, it then creates the leaf PodGroups.
+// This ensures that dependent operations (like creating PodGroups that reference these CompositePodGroups) won't fail due to cache lag.
+// It then creates the leaf PodGroups.
 func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext, opIndex int, op *createCompositePodGroups) error {
 	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
 		return err
@@ -338,10 +338,7 @@ func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext,
 		return fmt.Errorf("timed out waiting for CompositePodGroups to be cached: %w", err)
 	}
 
-	if op.PodGroups != nil {
-		return e.runCreatePodGroupsOp(tCtx, opIndex, op.PodGroups)
-	}
-	return nil
+	return e.runCreatePodGroupsOp(tCtx, opIndex, op.CreatePodGroupsOp)
 }
 
 func (e *WorkloadExecutor) createCompositePodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1beta1.CompositePodGroup, namespace, templatePath string) error {
