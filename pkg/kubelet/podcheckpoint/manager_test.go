@@ -157,10 +157,11 @@ func (m *checkpointProbeManager) ResumeProbes(uid types.UID) {
 
 // checkpointPodWorkers stands in for the pod workers in checkpoint tests. A
 // sync runs only the step of SyncPod that captures a requested checkpoint,
-// with the status that the runtime reports. onSync, if set, replaces the
-// capture.
+// with the status that the runtime reports. It runs before SyncPodNow returns
+// unless async is set. onSync, if set, replaces the capture.
 type checkpointPodWorkers struct {
 	manager              *manager
+	async                bool
 	terminationRequested map[types.UID]bool
 	onSync               func(pod *v1.Pod)
 }
@@ -174,12 +175,19 @@ func (w *checkpointPodWorkers) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 		w.onSync(pod)
 		return
 	}
-	podStatus, err := w.manager.containerRuntime.GetPodStatus(ctx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
-	if err != nil {
+	syncPod := func() {
+		podStatus, err := w.manager.containerRuntime.GetPodStatus(ctx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
+		if err != nil {
+			return
+		}
+		markContainersStarted(ctx, w.manager, pod, podStatus)
+		w.manager.syncPodCheckpointRequest(ctx, pod, podStatus)
+	}
+	if w.async {
+		go syncPod()
 		return
 	}
-	markContainersStarted(ctx, w.manager, pod, podStatus)
-	w.manager.syncPodCheckpointRequest(ctx, pod, podStatus)
+	syncPod()
 }
 
 // markContainersStarted records the running containers as started, as the
@@ -1174,6 +1182,7 @@ func TestSyncPodCheckpoint(t *testing.T) {
 		pc := &nodev1alpha1.PodCheckpoint{
 			ObjectMeta: metav1.ObjectMeta{Name: "ckpt", Namespace: "ns", UID: "checkpoint-uid"},
 			Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: nodev1alpha1.PodReference{Name: "src"}},
+			Status:     &nodev1alpha1.PodCheckpointStatus{},
 		}
 		if specUID != "" {
 			pc.Spec.SourcePod.UID = new(types.UID(specUID))
@@ -1441,7 +1450,7 @@ func TestFinalizeInterruptedCheckpointsRemovesOutput(t *testing.T) {
 			Namespace: "ns",
 			UID:       "interrupted-uid",
 		},
-		Status: nodev1alpha1.PodCheckpointStatus{
+		Status: &nodev1alpha1.PodCheckpointStatus{
 			NodeName: new("testNode"),
 			Conditions: []metav1.Condition{{
 				Type:   nodev1alpha1.PodCheckpointConditionReady,
@@ -1505,7 +1514,7 @@ func TestFinalizeInterruptedCheckpointsRetriesStatus(t *testing.T) {
 					Namespace: "ns",
 					UID:       "interrupted-uid",
 				},
-				Status: nodev1alpha1.PodCheckpointStatus{
+				Status: &nodev1alpha1.PodCheckpointStatus{
 					NodeName: new("testNode"),
 					Conditions: []metav1.Condition{{
 						Type:   nodev1alpha1.PodCheckpointConditionReady,
@@ -1595,7 +1604,7 @@ func TestFinalizeInterruptedCheckpointsFailsWhenCleanupPathIsInvalid(t *testing.
 			Namespace: "ns",
 			UID:       "../invalid-uid",
 		},
-		Status: nodev1alpha1.PodCheckpointStatus{
+		Status: &nodev1alpha1.PodCheckpointStatus{
 			NodeName: new("testNode"),
 			Conditions: []metav1.Condition{{
 				Type:   nodev1alpha1.PodCheckpointConditionReady,
