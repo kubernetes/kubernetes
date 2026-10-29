@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -452,8 +453,52 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
 }
 
+type swappablePrefixTransformer struct {
+	mu    sync.RWMutex
+	inner value.Transformer
+}
+
+func newSwappablePrefixTransformer() *swappablePrefixTransformer {
+	return &swappablePrefixTransformer{
+		inner: storagetesting.NewPrefixTransformer([]byte("test!"), false),
+	}
+}
+
+func (t *swappablePrefixTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.inner.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func (t *swappablePrefixTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.inner.TransformToStorage(ctx, data, dataCtx)
+}
+
+type cacherWithPrefixTransformer struct {
+	*CacheDelegator
+	transformer *swappablePrefixTransformer
+}
+
+func (c *cacherWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
+	c.transformer.mu.Lock()
+	orig := c.transformer.inner
+	copyTransformer := *orig.(*storagetesting.PrefixTransformer)
+	c.transformer.inner = modifier(&copyTransformer)
+	c.transformer.mu.Unlock()
+	return func() {
+		c.transformer.mu.Lock()
+		c.transformer.inner = orig
+		c.transformer.mu.Unlock()
+	}
+}
+
 func TestGuaranteedUpdate(t *testing.T) {
-	// TODO(#109831): Enable use of this test and run it.
+	transformer := newSwappablePrefixTransformer()
+	ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdate(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer}, checkStorageInvariants)
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
@@ -463,7 +508,11 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 }
 
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
-	// TODO(#109831): Enable use of this test and run it.
+	transformer := newSwappablePrefixTransformer()
+	// Leading-whitespace normalization in RunTestGuaranteedUpdateChecksStoredData requires a JSON codec.
+	ctx, cacher, terminate := testSetup(t, withCodec(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)), withTransformer(transformer))
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateChecksStoredData(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer})
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
@@ -588,10 +637,11 @@ func TestWatch(t *testing.T) {
 }
 
 func TestOptimisticConcurrency(t *testing.T) {
-	ctx, delegator, server, terminate := testSetupWithEtcdServer(t)
+	transformer := newSwappablePrefixTransformer()
+	ctx, delegator, server, terminate := testSetupWithEtcdServer(t, withTransformer(transformer))
 	t.Cleanup(terminate)
 	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
-	storagetesting.RunTestOptimisticConcurrency(ctx, t, delegator, true, recorder)
+	storagetesting.RunTestOptimisticConcurrency(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: delegator, transformer: transformer}, true, recorder)
 }
 
 // ===================================================
@@ -721,7 +771,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 	if err := cacher.Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
-	delegator := NewCacheDelegator(cacher, wrappedStorage)
+	delegator := NewCacheDelegator(cacher, etcdStorage)
 	terminate := func() {
 		delegator.Stop()
 		cacher.Stop()

@@ -342,7 +342,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestOptimisticConcurrency(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestOptimisticConcurrency(ctx, t, store, false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+	storagetesting.RunTestOptimisticConcurrency(ctx, t, &storeWithPrefixTransformer{store}, false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 }
 
 func TestList(t *testing.T) {
