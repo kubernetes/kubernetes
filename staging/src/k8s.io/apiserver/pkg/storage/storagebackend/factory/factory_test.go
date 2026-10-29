@@ -372,6 +372,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 
 	ready := make(chan struct{})
 	signal := make(chan struct{})
+	probeStarted := make(chan struct{})
 
 	var counter uint64
 	newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
@@ -387,6 +388,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 				// the race limiter to server the new request from the cache or allow
 				// it to go through
 				if val == 1 {
+					close(probeStarted)
 					select {
 					case <-ctx.Done():
 						return nil, ctx.Err()
@@ -419,6 +421,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 		close(signal)
 	}()
 
+	<-probeStarted
 	// wait until the rate limit allows new connections
 	time.Sleep(cfg.HealthcheckTimeout / 2)
 
