@@ -455,11 +455,9 @@ func TestReflectorListAndWatch(t *testing.T) {
 			},
 			expectedWatchOptions: []metav1.ListOptions{
 				{
-					AllowWatchBookmarks: true,
-					ResourceVersion:     "",
-					// ResourceVersionMatch defaults to "NotOlderThan" when
-					// ResourceVersion and Limit are empty.
-					ResourceVersionMatch: "NotOlderThan",
+					AllowWatchBookmarks:  true,
+					ResourceVersion:      "0",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					SendInitialEvents:    ptr.To(true),
 				},
 			},
@@ -541,8 +539,8 @@ func TestReflectorListAndWatch(t *testing.T) {
 			watcherCh := make(chan *watch.FakeWatcher)
 			var listOpts, watchOpts []metav1.ListOptions
 
-			// The ListFunc will never be called. So we expect Watch to only be called
-			// with options.ResourceVersion="" to start the WatchList.
+			// With WatchList enabled, the initial Watch request uses RV="0"
+			// and ListFunc is never called.
 			lw := &ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					watchOpts = append(watchOpts, options)
