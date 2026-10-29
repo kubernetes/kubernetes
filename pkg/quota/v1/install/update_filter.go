@@ -38,6 +38,10 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && hasResourcesChanged(oldPod, newPod) {
 				return true
 			}
+			// If Scheduler PreBind fails and Unreserve clears ExtraNodeAllocatableResources, the quota controller must release what was calculated during pod status patch (increase).
+			if !apiequality.Semantic.DeepEqual(oldPod.Status.ExtraNodeAllocatableResources, newPod.Status.ExtraNodeAllocatableResources) {
+				return true
+			}
 
 			// when scope changed
 			if core.IsTerminating(oldPod) != core.IsTerminating(newPod) {

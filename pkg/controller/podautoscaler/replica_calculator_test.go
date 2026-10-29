@@ -2373,13 +2373,14 @@ func TestCalculateRequests(t *testing.T) {
 	testPod := "test-pod"
 
 	tests := []struct {
-		name                    string
-		pods                    []*v1.Pod
-		container               string
-		resource                v1.ResourceName
-		enablePodLevelResources bool
-		expectedRequests        map[string]int64
-		expectedError           error
+		name                              string
+		pods                              []*v1.Pod
+		container                         string
+		resource                          v1.ResourceName
+		enablePodLevelResources           bool
+		enableDRANodeAllocatableResources bool
+		expectedRequests                  map[string]int64
+		expectedError                     error
 	}{
 		{
 			name:             "void",
@@ -2605,11 +2606,339 @@ func TestCalculateRequests(t *testing.T) {
 			expectedRequests: map[string]int64{testPod: 100},
 			expectedError:    nil,
 		},
+		{
+			name:                              "DRA node allocatable resources added to container spec requests",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1", "container2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(300, resource.DecimalSI)},
+							},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceCPU,
+									PerPod:       resource.NewMilliQuantity(50, resource.DecimalSI),
+									PerContainer: resource.NewMilliQuantity(25, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 550},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only pod with no pod.spec CPU request succeeds when DRANodeAllocatableResources enabled",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(400, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 400},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only pod fails when DRANodeAllocatableResources is disabled",
+			enableDRANodeAllocatableResources: false,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(400, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                              "Multi-container pod fails if one container lacks both spec and DRA request",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(400, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container2", testPod),
+		},
+		{
+			name:                              "Pod-level resources cover DRA without double-counting",
+			enablePodLevelResources:           true,
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(400, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name:                              "Container includes DRA allocation for target container",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(300, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 400},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only target container with no spec request",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(300, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 300},
+			expectedError:    nil,
+		},
+		{
+			name:                              "shared DRA claim counts in full for the target container",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1", "container2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(600, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 700}, // 100m spec + 600m claim
+			expectedError:    nil,
+		},
+		{
+			name:                              "shared DRA claim counted once for pod",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Containers: []string{"container1", "container2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(600, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 700}, // 100m spec + 600m claim, once
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA claim used only by plain init container is excluded while sidecar init container claim is included",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+						{Name: "sidecar1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)}}},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "init-only-claim"},
+							Containers: []string{"init1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(2000, resource.DecimalSI)},
+							},
+						},
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "sidecar-claim"},
+							Containers: []string{"sidecar1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: resource.NewMilliQuantity(300, resource.DecimalSI)},
+							},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 600}, // 100m container1 + 200m sidecar1 + 300m sidecar-claim (init-only-claim excluded)
+			expectedError:    nil,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.enablePodLevelResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.enableDRANodeAllocatableResources)
 
 			requests, err := calculateRequests(tc.pods, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
@@ -2637,7 +2966,7 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 		},
 	}
 
-	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU)
+	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU, false)
 
 	require.Error(t, err, "expected error for non-existent container")
 	expectedErr := "container non-existent-container not found in Pod test-pod"

@@ -218,6 +218,16 @@ var (
 		pod.Spec.Containers = append(pod.Spec.Containers, container)
 		return pod
 	}()
+	// podWithStaleExtraNodeAllocatableResources still has the status written by an earlier scheduling attempt.
+	podWithStaleExtraNodeAllocatableResources = func() *v1.Pod {
+		pod := podWithClaimReferenceInContainer.DeepCopy()
+		pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(apiresource.MustParse("1"))}},
+		}}
+		return pod
+	}()
 	groupedPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -1188,6 +1198,11 @@ type result struct {
 	// inFlightClaims is a list of claims which are expected to be tracked as
 	// in flight, nil if none.
 	inFlightClaims []metav1.Object
+
+	// extraNodeAllocatableResources is the list of extra node
+	// allocatable resources expected to be recorded in CycleState for the node
+	// during Filter.
+	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 }
 
 // change contains functions for modifying objects of a certain type. These
@@ -1282,6 +1297,9 @@ type testPluginCase struct {
 
 	prepare prepare
 	want    want
+
+	// otherPluginNodeAllocatableEntries are recorded per node by another plugin before Filter runs.
+	otherPluginNodeAllocatableEntries map[string][]v1.ExtraNodeAllocatableResource
 
 	// Invoke Filter with a canceled context.
 	cancelFilter bool
@@ -3441,15 +3459,15 @@ func testPlugin(tCtx ktesting.TContext) {
 			pod:                               podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				// In a real scheduling cycle, the Assume phase pre-populates the Pod's
-				// NodeAllocatableResourceClaimStatuses in the cache before PreBind runs.
+				// ExtraNodeAllocatableResources in the cache before PreBind runs.
 				// Because this plugin unit test skips the Assume phase, we must manually
 				// inject the expected status into the mock Pod to satisfy the equality check
-				// in patchNodeAllocatableResourceClaimStatus.
+				// in patchPodStatus.
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(apiresource.MustParse("1")),
@@ -3472,7 +3490,22 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil}, // Expect Success
+					workerNodeWithCapacity.Name: {
+						status: nil, // Expect Success
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{{
+									Name:     v1.ResourceCPU,
+									Quantity: new(apiresource.MustParse("1")),
+								}, {
+									Name:     v1.ResourceMemory,
+									Quantity: new(apiresource.MustParse("1Gi")),
+								}},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3493,10 +3526,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{{
 											Name:     v1.ResourceCPU,
 											Quantity: new(apiresource.MustParse("1")),
@@ -3514,16 +3547,70 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"node-allocatable-stale-entries-cleared-in-prebind": {
+			// No device on the chosen node maps node allocatable resources, so no write
+			// would replace the entries of the earlier attempt.
+			enableDRANodeAllocatableResources: true,
+			pod:                               podWithStaleExtraNodeAllocatableResources,
+			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			objs:                              []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithStaleExtraNodeAllocatableResources)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.Allocation = allocationResult
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-clear-failure": {
+			// Binding with the entries of the earlier attempt would account for them.
+			enableDRANodeAllocatableResources: true,
+			failPatch:                         true,
+			pod:                               podWithStaleExtraNodeAllocatableResources,
+			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			objs:                              []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Unschedulable, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
+				},
+			},
+		},
 		"node-allocatable-mapping-and-overhead-in-same-device": {
 			enableDRANodeAllocatableResources: true,
 			nodes:                             []*v1.Node{workerNodeWithCapacity},
 			pod:                               podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(apiresource.MustParse("1")),
@@ -3547,7 +3634,23 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{{
+									Name:     v1.ResourceCPU,
+									Quantity: new(apiresource.MustParse("1")),
+								}},
+								Overhead: []v1.NodeAllocatableOverheadResources{{
+									Name:   v1.ResourceMemory,
+									PerPod: apiresource.NewQuantity(100, apiresource.DecimalSI),
+								}},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3568,10 +3671,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{{
 											Name:     v1.ResourceCPU,
 											Quantity: new(apiresource.MustParse("1")),
@@ -3598,10 +3701,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			patchTestCase: func(tc *testPluginCase) {
 				// Simulate the Assume phase by pre-populating the status
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(apiresource.MustParse("1")),
@@ -3614,7 +3717,19 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs:    []apiruntime.Object{workerNodeSliceWithNodeAllocatableResource(), podWithClaimReferenceInContainer},
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{{
+									Name:     v1.ResourceCPU,
+									Quantity: new(apiresource.MustParse("1")),
+								}},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{
@@ -3644,10 +3759,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{{
 											Name:     v1.ResourceCPU,
 											Quantity: new(apiresource.MustParse("1")),
@@ -3670,10 +3785,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			patchTestCase: func(tc *testPluginCase) {
 				// Simulate the Assume phase by pre-populating the status
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(apiresource.MustParse("1")),
@@ -3697,7 +3812,22 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{{
+									Name:     v1.ResourceCPU,
+									Quantity: new(apiresource.MustParse("1")),
+								}, {
+									Name:     v1.ResourceMemory,
+									Quantity: new(apiresource.MustParse("1Gi")),
+								}},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{
@@ -3727,10 +3857,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{{
 											Name:     v1.ResourceCPU,
 											Quantity: new(apiresource.MustParse("1")),
@@ -3764,6 +3894,39 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`)},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-resource-insufficient-with-other-plugin-entries": {
+			// The claim's CPU fits the node alone, but not on top of what another plugin recorded.
+			enableDRANodeAllocatableResources: true,
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
+			pod:                               podWithClaimReferenceInContainer,
+			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			otherPluginNodeAllocatableEntries: map[string][]v1.ExtraNodeAllocatableResource{workerNodeWithCapacity.Name: {{
+				Source:  v1.ExtraNodeAllocatableReference{APIGroup: "example.com", Kind: "Test", Name: "abc"},
+				Mapping: []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(apiresource.MustParse("10"))}},
+			}}},
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`),
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{{
+							Source:  v1.ExtraNodeAllocatableReference{APIGroup: "example.com", Kind: "Test", Name: "abc"},
+							Mapping: []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(apiresource.MustParse("10"))}},
+						}},
+					},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -3894,10 +4057,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			pod:                               podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{"c1"},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{"c1"},
 						Overhead: []v1.NodeAllocatableOverheadResources{
 							{
 								Name:   v1.ResourceMemory,
@@ -3935,7 +4098,21 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{"c1"},
+								Overhead: []v1.NodeAllocatableOverheadResources{
+									{
+										Name:   v1.ResourceMemory,
+										PerPod: new(apiresource.MustParse("100")),
+									},
+								},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimReferenceInContainer)),
@@ -3951,10 +4128,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{"c1"},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{"c1"},
 										Overhead: []v1.NodeAllocatableOverheadResources{
 											{
 												Name:   v1.ResourceMemory,
@@ -3977,10 +4154,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			pod:                               podWithClaimName, // claim not referenced in any container
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{},
 						Mapping: []v1.NodeAllocatableMappedResources{
 							{
 								Name:     v1.ResourceCPU,
@@ -4001,7 +4178,21 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{
+										Name:     v1.ResourceCPU,
+										Quantity: new(apiresource.MustParse("1")),
+									},
+								},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
@@ -4017,10 +4208,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{},
 										Mapping: []v1.NodeAllocatableMappedResources{
 											{
 												Name:     v1.ResourceCPU,
@@ -4043,10 +4234,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			pod:                               podWithClaimName, // claim not referenced in any container
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+						Containers: []string{},
 						Overhead: []v1.NodeAllocatableOverheadResources{
 							{
 								Name:   v1.ResourceMemory,
@@ -4067,7 +4258,21 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+								Containers: []string{},
+								Overhead: []v1.NodeAllocatableOverheadResources{
+									{
+										Name:   v1.ResourceMemory,
+										PerPod: new(apiresource.MustParse("1Gi")),
+									},
+								},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
@@ -4083,10 +4288,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+										Containers: []string{},
 										Overhead: []v1.NodeAllocatableOverheadResources{
 											{
 												Name:   v1.ResourceMemory,
@@ -4094,6 +4299,104 @@ func testPlugin(tCtx ktesting.TContext) {
 											},
 										},
 									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-extended-resource": {
+			enableDRAExtendedResource:         true,
+			enableDRANodeAllocatableResources: true,
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
+			pod:                               podWithExtendedResourceName,
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{
+								Name:     v1.ResourceCPU,
+								Quantity: new(apiresource.MustParse("1")),
+							},
+						},
+					},
+				}
+				var podStatusPatches int
+				tc.reactors = []cgotesting.Reactor{
+					&cgotesting.SimpleReactor{
+						Verb:     "patch",
+						Resource: "pods",
+						Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+							if action.GetSubresource() == "status" {
+								podStatusPatches++
+								if podStatusPatches > 1 {
+									return true, nil, fmt.Errorf("expected a single pod status patch, got %d", podStatusPatches)
+								}
+							}
+							return false, nil, nil
+						},
+					},
+				}
+			},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithExtendedResourceName}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
+								Containers: []string{podWithExtendedResourceName.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{
+										Name:     v1.ResourceCPU,
+										Quantity: new(apiresource.MustParse("1")),
+									},
+								},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+									{
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaim.Name},
+										Containers: []string{p.Spec.Containers[0].Name},
+										Mapping: []v1.NodeAllocatableMappedResources{
+											{
+												Name:     v1.ResourceCPU,
+												Quantity: new(apiresource.MustParse("1")),
+											},
+										},
+									},
+								}
+								p.Status.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+									RequestMappings: []v1.ContainerExtendedResourceRequest{
+										{ContainerName: p.Spec.Containers[0].Name, ResourceName: extendedResourceName, RequestName: "container-0-request-0"},
+									},
+									ResourceClaimName: extendedResourceClaim.Name,
 								}
 								return p
 							}
@@ -4191,6 +4494,9 @@ func testPlugin(tCtx ktesting.TContext) {
 
 			initialObjects = testCtx.listAll(tCtx)
 			testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.filter)
+			for nodeName, entries := range tc.otherPluginNodeAllocatableEntries {
+				framework.GetExtraNodeAllocatableResourcesState(testCtx.state).Set(nodeName, "OtherPlugin", entries)
+			}
 			if !unschedulable {
 				for _, nodeInfo := range testCtx.nodeInfos {
 					var status *fwk.Status
@@ -4204,7 +4510,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						}
 						status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
 						nodeName := nodeInfo.Node().Name
-						testCtx.verify(tCtx, tc.want.filter.forNode(nodeName), initialObjects, tc.pod, nil, status)
+						nodeResult := tc.want.filter.forNode(nodeName)
+						testCtx.verify(tCtx, nodeResult, initialObjects, tc.pod, nil, status)
+						var gotResources []v1.ExtraNodeAllocatableResource
+						if state := framework.GetExtraNodeAllocatableResourcesState(testCtx.state); state != nil {
+							gotResources = state.Get(nodeName)
+						}
+						if diff := cmp.Diff(nodeResult.extraNodeAllocatableResources, gotResources, cmpopts.EquateEmpty()); diff != "" {
+							tCtx.Errorf("ExtraNodeAllocatableResourcesState for node %s mismatch (-want +got):\n%s", nodeName, diff)
+						}
 					})
 					if status.Code() == fwk.Success {
 						potentialNodes = append(potentialNodes, nodeInfo)

@@ -97,6 +97,7 @@ type Fit struct {
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableDRANodeAllocatableResources                  bool
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
@@ -219,6 +220,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if err != nil {
 		return nil, err
 	}
+	scorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -243,6 +245,8 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 
+		enableDRANodeAllocatableResources: fts.EnableDRANodeAllocatableResources,
+
 		resourceAllocationScorer: scorer,
 	}
 
@@ -254,6 +258,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		if err != nil {
 			return nil, err
 		}
+		placementScorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 		pl.placementScorer = placementScorer
 	}
 
@@ -278,7 +283,11 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
+	result := computePodResourceRequest(pod, ResourceRequestsOptions{
+		EnablePodLevelResources: f.enablePodLevelResources,
+		// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
+	})
 
 	cycleState.Write(preFilterStateKey, result)
 	return nil, nil
@@ -432,7 +441,11 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	opts := resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling}
+	opts := resource.PodResourcesOptions{
+		UseStatusResources: f.enableInPlacePodVerticalScaling,
+		InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling,
+		UseExtraNodeAllocatableResources:               f.enableDRANodeAllocatableResources,
+	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
 
@@ -486,8 +499,9 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRAExtendedResource:         f.enableDRAExtendedResource,
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
 	}
 
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
@@ -603,6 +617,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
+	s = f.recomputePodResourceRequestForNode(cycleState, pod, nodeInfo, s)
 
 	var draManager fwk.SharedDRAManager
 	if f.enableDRAExtendedResource {
@@ -635,6 +650,30 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	return nil
 }
 
+// recomputePodResourceRequestForNode recomputes the pod request including the node
+// allocatable resources that other plugins recorded for nodeInfo during Filter.
+// This recomputation is necessary because the other plugins' resource footprint
+// is not known during PreFilter.
+func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo, s *preFilterState) *preFilterState {
+	if !f.enableDRANodeAllocatableResources {
+		return s
+	}
+	state := framework.GetExtraNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return s
+	}
+	extraResources := state.Get(nodeInfo.Node().Name)
+	if len(extraResources) == 0 {
+		return s
+	}
+	podCopy := *pod
+	podCopy.Status.ExtraNodeAllocatableResources = extraResources
+	return computePodResourceRequest(&podCopy, ResourceRequestsOptions{
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRANodeAllocatableResources: true,
+	})
+}
+
 // Score invoked at the Score extension point.
 func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	s, err := getPreScoreState(state)
@@ -653,7 +692,8 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := f.calculatePodRequestWithExtraNodeAllocatable(state, pod, nodeInfo.Node().Name, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
 }
 
 // PlacementScoreExtensions is not used by this plugin.

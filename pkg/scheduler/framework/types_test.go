@@ -2258,15 +2258,15 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                                 string
-		containers                           []v1.Container
-		podResources                         *v1.ResourceRequirements
-		podLevelResourcesEnabled             bool
-		nodeAllocatableResourcesDRAEnabled   bool
-		nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
-		expectedResource                     fwk.PodResource
-		initContainers                       []v1.Container
-		overhead                             *v1.ResourceList
+		name                               string
+		containers                         []v1.Container
+		podResources                       *v1.ResourceRequirements
+		podLevelResourcesEnabled           bool
+		nodeAllocatableResourcesDRAEnabled bool
+		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		expectedResource                   fwk.PodResource
+		initContainers                     []v1.Container
+		overhead                           *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -2511,9 +2511,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2547,9 +2547,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2586,16 +2586,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
 					},
 				},
 				{
-					ResourceClaimName: "node-allocatable-claim-2",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-2"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 					},
@@ -2628,9 +2628,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu1000m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2679,9 +2679,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2722,9 +2722,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem800M,
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2758,9 +2758,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2800,10 +2800,10 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
+					Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+					Containers: []string{"c1"},
 					Overhead: []v1.NodeAllocatableOverheadResources{
 						{
 							Name:         v1.ResourceCPU,
@@ -2846,10 +2846,10 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
+					Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+					Containers: []string{"c1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{
 							Name:     v1.ResourceCPU,
@@ -2902,7 +2902,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Pod: &v1.Pod{
 					Spec: podSpec,
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: tc.nodeAllocatableResourceClaimStatuses,
+						ExtraNodeAllocatableResources: tc.extraNodeAllocatableResources,
 					},
 				},
 			}

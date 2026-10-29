@@ -377,7 +377,7 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), "kubernetes.io/foo", "must be a node allocatable resource name").MarkFromImperative(),
 					},
 				},
-				"invalid: node allocatable resource name ephemeral-storage": {
+				"valid: node allocatable resource name ephemeral-storage": {
 					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
 						"ephemeral-storage": {
 							Overhead: &resource.NodeAllocatableOverhead{
@@ -385,9 +385,6 @@ func TestDeclarativeValidate(t *testing.T) {
 							},
 						},
 					})),
-					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), "ephemeral-storage", "must be a node allocatable resource name").MarkFromImperative(),
-					},
 				},
 				"valid: node allocatable resource name hugepages": {
 					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{

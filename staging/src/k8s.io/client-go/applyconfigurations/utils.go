@@ -730,6 +730,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.EvictionResponderApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ExecAction"):
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ExtraNodeAllocatableReference"):
+		return &applyconfigurationscorev1.ExtraNodeAllocatableReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ExtraNodeAllocatableResource"):
+		return &applyconfigurationscorev1.ExtraNodeAllocatableResourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):
 		return &applyconfigurationscorev1.FCVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FileKeySelector"):
@@ -812,8 +816,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAllocatableMappedResourcesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableOverheadResources"):
 		return &applyconfigurationscorev1.NodeAllocatableOverheadResourcesApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
-		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
 		return &applyconfigurationscorev1.NodeConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeConfigSource"):
