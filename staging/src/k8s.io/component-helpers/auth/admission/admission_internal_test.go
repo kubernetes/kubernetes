@@ -35,6 +35,45 @@ import (
 	"k8s.io/klog/v2/textlogger"
 )
 
+// TestBearerToken_Table exercises the header parser directly across the scheme
+// and token shapes it must accept or reject. The scheme match is
+// case-insensitive (RFC 7235); an empty or whitespace-only token is rejected so
+// a bare "Bearer" header cannot slip through as a present-but-empty credential.
+func TestBearerToken_Table(t *testing.T) {
+	tests := []struct {
+		name      string
+		header    string // "" means no Authorization header at all
+		wantToken string
+		wantOK    bool
+	}{
+		{name: "valid bearer", header: "Bearer abc.def.ghi", wantToken: "abc.def.ghi", wantOK: true},
+		{name: "lowercase scheme is accepted", header: "bearer abc", wantToken: "abc", wantOK: true},
+		{name: "mixed-case scheme is accepted", header: "BeArEr abc", wantToken: "abc", wantOK: true},
+		{name: "trailing header whitespace is trimmed", header: "Bearer abc   ", wantToken: "abc", wantOK: true},
+		{name: "extra space before the token is rejected (matches apiserver)", header: "Bearer    abc", wantOK: false},
+		{name: "no header", header: "", wantOK: false},
+		{name: "non-bearer scheme", header: "Basic dXNlcjpwYXNz", wantOK: false},
+		{name: "bearer with empty token", header: "Bearer ", wantOK: false},
+		{name: "bearer with whitespace-only token", header: "Bearer      ", wantOK: false},
+		{name: "shorter than the scheme prefix", header: "Bear", wantOK: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/validate", nil)
+			if tc.header != "" {
+				r.Header.Set("Authorization", tc.header)
+			}
+			token, ok := bearerToken(r)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if ok && token != tc.wantToken {
+				t.Errorf("token = %q, want %q", token, tc.wantToken)
+			}
+		})
+	}
+}
+
 func TestWithTokenVerificationConstruction(t *testing.T) {
 	var requests atomic.Int32
 	var server *httptest.Server
