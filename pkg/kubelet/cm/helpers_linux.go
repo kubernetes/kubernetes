@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
@@ -253,7 +254,32 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		}
 	}
 
+	// KEP-5359: an explicit pod-level swap limit is a pod cgroup ceiling
+	// (memory.swap.max). Containers without their own limits.swap inherit it
+	// (see effectiveSwapLimit in kuberuntime). Without a pod-level limit the pod
+	// cgroup stays at "max" and only container cgroups bound swap.
+	if podLevelResourcesEnabled && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) {
+		if swapLimit, ok := PodSwapLimit(allocatedPod); ok {
+			SetSwapLimit(result, &swapLimit)
+		}
+	}
+
 	return result
+}
+
+var isSwapControllerAvailable = sync.OnceValue(checkSwapControllerAvailable)
+
+func checkSwapControllerAvailable() bool {
+	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		cgMap, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			return false
+		}
+		p = filepath.Join("/sys/fs/cgroup", cgMap[""], Cgroup2MaxSwapFilename)
+	}
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // getCgroupSubsystemsV1 returns information about the mounted cgroup v1 subsystems

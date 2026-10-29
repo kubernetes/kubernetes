@@ -330,6 +330,10 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 	if resourceConfig.Unified != nil && m.isCgroup2UnifiedMode() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
+			if k == Cgroup2MaxSwapFilename && !isSwapControllerAvailable() {
+				logger.V(6).Info("Optional cgroup unified file not supported", "file", k)
+				continue
+			}
 			resources.Unified[k] = v
 		}
 	}
