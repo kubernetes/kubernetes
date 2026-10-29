@@ -996,6 +996,7 @@ func (s *sharedIndexInformer) GetController() Controller {
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
+	//nolint:logcheck // Cannot provide Logger here.
 	return s.AddEventHandlerWithOptions(handler, HandlerOptions{})
 }
 
@@ -1017,6 +1018,7 @@ func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) tim
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
+	//nolint:logcheck // Cannot provide Logger here.
 	return s.AddEventHandlerWithOptions(handler, HandlerOptions{ResyncPeriod: &resyncPeriod})
 }
 

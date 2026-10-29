@@ -55,7 +55,7 @@ func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
 }
 
 func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
-	streamws.IgnoreReceives(ws, timeout)
+	streamws.IgnoreReceivesWithLogger(klog.Background(), ws, timeout)
 }
 
 func IgnoreReceivesWithLogger(logger klog.Logger, ws *websocket.Conn, timeout time.Duration) {
