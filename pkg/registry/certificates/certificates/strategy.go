@@ -107,7 +107,7 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 
-	newCSR.Spec = oldCSR.Spec
+
 	newCSR.Status = oldCSR.Status
 }
 
