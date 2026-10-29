@@ -66,6 +66,8 @@ import (
 // limited to three decimal places: "18446744073709551616" keeps its value, and
 // "1.2345" keeps its precision (String reports it as "1234500u"). Parsing does
 // cap a binarySI quantity, silently, at 2^63-1: "8Ei" parses as 2^63-1.
+// Parsing keeps at most 29 significant digits, enough for any int64 value at
+// nano precision, and rounds any precision beyond this away from zero.
 // Parsing also preserves a value only down to nano, rounding a finer non-zero
 // value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
 // may overflow on top of that: see Value, MilliValue and ScaledValue.
@@ -231,8 +233,22 @@ var (
 	ErrSuffix      = errors.New("unable to parse quantity's suffix")
 )
 
-// parseQuantityString is a fast scanner for quantity values.
-func parseQuantityString(str string) (positive bool, value, num, denom, suffix string, defaultedNum bool, err error) {
+// parseQuantityString is a fast scanner for quantity values. For example, given
+// a string of "-1.025Ti" parseQuantityString returns:
+//
+// (positive: false, num: "1", denom: "025", suffix: "Ti").
+//
+// The return values contain the number parts, including:
+//   - positive, which is false if str starts with "-".
+//   - num, which represents the integer part, without leading zeros, or "0" if that leaves
+//     no digits.
+//   - denom, which represents the fractional part: the digits after the decimal point, or
+//     "" if there are none.
+//   - suffix, which represents the rest of str, such as "Ki", "m" or "e-3".
+//   - defaultedNum, which is true if num was not parsed from the input and was defaulted to "0".
+//
+// err is ErrFormatWrong if str has characters that fit none of these parts.
+func parseQuantityString(str string) (positive bool, num, denom, suffix string, defaultedNum bool, err error) {
 	positive = true
 	pos := 0
 	end := len(str)
@@ -255,7 +271,6 @@ Zeroes:
 		if i >= end {
 			defaultedNum = !sawZeros
 			num = "0"
-			value = num
 			return
 		}
 		switch str[i] {
@@ -267,12 +282,11 @@ Zeroes:
 		}
 	}
 
-	// extract the numerator
+	// extract the integer part
 Num:
 	for i := pos; ; i++ {
 		if i >= end {
 			num = str[pos:end]
-			value = str[0:end]
 			return
 		}
 		switch str[i] {
@@ -290,14 +304,13 @@ Num:
 		num = "0"
 	}
 
-	// handle a denominator
+	// handle a fractional part
 	if pos < end && str[pos] == '.' {
 		pos++
 	Denom:
 		for i := pos; ; i++ {
 			if i >= end {
 				denom = str[pos:end]
-				value = str[0:end]
 				return
 			}
 			switch str[i] {
@@ -314,7 +327,6 @@ Num:
 		// 	return
 		// }
 	}
-	value = str[0:pos]
 
 	// grab the elements of the suffix
 	suffixStart := pos
@@ -361,7 +373,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{Format: DecimalSI, s: newCachedString(str, DecimalSI)}, nil
 	}
 
-	positive, value, num, denom, suf, _, err := parseQuantityString(str)
+	positive, num, denom, suf, defaultedNum, err := parseQuantityString(str)
 	if err != nil {
 		return Quantity{}, err
 	}
@@ -441,8 +453,17 @@ func ParseQuantity(str string) (Quantity, error) {
 		}
 	}
 
-	amount := new(inf.Dec)
-	if _, ok := amount.SetString(value); !ok {
+	// Handle a number with no digits, such as "-.Pi", as an error.
+	if len(denom) == 0 && (len(num) == 0 || defaultedNum) {
+		return Quantity{}, ErrNumeric
+	}
+
+	maxDigits := maxSignificantDigits
+	if base == 2 {
+		maxDigits = maxBinarySISignificantDigits
+	}
+	amount, ok := decFromDigits(positive, num, denom, maxDigits)
+	if !ok {
 		return Quantity{}, ErrNumeric
 	}
 
@@ -456,15 +477,16 @@ func ParseQuantity(str string) (Quantity, error) {
 		// This is guaranteed to fit within inf.Scale because of the above check.
 		widenedExponentScale := widenScale(Scale(exponent))
 
-		// amount only contains the mantissa+fractional part at this point (with no exponent / suffix).
-		// Values without fractional digits have scale 0.
-		// Values with fractional digits have scale < 0.
-		// Therefore, this must be <=0.
+		// amount only contains the whole number part+fractional part at this point (with no exponent / suffix).
+		// Values that kept fractional digits have scale < 0.
+		// Values whose rounding dropped integer digits have scale > 0.
+		// All other values have scale 0, including values whose rounding dropped all fractional digits.
 		widenedAmountScale := widenInfScale(amount.Scale())
 
-		effectiveScale, fits := narrowScale(widenedAmountScale + widenedExponentScale)
+		effectiveScale, _ := narrowScale(widenedAmountScale + widenedExponentScale)
+		// We ignore the fits return value and saturate to scale to math.MinInt32 or math.MaxInt32.
 		effectiveInfScale, canInfScale := effectiveScale.infScale()
-		if fits && canInfScale {
+		if canInfScale {
 			amount.SetScale(effectiveInfScale)
 		} else {
 			// We can only get here for a negative scale that doesn't fit. We deal with this
@@ -526,6 +548,78 @@ func ParseQuantity(str string) (Quantity, error) {
 	q := Quantity{d: infDecAmount{amount}, Format: format}
 	q.CacheString()
 	return q, nil
+}
+
+// maxSignificantDigits is how many significant digits ParseQuantity keeps for a
+// DecimalSI or DecimalExponent quantity. 29 digits hold the sum of two int64
+// values at nano precision (20 integer digits + 9), so such a sum reads back
+// unchanged after it is written. maxScaleGap uses 29 in Add and Sub for the
+// same reason.
+const maxSignificantDigits = 29
+
+// maxBinarySISignificantDigits is how many significant digits ParseQuantity
+// keeps in front of a BinarySI suffix. A BinarySI quantity is a whole number of
+// nanos up to 2^63-1, and writing any of those in front of Ei takes at most 70
+// digits.
+const maxBinarySISignificantDigits = 70
+
+// decFromDigits converts the digits of a decimal number to an inf.Dec. It keeps
+// at most maxDigits significant digits and then rounds any precision finer than
+// that away from zero. For example, with maxDigits 3, integerDigits "12" and
+// decimalDigits "345" become 12.4, or -12.4 if positive is false.
+//
+// decFromDigits takes these parts of the parsed quantity string:
+//   - positive, which indicates whether the number is positive or negative.
+//   - integerDigits, which represents the integer part: the digits before the decimal point.
+//   - decimalDigits, which represents the fractional part: the digits after the decimal point, or
+//     "" if there are none.
+func decFromDigits(positive bool, integerDigits, decimalDigits string, maxDigits int) (result *inf.Dec, fits bool) {
+	// Process the number as a string of significantDigits (without a decimal point) until it is bounded.
+	// decimalPointScale tracks the position of the decimal point.
+	significantDigits := strings.TrimLeft(integerDigits+decimalDigits, "0")
+	if significantDigits == "" {
+		// Zero has no significant digits. Keep one 0 so SetString has a digit to parse.
+		significantDigits = "0"
+	}
+	decimalPointScale := -widenedScale(len(decimalDigits))
+
+	// If the number exceeds the limit, keep track of the digits dropped and increase the
+	// decimalPointScale to account for the digits dropped.
+	boundedSignificantDigits := significantDigits
+	dropped := ""
+	if len(significantDigits) > maxDigits {
+		boundedSignificantDigits, dropped = significantDigits[:maxDigits], significantDigits[maxDigits:]
+		decimalPointScale += widenedScale(len(dropped))
+	}
+
+	// Now that the string is bounded, create an inf.Dec from it.
+	amount := new(inf.Dec)
+	if _, ok := amount.UnscaledBig().SetString(boundedSignificantDigits, 10); !ok {
+		// The integerDigits and decimalDigits were already successfully parsed before decFromDigits was called
+		assertUnreachable("decFromDigits: digits did not parse")
+		return nil, false
+	}
+
+	// If any non-zero digits were dropped, round away from zero.
+	if strings.TrimLeft(dropped, "0") != "" {
+		amount.UnscaledBig().Add(amount.UnscaledBig(), bigOne)
+	}
+	// Apply the sign
+	if !positive {
+		amount.Neg(amount)
+	}
+
+	// Apply the decimal point
+	scale, fits := narrowScale(decimalPointScale)
+	infScale, canInfScale := scale.infScale()
+	if !fits || !canInfScale {
+		// maxDigits limits the digits kept, not the decimalPointScale. A large number of dropped
+		// digits, or digits after the decimal point, results in a decimalPointScale out of a
+		// Scale's range. That takes at least 2^31 (about 2 billion) digits, a string of at least 2 GiB.
+		return nil, false
+	}
+	amount.SetScale(infScale)
+	return amount, true
 }
 
 // DeepCopy returns a deep-copy of the Quantity value.
