@@ -91,6 +91,10 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
 }
 
+func (c *CacheDelegator) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+	return c.storage.DeleteOnce(ctx, key, origState, out)
+}
+
 func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	// if the watch-list feature wasn't set and the resourceVersion is unset
 	// ensure that the rv from which the watch is being served, is the latest
@@ -200,6 +204,10 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
+}
+
+func (c *CacheDelegator) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+	return c.storage.UpdateOnce(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
 }
 
 func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {

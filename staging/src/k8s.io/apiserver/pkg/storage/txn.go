@@ -35,9 +35,12 @@ type ObjState struct {
 	Meta *ResponseMeta
 	Rev  int64
 	Data []byte
-	// Current is true when this state was loaded from storage, and false when
-	// it was initialized in-memory from cachedExistingObject.
+	// Current is true when this state reflects a consistent read, and false when
+	// it was initialized from a potentially stale cached object.
 	Current bool
+	// FromStorage is true when Data and Stale were read directly from the
+	// underlying storage backend rather than serialized in-memory.
+	FromStorage bool
 	// Stale is true when TransformFromStorage reported that the value in storage
 	// needs to be rewritten via TransformToStorage even if data has not changed.
 	Stale bool

@@ -345,6 +345,16 @@ func TestOptimisticConcurrency(t *testing.T) {
 	storagetesting.RunTestOptimisticConcurrency(ctx, t, &storeWithPrefixTransformer{store}, false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 }
 
+func TestDeleteOnce(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteOnce(ctx, t, store, store.codec)
+}
+
+func TestUpdateOnce(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestUpdateOnce(ctx, t, store, store.codec)
+}
+
 func TestList(t *testing.T) {
 	for _, rangeStream := range []bool{false, true} {
 		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {

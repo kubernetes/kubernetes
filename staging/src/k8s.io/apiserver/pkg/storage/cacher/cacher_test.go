@@ -135,6 +135,18 @@ func TestConditionalDelete(t *testing.T) {
 	storagetesting.RunTestConditionalDelete(ctx, t, cacher)
 }
 
+func TestDeleteOnce(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteOnce(ctx, t, cacher, examplev1ProtoCodec)
+}
+
+func TestUpdateOnce(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestUpdateOnce(ctx, t, cacher, examplev1ProtoCodec)
+}
+
 func TestDeleteWithSuggestion(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
