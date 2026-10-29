@@ -175,19 +175,22 @@ func NewController(
 		evictionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: controllerName + "_eviction",
+				Name:   controllerName + "_eviction",
+				Logger: &logger,
 			},
 		),
 		evictionRequestQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: controllerName + "_eviction_request",
+				Name:   controllerName + "_eviction_request",
+				Logger: &logger,
 			},
 		),
 		evictionMetaRefreshQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: controllerName + "_eviction_metadata_refresh",
+				Name:   controllerName + "_eviction_metadata_refresh",
+				Logger: &logger,
 			},
 		),
 		terminalTimeCache: NewTerminalTimeCache(),
@@ -332,7 +335,7 @@ func NewController(
 
 // Run starts the eviction request controller.
 func (c *EvictionRequestController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "controller", c.controllerName)

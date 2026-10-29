@@ -178,34 +178,43 @@ func main() {
 	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
 
 	// create the workqueue
-	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+	queue := workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[string](), workqueue.TypedRateLimitingQueueConfig[string]{
+		Logger: &logger,
+	})
 
 	// Bind the workqueue to a cache with the help of an informer. This way we make sure that
 	// whenever the cache is updated, the pod key is added to the workqueue.
 	// Note that when we finally process the item from the workqueue, we might see a newer version
 	// of the Pod than the version which was responsible for triggering the update.
-	indexer, informer := cache.NewIndexerInformer(podListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				queue.Add(key)
-			}
+	store, informer := cache.NewInformerWithOptions(cache.InformerOptions{
+		Logger:        &logger,
+		ListerWatcher: podListWatcher,
+		ObjectType:    &v1.Pod{},
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					queue.Add(key)
+				}
+			},
+			UpdateFunc: func(old interface{}, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				if err == nil {
+					queue.Add(key)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				// IndexerInformer uses a delta queue, therefore for deletes we have to use this
+				// key function.
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				if err == nil {
+					queue.Add(key)
+				}
+			},
 		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				queue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-			// key function.
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				queue.Add(key)
-			}
-		},
-	}, cache.Indexers{})
+		Indexers: cache.Indexers{},
+	})
+	indexer := store.(cache.Indexer)
 
 	controller := NewController(queue, indexer, informer)
 

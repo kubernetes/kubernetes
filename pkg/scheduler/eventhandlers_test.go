@@ -558,10 +558,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 
-			informerFactory.Start(testSched.StopEverything)
-			dynInformerFactory.Start(testSched.StopEverything)
-			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
-			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+			informerFactory.StartWithContext(ctx)
+			dynInformerFactory.StartWithContext(ctx)
+			staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
+			dynamicInformers := dynInformerFactory.WaitForCacheSyncWithContext(ctx).Synced
 
 			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
@@ -616,10 +616,10 @@ func TestAddAllEventHandlersPodEventResources(t *testing.T) {
 		}
 	}
 
-	informerFactory.Start(testSched.StopEverything)
-	dynInformerFactory.Start(testSched.StopEverything)
-	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
-	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+	informerFactory.StartWithContext(ctx)
+	dynInformerFactory.StartWithContext(ctx)
+	staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
+	dynamicInformers := dynInformerFactory.WaitForCacheSyncWithContext(ctx).Synced
 
 	expectStaticInformers := map[reflect.Type]bool{
 		reflect.TypeFor[*v1.Pod]():       true,

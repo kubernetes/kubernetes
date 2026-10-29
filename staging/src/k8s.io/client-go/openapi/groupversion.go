@@ -27,7 +27,7 @@ const ContentTypeOpenAPIV3PB = "application/com.github.proto-openapi.spec.v3@v1.
 
 // GroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use GroupVersionWithContext instead.
+//logcheck:context // Use GroupVersionWithContext instead of GroupVersion in code which supports contextual logging.
 type GroupVersion interface {
 	Schema(contentType string) ([]byte, error)
 

@@ -75,7 +75,7 @@ var (
 //
 // ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerResourcesForGroupVersionWithContext instead.
+//logcheck:context // Use ServerResourcesForGroupVersionWithContext instead of ServerResourcesForGroupVersion in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return d.ServerResourcesForGroupVersionWithContext(context.Background(), groupVersion)
 }
@@ -114,7 +114,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersionWithContext(ctx co
 //
 // ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsAndResourcesWithContext instead.
+//logcheck:context // Use ServerGroupsAndResourcesWithContext instead of ServerGroupsAndResources in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return d.ServerGroupsAndResourcesWithContext(context.Background())
 }
@@ -129,7 +129,7 @@ func (d *CachedDiscoveryClient) ServerGroupsAndResourcesWithContext(ctx context.
 //
 // ServerGroupsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsWithContext instead.
+//logcheck:context // Use ServerGroupsWithContext instead of ServerGroups in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	return d.ServerGroupsWithContext(context.Background())
 }
@@ -255,7 +255,7 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 //
 // ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.ServerPreferredResourcesWithContext(context.Background())
 }
@@ -271,7 +271,7 @@ func (d *CachedDiscoveryClient) ServerPreferredResourcesWithContext(ctx context.
 //
 // ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredNamespacedResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.ServerPreferredNamespacedResourcesWithContext(context.Background())
 }
@@ -286,7 +286,7 @@ func (d *CachedDiscoveryClient) ServerPreferredNamespacedResourcesWithContext(ct
 //
 // ServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerVersionWithContext instead.
+//logcheck:context // Use ServerVersionWithContext instead of ServerVersion in code which supports contextual logging.
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.ServerVersionWithContext(context.Background())
 }
@@ -300,7 +300,7 @@ func (d *CachedDiscoveryClient) ServerVersionWithContext(ctx context.Context) (*
 //
 // OpenAPISchemaWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPISchemaWithContext instead.
+//logcheck:context // Use OpenAPISchemaWithContext instead of OpenAPISchema in code which supports contextual logging.
 func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.OpenAPISchemaWithContext(context.Background())
 }
@@ -339,7 +339,7 @@ func (d *CachedDiscoveryClient) openAPIV3(ctx context.Context) *cachedopenapi.Cl
 //
 // FreshWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use FreshWithContext instead.
+//logcheck:context // Use FreshWithContext instead of Fresh in code which supports contextual logging.
 func (d *CachedDiscoveryClient) Fresh() bool {
 	return d.FreshWithContext(context.Background())
 }
@@ -357,7 +357,7 @@ func (d *CachedDiscoveryClient) FreshWithContext(ctx context.Context) bool {
 //
 // InvalidateWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use InvalidateWithContext instead.
+//logcheck:context // Use InvalidateWithContext instead of Invalidate in code which supports contextual logging.
 func (d *CachedDiscoveryClient) Invalidate() {
 	d.InvalidateWithContext(context.Background())
 }

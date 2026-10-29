@@ -73,7 +73,10 @@ type TypedRateLimitingQueueConfig[T comparable] struct {
 // NewRateLimitingQueueWithConfig instead and specify a name.
 //
 // Deprecated: Use NewTypedRateLimitingQueue instead.
+//
+//logcheck:context // NewRateLimitingQueueWithConfig and logger should be used instead of NewRateLimitingQueue in code which supports contextual logging.
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{})
 }
 
@@ -81,7 +84,10 @@ func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
 // NewTypedRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewTypedRateLimitingQueueWithConfig instead and specify a name.
+//
+//logcheck:context // NewTypedRateLimitingQueueWithConfig and logger should be used instead of NewTypedRateLimitingQueue in code which supports contextual logging.
 func NewTypedRateLimitingQueue[T comparable](rateLimiter TypedRateLimiter[T]) TypedRateLimitingInterface[T] {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewTypedRateLimitingQueueWithConfig(rateLimiter, TypedRateLimitingQueueConfig[T]{})
 }
 
@@ -120,7 +126,10 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 // NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
 //
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
+//
+//logcheck:context // NewRateLimitingQueueWithConfig and logger should be used instead of NewNamedRateLimitingQueue in code which supports contextual logging.
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		Name: name,
 	})
@@ -130,7 +139,10 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 // with the option to inject a custom delaying queue instead of the default one.
 //
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
+//
+//logcheck:context // NewRateLimitingQueueWithDelayingInterface and logger should be used instead of NewRateLimitingQueueWithConfig in code which supports contextual logging.
 func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		DelayingQueue: di,
 	})

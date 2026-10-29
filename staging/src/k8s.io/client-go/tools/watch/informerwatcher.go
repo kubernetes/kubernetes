@@ -106,7 +106,7 @@ func (e *eventProcessor) stop() {
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
 //
-// Contextual logging: NewIndexerInformerWatcherWithLogger should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
+//logcheck:context // NewIndexerInformerWatcherWithLogger should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
 func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	return NewIndexerInformerWatcherWithLogger(klog.Background(), lw, objType)
 }
@@ -119,34 +119,40 @@ func NewIndexerInformerWatcherWithLogger(logger klog.Logger, lw cache.ListerWatc
 	w := watch.NewProxyWatcher(ch)
 	e := newEventProcessor(ch)
 
-	indexer, informer := cache.NewIndexerInformer(lw, objType, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			e.push(watch.Event{
-				Type:   watch.Added,
-				Object: obj.(runtime.Object),
-			})
-		},
-		UpdateFunc: func(old, new interface{}) {
-			e.push(watch.Event{
-				Type:   watch.Modified,
-				Object: new.(runtime.Object),
-			})
-		},
-		DeleteFunc: func(obj interface{}) {
-			staleObj, stale := obj.(cache.DeletedFinalStateUnknown)
-			if stale {
-				// We have no means of passing the additional information down using
-				// watch API based on watch.Event but the caller can filter such
-				// objects by checking if metadata.deletionTimestamp is set
-				obj = staleObj.Obj
-			}
+	store, informer := cache.NewInformerWithOptions(cache.InformerOptions{
+		Logger:        &logger,
+		ListerWatcher: lw,
+		ObjectType:    objType,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				e.push(watch.Event{
+					Type:   watch.Added,
+					Object: obj.(runtime.Object),
+				})
+			},
+			UpdateFunc: func(old, new interface{}) {
+				e.push(watch.Event{
+					Type:   watch.Modified,
+					Object: new.(runtime.Object),
+				})
+			},
+			DeleteFunc: func(obj interface{}) {
+				staleObj, stale := obj.(cache.DeletedFinalStateUnknown)
+				if stale {
+					// We have no means of passing the additional information down using
+					// watch API based on watch.Event but the caller can filter such
+					// objects by checking if metadata.deletionTimestamp is set
+					obj = staleObj.Obj
+				}
 
-			e.push(watch.Event{
-				Type:   watch.Deleted,
-				Object: obj.(runtime.Object),
-			})
+				e.push(watch.Event{
+					Type:   watch.Deleted,
+					Object: obj.(runtime.Object),
+				})
+			},
 		},
-	}, cache.Indexers{})
+		Indexers: cache.Indexers{},
+	})
 
 	// This will get stopped, but without waiting for it.
 	go e.run()
@@ -161,6 +167,9 @@ func NewIndexerInformerWatcherWithLogger(logger klog.Logger, lw cache.ListerWatc
 		ctx = klog.NewContext(ctx, logger)
 		informer.RunWithContext(ctx)
 	}()
+
+	// Since Indexers were set, the returned Store is guaranteed to also implement Indexer.
+	indexer := store.(cache.Indexer)
 
 	return indexer, informer, w, doneCh
 }

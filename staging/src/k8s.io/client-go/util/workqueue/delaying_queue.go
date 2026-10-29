@@ -70,14 +70,20 @@ type TypedDelayingQueueConfig[T comparable] struct {
 // NewDelayingQueueWithConfig instead and specify a name.
 //
 // Deprecated: use NewTypedDelayingQueue instead.
+//
+//logcheck:context // NewDelayingQueueWithConfig and logger should be used instead of NewDelayingQueue in code which supports contextual logging.
 func NewDelayingQueue() DelayingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{})
 }
 
 // NewTypedDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewTypedDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewTypedDelayingQueueWithConfig instead and specify a name.
+//
+//logcheck:context // NewTypedDelayingQueueWithConfig and logger should be used instead of NewTypedDelayingQueue in code which supports contextual logging.
 func NewTypedDelayingQueue[T comparable]() TypedDelayingInterface[T] {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[T]{})
 }
 
@@ -122,7 +128,10 @@ func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConf
 // inject custom queue Interface instead of the default one
 //
 // Deprecated: Use NewDelayingQueueWithConfig instead.
+//
+//logcheck:context // NewDelayingQueueWithConfig and logger should be used instead of NewDelayingQueueWithCustomQueue in code which supports contextual logging.
 func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
 		Name:  name,
 		Queue: q,
@@ -132,7 +141,10 @@ func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface
 // NewNamedDelayingQueue constructs a new named workqueue with delayed queuing ability.
 //
 // Deprecated: Use NewDelayingQueueWithConfig instead.
+//
+//logcheck:context // NewDelayingQueueWithConfig and logger should be used instead of NewNamedDelayingQueue in code which supports contextual logging.
 func NewNamedDelayingQueue(name string) DelayingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{Name: name})
 }
 
@@ -140,7 +152,10 @@ func NewNamedDelayingQueue(name string) DelayingInterface {
 // with ability to inject real or fake clock for testing purposes.
 //
 // Deprecated: Use NewDelayingQueueWithConfig instead.
+//
+//logcheck:context // NewDelayingQueueWithConfig and logger should be used instead of NewDelayingQueueWithCustomClock in code which supports contextual logging.
 func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
 		Name:  name,
 		Clock: clock,

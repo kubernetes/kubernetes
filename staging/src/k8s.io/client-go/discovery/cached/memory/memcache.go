@@ -144,7 +144,7 @@ func (d *memCacheClient) ServerResourcesForGroupVersionWithContext(ctx context.C
 //
 // ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsAndResourcesWithContext instead.
+//logcheck:context // Use ServerGroupsAndResourcesWithContext instead of ServerGroupsAndResources in code which supports contextual logging.
 func (d *memCacheClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return d.ServerGroupsAndResourcesWithContext(context.Background())
 }
@@ -160,7 +160,7 @@ func (d *memCacheClient) ServerGroupsAndResourcesWithContext(ctx context.Context
 //
 // GroupsAndMaybeResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use GroupsAndMaybeResourcesWithContext instead.
+//logcheck:context // Use GroupsAndMaybeResourcesWithContext instead of GroupsAndMaybeResources in code which supports contextual logging.
 func (d *memCacheClient) GroupsAndMaybeResources() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error, error) {
 	return d.GroupsAndMaybeResourcesWithContext(context.Background())
 }
@@ -204,7 +204,7 @@ func (d *memCacheClient) GroupsAndMaybeResourcesWithContext(ctx context.Context)
 
 // ServerGroupsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsWithContext instead.
+//logcheck:context // Use ServerGroupsWithContext instead of ServerGroups in code which supports contextual logging.
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
 	return d.ServerGroupsWithContext(context.Background())
 }
@@ -223,7 +223,7 @@ func (d *memCacheClient) RESTClient() restclient.Interface {
 
 // ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 func (d *memCacheClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.ServerPreferredResourcesWithContext(context.Background())
 }
@@ -234,7 +234,7 @@ func (d *memCacheClient) ServerPreferredResourcesWithContext(ctx context.Context
 
 // ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredNamespacedResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.ServerPreferredNamespacedResourcesWithContext(context.Background())
 }
@@ -245,7 +245,7 @@ func (d *memCacheClient) ServerPreferredNamespacedResourcesWithContext(ctx conte
 
 // ServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerVersionWithContext instead.
+//logcheck:context // Use ServerVersionWithContext instead of ServerVersion in code which supports contextual logging.
 func (d *memCacheClient) ServerVersion() (*version.Info, error) {
 	return d.ServerVersionWithContext(context.Background())
 }
@@ -256,7 +256,7 @@ func (d *memCacheClient) ServerVersionWithContext(ctx context.Context) (*version
 
 // OpenAPISchemaWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPISchemaWithContext instead.
+//logcheck:context // Use OpenAPISchemaWithContext instead of OpenAPISchema in code which supports contextual logging.
 func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.OpenAPISchemaWithContext(context.Background())
 }
@@ -267,7 +267,7 @@ func (d *memCacheClient) OpenAPISchemaWithContext(ctx context.Context) (*openapi
 
 // OpenAPIV3WithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPIV3WithContext instead.
+//logcheck:context // Use OpenAPIV3WithContext instead of OpenAPIV3 in code which supports contextual logging.
 func (d *memCacheClient) OpenAPIV3() openapi.Client {
 	return d.openAPIV3(context.Background())
 }
@@ -290,7 +290,7 @@ func (d *memCacheClient) openAPIV3(ctx context.Context) *cachedopenapi.Client {
 
 // FreshWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use FreshWithContext instead.
+//logcheck:context // Use FreshWithContext instead of Fresh in code which supports contextual logging.
 func (d *memCacheClient) Fresh() bool {
 	return d.FreshWithContext(context.Background())
 }
@@ -309,7 +309,7 @@ func (d *memCacheClient) FreshWithContext(ctx context.Context) bool {
 //
 // InvalidateWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use InvalidateWithContext instead.
+//logcheck:context // Use InvalidateWithContext instead of Invalidate in code which supports contextual logging.
 func (d *memCacheClient) Invalidate() {
 	d.InvalidateWithContext(context.Background())
 }
@@ -433,7 +433,7 @@ func (d *memCacheClient) serverResourcesForGroupVersion(ctx context.Context, gro
 //
 // WithLegacyWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use WithLegacyWithContext instead.
+//logcheck:context // Use WithLegacyWithContext instead of WithLegacy in code which supports contextual logging.
 func (d *memCacheClient) WithLegacy() discovery.DiscoveryInterface {
 	return d
 }
@@ -452,7 +452,7 @@ func (d *memCacheClient) WithLegacyWithContext(ctx context.Context) discovery.Di
 //
 // NewMemCacheClientWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewMemCacheClientWithContext instead.
+//logcheck:context // Use NewMemCacheClientWithContext instead of NewMemCacheClient in code which supports contextual logging.
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
 	return newMemCacheClient(discovery.ToDiscoveryInterfaceWithContext(delegate))
 }

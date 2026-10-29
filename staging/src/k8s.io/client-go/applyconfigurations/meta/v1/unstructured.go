@@ -132,7 +132,7 @@ type extractor struct {
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) (UnstructuredExtractor, error) {
-	client := dc.OpenAPIV3()
+	client := dc.OpenAPIV3() //nolint:logcheck // Public API without context; cannot provide one here.
 	paths, err := client.Paths()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list openapi v3 group versions: %w", err)

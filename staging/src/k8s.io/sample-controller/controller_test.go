@@ -120,8 +120,8 @@ func (f *fixture) runExpectError(ctx context.Context, fooRef cache.ObjectName) {
 func (f *fixture) runController(ctx context.Context, fooRef cache.ObjectName, startInformers bool, expectError bool) {
 	c, i, k8sI := f.newController(ctx)
 	if startInformers {
-		i.Start(ctx.Done())
-		k8sI.Start(ctx.Done())
+		i.StartWithContext(ctx)
+		k8sI.StartWithContext(ctx)
 	}
 
 	err := c.syncHandler(ctx, fooRef)

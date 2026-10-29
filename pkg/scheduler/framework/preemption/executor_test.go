@@ -834,8 +834,8 @@ func TestPrepareCandidate(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					informerFactory.Start(ctx.Done())
-					informerFactory.WaitForCacheSync(ctx.Done())
+					informerFactory.StartWithContext(ctx)
+					informerFactory.WaitForCacheSyncWithContext(ctx)
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false, false)
 						schedFramework.SetAPICacher(apicache.New(nominator, cache))
@@ -1088,7 +1088,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					informerFactory.Start(ctx.Done())
+					informerFactory.StartWithContext(ctx)
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false, false)
 						schedFramework.SetAPICacher(apicache.New(nil, cache))
@@ -1361,8 +1361,8 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			executor := NewExecutor(schedFramework, feature.Features{EnableAsyncPreemption: true})
 
@@ -2184,7 +2184,7 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					informerFactory.Start(ctx.Done())
+					informerFactory.StartWithContext(ctx)
 
 					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: async})
 					var execPreemptor ExecutorPreemptor

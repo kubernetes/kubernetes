@@ -54,8 +54,9 @@ func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
 	return streamws.IsWebSocketRequestWithTunnelingProtocol(req)
 }
 
+//logcheck:context // IgnoreReceivesWithLogger should be used instead of IgnoreReceives in code which uses contextual logging.
 func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
-	streamws.IgnoreReceives(ws, timeout)
+	streamws.IgnoreReceivesWithLogger(klog.Background(), ws, timeout)
 }
 
 func IgnoreReceivesWithLogger(logger klog.Logger, ws *websocket.Conn, timeout time.Duration) {

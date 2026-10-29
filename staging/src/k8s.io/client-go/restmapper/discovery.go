@@ -44,7 +44,7 @@ type APIGroupResources struct {
 //
 // NewDiscoveryRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewDiscoveryRESTMapperWithContext instead.
+//logcheck:context // Use NewDiscoveryRESTMapperWithContext instead of NewDiscoveryRESTMapper in code which supports contextual logging.
 func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper {
 	mappers, resourcePriority, kindPriority := newDiscoveryRESTMapper(groupResources)
 	multiMapper := make(meta.MultiRESTMapper, len(mappers))
@@ -176,7 +176,7 @@ func newDiscoveryRESTMapper(groupResources []*APIGroupResources) ([]*meta.Defaul
 //
 // GetAPIGroupResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use GetAPIGroupResourcesWithContext instead.
+//logcheck:context // Use GetAPIGroupResourcesWithContext instead of GetAPIGroupResources in code which supports contextual logging.
 func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources, error) {
 	return GetAPIGroupResourcesWithContext(context.Background(), discovery.ToDiscoveryInterfaceWithContext(cl))
 }
@@ -234,7 +234,7 @@ var (
 //
 // NewDeferredDiscoveryRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewDeferredDiscoveryRESTMapperWithContext instead. NewDeferredDiscoveryRESTMapper will try to convert cl to discovery.CachedDiscoveryInterfaceWithContext and use a wrapper if that is not possible, but NewDeferredDiscoveryRESTMapperWithContext ensures that no such conversion is necessary.
+//logcheck:context // Use NewDeferredDiscoveryRESTMapperWithContext instead of NewDeferredDiscoveryRESTMapper in code which supports contextual logging. NewDeferredDiscoveryRESTMapper will try to convert cl to discovery.CachedDiscoveryInterfaceWithContext and use a wrapper if that is not possible, but NewDeferredDiscoveryRESTMapperWithContext ensures that no such conversion is necessary.
 func NewDeferredDiscoveryRESTMapper(cl discovery.CachedDiscoveryInterface) *DeferredDiscoveryRESTMapper {
 	return &DeferredDiscoveryRESTMapper{
 		cl: discovery.ToCachedDiscoveryInterfaceWithContext(cl),
@@ -290,7 +290,7 @@ func (d *DeferredDiscoveryRESTMapper) ResetWithContext(ctx context.Context) {
 //
 // KindForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use KindForWithContext instead.
+//logcheck:context // Use KindForWithContext instead of KindFor in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) KindFor(resource schema.GroupVersionResource) (gvk schema.GroupVersionKind, err error) {
 	return d.KindForWithContext(context.Background(), resource)
 }
@@ -315,7 +315,7 @@ func (d *DeferredDiscoveryRESTMapper) KindForWithContext(ctx context.Context, re
 //
 // KindsForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use KindsForWithContext instead.
+//logcheck:context // Use KindsForWithContext instead of KindsFor in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) KindsFor(resource schema.GroupVersionResource) (gvks []schema.GroupVersionKind, err error) {
 	return d.KindsForWithContext(context.Background(), resource)
 }
@@ -340,7 +340,7 @@ func (d *DeferredDiscoveryRESTMapper) KindsForWithContext(ctx context.Context, r
 //
 // ResourceForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourceForWithContext instead.
+//logcheck:context // Use ResourceForWithContext instead of ResourceFor in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) ResourceFor(input schema.GroupVersionResource) (gvr schema.GroupVersionResource, err error) {
 	return d.ResourceForWithContext(context.Background(), input)
 }
@@ -365,7 +365,7 @@ func (d *DeferredDiscoveryRESTMapper) ResourceForWithContext(ctx context.Context
 //
 // ResourcesForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourcesForWithContext instead.
+//logcheck:context // Use ResourcesForWithContext instead of ResourcesFor in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) ResourcesFor(input schema.GroupVersionResource) (gvrs []schema.GroupVersionResource, err error) {
 	return d.ResourcesForWithContext(context.Background(), input)
 }
@@ -390,7 +390,7 @@ func (d *DeferredDiscoveryRESTMapper) ResourcesForWithContext(ctx context.Contex
 //
 // RESTMappingWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use RESTMappingWithContext instead.
+//logcheck:context // Use RESTMappingWithContext instead of RESTMapping in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (m *meta.RESTMapping, err error) {
 	return d.RESTMappingWithContext(context.Background(), gk, versions...)
 }
@@ -416,7 +416,7 @@ func (d *DeferredDiscoveryRESTMapper) RESTMappingWithContext(ctx context.Context
 //
 // RESTMappingsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use RESTMappingsWithContext instead.
+//logcheck:context // Use RESTMappingsWithContext instead of RESTMappings in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (ms []*meta.RESTMapping, err error) {
 	return d.RESTMappingsWithContext(context.Background(), gk, versions...)
 }
@@ -442,7 +442,7 @@ func (d *DeferredDiscoveryRESTMapper) RESTMappingsWithContext(ctx context.Contex
 //
 // ResourceSingularizerWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourceSingularizerWithContext instead.
+//logcheck:context // Use ResourceSingularizerWithContext instead of ResourceSingularizer in code which supports contextual logging.
 func (d *DeferredDiscoveryRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return d.ResourceSingularizerWithContext(context.Background(), resource)
 }

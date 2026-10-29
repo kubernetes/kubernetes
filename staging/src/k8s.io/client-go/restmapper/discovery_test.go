@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/ktesting"
 	"k8s.io/utils/dump"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
@@ -97,7 +98,8 @@ func TestRESTMapper(t *testing.T) {
 		},
 	}
 
-	restMapper := NewDiscoveryRESTMapper(resources)
+	tCtx := ktesting.Init(t)
+	restMapper := NewDiscoveryRESTMapperWithContext(resources)
 
 	kindTCs := []struct {
 		input schema.GroupVersionResource
@@ -164,7 +166,7 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	for _, tc := range kindTCs {
-		got, err := restMapper.KindFor(tc.input)
+		got, err := restMapper.KindForWithContext(tCtx, tc.input)
 		if err != nil {
 			t.Errorf("KindFor(%#v) unexpected error: %v", tc.input, err)
 			continue
@@ -230,7 +232,7 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	for _, tc := range resourceTCs {
-		got, err := restMapper.ResourceFor(tc.input)
+		got, err := restMapper.ResourceForWithContext(tCtx, tc.input)
 		if err != nil {
 			t.Errorf("ResourceFor(%#v) unexpected error: %v", tc.input, err)
 			continue
@@ -245,12 +247,13 @@ func TestRESTMapper(t *testing.T) {
 func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert := assert.New(t)
 
+	tCtx := ktesting.Init(t)
 	cdc := fakeCachedDiscoveryInterface{fresh: false}
-	m := NewDeferredDiscoveryRESTMapper(&cdc)
+	m := NewDeferredDiscoveryRESTMapperWithContext(ToCachedDiscoveryInterfaceWithContext(&cdc))
 	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
 	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
 
-	gvk, err := m.KindFor(schema.GroupVersionResource{
+	gvk, err := m.KindForWithContext(tCtx, schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
@@ -260,7 +263,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(1, cdc.invalidateCalls, "should have called Invalidate() once")
 	assert.Equal("Foo", gvk.Kind)
 
-	gvk, err = m.KindFor(schema.GroupVersionResource{
+	gvk, err = m.KindForWithContext(tCtx, schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
@@ -268,7 +271,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again")
 
-	gvk, err = m.KindFor(schema.GroupVersionResource{
+	gvk, err = m.KindForWithContext(tCtx, schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "bar",
@@ -277,7 +280,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
 
 	cdc.fresh = false
-	gvk, err = m.KindFor(schema.GroupVersionResource{
+	gvk, err = m.KindForWithContext(tCtx, schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "bar",
@@ -357,7 +360,8 @@ func TestGetAPIGroupResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := GetAPIGroupResources(test.discovery)
+			tCtx := ktesting.Init(t)
+			got, err := GetAPIGroupResourcesWithContext(tCtx, ToDiscoveryInterfaceWithContext(test.discovery))
 			if err == nil && test.expectedError != nil {
 				t.Fatalf("expected error %q, but got none", test.expectedError)
 			} else if err != nil && test.expectedError == nil {
@@ -393,6 +397,7 @@ func (d *fakeFailingDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 }
 
 func (d *fakeFailingDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	//nolint:logcheck // Implementing the old, non-contextual DiscoveryInterface method leaves no context to pass through.
 	return ServerGroupsAndResources(d)
 }
 func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -403,10 +408,12 @@ func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion strin
 }
 
 func (d *fakeFailingDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	//nolint:logcheck // Implementing the old, non-contextual DiscoveryInterface method leaves no context to pass through.
 	return ServerPreferredResources(d)
 }
 
 func (d *fakeFailingDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	//nolint:logcheck // Implementing the old, non-contextual DiscoveryInterface method leaves no context to pass through.
 	return ServerPreferredNamespacedResources(d)
 }
 
@@ -458,6 +465,7 @@ func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, err
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	//nolint:logcheck // Implementing the old, non-contextual DiscoveryInterface method leaves no context to pass through.
 	return ServerGroupsAndResources(c)
 }
 

@@ -61,6 +61,7 @@ type discoveryScaleResolver struct {
 }
 
 func (r *discoveryScaleResolver) ScaleForResource(inputRes schema.GroupVersionResource) (scaleVersion schema.GroupVersionKind, err error) {
+	//nolint:logcheck // ScaleForResource implements the old, non-contextual ScaleKindResolver interface method, leaving no context to pass through.
 	groupVerResources, err := r.discoveryClient.ServerResourcesForGroupVersion(inputRes.GroupVersion().String())
 	if err != nil {
 		return schema.GroupVersionKind{}, fmt.Errorf("unable to fetch discovery information for %s: %v", inputRes.String(), err)

@@ -69,7 +69,7 @@ type FileStore interface {
 // ${certDirectory}/${pairNamePrefix}-current.pem will be created as a soft
 // link to the currently selected cert/key pair.
 //
-// Contextual logging: NewFileStoreWithLogger should be used instead of NewFileStore in code which supports contextual logging.
+//logcheck:context // NewFileStoreWithLogger should be used instead of NewFileStore in code which supports contextual logging.
 func NewFileStore(
 	pairNamePrefix string,
 	certDirectory string,

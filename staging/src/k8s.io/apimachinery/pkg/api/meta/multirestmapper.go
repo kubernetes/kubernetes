@@ -36,7 +36,7 @@ var (
 //
 // MultiRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext instead of MultiRESTMapper in code which supports contextual logging.
 type MultiRESTMapper []RESTMapper
 
 // MultiRESTMapperWithContext is a wrapper for multiple RESTMapperWithContext instances.
@@ -77,35 +77,35 @@ func ToMultiRESTMapperWithContext(m MultiRESTMapper) MultiRESTMapperWithContext 
 //
 // MultiRESTMapperWithContext.ResourceSingularizerWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.ResourceSingularizerWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.ResourceSingularizerWithContext instead of ResourceSingularizer in code which supports contextual logging.
 func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return ToMultiRESTMapperWithContext(m).ResourceSingularizerWithContext(context.Background(), resource)
 }
 
 // MultiRESTMapperWithContext.ResourcesForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.ResourcesForWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.ResourcesForWithContext instead of ResourcesFor in code which supports contextual logging.
 func (m MultiRESTMapper) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return ToMultiRESTMapperWithContext(m).ResourcesForWithContext(context.Background(), resource)
 }
 
 // MultiRESTMapperWithContext.KindsForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.KindsForWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.KindsForWithContext instead of KindsFor in code which supports contextual logging.
 func (m MultiRESTMapper) KindsFor(resource schema.GroupVersionResource) (gvk []schema.GroupVersionKind, err error) {
 	return ToMultiRESTMapperWithContext(m).KindsForWithContext(context.Background(), resource)
 }
 
 // MultiRESTMapperWithContext.ResourceForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.ResourceForWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.ResourceForWithContext instead of ResourceFor in code which supports contextual logging.
 func (m MultiRESTMapper) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return ToMultiRESTMapperWithContext(m).ResourceForWithContext(context.Background(), resource)
 }
 
 // MultiRESTMapperWithContext.KindForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.KindForWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.KindForWithContext instead of KindFor in code which supports contextual logging.
 func (m MultiRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	return ToMultiRESTMapperWithContext(m).KindForWithContext(context.Background(), resource)
 }
@@ -116,7 +116,7 @@ func (m MultiRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.G
 //
 // MultiRESTMapperWithContext.RESTMappingWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.RESTMappingWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.RESTMappingWithContext instead of RESTMapping in code which supports contextual logging.
 func (m MultiRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
 	return ToMultiRESTMapperWithContext(m).RESTMappingWithContext(context.Background(), gk, versions...)
 }
@@ -126,14 +126,14 @@ func (m MultiRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 //
 // MultiRESTMapperWithContext.RESTMappingsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.RESTMappingsWithContext instead.
+//logcheck:context // Use MultiRESTMapperWithContext.RESTMappingsWithContext instead of RESTMappings in code which supports contextual logging.
 func (m MultiRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
 	return ToMultiRESTMapperWithContext(m).RESTMappingsWithContext(context.Background(), gk, versions...)
 }
 
-// MultiRESTMapperWithContext.Reset is a better alternative because it supports contextual logging and cancellation.
+// MultiRESTMapperWithContext.ResetWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.Reset instead.
+//logcheck:context // Use MultiRESTMapperWithContext.ResetWithContext instead of Reset in code which supports contextual logging.
 func (m MultiRESTMapper) Reset() {
 	for _, t := range m {
 		MaybeResetRESTMapper(t)

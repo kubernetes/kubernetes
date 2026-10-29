@@ -177,8 +177,8 @@ func TestProcessNextWorkItem(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+			logger, ctx := ktesting.NewTestContext(t)
+			queue := workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[string](), workqueue.TypedRateLimitingQueueConfig[string]{Logger: &logger})
 			defer queue.ShutDown()
 
 			key := namespacedKey(defaultNS, defaultPGName)
@@ -565,8 +565,8 @@ func TestCompositePodGroupProtectionController(t *testing.T) {
 				t.Fatalf("unexpected error creating controller: %v", err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			go ctrl.Run(ctx, 1)
 
 			// In order to reduce test flakiness, make sure that the object-to-delete is visible in the client set. Create a dummy CPG and PG to "warm up" the watch pipe.

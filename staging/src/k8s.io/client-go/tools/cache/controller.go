@@ -90,7 +90,7 @@ type Config struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	//
-	// Contextual logging: WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
+	//logcheck:context // WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
 	WatchErrorHandler WatchErrorHandler
 
 	// Called whenever the ListAndWatch drops the connection with an error
@@ -138,7 +138,7 @@ type Controller interface {
 	// Run does the same as RunWithContext with a stop channel instead of
 	// a context.
 	//
-	// Contextual logging: RunWithcontext should be used instead of Run in code which supports contextual logging.
+	//logcheck:context // RunWithcontext should be used instead of Run in code which supports contextual logging.
 	Run(stopCh <-chan struct{})
 
 	// HasSynced delegates to the Config's Queue
@@ -703,6 +703,8 @@ func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 //   - h is the object you want notifications sent to.
 //
 // Deprecated: Use NewInformerWithOptions instead.
+//
+//logcheck:context // NewInformerWithOptions and logger should be used instead of NewInformer in code which supports contextual logging.
 func NewInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -718,6 +720,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
+	//nolint:logcheck // Cannot provide Logger here, use NewInformerWithOptions.
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
@@ -738,6 +741,8 @@ func NewInformer(
 //   - indexers is the indexer for the received object type.
 //
 // Deprecated: Use NewInformerWithOptions instead.
+//
+//logcheck:context // NewInformerWithOptions and logger should be used instead of NewIndexerInformer in code which supports contextual logging.
 func NewIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -755,6 +760,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
+	//nolint:logcheck // Cannot provide Logger here.
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
@@ -767,6 +773,8 @@ func NewIndexerInformer(
 // be invoked for them.
 //
 // Deprecated: Use NewInformerWithOptions instead.
+//
+//logcheck:context // NewInformerWithOptions and logger should be used instead of NewTransformingInformer in code which supports contextual logging.
 func NewTransformingInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -784,6 +792,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
+	//nolint:logcheck // Cannot provide Logger here.
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
@@ -796,6 +805,8 @@ func NewTransformingInformer(
 // be invoked for them.
 //
 // Deprecated: Use NewInformerWithOptions instead.
+//
+//logcheck:context // NewInformerWithOptions and logger should be used instead of NewTransformingIndexerInformer in code which supports contextual logging.
 func NewTransformingIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -815,6 +826,7 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
+	//nolint:logcheck // Cannot provide Logger here.
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
