@@ -6223,3 +6223,147 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 		})
 	}
 }
+
+func TestGenerateCPUTopologyHintsScoreForResize(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}
+
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		reservedCPUs  cpuset.CPUSet
+		availableCPUs cpuset.CPUSet
+		// CPUs reused from initContainers plus CPUs already retained
+		reusableCPUs   cpuset.CPUSet
+		request        int
+		expectedScores []expectedHintScore
+	}{
+		{
+			description:   "2 of 4 assigned on NUMA 0, score reflects utilization before scale up with availableCPUs/reusableCPUs empty, request > availableCPUs in NUMA 0",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(),
+			reusableCPUs:  cpuset.New(),
+			request:       4,
+			// NUMA 0 generates no hint: availableCPUs is empty
+			// NUMA 1 generates no hint: availableCPUs is empty
+			expectedScores: []expectedHintScore{},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0, score reflects utilization before scale up with availableCPUs only empty request > availableCPUs in NUMA 0",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(),
+			reusableCPUs:  cpuset.New(0, 1),
+			request:       4,
+			// NUMA 0 generates no hint: availableCPUs is empty
+			// NUMA 1 generates no hint: availableCPUs is empty
+			expectedScores: []expectedHintScore{},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0, score reflects utilization before scale up with requested CPUs = availableCPUs in NUMA 0",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       2,
+			// NUMA 0: 4 allocatable, 2 free, 2 assigned → 2*100/4 = 50
+			// NUMA 1: 4 allocatable, 4 free, 0 assigned → max(1, 0) = 1
+			// NUMA {0,1}: 8 allocatable, 6 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0 including init-containers, score reflects utilization before scale up = NUMA 0 CPUs",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(0, 1),
+			request:       4,
+			// NUMA 0: 4 allocatable, 2 free, 2 assigned → 2*100/4 = 50
+			// NUMA 1 generates no hint: none of the usable CPUs live there
+			// NUMA {0,1}: 8 allocatable, 6 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0 including init-containers, score reflects utilization before scale up > NUMA 0 CPUs",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(0, 1),
+			request:       6,
+			// NUMA 0: generates no hint
+			// NUMA 1: generates no hint
+			// NUMA {0,1}: 8 allocatable, 6 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+		{
+			description:   "4 of 4 assigned on NUMA 0 including init-containers, score reflects utilization before scale down",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(0, 1),
+			request:       2,
+			// NUMA 0: 4 allocatable, 0 free, 4 assigned → 4*100/4 = 100
+			// NUMA 1: generates no hint
+			// NUMA {0,1}: 8 allocatable, 4 free, 4 assigned → 4*100/8 = 50
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 100},
+				{mask: newNUMAAffinity(0, 1), score: 50},
+			},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0, score reflects utilization before regenerate",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       2,
+			// NUMA 0: 4 allocatable, 2 free, 2 assigned → 2*100/4 = 50
+			// NUMA 1: 4 allocatable, 4 free, 0 assigned → max(1, 0) = 1
+			// NUMA {0,1}: 8 allocatable, 4 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+
+			p := staticPolicy{
+				topology:     testCase.topo,
+				reservedCPUs: testCase.reservedCPUs,
+				numaNodes:    testCase.topo.CPUDetails.NUMANodes().List(),
+			}
+			hints := p.generateCPUTopologyHintsForResize(testCase.availableCPUs, testCase.reusableCPUs, testCase.request)
+
+			if len(hints) != len(testCase.expectedScores) {
+				t.Errorf("expected %d hints, got %d: %v", len(testCase.expectedScores), len(hints), hints)
+			}
+			for _, expected := range testCase.expectedScores {
+				hint := findHintForMask(hints, expected.mask)
+				if hint == nil {
+					t.Errorf("expected a hint for NUMA %v but found none", expected.mask.GetBits())
+					continue
+				}
+				if hint.Score != expected.score {
+					t.Errorf("NUMA %v: expected Score %d, got %d", expected.mask.GetBits(), expected.score, hint.Score)
+				}
+			}
+		})
+	}
+}

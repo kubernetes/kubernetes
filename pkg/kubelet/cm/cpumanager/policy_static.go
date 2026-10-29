@@ -1752,15 +1752,16 @@ func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.
 		requestedByContainer := p.guaranteedCPUs(logger, pod, &container)
 		if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
 			if allocated.Size() > requestedByContainer { // scale down
-				baselineCPUs, _ := s.GetBaselineCPUSet(string(pod.UID), container.Name)
-				// Get the NUMA nodes of the baseline CPUs
-				baselineCPUsNUMANodes := p.topology.CPUDetails.KeepOnly(baselineCPUs).NUMANodes()
-				// Get the allocated CPUs on the NUMA nodes of the baseline CPUs
-				allocatedOnBaselineNUMANodes := p.topology.CPUDetails.CPUsInNUMANodes(baselineCPUsNUMANodes.List()...).Intersection(allocated)
-				if allocatedOnBaselineNUMANodes.Size() >= requestedByContainer {
-					retainedCPUs = retainedCPUs.Union(baselineCPUs)
-					available = available.Union(allocated.Difference(baselineCPUs))
-					continue
+				if baselineCPUs, exists := s.GetBaselineCPUSet(string(pod.UID), container.Name); exists {
+					// Get the NUMA nodes of the baseline CPUs
+					baselineCPUsNUMANodes := p.topology.CPUDetails.KeepOnly(baselineCPUs).NUMANodes()
+					// Get the allocated CPUs on the NUMA nodes of the baseline CPUs
+					allocatedOnBaselineNUMANodes := p.topology.CPUDetails.CPUsInNUMANodes(baselineCPUsNUMANodes.List()...).Intersection(allocated)
+					if allocatedOnBaselineNUMANodes.Size() >= requestedByContainer {
+						retainedCPUs = retainedCPUs.Union(baselineCPUs)
+						available = available.Union(allocated.Difference(baselineCPUs))
+						continue
+					}
 				}
 			}
 			retainedCPUs = retainedCPUs.Union(allocated)
@@ -2056,7 +2057,8 @@ func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CP
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
-		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
+		cpusInMaskSet := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...)
+		cpusInMask := cpusInMaskSet.Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
 		}
@@ -2085,12 +2087,31 @@ func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CP
 			return
 		}
 
+		// Compute the utilization score for this NUMA combination. Score is a
+		// snapshot of node state, so everything outside the free pool counts as
+		// assigned: CPUs this pod's init containers still hold and will hand
+		// over (reusableCPUs), and on the regeneration path the container's own
+		// allocation. Both are genuinely in use, and both raise the score of the
+		// NUMA node the pod is already tied to, which is where a packing policy
+		// should want it. It follows that the score must not depend on
+		// usableCPUs, which on the regeneration path describes the caller
+		// rather than the node.
+		//
+		// A hint spanning several NUMA nodes scores the span as a whole:
+		// everything assigned across those nodes over everything allocatable
+		// across them. That is not the mean of the per-node scores once the
+		// nodes differ in size.
+		allocatable := cpusInMaskSet.Difference(p.reservedCPUs).Size()
+		free := availableCPUs.Intersection(cpusInMaskSet).Size()
+		score := topologymanager.UtilizationScore(int64(allocatable), int64(allocatable-free))
+
 		// Otherwise, create a new hint from the numa node bitmask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
 			NUMANodeAffinity: mask,
 			Preferred:        false,
+			Score:            score,
 		})
 	})
 
