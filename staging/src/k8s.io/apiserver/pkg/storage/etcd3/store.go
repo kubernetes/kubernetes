@@ -390,10 +390,24 @@ func (s *store) Delete(
 	return storage.ConditionalDelete(ctx, d, preparedKey, out, preconditions, validateDeletion, origState)
 }
 
-func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *storage.ObjState, v reflect.Value, expectTransformOrDecodeError bool) (state *storage.ObjState, success bool, err error) {
+// DeleteOnce implements storage.Interface.
+func (s *store) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+	preparedKey, err := s.prepareKey(key, false)
+	if err != nil {
+		return false, err
+	}
+	v, err := conversion.EnforcePtr(out)
+	if err != nil {
+		return false, fmt.Errorf("unable to convert output object to pointer: %v", err)
+	}
+	_, success, err := s.deleteOnce(ctx, preparedKey, out, origState, v, false, false)
+	return success, err
+}
+
+func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *storage.ObjState, v reflect.Value, getOnFailure, expectTransformOrDecodeError bool) (state *storage.ObjState, success bool, err error) {
 	startTime := time.Now()
 	txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.Rev, kubernetes.DeleteOptions{
-		GetOnFailure: true,
+		GetOnFailure: getOnFailure,
 	})
 	metrics.RecordEtcdRequest("delete", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
 	if err != nil {
@@ -402,6 +416,9 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, 
 	success = txnResp.Succeeded
 	if !success {
 		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
+		if !getOnFailure {
+			return nil, false, nil
+		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 		return origState, success, err
 	}
@@ -451,7 +468,20 @@ func (s *store) GuaranteedUpdate(
 	return storage.GuaranteedUpdate(ctx, d, preparedKey, destination, ignoreNotFound, preconditions, tryUpdate, origState)
 }
 
-func (s *store) updateOnce(ctx context.Context, preparedKey string, destination runtime.Object, origState *storage.ObjState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound bool) (state *storage.ObjState, success bool, err error) {
+// UpdateOnce implements storage.Interface.
+func (s *store) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+	preparedKey, err := s.prepareKey(key, false)
+	if err != nil {
+		return nil, false, err
+	}
+	v, err := conversion.EnforcePtr(destination)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to convert output object to pointer: %v", err)
+	}
+	return s.updateOnce(ctx, preparedKey, destination, origState, obj, ttl, v, ignoreNotFound, false)
+}
+
+func (s *store) updateOnce(ctx context.Context, preparedKey string, destination runtime.Object, origState *storage.ObjState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound, getOnFailure bool) (state *storage.ObjState, success bool, err error) {
 	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
 		return origState, false, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
@@ -469,7 +499,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 		// If we skipped the original Get in this loop, we must refresh from
 		// etcd in order to be sure the data in the store is equivalent to
 		// our desired serialization before short-circuiting a write.
-		if !origState.Current {
+		if !origState.FromStorage {
 			origState, err = s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
 			if err != nil {
 				return origState, false, err
@@ -509,7 +539,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 	startTime := time.Now()
 
 	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.Rev, kubernetes.PutOptions{
-		GetOnFailure: true,
+		GetOnFailure: getOnFailure,
 		LeaseID:      lease,
 	})
 	metrics.RecordEtcdRequest("update", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
@@ -522,6 +552,9 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 	span.AddEvent("Transaction committed")
 	if !success {
 		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
+		if !getOnFailure {
+			return nil, false, nil
+		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 		if err != nil {
 			return origState, success, err
@@ -565,11 +598,11 @@ func (d *storeTxnDelegator) GetCurrentState(ctx context.Context, ignoreNotFound 
 }
 
 func (d *storeTxnDelegator) DeleteOnce(ctx context.Context, origState *storage.ObjState, out runtime.Object) (*storage.ObjState, bool, error) {
-	return d.store.deleteOnce(ctx, d.key, out, origState, d.v, d.expectTransformOrDecodeError)
+	return d.store.deleteOnce(ctx, d.key, out, origState, d.v, true, d.expectTransformOrDecodeError)
 }
 
 func (d *storeTxnDelegator) UpdateOnce(ctx context.Context, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
-	return d.store.updateOnce(ctx, d.key, destination, origState, obj, ttl, d.v, ignoreNotFound)
+	return d.store.updateOnce(ctx, d.key, destination, origState, obj, ttl, d.v, ignoreNotFound, true)
 }
 
 func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
@@ -1114,8 +1147,9 @@ func (s *store) getCurrentState(ctx context.Context, verb, key string, v reflect
 // storage.ObjState will both be nil.
 func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*storage.ObjState, error) {
 	state := &storage.ObjState{
-		Meta:    &storage.ResponseMeta{},
-		Current: true,
+		Meta:        &storage.ResponseMeta{},
+		Current:     true,
+		FromStorage: true,
 	}
 
 	if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
