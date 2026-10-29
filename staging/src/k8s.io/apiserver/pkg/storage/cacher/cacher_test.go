@@ -124,18 +124,6 @@ func TestGet(t *testing.T) {
 	storagetesting.RunTestGet(ctx, t, cacher)
 }
 
-func TestUnconditionalDelete(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
-}
-
-func TestConditionalDelete(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestConditionalDelete(ctx, t, cacher)
-}
-
 func TestDeleteOnce(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
@@ -146,42 +134,6 @@ func TestUpdateOnce(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestUpdateOnce(ctx, t, cacher, examplev1ProtoCodec)
-}
-
-func TestDeleteWithSuggestion(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteWithSuggestion(ctx, t, cacher)
-}
-
-func TestDeleteWithSuggestionAndConflict(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
-}
-
-func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
-}
-
-func TestValidateDeletionWithSuggestion(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
-}
-
-func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
-}
-
-func TestDeleteWithConflict(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
 }
 
 type testTransformer struct {
@@ -216,58 +168,87 @@ func (tc *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into
 	return tc.Codec.Decode(data, defaults, into)
 }
 
-func TestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-
-	transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
-	ctx, s, terminate := testSetup(t, withTransformer(transformer))
-	t.Cleanup(terminate)
-
-	storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
-}
-
-func TestDeleteWithConflictAndExpectedTransformError(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-
-	transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
-	ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
-	t.Cleanup(terminate)
-
-	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, transformer.setFailing)
-}
-
-func TestDeleteWithConflictAndExpectedDecodeError(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-
-	// Decode errors cause a panic when they occur during tests. Disable for this particular
-	// test since it is deliberately exercising a case where the stored bytes cannot be decoded.
-	etcd3.TestOnlySetFatalOnDecodeError(t, false)
-
-	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
-	ctx, cacher, terminate := testSetup(t, withCodec(codec))
-	t.Cleanup(terminate)
-
-	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, codec.setFailing)
-}
-
-func TestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, cacher)
-}
-
-func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
-}
-
-func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
+func TestDelete(t *testing.T) {
+	t.Run("UnconditionalDelete", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
+	})
+	t.Run("ConditionalDelete", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestConditionalDelete(ctx, t, cacher)
+	})
+	t.Run("DeleteWithSuggestion", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithSuggestion(ctx, t, cacher)
+	})
+	t.Run("DeleteWithSuggestionAndConflict", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
+	})
+	t.Run("DeleteWithSuggestionOfDeletedObject", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
+	})
+	t.Run("ValidateDeletionWithSuggestion", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
+	})
+	t.Run("ValidateDeletionWithOnlySuggestionValid", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
+	})
+	t.Run("DeleteWithConflict", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
+	})
+	t.Run("DeleteWithConflictAndMissingExpectedTransformOrDecodeError", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+		transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
+		ctx, s, terminate := testSetup(t, withTransformer(transformer))
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
+	})
+	t.Run("DeleteWithConflictAndExpectedTransformError", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+		transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
+		ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, transformer.setFailing)
+	})
+	t.Run("DeleteWithConflictAndExpectedDecodeError", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+		// Decode errors cause a panic when they occur during tests. Disable for this particular
+		// test since it is deliberately exercising a case where the stored bytes cannot be decoded.
+		etcd3.TestOnlySetFatalOnDecodeError(t, false)
+		codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+		ctx, cacher, terminate := testSetup(t, withCodec(codec))
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, codec.setFailing)
+	})
+	t.Run("DeleteWithSuggestionAndMissingExpectedTransformOrDecodeError", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, cacher)
+	})
+	t.Run("PreconditionalDeleteWithSuggestion", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
+	})
+	t.Run("PreconditionalDeleteWithSuggestionPass", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
+	})
 }
 
 func TestListPaging(t *testing.T) {
@@ -509,36 +490,34 @@ func (c *cacherWithPrefixTransformer) UpdatePrefixTransformer(modifier storagete
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
-	transformer := newSwappablePrefixTransformer()
-	ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
-	t.Cleanup(terminate)
-	storagetesting.RunTestGuaranteedUpdate(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer}, checkStorageInvariants)
-}
-
-func TestGuaranteedUpdateWithTTL(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
-}
-
-func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
-	transformer := newSwappablePrefixTransformer()
-	// Leading-whitespace normalization in RunTestGuaranteedUpdateChecksStoredData requires a JSON codec.
-	ctx, cacher, terminate := testSetup(t, withCodec(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)), withTransformer(transformer))
-	t.Cleanup(terminate)
-	storagetesting.RunTestGuaranteedUpdateChecksStoredData(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer})
-}
-
-func TestGuaranteedUpdateWithConflict(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
-}
-
-func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
+	t.Run("GuaranteedUpdate", func(t *testing.T) {
+		transformer := newSwappablePrefixTransformer()
+		ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
+		t.Cleanup(terminate)
+		storagetesting.RunTestGuaranteedUpdate(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer}, checkStorageInvariants)
+	})
+	t.Run("GuaranteedUpdateWithTTL", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
+	})
+	t.Run("GuaranteedUpdateChecksStoredData", func(t *testing.T) {
+		transformer := newSwappablePrefixTransformer()
+		// Leading-whitespace normalization in RunTestGuaranteedUpdateChecksStoredData requires a JSON codec.
+		ctx, cacher, terminate := testSetup(t, withCodec(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)), withTransformer(transformer))
+		t.Cleanup(terminate)
+		storagetesting.RunTestGuaranteedUpdateChecksStoredData(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer})
+	})
+	t.Run("GuaranteedUpdateWithConflict", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
+	})
+	t.Run("GuaranteedUpdateWithSuggestionAndConflict", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
+	})
 }
 
 func TestTransformationFailure(t *testing.T) {
