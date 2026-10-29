@@ -299,6 +299,8 @@ type Cacher struct {
 	// Versioner is used to handle resource versions.
 	versioner storage.Versioner
 
+	codec runtime.Codec
+
 	// newFunc is a function that creates new empty object storing a object of type Type.
 	newFunc func() runtime.Object
 
@@ -398,6 +400,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		objectType:     objType,
 		groupResource:  config.GroupResource,
 		versioner:      config.Versioner,
+		codec:          config.Codec,
 		newFunc:        config.NewFunc,
 		newListFunc:    config.NewListFunc,
 		indexedTrigger: indexedTrigger,
