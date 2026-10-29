@@ -140,6 +140,10 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	}, cache.HandlerOptions{Logger: &logger})
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
+	if err := endpointsliceutil.AddServiceSelectorIndexer(serviceInformer.Informer()); err != nil {
+		logger.Error(err, "Failed to add Service selector index")
+	}
+	c.serviceIndexer = serviceInformer.Informer().GetIndexer()
 
 	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.onPodUpdate(nil, obj) },
@@ -211,6 +215,8 @@ type Controller struct {
 	// servicesSynced returns true if the service shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	servicesSynced cache.InformerSynced
+	// serviceIndexer finds the Services that select a pod using endpointsliceutil.ServiceSelectorIndex.
+	serviceIndexer cache.Indexer
 
 	// podLister is able to list/get pods and is populated by the
 	// shared informer passed to NewController
@@ -501,7 +507,7 @@ func (c *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProje
 		logger.V(4).Info("Finished syncing pod", "PodProjectionKey", *key, "elapsedTime", time.Since(startTime))
 	}()
 
-	servicesToUpdate, err := endpointsliceutil.GetServicesToUpdate(c.serviceLister, key)
+	servicesToUpdate, err := endpointsliceutil.GetServicesToUpdate(c.serviceIndexer, key)
 	if err != nil {
 		return err
 	}
