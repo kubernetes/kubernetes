@@ -98,6 +98,19 @@ func waitForStatus(ctx context.Context, c clientset.Interface, set *appsv1.State
 	return set
 }
 
+// waitForUpdatedRevision waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation and CurrentRevision to be equal to UpdateRevision.
+// The returned StatefulSet contains such a StatefulSetStatus
+func waitForUpdatedRevision(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet) *appsv1.StatefulSet {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+		if set2.Status.ObservedGeneration >= set.Generation && set2.Status.CurrentRevision == set2.Status.UpdateRevision {
+			set = set2
+			return true, nil
+		}
+		return false, nil
+	})
+	return set
+}
+
 // waitForPodNames waits for the StatefulSet's pods to match expected names.
 func waitForPodNames(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedPodNames []string) {
 	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll,
