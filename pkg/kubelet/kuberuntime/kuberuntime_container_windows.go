@@ -23,10 +23,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -116,6 +119,14 @@ func (m *kubeGenericRuntimeManager) calculateWindowsResources(ctx context.Contex
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
 func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) && m.recorder != nil {
+		if cm.HasExplicitSwapLimit(pod, container) {
+			m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, kubeletevents.SwapLimitNotEnforced,
+				"Container %s declares resources.limits.swap but Windows nodes do not support swap limits",
+				container.Name)
+		}
+	}
+
 	wc := &runtimeapi.WindowsContainerConfig{
 		Resources:       m.generateWindowsContainerResources(ctx, pod, container),
 		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
@@ -189,6 +200,14 @@ func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.Co
 
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
 	return types.NoSwap
+}
+
+func (m *kubeGenericRuntimeManager) effectiveSwapLimit(pod *v1.Pod, container *v1.Container) (int64, swapLimitSource) {
+	return 0, swapSourceNone
+}
+
+func (m *kubeGenericRuntimeManager) nodeSwapEnabled() bool {
+	return false
 }
 
 // initSwapControllerAvailabilityCheck returns a function that always returns false on Windows

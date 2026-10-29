@@ -205,6 +205,7 @@ type NodeConfig struct {
 	TopologyManagerPolicyOptions map[string]string
 	CgroupVersion                int
 	CgroupNsdelegate             bool
+	MemorySwapBehavior           string
 }
 
 type NodeAllocatableConfig struct {

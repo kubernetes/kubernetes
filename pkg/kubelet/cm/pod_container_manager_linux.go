@@ -63,6 +63,8 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
+	// memorySwapBehavior is the node's configured swap behavior
+	memorySwapBehavior string
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -97,6 +99,9 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
+		if !m.isNodeSwapEnabled() {
+			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
+		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
@@ -111,6 +116,16 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 
 	}
 	return nil
+}
+
+func (m *podContainerManagerImpl) isNodeSwapEnabled() bool {
+	if !IsSwapBehaviorEnabled(m.memorySwapBehavior) {
+		return false
+	}
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return false
+	}
+	return isSwapControllerAvailable()
 }
 
 // applyPodLevelMemoryHigh sets memory.high on the pod cgroup.
