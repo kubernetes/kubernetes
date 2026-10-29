@@ -232,7 +232,7 @@ var (
 )
 
 // parseQuantityString is a fast scanner for quantity values.
-func parseQuantityString(str string) (positive bool, value, num, denom, suffix string, err error) {
+func parseQuantityString(str string) (positive bool, value, num, denom, suffix string, defaultedNum bool, err error) {
 	positive = true
 	pos := 0
 	end := len(str)
@@ -249,15 +249,18 @@ func parseQuantityString(str string) (positive bool, value, num, denom, suffix s
 	}
 
 	// strip leading zeros
+	sawZeros := false
 Zeroes:
 	for i := pos; ; i++ {
 		if i >= end {
+			defaultedNum = !sawZeros
 			num = "0"
 			value = num
 			return
 		}
 		switch str[i] {
 		case '0':
+			sawZeros = true
 			pos++
 		default:
 			break Zeroes
@@ -283,6 +286,7 @@ Num:
 
 	// if we stripped all numerator positions, always return 0
 	if len(num) == 0 {
+		defaultedNum = !sawZeros
 		num = "0"
 	}
 
@@ -357,7 +361,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{Format: DecimalSI, s: newCachedString(str, DecimalSI)}, nil
 	}
 
-	positive, value, num, denom, suf, err := parseQuantityString(str)
+	positive, value, num, denom, suf, _, err := parseQuantityString(str)
 	if err != nil {
 		return Quantity{}, err
 	}

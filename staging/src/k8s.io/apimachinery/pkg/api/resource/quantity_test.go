@@ -18,6 +18,7 @@ package resource
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -339,28 +340,189 @@ func TestQuantityCmp(t *testing.T) {
 	}
 }
 
-func TestParseQuantityString(t *testing.T) {
-	table := []struct {
-		input              string
-		positive           bool
-		value              string
-		num, denom, suffix string
-	}{
-		{"0.025Ti", true, "0.025", "0", "025", "Ti"},
-		{"1.025Ti", true, "1.025", "1", "025", "Ti"},
-		{"-1.025Ti", false, "-1.025", "1", "025", "Ti"},
-		{".", true, ".", "0", "", ""},
-		{"-.", false, "-.", "0", "", ""},
-		{"1E-3", true, "1", "1", "", "E-3"},
+type parseQuantityStringTestcase struct {
+	input string
+
+	// Expected values for a successful parse of the input string.
+	// Should only be set for valid input test cases. Otherwise, err
+	// should be set.
+	positive           bool
+	num, denom, suffix string
+	defaultedNum       bool
+
+	// err is the error parseQuantityString should return for invalid input test
+	// cases. This is nil for valid input test cases.
+	err error
+}
+
+// quantityStringCombinations produces all combinations of a sign, an integer
+// part, a fractional part and a suffix that form valid test cases.
+func quantityStringCombinations() []parseQuantityStringTestcase {
+	signs := []string{"", "-", "+"}
+	integers := []string{"", "0", "00", "01", "001", "1", "10"}
+	fractions := []string{"", ".", ".0", ".1", ".10"}
+	suffixes := []string{
+		"", "n", "u", "m", "k", "M", "G", "T", "P", "E",
+		"Ki", "Mi", "Gi", "Ti", "Pi", "Ei",
+		"e3", "E-3", "e+3", "e0",
 	}
+	var testcases []parseQuantityStringTestcase
+	for _, sign := range signs {
+		for _, integer := range integers {
+			num := strings.TrimLeft(integer, "0")
+			if num == "" {
+				num = "0"
+			}
+			for _, fraction := range fractions {
+				for _, suf := range suffixes {
+					testcases = append(testcases, parseQuantityStringTestcase{
+						input:        sign + integer + fraction + suf,
+						positive:     sign != "-",
+						num:          num,
+						denom:        strings.TrimPrefix(fraction, "."),
+						suffix:       suf,
+						defaultedNum: len(integer) == 0,
+					})
+				}
+			}
+		}
+	}
+	return testcases
+}
+
+// quantityStringInsertions injects invalid characters into inputs to produce
+// combinations of inputs that fail parseQuantityString with an error.
+func quantityStringInsertions() []parseQuantityStringTestcase {
+	notInQuantity := []string{
+		"_", ",", " ", "\t", "\n", "\x00", "\u00b5", "\uff11",
+	}
+	for _, c := range "ABCDFHIJLNOQRSUVWXYZabcdfghjlopqrstvwxyz" {
+		notInQuantity = append(notInQuantity, string(c))
+	}
+	var testcases []parseQuantityStringTestcase
+	for _, test := range quantityStringCombinations() {
+		combination := test.input
+		for i := 0; i <= len(combination); i++ {
+			for _, c := range notInQuantity {
+				testcases = append(testcases, parseQuantityStringTestcase{
+					input: combination[:i] + c + combination[i:],
+					err:   ErrFormatWrong,
+				})
+			}
+			if strings.Contains(combination, ".") {
+				testcases = append(testcases, parseQuantityStringTestcase{
+					input: combination[:i] + "." + combination[i:],
+					err:   ErrFormatWrong,
+				})
+			}
+		}
+	}
+	return testcases
+}
+
+func TestParseQuantityString(t *testing.T) {
+	table := []parseQuantityStringTestcase{
+		// Valid inputs:
+		{input: "0.025Ti", positive: true, num: "0", denom: "025", suffix: "Ti"},
+		{input: "1.025Ti", positive: true, num: "1", denom: "025", suffix: "Ti"},
+		{input: "-1.025Ti", positive: false, num: "1", denom: "025", suffix: "Ti"},
+		{input: ".", positive: true, num: "0", denom: "", suffix: "", defaultedNum: true},
+		{input: "-.", positive: false, num: "0", denom: "", suffix: "", defaultedNum: true},
+		{input: "1E-3", positive: true, num: "1", denom: "", suffix: "E-3"},
+		// allowed omissions
+		{input: "1.", positive: true, num: "1"},
+		{input: ".1", positive: true, num: "0", denom: "1", defaultedNum: true},
+		{input: "Ki", positive: true, num: "0", suffix: "Ki", defaultedNum: true},
+		{input: "-", positive: false, num: "0", defaultedNum: true},
+		// allowed extraneous signs and digits
+		{input: "+1", positive: true, num: "1"},
+		{input: "001", positive: true, num: "1"},
+
+		// Valid inputs that are not valid quantities:
+		// (parseQuantityString accepts some invalid input data in the suffix,
+		// which is then dealt with by the caller)
+		// invalid signs
+		{input: "--1", positive: false, num: "0", suffix: "-1", defaultedNum: true},
+		{input: ".-1", positive: true, num: "0", suffix: "-1", defaultedNum: true},
+		{input: "1-", positive: true, num: "1", suffix: "-"},
+		{input: "1-1", positive: true, num: "1", suffix: "-1"},
+		{input: "1.-1", positive: true, num: "1", suffix: "-1"},
+		// invalid exponent with no digits
+		{input: "1e", positive: true, num: "1", suffix: "e"},
+		{input: "1e-", positive: true, num: "1", suffix: "e-"},
+		// invalid suffixes (repeated or out of order, or Ki and e3 together)
+		{input: "1KiKi", positive: true, num: "1", suffix: "KiKi"},
+		{input: "1ee3", positive: true, num: "1", suffix: "ee3"},
+		{input: "1iK", positive: true, num: "1", suffix: "iK"},
+		{input: "1Kie3", positive: true, num: "1", suffix: "Kie3"},
+		// invalid suffix case
+		{input: "1K", positive: true, num: "1", suffix: "K"},
+		{input: "1ki", positive: true, num: "1", suffix: "ki"},
+		// invalid tokens after suffix
+		{input: "1Ki1", positive: true, num: "1", suffix: "Ki1"},
+		{input: "1Ki-", positive: true, num: "1", suffix: "Ki-"},
+		// invalid suffix before the number
+		{input: "Ki1", positive: true, num: "0", suffix: "Ki1", defaultedNum: true},
+
+		// Invalid inputs:
+		// repeated decimal points
+		{input: "..", err: ErrFormatWrong},
+		{input: "1..1", err: ErrFormatWrong},
+		{input: ".1.1", err: ErrFormatWrong},
+		{input: "1.1.", err: ErrFormatWrong},
+		{input: "1.1.1", err: ErrFormatWrong},
+		{input: "1.1.1Ki", err: ErrFormatWrong},
+		// a decimal point in the suffix
+		{input: "1Ki.1", err: ErrFormatWrong},
+		{input: "1e.1", err: ErrFormatWrong},
+		{input: "1e3.1", err: ErrFormatWrong},
+		// a sign or suffix letter after the suffix's digits
+		{input: "--1Ki", err: ErrFormatWrong},
+		{input: "1e3e3", err: ErrFormatWrong},
+		{input: "1e3-", err: ErrFormatWrong},
+		{input: "1e3Ki", err: ErrFormatWrong},
+		// a suffix letter after the suffix's sign
+		{input: "1-Ki", err: ErrFormatWrong},
+		{input: "1-e3", err: ErrFormatWrong},
+		// two signs in the suffix
+		{input: "1--1", err: ErrFormatWrong},
+		{input: "1e+-3", err: ErrFormatWrong},
+		// characters that are not part of a quantity
+		{input: " 1", err: ErrFormatWrong},
+		{input: "1 ", err: ErrFormatWrong},
+		{input: "1\n", err: ErrFormatWrong},
+		{input: "1\x00", err: ErrFormatWrong},
+		{input: "1KiB", err: ErrFormatWrong},
+		{input: "1\u00b5", err: ErrFormatWrong},
+		{input: "\uff11", err: ErrFormatWrong},
+		// legible number formats that are not accepted
+		{input: "0x10", err: ErrFormatWrong},
+		{input: "1,000", err: ErrFormatWrong},
+		{input: "1_000", err: ErrFormatWrong},
+		{input: "1/2", err: ErrFormatWrong},
+		{input: "NaN", err: ErrFormatWrong},
+		{input: "Inf", err: ErrFormatWrong},
+		{input: "inf", err: ErrFormatWrong},
+	}
+	// Test for combinations of valid inputs
+	table = append(table, quantityStringCombinations()...)
+	// Test for injection of characters that result in invalid inputs
+	table = append(table, quantityStringInsertions()...)
+
 	for _, test := range table {
-		positive, value, num, denom, suffix, err := parseQuantityString(test.input)
+		positive, _, num, denom, suf, defaultedNum, err := parseQuantityString(test.input)
+		if test.err != nil {
+			if !errors.Is(err, test.err) {
+				t.Errorf("%q: got error %v, want %v", test.input, err, test.err)
+			}
+			continue
+		}
 		if err != nil {
 			t.Errorf("%s: error: %v", test.input, err)
 			continue
 		}
-		if positive != test.positive || value != test.value || num != test.num || denom != test.denom || suffix != test.suffix {
-			t.Errorf("%s: unmatched: %t %q %q %q %q", test.input, positive, value, num, denom, suffix)
+		if positive != test.positive || num != test.num || denom != test.denom || suf != test.suffix || defaultedNum != test.defaultedNum {
+			t.Errorf("%s: unmatched: %t %q %q %q %v", test.input, positive, num, denom, suf, defaultedNum)
 		}
 	}
 }
@@ -493,6 +655,7 @@ func quantityTestcases() []parseQuantityTestcase {
 		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI), "2n"}, // rounds up, changes format
 		{".001", decQuantity(1, -3, DecimalSI), "1m"},
 		{".0001k", decQuantity(100, -3, DecimalSI), "100m"},
+		{".1G", decQuantity(100, 6, DecimalSI), "100M"},
 		{"1.", decQuantity(1, 0, DecimalSI), "1."},
 		{"1.G", decQuantity(1, 9, DecimalSI), "1.G"},
 	}
@@ -609,7 +772,7 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			// verify that we can decompose the input and get the same result by building up from the base.
-			positive, _, num, denom, suffix, err := parseQuantityString(item.input)
+			positive, _, num, denom, suffix, _, err := parseQuantityString(item.input)
 			if err != nil {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
@@ -695,6 +858,24 @@ func TestQuantityParse(t *testing.T) {
 		"1i",
 		"-3.01i",
 		"-3.01e-",
+
+		// parseQuantityString leaves the invalid part of these in suffix
+		"--1",
+		".-1",
+		"1-",
+		"1-1",
+		"1.-1",
+		"1e",
+		"1e-",
+		"1KiKi",
+		"1ee3",
+		"1iK",
+		"1Kie3",
+		"1K",
+		"1ki",
+		"1Ki1",
+		"1Ki-",
+		"Ki1",
 
 		// an exponent that narrows to a scale of math.MinInt32 is rejected,
 		// because negating that scale overflows int32
@@ -5428,6 +5609,13 @@ func TestParseQuantity(t *testing.T) {
 		{input: "1.000000000000000000e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("1000000000000000000", -2147483629)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1000000000000000000, scale: 2147483629}, Format: DecimalExponent}}, // trailing zeros count as digits; 19 digits still fit int64
 		{input: "1.0000000000000000000e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("10000000000000000000", -2147483628)), canonical: "10e2147483646", want: Quantity{d: scaledDec("10000000000000000000", -2147483628), Format: DecimalExponent}},           // 20 digits do not fit int64
 		{input: "00000000000000000001e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1, scale: 2147483647}, Format: DecimalExponent}},                                     // leading zeros do not count as digits
+		// more than 29 significant digits near the int32 exponent limit
+		{input: "98765432109876543210987654321098765e2147483645", wantAsInt64: nil, wantAsDec: new(scaledDec("98765432109876543210987654321098765", -2147483645)), canonical: "9876543210987654321098765432109876500e2147483643", want: Quantity{d: scaledDec("98765432109876543210987654321098765", -2147483645), Format: DecimalExponent}},
+		{input: "-98765432109876543210987654321098765e2147483645", wantAsInt64: nil, wantAsDec: new(scaledDec("-98765432109876543210987654321098765", -2147483645)), canonical: "-9876543210987654321098765432109876500e2147483643", want: Quantity{d: scaledDec("-98765432109876543210987654321098765", -2147483645), Format: DecimalExponent}},
+		{input: "98765432109876543210987654321098765e2147483641", wantAsInt64: nil, wantAsDec: new(scaledDec("98765432109876543210987654321098765", -2147483641)), canonical: "987654321098765432109876543210987650e2147483640", want: Quantity{d: scaledDec("98765432109876543210987654321098765", -2147483641), Format: DecimalExponent}},  // keeping only 29 digits would raise the exponent to math.MaxInt32
+		{input: "98765432109876543210987654321098765e2147483642", wantAsInt64: nil, wantAsDec: new(scaledDec("98765432109876543210987654321098765", -2147483642)), canonical: "9876543210987654321098765432109876500e2147483640", want: Quantity{d: scaledDec("98765432109876543210987654321098765", -2147483642), Format: DecimalExponent}}, // keeping only 29 digits would raise the exponent past math.MaxInt32
+		{input: "987654321098765432109876543210.5e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("9876543210987654321098765432105", -2147483646)), canonical: "9876543210987654321098765432105e2147483646", want: Quantity{d: scaledDec("9876543210987654321098765432105", -2147483646), Format: DecimalExponent}},                  // 30 integer digits and a fractional digit
+		{input: "1" + strings.Repeat("0", 29) + "e2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("1"+strings.Repeat("0", 29), -2147483647)), canonical: "1" + strings.Repeat("0", 30) + "e2147483646", want: Quantity{d: scaledDec("1"+strings.Repeat("0", 29), -2147483647), Format: DecimalExponent}},                             // 30 significant digits at the largest exponent
 		{input: "1e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		{input: "1000000000.0000000001e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		// zero with fractional digits
