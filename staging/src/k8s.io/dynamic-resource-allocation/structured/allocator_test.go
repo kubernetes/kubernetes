@@ -51,3 +51,7 @@ func TestAllocator(t *testing.T) {
 			return internalAllocator, nil
 		})
 }
+
+func TestAllocatorSelection(t *testing.T) {
+	allocatortesting.TestAllocatorSelection(t, EnableAllocators, NewAllocator)
+}

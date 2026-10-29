@@ -18,11 +18,18 @@ package internal
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 )
 
 // ErrFailedAllocationOnNode is an empty sentinel for errors.Is.
@@ -88,6 +95,7 @@ type Features struct {
 	OptionalNodeOperations  bool
 	PartitionableDevices    bool
 	PrioritizedList         bool
+	SharingAffinity         bool
 }
 
 // Set returns all features which are set to true.
@@ -128,6 +136,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.SharingAffinity {
+		enabled.Insert("DRASharingAffinity")
+	}
 	if f.DeviceBindingAndStatus {
 		enabled.Insert("DRADeviceBindingConditions+DRAResourceClaimDeviceStatus")
 	}
@@ -146,4 +157,84 @@ var FeaturesAll = Features{
 	OptionalNodeOperations:  true,
 	PartitionableDevices:    true,
 	PrioritizedList:         true,
+	SharingAffinity:         true,
+}
+
+// ClaimAffinity holds the sharing affinity metadata for a single allocated
+// ResourceClaim. Devices has one entry per element of
+// AllocationResult.Devices.Results, in the same order.
+type ClaimAffinity struct {
+	Devices []DeviceAffinity
+}
+
+// DeviceAffinity records the sharing affinity metadata evaluated for an
+// allocated device during scheduling (not persisted in the API).
+type DeviceAffinity struct {
+	ResultIndex        int
+	Request            string
+	Device             DeviceID
+	Pool               sharingaffinity.PoolKey
+	Digest             string
+	HasSharingAffinity bool
+	Values             map[string]string
+	Contributes        bool
+}
+
+// PoolMetadataView describes the complete highest generation without running CEL.
+type PoolMetadataView struct {
+	Complete   bool
+	Generation int64
+	Digest     string
+	Extractors []resourceapi.SharingAffinityExtractor
+}
+
+var EmptyExtractorDigest = ExtractorDigest(nil)
+
+// ExtractorDigest is independent of ResourceSlice and extractor ordering.
+func ExtractorDigest(extractors []resourceapi.SharingAffinityExtractor) string {
+	entries := make([]string, 0, len(extractors))
+	for _, extractor := range extractors {
+		data, _ := json.Marshal(extractor)
+		entries = append(entries, string(data))
+	}
+	slices.Sort(entries)
+	data, _ := json.Marshal(entries)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
+// ComputePoolMetadataView includes metadata slices which do not target this node.
+func ComputePoolMetadataView(allSlices []*draapi.ResourceSlice, driver, pool string) PoolMetadataView {
+	var selected []*draapi.ResourceSlice
+	var view PoolMetadataView
+	for _, slice := range allSlices {
+		if slice.Spec.Driver.String() != driver || slice.Spec.Pool.Name.String() != pool {
+			continue
+		}
+		if len(selected) == 0 || slice.Spec.Pool.Generation > view.Generation {
+			selected = nil
+			view.Generation = slice.Spec.Pool.Generation
+		}
+		if slice.Spec.Pool.Generation == view.Generation {
+			selected = append(selected, slice)
+		}
+	}
+	view.Digest = EmptyExtractorDigest
+	if len(selected) == 0 {
+		return view
+	}
+	slices.SortFunc(selected, func(a, b *draapi.ResourceSlice) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	count := selected[0].Spec.Pool.ResourceSliceCount
+	view.Complete = count > 0 && int64(len(selected)) == count
+	names := sets.New[string]()
+	for _, slice := range selected {
+		if slice.Spec.Pool.ResourceSliceCount != count || names.Has(slice.Name) {
+			view.Complete = false
+		}
+		names.Insert(slice.Name)
+		view.Extractors = append(view.Extractors, slice.Spec.SharingAffinity...)
+	}
+	view.Digest = ExtractorDigest(view.Extractors)
+	return view
 }

@@ -127,4 +127,14 @@ func TestCacheIsolation(t *testing.T) {
 	if resultDerived != resultDerivedAgain {
 		t.Fatal("successful derived attribute compilation should have been cached")
 	}
+
+	// 4. SharingAffinityExtractor returns a stable, non-nil extractor instance
+	// across calls on the same Cache, and returns a valid fallback for a nil Cache.
+	extractor1 := cache.SharingAffinityExtractor()
+	require.NotNil(t, extractor1)
+	extractor2 := cache.SharingAffinityExtractor()
+	require.Same(t, extractor1, extractor2)
+
+	var nilCache *Cache
+	require.NotNil(t, nilCache.SharingAffinityExtractor())
 }
