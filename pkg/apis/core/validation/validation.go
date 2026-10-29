@@ -368,8 +368,17 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 
 // validateOverhead can be used to check whether the given Overhead is valid.
 func validateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	if opts.AllowWorkloadControlledSwap {
+		for resName := range overhead {
+			if resourcehelper.IsLimitOnlyResource(v1.ResourceName(resName)) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Key(string(resName)), fmt.Sprintf("%s may not be specified in overhead", resName)))
+			}
+		}
+	}
 	// reuse the ResourceRequirements validation logic
-	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts)
+	allErrs = append(allErrs, ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts)...)
+	return allErrs
 }
 
 // Validates that given value is not negative.
@@ -4933,6 +4942,21 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 			}
 		}
 	}
+	for i, ctr := range spec.InitContainers {
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			if !resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+				continue
+			}
+			podSpecLimits, exists := spec.Resources.Limits[resourceName]
+			if !exists {
+				continue
+			}
+			if ctrLimit.Cmp(podSpecLimits) > 0 {
+				fldPath := fldPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
+				allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -5004,7 +5028,15 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	if spec.ShareProcessNamespace != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 	}
+	if spec.Resources != nil {
+		if _, ok := spec.Resources.Limits[core.ResourceSwap]; ok {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
+	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		if _, ok := c.Resources.Limits[core.ResourceSwap]; ok {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
 		// validate container security context
 		sc := c.SecurityContext
 		// OS based podSecurityContext validation
@@ -6616,7 +6648,7 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 			&oldPod.Spec.Containers[ix].Resources,
 			newPod.Spec.Containers[ix].ResizePolicy,
 			specPath.Child("containers").Index(ix).Child("resources"))...)
-		dropResizableResourcesFromContainer(&mungedPodSpec.Containers[ix], &oldPod.Spec.Containers[ix])
+		dropResizableResourcesFromContainer(&mungedPodSpec.Containers[ix], &oldPod.Spec.Containers[ix], opts)
 	}
 
 	for ix := range mungedPodSpec.InitContainers {
@@ -6637,7 +6669,7 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 				}
 			}
 		}
-		dropResizableResourcesFromContainer(&mungedPodSpec.InitContainers[ix], oldCtr)
+		dropResizableResourcesFromContainer(&mungedPodSpec.InitContainers[ix], oldCtr, opts)
 	}
 
 	// Only sizeLimit of memory-backed emptyDir volumes is mutable on resize.
@@ -6930,7 +6962,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.P
 
 	}
 
-	mungedPodSpec.Resources = dropResizableResourceRequirementsUpdates(mungedPodSpec.Resources, oldPod.Spec.Resources)
+	mungedPodSpec.Resources = dropResizableResourceRequirementsUpdates(mungedPodSpec.Resources, oldPod.Spec.Resources, opts)
 
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec.Resources, oldPod.Spec.Resources) {
 		// This likely means that the user has made changes to pod-level resources other
@@ -6955,7 +6987,16 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.P
 	return allErrs, mungedPodSpec
 }
 
-func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+// resizableResourceSet returns the resources whose values may change on a
+// resize. swap (KEP-5359) joins cpu and memory when the gate is on.
+func resizableResourceSet(opts PodValidationOptions) sets.Set[core.ResourceName] {
+	if opts.AllowWorkloadControlledSwap {
+		return supportedResizeResources.Clone().Insert(core.ResourceSwap)
+	}
+	return supportedResizeResources
+}
+
+func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceList, opts PodValidationOptions) core.ResourceList {
 	var mungedResourceList core.ResourceList
 	if resourceList == nil {
 		if oldResourceList == nil {
@@ -6965,7 +7006,7 @@ func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceLis
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	for r := range supportedResizeResources {
+	for r := range resizableResourceSet(opts) {
 		delete(mungedResourceList, r)
 		if quantity, found := oldResourceList[r]; found {
 			mungedResourceList[r] = quantity
@@ -6977,16 +7018,16 @@ func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceLis
 // dropResizableResourcesFromContainer reverts the updates to resizable resources from the
 // container.
 // TODO(ndixita): refactor to reuse dropResizableResourceRequirementsUpdates
-func dropResizableResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
-	lim := dropResizableResourceUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
-	req := dropResizableResourceUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+func dropResizableResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container, opts PodValidationOptions) {
+	lim := dropResizableResourceUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits, opts)
+	req := dropResizableResourceUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests, opts)
 	// Resource claims are immutable during pod resize and the original configuration must be preserved.
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
 
 // dropResizableResourceRequirementsUpdates reverts the updates to resizable resources
 // from the `resources` field.
-func dropResizableResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) *core.ResourceRequirements {
+func dropResizableResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements, opts PodValidationOptions) *core.ResourceRequirements {
 	if resources == nil {
 		return resources
 	}
@@ -7000,8 +7041,8 @@ func dropResizableResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		oldLims = oldPodResources.Limits // +k8s:verify-mutation:reason=clone'
 	}
 
-	resources.Requests = dropResizableResourceUpdates(resources.Requests, oldReqs)
-	resources.Limits = dropResizableResourceUpdates(resources.Limits, oldLims)
+	resources.Requests = dropResizableResourceUpdates(resources.Requests, oldReqs, opts)
+	resources.Limits = dropResizableResourceUpdates(resources.Limits, oldLims, opts)
 
 	// Set the entire Resources block to nil if two conditions are met:
 	// 1. The old PodSpec Resources lacked any Resources
@@ -7091,6 +7132,21 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
 					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)
+				}
+			}
+		}
+
+		for _, ctr := range pod.Spec.InitContainers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if !resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+					continue
+				}
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+				if ctrLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit for initContainer %s", resourceName, ctr.Name)
 				}
 			}
 		}
@@ -8106,6 +8162,9 @@ func validateLimitRangeTypeName(value core.LimitType, fldPath *field.Path) field
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType core.LimitType, value core.ResourceName, fldPath *field.Path) field.ErrorList {
+	if resourcehelper.IsLimitOnlyResource(v1.ResourceName(value)) {
+		return field.ErrorList{field.Invalid(fldPath, value, "must be a standard resource for containers")}
+	}
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
 		return ValidateContainerResourceName(value, fldPath)
@@ -8427,11 +8486,21 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		if resourceName == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+			return nil
+		}
+		return validatePodResourceName(resourceName, fldPath)
+	}, podClaimNames, fldPath, opts)
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		if resourceName == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+			return nil
+		}
+		return ValidateContainerResourceName(resourceName, fldPath)
+	}, podClaimNames, fldPath, opts)
 }
 
 // Validates resource requirement spec.
@@ -8467,10 +8536,18 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
+		nameErrs := resourceNameFn(resourceName, fldPath)
+		allErrs = append(allErrs, nameErrs...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+
+		if resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+			if len(nameErrs) == 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("%s may only be specified in limits, not requests", resourceName)))
+			}
+			continue
+		}
 
 		// Check that request <= limit.
 		limitQuantity, exists := requirements.Limits[resourceName]

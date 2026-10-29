@@ -19,8 +19,10 @@ limitations under the License.
 package qos
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -45,8 +47,7 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 // NOTE: This is tested in pkg/apis/core/v1/helper/qos/qos_test.go
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || helper.IsPodLevelResourcesSet(pod))) {
+	if usePodLevelResourcesForQOS(pod) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 
@@ -123,4 +124,29 @@ func resourceQOS(resources *core.ResourceRequirements, res core.ResourceName) co
 		// req == lim != 0
 		return core.PodQOSGuaranteed
 	}
+}
+
+func usePodLevelResourcesForQOS(pod *core.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) || pod.Spec.Resources == nil {
+		return false
+	}
+	if hasOnlyLimitOnlyResources(pod.Spec.Resources) {
+		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) {
+		return helper.IsPodLevelResourcesSet(pod)
+	}
+	return true
+}
+
+func hasOnlyLimitOnlyResources(resources *core.ResourceRequirements) bool {
+	if resources == nil || len(resources.Requests) > 0 || len(resources.Limits) == 0 {
+		return false
+	}
+	for name := range resources.Limits {
+		if !resourcehelper.IsLimitOnlyResource(v1.ResourceName(name)) {
+			return false
+		}
+	}
+	return true
 }
