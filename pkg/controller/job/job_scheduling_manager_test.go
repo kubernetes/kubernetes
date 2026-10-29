@@ -41,10 +41,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2/ktesting"
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -615,16 +617,17 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 	suspendedDelegatedJob := delegatedJob.DeepCopy()
 	suspendedDelegatedJob.Spec.Suspend = new(true)
 
+	type objectSync struct{ kind, action, result string }
+
 	testCases := map[string]struct {
 		job               *batch.Job
 		pods              []*v1.Pod
 		existingWorkloads []*schedulingv1beta1.Workload
 		existingPodGroups []*schedulingv1beta1.PodGroup
 
-		// When true, the Workload create reactor returns a generic error.
-		simulateCreateError bool
-		// When true, PodGroup create returns a generic error.
-		simulatePGCreateError bool
+		simulateCreateError        bool
+		simulatePGCreateError      bool
+		simulateWorkloadPatchError bool
 
 		wantPodGroup                bool
 		wantPodGroupName            string
@@ -641,6 +644,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		wantBlockMessage            string
 		wantWorkloadsInAPI          []string
 		wantPodGroupsInAPI          []string
+		wantSchedulingObjectSyncs   map[objectSync]int
 	}{
 		"CronJob-owned Job with spec.scheduling gets a Workload and PodGroup": {
 			job: func() *batch.Job {
@@ -686,6 +690,10 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			job:              baseJob,
 			wantPodGroup:     true,
 			wantPodGroupName: podGroupName,
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.Workload, metrics.Create, metrics.Success}: 1,
+				{metrics.PodGroup, metrics.Create, metrics.Success}: 1,
+			},
 		},
 		"skips creation when Job has pods but no Workload": {
 			job:  baseJob,
@@ -798,6 +806,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingPodGroups:  []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
 			wantWorkloadsInAPI: []string{workloadName},
 			wantPodGroupsInAPI: []string{},
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.PodGroup, metrics.Delete, metrics.Success}: 1,
+			},
 		},
 		"suspend leaves a PodGroup the Job does not control": {
 			job:               suspendedJob,
@@ -853,6 +864,23 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads:        []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
 			wantWorkloadGangMinCount: new(int32(6)),
 			wantPodGroupsInAPI:       []string{},
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.Workload, metrics.Update, metrics.Success}: 1,
+			},
+		},
+		"Workload minCount patch error propagates": {
+			job: func() *batch.Job {
+				j := suspendedJob.DeepCopy()
+				j.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = new(int32(6))
+				return j
+			}(),
+			existingWorkloads:          []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			simulateWorkloadPatchError: true,
+			wantErr:                    true,
+			wantErrContains:            "synthetic Workload patch error",
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.Workload, metrics.Update, metrics.Error}: 1,
+			},
 		},
 		"resume after a suspended resize creates the PodGroup with the new minCount in one write": {
 			job: func() *batch.Job {
@@ -972,8 +1000,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					},
 				},
 			},
-			wantErr:         true,
-			wantBlockReason: ReasonInvalidSchedulingObjects,
+			wantErr:                   true,
+			wantBlockReason:           ReasonInvalidSchedulingObjects,
+			wantSchedulingObjectSyncs: map[objectSync]int{},
 		},
 		"Workload with a bad template count and a foreign controllerRef reports both problems": {
 			job: baseJob,
@@ -994,6 +1023,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			job:                 baseJob,
 			simulateCreateError: true,
 			wantErr:             true,
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.Workload, metrics.Create, metrics.Error}: 1,
+			},
 		},
 
 		"PodGroup create error propagates": {
@@ -1001,6 +1033,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads:     []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
 			simulatePGCreateError: true,
 			wantErr:               true,
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.PodGroup, metrics.Create, metrics.Error}: 1,
+			},
 		},
 		"delegated Job creates the PodGroup from the parent's template": {
 			job:                      delegatedJob,
@@ -1016,6 +1051,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			wantPodGroup:             true,
 			wantPodGroupName:         delegatedPodGroupName,
 			wantPodGroupGangMinCount: new(int32(7)),
+			wantSchedulingObjectSyncs: map[objectSync]int{
+				{metrics.PodGroup, metrics.Update, metrics.Success}: 1,
+			},
 		},
 		"delegated PodGroup already matching the parent template is left unchanged": {
 			job:                      delegatedJob,
@@ -1119,6 +1157,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			}
 			clientSet := fake.NewClientset(objs...)
 			jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
+			metrics.JobSchedulingObjectSyncsTotal.Reset()
 
 			if tc.simulateCreateError {
 				clientSet.PrependReactor("create", "workloads", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -1132,12 +1171,33 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				})
 			}
 
+			if tc.simulateWorkloadPatchError {
+				clientSet.PrependReactor("patch", "workloads", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, fmt.Errorf("synthetic Workload patch error")
+				})
+			}
+
 			sharedInformers.StartWithContext(ctx)
 			sharedInformers.WaitForCacheSyncWithContext(ctx)
 
 			// The shared fixture Jobs must not leak state across cases.
 			job := tc.job.DeepCopy()
 			pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, tc.pods)
+			if tc.wantSchedulingObjectSyncs != nil {
+				for _, kind := range []string{metrics.Workload, metrics.PodGroup} {
+					for _, action := range []string{metrics.Create, metrics.Update, metrics.Delete} {
+						for _, result := range []string{metrics.Success, metrics.Error} {
+							got, metricErr := metricstestutil.GetCounterMetricValue(metrics.JobSchedulingObjectSyncsTotal.WithLabelValues(kind, action, result))
+							if metricErr != nil {
+								t.Fatalf("reading job_scheduling_object_syncs_total{%s,%s,%s}: %v", kind, action, result, metricErr)
+							}
+							if want := tc.wantSchedulingObjectSyncs[objectSync{kind, action, result}]; int(got) != want {
+								t.Errorf("job_scheduling_object_syncs_total{kind=%s,action=%s,result=%s} = %v, want %d", kind, action, result, got, want)
+							}
+						}
+					}
+				}
+			}
 			blockedErr, blocked := errors.AsType[*schedulingBlockedError](err)
 			if tc.wantBlockReason != "" {
 				if !blocked {
