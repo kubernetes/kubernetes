@@ -55,7 +55,7 @@ func TestImagePullDurationMetric(t *testing.T) {
 			duration := dp[1]
 			t.Log(imageSize, duration)
 			t.Log(GetImageSizeBucket(uint64(imageSize)))
-			ImagePullDuration.WithLabelValues(GetImageSizeBucket(uint64(imageSize))).Observe(duration)
+			ImagePullDuration.WithLabelValues(GetImageSizeBucket(uint64(imageSize)), "always").Observe(duration)
 		}
 
 		wants, err := os.Open("testdata/image_pull_duration_metric")
@@ -176,12 +176,44 @@ func TestObserveImagePullDurationExemplars(t *testing.T) {
 		t.Fatal("no exemplar found on any bucket")
 	}
 
-	wantLabels := map[string]string{
-		"image":       "gcr.io/project/app",
-		"pull_policy": "Always",
-	}
+	wantLabels := map[string]string{"image": "gcr.io/project/app"}
 	if !reflect.DeepEqual(gotLabels, wantLabels) {
 		t.Errorf("exemplar labels = %v, want %v", gotLabels, wantLabels)
+	}
+}
+
+func TestObserveImagePullDurationPullPolicyLabel(t *testing.T) {
+	Register()
+	defer clearMetrics()
+
+	ObserveImagePullDuration(10.0, "gcr.io/project/app:v1", "Always", 5*1024*1024)
+	ObserveImagePullDuration(20.0, "gcr.io/project/app:v1", "IfNotPresent", 5*1024*1024)
+	ObserveImagePullDuration(30.0, "gcr.io/project/app:v1", "IfNotPresent", 5*1024*1024)
+
+	mfs, err := GetGather().Gather()
+	if err != nil {
+		t.Fatalf("Gather failed: %v", err)
+	}
+	got := map[string]uint64{}
+	for _, mf := range mfs {
+		if mf.GetName() != imagePullDurationKey {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			labels := map[string]string{}
+			for _, l := range m.GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			if labels["image_size_in_bytes"] != "0-10MB" {
+				t.Errorf("image_size_in_bytes = %q, want 0-10MB", labels["image_size_in_bytes"])
+			}
+			got[labels["pull_policy"]] = m.GetHistogram().GetSampleCount()
+		}
+	}
+	// Policies are separate series and lowercased like the ensure_image_requests_total label.
+	want := map[string]uint64{"always": 1, "ifnotpresent": 2}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sample counts by pull_policy = %v, want %v", got, want)
 	}
 }
 
@@ -202,13 +234,13 @@ func TestObserveImagePullDurationExemplarLabelLimits(t *testing.T) {
 		{
 			name:  "image longer than the exemplar rune budget is truncated, not a panic",
 			image: "registry.example.com/" + strings.Repeat("a", 300) + ":v1",
-			// budget = ExemplarMaxRunes - len("image") - len("pull_policy") - len("Always")
-			wantImage: ("registry.example.com/" + strings.Repeat("a", 300))[:metrics.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")],
+			// budget = ExemplarMaxRunes - len("image")
+			wantImage: ("registry.example.com/" + strings.Repeat("a", 300))[:metrics.ExemplarMaxRunes-len("image")],
 		},
 		{
 			name:      "truncation does not split multi-byte runes",
 			image:     "registry.example.com/" + strings.Repeat("é", 300),
-			wantImage: "registry.example.com/" + strings.Repeat("é", metrics.ExemplarMaxRunes-len("image")-len("pull_policy")-len("Always")-len("registry.example.com/")),
+			wantImage: "registry.example.com/" + strings.Repeat("é", metrics.ExemplarMaxRunes-len("image")-len("registry.example.com/")),
 		},
 		{
 			name:      "invalid UTF-8 is replaced, not a panic",
@@ -241,7 +273,7 @@ func TestObserveImagePullDurationExemplarLabelLimits(t *testing.T) {
 			if gotImage != tt.wantImage {
 				t.Errorf("exemplar image = %q, want %q", gotImage, tt.wantImage)
 			}
-			if n := utf8.RuneCountInString("image" + gotImage + "pull_policy" + "Always"); n > metrics.ExemplarMaxRunes {
+			if n := utf8.RuneCountInString("image" + gotImage); n > metrics.ExemplarMaxRunes {
 				t.Errorf("exemplar labels use %d runes, limit is %d", n, metrics.ExemplarMaxRunes)
 			}
 		})

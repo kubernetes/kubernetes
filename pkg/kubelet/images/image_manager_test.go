@@ -50,6 +50,7 @@ import (
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -1702,5 +1703,70 @@ func TestPullLogsImagePullFinished(t *testing.T) {
 		if !strings.Contains(logs, want) {
 			t.Errorf("log output is missing %s:\n%s", want, logs)
 		}
+	}
+}
+
+func TestPullObservesImagePullDuration(t *testing.T) {
+	kubeletmetrics.Register()
+	kubeletmetrics.ImagePullDuration.Reset()
+	defer kubeletmetrics.ImagePullDuration.Reset()
+
+	c := pullerTestCase{
+		testName:       "image missing, pull",
+		containerImage: "registry.example.com/team/app:v1",
+		policy:         v1.PullIfNotPresent,
+		qps:            0.0,
+		burst:          0,
+	}
+	puller, fakeClock, _, container, _, _ := pullerTestEnv(t, c, false, nil)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test_pod", Namespace: "test-ns", UID: "bar"},
+	}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID)},
+	}
+	fakeClock.Step(time.Second)
+	if _, _, err := puller.EnsureImageExists(context.Background(), &v1.ObjectReference{Kind: "Pod", Name: pod.Name, Namespace: pod.Namespace}, pod, container.Image, nil, podSandboxConfig, "", container.ImagePullPolicy); err != nil {
+		t.Fatalf("EnsureImageExists failed: %v", err)
+	}
+
+	mfs, err := kubeletmetrics.GetGather().Gather()
+	if err != nil {
+		t.Fatalf("Gather failed: %v", err)
+	}
+	var found bool
+	for _, mf := range mfs {
+		if mf.GetName() != "kubelet_"+kubeletmetrics.ImagePullDurationKey {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			found = true
+			labels := map[string]string{}
+			for _, l := range m.GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			if got := labels["pull_policy"]; got != "ifnotpresent" {
+				t.Errorf("pull_policy label = %q, want %q", got, "ifnotpresent")
+			}
+			// The image name is an exemplar, not a label.
+			if _, ok := labels["image"]; ok {
+				t.Errorf("unexpected image label: %v", labels)
+			}
+			var exemplarImage string
+			for _, b := range m.GetHistogram().GetBucket() {
+				for _, l := range b.GetExemplar().GetLabel() {
+					if l.GetName() == "image" {
+						exemplarImage = l.GetValue()
+					}
+				}
+			}
+			if want := "registry.example.com/team/app"; exemplarImage != want {
+				t.Errorf("exemplar image = %q, want %q", exemplarImage, want)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no image pull duration observation recorded")
 	}
 }

@@ -1131,7 +1131,7 @@ var (
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
 	// including the time spent in the waiting queue of image puller.
-	// The metric is broken down by bucketed image size.
+	// The metric is broken down by bucketed image size and pull policy.
 	ImagePullDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1140,7 +1140,7 @@ var (
 			Buckets:        imagePullDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"image_size_in_bytes"},
+		[]string{"image_size_in_bytes", "pull_policy"},
 	)
 
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
@@ -1676,10 +1676,12 @@ func GetImageNameForMetrics(image string) string {
 	return image
 }
 
-// ObserveImagePullDuration records an image pull duration observation with image and pull_policy
-// attached as exemplar labels rather than metric labels, avoiding unbounded cardinality growth.
+// ObserveImagePullDuration records an image pull duration observation. The pull policy is a metric
+// label, lowercased to match the pull_policy label of kubelet_image_manager_ensure_image_requests_total.
+// The image name is attached as an exemplar rather than a metric label, avoiding unbounded
+// cardinality growth.
 func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
-	metrics.ObserveWithExemplar(ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize)), duration, imagePullExemplarLabels(image, pullPolicy))
+	metrics.ObserveWithExemplar(ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize), strings.ToLower(pullPolicy)), duration, imagePullExemplarLabels(image))
 }
 
 // imagePullExemplarLabels builds the exemplar labels for an image pull observation.
@@ -1689,14 +1691,11 @@ func ObserveImagePullDuration(duration float64, image string, pullPolicy string,
 // spec and is not bounded, so it is truncated to the remaining rune budget (keeping the registry
 // and the start of the repository path) instead of crashing the pull path. The full reference
 // is still available in the pull event and log.
-func imagePullExemplarLabels(image, pullPolicy string) map[string]string {
+func imagePullExemplarLabels(image string) map[string]string {
 	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
-	budget := max(metrics.ExemplarMaxRunes-utf8.RuneCountInString("image"+"pull_policy"+pullPolicy), 0)
+	budget := max(metrics.ExemplarMaxRunes-utf8.RuneCountInString("image"), 0)
 	if utf8.RuneCountInString(image) > budget {
 		image = string([]rune(image)[:budget])
 	}
-	return map[string]string{
-		"image":       image,
-		"pull_policy": pullPolicy,
-	}
+	return map[string]string{"image": image}
 }
