@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -78,6 +79,10 @@ var SupportedFeatures = internal.Features{
 	DeviceBindingAndStatus:  true,
 	ConsumableCapacity:      true,
 	FractionalCapacityRange: true,
+	ListTypeAttributes:      true,
+	OptionalNodeOperations:  true,
+	DerivedAttributes:       true,
+	CompatibilityGroups:     true,
 }
 
 type Allocator struct {
@@ -98,7 +103,14 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
-	mutex             sync.RWMutex
+	// compatibilityGroupsBaseline caches, per resource pool, the
+	// compatibility-group intersection contributed by already-allocated devices
+	// (their groups read live from the source ResourceSlice). Like
+	// availableCounters it is computed lazily, never changes once set, and is
+	// guarded by mutex. The keys in the map are resource pool IDs (driver name
+	// and pool name), and the inner map keys are counter set names.
+	compatibilityGroupsBaseline map[PoolID]map[string]compatibilityGroupIntersection
+	mutex                       sync.RWMutex
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -129,7 +141,7 @@ func NewAllocator(ctx context.Context,
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
 		}
 	}
-	return &Allocator{
+	a := &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
@@ -138,7 +150,10 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
-	}, nil
+
+		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
+	}
+	return a, nil
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
@@ -147,17 +162,21 @@ func (a *Allocator) Channel() internal.AllocatorChannel {
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
-		Allocator:            a,
-		ctx:                  ctx, // all methods share the same a and thus ctx
-		logger:               klog.FromContext(ctx),
-		node:                 node,
-		claimsToAllocate:     claims,
-		deviceMatchesRequest: make(map[matchKey]bool),
-		constraints:          make([][]constraint, len(claims)),
-		consumedCounters:     make(map[PoolID]counterSets),
-		requestData:          make(map[requestIndices]requestData),
-		result:               make([]internalAllocationResult, len(claims)),
-		allocatingCapacity:   NewConsumedCapacityCollection(),
+		Allocator:              a,
+		ctx:                    ctx, // all methods share the same a and thus ctx
+		logger:                 klog.FromContext(ctx),
+		node:                   node,
+		claimsToAllocate:       claims,
+		deviceMatchesRequest:   make(map[matchKey]bool),
+		derivedAttributesCache: make(map[deviceExprKey]any),
+		constraints:            make([][]constraint, len(claims)),
+		consumedCounters:       make(map[PoolID]counterSets),
+
+		consumedCompatibilityGroups: make(map[PoolID]map[string]compatibilityGroupIntersection),
+
+		requestData:        make(map[requestIndices]requestData),
+		result:             make([]internalAllocationResult, len(claims)),
+		allocatingCapacity: NewConsumedCapacityCollection(),
 	}
 	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
 	if loggerV6 := alloc.logger.V(6); loggerV6.Enabled() {
@@ -282,16 +301,18 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			switch {
 			case constraint.MatchAttribute != nil:
 				matchAttribute := string(*constraint.MatchAttribute)
-				domain, id, _ := strings.Cut(matchAttribute, "/")
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
 					logger = klog.LoggerWithValues(logger, "matchAttribute", matchAttribute)
 				}
+				domain, id, _ := strings.Cut(matchAttribute, "/")
 				m := &matchAttributeConstraint{
-					logger:        logger,
-					requestNames:  sets.New(constraint.Requests...),
-					attributeName: draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
+					logger:            logger,
+					requestNames:      sets.New(constraint.Requests...),
+					attributeName:     draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
+					features:          a.features,
+					attributeProvider: alloc,
 				}
 				if loggerV7 := logger.V(7); loggerV7.Enabled() {
 					m.loggerV7 = &loggerV7
@@ -299,16 +320,18 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
 				distinctAttribute := string(*constraint.DistinctAttribute)
-				domain, id, _ := strings.Cut(distinctAttribute, "/")
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "distinctAttributeConstraint")
 					logger = klog.LoggerWithValues(logger, "distinctAttribute", distinctAttribute)
 				}
+				domain, id, _ := strings.Cut(distinctAttribute, "/")
 				m := &distinctAttributeConstraint{
-					logger:        logger,
-					requestNames:  sets.New(constraint.Requests...),
-					attributeName: draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
+					logger:            logger,
+					requestNames:      sets.New(constraint.Requests...),
+					attributeName:     draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
+					features:          a.features,
+					attributeProvider: alloc,
 				}
 				if loggerV7 := logger.V(7); loggerV7.Enabled() {
 					m.loggerV7 = &loggerV7
@@ -394,6 +417,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Tolerations:      internal.lookupRequest(claim).tolerations(),
 				ShareID:          internal.shareID,
 				ConsumedCapacity: consumedCapacity,
+				// If OptionalNodeOperations feature is off, allocateDevice ensures
+				// selected devices have SkipNodeOperations == nil.
+				SkipNodeOperations: internal.slice.Spec.SkipNodeOperations,
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
@@ -534,14 +560,24 @@ func (a *Allocator) GetStats() Stats {
 func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
 	claim := alloc.claimsToAllocate[requestKey.claimIndex]
 	requestData := requestData{
+		indices:       requestKey,
 		request:       request,
 		parentRequest: parentRequest,
 	}
-	// The DerivedAttributes feature is currently an alpha-only feature and is
-	// not supported in the incubating variant. Implementation will be added
-	// once the feature's support is extended to this variant.
-	if len(request.derivedAttributes()) > 0 {
-		return requestData, fmt.Errorf("claim %s, request %s: cannot handle request with derived attributes, the feature is disabled", klog.KObj(claim), request.name())
+	derivedAttrs := request.derivedAttributes()
+	if len(derivedAttrs) > 0 {
+		// Explicitly reject if the feature gate is disabled to avoid silently
+		// ignoring constraints. This can happen during a cluster upgrade if
+		// the API server has the feature enabled but the scheduler does not.
+		// Scheduling can succeed later if the scheduler is restarted with a
+		// configuration that supports this feature.
+		if !alloc.features.DerivedAttributes {
+			return requestData, fmt.Errorf("claim %s, request %s: cannot handle request with derived attributes, the feature is disabled", klog.KObj(claim), request.name())
+		}
+		requestData.derivedAttributes = make(map[resourceapi.FullyQualifiedName]string, len(derivedAttrs))
+		for _, attr := range derivedAttrs {
+			requestData.derivedAttributes[attr.Name] = attr.Expression
+		}
 	}
 	for i, selector := range request.selectors() {
 		if selector.CEL == nil {
@@ -659,12 +695,23 @@ type allocator struct {
 	claimsToAllocate     []*resourceapi.ResourceClaim
 	pools                []*Pool
 	deviceMatchesRequest map[matchKey]bool
-	constraints          [][]constraint // one list of constraints per claim
+	// derivedAttributesCache caches evaluated CEL derived attributes for a
+	// device. It is keyed by deviceExprKey (DeviceID + exact CEL expression)
+	// to avoid re-evaluating identical expressions on the same device,
+	// regardless of which derived attribute name or subrequest uses it.
+	derivedAttributesCache map[deviceExprKey]any
+	constraints            [][]constraint // one list of constraints per claim
 	// consumedCounters keeps track of the counters consumed by all devices
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
-	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	// consumedCompatibilityGroups tracks the rolling compatibility-group
+	// intersection per counter set for each pool across the devices being
+	// allocated in the current attempt. It is seeded from the already-allocated
+	// peers (compatibilityGroupsBaseline) the first time a counter set is touched.
+	// pool ID -> counter set name -> running intersection.
+	consumedCompatibilityGroups map[PoolID]map[string]compatibilityGroupIntersection
+	requestData                 map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
 	// and its values represent for which of a pod's claims the device will
@@ -687,6 +734,15 @@ type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
 type matchKey struct {
 	DeviceID
 	requestIndices
+}
+
+// deviceExprKey identifies a specific CEL expression evaluated on a specific device.
+// This allows caching the evaluated derived attribute so that identical CEL expressions
+// are evaluated at most once per device, regardless of how many derived attributes or
+// constraints reference them.
+type deviceExprKey struct {
+	DeviceID
+	expr string
 }
 
 // requestIndices identifies one specific request
@@ -717,6 +773,8 @@ type deviceLocation struct {
 }
 
 type requestData struct {
+	// indices holds the requestIndices for this request
+	indices requestIndices
 	// The request or subrequest which needs to be allocated.
 	// Never nil.
 	request requestAccessor
@@ -731,6 +789,9 @@ type requestData struct {
 
 	// pre-determined set of devices for allocating "all" devices
 	allDevices []deviceWithID
+
+	// derivedAttributes maps derived attribute name to its CEL expression
+	derivedAttributes map[resourceapi.FullyQualifiedName]string
 }
 
 func (rd *requestData) requestName() string {
@@ -797,15 +858,116 @@ func (idr internalDeviceResult) lookupRequest(claim *resourceapi.ResourceClaim) 
 type constraint interface {
 	// add is called whenever a device is about to be allocated. It must
 	// check whether the device matches the constraint and if yes,
-	// track that it is allocated. add returns an error if the device has
-	// an attribute value that this constraint cannot evaluate (for
-	// example, an unsupported type), which aborts the allocation attempt
-	// instead of merely rejecting this one device.
-	add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error)
+	// track that it is allocated.
+	add(request *requestData, device *draapi.Device, deviceID DeviceID) (bool, error)
 
 	// For every successful add there is exactly one matching removed call
 	// with the exact same parameters.
-	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
+	remove(request *requestData, device *draapi.Device, deviceID DeviceID)
+}
+
+// deviceAttributeListAsSet is set-based representation of DeviceAttributeListType.
+// This has the same structure as DeviceAttributeListType, but uses sets.Set instead of slices.
+type deviceAttributeListAsSet struct {
+	intValue     sets.Set[int64]
+	boolValue    sets.Set[bool]
+	stringValue  sets.Set[string]
+	versionValue sets.Set[string]
+}
+
+// intersection returns the new intersection set of two attribute sets as a new set.
+// Returns nil if there is no intersection or if the types do not match.
+func (s *deviceAttributeListAsSet) intersection(other *deviceAttributeListAsSet) *deviceAttributeListAsSet {
+	result := &deviceAttributeListAsSet{}
+
+	switch {
+	case s.intValue != nil && other.intValue != nil:
+		intersection := s.intValue.Intersection(other.intValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.intValue = intersection
+		return result
+	case s.boolValue != nil && other.boolValue != nil:
+		intersection := s.boolValue.Intersection(other.boolValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.boolValue = intersection
+		return result
+	case s.stringValue != nil && other.stringValue != nil:
+		intersection := s.stringValue.Intersection(other.stringValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.stringValue = intersection
+		return result
+	case s.versionValue != nil && other.versionValue != nil:
+		intersection := s.versionValue.Intersection(other.versionValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.versionValue = intersection
+		return result
+	default:
+		// Type mismatch
+		return nil
+	}
+}
+
+// attributeAsSet creates deviceAttributeListAsSet from DeviceAttribute.
+// Both scalar and list attributes are converted to set representation.
+// For scalar values, creates a single-element set.
+// For list values, creates a set from all elements.
+// Returns nil if the attribute type is unknown.
+func attributeAsSet(attribute any) *deviceAttributeListAsSet {
+	if attribute == nil {
+		return nil
+	}
+
+	result := &deviceAttributeListAsSet{}
+
+	switch attribute := attribute.(type) {
+	case []int64:
+		result.intValue = sets.New(attribute...)
+		return result
+	case []bool:
+		result.boolValue = sets.New(attribute...)
+		return result
+	case []string:
+		result.stringValue = sets.New(attribute...)
+		return result
+	case []semver.Version:
+		result.versionValue = sets.New[string]()
+		for _, ver := range attribute {
+			result.versionValue.Insert(versionWithoutBuild(ver))
+		}
+		return result
+	case int64:
+		result.intValue = sets.New(attribute)
+		return result
+	case bool:
+		result.boolValue = sets.New(attribute)
+		return result
+	case string:
+		result.stringValue = sets.New(attribute)
+		return result
+	case semver.Version:
+		result.versionValue = sets.New(versionWithoutBuild(attribute))
+		return result
+	default:
+		return nil
+	}
+}
+
+// versionWithoutBuild renders a version as a string while ignoring build
+// metadata, matching the precedence semantics of Version.Equals (semver
+// build metadata has no effect on equality). This keeps list-type attribute
+// sets consistent with the scalar comparison in matchAttributeConstraint and
+// distinctAttributeConstraint, which also use Equals.
+func versionWithoutBuild(ver semver.Version) string {
+	ver.Build = nil
+	return ver.String()
 }
 
 // matchAttributeConstraint compares an attribute value across devices.
@@ -816,52 +978,77 @@ type constraint interface {
 // We don't need to track *which* devices are part of the set, only
 // how many.
 type matchAttributeConstraint struct {
-	logger        klog.Logger  // Includes name and attribute name, so no need to repeat in log messages.
-	loggerV7      *klog.Logger // Non-nil only if V(7) is enabled, to avoid the cost of building log arguments otherwise.
-	requestNames  sets.Set[string]
-	attributeName draapi.FullyQualifiedName
+	logger            klog.Logger  // Includes name and attribute name, so no need to repeat in log messages.
+	loggerV7          *klog.Logger // Non-nil only if V(7) is enabled, to avoid the cost of building log arguments otherwise.
+	requestNames      sets.Set[string]
+	attributeName     draapi.FullyQualifiedName
+	features          Features
+	attributeProvider attributeProvider
 
-	attribute  any
+	// For scalar values (existing behavior)
+	attribute any
+
+	// For list values (when DRAListTypeAttributes feature gate is enabled).
+	// intersectionStack[len-1] is the current intersection; each add() pushes and each remove() pops,
+	// so backtracking always restores the intersection to its pre-add state.
+	intersectionStack []*deviceAttributeListAsSet
+
 	numDevices int
 }
 
-func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error) {
-	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Device, deviceID DeviceID) (bool, error) {
+	if m.requestNames.Len() > 0 && !m.matches(request) {
 		// Device not affected by constraint.
 		if m.loggerV7 != nil {
-			m.loggerV7.Info("Constraint does not apply to request", "request", requestName)
+			m.loggerV7.Info("Constraint does not apply to request", "request", request.requestName())
 		}
 		return true, nil
 	}
 
-	attribute, ok := device.Attributes.Lookup(m.attributeName)
-	if !ok {
+	attribute, err := m.attributeProvider.lookupAttribute(request, device, deviceID, m.attributeName)
+	if err != nil {
+		return false, err
+	}
+	if attribute == nil {
 		// Doesn't have the attribute.
 		if m.loggerV7 != nil {
 			m.loggerV7.Info("Constraint not satisfied, attribute not set")
 		}
 		return false, nil
 	}
-	if attribute == nil {
-		// Has the attribute, but with a value that this client cannot represent
-		// (for example, a value type added in a newer API version).
-		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
-	}
 
-	switch attribute.(type) {
-	case string:
-	case int64:
-	case bool:
-	case semver.Version:
-	default:
-		// Unknown value type, cannot match. Better stop instead of
-		// silently ignoring the device.
-		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
+	// Check value and convert to a set if needed.
+	var newSet *deviceAttributeListAsSet
+	if m.features.ListTypeAttributes {
+		newSet = attributeAsSet(attribute)
+		if newSet == nil {
+			// Internal error: attribute was already validated by lookupAttribute, so
+			// attributeAsSet must recognize its type. This should never be reached.
+			return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
+		}
+	} else {
+		switch attribute.(type) {
+		case string:
+		case int64:
+		case bool:
+		case semver.Version:
+		default:
+			// Unknown value type, cannot match. Better stop instead of
+			// silently ignoring the device.
+			//
+			// This can be reached for list values.
+			return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
+		}
 	}
 
 	if m.numDevices == 0 {
-		// The first device can always get picked.
-		m.attribute = attribute
+		// The first device can always get picked. Validation above ensures that
+		// we have a valid set resp. attribute.
+		if m.features.ListTypeAttributes {
+			m.intersectionStack = append(m.intersectionStack, newSet)
+		} else {
+			m.attribute = attribute
+		}
 		m.numDevices = 1
 		if m.loggerV7 != nil {
 			m.loggerV7.Info("First in set")
@@ -869,66 +1056,81 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		return true, nil
 	}
 
-	switch candidate := attribute.(type) {
-	case string:
-		existing, ok := m.attribute.(string)
-		if !ok {
+	// Check if we are matching with set-based logic or scalar-based logic
+	if m.features.ListTypeAttributes {
+		// Set-based matching: check if there is non-empty intersection
+		current := m.intersectionStack[m.numDevices-1]
+		narrowed := current.intersection(newSet)
+		if narrowed == nil {
 			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				m.loggerV7.Info("Attribute values have no common elements")
 			}
 			return false, nil
 		}
-		if existing != candidate {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+		// Push a narrowed copy so remove() can pop back to the previous intersection.
+		m.intersectionStack = append(m.intersectionStack, narrowed)
+	} else {
+		switch existing := m.attribute.(type) {
+		case string:
+			candidate, ok := attribute.(string)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-	case int64:
-		existing, ok := m.attribute.(int64)
-		if !ok {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+			if existing != candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-		if existing != candidate {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+		case int64:
+			candidate, ok := attribute.(int64)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-	case bool:
-		existing, ok := m.attribute.(bool)
-		if !ok {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+			if existing != candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-		if existing != candidate {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+		case bool:
+			candidate, ok := attribute.(bool)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-	case semver.Version:
-		existing, ok := m.attribute.(semver.Version)
-		if !ok {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+			if existing != candidate {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-		if !existing.Equals(candidate) {
-			if m.loggerV7 != nil {
-				m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+		case semver.Version:
+			candidate, ok := attribute.(semver.Version)
+			if !ok {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
 			}
-			return false, nil
+			if !existing.Equals(candidate) {
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				}
+				return false, nil
+			}
+		default:
+			// Validated above already; this should never be reached.
+			return false, fmt.Errorf("internal error: unexpected attribute type %T", m.attribute)
 		}
-	default:
-		// Validated above already; this should never be reached.
-		return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
 	}
 
 	m.numDevices++
@@ -938,25 +1140,81 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 	return true, nil
 }
 
-func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
-	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+func (m *matchAttributeConstraint) remove(request *requestData, device *draapi.Device, deviceID DeviceID) {
+	if m.requestNames.Len() > 0 && !m.matches(request) {
 		// Device not affected by constraint.
 		return
 	}
 
 	m.numDevices--
+	if m.features.ListTypeAttributes {
+		// Pop the current intersection; the previous entry on the stack becomes current or the stack is empty.
+		m.intersectionStack = m.intersectionStack[:m.numDevices]
+	}
 	if m.loggerV7 != nil {
 		m.loggerV7.Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 	}
 }
 
-func (m *matchAttributeConstraint) matches(requestName, subRequestName string) bool {
-	if subRequestName == "" {
-		return m.requestNames.Has(requestName)
-	} else {
+func (m *matchAttributeConstraint) matches(request *requestData) bool {
+	if request.parentRequest != nil {
+		requestName := request.parentRequest.name()
+		subRequestName := request.request.name()
 		fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
 		return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
+	} else {
+		return m.requestNames.Has(request.request.name())
 	}
+}
+
+// lookupAttribute is the unified entry point for attribute resolution
+// in the allocator. It implements the lookup precedence:
+//  1. If the attribute is defined as a derived attribute on the request,
+//     it compiles/evaluates the CEL expression, caches it in the
+//     request scope, and returns the synthesized virtual attribute.
+//  2. Otherwise, it falls back to looking up the static attribute on
+//     the Device object.
+//
+// The returned value uses the same types as the attributes in draapi.Device.
+func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attribute draapi.FullyQualifiedName) (any, error) {
+	attributeName := resourceapi.FullyQualifiedName(attribute.Domain.String() + "/" + attribute.Identifier.String())
+	if targetExpr, found := request.derivedAttributes[attributeName]; found {
+		cacheKey := deviceExprKey{DeviceID: deviceID, expr: targetExpr}
+		if attr, found := alloc.derivedAttributesCache[cacheKey]; found {
+			return attr, nil
+		}
+
+		expr := alloc.celCache.GetOrCompileDerivedAttribute(targetExpr)
+		if expr.Error != nil {
+			return nil, fmt.Errorf("compile derived attribute %s failed: %w", attributeName, expr.Error)
+		}
+
+		evaluatedAttr, _, err := expr.EvaluateDerivedAttribute(alloc.ctx, cel.Device{
+			Driver:                   deviceID.Driver.String(),
+			AllowMultipleAllocations: device.AllowMultipleAllocations,
+			Attributes:               device.Attributes,
+			Capacity:                 device.Capacity,
+			LookupUniqueString:       draapi.MakeUniqueString, // TODO (?): can we use the per-slice cache?
+		})
+		if err != nil {
+			return nil, fmt.Errorf("evaluate derived attribute %s on device %s failed: %w", attributeName, deviceID, err)
+		}
+
+		alloc.derivedAttributesCache[cacheKey] = evaluatedAttr
+		return evaluatedAttr, nil
+	}
+
+	value, found := device.Attributes.Lookup(attribute)
+	if !found {
+		// Doesn't have the attribute.
+		return nil, nil
+	}
+	if value == nil {
+		// Has the attribute, but with a value that this client cannot
+		// represent (for example, a value type added in a newer API version).
+		return nil, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, attribute)
+	}
+	return value, nil
 }
 
 // allocateOne iterates over all eligible devices (not in use, match selector,
@@ -1428,6 +1686,21 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
+	if len(device.slice.Spec.SkipNodeOperations) > 0 {
+		if !alloc.features.OptionalNodeOperations {
+			if alloc.loggerV7 != nil {
+				alloc.loggerV7.Info("Device requires optional node operations, but the optional node operations feature is not enabled", "device", device.id)
+			}
+			return false, nil, nil
+		}
+		if !slices.Contains(alloc.node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+			if alloc.loggerV7 != nil {
+				alloc.loggerV7.Info("Device requires DRAOptionalNodeOperations but node lacks it", "device", device.id)
+			}
+			return false, nil, nil
+		}
+	}
+
 	// Devices that consume counters can not be allocated if the PartitionableDevices feature
 	// is not enabled.
 	if !alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
@@ -1441,65 +1714,80 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// accounted for, so a further share must not charge them again.
 	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
 
+	var parentRequestName string
+	if requestData.parentRequest != nil {
+		parentRequestName = requestData.parentRequest.name()
+	}
+
+	// state records the mutations this call makes so rollbackDevice can undo
+	// them. Every rejection path after the first mutation calls rollbackDevice
+	// synchronously, and the success path returns a closure that calls the same
+	// helper during backtracking, so both undo routes stay identical. Passing
+	// the state by value to rollbackDevice keeps it (and the flags) on the
+	// stack for the rejection paths; only the success closure escapes.
+	state := deviceRollbackState{
+		previousNumResults: len(alloc.result[r.claimIndex].devices),
+	}
+
+	// Enforce the DRADeviceCompatibilityGroups constraint: a device may only be
+	// co-allocated with the other devices already drawing from a counter set when
+	// their declared compatibility groups intersect. This is gated identically to
+	// the counter check below so that additional shares of an already-allocated
+	// device (skipCounterCheck) are not re-evaluated, and runs before it so that
+	// a rejection returns before any counters have been reserved. While the
+	// feature is disabled there is nothing to check: GatherPools already ignored
+	// all slices with compatibility groups.
+	if alloc.features.CompatibilityGroups && !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
+		if !ok {
+			if alloc.loggerV7 != nil {
+				alloc.loggerV7.Info("Incompatible compatibility groups", "device", device.id)
+			}
+			return false, nil, nil
+		}
+		state.restoreCompatibilityGroups = restore
+	}
+
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	// countersReserved records whether checkAvailableCounters actually reserved
-	// this device's counters. It is not the same as len(device.ConsumesCounters) > 0,
-	// because skipCounterCheck can bypass the reservation.
-	countersReserved := false
+	// state.countersReserved records whether checkAvailableCounters actually
+	// reserved this device's counters. It is not the same as
+	// len(device.ConsumesCounters) > 0, because skipCounterCheck can bypass the
+	// reservation.
 	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
 		ok, err := alloc.checkAvailableCounters(device)
-		if err != nil {
-			return false, nil, err
-		}
-		if !ok {
+		if err != nil || !ok {
+			// Unwind the compatibility-group intersection consumed above now
+			// that the device is rejected; nothing else has been mutated yet.
+			alloc.rollbackDevice(r, device, &requestData, state)
+			if err != nil {
+				return false, nil, err
+			}
 			if alloc.loggerV7 != nil {
 				alloc.loggerV7.Info("Insufficient counters", "device", device.id)
 			}
 			return false, nil, nil
 		}
-		countersReserved = true
-	}
-
-	var parentRequestName string
-	var baseRequestName string
-	var subRequestName string
-	if requestData.parentRequest == nil {
-		baseRequestName = requestData.request.name()
-	} else {
-		parentRequestName = requestData.parentRequest.name()
-		baseRequestName = parentRequestName
-		subRequestName = requestData.request.name()
-	}
-
-	// state records the mutations this call makes so rollbackDevice can undo
-	// them. Every rejection path after a successful counter reservation calls
-	// rollbackDevice synchronously, and the success path returns a closure that
-	// calls the same helper during backtracking, so both undo routes stay
-	// identical. Passing the state by value to rollbackDevice keeps it (and the flags) on the
-	// stack for the rejection paths; only the success closure escapes.
-	state := deviceRollbackState{
-		countersReserved:   countersReserved,
-		previousNumResults: len(alloc.result[r.claimIndex].devices),
+		state.countersReserved = true
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
 	if alloc.features.DeviceTaints && taintPreventsAllocation(device.Device, request) {
-		alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+		alloc.rollbackDevice(r, device, &requestData, state)
 		return false, nil, nil
 	}
 
 	// It's available. Now check constraints.
 	for _, constraint := range alloc.constraints[r.claimIndex] {
-		added, err := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
+		added, err := constraint.add(&requestData, device.Device, device.id)
 		if err != nil {
-			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
-			return false, nil, fmt.Errorf("claim %s, request %s: %w", klog.KObj(claim), request.name(), err)
+			alloc.rollbackDevice(r, device, &requestData, state)
+			return false, nil, err
 		}
 		if !added {
-			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			alloc.rollbackDevice(r, device, &requestData, state)
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting
 				// all devices. Treat this as an error.
@@ -1532,21 +1820,21 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		if err != nil {
 			// The overflow guard already ran during validation, so an error here is
 			// unexpected. Roll back and surface it rather than swallowing it.
-			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			alloc.rollbackDevice(r, device, &requestData, state)
 			return false, nil, fmt.Errorf("claim %s, request %s: rechecking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
 		}
 		if !success {
 			if alloc.loggerV7 != nil {
 				alloc.loggerV7.Info("Device capacity not enough", "device", device)
 			}
-			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			alloc.rollbackDevice(r, device, &requestData, state)
 			return false, nil, nil
 		}
 
 		if allowMultipleAllocations {
 			consumedCapacity, err = getConsumedCapacityFromRequest(resolvedRequests, device, alloc.features.FractionalCapacityRange)
 			if err != nil {
-				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+				alloc.rollbackDevice(r, device, &requestData, state)
 				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
 			}
 			shareID = GenerateNewShareID()
@@ -1587,7 +1875,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// and its flags to the heap on the rejection paths too, which never escape.
 	undo := state
 	return true, func() {
-		alloc.rollbackDevice(r, device, baseRequestName, subRequestName, undo)
+		alloc.rollbackDevice(r, device, &requestData, undo)
 	}, nil
 }
 
@@ -1595,20 +1883,24 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 // candidate so rollbackDevice can undo them, both when the candidate is rejected
 // and when the backtracking search abandons a previously successful candidate.
 type deviceRollbackState struct {
-	countersReserved     bool
-	constraintsAdded     int
-	deviceMarked         bool
-	capacityInserted     bool
-	capacityEntryExisted bool
-	resultAdded          bool
-	previousNumResults   int
-	consumedCapacity     ConsumedCapacity
+	// restoreCompatibilityGroups, when non-nil, reverts the rolling
+	// compatibility-group intersection consumed for this device by
+	// checkAndConsumeCompatibilityGroups.
+	restoreCompatibilityGroups func()
+	countersReserved           bool
+	constraintsAdded           int
+	deviceMarked               bool
+	capacityInserted           bool
+	capacityEntryExisted       bool
+	resultAdded                bool
+	previousNumResults         int
+	consumedCapacity           ConsumedCapacity
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
 // they were applied. It is called synchronously on the rejection paths and, via
 // the closure returned on success, during backtracking.
-func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, baseRequestName, subRequestName string, state deviceRollbackState) {
+func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, requestData *requestData, state deviceRollbackState) {
 	if state.resultAdded {
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
 	}
@@ -1627,7 +1919,10 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
 	}
 	for i := state.constraintsAdded - 1; i >= 0; i-- {
-		alloc.constraints[r.claimIndex][i].remove(baseRequestName, subRequestName, device.Device, device.id)
+		alloc.constraints[r.claimIndex][i].remove(requestData, device.Device, device.id)
+	}
+	if state.restoreCompatibilityGroups != nil {
+		state.restoreCompatibilityGroups()
 	}
 	if state.countersReserved {
 		alloc.deallocateCountersForDevice(device)
@@ -1823,6 +2118,106 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 			consumedCounterSet[name] = consumedCounter
 		}
 	}
+}
+
+// compatibilityGroupsBaselineForPool returns, per counter set in the pool, the
+// compatibility-group intersection contributed by the devices that are already
+// allocated (i.e. recorded in allocatedState). Both counter set membership and
+// the declared group values are read live from the source ResourceSlice,
+// exactly like checkAvailableCounters does for counters: an allocated device's
+// consumption is assumed stable in the slice. A device that is allocated but no
+// longer present in the slice contributes nothing, just as its counters do not.
+//
+// The result is computed once per pool and cached, mirroring availableCounters.
+func (alloc *allocator) compatibilityGroupsBaselineForPool(pool *Pool) map[string]compatibilityGroupIntersection {
+	poolID := pool.PoolID
+
+	alloc.mutex.RLock()
+	baseline, found := alloc.compatibilityGroupsBaseline[poolID]
+	alloc.mutex.RUnlock()
+	if found {
+		return baseline
+	}
+
+	baseline = make(map[string]compatibilityGroupIntersection)
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				deviceID := DeviceID{
+					Driver: slice.Spec.Driver,
+					Pool:   slice.Spec.Pool.Name,
+					Device: device.Name,
+				}
+				if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+					continue
+				}
+				for _, deviceCounterConsumption := range device.ConsumesCounters {
+					counterSetName := deviceCounterConsumption.CounterSet.String()
+					cur := baseline[counterSetName]
+					baseline[counterSetName] = cur.add(compatibilityGroupSet(deviceCounterConsumption.CompatibilityGroups))
+				}
+			}
+		}
+	}
+
+	alloc.mutex.Lock()
+	alloc.compatibilityGroupsBaseline[poolID] = baseline
+	alloc.mutex.Unlock()
+	return baseline
+}
+
+// checkAndConsumeCompatibilityGroups verifies that the candidate device can be
+// co-allocated, for every counter set it consumes, with the devices already
+// placed on that counter set (allocated peers plus in-flight allocations of the
+// current attempt). If so it folds the candidate's groups into the rolling
+// intersection and returns a rollback function that restores the previous state
+// when the allocator backtracks. If not, it leaves the running state unchanged
+// and returns false.
+func (alloc *allocator) checkAndConsumeCompatibilityGroups(device deviceWithID) (bool, func()) {
+	poolID := device.pool.PoolID
+	running, found := alloc.consumedCompatibilityGroups[poolID]
+	if !found {
+		running = make(map[string]compatibilityGroupIntersection)
+		alloc.consumedCompatibilityGroups[poolID] = running
+	}
+	baseline := alloc.compatibilityGroupsBaselineForPool(device.pool)
+
+	type savedEntry struct {
+		counterSet string
+		prev       compatibilityGroupIntersection
+		existed    bool
+	}
+	var saved []savedEntry
+	rollback := func() {
+		// Restore in reverse order so repeated entries for the same counter set
+		// (a device cannot have them, but be defensive) unwind correctly.
+		for idx := len(saved) - 1; idx >= 0; idx-- {
+			s := saved[idx]
+			if s.existed {
+				running[s.counterSet] = s.prev
+			} else {
+				delete(running, s.counterSet)
+			}
+		}
+	}
+
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		counterSetName := deviceCounterConsumption.CounterSet.String()
+		cur, existed := running[counterSetName]
+		if !existed {
+			// Seed from the already-allocated peers for this counter set.
+			cur = baseline[counterSetName]
+		}
+		groups := compatibilityGroupSet(deviceCounterConsumption.CompatibilityGroups)
+		if !cur.admits(groups) {
+			rollback()
+			return false, nil
+		}
+		saved = append(saved, savedEntry{counterSet: counterSetName, prev: cur, existed: existed})
+		running[counterSetName] = cur.add(groups)
+	}
+
+	return true, rollback
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,

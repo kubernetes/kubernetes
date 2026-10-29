@@ -55,6 +55,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	baseversion "k8s.io/component-base/version"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -5097,25 +5098,46 @@ func TestAllocatorSelection(t *testing.T) {
 		allFeatures.Insert(field.Name)
 	}
 
+	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+
 	for name, tc := range map[string]struct {
+		emulationVersion     string
 		features             string
 		usingFeatureGroup    bool
 		expectImplementation string
 	}{
-		// The most conservative implementation: only used when explicitly asking
-		// for the most stable Kubernetes (no alpha or beta features).
+		// The conservative configuration (no alpha or beta features).
 		"only-GA": {
 			features:             "AllAlpha=false,AllBeta=false",
 			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
 
-		// By default, some beta features are on and the incubating implementation
-		// is used.
+		// Even more conservative configuration (no alpha or beta features, previous releases).
+		"only-GA-minus-1": {
+			emulationVersion:     binaryVersion.SubtractMinor(1).String(),
+			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
+			expectImplementation: "stable",
+		},
+		"only-GA-minus-2": {
+			emulationVersion:     binaryVersion.SubtractMinor(2).String(),
+			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
+			expectImplementation: "stable",
+		},
+		"only-GA-minus-3": {
+			emulationVersion:     binaryVersion.SubtractMinor(3).String(),
+			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
+			expectImplementation: "stable",
+		},
+
+		// The default implementation, potentially with some beta features enabled.
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 
 		// Alpha features may need the experimental implementation, if there are any
@@ -5123,7 +5145,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
 			usingFeatureGroup:    true,
-			expectImplementation: "experimental",
+			expectImplementation: "incubating", // This needs to become "experimental" again when adding a new alpha feature.
 		},
 
 		// Let's also determine which allocator is picked for each of the
@@ -5136,15 +5158,15 @@ func TestAllocatorSelection(t *testing.T) {
 			// DRAPartitionableDevices must be enabled together with the
 			// compatibility groups gate (feature dependency).
 			features:             "AllAlpha=false,AllBeta=false,DRADeviceCompatibilityGroups=true,DRAPartitionableDevices=true",
-			expectImplementation: "experimental",
+			expectImplementation: "incubating",
 		},
 		"ConsumableCapacity": {
 			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 		"DeviceBindingAndStatus": {
 			features:             "AllAlpha=false,AllBeta=false,DRAResourceClaimDeviceStatus=true,DRADeviceBindingConditions=true",
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 		"DeviceTaints": {
 			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",
@@ -5152,11 +5174,11 @@ func TestAllocatorSelection(t *testing.T) {
 		},
 		"ListTypeAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRAListTypeAttributes=true",
-			expectImplementation: "experimental",
+			expectImplementation: "incubating",
 		},
 		"OptionalNodeOperations": {
 			features:             "AllAlpha=false,AllBeta=false,DRAOptionalNodeOperations=true",
-			expectImplementation: "experimental",
+			expectImplementation: "incubating",
 		},
 		"PartitionableDevices": {
 			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
@@ -5164,7 +5186,7 @@ func TestAllocatorSelection(t *testing.T) {
 		},
 		"FractionalCapacityRange": {
 			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRAFractionalCapacityRange=true",
-			expectImplementation: "incubating",
+			expectImplementation: "stable",
 		},
 		"PrioritizedList": {
 			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
@@ -5172,12 +5194,15 @@ func TestAllocatorSelection(t *testing.T) {
 		},
 		"DerivedAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
-			expectImplementation: "experimental",
+			expectImplementation: "incubating",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			if tc.emulationVersion != "" {
+				tCtx.ExpectNoError(featureGate.SetEmulationVersion(version.MustParse(tc.emulationVersion)), "set emulation version")
+			}
 			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
 			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
 			features := AllocatorFeatures(fts)
