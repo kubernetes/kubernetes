@@ -27,7 +27,7 @@ kube::util::ensure_clean_working_dir
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
 kube::golang::setup_env
 
-go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+GOVULNCHECK=$(go -C "${KUBE_ROOT}/hack/tools" tool -n govulncheck)
 
 # KUBE_VERIFY_GIT_BRANCH is populated in verify CI jobs
 BRANCH="${KUBE_VERIFY_GIT_BRANCH:-master}"
@@ -41,9 +41,9 @@ git worktree add -f -q "${WORKTREE}" "${BRANCH}"
 # Clean up the copy on exit
 kube::util::trap_add "git worktree remove -f ${WORKTREE}" EXIT
 
-govulncheck ./... > "${KUBE_TEMP}/head.txt" || true
+${GOVULNCHECK} ./... > "${KUBE_TEMP}/head.txt" || true
 pushd "${WORKTREE}" >/dev/null
-  govulncheck ./... > "${KUBE_TEMP}/pr-base.txt" || true
+  ${GOVULNCHECK} ./... > "${KUBE_TEMP}/pr-base.txt" || true
 popd >/dev/null
 
 echo -e "\n HEAD: $(cat "${KUBE_TEMP}"/head.txt)" 
