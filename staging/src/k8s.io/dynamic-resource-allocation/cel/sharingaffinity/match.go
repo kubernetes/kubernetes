@@ -1,0 +1,47 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package sharingaffinity
+
+import "strings"
+
+type configMetadata struct {
+	group, kind       string
+	hasGroup, hasKind bool
+}
+
+func metadataOf(parameters map[string]any) configMetadata {
+	var metadata configMetadata
+	if apiVersion, ok := parameters["apiVersion"].(string); ok {
+		// This is a filter, not schema validation. Extra slashes leave a
+		// group that cannot equal a valid DNS subdomain.
+		if slash := strings.LastIndex(apiVersion, "/"); slash >= 0 {
+			metadata.group = apiVersion[:slash]
+			metadata.hasGroup = metadata.group != ""
+		}
+	}
+	metadata.kind, metadata.hasKind = parameters["kind"].(string)
+	return metadata
+}
+
+type matcher struct {
+	apiGroup, kind string
+}
+
+func (m matcher) matches(metadata configMetadata) bool {
+	return (m.apiGroup == "*" || metadata.hasGroup && metadata.group == m.apiGroup) &&
+		(m.kind == "*" || metadata.hasKind && metadata.kind == m.kind)
+}

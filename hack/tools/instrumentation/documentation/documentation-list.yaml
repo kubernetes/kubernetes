@@ -6893,6 +6893,58 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: sharing_affinity_compatible_reuse_total
+  subsystem: scheduler
+  help: Number of successful placements onto an already-locked device whose affinity
+    values matched.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: sharing_affinity_extractor_evaluations_total
+  subsystem: scheduler
+  help: Total CEL extractor evaluations the scheduler has performed.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: sharing_affinity_lock_conflict_total
+  subsystem: scheduler
+  help: Number of candidate devices filtered out during Filter because the device's
+    existing affinity lock is incompatible with the claim's extracted keys.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: sharing_affinity_locked_devices
+  subsystem: scheduler
+  help: Number of devices currently holding at least one active affinity lock.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: sharing_affinity_no_keys_extracted_total
+  subsystem: scheduler
+  help: Number of candidate devices filtered out during Filter because the slice's
+    extractors did not produce a value for every declared extractor.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: sharing_affinity_unreconstructable_devices
+  subsystem: scheduler
+  help: Number of devices currently in conservative quarantine because their lock
+    state cannot be reconstructed.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
   help: Latency for storing scheduling results for opportunistic batching, by scheduler

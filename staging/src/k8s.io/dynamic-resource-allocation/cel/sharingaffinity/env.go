@@ -104,3 +104,27 @@ func (costEstimator) EstimateSize(node checker.AstNode) *checker.SizeEstimate {
 func (costEstimator) EstimateCallCost(string, string, *checker.AstNode, []checker.AstNode) *checker.CallEstimate {
 	return nil
 }
+
+// A budget belongs to one pool/request extraction, never to a cached program.
+type budget struct {
+	remaining, spent, lastFailedCost uint64
+}
+
+func newBudget() *budget {
+	return &budget{remaining: resourceapi.SharingAffinityCELMaxCost}
+}
+
+func (b *budget) program(compiled *compiledExpression) (cel.Program, error) {
+	if b.remaining == resourceapi.SharingAffinityCELMaxCost {
+		return compiled.full, nil
+	}
+	// CEL's limit is fixed at program construction. Re-plan the checked AST,
+	// including at zero: a zero-cost constant remains legal at the boundary.
+	return compiled.program(b.remaining)
+}
+
+func (b *budget) charge(actual uint64) {
+	charged := min(actual, b.remaining)
+	b.remaining -= charged
+	b.spent += charged
+}

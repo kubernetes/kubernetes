@@ -58,15 +58,25 @@ type DefaultDRAManager struct {
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
+	sliceLister := &resourceSliceLister{tracker: resourceSliceTracker}
+	var classLister *deviceClassLister
+	if informerFactory != nil {
+		classLister = &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()}
+	}
+	allocated := newAllocatedDevices(logger)
+	tracker := &claimTracker{
+		cache:               claimsCache,
+		inFlightAllocations: make(map[types.UID]inFlightAllocation),
+		allocatedDevices:    allocated,
+		logger:              logger,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity) && utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
+		tracker.enableSharingAffinity(ctx, sliceLister, resourceSliceTracker)
+	}
 	manager := &DefaultDRAManager{
-		resourceClaimTracker: &claimTracker{
-			cache:               claimsCache,
-			inFlightAllocations: make(map[types.UID]inFlightAllocation),
-			allocatedDevices:    newAllocatedDevices(logger),
-			logger:              logger,
-		},
-		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
-		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
+		resourceClaimTracker: tracker,
+		resourceSliceLister:  sliceLister,
+		deviceClassLister:    classLister,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
@@ -75,7 +85,9 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
-	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
+	if claimsCache != nil {
+		claimsCache.AddEventHandler(allocated.handlers())
+	}
 
 	return manager
 }
@@ -109,6 +121,9 @@ type resourceSliceLister struct {
 }
 
 func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
+	if l == nil || l.tracker == nil {
+		return nil, nil
+	}
 	return l.tracker.ListPatchedResourceSlices()
 }
 
@@ -190,12 +205,14 @@ type claimTracker struct {
 	// for disjoint sets of keys" case that sync.Map is optimized for.
 	inFlightAllocations map[types.UID]inFlightAllocation
 	allocatedDevices    *allocatedDevices
+	sharingAffinity     *sharingAffinityTracker
 	logger              klog.Logger
 }
 
 type inFlightAllocation struct {
-	claim   *resourceapi.ResourceClaim
-	sharers int
+	claim    *resourceapi.ResourceClaim
+	sharers  int
+	affinity *structured.ClaimAffinity
 }
 
 func (c *claimTracker) GetPendingAllocation(claimUID types.UID) *resourceapi.AllocationResult {
@@ -243,6 +260,9 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 		claim:   allocatedClaim,
 		sharers: 1,
 	}
+	if c.sharingAffinity != nil {
+		c.sharingAffinity.stateValid = false
+	}
 	// This is the same verbosity as the corresponding log in the assume cache.
 	c.logger.V(5).Info("Added in-flight claim", "claim", klog.KObj(allocatedClaim), "uid", claimUID, "version", allocatedClaim.ResourceVersion)
 	// There's no reason to return an error in this implementation, but the error is helpful for other implementations.
@@ -265,6 +285,9 @@ func (c *claimTracker) MaybeRemoveClaimPendingAllocation(claimUID types.UID, for
 
 	if forceRemove || inFlight.sharers == 1 {
 		delete(c.inFlightAllocations, claimUID)
+		if c.sharingAffinity != nil {
+			c.pruneDrainedDeviceLocksLocked()
+		}
 		c.logger.V(5).Info("Removed in-flight claim", "claim", klog.KObj(claim), "uid", claimUID, "version", claim.ResourceVersion)
 		return true
 	}
@@ -427,12 +450,22 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 				aggregatedCapacity.Insert(capacity)
 			})
 	}
+	var deviceSharingAffinity structured.SharingAffinityState
+	if c.sharingAffinity != nil {
+		var err error
+		deviceSharingAffinity, err = c.gatherDeviceSharingAffinity(revision1)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
 			AllocatedDevices:         allocated,
 			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
 			AggregatedCapacity:       aggregatedCapacity,
+			DeviceSharingAffinity:    deviceSharingAffinity,
 		}, nil
 	}
 
