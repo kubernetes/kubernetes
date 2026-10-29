@@ -1911,10 +1911,9 @@ type PodSandboxConfig struct {
 	// binary log files with structured logging data from the individual
 	// containers. For example, the files might be newline separated JSON
 	// structured logs, systemd-journald journal files, gRPC trace files, etc.
-	// E.g.,
-	//
-	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-	//	ContainerConfig.LogPath = `containerName/Instance#.log`
+	// For example:
+	//   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+	//   - ContainerConfig.LogPath = `containerName/Instance#.log`
 	LogDirectory string `protobuf:"bytes,3,opt,name=log_directory,json=logDirectory,proto3" json:"log_directory,omitempty"`
 	// DNS config for the sandbox.
 	DnsConfig *DNSConfig `protobuf:"bytes,4,opt,name=dns_config,json=dnsConfig,proto3" json:"dns_config,omitempty"`
@@ -5654,11 +5653,10 @@ type ContainerConfig struct {
 	Devices []*Device `protobuf:"bytes,8,rep,name=devices,proto3" json:"devices,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	// Label keys are of the form:
-	//
-	//	label-key ::= prefixed-name | name
-	//	prefixed-name ::= prefix '/' name
-	//	prefix ::= DNS_SUBDOMAIN
-	//	name ::= DNS_LABEL
+	//   - label-key ::= prefixed-name | name
+	//   - prefixed-name ::= prefix '/' name
+	//   - prefix ::= DNS_SUBDOMAIN
+	//   - name ::= DNS_LABEL
 	Labels map[string]string `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Unstructured key-value map that may be used by the kubelet to store and
 	// retrieve arbitrary metadata.
@@ -5673,10 +5671,9 @@ type ContainerConfig struct {
 	Annotations map[string]string `protobuf:"bytes,10,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Path relative to PodSandboxConfig.LogDirectory for container to store
 	// the log (STDOUT and STDERR) on the host.
-	// E.g.,
-	//
-	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-	//	ContainerConfig.LogPath = `containerName/Instance#.log`
+	// For example:
+	//   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+	//   - ContainerConfig.LogPath = `containerName/Instance#.log`
 	LogPath string `protobuf:"bytes,11,opt,name=log_path,json=logPath,proto3" json:"log_path,omitempty"`
 	// Variables for interactive containers, these have very specialized
 	// use-cases (e.g. debugging).

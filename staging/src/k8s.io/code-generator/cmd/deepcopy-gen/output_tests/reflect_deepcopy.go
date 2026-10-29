@@ -28,7 +28,7 @@ func ReflectDeepCopy(in interface{}) interface{} {
 
 func reflectDeepCopy(src reflect.Value) reflect.Value {
 	switch src.Kind() {
-	case reflect.Interface, reflect.Ptr, reflect.Map, reflect.Slice:
+	case reflect.Interface, reflect.Pointer, reflect.Map, reflect.Slice:
 		if src.IsNil() {
 			return src
 		}
@@ -51,7 +51,7 @@ func reflectDeepCopy(src reflect.Value) reflect.Value {
 			dst.SetMapIndex(k, reflectDeepCopy(src.MapIndex(k)))
 		}
 		return dst
-	case reflect.Ptr:
+	case reflect.Pointer:
 		dst := reflect.New(src.Type().Elem())
 		dst.Elem().Set(reflectDeepCopy(src.Elem()))
 		return dst

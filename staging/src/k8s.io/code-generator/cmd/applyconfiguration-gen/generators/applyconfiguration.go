@@ -316,13 +316,24 @@ func isNillable(t *types.Type) bool {
 // and ensures all comments have the proper // prefix
 func commentsWithoutMarkers(comments []string) string {
 	b := strings.Builder{}
+	emptyLines := strings.Builder{}
 	for _, comment := range comments {
 		trimmed := strings.TrimSpace(comment)
 		if strings.HasPrefix(trimmed, "+") {
 			continue
 		}
 
-		b.WriteString("// " + trimmed + "\n")
+		if len(trimmed) == 0 {
+			// accumulate empty comment lines
+			emptyLines.WriteString("//\n")
+		} else {
+			// append any accumulated empty comment lines
+			b.WriteString(emptyLines.String())
+			emptyLines.Reset()
+
+			// append the trimmed comment
+			b.WriteString("// " + trimmed + "\n")
+		}
 	}
 	return b.String()
 }
