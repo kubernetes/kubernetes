@@ -2383,6 +2383,86 @@ func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 	})
 }
 
+// A Pod lost mid-rollout must come back on the update revision under Parallel, otherwise the rollout deletes it again.
+func TestStatefulSetControlParallelNilRollingUpdateRecreatesOnUpdateRevision(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("MaxUnavailableStatefulSet=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, enabled)
+			set := burst(newStatefulSet(3))
+			set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType}
+			client := fake.NewSimpleClientset(set)
+			om, _, ssc := setupController(client)
+			if err := scaleUpStatefulSetControl(set, ssc, om, assertBurstInvariants, nil); err != nil {
+				t.Fatalf("failed to scale up: %v", err)
+			}
+			set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("failed to get set: %v", err)
+			}
+			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+			if err != nil {
+				t.Fatalf("failed to build selector: %v", err)
+			}
+
+			// Start a rollout and let the controller record a status with a partially updated set of Pods.
+			set = set.DeepCopy()
+			set.Spec.Template.Spec.Containers[0].Image = "foo"
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("failed to list pods: %v", err)
+			}
+			if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+				t.Fatalf("failed to start rollout: %v", err)
+			}
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("failed to get set: %v", err)
+			}
+			if set.Status.CurrentRevision == set.Status.UpdateRevision {
+				t.Fatalf("expected a rollout in progress, got revision %s for both current and update", set.Status.CurrentRevision)
+			}
+			if set.Status.CurrentReplicas == 0 {
+				t.Fatal("expected Status.CurrentReplicas > 0 mid-rollout")
+			}
+
+			// Pod 0 is below Status.CurrentReplicas, which is what used to pin it to the current revision.
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("failed to list pods: %v", err)
+			}
+			if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 0)); err != nil {
+				t.Fatalf("failed to delete pod 0: %v", err)
+			}
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("failed to list pods: %v", err)
+			}
+			if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+				t.Fatalf("failed to sync after deleting pod 0: %v", err)
+			}
+
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("failed to get set: %v", err)
+			}
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("failed to list pods: %v", err)
+			}
+			pod := findPodByOrdinal(pods, 0)
+			if pod == nil {
+				t.Fatal("expected pod 0 to be recreated on the update revision; it is missing, which means it was recreated on the current revision and deleted again by the rollout")
+			}
+			if got, want := getPodRevision(pod), set.Status.UpdateRevision; got != want {
+				t.Errorf("expected recreated pod 0 at update revision %q, got %q", want, got)
+			}
+			if got := pod.Spec.Containers[0].Image; got != "foo" {
+				t.Errorf("expected recreated pod 0 to use image foo, got %q", got)
+			}
+		})
+	}
+}
+
 func TestStatefulSetControlRecreateUpdatePreservesPVC(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, true)
 	runTestOverPVCRetentionPolicies(

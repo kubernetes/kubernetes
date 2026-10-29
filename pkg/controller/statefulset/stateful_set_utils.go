@@ -533,9 +533,15 @@ func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 // the current revision. updateRevision is the name of the update revision. ordinal is the ordinal of the Pod. If the
 // returned error is nil, the returned Pod is valid.
 func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, currentRevision, updateRevision string, ordinal int) *v1.Pod {
+	partition := int32(0)
+	if rollingUpdate := currentSet.Spec.UpdateStrategy.RollingUpdate; rollingUpdate != nil && rollingUpdate.Partition != nil {
+		partition = *rollingUpdate.Partition
+	} else if rollingUpdate == nil && !allowsBurst(currentSet) {
+		// Ordered updates recreate pods on the current revision until their turn.
+		partition = currentSet.Status.CurrentReplicas
+	}
 	if currentSet.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(currentSet)+int(currentSet.Status.CurrentReplicas))) ||
-		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(currentSet)+int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition))) {
+		ordinal < getStartOrdinal(currentSet)+int(partition) {
 		pod := newStatefulSetPod(currentSet, ordinal)
 		setPodRevision(pod, currentRevision)
 		return pod
