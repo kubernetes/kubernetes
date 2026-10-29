@@ -251,8 +251,8 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			logger := klog.FromContext(ctx)
 			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
 			target.StartWithContext(ctx)
-			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
-				t.Errorf("informer for %s hasn't synced", ts.gvr)
+			if result := target.WaitForCacheSyncWithContext(ctx); result.Err != nil || !result.Synced[ts.gvr] {
+				t.Errorf("informer for %s hasn't synced: %v", ts.gvr, result.Err)
 			}
 
 			testObject := ts.trigger(ts.gvr, ts.ns, fakeClient, ts.existingObj)
@@ -376,8 +376,8 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			logger := klog.FromContext(ctx)
 			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
 			target.StartWithContext(ctx)
-			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
-				t.Errorf("informer for %s hasn't synced", ts.gvr)
+			if result := target.WaitForCacheSyncWithContext(ctx); result.Err != nil || !result.Synced[ts.gvr] {
+				t.Errorf("informer for %s hasn't synced: %v", ts.gvr, result.Err)
 			}
 
 			testObject := ts.trigger(ts.gvr, ts.ns, fakeClient, ts.existingObj)
