@@ -260,7 +260,7 @@ func newHandler(v *Verifier, next AdmissionHandler, maxBody int64) *Handler {
 // ServeHTTP implements http.Handler.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	token, ok := BearerToken(r)
+	token, ok := bearerToken(r)
 	if !ok {
 		denyPreDecode(ctx, w, "no bearer token presented")
 		return
@@ -569,9 +569,8 @@ func (v *Verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 	return nil
 }
 
-// BearerToken extracts a bearer using the apiserver's header parsing rules.
-// Callers that decode AdmissionReviews themselves can pass it to [Verifier.Verify].
-func BearerToken(r *http.Request) (token string, ok bool) {
+// bearerToken extracts a bearer using the apiserver's header parsing rules.
+func bearerToken(r *http.Request) (token string, ok bool) {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if auth == "" {
 		return "", false

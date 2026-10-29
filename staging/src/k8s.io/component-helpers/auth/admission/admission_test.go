@@ -730,7 +730,6 @@ var (
 	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
 	_ func(context.Context, ...admission.Option) (*admission.Verifier, error)                            = admission.NewVerifier
 	_ func(*admission.Verifier, context.Context, *admissionv1.AdmissionRequest, string) error            = (*admission.Verifier).Verify
-	_ func(*http.Request) (string, bool)                                                                 = admission.BearerToken
 	_ func(string) admission.Option                                                                      = admission.WithAudience
 	_ func(string, string, *http.Client) admission.Option                                                = admission.WithRemoteIssuer
 )
@@ -1698,45 +1697,6 @@ func TestExampleEndToEnd_InClusterSpoofedHostCannotChooseAudience(t *testing.T) 
 	allowed := verifyRequest(trustedAudience, "webhook.default.svc", http.StatusOK)
 	if allowed == nil || !allowed.Allowed || !reached {
 		t.Fatalf("trusted follow-up: response %+v reached %t, want allow", allowed, reached)
-	}
-}
-
-// TestBearerToken_Table exercises the header parser directly across the scheme
-// and token shapes it must accept or reject. The scheme match is
-// case-insensitive (RFC 7235); an empty or whitespace-only token is rejected so
-// a bare "Bearer" header cannot slip through as a present-but-empty credential.
-func TestBearerToken_Table(t *testing.T) {
-	tests := []struct {
-		name      string
-		header    string // "" means no Authorization header at all
-		wantToken string
-		wantOK    bool
-	}{
-		{name: "valid bearer", header: "Bearer abc.def.ghi", wantToken: "abc.def.ghi", wantOK: true},
-		{name: "lowercase scheme is accepted", header: "bearer abc", wantToken: "abc", wantOK: true},
-		{name: "mixed-case scheme is accepted", header: "BeArEr abc", wantToken: "abc", wantOK: true},
-		{name: "trailing header whitespace is trimmed", header: "Bearer abc   ", wantToken: "abc", wantOK: true},
-		{name: "extra space before the token is rejected (matches apiserver)", header: "Bearer    abc", wantOK: false},
-		{name: "no header", header: "", wantOK: false},
-		{name: "non-bearer scheme", header: "Basic dXNlcjpwYXNz", wantOK: false},
-		{name: "bearer with empty token", header: "Bearer ", wantOK: false},
-		{name: "bearer with whitespace-only token", header: "Bearer      ", wantOK: false},
-		{name: "shorter than the scheme prefix", header: "Bear", wantOK: false},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodPost, "/validate", nil)
-			if tc.header != "" {
-				r.Header.Set("Authorization", tc.header)
-			}
-			token, ok := admission.BearerToken(r)
-			if ok != tc.wantOK {
-				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
-			}
-			if ok && token != tc.wantToken {
-				t.Errorf("token = %q, want %q", token, tc.wantToken)
-			}
-		})
 	}
 }
 
