@@ -359,11 +359,12 @@ func checkRequestObjectKinds(req *admissionv1.AdmissionRequest) (bool, bool, err
 	if req.Kind.Group != req.Resource.Group && !allowedKindResourceGroupMismatch(req) {
 		return false, false, fmt.Errorf("object kind group %q differs from authorized resource group %q", req.Kind.Group, req.Resource.Group)
 	}
-	objectPresent, err := checkObjectMatchesAdmittedKind("object", req.Object, req.Kind.Group, req.Kind.Version, req.Kind.Kind)
+	admittedKind := schema.GroupVersionKind(req.Kind)
+	objectPresent, err := checkObjectMatchesAdmittedKind("object", req.Object, admittedKind)
 	if err != nil {
 		return false, false, err
 	}
-	oldObjectPresent, err := checkObjectMatchesAdmittedKind("oldObject", req.OldObject, req.Kind.Group, req.Kind.Version, req.Kind.Kind)
+	oldObjectPresent, err := checkObjectMatchesAdmittedKind("oldObject", req.OldObject, admittedKind)
 	if err != nil {
 		return false, false, err
 	}
@@ -413,12 +414,12 @@ func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest) bool {
 }
 
 // checkObjectMatchesAdmittedKind validates both RawExtension representations against the admitted GVK.
-func checkObjectMatchesAdmittedKind(name string, extension runtime.RawExtension, group, version, kind string) (bool, error) {
-	rawPresent, err := checkRawObjectMatchesAdmittedKind(name, extension.Raw, group, version, kind)
+func checkObjectMatchesAdmittedKind(name string, extension runtime.RawExtension, admittedKind schema.GroupVersionKind) (bool, error) {
+	rawPresent, err := checkRawObjectMatchesAdmittedKind(name, extension.Raw, admittedKind)
 	if err != nil {
 		return false, err
 	}
-	objectPresent, err := checkRuntimeObjectMatchesAdmittedKind(name, extension.Object, group, version, kind)
+	objectPresent, err := checkRuntimeObjectMatchesAdmittedKind(name, extension.Object, admittedKind)
 	if err != nil {
 		return false, err
 	}
@@ -430,7 +431,7 @@ func checkObjectMatchesAdmittedKind(name string, extension runtime.RawExtension,
 }
 
 // checkRuntimeObjectMatchesAdmittedKind reads in-memory GVK without marshaling object contents.
-func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, group, version, kind string) (bool, error) {
+func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, admittedKind schema.GroupVersionKind) (bool, error) {
 	if object == nil {
 		return false, nil
 	}
@@ -446,7 +447,7 @@ func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, g
 		if unknown.ContentEncoding != "" || (unknown.ContentType != "" && unknown.ContentType != runtime.ContentTypeJSON) {
 			return false, fmt.Errorf("%s has unsupported content encoding or type", name)
 		}
-		present, err := checkRawObjectMatchesAdmittedKind(name, unknown.Raw, group, version, kind)
+		present, err := checkRawObjectMatchesAdmittedKind(name, unknown.Raw, admittedKind)
 		if err != nil {
 			return false, err
 		}
@@ -455,7 +456,7 @@ func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, g
 			if !present {
 				return false, fmt.Errorf("%s has type metadata without an object", name)
 			}
-			if err := checkGVKMatchesAdmittedKind(name, unknown.GroupVersionKind(), group, version, kind); err != nil {
+			if err := checkGVKMatchesAdmittedKind(name, unknown.GroupVersionKind(), admittedKind); err != nil {
 				return false, err
 			}
 		}
@@ -465,14 +466,14 @@ func checkRuntimeObjectMatchesAdmittedKind(name string, object runtime.Object, g
 	if objectKind == nil {
 		return false, fmt.Errorf("%s has no kind", name)
 	}
-	if err := checkGVKMatchesAdmittedKind(name, objectKind.GroupVersionKind(), group, version, kind); err != nil {
+	if err := checkGVKMatchesAdmittedKind(name, objectKind.GroupVersionKind(), admittedKind); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
 // checkRawObjectMatchesAdmittedKind reads JSON TypeMeta; empty or null data is absent.
-func checkRawObjectMatchesAdmittedKind(name string, raw []byte, group, version, kind string) (bool, error) {
+func checkRawObjectMatchesAdmittedKind(name string, raw []byte, admittedKind schema.GroupVersionKind) (bool, error) {
 	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 		return false, nil
 	}
@@ -484,17 +485,17 @@ func checkRawObjectMatchesAdmittedKind(name string, raw []byte, group, version, 
 	if err != nil {
 		return false, fmt.Errorf("%s apiVersion %q is invalid: %w", name, tm.APIVersion, err)
 	}
-	if err := checkGVKMatchesAdmittedKind(name, gv.WithKind(tm.Kind), group, version, kind); err != nil {
+	if err := checkGVKMatchesAdmittedKind(name, gv.WithKind(tm.Kind), admittedKind); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func checkGVKMatchesAdmittedKind(name string, gvk schema.GroupVersionKind, group, version, kind string) error {
+func checkGVKMatchesAdmittedKind(name string, gvk schema.GroupVersionKind, admittedKind schema.GroupVersionKind) error {
 	if gvk.Version == "" || gvk.Kind == "" {
 		return fmt.Errorf("%s has no apiVersion or kind", name)
 	}
-	if gvk.Group != group || gvk.Version != version || gvk.Kind != kind {
+	if gvk != admittedKind {
 		return fmt.Errorf("%s GVK %s differs from the admitted kind", name, gvk.String())
 	}
 	return nil
