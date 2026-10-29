@@ -340,6 +340,63 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "POST",
+			options:            "create admission=" + string(validatingPolicy),
+			httpMethod:         http.MethodPost,
+			path:               podsPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticPodBody(b),
+			admissionPolicy:    validatingPolicy,
+		},
+		{
+			method:             "POST",
+			options:            "create admission=" + string(mutatingApplyPolicy),
+			httpMethod:         http.MethodPost,
+			path:               podsPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticPodBody(b),
+			admissionPolicy:    mutatingApplyPolicy,
+		},
+		{
+			method:             "POST",
+			options:            "create admission=" + string(mutatingJSONPatchPolicy),
+			httpMethod:         http.MethodPost,
+			path:               podsPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticPodBody(b),
+			admissionPolicy:    mutatingJSONPatchPolicy,
+		},
+		{
+			method:             "POST",
+			options:            "create " + string(validatingPolicy),
+			httpMethod:         http.MethodPost,
+			path:               vapPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticObjectBody(b, benchVAP()),
+		},
+		{
+			method:             "POST",
+			options:            "create " + string(mutatingApplyPolicy),
+			httpMethod:         http.MethodPost,
+			path:               mapPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticObjectBody(b, benchMAPApply()),
+		},
+		{
+			method:             "POST",
+			options:            "create " + string(mutatingJSONPatchPolicy),
+			httpMethod:         http.MethodPost,
+			path:               mapPath,
+			query:              "fieldManager=bench",
+			acceptContentTypes: writeFormats,
+			body:               staticObjectBody(b, benchMAPJSONPatch()),
+		},
+		{
+			method:             "POST",
 			options:            "binding",
 			httpMethod:         http.MethodPost,
 			path:               unboundPodPath + "/binding",
@@ -548,6 +605,9 @@ func BenchmarkRequestCost(b *testing.B) {
 						targetPods = seedPods(tCtx, informer, ephemeralNamespace, count, sc.extraBytes)
 						defer clearNamespace(tCtx, informer, ephemeralNamespace)
 					}
+					if sc.admissionPolicy != admissionPolicyNone {
+						defer installAdmissionPolicy(tCtx, server, sc.admissionPolicy)()
+					}
 					for _, dryRun := range []bool{true, false} {
 						if !dryRun && !supportsCommit(sc) {
 							continue
@@ -576,12 +636,14 @@ type requestScenario struct {
 	requestContentType string
 	acceptContentTypes []contentType
 	body               bodyBuilder
+	// admissionPolicy, if set, is installed while the scenario is measured.
+	admissionPolicy admissionPolicy
 }
 
 func supportsCommit(sc requestScenario) bool {
 	return sc.httpMethod == http.MethodPut ||
 		sc.httpMethod == http.MethodPatch ||
-		(sc.httpMethod == http.MethodPost && sc.options == "create")
+		(sc.httpMethod == http.MethodPost && (sc.options == "create" || sc.admissionPolicy != admissionPolicyNone))
 }
 
 // perfData and dataItem match k8s.io/kubernetes/test/e2e/perftype (duplicated
