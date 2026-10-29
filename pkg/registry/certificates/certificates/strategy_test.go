@@ -230,7 +230,6 @@ func TestStatusUpdate(t *testing.T) {
 	}
 }
 
-
 func TestStrategyUpdateRejectsSpecChange(t *testing.T) {
 	oldObj := &certapi.CertificateSigningRequest{
 		Spec: certapi.CertificateSigningRequestSpec{
