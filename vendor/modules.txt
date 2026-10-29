@@ -113,7 +113,7 @@ github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.4
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
-# github.com/coredns/corefile-migration v1.0.35
+# github.com/coredns/corefile-migration v1.0.36
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile

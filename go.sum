@@ -60,8 +60,8 @@ github.com/containerd/typeurl/v2 v2.3.0/go.mod h1:Qk+PAdUYArVj41TnGi6rJ+48RF0Pkc
 github.com/coredns/caddy v1.1.1/go.mod h1:A6ntJQlAWuQfFlsd9hvigKbo2WS0VUs2l1e2F+BawD4=
 github.com/coredns/caddy v1.1.4 h1:+Lls5xASB0QsA2jpCroCOwpPlb5GjIGlxdjXxdX0XVo=
 github.com/coredns/caddy v1.1.4/go.mod h1:A6ntJQlAWuQfFlsd9hvigKbo2WS0VUs2l1e2F+BawD4=
-github.com/coredns/corefile-migration v1.0.35 h1:kZ4NRtenBmavOkFHCBCekxhrvoEzwAKRlNnD+9daVkI=
-github.com/coredns/corefile-migration v1.0.35/go.mod h1:56DPqONc3njpVPsdilEnfijCwNGC3/kTJLl7i7SPavY=
+github.com/coredns/corefile-migration v1.0.36 h1:szNRCWf+bDe4sPz1MvHdxtA9GCburX7hg89wNtbl21I=
+github.com/coredns/corefile-migration v1.0.36/go.mod h1:56DPqONc3njpVPsdilEnfijCwNGC3/kTJLl7i7SPavY=
 github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBqoWM=
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
 github.com/coreos/go-semver v0.3.1 h1:yi21YpKnrx1gt5R+la8n5WgS0kCrsPp33dmEyHReZr4=

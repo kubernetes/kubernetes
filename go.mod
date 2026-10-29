@@ -19,7 +19,7 @@ require (
 	github.com/anishathalye/porcupine v1.3.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.13.0
-	github.com/coredns/corefile-migration v1.0.35
+	github.com/coredns/corefile-migration v1.0.36
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
