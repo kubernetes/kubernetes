@@ -36,6 +36,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts" // nolint:depguard // this package provides test utilities
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/test/coverage"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/randfill"
@@ -129,12 +131,12 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	for t := range s.s.validationFuncs {
 		var v any
 		// TODO: this should handle maps and slices
-		if t.Kind() == reflect.Ptr {
+		if t.Kind() == reflect.Pointer {
 			v = reflect.New(t.Elem()).Interface()
 		} else {
 			v = reflect.Indirect(reflect.New(t)).Interface()
 		}
-		if reflect.TypeOf(v).Kind() != reflect.Ptr {
+		if reflect.TypeOf(v).Kind() != reflect.Pointer {
 			v = &v
 		}
 		s.ValueFuzzed(v)
@@ -373,8 +375,20 @@ func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected fi
 }
 
 func (v *ValidationTester) validate() field.ErrorList {
+	var errs field.ErrorList
 	if v.isUpdate {
-		return v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
+		errs = v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
+	} else {
+		errs = v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
 	}
-	return v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
+
+	rt := reflect.TypeOf(v.value)
+	for rt.Kind() == reflect.Pointer {
+		rt = rt.Elem()
+	}
+	pkgName := strings.Split(rt.String(), ".")[0]
+	gvk := schema.GroupVersionKind{Group: rt.PkgPath(), Version: pkgName, Kind: rt.Name()}
+	coverage.RecordObservedRules(gvk, errs)
+
+	return errs
 }
