@@ -120,6 +120,12 @@ func TestCreateIngressValidation(t *testing.T) {
 			},
 			expected: "",
 		},
+		"valid tls rule with secret containing dots": {
+			rules: []string{
+				"foo.com/=svc:http,tls=foo.com-tls",
+			},
+			expected: "",
+		},
 		"valid path with type prefix": {
 			rules: []string{
 				"foo.com/admin*=svc:8080",
