@@ -98,6 +98,11 @@ type watcher struct {
 	transformer              value.Transformer
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
+
+	// running counts the run goroutines of watches this watcher has started.
+	// Stopping a watch only cancels it, so tests wait on this before tearing
+	// down storage that a still-running decode could touch.
+	running sync.WaitGroup
 }
 
 // storageKey keeps backend-prefixed keys distinct from the resource-relative
@@ -148,7 +153,11 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 		return nil, err
 	}
 	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
-	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
+	w.running.Add(1)
+	go func() {
+		defer w.running.Done()
+		wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
+	}()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
 	// has already caught up. So in the initial version (given that watchcache
