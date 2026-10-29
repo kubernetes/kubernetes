@@ -24,6 +24,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 )
 
 func TestCacheSemantic(t *testing.T) {
@@ -127,4 +129,14 @@ func TestCacheIsolation(t *testing.T) {
 	if resultDerived != resultDerivedAgain {
 		t.Fatal("successful derived attribute compilation should have been cached")
 	}
+
+	// 4. SharingAffinityExtractor returns nil until SetSharingAffinityExtractor is called,
+	// and then returns the configured extractor instance.
+	require.Nil(t, cache.SharingAffinityExtractor())
+	extractor := sharingaffinity.NewExtractor(10)
+	cache.SetSharingAffinityExtractor(extractor)
+	require.Same(t, extractor, cache.SharingAffinityExtractor())
+
+	var nilCache *Cache
+	require.Nil(t, nilCache.SharingAffinityExtractor())
 }

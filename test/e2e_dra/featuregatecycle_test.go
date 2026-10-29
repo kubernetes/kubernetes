@@ -94,6 +94,15 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			// emulate that version so the test keeps working once the gate locks.
 			emulatedVersion: "1.37",
 		},
+		"sharing-affinity": {
+			test:                sharingAffinityGateCycle,
+			driverResourcesFunc: sharingAffinityDriverResources,
+			enabledGates:        []string{"DRAConsumableCapacity"},
+			toggledGates:        []string{"DRASharingAffinity"},
+			// DRASharingAffinity is alpha and toggleable starting in 1.38;
+			// emulate that version so the test keeps working once the gate locks.
+			emulatedVersion: "1.38",
+		},
 	}
 
 	for name, def := range subTests {

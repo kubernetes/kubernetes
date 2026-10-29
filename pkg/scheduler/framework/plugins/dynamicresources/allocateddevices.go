@@ -127,6 +127,7 @@ type allocatedDevices struct {
 	capacities                structured.ConsumedCapacityCollection
 	invalidCapacities         map[types.UID]error
 	enabledConsumableCapacity bool
+	sharingAffinity           *sharingAffinityTracker
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
@@ -273,9 +274,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
-
 	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Insert(deviceID)
@@ -288,6 +287,16 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	}
 	if capacityErr != nil {
 		a.invalidCapacities[claim.UID] = capacityErr
+	}
+	// Update under a.mutex to keep shared claims consistent with a.revision.
+	notifySharingAffinity := a.sharingAffinity != nil && len(shareIDs) > 0
+	if notifySharingAffinity {
+		a.sharingAffinity.addAllocatedClaim(claim)
+	}
+	a.mutex.Unlock()
+	if notifySharingAffinity {
+		// Notify outside a.mutex to avoid lock-order inversion with inFlightMutex.
+		a.sharingAffinity.onResourceClaimOrSliceChanged()
 	}
 }
 
@@ -328,9 +337,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
-
 	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Delete(deviceID)
@@ -342,4 +349,14 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		a.capacities.Remove(capacity)
 	}
 	delete(a.invalidCapacities, claim.UID)
+	// Update under a.mutex to keep shared claims consistent with a.revision.
+	notifySharingAffinity := a.sharingAffinity != nil && len(shareIDs) > 0
+	if notifySharingAffinity {
+		a.sharingAffinity.removeAllocatedClaim(claim)
+	}
+	a.mutex.Unlock()
+	if notifySharingAffinity {
+		// Notify outside a.mutex to avoid lock-order inversion with inFlightMutex.
+		a.sharingAffinity.onResourceClaimOrSliceChanged()
+	}
 }

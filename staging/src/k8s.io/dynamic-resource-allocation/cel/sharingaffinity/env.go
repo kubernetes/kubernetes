@@ -44,6 +44,8 @@ var affinityEnv = sync.OnceValues(func() (*environment.EnvSet, error) {
 	})
 })
 
+// compiledExpression holds the type-checked CEL AST, estimated max cost, and
+// a default full-budget cel.Program for an extractor expression.
 type compiledExpression struct {
 	env     *cel.Env
 	ast     *cel.Ast
@@ -51,6 +53,9 @@ type compiledExpression struct {
 	full    cel.Program
 }
 
+// compileExpression compiles expression in envType, verifies that its output
+// type can evaluate to string, estimates its static cost, and constructs its
+// full-budget CEL program.
 func compileExpression(expression string, envType environment.Type) (*compiledExpression, error) {
 	envset, err := affinityEnv()
 	if err != nil {
@@ -82,6 +87,7 @@ func compileExpression(expression string, envType environment.Type) (*compiledEx
 	return compiled, nil
 }
 
+// program instantiates a cel.Program from the compiled AST with the given runtime cost limit.
 func (e *compiledExpression) program(limit uint64) (cel.Program, error) {
 	return e.env.Program(e.ast,
 		cel.CostTracking(&library.CostEstimator{}),
@@ -92,6 +98,7 @@ func (e *compiledExpression) program(limit uint64) (cel.Program, error) {
 
 type costEstimator struct{}
 
+// EstimateSize bounds the size of dynamic parameters fields by the maximum request size in bytes.
 func (costEstimator) EstimateSize(node checker.AstNode) *checker.SizeEstimate {
 	if path := node.Path(); len(path) > 0 && path[0] == parametersVar {
 		// No schema is available. A field cannot contain more elements or
@@ -101,6 +108,35 @@ func (costEstimator) EstimateSize(node checker.AstNode) *checker.SizeEstimate {
 	return nil
 }
 
+// EstimateCallCost returns no custom call cost override, deferring to the standard library estimator.
 func (costEstimator) EstimateCallCost(string, string, *checker.AstNode, []checker.AstNode) *checker.CallEstimate {
 	return nil
+}
+
+// A budget belongs to one pool/request extraction, never to a cached program.
+type budget struct {
+	remaining, spent, lastFailedCost uint64
+}
+
+// newBudget initializes a fresh per-request CEL runtime cost budget.
+func newBudget() *budget {
+	return &budget{remaining: resourceapi.SharingAffinityCELMaxCost}
+}
+
+// program returns a cel.Program bounded by the remaining runtime budget,
+// reusing compiled.full when the full budget is still available.
+func (b *budget) program(compiled *compiledExpression) (cel.Program, error) {
+	if b.remaining == resourceapi.SharingAffinityCELMaxCost {
+		return compiled.full, nil
+	}
+	// CEL's limit is fixed at program construction. Re-plan the checked AST,
+	// including at zero: a zero-cost constant remains legal at the boundary.
+	return compiled.program(b.remaining)
+}
+
+// charge deducts actual CEL evaluation cost from the remaining request budget.
+func (b *budget) charge(actual uint64) {
+	charged := min(actual, b.remaining)
+	b.remaining -= charged
+	b.spent += charged
 }

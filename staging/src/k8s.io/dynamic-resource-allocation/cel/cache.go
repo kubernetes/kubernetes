@@ -19,16 +19,18 @@ package cel
 import (
 	"sync"
 
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/utils/keymutex"
 	"k8s.io/utils/lru"
 )
 
 // Cache is a thread-safe LRU cache for a compiled CEL expression.
 type Cache struct {
-	compileMutex keymutex.KeyMutex
-	cacheMutex   sync.RWMutex
-	cache        *lru.Cache
-	compiler     *compiler
+	compileMutex    keymutex.KeyMutex
+	cacheMutex      sync.RWMutex
+	cache           *lru.Cache
+	compiler        *compiler
+	sharingAffinity *sharingaffinity.Extractor
 }
 
 // NewCache creates a cache. The maximum number of entries determines
@@ -42,6 +44,30 @@ func NewCache(maxCacheEntries int, features Features) *Cache {
 		cache:        lru.New(maxCacheEntries),
 		compiler:     GetCompiler(features),
 	}
+}
+
+// SetSharingAffinityExtractor configures the cache to use an existing
+// sharing-affinity CEL extractor (for example, one shared with a scheduler-wide
+// DRA manager).
+func (c *Cache) SetSharingAffinityExtractor(extractor *sharingaffinity.Extractor) {
+	if c == nil || extractor == nil {
+		return
+	}
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+	c.sharingAffinity = extractor
+}
+
+// SharingAffinityExtractor returns the cache's sharing-affinity CEL extractor,
+// whose LRU cache is independent from device selector and derived attribute
+// expressions. It returns nil if the receiver is nil or no extractor was set.
+func (c *Cache) SharingAffinityExtractor() *sharingaffinity.Extractor {
+	if c == nil {
+		return nil
+	}
+	c.cacheMutex.RLock()
+	defer c.cacheMutex.RUnlock()
+	return c.sharingAffinity
 }
 
 // GetOrCompile checks whether the cache already has a compilation result

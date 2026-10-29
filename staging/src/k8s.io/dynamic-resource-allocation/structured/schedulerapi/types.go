@@ -17,6 +17,8 @@ limitations under the License.
 package schedulerapi
 
 import (
+	"fmt"
+	"maps"
 	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
@@ -81,6 +83,62 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
 	}
 }
 
+// AffinityStatus is scheduler-internal state, never serialized.
+// Its zero value is AffinityStatusClean, so missing DeviceAffinityStateCollection entries
+// represent clean devices.
+type AffinityStatus int
+
+const (
+	AffinityStatusClean AffinityStatus = iota
+	AffinityStatusLocked
+	// AffinityStatusUnreconstructable means a consistent affinity lock cannot
+	// be reconstructed for the device.
+	AffinityStatusUnreconstructable
+)
+
+func (s AffinityStatus) String() string {
+	switch s {
+	case AffinityStatusClean:
+		return "Clean"
+	case AffinityStatusLocked:
+		return "Locked"
+	case AffinityStatusUnreconstructable:
+		return "Unreconstructable"
+	default:
+		return fmt.Sprintf("AffinityStatus(%d)", s)
+	}
+}
+
+// DeviceAffinityState is the sharing-affinity state of one device.
+type DeviceAffinityState struct {
+	Status AffinityStatus
+	// LockedAffinity is nonempty only when Status is Locked; nil otherwise.
+	LockedAffinity map[string]string
+}
+
+// Clone returns a state with an independently owned lock map.
+func (s DeviceAffinityState) Clone() DeviceAffinityState {
+	cloned := s
+	cloned.LockedAffinity = maps.Clone(s.LockedAffinity)
+	return cloned
+}
+
+// DeviceAffinityStateCollection records sharing-affinity state by device.
+// Devices without an entry are considered clean.
+type DeviceAffinityStateCollection map[DeviceID]DeviceAffinityState
+
+// Clone preserves nil and isolates every device's lock map.
+func (c DeviceAffinityStateCollection) Clone() DeviceAffinityStateCollection {
+	if c == nil {
+		return nil
+	}
+	cloned := make(DeviceAffinityStateCollection, len(c))
+	for device, state := range c {
+		cloned[device] = state.Clone()
+	}
+	return cloned
+}
+
 // AllocatedState represents the current state of allocated resources.
 // This type is used in the scheduler and autoscaler contract.
 // AllocatedState packs information of allocated devices which is gathered from allocated resource claims.
@@ -93,6 +151,18 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	// DeviceSharingAffinity records sharing-affinity state when the
+	// DRASharingAffinity feature is enabled.
+	DeviceSharingAffinity DeviceAffinityStateCollection
+}
+
+// PoolID identifies a pool by driver and pool name.
+type PoolID struct {
+	Driver, Pool string
+}
+
+func (p PoolID) String() string {
+	return p.Driver + "/" + p.Pool
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
