@@ -295,10 +295,14 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 
 		// Wait for all caches to sync before scheduling.
-		cc.InformerFactory.WaitForCacheSyncWithContext(ctx)
+		if err := cc.InformerFactory.WaitForCacheSyncWithContext(ctx).AsError(); err != nil {
+			logger.Error(err, "informers are not fully synced")
+		}
 		// DynInformerFactory can be nil in tests.
 		if cc.DynInformerFactory != nil {
-			cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
+			if err := cc.DynInformerFactory.WaitForCacheSyncWithContext(ctx).AsError(); err != nil {
+				logger.Error(err, "dynamic informers are not fully synced")
+			}
 		}
 
 		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
