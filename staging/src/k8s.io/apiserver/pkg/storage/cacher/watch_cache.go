@@ -418,13 +418,21 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 	return keys, nil
 }
 
+type readConsistency string
+
+const (
+	consistencyConsistent   readConsistency = "Consistent"
+	consistencyExact        readConsistency = "Exact"
+	consistencyNotOlderThan readConsistency = "NotOlderThan"
+)
+
 // NOTICE: Structure follows the shouldDelegateList function in
 // staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
 func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
 	// The RV semantic below is for Recursive List, non-recursive lists should use waitUntilFreshAndListNonRecursive.
 	recursive := true
 	var continueKey string
-	var snap store.Snapshot
+	var semantic readConsistency
 	matchValues := opts.Predicate.MatcherIndex(ctx)
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
@@ -432,9 +440,9 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 	}
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
+		semantic = consistencyExact
 	case metav1.ResourceVersionMatchNotOlderThan:
-		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
+		semantic = consistencyNotOlderThan
 	case "":
 		var continueRV int64
 		// Continue
@@ -444,22 +452,34 @@ func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key str
 				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 			}
 			if continueRV > 0 {
-				snap, err = w.waitAndGetExactSnapshot(ctx, uint64(continueRV))
+				listRV = uint64(continueRV)
+				semantic = consistencyExact
 			} else {
 				// Don't pass matchValues as they don't support continueKey
 				matchValues = nil
-				snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+				semantic = consistencyConsistent
 			}
 		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			// Legacy exact match
-			snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
+			semantic = consistencyExact
 		} else if opts.ResourceVersion == "" {
-			snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+			semantic = consistencyConsistent
 		} else {
-			snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
+			semantic = consistencyNotOlderThan
 		}
 	default:
+		semantic = consistencyNotOlderThan
+	}
+	var snap store.Snapshot
+	switch semantic {
+	case consistencyExact:
+		snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
+	case consistencyConsistent:
+		snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+	case consistencyNotOlderThan:
 		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
+	default:
+		return listResp{}, "", fmt.Errorf("unknown RV semantic: %s", semantic)
 	}
 	if err != nil {
 		return listResp{}, "", err
