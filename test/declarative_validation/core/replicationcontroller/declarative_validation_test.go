@@ -204,7 +204,7 @@ func TestDeclarativeValidate(t *testing.T) {
 		"tolerations: invalid key format": {
 			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"activeDeadlineSeconds minimum boundary violation": {

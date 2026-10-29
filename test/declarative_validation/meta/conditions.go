@@ -48,7 +48,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				MkCondition(TweakStatus(metav1.ConditionFalse)),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Duplicate(fldPath.Index(1), "").MarkAlpha(),
+				field.Duplicate(fldPath.Index(1), "").MarkBeta(),
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				MkCondition(TweakType("")),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Index(0).Child("type"), "").MarkAlpha(),
+				field.Required(fldPath.Index(0).Child("type"), "").MarkBeta(),
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				MkCondition(TweakStatus("")),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Index(0).Child("status"), "").MarkAlpha(),
+				field.Required(fldPath.Index(0).Child("status"), "").MarkBeta(),
 			},
 		},
 		{
@@ -163,7 +163,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 					fldPath.Index(0).Child("status"),
 					metav1.ConditionStatus("Invalid"),
 					[]string{"False", "True", "Unknown"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		{
@@ -183,7 +183,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 					fldPath.Index(0).Child("observedGeneration"),
 					int64(-1),
 					"",
-				).WithOrigin("minimum").MarkAlpha(),
+				).WithOrigin("minimum").MarkBeta(),
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				MkCondition(TweakLastTransitionTime(metav1.Time{})),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Index(0).Child("lastTransitionTime"), "").MarkAlpha(),
+				field.Required(fldPath.Index(0).Child("lastTransitionTime"), "").MarkBeta(),
 			},
 		},
 		{
@@ -222,7 +222,7 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				MkCondition(TweakReason("")),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Index(0).Child("reason"), "").MarkAlpha(),
+				field.Required(fldPath.Index(0).Child("reason"), "").MarkBeta(),
 			},
 		},
 		{

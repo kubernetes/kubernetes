@@ -165,7 +165,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidBundle(t, tweakSignerName("example.com/bar")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), "example.com:foo:bar", "ClusterTrustBundle for signerName example.com/bar must be named with prefix example.com:bar:").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec", "signerName"), "example.com/bar", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "signerName"), "example.com/bar", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"signerName set from unset - invalid": {
@@ -173,7 +173,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidBundle(t, tweakName("no-signer-bundle")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), "no-signer-bundle", "ClusterTrustBundle for signerName example.com/foo must be named with prefix example.com:foo:").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec", "signerName"), "example.com/foo", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "signerName"), "example.com/foo", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"signerName unset from set - invalid": {
@@ -181,7 +181,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidBundle(t, tweakSignerName("")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), "example.com:foo:bar", `ClusterTrustBundle without signer name must not have ":" in its name`).MarkFromImperative(),
-				field.Invalid(field.NewPath("spec", "signerName"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "signerName"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}

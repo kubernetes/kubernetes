@@ -141,21 +141,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 					APIGroup: "rbac.authorization.k8s.io",
 					Kind:     "Role",
 					Name:     "different-role",
-				}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				}, "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"roleRef set from unset - invalid": {
 			oldObj:    mkValidRoleBinding(tweakRoleRef(rbac.RoleRef{})),
 			updateObj: mkValidRoleBinding(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"roleRef unset from set - invalid": {
 			updateObj: mkValidRoleBinding(tweakRoleRef(rbac.RoleRef{})),
 			oldObj:    mkValidRoleBinding(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkBeta(),
 				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkShortCircuitedInDV(),
 				field.NotSupported(field.NewPath("roleRef", "kind"), "", []string{}).MarkFromImperative(),
 				field.NotSupported(field.NewPath("roleRef", "apiGroup"), "", []string{}).MarkFromImperative(),

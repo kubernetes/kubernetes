@@ -111,7 +111,7 @@ func RunDeclarativeValidateEvictionRespondersTestCases[T runtime.Object](t *test
 				PodGroupName: new("blue"),
 			},
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("schedulingGroup"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+				field.Forbidden(specPath.Child("schedulingGroup"), "").WithOrigin("dependentForbidden").MarkBeta(),
 			},
 		},
 		"max items": {

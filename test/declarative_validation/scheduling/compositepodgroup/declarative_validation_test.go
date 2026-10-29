@@ -445,7 +445,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				}}
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), nil, "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 		"valid noop update": {

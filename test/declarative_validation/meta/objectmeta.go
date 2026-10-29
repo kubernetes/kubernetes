@@ -109,7 +109,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				meta.SetGeneration(-1)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -169,7 +169,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -180,7 +180,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -191,7 +191,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -258,7 +258,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.NotSupported(fldPath.Child("managedFields").Index(0).Child("operation"), metav1.ManagedFieldsOperationType("Invalid"), []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkAlpha(),
+				field.NotSupported(fldPath.Child("managedFields").Index(0).Child("operation"), metav1.ManagedFieldsOperationType("Invalid"), []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkBeta(),
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkAlpha(),
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkBeta(),
 			},
 		},
 		{
@@ -519,7 +519,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(-1)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkBeta(),
 				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
@@ -539,7 +539,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetUID("uid-2")
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("uid"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("uid"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -549,7 +549,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetCreationTimestamp(t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -559,7 +559,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionTimestamp(&t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -571,7 +571,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionGracePeriodSeconds(&g2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{

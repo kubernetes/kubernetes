@@ -82,21 +82,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
 			updateObj: mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecycleEphemeral)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"invalid update volumeLifecycleModes unset to set": {
 			oldObj:    mkCSIDriver(),
 			updateObj: mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"invalid update volumeLifecycleModes set to unset": {
 			oldObj:    mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
 			updateObj: mkCSIDriver(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}

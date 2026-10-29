@@ -185,7 +185,7 @@ func testDeclarativeValidateNodeUpdate(t *testing.T, apiVersion string) {
 				n.Spec.ProviderID = "provider:///node-2"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be modified once set").WithOrigin("update").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be modified once set").WithOrigin("update").MarkBeta(),
 			},
 		},
 		"clear providerID": {
@@ -194,7 +194,7 @@ func testDeclarativeValidateNodeUpdate(t *testing.T, apiVersion string) {
 			}),
 			update: mkValidNode(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be cleared once set").WithOrigin("update").MarkBeta(),
 			},
 		},
 		"no change with podCIDRs": {
