@@ -1204,6 +1204,12 @@ const (
 	// Enables support for graceful shutdown windows node.
 	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
 
+	// owner: @ajaysundark
+	// kep: https://kep.k8s.io/5359
+	//
+	// Enables explicit container-level and pod-level swap limit configuration via resources.limits.swap.
+	WorkloadControlledSwap featuregate.Feature = "WorkloadControlledSwap"
+
 	// owner: @helayoty @mm4tt @wojtek-t
 	// kep: https://kep.k8s.io/5547
 	//
@@ -2085,6 +2091,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	WorkloadControlledSwap: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	WorkloadWithJob: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2671,6 +2681,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsCPUAndMemoryAffinity: {},
 
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
+
+	WorkloadControlledSwap: {},
 
 	WorkloadWithJob: {GenericWorkload},
 

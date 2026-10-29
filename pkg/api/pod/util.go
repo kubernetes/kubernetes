@@ -436,6 +436,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
 		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
+		AllowWorkloadControlledSwap:                             utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -498,6 +499,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec uses a seccomp profile of type OCI, allow it
 		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
+		// If old spec already had swap limits configured, allow updates to the pod
+		opts.AllowWorkloadControlledSwap = opts.AllowWorkloadControlledSwap || swapLimitInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -2164,7 +2167,7 @@ func DefaultPodLevelResources(pod *api.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
-	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+	if !helper.IsPodLevelResourcesSet(pod) {
 		return
 	}
 
@@ -2182,6 +2185,26 @@ func DefaultPodLevelResources(pod *api.Pod) {
 	defaultHugePagePodLevelLimits(pod, v1Pod)
 	defaultPodLevelRequests(pod, v1Pod)
 	defaultPodLevelLimits(pod, v1Pod)
+}
+
+func swapLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.Resources != nil {
+		if _, ok := podSpec.Resources.Limits[api.ResourceSwap]; ok {
+			return true
+		}
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if _, ok := c.Resources.Limits[api.ResourceSwap]; ok {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 // defaultHugePagePodLevelLimits applies default values for pod-level hugepage limits,
