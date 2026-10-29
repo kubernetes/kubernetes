@@ -21,6 +21,7 @@ package clustertrustbundle
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -47,7 +48,10 @@ func (strategy) NamespaceScoped() bool {
 	return false
 }
 
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	bundle := obj.(*certificates.ClusterTrustBundle)
+	bundle.Generation = 1
+}
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	bundle := obj.(*certificates.ClusterTrustBundle)
@@ -64,7 +68,14 @@ func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (s strategy) PrepareForUpdate(ctx context.Context, new, old runtime.Object) {}
+func (s strategy) PrepareForUpdate(ctx context.Context, new, old runtime.Object) {
+	newBundle := new.(*certificates.ClusterTrustBundle)
+	oldBundle := old.(*certificates.ClusterTrustBundle)
+
+	if !apiequality.Semantic.DeepEqual(newBundle.Spec, oldBundle.Spec) {
+		newBundle.Generation = oldBundle.Generation + 1
+	}
+}
 
 func (s strategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newBundle := new.(*certificates.ClusterTrustBundle)
