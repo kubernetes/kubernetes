@@ -351,6 +351,17 @@ linters:
         path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
       - text: "nonpointerstructs: field ExternalMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
         path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+      
+      # forbiddenmarkers: approved uses of +k8s:customValidation, where no declarative tag fits.
+      # EvictionResponder.Name rejects the reserved *.k8s.io and *.kubernetes.io domains.
+      - text: 'forbiddenmarkers: field EvictionResponder.Name has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # EvictionResponder.Priority reserves priorities 0-999 for *.k8s.io responders.
+      - text: 'forbiddenmarkers: field EvictionResponder.Priority has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # EvictionRequestSpec.Requester has the same reserved-domain rule as EvictionResponder.Name.
+      - text: 'forbiddenmarkers: field EvictionRequestSpec.Requester has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
 
       - linters:
         - forbidigo
@@ -481,6 +492,7 @@ linters:
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               - "defaultorrequired" # Prevent the usage of default tags with required fields.
+              - "forbiddenmarkers" # Prevent the usage of the markers listed in lintersConfig.
               - "integers" # Ensure only int32 and int64 are used for integers.
               - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
@@ -518,6 +530,10 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:optional"
+            forbiddenmarkers:
+              markers:
+                # Validation should use declarative tags; approved exceptions are in exceptions.yaml.
+                - identifier: "k8s:customValidation"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
