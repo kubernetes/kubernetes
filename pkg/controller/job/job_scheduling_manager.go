@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -39,6 +40,7 @@ import (
 	jobutil "k8s.io/kubernetes/pkg/api/job"
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -215,8 +217,10 @@ func (jm *Controller) patchWorkloadMinCount(ctx context.Context, workload *sched
 	if err != nil {
 		return err
 	}
+	start := jm.clock.Now()
 	_, err = jm.kubeClient.SchedulingV1beta1().Workloads(workload.Namespace).
 		Patch(ctx, workload.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	jm.recordSchedulingObjectSync(metrics.Workload, metrics.Update, start, err)
 	return err
 }
 
@@ -239,9 +243,22 @@ func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *sched
 	if err != nil {
 		return err
 	}
+	start := jm.clock.Now()
 	_, err = jm.kubeClient.SchedulingV1beta1().PodGroups(podGroup.Namespace).
 		Patch(ctx, podGroup.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	jm.recordSchedulingObjectSync(metrics.PodGroup, metrics.Update, start, err)
 	return err
+}
+
+// recordSchedulingObjectSync records the result and latency of one Workload or
+// PodGroup API write that started at start.
+func (jm *Controller) recordSchedulingObjectSync(kind, action string, start time.Time, err error) {
+	result := metrics.Success
+	if err != nil {
+		result = metrics.Error
+	}
+	metrics.JobSchedulingObjectSyncsTotal.WithLabelValues(kind, action, result).Inc()
+	metrics.JobSchedulingObjectSyncDurationSeconds.WithLabelValues(kind, action).Observe(jm.clock.Since(start).Seconds())
 }
 
 // markSchedulingBlocked records the non-terminal SchedulingBlocked=True condition
@@ -393,11 +410,13 @@ func (jm *Controller) deleteSuspendedPodGroup(ctx context.Context, job *batch.Jo
 	if podGroup == nil || podGroup.DeletionTimestamp != nil || !metav1.IsControlledBy(podGroup, job) {
 		return nil
 	}
+	start := jm.clock.Now()
 	err := jm.kubeClient.SchedulingV1beta1().PodGroups(podGroup.Namespace).Delete(ctx, podGroup.Name, metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &podGroup.UID,
 		},
 	})
+	jm.recordSchedulingObjectSync(metrics.PodGroup, metrics.Delete, start, err)
 	switch {
 	case apierrors.IsNotFound(err):
 		// Deleted by another actor since the lister was read.
@@ -536,7 +555,9 @@ func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) 
 		return nil, nil
 	}
 
+	start := jm.clock.Now()
 	created, err := jm.kubeClient.SchedulingV1beta1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
+	jm.recordSchedulingObjectSync(metrics.Workload, metrics.Create, start, err)
 	if err != nil {
 		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCreate",
 			"Failed to create Workload for Job %s: %v", job.Name, err)
@@ -592,7 +613,9 @@ func (jm *Controller) createPodGroup(ctx context.Context, job *batch.Job, worklo
 		})
 	}
 
+	start := jm.clock.Now()
 	created, err := jm.kubeClient.SchedulingV1beta1().PodGroups(job.Namespace).Create(ctx, podGroup, metav1.CreateOptions{})
+	jm.recordSchedulingObjectSync(metrics.PodGroup, metrics.Create, start, err)
 	if err != nil {
 		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCreate",
 			"Failed to create PodGroup %s for Job %s: %v", podGroup.Name, job.Name, err)

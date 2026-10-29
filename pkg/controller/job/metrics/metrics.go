@@ -60,7 +60,7 @@ var (
 	// Possible label values:
 	//   completion_mode: Indexed, NonIndexed
 	//   result:          failed, succeeded
-	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", "FailedIndexes", "MaxFailedIndexesExceeded", "SuccessPolicy", "CompletionsReached"
+	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", "FailedIndexes", "MaxFailedIndexesExceeded", "SuccessPolicy", "CompletionsReached", "FailedWorkloadCompilation"
 	JobFinishedNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
@@ -160,6 +160,44 @@ Possible values of the "status" label are:
 "succeeded", "failed".`,
 		}, []string{"reason", "status"})
 
+	// JobSchedulingObjectSyncsTotal records the number of Workload and PodGroup
+	// API calls made by the Job controller, both successful and unsuccessful,
+	// labelled with the object kind, the action, and the result of the call.
+	// Possible label values:
+	//   kind:   Workload, PodGroup
+	//   action: create, update, delete
+	//   result: success, error
+	JobSchedulingObjectSyncsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_scheduling_object_syncs_total",
+			Help: `The number of Workload and PodGroup API calls made by the Job controller.
+Possible values of the "kind" label are: "Workload", "PodGroup".
+Possible values of the "action" label are: "create", "update", "delete".
+Possible values of the "result" label are: "success", "error".`,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"kind", "action", "result"},
+	)
+
+	// JobSchedulingObjectSyncDurationSeconds tracks the latency of the Workload
+	// and PodGroup API calls counted by JobSchedulingObjectSyncsTotal.
+	// Possible label values:
+	//   kind:   Workload, PodGroup
+	//   action: create, update, delete
+	JobSchedulingObjectSyncDurationSeconds = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_scheduling_object_sync_duration_seconds",
+			Help: `The time it took the Job controller to make a Workload or PodGroup API call.
+Possible values of the "kind" label are: "Workload", "PodGroup".
+Possible values of the "action" label are: "create", "update", "delete".`,
+			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+		},
+		[]string{"kind", "action"},
+	)
+
 	// JobRequeueSkips track the number of job syncs skipped due to a stale
 	// watch cache.
 	JobRequeueSkips = metrics.NewCounterVec(
@@ -199,16 +237,32 @@ const (
 	Succeeded = "succeeded"
 	Failed    = "failed"
 
+	// Possible values for the "result" label in the job_scheduling_object_syncs_total metric.
+
+	Success = "success"
+	Error   = "error"
+
 	// Possible values for "event"  label in the terminated_pods_tracking_finalizer
 	// metric.
 	Add    = "add"
 	Delete = "delete"
+
+	// Possible values for the "action" label in the job_scheduling_object_*
+	// metrics. Delete is shared with the "event" label above.
+
+	Create = "create"
+	Update = "update"
 
 	// Possible values for "reason" label in the job_pods_creation_total metric.
 
 	PodCreateNew                   = "new"
 	PodRecreateTerminatingOrFailed = "recreate_terminating_or_failed"
 	PodRecreateFailed              = "recreate_failed"
+
+	// Possible values for the "kind" label in the job_scheduling_object_* metrics.
+
+	Workload = "Workload"
+	PodGroup = "PodGroup"
 )
 
 var registerMetrics sync.Once
@@ -226,5 +280,7 @@ func Register() {
 		legacyregistry.MustRegister(JobPodsCreationTotal)
 		legacyregistry.MustRegister(JobByExternalControllerTotal)
 		legacyregistry.MustRegister(JobRequeueSkips)
+		legacyregistry.MustRegister(JobSchedulingObjectSyncsTotal)
+		legacyregistry.MustRegister(JobSchedulingObjectSyncDurationSeconds)
 	})
 }
