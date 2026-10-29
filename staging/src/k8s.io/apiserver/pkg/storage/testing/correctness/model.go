@@ -123,11 +123,25 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpList:
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
-		if !reflect.DeepEqual(expected, output) {
+		if !s.equalWriteResponse(expected, output) {
 			return false, s, nil
 		}
 		return true, next, change
 	}
+}
+
+func (s *Model) equalWriteResponse(expected, output Response) bool {
+	if reflect.DeepEqual(expected, output) {
+		return true
+	}
+	expErr, ok := expected.Err.(*storage.StorageError)
+	if !ok || expected.Object != nil || s.Prefix == "" || !strings.HasPrefix(expErr.Key, s.Prefix+"/") {
+		return false
+	}
+	// CacheDelegator returns storage errors keyed without etcd3's path prefix.
+	unprefixed := *expErr
+	unprefixed.Key = strings.TrimPrefix(expErr.Key, s.Prefix)
+	return reflect.DeepEqual(Response{Err: &unprefixed}, output)
 }
 
 // execute returns the response storage gives for input served from this
