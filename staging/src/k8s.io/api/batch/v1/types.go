@@ -712,6 +712,10 @@ const (
 	JobFailureTarget JobConditionType = "FailureTarget"
 	// JobSuccessCriteriaMet means the Job has been succeeded.
 	JobSuccessCriteriaMet JobConditionType = "SuccessCriteriaMet"
+	// JobSchedulingBlocked means the controller cannot safely create pods because
+	// the scheduling objects for the Job are missing, ambiguous, or have an
+	// unsupported structure.
+	JobSchedulingBlocked JobConditionType = "SchedulingBlocked"
 )
 
 const (
@@ -734,6 +738,21 @@ const (
 	// JobReasonCompletionsReached reason indicates a SuccessCriteriaMet condition is added due to
 	// a number of succeeded Job pods met completions.
 	JobReasonCompletionsReached string = "CompletionsReached"
+	// JobReasonFailedWorkloadCompilation reason indicates the Job failed because
+	// spec.scheduling could not be compiled into a Workload.
+	JobReasonFailedWorkloadCompilation string = "FailedWorkloadCompilation"
+	// JobReasonUnsupportedWorkloadStructure reason indicates SchedulingBlocked
+	// because the Job's scheduling objects are ambiguous or have an unsupported shape.
+	JobReasonUnsupportedWorkloadStructure string = "UnsupportedWorkloadStructure"
+	// JobReasonWorkloadNotFound reason indicates SchedulingBlocked because a
+	// delegated Job's named Workload is not available yet.
+	JobReasonWorkloadNotFound string = "WorkloadNotFound"
+	// JobReasonPodGroupTemplateNotFound reason indicates SchedulingBlocked because
+	// the named PodGroupTemplate is missing from the delegated Workload.
+	JobReasonPodGroupTemplateNotFound string = "PodGroupTemplateNotFound"
+	// JobReasonSchedulingObjectsValid reason indicates SchedulingBlocked was
+	// cleared because the Job's scheduling objects are usable again.
+	JobReasonSchedulingObjectsValid string = "SchedulingObjectsValid"
 )
 
 // JobCondition describes current state of a job.
