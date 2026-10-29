@@ -7621,9 +7621,13 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 
 	twoTemplateWorkload := makeWorkload(gangJob)
 	twoTemplateWorkload.Spec.PodGroupTemplates = append(twoTemplateWorkload.Spec.PodGroupTemplates, schedulingv1beta1.PodGroupTemplate{Name: "extra"})
+	twoTemplateMessage := fmt.Sprintf("workload %s/%s for job %s/%s: has 2 PodGroupTemplates, want exactly 1",
+		twoTemplateWorkload.Namespace, twoTemplateWorkload.Name, gangJob.Namespace, gangJob.Name)
 
 	testCases := map[string]struct {
 		job              *batch.Job
+		conditions       []batch.JobCondition
+		pods             []*v1.Pod
 		existingWorkload *schedulingv1beta1.Workload
 		existingPodGroup *schedulingv1beta1.PodGroup
 
@@ -7632,6 +7636,12 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 		wantSchedulingGroupName string
 		wantCreations           int32
 		wantErr                 bool
+		// wantSchedulingBlocked is the SchedulingBlocked condition on the last status write.
+		wantSchedulingBlocked *batch.JobCondition
+		wantStatusUpdates     *int
+		wantActive            *int32
+		wantReady             *int32
+		wantTerminating       *int32
 	}{
 		"gang-eligible job with PodGroup: pods get schedulingGroup without PodGroup ownerRef": {
 			job:              gangJob,
@@ -7680,12 +7690,128 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			}(),
 			wantCreations: 0,
 		},
-		"unsupported Workload structure blocks pod creation": {
+		"unsupported Workload structure blocks pod creation and records SchedulingBlocked": {
+			job:               gangJob,
+			workloadWithJob:   true,
+			existingWorkload:  twoTemplateWorkload,
+			wantErr:           true,
+			wantCreations:     0,
+			wantStatusUpdates: new(1),
+			wantSchedulingBlocked: &batch.JobCondition{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  batch.JobReasonUnsupportedWorkloadStructure,
+				Message: twoTemplateMessage,
+			},
+			wantActive:      new(int32(0)),
+			wantReady:       new(int32(0)),
+			wantTerminating: new(int32(0)),
+		},
+		"blocked Job with existing pods reports their counts": {
+			job:             gangJob,
+			workloadWithJob: true,
+			pods: []*v1.Pod{
+				buildPod().name("ready").job(gangJob).index("0").status(v1.PodStatus{
+					Phase:      v1.PodRunning,
+					Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
+				}).Pod,
+				buildPod().name("terminating").job(gangJob).index("1").phase(v1.PodRunning).deletionTimestamp().Pod,
+			},
+			existingWorkload:  twoTemplateWorkload,
+			wantErr:           true,
+			wantCreations:     0,
+			wantStatusUpdates: new(1),
+			wantSchedulingBlocked: &batch.JobCondition{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  batch.JobReasonUnsupportedWorkloadStructure,
+				Message: twoTemplateMessage,
+			},
+			wantActive:      new(int32(1)),
+			wantReady:       new(int32(1)),
+			wantTerminating: new(int32(1)),
+		},
+		"already blocked for the same reason does not rewrite status": {
+			job: func() *batch.Job {
+				j := gangJob.DeepCopy()
+				j.Status.Ready = new(int32(0))
+				j.Status.Terminating = new(int32(0))
+				return j
+			}(),
+			conditions: []batch.JobCondition{{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  batch.JobReasonUnsupportedWorkloadStructure,
+				Message: twoTemplateMessage,
+			}},
+			workloadWithJob:   true,
+			existingWorkload:  twoTemplateWorkload,
+			wantErr:           true,
+			wantCreations:     0,
+			wantStatusUpdates: new(0),
+		},
+		"already blocked with unset Ready and Terminating writes the counters": {
+			job: gangJob,
+			conditions: []batch.JobCondition{{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  batch.JobReasonUnsupportedWorkloadStructure,
+				Message: twoTemplateMessage,
+			}},
+			workloadWithJob:   true,
+			existingWorkload:  twoTemplateWorkload,
+			wantErr:           true,
+			wantCreations:     0,
+			wantStatusUpdates: new(1),
+			wantSchedulingBlocked: &batch.JobCondition{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  batch.JobReasonUnsupportedWorkloadStructure,
+				Message: twoTemplateMessage,
+			},
+			wantActive:      new(int32(0)),
+			wantReady:       new(int32(0)),
+			wantTerminating: new(int32(0)),
+		},
+		"repaired scheduling objects clear SchedulingBlocked and pods are created": {
+			job: gangJob,
+			conditions: []batch.JobCondition{{
+				Type:   batch.JobSchedulingBlocked,
+				Status: v1.ConditionTrue,
+				Reason: batch.JobReasonUnsupportedWorkloadStructure,
+			}},
+			workloadWithJob:         true,
+			existingWorkload:        gangWorkload,
+			existingPodGroup:        gangPodGroup,
+			wantSchedulingGroupName: gangPodGroup.Name,
+			wantCreations:           4,
+			wantSchedulingBlocked: &batch.JobCondition{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionFalse,
+				Reason:  batch.JobReasonSchedulingObjectsValid,
+				Message: "Scheduling objects for the Job are valid",
+			},
+		},
+		"active pod without schedulingGroup - new pods are created without the PodGroup": {
 			job:              gangJob,
 			workloadWithJob:  true,
-			existingWorkload: twoTemplateWorkload,
-			wantErr:          true,
-			wantCreations:    0,
+			pods:             []*v1.Pod{buildPod().name("ungrouped").job(gangJob).index("0").phase(v1.PodRunning).Pod},
+			existingWorkload: gangWorkload,
+			existingPodGroup: gangPodGroup,
+			wantCreations:    3,
+		},
+		"active pod with schedulingGroup - new pods join the PodGroup": {
+			job:             gangJob,
+			workloadWithJob: true,
+			pods: []*v1.Pod{func() *v1.Pod {
+				p := buildPod().name("grouped").job(gangJob).index("0").phase(v1.PodRunning).Pod
+				p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &gangPodGroup.Name}
+				return p
+			}()},
+			existingWorkload:        gangWorkload,
+			existingPodGroup:        gangPodGroup,
+			wantSchedulingGroupName: gangPodGroup.Name,
+			wantCreations:           3,
 		},
 		"feature gate disabled: gang-eligible job creates pods without scheduling objects": {
 			job: func() *batch.Job {
@@ -7718,24 +7844,57 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 
 			fakePodControl := controller.FakePodControl{}
 			jm.podControl = &fakePodControl
+			var statusUpdates []*batch.Job
 			jm.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				statusUpdates = append(statusUpdates, job.DeepCopy())
 				return job, nil
 			}
 
 			sharedInformers.StartWithContext(ctx)
 			sharedInformers.WaitForCacheSyncWithContext(ctx)
 
-			if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job); err != nil {
+			job := tc.job.DeepCopy()
+			job.Status.Conditions = tc.conditions
+			if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
+			for _, pod := range tc.pods {
+				if err := sharedInformers.Core().V1().Pods().Informer().GetIndexer().Add(pod); err != nil {
+					t.Fatalf("Failed to insert pod in index: %v", err)
+				}
+			}
 
-			err := jm.syncJob(ctx, testutil.GetKey(tc.job, t))
+			err := jm.syncJob(ctx, testutil.GetKey(job, t))
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("syncJob() error = %v, wantErr %v", err, tc.wantErr)
 			}
-
 			if int32(len(fakePodControl.Templates)) != tc.wantCreations {
 				t.Fatalf("expected %d pod creations, got %d", tc.wantCreations, len(fakePodControl.Templates))
+			}
+			if tc.wantStatusUpdates != nil && len(statusUpdates) != *tc.wantStatusUpdates {
+				t.Errorf("status updates = %d, want %d", len(statusUpdates), *tc.wantStatusUpdates)
+			}
+			if tc.wantSchedulingBlocked != nil {
+				if len(statusUpdates) == 0 {
+					t.Fatal("expected a status update carrying SchedulingBlocked")
+				}
+				got := statusUpdates[len(statusUpdates)-1]
+				if diff := cmp.Diff(tc.wantSchedulingBlocked, findConditionByType(got.Status.Conditions, batch.JobSchedulingBlocked),
+					cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("unexpected SchedulingBlocked condition (-want +got):\n%s", diff)
+				}
+				if tc.wantErr && got.Status.StartTime != nil {
+					t.Errorf("startTime = %v, want unset while blocked", got.Status.StartTime)
+				}
+				if tc.wantActive != nil && got.Status.Active != *tc.wantActive {
+					t.Errorf("Active = %d, want %d", got.Status.Active, *tc.wantActive)
+				}
+				if tc.wantReady != nil && !ptr.Equal(got.Status.Ready, tc.wantReady) {
+					t.Errorf("Ready = %v, want %v", got.Status.Ready, tc.wantReady)
+				}
+				if tc.wantTerminating != nil && !ptr.Equal(got.Status.Terminating, tc.wantTerminating) {
+					t.Errorf("Terminating = %v, want %v", got.Status.Terminating, tc.wantTerminating)
+				}
 			}
 
 			for i, tmpl := range fakePodControl.Templates {

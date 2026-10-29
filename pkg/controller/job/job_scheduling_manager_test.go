@@ -18,6 +18,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -730,6 +731,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		wantPodGroupGangMinCount    *int32
 		wantParentCompositePodGroup string
 		wantErr                     bool
+		wantBlockReason             string
+		wantBlockMessage            string
 	}{
 		"root Job attaches its PodGroup to the parent CompositePodGroup": {
 			job: func() *batch.Job {
@@ -856,7 +859,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads: []*schedulingv1beta1.Workload{
 				makeWorkload(workloadName, "someone-else"),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonUnsupportedWorkloadStructure,
 		},
 		"BYO PodGroup (no controller ownerRef) is ignored; controller creates its own": {
 			job:               baseJob,
@@ -894,7 +898,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingPodGroups: []*schedulingv1beta1.PodGroup{
 				makePodGroup(podGroupName, "other-workload"),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonUnsupportedWorkloadStructure,
 		},
 		"unsupported PodGroupTemplate count blocks": {
 			job: baseJob,
@@ -915,7 +920,22 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonUnsupportedWorkloadStructure,
+		},
+		"Workload with a bad template count and a foreign controllerRef reports both problems": {
+			job: baseJob,
+			existingWorkloads: []*schedulingv1beta1.Workload{
+				func() *schedulingv1beta1.Workload {
+					wl := makeWorkload(workloadName, "someone-else")
+					wl.Spec.PodGroupTemplates = append(wl.Spec.PodGroupTemplates, schedulingv1beta1.PodGroupTemplate{Name: "extra"})
+					return wl
+				}(),
+			},
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonUnsupportedWorkloadStructure,
+			wantBlockMessage: fmt.Sprintf("workload %s/%s for job %s/%s: has 2 PodGroupTemplates, want exactly 1, controllerRef does not point at job %s/%s",
+				metav1.NamespaceDefault, workloadName, baseJob.Namespace, baseJob.Name, baseJob.Namespace, baseJob.Name),
 		},
 
 		"Workload create error propagates": {
@@ -959,7 +979,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				delete(j.Annotations, apischeduling.WorkloadNameAnnotation)
 				return j
 			}(),
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonWorkloadNotFound,
 		},
 		"delegated Job with an empty group-template-name blocks instead of picking a template": {
 			job: func() *batch.Job {
@@ -969,10 +990,12 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			}(),
 			existingWorkloads: []*schedulingv1beta1.Workload{makeParentWorkload(4)},
 			wantErr:           true,
+			wantBlockReason:   batch.JobReasonPodGroupTemplateNotFound,
 		},
 		"delegated Job whose Workload does not exist yet blocks": {
-			job:     delegatedJob,
-			wantErr: true,
+			job:             delegatedJob,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonWorkloadNotFound,
 		},
 		"delegated Job whose PodGroupTemplate is missing blocks": {
 			job: delegatedJob,
@@ -983,7 +1006,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					return wl
 				}(),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: batch.JobReasonPodGroupTemplateNotFound,
 		},
 		"standalone BYO Workload is used and only the PodGroup is created": {
 			job: func() *batch.Job {
@@ -1036,6 +1060,20 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			// The shared fixture Jobs must not leak state across cases.
 			job := tc.job.DeepCopy()
 			_, pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, tc.pods)
+			cond := findConditionByType(job.Status.Conditions, batch.JobSchedulingBlocked)
+			if tc.wantBlockReason != "" {
+				if cond == nil || cond.Status != v1.ConditionTrue || cond.Reason != tc.wantBlockReason {
+					t.Fatalf("SchedulingBlocked = %+v, want True with reason %q", cond, tc.wantBlockReason)
+				}
+				if tc.wantBlockMessage != "" && cond.Message != tc.wantBlockMessage {
+					t.Errorf("SchedulingBlocked message = %q, want %q", cond.Message, tc.wantBlockMessage)
+				}
+				if _, ok := errors.AsType[*schedulingBlockedError](err); !ok {
+					t.Errorf("error = %v, want it to wrap *schedulingBlockedError", err)
+				}
+			} else if cond != nil {
+				t.Fatalf("unexpected SchedulingBlocked condition: %+v", cond)
+			}
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	batch "k8s.io/api/batch/v1"
@@ -38,6 +39,16 @@ import (
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+// schedulingBlockedError is returned when the Job's scheduling objects block pod
+// creation until the user fixes them.
+type schedulingBlockedError struct {
+	message string
+}
+
+func (e *schedulingBlockedError) Error() string {
+	return "scheduling blocked: " + e.message
+}
 
 // managementMode describes which scheduling objects the Job controller
 // manages for a given Job.
@@ -237,6 +248,30 @@ func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *sched
 	return err
 }
 
+// markSchedulingBlocked records the non-terminal SchedulingBlocked=True condition
+// on the in-memory Job and emits a Warning event.
+func (jm *Controller) markSchedulingBlocked(job *batch.Job, eventReason, conditionReason, message string) error {
+	jm.recorder.Event(job, v1.EventTypeWarning, eventReason, message)
+	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, batch.JobSchedulingBlocked,
+		v1.ConditionTrue, conditionReason, message, jm.clock.Now())
+	return &schedulingBlockedError{message: message}
+}
+
+// updateSchedulingBlockedStatus writes the SchedulingBlocked condition. A blocked
+// sync returns before that update, so StartTime stays unset and Succeeded/Failed
+// and pod finalizers are reconciled once the Job is unblocked.
+func (jm *Controller) updateSchedulingBlockedStatus(ctx context.Context, cachedConditions []batch.JobCondition, jobCtx *syncJobCtx) error {
+	job := jobCtx.job
+	countersChanged := setPodCounters(job, int32(len(jobCtx.activePods)), jobCtx.ready, jobCtx.terminating)
+	if !countersChanged && reflect.DeepEqual(cachedConditions, job.Status.Conditions) {
+		return nil
+	}
+	if _, err := jm.updateStatusHandler(ctx, job); err != nil {
+		return fmt.Errorf("recording SchedulingBlocked for Job %s/%s: %w", job.Namespace, job.Name, err)
+	}
+	return nil
+}
+
 func (jm *Controller) getWorkload(namespace, name string) (*schedulingv1beta1.Workload, error) {
 	if jm.workloadLister == nil {
 		return nil, fmt.Errorf("workload lister is not configured")
@@ -269,7 +304,8 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 
 	workloadName := job.Annotations[apischeduling.WorkloadNameAnnotation]
 	if workloadName == "" {
-		return nil, fmt.Errorf("job %s/%s is missing annotation %s", job.Namespace, job.Name, apischeduling.WorkloadNameAnnotation)
+		return nil, jm.markSchedulingBlocked(job, "SchedulingDependencyNotFound", batch.JobReasonWorkloadNotFound,
+			fmt.Sprintf("Job %s/%s is missing annotation %s", job.Namespace, job.Name, apischeduling.WorkloadNameAnnotation))
 	}
 	parentWorkload, err := jm.getWorkload(job.Namespace, workloadName)
 	if err != nil {
@@ -278,7 +314,8 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	if parentWorkload == nil {
 		logger.V(2).Info("Named Workload not found yet for delegated Job, will retry",
 			"job", klog.KObj(job), "workload", workloadName)
-		return nil, fmt.Errorf("workload %s/%s not found for job %s", job.Namespace, workloadName, job.Name)
+		return nil, jm.markSchedulingBlocked(job, "SchedulingDependencyNotFound", batch.JobReasonWorkloadNotFound,
+			fmt.Sprintf("Workload %s/%s not found for Job %s", job.Namespace, workloadName, job.Name))
 	}
 
 	templateName := job.Annotations[apischeduling.GroupTemplateNameAnnotation]
@@ -286,7 +323,8 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	if template == nil {
 		logger.V(2).Info("Delegated PodGroupTemplate not found in Workload, will retry",
 			"job", klog.KObj(job), "workload", klog.KObj(parentWorkload), "template", templateName)
-		return nil, fmt.Errorf("podGroupTemplate %q not found in workload %s/%s for job %s", templateName, parentWorkload.Namespace, parentWorkload.Name, job.Name)
+		return nil, jm.markSchedulingBlocked(job, "SchedulingDependencyNotFound", batch.JobReasonPodGroupTemplateNotFound,
+			fmt.Sprintf("PodGroupTemplate %q not found in Workload %s/%s for Job %s", templateName, parentWorkload.Namespace, parentWorkload.Name, job.Name))
 	}
 
 	pgName := computePodGroupName(parentWorkload.Name, template.Name, job.UID)
@@ -295,8 +333,9 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 		return nil, err
 	}
 	if updatedPG != nil && !podGroupMatchesTemplate(updatedPG, parentWorkload.Name, template.Name) {
-		return nil, fmt.Errorf("podGroup %s/%s does not reference workload %q template %q",
-			updatedPG.Namespace, updatedPG.Name, parentWorkload.Name, template.Name)
+		return nil, jm.markSchedulingBlocked(job, batch.JobReasonUnsupportedWorkloadStructure, batch.JobReasonUnsupportedWorkloadStructure,
+			fmt.Sprintf("PodGroup %s/%s does not reference Workload %q template %q",
+				updatedPG.Namespace, updatedPG.Name, parentWorkload.Name, template.Name))
 	}
 	// A create that races with another actor returns AlreadyExists, which
 	// requeues the Job so the next sync discovers it.
@@ -356,7 +395,7 @@ func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
 }
 
 // getOrCreateWorkload returns the Workload for this root Job, looked up by the
-// deterministic name. An unsupported object at that name returns an error.
+// deterministic name. An unsupported object at that name blocks the Job.
 // Returns (nil, nil) when no Workload exists and canCreate is false.
 func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 	job *batch.Job, canCreate bool) (*schedulingv1beta1.Workload, error) {
@@ -377,7 +416,7 @@ func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 	return wl, nil
 }
 
-// validateWorkloadStructure returns an error when a root Job's Workload does not have
+// validateWorkloadStructure blocks when a root Job's Workload does not have
 // exactly one template or its controllerRef does not point at this Job.
 func (jm *Controller) validateWorkloadStructure(ctx context.Context, job *batch.Job, wl *schedulingv1beta1.Workload) error {
 	var errMessages []string
@@ -390,8 +429,9 @@ func (jm *Controller) validateWorkloadStructure(ctx context.Context, job *batch.
 	if len(errMessages) == 0 {
 		return nil
 	}
-	return fmt.Errorf("workload %s/%s for job %s/%s: %s",
+	msg := fmt.Sprintf("workload %s/%s for job %s/%s: %s",
 		wl.Namespace, wl.Name, job.Namespace, job.Name, strings.Join(errMessages, ", "))
+	return jm.markSchedulingBlocked(job, batch.JobReasonUnsupportedWorkloadStructure, batch.JobReasonUnsupportedWorkloadStructure, msg)
 }
 
 func workloadControllerRefMatchesJob(wl *schedulingv1beta1.Workload, job *batch.Job) bool {
@@ -409,7 +449,7 @@ func podGroupMatchesTemplate(pg *schedulingv1beta1.PodGroup, workloadName, templ
 
 // getOrCreatePodGroup returns the PodGroup for this Workload, looked up by name.
 // The Workload must already have passed validateWorkloadStructure.
-// An object at that name that does not reference the template returns an error.
+// An object at that name that does not reference the template blocks the Job.
 func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 	workload *schedulingv1beta1.Workload, canCreate bool) (*schedulingv1beta1.PodGroup, error) {
 	templateName := workload.Spec.PodGroupTemplates[0].Name
@@ -419,8 +459,9 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 		return nil, err
 	}
 	if pg != nil && !podGroupMatchesTemplate(pg, workload.Name, templateName) {
-		return nil, fmt.Errorf("podGroup %s/%s does not reference workload %q template %q",
-			pg.Namespace, pg.Name, workload.Name, templateName)
+		return nil, jm.markSchedulingBlocked(job, batch.JobReasonUnsupportedWorkloadStructure, batch.JobReasonUnsupportedWorkloadStructure,
+			fmt.Sprintf("PodGroup %s/%s does not reference Workload %q template %q",
+				pg.Namespace, pg.Name, workload.Name, templateName))
 	}
 	if pg == nil && canCreate {
 		return jm.createPodGroup(ctx, job, workload, templateName, true)
@@ -466,9 +507,13 @@ func (jm *Controller) generateWorkload(job *batch.Job) (*schedulingv1beta1.Workl
 func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) (*schedulingv1beta1.Workload, error) {
 	workload, err := jm.generateWorkload(job)
 	if err != nil {
-		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCompilation",
-			"Failed to compile Workload for Job %s: %v", job.Name, err)
-		return nil, err
+		// A finished Job requires startTime, which a suspended Job does not have.
+		// The Job is failed on the first sync after it is resumed.
+		if !jobSuspended(job) {
+			job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, batch.JobFailureTarget, v1.ConditionTrue,
+				batch.JobReasonFailedWorkloadCompilation, fmt.Sprintf("Failed to compile Workload for Job %s: %v", job.Name, err), jm.clock.Now())
+		}
+		return nil, nil
 	}
 
 	created, err := jm.kubeClient.SchedulingV1beta1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
