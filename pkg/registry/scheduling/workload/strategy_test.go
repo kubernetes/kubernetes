@@ -1347,8 +1347,9 @@ func TestDropCompositePodGroupTemplates(t *testing.T) {
 			if tc.oldWorkload != nil {
 				oldSpec = &tc.oldWorkload.Spec
 			}
-			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
-			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+			newWorkload := tc.newWorkload.DeepCopy()
+			dropDisabledWorkloadSpecFields(&newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, newWorkload); diff != "" {
 				t.Errorf("new Workload changed (- want, + got): %s", diff)
 			}
 		})
@@ -1491,8 +1492,9 @@ func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
 			if tc.oldWorkload != nil {
 				oldSpec = &tc.oldWorkload.Spec
 			}
-			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
-			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+			newWorkload := tc.newWorkload.DeepCopy()
+			dropDisabledWorkloadSpecFields(&newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, newWorkload); diff != "" {
 				t.Errorf("new Workload changed (- want, + got): %s", diff)
 			}
 		})
