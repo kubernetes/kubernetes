@@ -106,8 +106,6 @@ func (csrStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
-
-
 	newCSR.Status = oldCSR.Status
 }
 
