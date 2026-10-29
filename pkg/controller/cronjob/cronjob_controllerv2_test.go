@@ -1965,9 +1965,9 @@ func TestControllerV2DeleteJob(t *testing.T) {
 		{
 			name:              "job already deleted",
 			deleteErr:         errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "my-job"),
-			expectedSucceeded: false,
-			expectedActive:    1,
-			expectedEvents:    []string{},
+			expectedSucceeded: true,
+			expectedActive:    0,
+			expectedEvents:    []string{"Normal SuccessfulDelete Deleted job my-job"},
 		},
 		{
 			name:              "job deletion failed",
