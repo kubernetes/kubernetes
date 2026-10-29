@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -600,6 +601,20 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		}
 	}
 
+	activePod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}
+	succeededPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault},
+		Status:     v1.PodStatus{Phase: v1.PodSucceeded},
+	}
+	terminatingPodGroup := makePodGroup(podGroupName, workloadName)
+	terminatingPodGroup.DeletionTimestamp = new(metav1.Now())
+	terminatingPodGroup.Finalizers = []string{"scheduling.k8s.io/podgroup-protection"}
+
+	suspendedJob := baseJob.DeepCopy()
+	suspendedJob.Spec.Suspend = new(true)
+	suspendedDelegatedJob := delegatedJob.DeepCopy()
+	suspendedDelegatedJob.Spec.Suspend = new(true)
+
 	testCases := map[string]struct {
 		job               *batch.Job
 		pods              []*v1.Pod
@@ -622,6 +637,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		wantErrContains             string
 		wantBlockReason             string
 		wantBlockMessage            string
+		wantWorkloadsInAPI          []string
+		wantPodGroupsInAPI          []string
 	}{
 		"CronJob-owned Job with spec.scheduling gets a Workload and PodGroup": {
 			job: func() *batch.Job {
@@ -672,39 +689,23 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			job:  baseJob,
 			pods: []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}},
 		},
-		"skips creation when Job has StartTime set": {
+		"Job status alone does not close the creation window": {
 			job: func() *batch.Job {
 				j := baseJob.DeepCopy()
-				now := metav1.Now()
-				j.Status.StartTime = &now
-				return j
-			}(),
-		},
-		"skips creation when Job has succeeded pods": {
-			job: func() *batch.Job {
-				j := baseJob.DeepCopy()
+				j.Status.StartTime = new(metav1.Now())
 				j.Status.Succeeded = 1
-				return j
-			}(),
-		},
-		"skips creation when Job has failed pods": {
-			job: func() *batch.Job {
-				j := baseJob.DeepCopy()
 				j.Status.Failed = 1
+				j.Status.Conditions = []batch.JobCondition{{Type: batch.JobSuspended, Status: v1.ConditionFalse}}
 				return j
 			}(),
+			wantPodGroup:     true,
+			wantPodGroupName: podGroupName,
 		},
-		"skips creating Workload/PodGroup when Job was previously suspended": {
-			job: func() *batch.Job {
-				j := baseJob.DeepCopy()
-				j.Status.Conditions = []batch.JobCondition{
-					{
-						Type:   batch.JobSuspended,
-						Status: v1.ConditionTrue,
-					},
-				}
-				return j
-			}(),
+		"terminal pods close the Workload creation window": {
+			job:                baseJob,
+			pods:               []*v1.Pod{succeededPod},
+			wantWorkloadsInAPI: []string{},
+			wantPodGroupsInAPI: []string{},
 		},
 		"discovers existing Workload and PodGroup": {
 			job:               baseJob,
@@ -726,6 +727,73 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
 			wantPodGroup:      true,
 			wantPodGroupName:  podGroupName,
+		},
+		"resumed Job with only terminal pods recreates the PodGroup from the retained Workload": {
+			job:               baseJob,
+			pods:              []*v1.Pod{succeededPod},
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			wantPodGroup:      true,
+			wantPodGroupName:  podGroupName,
+		},
+		"first sync after resume still carries Suspended=True and recreates the PodGroup": {
+			job: func() *batch.Job {
+				j := baseJob.DeepCopy()
+				j.Status.Conditions = []batch.JobCondition{{Type: batch.JobSuspended, Status: v1.ConditionTrue}}
+				return j
+			}(),
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			wantPodGroup:      true,
+			wantPodGroupName:  podGroupName,
+		},
+		"active pods keep a missing PodGroup from being created": {
+			job:                baseJob,
+			pods:               []*v1.Pod{activePod},
+			existingWorkloads:  []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			wantPodGroupsInAPI: []string{},
+		},
+		"terminating PodGroup is returned and not recreated": {
+			job:                baseJob,
+			existingWorkloads:  []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups:  []*schedulingv1beta1.PodGroup{terminatingPodGroup},
+			wantPodGroup:       true,
+			wantPodGroupName:   podGroupName,
+			wantPodGroupsInAPI: []string{podGroupName},
+		},
+		"Job created suspended gets a Workload but no PodGroup": {
+			job:                suspendedJob,
+			wantWorkloadsInAPI: []string{workloadName},
+			wantPodGroupsInAPI: []string{},
+		},
+		"suspend deletes the controlled PodGroup and keeps the Workload": {
+			job:                suspendedJob,
+			existingWorkloads:  []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups:  []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
+			wantWorkloadsInAPI: []string{workloadName},
+			wantPodGroupsInAPI: []string{},
+		},
+		"suspend leaves a PodGroup the Job does not control": {
+			job:               suspendedJob,
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1beta1.PodGroup{
+				func() *schedulingv1beta1.PodGroup {
+					pg := makePodGroup(podGroupName, workloadName)
+					pg.OwnerReferences = nil
+					return pg
+				}(),
+			},
+			wantPodGroupsInAPI: []string{podGroupName},
+		},
+		"suspend deletes the controlled delegated PodGroup": {
+			job:                suspendedDelegatedJob,
+			existingWorkloads:  []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+			existingPodGroups:  []*schedulingv1beta1.PodGroup{makeDelegatedPodGroup(4)},
+			wantWorkloadsInAPI: []string{"parent-workload"},
+			wantPodGroupsInAPI: []string{},
+		},
+		"suspended delegated Job whose Workload does not exist still blocks": {
+			job:             suspendedDelegatedJob,
+			wantErr:         true,
+			wantBlockReason: ReasonSchedulingDependencyNotFound,
 		},
 
 		"BYO Workload at the Job's name is reused without adding an ownerRef": {
@@ -1063,6 +1131,32 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				}
 				if got := gotPG.Spec.SchedulingPolicy.Gang.MinCount; got != *tc.wantPodGroupGangMinCount {
 					t.Errorf("podGroup gang minCount = %d, want %d", got, *tc.wantPodGroupGangMinCount)
+				}
+			}
+			if tc.wantWorkloadsInAPI != nil {
+				list, err := clientSet.SchedulingV1beta1().Workloads(metav1.NamespaceDefault).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("list workloads: %v", err)
+				}
+				var got []string
+				for _, wl := range list.Items {
+					got = append(got, wl.Name)
+				}
+				if diff := cmp.Diff(tc.wantWorkloadsInAPI, got, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("unexpected Workloads in the API (-want +got):\n%s", diff)
+				}
+			}
+			if tc.wantPodGroupsInAPI != nil {
+				list, err := clientSet.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("list podGroups: %v", err)
+				}
+				var got []string
+				for _, pg := range list.Items {
+					got = append(got, pg.Name)
+				}
+				if diff := cmp.Diff(tc.wantPodGroupsInAPI, got, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("unexpected PodGroups in the API (-want +got):\n%s", diff)
 				}
 			}
 		})
