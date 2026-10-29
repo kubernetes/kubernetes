@@ -142,9 +142,9 @@ type Store struct {
 	// default "<resource-prefix>/<namespace>/<name>" or
 	// "<resource-prefix>/<name>" format.
 	//
-	// If custom key funcs are supplied without ReverseKeyFunc, storage
-	// features that need object identity from a key must fall back to decoding
-	// the stored object.
+	// Custom key funcs may omit ReverseKeyFunc. Ordinary watches decode the
+	// previous object to identify deletions. Etcd watches with WatchWithoutPrevKV
+	// require ReverseKeyFunc because deletion events omit the previous object.
 	ReverseKeyFunc storage.ReverseKeyFunc
 
 	// ObjectNameFunc returns the name of an object or an error.

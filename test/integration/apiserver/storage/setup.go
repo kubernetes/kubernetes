@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
@@ -113,7 +114,7 @@ func setupStore(tCtx ktesting.TContext, transformer value.Transformer) (storage.
 		storageConfig,
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
-		nil,
+		genericregistry.NamespaceReverseKeyFunc("/pods"),
 		"/pods",
 	)
 	if err != nil {

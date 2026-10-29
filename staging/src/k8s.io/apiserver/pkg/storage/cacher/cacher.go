@@ -522,6 +522,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
+	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
+		return nil, errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate"))
+	}
 	key, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
