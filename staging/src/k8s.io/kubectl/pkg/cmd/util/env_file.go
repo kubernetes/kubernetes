@@ -81,11 +81,34 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
-	currentLine := 0
+	const multilineDelimiter = `"""`
+	var currentLine, multilineStart int
+	var inMultiline bool
+	var multilineKey string
+	var multilineValue []string
 	for scanner.Scan() {
+		scannedBytes := scanner.Bytes()
+
+		if inMultiline {
+			if !utf8.Valid(scannedBytes) {
+				return fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v",
+					filePath, currentLine+1, scannedBytes)
+			}
+			currentLine++
+
+			if line := string(scannedBytes); line != multilineDelimiter {
+				multilineValue = append(multilineValue, line)
+				continue
+			}
+			inMultiline = false
+			if err = addTo(multilineKey, strings.Join(multilineValue, "\n")); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// Process the current line, retrieving a key/value pair if
 		// possible.
-		scannedBytes := scanner.Bytes()
 		key, value, err := processEnvFileLine(scannedBytes, filePath, currentLine)
 		if err != nil {
 			return err
@@ -97,26 +120,19 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 			continue
 		}
 
-		if value == `"""` {
-			startLine := currentLine
-			var lines []string
-			for {
-				if !scanner.Scan() {
-					return fmt.Errorf("env file %s has an unterminated multi-line value for key %q starting at line %d",
-						filePath, key, startLine)
-				}
-				currentLine++
-				if scanner.Text() == `"""` {
-					break
-				}
-				lines = append(lines, scanner.Text())
-			}
-			value = strings.Join(lines, "\n")
+		if value == multilineDelimiter {
+			inMultiline = true
+			multilineKey, multilineStart, multilineValue = key, currentLine, nil
+			continue
 		}
 
 		if err = addTo(key, value); err != nil {
 			return err
 		}
+	}
+	if inMultiline {
+		return fmt.Errorf("env file %s has an unterminated multi-line value for key %q starting at line %d",
+			filePath, multilineKey, multilineStart)
 	}
 	return nil
 }

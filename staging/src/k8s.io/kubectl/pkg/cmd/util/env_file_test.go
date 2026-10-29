@@ -151,6 +151,11 @@ line 1
 `,
 			expectedErr: `unterminated multi-line value for key "KEY" starting at line 2`,
 		},
+		{
+			name:        "invalid utf8 inside a multi-line value",
+			content:     "KEY=\"\"\"\nline 1\n\xff\n\"\"\"\n",
+			expectedErr: "invalid utf8 bytes at line 3",
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
