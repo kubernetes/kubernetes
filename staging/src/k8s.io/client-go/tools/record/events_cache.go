@@ -292,6 +292,9 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string)
 		Type:           newEvent.Type,
 		Reason:         newEvent.Reason,
 		Source:         newEvent.Source,
+		// Part of the aggregation key, so shared by every aggregated event.
+		ReportingController: newEvent.ReportingController,
+		ReportingInstance:   newEvent.ReportingInstance,
 	}
 	return eventCopy, aggregateKey
 }
