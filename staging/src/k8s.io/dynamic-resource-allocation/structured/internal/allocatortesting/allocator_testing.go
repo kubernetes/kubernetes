@@ -8608,6 +8608,93 @@ func TestAllocator(t *testing.T,
 			)},
 		},
 
+		// List-aware comparison and request-scoped derived attributes are
+		// separate features, but a derived attribute can evaluate to a list,
+		// so matchAttribute ends up intersecting the results of two different
+		// CEL expressions. Nothing covered that combination.
+		"list-attributes-match-constraint-on-derived-list-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"y", "z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device2, false),
+			)},
+		},
+		"list-attributes-match-constraint-on-derived-list-values-without-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+
 		"allocation-mode-all-with-multi-host-resource-pool": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
 				Name: req0,
