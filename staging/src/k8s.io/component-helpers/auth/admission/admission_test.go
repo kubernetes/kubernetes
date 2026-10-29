@@ -730,8 +730,6 @@ var (
 	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
 	_ func(context.Context, ...admission.Option) (*admission.Verifier, error)                            = admission.NewVerifier
 	_ func(*admission.Verifier, context.Context, *admissionv1.AdmissionRequest, string) error            = (*admission.Verifier).Verify
-	_ func(*admission.Verifier) error                                                                    = (*admission.Verifier).HealthCheck
-	_ func(*admission.Handler) error                                                                     = (*admission.Handler).HealthCheck
 	_ func(*http.Request) (string, bool)                                                                 = admission.BearerToken
 	_ func(string) admission.Option                                                                      = admission.WithAudience
 	_ func(string, string, *http.Client) admission.Option                                                = admission.WithRemoteIssuer
@@ -947,16 +945,16 @@ func TestLibraryKeyRotationAndAvailability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := keyRequests.Load(); got != 1 {
-		t.Fatalf("initial availability requests = %d, want 1", got)
+	if got := keyRequests.Load(); got != 0 {
+		t.Fatalf("construction fetched signing keys %d times, want 0", got)
 	}
 	firstClaims := first.baseClaims()
 	firstClaims["iss"] = server.URL
 	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, first.sign(t, firstClaims)); err != nil {
 		t.Fatalf("first signing key: %v", err)
 	}
-	if got := keyRequests.Load(); got != 2 {
-		t.Fatalf("first verification requests = %d, want 2 (lazy key fetch)", got)
+	if got := keyRequests.Load(); got != 1 {
+		t.Fatalf("first verification requests = %d, want 1 (lazy key fetch)", got)
 	}
 	keys.Store(testJWKS(t, second.server, "/openid/v1/jwks"))
 	secondClaims := second.validWebhookClaims(testAudience, "validatingwebhookconfiguration", "vwc", "uid", []string{testGroup})
@@ -965,35 +963,41 @@ func TestLibraryKeyRotationAndAvailability(t *testing.T) {
 	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
 		t.Fatalf("rotated signing key: %v", err)
 	}
-	if got := keyRequests.Load(); got != 3 {
-		t.Fatalf("rotation requests = %d, want 3", got)
+	if got := keyRequests.Load(); got != 2 {
+		t.Fatalf("rotation requests = %d, want 2", got)
 	}
 	status.Store(http.StatusServiceUnavailable)
-	if err := v.HealthCheck(); err == nil {
-		t.Fatal("unavailable endpoint reported available")
-	}
 	before := keyRequests.Load()
 	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
-		t.Fatalf("availability failure invalidated cached signing keys: %v", err)
+		t.Fatalf("cached signing keys unusable during endpoint outage: %v", err)
 	}
 	if keyRequests.Load() != before {
-		t.Fatal("availability probe changed the library key cache")
+		t.Fatal("cached verification fetched keys during endpoint outage")
 	}
 	status.Store(http.StatusOK)
 	keys.Store([]byte("not JSON"))
-	if err := v.HealthCheck(); err != nil {
-		t.Fatalf("HTTP200 endpoint is available regardless of JWKS contents: %v", err)
-	}
 	fresh, err := newVerifier()
 	if err != nil {
-		t.Fatalf("availability-only construction: %v", err)
+		t.Fatalf("lazy verifier construction: %v", err)
 	}
 	if err := fresh.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil {
 		t.Fatal("real verification accepted malformed signing keys")
 	}
+	keys.Store(testJWKS(t, second.server, "/openid/v1/jwks"))
 	status.Store(http.StatusServiceUnavailable)
-	if unavailable, err := newVerifier(); err == nil || unavailable != nil {
-		t.Fatalf("construction with unavailable endpoint = (%v, %v)", unavailable, err)
+	before = keyRequests.Load()
+	unavailable, err := newVerifier()
+	if err != nil || unavailable == nil {
+		t.Fatalf("discovery with unavailable signing keys = (%v, %v), want a lazy verifier", unavailable, err)
+	}
+	if keyRequests.Load() != before {
+		t.Fatal("construction fetched unavailable signing keys")
+	}
+	if err := unavailable.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil {
+		t.Fatal("verification accepted unavailable signing keys")
+	}
+	if keyRequests.Load() <= before {
+		t.Fatal("verification did not fetch unavailable signing keys")
 	}
 }
 
@@ -1043,11 +1047,8 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, ts.sign(t, ts.baseClaims())); err == nil {
 		t.Fatal("incoming token selected the expected issuer")
 	}
-	if err := v.HealthCheck(); err != nil {
-		t.Fatal(err)
-	}
-	if requests.Load() < 3 {
-		t.Fatalf("local availability/verification requests = %d, want at least 3", requests.Load())
+	if requests.Load() == 0 {
+		t.Fatal("local verification did not fetch signing keys")
 	}
 	if config.Timeout != 0 {
 		t.Fatal("constructor mutated the supplied REST configuration")
@@ -1083,7 +1084,7 @@ func TestLocalVerificationRejectsEveryRedirect(t *testing.T) {
 	for _, status := range []int{http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
 		for _, crossOrigin := range []bool{false, true} {
 			t.Run(fmt.Sprintf("status-%d/cross-origin-%t", status, crossOrigin), func(t *testing.T) {
-				var foreignCalls, redirectedCalls atomic.Int32
+				var foreignCalls, redirectedCalls, jwksCalls atomic.Int32
 				foreign := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					foreignCalls.Add(1)
 					_, _ = w.Write([]byte(`{"keys":[]}`))
@@ -1096,6 +1097,7 @@ func TestLocalVerificationRejectsEveryRedirect(t *testing.T) {
 						_, _ = w.Write([]byte(`{"keys":[]}`))
 						return
 					}
+					jwksCalls.Add(1)
 					target := origin.URL + "/redirected"
 					if crossOrigin {
 						target = foreign.URL + "/keys"
@@ -1110,8 +1112,15 @@ func TestLocalVerificationRejectsEveryRedirect(t *testing.T) {
 					BearerToken:     issuer.sign(t, issuer.baseClaims()),
 					TLSClientConfig: rest.TLSClientConfig{CAData: ca},
 				}
-				if verifier, err := admission.NewLocalVerifierForTest(context.Background(), config, testAudience); err == nil || verifier != nil {
-					t.Fatalf("redirecting local endpoint = (%v, %v)", verifier, err)
+				verifier, err := admission.NewLocalVerifierForTest(context.Background(), config, testAudience)
+				if err != nil {
+					t.Fatalf("construct local verifier: %v", err)
+				}
+				if err := verifier.Verify(context.Background(), admissionReview(testGroup).Request, issuer.sign(t, issuer.baseClaims())); err == nil {
+					t.Fatal("verification followed a local signing-key redirect")
+				}
+				if jwksCalls.Load() == 0 {
+					t.Fatal("verification never fetched local JWKS")
 				}
 				if foreignCalls.Load() != 0 || redirectedCalls.Load() != 0 {
 					t.Fatal("local redirect forwarded a projected credential")
@@ -1591,9 +1600,6 @@ func TestExampleEndToEnd_InClusterExplicitAudience(t *testing.T) {
 	if err != nil {
 		t.Fatalf("construct in-cluster handler: %v", err)
 	}
-	if err := h.HealthCheck(); err != nil {
-		t.Fatalf("explicit audience should be ready at construction: %v", err)
-	}
 	server := httptest.NewServer(h)
 	defer server.Close()
 
@@ -1688,9 +1694,6 @@ func TestExampleEndToEnd_InClusterSpoofedHostCannotChooseAudience(t *testing.T) 
 	}
 	if denied := verifyRequest(otherAudience, "other.default.svc", http.StatusUnauthorized); denied != nil || reached {
 		t.Fatalf("spoofed first request: response %+v reached %t", denied, reached)
-	}
-	if err := h.HealthCheck(); err != nil {
-		t.Fatalf("endpoint availability after rejected request: %v", err)
 	}
 	allowed := verifyRequest(trustedAudience, "webhook.default.svc", http.StatusOK)
 	if allowed == nil || !allowed.Allowed || !reached {
@@ -2029,8 +2032,8 @@ func TestVerifierVerify_ZeroDecode(t *testing.T) {
 	}
 }
 
-// TestNewVerifier_InClusterExplicitAudience verifies that an explicitly bound
-// audience makes the decoded in-cluster path ready before its first request.
+// TestNewVerifier_InClusterExplicitAudience verifies that the decoded in-cluster
+// path enforces the explicitly configured audience.
 func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
@@ -2038,12 +2041,6 @@ func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
-	// Ready at construction: the audience was bound eagerly, so no first request
-	// is needed to leave not-ready.
-	if err := v.HealthCheck(); err != nil {
-		t.Fatalf("expected a ready verifier, got not-ready: %v", err)
-	}
-
 	token := ts.sign(t, ts.baseClaims())
 	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
 		t.Errorf("unexpected verification error: %v", err)

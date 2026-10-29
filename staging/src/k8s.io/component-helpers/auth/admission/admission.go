@@ -213,9 +213,6 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 		client:   client,
 		jwksURL:  metadata.JWKSURI,
 	}
-	if err := v.healthCheck(ctx); err != nil {
-		return nil, err
-	}
 	return v, nil
 }
 
@@ -252,9 +249,6 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 		verifier: oidc.NewVerifier(claims.Issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
 		client:   client,
 		jwksURL:  jwksURL,
-	}
-	if err := v.healthCheck(ctx); err != nil {
-		return nil, err
 	}
 	return v, nil
 }
@@ -575,28 +569,6 @@ func (v *Verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 	return nil
 }
 
-// HealthCheck checks signing-key endpoint availability, not key usability or
-// freshness. It neither populates nor invalidates the verifier's key cache.
-func (v *Verifier) HealthCheck() error {
-	return v.healthCheck(context.Background())
-}
-
-func (v *Verifier) healthCheck(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.jwksURL, nil)
-	if err != nil {
-		return fmt.Errorf("admission: creating signing-key availability request: %w", err)
-	}
-	resp, err := v.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("admission: signing-key endpoint is unavailable: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("admission: signing-key endpoint returned %s", resp.Status)
-	}
-	return nil
-}
-
 // BearerToken extracts a bearer using the apiserver's header parsing rules.
 // Callers that decode AdmissionReviews themselves can pass it to [Verifier.Verify].
 func BearerToken(r *http.Request) (token string, ok bool) {
@@ -613,9 +585,4 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 		return "", false
 	}
 	return token, true
-}
-
-// HealthCheck checks signing-key endpoint availability, not key usability or freshness.
-func (h *Handler) HealthCheck() error {
-	return h.verifier.HealthCheck()
 }
