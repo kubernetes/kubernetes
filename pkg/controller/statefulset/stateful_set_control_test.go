@@ -1361,11 +1361,43 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 		replicas                  int32
 		partition                 int32
 		maxUnavailable            intstr.IntOrString
+		omitRollingUpdate         bool
 		minReadySeconds           int32
 		unavailableOrdinals       []int
 		makeUnavailable           func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error
 		expectedRemainingOrdinals []int
 	}{
+		{
+			name:                "Parallel/nil rollingUpdate: lower-ordinal unavailable pod blocks update",
+			podManagementPolicy: apps.ParallelPodManagement,
+			replicas:            3,
+			omitRollingUpdate:   true,
+			unavailableOrdinals: []int{0},
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
+				return err
+			},
+			expectedRemainingOrdinals: []int{0, 1, 2},
+		},
+		{
+			name:                "Parallel/nil rollingUpdate: highest-ordinal unavailable pod blocks update",
+			podManagementPolicy: apps.ParallelPodManagement,
+			replicas:            3,
+			omitRollingUpdate:   true,
+			unavailableOrdinals: []int{2},
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
+				return err
+			},
+			expectedRemainingOrdinals: []int{0, 1, 2},
+		},
+		{
+			name:                      "Parallel/nil rollingUpdate: available pods update highest ordinal first",
+			podManagementPolicy:       apps.ParallelPodManagement,
+			replicas:                  3,
+			omitRollingUpdate:         true,
+			expectedRemainingOrdinals: []int{0, 1},
+		},
 		{
 			name:                "Parallel/single replica: unavailable pod on old revision must be updated",
 			podManagementPolicy: apps.ParallelPodManagement,
@@ -1685,6 +1717,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 					Partition:      &tc.partition,
 					MaxUnavailable: &tc.maxUnavailable,
 				},
+			}
+			if tc.omitRollingUpdate {
+				set.Spec.UpdateStrategy.RollingUpdate = nil
 			}
 			client := fake.NewSimpleClientset()
 			spc, _, ssc := setupController(client)
@@ -2388,6 +2423,84 @@ func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestStatefulSetControlParallelNilRollingUpdatePreservesCurrentRevision(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("MaxUnavailableStatefulSet=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, enabled)
+			set := burst(newStatefulSet(3))
+			set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType}
+			client := fake.NewSimpleClientset(set)
+			om, _, ssc := setupController(client)
+			if err := scaleUpStatefulSetControl(set, ssc, om, assertBurstInvariants, nil); err != nil {
+				t.Fatalf("failed to scale up: %v", err)
+			}
+			set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			set = set.DeepCopy()
+			set.Spec.Template.Spec.Containers[0].Image = "foo"
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ssc.UpdateStatefulSet(t.Context(), set, pods, time.Now()); err != nil {
+				t.Fatalf("failed to start rollout: %v", err)
+			}
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if set.Status.CurrentRevision == set.Status.UpdateRevision || set.Status.CurrentReplicas != 2 {
+				t.Fatalf("expected rollout to have two current-revision replicas, got status %+v", set.Status)
+			}
+			currentRevision := set.Status.CurrentRevision
+
+			// Losing a lower-ordinal Pod must not advance it to the update revision or cause a create-delete loop.
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 0)); err != nil {
+				t.Fatal(err)
+			}
+			for sync := 0; sync < 3; sync++ {
+				pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := ssc.UpdateStatefulSet(t.Context(), set, pods, time.Now()); err != nil {
+					t.Fatalf("sync %d failed: %v", sync, err)
+				}
+				set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+				if err != nil {
+					t.Fatal(err)
+				}
+				pod := findPodByOrdinal(pods, 0)
+				if pod == nil {
+					t.Fatalf("sync %d: recreated Pod 0 was deleted before its turn to update", sync)
+				}
+				if got := getPodRevision(pod); got != currentRevision {
+					t.Fatalf("sync %d: Pod 0 revision = %q, want current revision %q", sync, got, currentRevision)
+				}
+			}
+
+			if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
+				t.Fatalf("failed to complete rollout after Pods recover: %v", err)
+			}
+		})
+	}
 }
 
 func TestStatefulSetControlRecreateUpdatePreservesPVC(t *testing.T) {
