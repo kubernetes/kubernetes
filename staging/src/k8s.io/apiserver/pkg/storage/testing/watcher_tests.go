@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -2461,6 +2462,462 @@ func RunWatchErrorIsBlockingFurtherEvents(ctx context.Context, t *testing.T, sto
 		}()
 	}
 	wg.Wait()
+}
+
+func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interface, isWatchCache bool, compact Compaction, resync func()) {
+	type testRV string
+	const (
+		rvUnset        testRV = ""
+		rvZero         testRV = "0"
+		rvOne          testRV = "1"
+		rvBeforeTest   testRV = "beforeTest"
+		rvBeforeWatch  testRV = "beforeWatch"
+		rvBeforeResync testRV = "beforeResync"
+		rvAfterResync  testRV = "afterResync"
+	)
+
+	pod1, pod2, pod3 := makePod("1"), makePod("2"), makePod("3")
+	bookmarkPod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+		},
+	}
+	added := func(pod *example.Pod) watch.Event {
+		return watch.Event{Type: watch.Added, Object: pod}
+	}
+	initialBookmark := watch.Event{Type: watch.Bookmark, Object: bookmarkPod}
+
+	tests := []struct {
+		name                string
+		rv                  testRV
+		allowWatchBookmarks bool
+		sendInitialEvents   *bool
+		podsBeforeWatch     []*example.Pod
+		podsBeforeResync    []*example.Pod
+		compactBeforeResync *example.Pod
+		podsAfterResync     []*example.Pod
+		expectedOut         []watch.Event
+		skipEtcd3           bool
+	}{
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+			skipEtcd3:           true,
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=unset",
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=unset",
+			sendInitialEvents: ptr.To(true),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:             "legacy, RV=unset",
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=0",
+			rv:                  rvZero,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+			skipEtcd3:           true,
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=0",
+			rv:                  rvZero,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=0",
+			rv:                rvZero,
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=0",
+			rv:                rvZero,
+			sendInitialEvents: ptr.To(true),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:             "legacy, RV=0",
+			rv:               rvZero,
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		// TODO: Uncomment once cacher marks cacheInterval.initialEventsEndBookmark as received
+		// so WatchList watchers are not scheduled in bucket 0 for an immediate 1s periodic bookmark.
+		// {
+		// 	name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=1",
+		// 	rv:                  rvOne,
+		// 	allowWatchBookmarks: true,
+		// 	sendInitialEvents:   ptr.To(true),
+		// 	podsBeforeWatch:     []*example.Pod{pod1},
+		// 	podsBeforeResync:    []*example.Pod{pod2},
+		// 	podsAfterResync:     []*example.Pod{pod3},
+		// 	expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+		// 	skipEtcd3:           true,
+		// },
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=1",
+			rv:                  rvOne,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=1",
+			rv:                rvOne,
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=1",
+			rv:                rvOne,
+			sendInitialEvents: ptr.To(true),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:             "legacy, RV=1",
+			rv:               rvOne,
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=beforeTest",
+			rv:                  rvBeforeTest,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+			skipEtcd3:           true,
+		},
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeTest",
+			rv:                  rvBeforeTest,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=beforeTest",
+			rv:                rvBeforeTest,
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=beforeTest",
+			rv:                rvBeforeTest,
+			sendInitialEvents: ptr.To(true),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:             "legacy, RV=beforeTest",
+			rv:               rvBeforeTest,
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		// TODO: Uncomment once cacher marks cacheInterval.initialEventsEndBookmark as received
+		// so WatchList watchers are not scheduled in bucket 0 for an immediate 1s periodic bookmark.
+		// {
+		// 	name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=beforeWatch",
+		// 	rv:                  rvBeforeWatch,
+		// 	allowWatchBookmarks: true,
+		// 	sendInitialEvents:   ptr.To(true),
+		// 	podsBeforeWatch:     []*example.Pod{pod1},
+		// 	podsBeforeResync:    []*example.Pod{pod2},
+		// 	podsAfterResync:     []*example.Pod{pod3},
+		// 	expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+		// 	skipEtcd3:           true,
+		// },
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=beforeWatch",
+			rv:                rvBeforeWatch,
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=beforeWatch",
+			rv:                rvBeforeWatch,
+			sendInitialEvents: ptr.To(true),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:             "legacy, RV=beforeWatch",
+			rv:               rvBeforeWatch,
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod2), added(pod3)},
+		},
+		// TODO: Uncomment once background watch resync is implemented (watching from RV=beforeResync
+		// with sendInitialEvents=true requires resyncing after podsBeforeResync are created).
+		// {
+		// 	name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=beforeResync",
+		// 	rv:                  rvBeforeResync,
+		// 	allowWatchBookmarks: true,
+		// 	sendInitialEvents:   ptr.To(true),
+		// 	podsBeforeWatch:     []*example.Pod{pod1},
+		// 	podsBeforeResync:    []*example.Pod{pod2},
+		// 	podsAfterResync:     []*example.Pod{pod3},
+		// 	expectedOut:         []watch.Event{added(pod1), added(pod2), initialBookmark, added(pod3)},
+		// 	skipEtcd3:           true,
+		// },
+		{
+			name:                "allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeResync",
+			rv:                  rvBeforeResync,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod3)},
+		},
+		{
+			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=beforeResync",
+			rv:                rvBeforeResync,
+			sendInitialEvents: ptr.To(false),
+			podsBeforeWatch:   []*example.Pod{pod1},
+			podsBeforeResync:  []*example.Pod{pod2},
+			podsAfterResync:   []*example.Pod{pod3},
+			expectedOut:       []watch.Event{added(pod3)},
+		},
+		// TODO: Uncomment once background watch resync is implemented (watching from RV=beforeResync
+		// with sendInitialEvents=true requires resyncing after podsBeforeResync are created).
+		// {
+		// 	name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=beforeResync",
+		// 	rv:                rvBeforeResync,
+		// 	sendInitialEvents: ptr.To(true),
+		// 	podsBeforeWatch:   []*example.Pod{pod1},
+		// 	podsBeforeResync:  []*example.Pod{pod2},
+		// 	podsAfterResync:   []*example.Pod{pod3},
+		// 	expectedOut:       []watch.Event{added(pod1), added(pod2), added(pod3)},
+		// 	skipEtcd3:         true,
+		// },
+		{
+			name:             "legacy, RV=beforeResync",
+			rv:               rvBeforeResync,
+			podsBeforeWatch:  []*example.Pod{pod1},
+			podsBeforeResync: []*example.Pod{pod2},
+			podsAfterResync:  []*example.Pod{pod3},
+			expectedOut:      []watch.Event{added(pod3)},
+		},
+		{
+			name:                "compacted at watch RV before resync, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod1,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:                "compacted past watch RV before resync, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod2,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:                "compacted before resync, sendInitialEvents=false, RV=unset",
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod2,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:                "compacted before resync, sendInitialEvents=false, RV=0",
+			rv:                  rvZero,
+			sendInitialEvents:   ptr.To(false),
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod2,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod2), added(pod3)},
+		},
+		{
+			name:                "compacted before resync, legacy, RV=unset",
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod2,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		{
+			name:                "compacted before resync, legacy, RV=0",
+			rv:                  rvZero,
+			podsBeforeWatch:     []*example.Pod{pod1},
+			podsBeforeResync:    []*example.Pod{pod2},
+			compactBeforeResync: pod2,
+			podsAfterResync:     []*example.Pod{pod3},
+			expectedOut:         []watch.Event{added(pod1), added(pod2), added(pod3)},
+		},
+		// TODO: Uncomment once cacher marks cacheInterval.initialEventsEndBookmark as received
+		// so WatchList watchers are not scheduled in bucket 0 for an immediate 1s periodic bookmark.
+		// {
+		// 	name:                "compacted before resync, allowWatchBookmarks=true, sendInitialEvents=true",
+		// 	allowWatchBookmarks: true,
+		// 	sendInitialEvents:   ptr.To(true),
+		// 	podsBeforeWatch:     []*example.Pod{pod1},
+		// 	podsBeforeResync:    []*example.Pod{pod2},
+		// 	compactBeforeResync: pod2,
+		// 	podsAfterResync:     []*example.Pod{pod3},
+		// 	expectedOut:         []watch.Event{added(pod1), initialBookmark, added(pod2), added(pod3)},
+		// 	skipEtcd3:           true,
+		// },
+	}
+
+	for idx, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !isWatchCache && tt.skipEtcd3 {
+				t.Skip("skipping etcd3 due to watch initialization race")
+			}
+			ns := fmt.Sprintf("ns-%d", idx)
+			createPods := func(pods []*example.Pod) {
+				for _, pod := range pods {
+					pod.Namespace = ns
+					pod.ResourceVersion = ""
+					require.NoError(t, store.Create(ctx, computePodKey(pod), pod, pod, 0))
+				}
+			}
+
+			beforeTestRV, err := store.GetCurrentResourceVersion(ctx)
+			require.NoError(t, err)
+
+			createPods(tt.podsBeforeWatch)
+
+			beforeWatchRV, err := store.GetCurrentResourceVersion(ctx)
+			require.NoError(t, err)
+			bookmarkPod.ResourceVersion = strconv.FormatUint(beforeWatchRV, 10)
+			beforeResyncRV := beforeWatchRV + uint64(len(tt.podsBeforeResync))
+			afterResyncRV := beforeResyncRV + uint64(len(tt.podsAfterResync))
+
+			var rv string
+			switch tt.rv {
+			case rvUnset, rvZero, rvOne:
+				rv = string(tt.rv)
+			case rvBeforeTest:
+				rv = strconv.FormatUint(beforeTestRV, 10)
+			case rvBeforeWatch:
+				rv = strconv.FormatUint(beforeWatchRV, 10)
+			case rvBeforeResync:
+				rv = strconv.FormatUint(beforeResyncRV, 10)
+			case rvAfterResync:
+				rv = strconv.FormatUint(afterResyncRV, 10)
+			default:
+				t.Fatalf("unexpected rv: %q", tt.rv)
+			}
+
+			pred := storage.Everything
+			pred.AllowWatchBookmarks = tt.allowWatchBookmarks
+			w, err := store.Watch(ctx, fmt.Sprintf("/pods/%s", ns), storage.ListOptions{
+				ResourceVersion:   rv,
+				SendInitialEvents: tt.sendInitialEvents,
+				Predicate:         pred,
+				Recursive:         true,
+			})
+			require.NoError(t, err)
+			defer w.Stop()
+
+			createPods(tt.podsBeforeResync)
+			if tt.compactBeforeResync != nil {
+				compact(ctx, t, tt.compactBeforeResync.ResourceVersion)
+			}
+			if resync != nil {
+				resync()
+			}
+			createPods(tt.podsAfterResync)
+
+			TestCheckResultsInStrictOrder(t, w, tt.expectedOut)
+		})
+	}
 }
 
 func makePod(namePrefix string) *example.Pod {
