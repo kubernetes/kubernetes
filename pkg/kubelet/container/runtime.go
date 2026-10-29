@@ -369,6 +369,9 @@ type ContainerResources struct {
 	MemoryRequest *resource.Quantity
 	// Memory limit enforced on the container
 	MemoryLimit *resource.Quantity
+	// Swap limit (memory.swap.max) enforced on the container, when the runtime
+	// reports it. nil means unknown or unlimited.
+	SwapLimit *resource.Quantity
 }
 
 // Status represents the status of a container.

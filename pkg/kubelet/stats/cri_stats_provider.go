@@ -316,6 +316,7 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 		}
 		ps.CPU = fallbackStats.CPU
 		ps.Memory = fallbackStats.Memory
+		ps.Swap = fallbackStats.Swap
 
 		for _, fb := range fallbackStats.Containers {
 			var container *statsapi.ContainerStats
@@ -332,10 +333,55 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 				if container.Memory == nil {
 					container.Memory = fb.Memory
 				}
+				if container.Swap == nil {
+					container.Swap = fb.Swap
+				}
 			} else {
 				ps.Containers = append(ps.Containers, fb)
 			}
 		}
+	}
+
+	// When PodAndContainerStatsFromCRI is enabled (useCRIPodSandboxStats == true),
+	// runtimes that do not populate ContainerStats.Swap over CRI (such as containerd)
+	// leave container.Swap nil. Backfill missing swap stats from fallbackStatsProvider
+	// so swap limit decrease validation does not defer indefinitely on missing stats.
+	if p.useCRIPodSandboxStats && utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && p.fallbackStatsProvider != nil {
+		var needsSwapFallback bool
+		for _, cs := range ps.Containers {
+			if cs.Swap == nil || cs.Swap.SwapUsageBytes == nil {
+				needsSwapFallback = true
+				break
+			}
+		}
+		if needsSwapFallback {
+			fallbackStats, err := p.fallbackStatsProvider.PodCPUAndMemoryStats(ctx, pod, podStatus)
+			if err == nil && fallbackStats != nil {
+				if ps.Swap == nil {
+					ps.Swap = fallbackStats.Swap
+				}
+				for _, fb := range fallbackStats.Containers {
+					for i := range ps.Containers {
+						if ps.Containers[i].Name == fb.Name {
+							if ps.Containers[i].Swap == nil {
+								ps.Containers[i].Swap = fb.Swap
+							} else if ps.Containers[i].Swap.SwapUsageBytes == nil && fb.Swap != nil {
+								ps.Containers[i].Swap.SwapUsageBytes = fb.Swap.SwapUsageBytes
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Pod-level swap usage feeds the in-place resize swap-decrease validation
+	// (KEP-5359). CRI sandbox stats carry no swap field, so aggregate from
+	// containers (the pod cgroup's memory.swap.current is hierarchical and would
+	// be the exact source; see cgroupManager.MemoryUsage for the pattern).
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && ps.Swap == nil {
+		aggregatePodSwapStats(ps)
 	}
 
 	return ps, nil
