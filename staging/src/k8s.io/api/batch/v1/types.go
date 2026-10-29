@@ -395,7 +395,7 @@ type JobSpec struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("backoffLimitPerIndex")
 	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
