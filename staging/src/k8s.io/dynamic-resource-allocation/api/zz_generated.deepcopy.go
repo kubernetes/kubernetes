@@ -315,6 +315,11 @@ func (in *ResourceSliceSpec) DeepCopyInto(out *ResourceSliceSpec) {
 		*out = make([]v1.SkipNodeOperation, len(*in))
 		copy(*out, *in)
 	}
+	if in.SharingAffinity != nil {
+		in, out := &in.SharingAffinity, &out.SharingAffinity
+		*out = make([]v1.SharingAffinityExtractor, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

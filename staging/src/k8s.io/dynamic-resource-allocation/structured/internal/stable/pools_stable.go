@@ -71,6 +71,10 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses compatibility groups while the DRADeviceCompatibilityGroups feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
 			continue
 		}
+		if !features.SharingAffinity && sliceUsesSharingAffinity(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses sharing affinity while the DRASharingAffinity feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
+			continue
+		}
 
 		// Always include slices with SharedCounters since they are needed to use a pool
 		// regardless of their node selector.
@@ -153,6 +157,9 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 			// considered complete even though its devices with compatibility
 			// groups are not visible to the allocator.
 			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
+		}
+		if !features.SharingAffinity {
+			allSlicesForPool = slicesWithoutSharingAffinity(allSlicesForPool)
 		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
@@ -527,4 +534,18 @@ func (a *allocatedDevicesLogger) MarshalLog() any {
 
 	}
 	return info
+}
+
+func sliceUsesSharingAffinity(slice *draapi.ResourceSlice) bool {
+	return len(slice.Spec.SharingAffinity) > 0
+}
+
+func slicesWithoutSharingAffinity(slices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	var filtered []*draapi.ResourceSlice
+	for _, slice := range slices {
+		if !sliceUsesSharingAffinity(slice) {
+			filtered = append(filtered, slice)
+		}
+	}
+	return filtered
 }

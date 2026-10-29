@@ -199,6 +199,14 @@
     "partitionTypeAttribute": "partitionTypeAttributeValue",
     "skipNodeOperations": [
       "skipNodeOperationsValue"
+    ],
+    "sharingAffinity": [
+      {
+        "name": "nameValue",
+        "apiGroup": "apiGroupValue",
+        "kind": "kindValue",
+        "expression": "expressionValue"
+      }
     ]
   }
 }

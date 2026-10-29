@@ -131,6 +131,28 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.sharingAffinity": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.sharingAffinity[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.sharingAffinity[*].apiGroup": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.sharingAffinity[*].expression": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"spec.sharingAffinity[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.sharingAffinity[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.skipNodeOperations[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 				{ErrorType: "FieldValueNotSupported"},

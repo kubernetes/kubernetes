@@ -112,14 +112,15 @@ func (r *ResourceSlice) LookupUniqueString(str string) UniqueString {
 type ResourceSliceSpec struct {
 	Driver                 UniqueString
 	Pool                   ResourcePool
-	NodeName               *string                         `json:",omitempty"`
-	NodeSelector           *v1.NodeSelector                `json:",omitempty"`
-	AllNodes               bool                            `json:",omitempty"`
-	Devices                []Device                        `json:",omitempty"`
-	PerDeviceNodeSelection *bool                           `json:",omitempty"`
-	SharedCounters         []CounterSet                    `json:",omitempty"`
-	PartitionTypeAttribute *resourceapi.FullyQualifiedName `json:",omitempty"`
-	SkipNodeOperations     []resourceapi.SkipNodeOperation `json:",omitempty"`
+	NodeName               *string                                `json:",omitempty"`
+	NodeSelector           *v1.NodeSelector                       `json:",omitempty"`
+	AllNodes               bool                                   `json:",omitempty"`
+	Devices                []Device                               `json:",omitempty"`
+	PerDeviceNodeSelection *bool                                  `json:",omitempty"`
+	SharedCounters         []CounterSet                           `json:",omitempty"`
+	PartitionTypeAttribute *resourceapi.FullyQualifiedName        `json:",omitempty"`
+	SkipNodeOperations     []resourceapi.SkipNodeOperation        `json:",omitempty"`
+	SharingAffinity        []resourceapi.SharingAffinityExtractor `json:",omitempty"`
 }
 
 type CounterSet struct {
