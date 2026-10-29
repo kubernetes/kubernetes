@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podresource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -35,14 +36,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
+type getNodeFuncType func(ctx context.Context, useCache bool) (*v1.Node, error)
+
 // NewPodResizesAdmitHandler returns a PodAdmitHandler which is used to evaluate
 // if a pod resize can be allocated by the kubelet.
-func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, resourceManager cm.ResourceManager, containerRuntime kubecontainer.Runtime, allocationManager Manager) lifecycle.PodAdmitHandler {
+func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, resourceManager cm.ResourceManager, containerRuntime kubecontainer.Runtime, allocationManager Manager, getNode getNodeFuncType) lifecycle.PodAdmitHandler {
 	return &podResizesAdmitHandler{
 		containerManager:  containerManager,
 		resourceManager:   resourceManager,
 		containerRuntime:  containerRuntime,
 		allocationManager: allocationManager,
+		getNode:           getNode,
 	}
 }
 
@@ -51,6 +55,7 @@ type podResizesAdmitHandler struct {
 	resourceManager   cm.ResourceManager
 	containerRuntime  kubecontainer.Runtime
 	allocationManager Manager
+	getNode           getNodeFuncType
 }
 
 func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -61,6 +66,17 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceNodeResourceResize) {
+		if node, err := h.getNode(ctx, true); err != nil {
+			logger.V(4).Info("Failed to get node for resize capacity check; skipping", "err", err)
+		} else if msg, ok := exceedsNodeAllocatable(pod, node.Status.Allocatable); ok {
+			logger.V(3).Info(msg, "pod", klog.KObj(pod))
+			metrics.PodInfeasibleResizes.WithLabelValues("insufficient_node_allocatable").Inc()
+			return lifecycle.PodAdmitResult{Admit: false, Reason: lifecycle.CapacityInfeasible, Message: msg}
+		}
+	}
+
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
@@ -107,6 +123,25 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	}
 
 	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+// exceedsNodeAllocatable returns (message, true) if the pod's total CPU or
+// memory requests exceed the node's allocatable, (empty, false) otherwise.
+func exceedsNodeAllocatable(pod *v1.Pod, allocatable v1.ResourceList) (string, bool) {
+	cpuAllocatable := allocatable.Cpu().MilliValue()
+	memAllocatable := allocatable.Memory().Value()
+	cpuRequests := podresource.GetResourceRequest(pod, v1.ResourceCPU)
+	memRequests := podresource.GetResourceRequest(pod, v1.ResourceMemory)
+	if cpuRequests > cpuAllocatable || memRequests > memAllocatable {
+		var detail string
+		if memRequests > memAllocatable {
+			detail = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAllocatable)
+		} else {
+			detail = fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAllocatable)
+		}
+		return fmt.Sprintf("Node didn't have enough capacity: %s", detail), true
+	}
+	return "", false
 }
 
 func disallowResizeForMemoryBackedVolumes(desiredPod, allocatedPod *v1.Pod, cgroupVersion int) (bool, string, string) {

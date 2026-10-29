@@ -861,7 +861,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
-	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager)
+	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager, klet.GetCachedNode)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
@@ -1197,8 +1197,7 @@ func NewMainKubelet(ctx context.Context,
 
 	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
 
-	// When node allocatable changes, pending pod resizes may become feasible or
-	// need to transition to Infeasible.
+	// When node allocatable changes, pending pod resizes may become feasible or need to transition to Infeasible.
 	if nodeInformer != nil && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceNodeResourceResize) {
 		if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {

@@ -696,6 +696,7 @@ func TestRetryPendingResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceNodeResourceResize, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
@@ -884,7 +885,7 @@ func TestRetryPendingResizes(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
+					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -900,7 +901,7 @@ func TestRetryPendingResizes(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Node didn't have enough resource: cpu, requested: 5000, used: 2000, capacity: 4000",
+					Message: "Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -1102,7 +1103,7 @@ func TestRetryPendingResizes(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
+					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -1858,6 +1859,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceNodeResourceResize, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	cpu500m := resource.MustParse("500m")
@@ -1947,7 +1949,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					Type:               v1.PodResizePending,
 					Status:             "True",
 					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
+					Message:            "Node didn't have enough capacity: memory,",
 					ObservedGeneration: 2,
 				},
 				{
@@ -1956,7 +1958,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					ObservedGeneration: 1,
 				},
 			},
-			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000"}`,
+			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296"}`,
 		},
 		{
 			name:       "same as previous case to ensure no new event is generated",
@@ -1968,7 +1970,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					Type:               v1.PodResizePending,
 					Status:             "True",
 					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
+					Message:            "Node didn't have enough capacity: memory,",
 					ObservedGeneration: 2,
 				},
 				{
@@ -3520,7 +3522,10 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceNodeResourceResize, true)
+	tCtx := ktesting.Init(t)
+
+	logger := klog.FromContext(tCtx)
 
 	tests := []struct {
 		name                     string
@@ -3935,9 +3940,9 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			}
 
 			// Actuate
-			resizeAllocated, err := allocationManager.(*manager).handlePodResourcesResize(tCtx, test.targetPod)
+			outcome, err := allocationManager.(*manager).handlePodResourcesResize(tCtx, test.targetPod)
 			require.NoError(t, err)
-			assert.Equal(t, test.expectResizeAllocated, resizeAllocated)
+			assert.Equal(t, test.expectResizeAllocated, outcome == resizeOutcomeAllocated)
 
 			// Verify the final checkpoint allocation
 			limit, exists := allocationManager.(*manager).allocated.GetEmptyDirVolumeLimit(test.pod.UID, "mem-vol")
@@ -4033,7 +4038,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	}
 
 	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager, getNode)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
@@ -4247,10 +4252,6 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	return allocationManager, runningPod, pendingPod, logger
 }
 
-
-// makeAllocationManagerWithNodeGetter is like makeAllocationManager but accepts a
-// caller-supplied getNode function, enabling tests to swap allocatable between
-// RetryPendingResizes calls and observe state-machine transitions.
 func makeAllocationManagerWithNodeGetter(
 	t *testing.T,
 	runtime *containertest.FakeRuntime,
@@ -4269,14 +4270,11 @@ func makeAllocationManagerWithNodeGetter(
 		record.NewFakeRecorder(20),
 	)
 	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager, getNode)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
 
-// TestDeferredResizeRetriedOnNodeUpscale verifies that a pod resize that was
-// Deferred because the node lacked capacity is re-evaluated and accepted when
-// Node.Status.Allocatable increases.
 func TestDeferredResizeRetriedOnNodeUpscale(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
@@ -4382,9 +4380,6 @@ func TestDeferredResizeRetriedOnNodeUpscale(t *testing.T) {
 	assert.Equal(t, v1.ConditionTrue, conditions[0].Status)
 }
 
-// TestDeferredResizeBecomesInfeasibleOnNodeDownscale verifies that a pod resize
-// that was Deferred transitions to Infeasible when Node.Status.Allocatable
-// decreases below the requested size.
 func TestDeferredResizeBecomesInfeasibleOnNodeDownscale(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
