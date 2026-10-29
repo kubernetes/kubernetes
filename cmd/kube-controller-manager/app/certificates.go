@@ -331,7 +331,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		certificatesv1beta1.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
 	} {
-		ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient, gv)
+		ctbAvailable, err := clusterTrustBundlesAvailable(ctx, apiserverSignerClient, gv)
 		if err != nil {
 			return nil, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
 		}
@@ -360,8 +360,8 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	return newControllerLoop(runner.Run, controllerName), nil
 }
 
-func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
-	resList, err := client.Discovery().ServerResourcesForGroupVersion(schemaVersion.String())
+func clusterTrustBundlesAvailable(ctx context.Context, client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersionWithContext(ctx, schemaVersion.String())
 	if errors.IsNotFound(err) {
 		return false, nil
 	}
