@@ -1323,8 +1323,8 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			defer stopFn()
 
 			// Run scheduler.
-			informerFactory.Start(tCtx.Done())
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 			go scheduler.Run(tCtx)
 
 			// Send pods to be scheduled.
@@ -1540,10 +1540,9 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	informerFactory := NewInformerFactory(cs, 0, nil)
 	lister := informerFactory.Core().V1().Pods().Lister()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	tCtx := utiltesting.Init(t)
+	informerFactory.StartWithContext(tCtx)
+	tCtx.ExpectNoError(informerFactory.WaitForCacheSyncWithContext(tCtx).AsError())
 
 	p, err := lister.Pods("default").Get("test")
 	require.NoError(t, err)
@@ -1565,10 +1564,9 @@ func TestNewInformerFactoryMetrics(t *testing.T) {
 	informerFactory.Core().V1().Pods().Informer()
 	informerFactory.Core().V1().Nodes().Informer()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	tCtx := utiltesting.Init(t)
+	informerFactory.StartWithContext(tCtx)
+	tCtx.ExpectNoError(informerFactory.WaitForCacheSyncWithContext(tCtx).AsError())
 
 	want := `
 # HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.

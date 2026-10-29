@@ -47,7 +47,7 @@ type testInformer struct {
 	handler cache.ResourceEventHandler
 }
 
-func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+func (i *testInformer) AddEventHandlerWithOptions(handler cache.ResourceEventHandler, options cache.HandlerOptions) (cache.ResourceEventHandlerRegistration, error) {
 	i.handler = handler
 	return nil, nil
 }
