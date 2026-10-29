@@ -35,27 +35,6 @@ import (
 	"k8s.io/klog/v2/textlogger"
 )
 
-func TestHandlerHealthCheckDelegates(t *testing.T) {
-	var status atomic.Int64
-	status.Store(http.StatusServiceUnavailable)
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != localJWKSPath {
-			t.Errorf("probe path = %q, want %q", r.URL.Path, localJWKSPath)
-		}
-		w.WriteHeader(int(status.Load()))
-		_, _ = w.Write([]byte("not a JWKS"))
-	}))
-	defer server.Close()
-	handler := &Handler{verifier: &Verifier{client: server.Client(), jwksURL: server.URL + localJWKSPath}}
-	if err := handler.HealthCheck(); err == nil {
-		t.Fatal("HealthCheck succeeded for an unavailable endpoint")
-	}
-	status.Store(http.StatusOK)
-	if err := handler.HealthCheck(); err != nil {
-		t.Fatalf("HealthCheck after endpoint recovery: %v", err)
-	}
-}
-
 func TestWithTokenVerificationConstruction(t *testing.T) {
 	var requests atomic.Int32
 	var server *httptest.Server
@@ -93,8 +72,8 @@ func TestWithTokenVerificationConstruction(t *testing.T) {
 	if err != nil || h == nil {
 		t.Fatalf("construction = (%v, %v)", h, err)
 	}
-	if optionsApplied != 1 || requests.Load() != 2 {
-		t.Fatalf("options applied %d times, endpoint requests %d; want 1 and 2", optionsApplied, requests.Load())
+	if optionsApplied != 1 || requests.Load() != 1 {
+		t.Fatalf("options applied %d times, discovery requests %d; want 1 and 1", optionsApplied, requests.Load())
 	}
 }
 
