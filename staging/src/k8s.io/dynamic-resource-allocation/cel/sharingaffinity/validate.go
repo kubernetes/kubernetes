@@ -17,6 +17,9 @@ limitations under the License.
 package sharingaffinity
 
 import (
+	"fmt"
+
+	resourceapi "k8s.io/api/resource/v1"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 )
@@ -28,17 +31,8 @@ type CompileResult struct {
 	Error   error
 }
 
-// CompileError wraps an apiserver CEL Error, preserving its invalid/internal
-// classification and compiler diagnostics for admission field errors.
-type CompileError struct {
-	Err error
-}
-
-func (e *CompileError) Error() string { return e.Err.Error() }
-func (e *CompileError) Unwrap() error { return e.Err }
-
-func newCompileError(kind apiservercel.ErrorType, err error) *CompileError {
-	return &CompileError{Err: &apiservercel.Error{Type: kind, Detail: err.Error(), Cause: err}}
+func newCompileError(kind apiservercel.ErrorType, err error) error {
+	return &apiservercel.Error{Type: kind, Detail: err.Error(), Cause: err}
 }
 
 // ValidateExpression checks syntax, types and program construction in the
@@ -49,4 +43,39 @@ func ValidateExpression(expression string, envType environment.Type) CompileResu
 		return CompileResult{Error: err}
 	}
 	return CompileResult{MaxCost: compiled.maxCost}
+}
+
+// ValidateExpressions checks CEL compilation and combined estimated cost in the
+// stored-expression environment. Extractor names are used only for diagnostics;
+// callers validate name uniqueness and other non-CEL constraints separately.
+func ValidateExpressions(extractors []resourceapi.SharingAffinityExtractor) error {
+	_, err := compileExpressions(extractors, compileExpression)
+	return err
+}
+
+type compiledExtractor struct {
+	name    string
+	matcher matcher
+	program *compiledExpression
+}
+
+func compileExpressions(extractors []resourceapi.SharingAffinityExtractor, compile func(string, environment.Type) (*compiledExpression, error)) ([]compiledExtractor, error) {
+	compiled := make([]compiledExtractor, 0, len(extractors))
+	remaining := uint64(resourceapi.SharingAffinityCELMaxCost)
+	for _, extractor := range extractors {
+		program, err := compile(extractor.Expression, environment.StoredExpressions)
+		if err != nil {
+			return nil, &Error{Kind: ErrInvalidDefinition, Extractor: extractor.Name, ConfigIndex: -1,
+				Err: &redactedError{summary: "CEL expression could not be compiled", cause: err}}
+		}
+		if program.maxCost > remaining {
+			return nil, &Error{Kind: ErrInvalidDefinition, Extractor: extractor.Name, ConfigIndex: -1,
+				Err: fmt.Errorf("combined estimated cost exceeds %d: %w", resourceapi.SharingAffinityCELMaxCost, ErrCostExceeded)}
+		}
+		remaining -= program.maxCost
+		compiled = append(compiled, compiledExtractor{
+			name: extractor.Name, matcher: matcher{apiGroup: extractor.APIGroup, kind: extractor.Kind}, program: program,
+		})
+	}
+	return compiled, nil
 }

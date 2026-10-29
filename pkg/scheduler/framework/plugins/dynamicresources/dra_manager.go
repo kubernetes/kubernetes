@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -58,15 +59,27 @@ type DefaultDRAManager struct {
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
+	sliceLister := &resourceSliceLister{tracker: resourceSliceTracker}
+	var classLister *deviceClassLister
+	if informerFactory != nil {
+		classLister = &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()}
+	}
+	enabledSharingAffinity := utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity) && utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	allocated := newAllocatedDevices(logger)
+	tracker := &claimTracker{
+		ctx:                  ctx,
+		cache:                claimsCache,
+		inFlightAllocations:  make(map[types.UID]inFlightAllocation),
+		allocatedDevices:     allocated,
+		logger:               logger,
+		resourceSliceTracker: resourceSliceTracker,
+		resourceSliceLister:  sliceLister,
+	}
+	tracker.configureSharingAffinity(enabledSharingAffinity)
 	manager := &DefaultDRAManager{
-		resourceClaimTracker: &claimTracker{
-			cache:               claimsCache,
-			inFlightAllocations: make(map[types.UID]inFlightAllocation),
-			allocatedDevices:    newAllocatedDevices(logger),
-			logger:              logger,
-		},
-		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
-		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
+		resourceClaimTracker: tracker,
+		resourceSliceLister:  sliceLister,
+		deviceClassLister:    classLister,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
@@ -75,7 +88,9 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
-	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
+	if claimsCache != nil {
+		claimsCache.AddEventHandler(allocated.handlers())
+	}
 
 	return manager
 }
@@ -109,6 +124,9 @@ type resourceSliceLister struct {
 }
 
 func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
+	if l == nil || l.tracker == nil {
+		return nil, nil
+	}
 	return l.tracker.ListPatchedResourceSlices()
 }
 
@@ -188,14 +206,25 @@ type claimTracker struct {
 	// pods is expected to be rare compared to per-pod claim, so we end up
 	// hitting the "multiple goroutines read, write, and overwrite entries
 	// for disjoint sets of keys" case that sync.Map is optimized for.
-	inFlightAllocations map[types.UID]inFlightAllocation
-	allocatedDevices    *allocatedDevices
-	logger              klog.Logger
+	ctx                     context.Context
+	inFlightAllocations     map[types.UID]inFlightAllocation
+	allocatedDevices        *allocatedDevices
+	logger                  klog.Logger
+	enabledSharingAffinity  bool
+	forceConsumableCapacity bool
+	sliceHandlerRegistered  bool
+	resourceSliceTracker    *resourceslicetracker.Tracker
+	resourceSliceLister     fwk.ResourceSliceLister
+	extractor               *sharingaffinity.Extractor
+	establishedDeviceLocks  map[structured.DeviceID]*deviceLockBaseline
+	incompleteDevices       sets.Set[structured.DeviceID]
+	claimExtractionCache    map[claimExtractionKey]claimExtractionEntry
 }
 
 type inFlightAllocation struct {
-	claim   *resourceapi.ResourceClaim
-	sharers int
+	claim    *resourceapi.ResourceClaim
+	sharers  int
+	affinity *structured.ClaimAffinity
 }
 
 func (c *claimTracker) GetPendingAllocation(claimUID types.UID) *resourceapi.AllocationResult {
@@ -265,6 +294,9 @@ func (c *claimTracker) MaybeRemoveClaimPendingAllocation(claimUID types.UID, for
 
 	if forceRemove || inFlight.sharers == 1 {
 		delete(c.inFlightAllocations, claimUID)
+		if c.enabledSharingAffinity {
+			c.pruneDrainedDeviceLocksLocked()
+		}
 		c.logger.V(5).Info("Removed in-flight claim", "claim", klog.KObj(claim), "uid", claimUID, "version", claim.ResourceVersion)
 		return true
 	}
@@ -377,7 +409,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
-	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) || c.forceConsumableCapacity
 
 	allocated, revision1 := c.allocatedDevices.get()
 	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
@@ -385,8 +417,9 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if err != nil {
 		return nil, err
 	}
+	allocatedClaims, revision4 := c.allocatedDevices.Claims()
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision2 || revision2 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
@@ -427,12 +460,22 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 				aggregatedCapacity.Insert(capacity)
 			})
 	}
+	var deviceSharingAffinity structured.SharingAffinityState
+	if c.enabledSharingAffinity && (enabledConsumableCapacity || c.forceConsumableCapacity) {
+		var err error
+		deviceSharingAffinity, err = c.gatherDeviceSharingAffinity(allocatedClaims)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
 			AllocatedDevices:         allocated,
 			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
 			AggregatedCapacity:       aggregatedCapacity,
+			DeviceSharingAffinity:    deviceSharingAffinity,
 		}, nil
 	}
 

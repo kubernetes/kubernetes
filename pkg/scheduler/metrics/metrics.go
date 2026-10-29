@@ -204,6 +204,14 @@ var (
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
+	// The below are only available when the DRASharingAffinity feature gate is enabled.
+	SharingAffinityLockedDevices             *metrics.Gauge
+	SharingAffinityUnreconstructableDevices  *metrics.Gauge
+	SharingAffinityExtractorEvaluationsTotal *metrics.Counter
+	SharingAffinityLockConflictTotal         *metrics.Counter
+	SharingAffinityNoKeysExtractedTotal      *metrics.Counter
+	SharingAffinityCompatibleReuseTotal      *metrics.Counter
+
 	WorkloadPreemptionAttempts    *metrics.CounterVec
 	WorkloadPreemptionVictims     *metrics.HistogramVec
 	PreemptionWorkloadDisruptions *metrics.HistogramVec
@@ -262,6 +270,16 @@ func Register() {
 			RegisterMetrics(
 				DRABindingConditionsAllocationsTotal,
 				DRABindingConditionsPreBindDuration,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity) {
+			RegisterMetrics(
+				SharingAffinityLockedDevices,
+				SharingAffinityUnreconstructableDevices,
+				SharingAffinityExtractorEvaluationsTotal,
+				SharingAffinityLockConflictTotal,
+				SharingAffinityNoKeysExtractedTotal,
+				SharingAffinityCompatibleReuseTotal,
 			)
 		}
 	})
@@ -560,6 +578,49 @@ func InitMetrics() {
 		},
 		[]string{"profile", "driver", "status"},
 	)
+
+	SharingAffinityLockedDevices = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_locked_devices",
+			Help:           "Number of devices currently holding at least one active affinity lock.",
+			StabilityLevel: metrics.ALPHA,
+		})
+	SharingAffinityUnreconstructableDevices = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_unreconstructable_devices",
+			Help:           "Number of devices currently in conservative quarantine because their lock state cannot be reconstructed.",
+			StabilityLevel: metrics.ALPHA,
+		})
+	SharingAffinityExtractorEvaluationsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_extractor_evaluations_total",
+			Help:           "Total CEL extractor evaluations the scheduler has performed.",
+			StabilityLevel: metrics.ALPHA,
+		})
+	SharingAffinityLockConflictTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_lock_conflict_total",
+			Help:           "Number of candidate devices filtered out during Filter because the device's existing affinity lock is incompatible with the claim's extracted keys.",
+			StabilityLevel: metrics.ALPHA,
+		})
+	SharingAffinityNoKeysExtractedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_no_keys_extracted_total",
+			Help:           "Number of candidate devices filtered out during Filter because the slice's extractors did not produce a value for every declared extractor.",
+			StabilityLevel: metrics.ALPHA,
+		})
+	SharingAffinityCompatibleReuseTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "sharing_affinity_compatible_reuse_total",
+			Help:           "Number of successful placements onto an already-locked device whose affinity values matched.",
+			StabilityLevel: metrics.ALPHA,
+		})
 
 	GetNodeHintDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
