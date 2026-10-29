@@ -255,8 +255,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		case "":
 		case string(kubetypes.NoSwap):
 		case string(kubetypes.LimitedSwap):
+		case string(kubetypes.WorkloadControlledSwap):
+			if !localFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q requires feature gate WorkloadControlledSwap", kc.MemorySwap.SwapBehavior))
+			}
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q, %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap, kubetypes.WorkloadControlledSwap))
 		}
 	}
 	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {

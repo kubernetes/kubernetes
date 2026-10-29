@@ -130,6 +130,7 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 	if desiredPod == nil || allocatedPod == nil {
 		return false, ""
 	}
+	workloadControlledSwap := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap)
 	restartableMemoryResizePolicy := func(resizePolicies []v1.ContainerResizePolicy) bool {
 		for _, policy := range resizePolicies {
 			if policy.ResourceName == v1.ResourceMemory {
@@ -137,6 +138,15 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 			}
 		}
 		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		allocatedPodSwap, allocatedHasPodSwap := cm.PodSwapLimit(allocatedPod)
+		desiredPodSwap, desiredHasPodSwap := cm.PodSwapLimit(desiredPod)
+		if allocatedHasPodSwap != desiredHasPodSwap || (allocatedHasPodSwap && allocatedPodSwap != desiredPodSwap) {
+			if !workloadControlledSwap || runtime.GetContainerSwapBehavior(desiredPod, nil) == kubetypes.NoSwap {
+				return true, "In-place resize of pod swap limit is not supported when swap is disabled on the node."
+			}
+		}
 	}
 	allocatedContainers := make(map[string]*v1.Container)
 	for container := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
@@ -147,14 +157,46 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		if !ok {
 			continue
 		}
-		origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
-		newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
-		if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
-			aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
-			bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
+		allocatedSwap, allocatedHasSwap := allocatedContainer.Resources.Limits[v1.ResourceSwap]
+		desiredSwap, desiredHasSwap := desiredContainer.Resources.Limits[v1.ResourceSwap]
+		if allocatedHasSwap != desiredHasSwap || (allocatedHasSwap && !allocatedSwap.Equal(desiredSwap)) {
+			if !workloadControlledSwap || (runtime.GetContainerSwapBehavior(desiredPod, desiredContainer) == kubetypes.NoSwap && runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer) == kubetypes.NoSwap) {
+				return true, fmt.Sprintf("In-place resize of swap limit for container %q is not supported when swap is disabled on the node.", desiredContainer.Name)
+			}
+		}
+		memRequestChanged := !desiredContainer.Resources.Requests.Memory().Equal(*allocatedContainer.Resources.Requests.Memory())
+		memLimitChanged := workloadControlledSwap && !desiredContainer.Resources.Limits.Memory().Equal(*allocatedContainer.Resources.Limits.Memory())
+		if (!memRequestChanged && !memLimitChanged) || restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
+			continue
+		}
+		aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
+		bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
+
+		if !workloadControlledSwap {
+			// Pre-KEP-5359: LimitedSwap derives memory.swap.max from requests.memory,
+			// and the resize path could not see or validate that recalculation.
 			if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
 				return true, "In-place resize of containers with swap is not supported."
 			}
+			continue
+		}
+
+		// KEP-5359: the swap limit is a first-class resize resource. A memory
+		// request change on a LimitedSwap container surfaces as a validated,
+		// ordered swap delta (see kuberuntime computePodResizeAction and
+		// validateMemoryResizeAction), so it no longer needs to be refused here.
+		//
+		// One case cannot converge in place: LimitedSwap recalculating to 0 because
+		// the resize makes requests.memory == limits.memory (GetContainerSwapBehavior
+		// returns NoSwap for the desired spec). The strict decrease validation would
+		// defer until memory.swap.current reaches 0, which cold pages may never do.
+		// Keep that case Infeasible so the user gets a clear signal; explicit
+		// limits.swap (container or pod) opts out of the recalculation entirely.
+		if cm.HasExplicitSwapLimit(desiredPod, desiredContainer) || cm.HasExplicitSwapLimit(allocatedPod, allocatedContainer) {
+			continue
+		}
+		if bSwapBehavior == kubetypes.LimitedSwap && aSwapBehavior == kubetypes.NoSwap {
+			return true, fmt.Sprintf("In-place resize of container %q would disable its LimitedSwap allocation (memory request equals limit); set resources.limits.swap explicitly or use a RestartContainer resize policy for memory.", desiredContainer.Name)
 		}
 	}
 	return false, ""

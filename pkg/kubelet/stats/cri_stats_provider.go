@@ -316,6 +316,7 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 		}
 		ps.CPU = fallbackStats.CPU
 		ps.Memory = fallbackStats.Memory
+		ps.Swap = fallbackStats.Swap
 
 		for _, fb := range fallbackStats.Containers {
 			var container *statsapi.ContainerStats
@@ -332,10 +333,21 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 				if container.Memory == nil {
 					container.Memory = fb.Memory
 				}
+				if container.Swap == nil {
+					container.Swap = fb.Swap
+				}
 			} else {
 				ps.Containers = append(ps.Containers, fb)
 			}
 		}
+	}
+
+	// Pod-level swap usage feeds the in-place resize swap-decrease validation
+	// (KEP-5359). CRI sandbox stats carry no swap field, so aggregate from
+	// containers (the pod cgroup's memory.swap.current is hierarchical and would
+	// be the exact source; see cgroupManager.MemoryUsage for the pattern).
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && ps.Swap == nil {
+		aggregatePodSwapStats(ps)
 	}
 
 	return ps, nil

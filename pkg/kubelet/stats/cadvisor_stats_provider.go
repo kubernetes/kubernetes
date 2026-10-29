@@ -212,6 +212,9 @@ func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(&info)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				podStats.Swap = cadvisorInfoToSwapStats(&info)
+			}
 		} else {
 			containerName := kubetypes.GetContainerName(info.Spec.Labels)
 			if containerName != kubetypes.PodInfraContainerName && containerName != "" {
