@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	batch "k8s.io/api/batch/v1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 	jobutil "k8s.io/kubernetes/pkg/api/job"
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -117,15 +119,9 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 		return nil, nil, nil
 	}
 
-	// Objects are only created for a Job that has never started, so a
-	// Job that predates the feature gate being enabled is left untouched.
-	// An already-started Job discovers and reuses existing objects
-	// but never creates new ones.
-	newJob := isNewJob(job, pods)
-
 	// Case 1 - manage the PodGroup only.
 	if mode == managePodGroupOnly {
-		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, newJob)
+		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, canCreatePodGroup(job, pods))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -133,18 +129,18 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 	}
 
 	// Case 2 - manage both Workload and PodGroup (root Job).
-	wl, err := jm.getOrCreateWorkload(ctx, job, newJob)
+	wl, err := jm.getOrCreateWorkload(ctx, job, canCreateWorkload(pods))
 	if err != nil || wl == nil {
 		return nil, nil, err
 	}
-	pg, err := jm.getOrCreatePodGroup(ctx, job, wl, newJob)
+	pg, err := jm.getOrCreatePodGroup(ctx, job, wl, canCreatePodGroup(job, pods))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// propagate a changed gang minCount (elastic scaling) to the controller-owned
 	// Workload/PodGroup. Runs regardless of pod state so a running gang Job can
-	// be resized.
+	// be resized, and while suspended so the retained Workload stays current.
 	err = jm.syncGangMinCount(ctx, job, wl, pg)
 	if err != nil {
 		return nil, nil, err
@@ -337,6 +333,9 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 			fmt.Sprintf("PodGroup %s/%s does not reference Workload %q template %q",
 				updatedPG.Namespace, updatedPG.Name, parentWorkload.Name, template.Name))
 	}
+	if jobSuspended(job) {
+		return nil, jm.deleteSuspendedPodGroup(ctx, job, updatedPG)
+	}
 	// A create that races with another actor returns AlreadyExists, which
 	// requeues the Job so the next sync discovers it.
 	if updatedPG == nil && canCreate {
@@ -374,24 +373,41 @@ func (jm *Controller) syncDelegatedPodGroupMinCount(ctx context.Context, job *ba
 	return jm.patchPodGroupMinCount(ctx, podGroup, desiredMinCount)
 }
 
-// isNewJob returns true if the Job has never started. This prevents creating
-// scheduling objects for Jobs that predate the feature gate being enabled.
-//
-// This heuristic is intentionally conservative for alpha and will be replaced
-// by a more robust mechanism before beta.
-//
-// We check pods, StartTime, terminal counters, and the Suspended condition
-// because each alone has gaps, pods may be GC'd, StartTime is reset on
-// suspend, but Succeeded/Failed persist. A Job that was suspended early
-// would pass the other checks, so the Suspended condition catches that case.
-func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
-	if len(pods) != 0 ||
-		job.Status.StartTime != nil ||
-		job.Status.Succeeded != 0 ||
-		job.Status.Failed != 0 {
-		return false
+// canCreateWorkload reports whether the Job owns no pods, so a Job that
+// predates the feature gate being enabled is left untouched.
+func canCreateWorkload(pods []*v1.Pod) bool {
+	return len(pods) == 0
+}
+
+// canCreatePodGroup reports whether the Job is running and has no active pods,
+// so grouped and ungrouped pods are not mixed. Suspend deletes the active pods,
+// which lets resume recreate the PodGroup deleted on suspend.
+func canCreatePodGroup(job *batch.Job, pods []*v1.Pod) bool {
+	return !jobSuspended(job) && !slices.ContainsFunc(pods, controller.IsPodActive)
+}
+
+// deleteSuspendedPodGroup deletes the PodGroup of a suspended Job so the Job
+// is scheduled as a new gang on resume. A PodGroup the Job does not control is
+// left untouched, and the Workload is never deleted.
+func (jm *Controller) deleteSuspendedPodGroup(ctx context.Context, job *batch.Job, podGroup *schedulingv1beta1.PodGroup) error {
+	if podGroup == nil || podGroup.DeletionTimestamp != nil || !metav1.IsControlledBy(podGroup, job) {
+		return nil
 	}
-	return findConditionByType(job.Status.Conditions, batch.JobSuspended) == nil
+	err := jm.kubeClient.SchedulingV1beta1().PodGroups(podGroup.Namespace).Delete(ctx, podGroup.Name, metav1.DeleteOptions{
+		Preconditions: &metav1.Preconditions{
+			UID: &podGroup.UID,
+		},
+	})
+	switch {
+	case apierrors.IsNotFound(err):
+		// Deleted by another actor since the lister was read.
+		return nil
+	case err != nil:
+		return fmt.Errorf("deleting PodGroup %s/%s of suspended Job %s/%s: %w", podGroup.Namespace, podGroup.Name, job.Namespace, job.Name, err)
+	}
+	jm.recorder.Eventf(job, v1.EventTypeNormal, "PodGroupDeleted",
+		"Deleted PodGroup %s for suspended Job %s", podGroup.Name, job.Name)
+	return nil
 }
 
 // getOrCreateWorkload returns the Workload for this root Job, looked up by the
@@ -450,6 +466,7 @@ func podGroupMatchesTemplate(pg *schedulingv1beta1.PodGroup, workloadName, templ
 // getOrCreatePodGroup returns the PodGroup for this Workload, looked up by name.
 // The Workload must already have passed validateWorkloadStructure.
 // An object at that name that does not reference the template blocks the Job.
+// A terminating PodGroup is returned as is; pod creation waits for it to go away.
 func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 	workload *schedulingv1beta1.Workload, canCreate bool) (*schedulingv1beta1.PodGroup, error) {
 	templateName := workload.Spec.PodGroupTemplates[0].Name
@@ -462,6 +479,9 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 		return nil, jm.markSchedulingBlocked(job, batch.JobReasonUnsupportedWorkloadStructure, batch.JobReasonUnsupportedWorkloadStructure,
 			fmt.Sprintf("PodGroup %s/%s does not reference Workload %q template %q",
 				pg.Namespace, pg.Name, workload.Name, templateName))
+	}
+	if jobSuspended(job) {
+		return nil, jm.deleteSuspendedPodGroup(ctx, job, pg)
 	}
 	if pg == nil && canCreate {
 		return jm.createPodGroup(ctx, job, workload, templateName, true)

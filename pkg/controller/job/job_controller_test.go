@@ -7792,6 +7792,18 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				Message: "Scheduling objects for the Job are valid",
 			},
 		},
+		"terminating PodGroup - no pods are created until it is gone": {
+			job:              gangJob,
+			workloadWithJob:  true,
+			existingWorkload: gangWorkload,
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
+				pg := gangPodGroup.DeepCopy()
+				pg.DeletionTimestamp = new(metav1.Now())
+				pg.Finalizers = []string{"scheduling.k8s.io/podgroup-protection"}
+				return pg
+			}(),
+			wantCreations: 0,
+		},
 		"active pod without schedulingGroup - new pods are created without the PodGroup": {
 			job:              gangJob,
 			workloadWithJob:  true,
@@ -7812,6 +7824,14 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			existingPodGroup:        gangPodGroup,
 			wantSchedulingGroupName: gangPodGroup.Name,
 			wantCreations:           3,
+		},
+		"resumed job with only terminal pods - PodGroup is recreated and pods get schedulingGroup": {
+			job:                     gangJob,
+			workloadWithJob:         true,
+			pods:                    []*v1.Pod{buildPod().name("failed").job(gangJob).index("0").phase(v1.PodFailed).Pod},
+			existingWorkload:        gangWorkload,
+			wantSchedulingGroupName: gangPodGroup.Name,
+			wantCreations:           4,
 		},
 		"feature gate disabled: gang-eligible job creates pods without scheduling objects": {
 			job: func() *batch.Job {

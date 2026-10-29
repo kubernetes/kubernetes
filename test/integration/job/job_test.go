@@ -5678,81 +5678,198 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 		features.WorkloadWithJob: true,
 	})
 
-	closeFn, restConfig, clientSet, ns := setup(t, "gang-suspend")
-	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
-
-	// Create suspended: the Workload/PodGroup must exist before any pods.
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-		Spec: batchv1.JobSpec{
-			Parallelism:    new(int32(4)),
-			Completions:    new(int32(4)),
-			CompletionMode: new(batchv1.IndexedCompletion),
-			Suspend:        new(true),
-			Scheduling: &batchv1.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
-				},
-			},
+	cases := map[string]struct {
+		// keeps the deleted PodGroup terminating with a test finalizer.
+		holdPodGroupOnSuspend  bool
+		succeededBeforeSuspend int
+	}{
+		"resume recreates the PodGroup deleted on suspend": {},
+		"resume waits for a terminating PodGroup before creating pods": {
+			holdPodGroupOnSuspend: true,
 		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create Job: %v", err)
+		"completed pods left behind do not keep the PodGroup from being deleted": {
+			succeededBeforeSuspend: 2,
+		},
 	}
 
-	workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
-	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
-	workloadUID, podGroupUID := workload.UID, podGroup.UID
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active: 0, Ready: new(int32(0)), Terminating: new(int32(0)),
-	})
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			closeFn, restConfig, clientSet, ns := setup(t, "gang-suspend")
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
 
-	setSuspend := func(suspend bool) {
-		if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
-			j.Spec.Suspend = new(suspend)
-		}); err != nil {
-			t.Fatalf("Failed to set suspend=%v: %v", suspend, err)
-		}
-	}
-	verifyPodsInPodGroup := func(stage string) {
-		pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
-		if err != nil {
-			t.Fatalf("[%s] Failed to get job pods: %v", stage, err)
-		}
-		for _, pod := range pods {
-			if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil ||
-				*pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
-				t.Errorf("[%s] Pod %s schedulingGroup = %+v, want podGroupName %q", stage, pod.Name, pod.Spec.SchedulingGroup, podGroup.Name)
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    new(int32(4)),
+					Completions:    new(int32(4)),
+					CompletionMode: new(batchv1.IndexedCompletion),
+					Suspend:        new(true),
+					Scheduling: &batchv1.JobSchedulingConfiguration{
+						SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+							Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+						},
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
 			}
-		}
-	}
 
-	// Resume: pods are created and wired to the existing PodGroup.
-	setSuspend(false)
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active: 4, Ready: new(int32(0)), Terminating: new(int32(0)),
-	})
-	verifyPodsInPodGroup("after resume")
+			podGroupClient := clientSet.SchedulingV1beta1().PodGroups(ns.Name)
+			setSuspend := func(suspend bool) {
+				if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = new(suspend)
+				}); err != nil {
+					t.Fatalf("Failed to set suspend=%v: %v", suspend, err)
+				}
+			}
+			setHoldFinalizer := func(name string, hold bool) {
+				if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					pg, err := podGroupClient.Get(ctx, name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					pg.Finalizers = slices.DeleteFunc(pg.Finalizers, func(f string) bool { return f == "example.com/hold-podgroup" })
+					if hold {
+						pg.Finalizers = append(pg.Finalizers, "example.com/hold-podgroup")
+					}
+					_, err = podGroupClient.Update(ctx, pg, metav1.UpdateOptions{})
+					return err
+				}); err != nil {
+					t.Fatalf("Failed to set hold=%v on PodGroup %s: %v", hold, name, err)
+				}
+			}
+			// waitForLivePodGroup waits for a non-terminating PodGroup owned by the
+			// Job whose UID differs from oldUID.
+			waitForLivePodGroup := func(oldUID types.UID) *schedulingv1beta1.PodGroup {
+				var podGroup *schedulingv1beta1.PodGroup
+				if err := wait.PollUntilContextTimeout(ctx, waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					list, err := podGroupClient.List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, err
+					}
+					for i := range list.Items {
+						pg := &list.Items[i]
+						if metav1.IsControlledBy(pg, jobObj) && pg.UID != oldUID && pg.DeletionTimestamp == nil {
+							podGroup = pg
+							return true, nil
+						}
+					}
+					return false, nil
+				}); err != nil {
+					t.Fatalf("Timed out waiting for a live PodGroup for Job %s other than UID %q: %v", jobObj.Name, oldUID, err)
+				}
+				return podGroup
+			}
+			verifyPodsInPodGroup := func(stage string, podGroup *schedulingv1beta1.PodGroup) {
+				pods, err := getJobPods(ctx, t, clientSet, jobObj, func(s v1.PodStatus) bool {
+					return s.Phase != v1.PodSucceeded && s.Phase != v1.PodFailed
+				})
+				if err != nil {
+					t.Fatalf("[%s] Failed to get job pods: %v", stage, err)
+				}
+				for _, pod := range pods {
+					if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil ||
+						*pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+						t.Errorf("[%s] Pod %s schedulingGroup = %+v, want podGroupName %q", stage, pod.Name, pod.Spec.SchedulingGroup, podGroup.Name)
+					}
+					var hasPodGroupOwner bool
+					for _, ref := range pod.OwnerReferences {
+						if ref.Kind == "PodGroup" && ref.UID == podGroup.UID {
+							hasPodGroupOwner = true
+						}
+					}
+					if !hasPodGroupOwner {
+						t.Errorf("[%s] Pod %s has no ownerReference to PodGroup %s (UID %v)", stage, pod.Name, podGroup.Name, podGroup.UID)
+					}
+				}
+			}
 
-	// Suspend: pods are removed, but the scheduling objects persist unchanged.
-	setSuspend(true)
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active: 0, Ready: new(int32(0)), Terminating: new(int32(0)),
-	})
-	if wl := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout); wl.UID != workloadUID {
-		t.Errorf("Workload was recreated across suspend: UID %v, want %v", wl.UID, workloadUID)
-	}
-	if pg := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout); pg.UID != podGroupUID {
-		t.Errorf("PodGroup was recreated across suspend: UID %v, want %v", pg.UID, podGroupUID)
-	}
+			// A Job created suspended gets its Workload, but no PodGroup until it is resumed.
+			workloadUID := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout).UID
+			waitForPodGroup(ctx, t, clientSet, jobObj, true, wait.ForeverTestTimeout)
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active: 0, Ready: new(int32(0)), Terminating: new(int32(0)),
+			})
+			verifyWorkloadRetained := func(stage string) {
+				if wl := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout); wl.UID != workloadUID {
+					t.Errorf("[%s] Workload UID = %v, want %v", stage, wl.UID, workloadUID)
+				}
+			}
 
-	// Resume again: the same objects are reused and pods are rewired to them.
-	setSuspend(false)
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active: 4, Ready: new(int32(0)), Terminating: new(int32(0)),
-	})
-	verifyPodsInPodGroup("after second resume")
+			setSuspend(false)
+			podGroup := waitForLivePodGroup("")
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active: 4, Ready: new(int32(0)), Terminating: new(int32(0)),
+			})
+			verifyPodsInPodGroup("after first resume", podGroup)
+
+			succeeded := tc.succeededBeforeSuspend
+			if succeeded > 0 {
+				if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, succeeded); err != nil {
+					t.Fatalf("Failed to mark %d pods succeeded: %v", succeeded, err)
+				}
+				validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+					Active: 4 - succeeded, Succeeded: succeeded, Ready: new(int32(0)), Terminating: new(int32(0)),
+				})
+			}
+			if tc.holdPodGroupOnSuspend {
+				setHoldFinalizer(podGroup.Name, true)
+			}
+
+			// Suspend deletes the PodGroup in the same sync as the pods and keeps the Workload.
+			setSuspend(true)
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active: 0, Succeeded: succeeded, Ready: new(int32(0)), Terminating: new(int32(0)),
+			})
+			verifyWorkloadRetained("after suspend")
+			if tc.holdPodGroupOnSuspend {
+				if err := wait.PollUntilContextTimeout(ctx, waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					pg, err := podGroupClient.Get(ctx, podGroup.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					return pg.DeletionTimestamp != nil, nil
+				}); err != nil {
+					t.Fatalf("Timed out waiting for PodGroup %s to be terminating: %v", podGroup.Name, err)
+				}
+			} else {
+				waitForPodGroup(ctx, t, clientSet, jobObj, true, wait.ForeverTestTimeout)
+			}
+
+			setSuspend(false)
+			if tc.holdPodGroupOnSuspend {
+				// The controller requeues the Job while the PodGroup is terminating;
+				// cover a couple of requeues before releasing it.
+				err := wait.PollUntilContextTimeout(ctx, waitInterval, 2*jobcontroller.DefaultJobApiBackOff+waitInterval, true, func(ctx context.Context) (bool, error) {
+					pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+					if err != nil {
+						return false, err
+					}
+					if len(pods) != 0 {
+						return false, fmt.Errorf("%d pods created while PodGroup %s is terminating", len(pods), podGroup.Name)
+					}
+					return false, nil
+				})
+				if !wait.Interrupted(err) {
+					t.Fatalf("Pods must not be created while the PodGroup is terminating: %v", err)
+				}
+				setHoldFinalizer(podGroup.Name, false)
+			}
+
+			// Resume creates a replacement PodGroup from the retained Workload.
+			replacement := waitForLivePodGroup(podGroup.UID)
+			if replacement.Name != podGroup.Name {
+				t.Errorf("Replacement PodGroup name = %q, want %q", replacement.Name, podGroup.Name)
+			}
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active: 4 - succeeded, Succeeded: succeeded, Ready: new(int32(0)), Terminating: new(int32(0)),
+			})
+			verifyPodsInPodGroup("after second resume", replacement)
+			verifyWorkloadRetained("after second resume")
+		})
+	}
 }
 
 // TestJobGangSchedulingFeatureGateReEnable verifies a gang Job while the
@@ -5904,6 +6021,7 @@ func TestJobDelegatedPodGroup(t *testing.T) {
 	cases := map[string]struct {
 		ownedByParent   bool
 		jobCount        int
+		suspend         bool
 		jobScheduling   *batchv1.JobSchedulingConfiguration
 		initialTemplate string
 		wantBlockReason string
@@ -5937,6 +6055,12 @@ func TestJobDelegatedPodGroup(t *testing.T) {
 			jobCount:        1,
 			initialTemplate: "other",
 			wantBlockReason: batchv1.JobReasonPodGroupTemplateNotFound,
+		},
+		"suspended Job created before its Workload blocks, then gets its PodGroup on resume": {
+			ownedByParent:   true,
+			jobCount:        1,
+			suspend:         true,
+			wantBlockReason: batchv1.JobReasonWorkloadNotFound,
 		},
 	}
 
@@ -5989,6 +6113,7 @@ func TestJobDelegatedPodGroup(t *testing.T) {
 						Parallelism:    new(parallelism),
 						Completions:    new(parallelism),
 						CompletionMode: new(batchv1.IndexedCompletion),
+						Suspend:        new(tc.suspend),
 						Scheduling:     tc.jobScheduling,
 					},
 				}
@@ -6024,6 +6149,17 @@ func TestJobDelegatedPodGroup(t *testing.T) {
 				createWorkload(templateName)
 				for _, job := range jobs {
 					waitForSchedulingBlocked(ctx, t, clientSet, job, v1.ConditionFalse, batchv1.JobReasonSchedulingObjectsValid)
+				}
+			}
+
+			if tc.suspend {
+				for _, job := range jobs {
+					waitForPodGroup(ctx, t, clientSet, job, true, wait.ForeverTestTimeout)
+					if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), job.Name, func(j *batchv1.Job) {
+						j.Spec.Suspend = new(false)
+					}); err != nil {
+						t.Fatalf("Failed to resume Job %s: %v", job.Name, err)
+					}
 				}
 			}
 

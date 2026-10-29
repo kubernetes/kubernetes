@@ -1843,6 +1843,12 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			return active, metrics.JobSyncActionPodsCreated, nil
 		}
 		podGroup := jobCtx.podGroup
+		if podGroup != nil && podGroup.DeletionTimestamp != nil {
+			// Pods must not join the old gang. The PodGroup is recreated once it is gone.
+			logger.V(2).Info("Waiting for terminating PodGroup before creating pods", "job", klog.KObj(job), "podGroup", klog.KObj(podGroup))
+			jm.enqueueSyncJobWithDelay(logger, job, DefaultJobApiBackOff)
+			return active, metrics.JobSyncActionPodsCreated, nil
+		}
 		if podGroup != nil &&
 			slices.ContainsFunc(jobCtx.activePods, func(p *v1.Pod) bool {
 				return p.Spec.SchedulingGroup == nil
