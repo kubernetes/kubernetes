@@ -7597,7 +7597,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				Kind:       "PodGroup",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            computePodGroupName(wl.Name, templateName),
+				Name:            computePodGroupName(wl.Name, templateName, job.UID),
 				Namespace:       metav1.NamespaceDefault,
 				UID:             types.UID("pg-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
@@ -7617,7 +7617,10 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	// A Basic Job (no spec.scheduling) still materializes a Workload/PodGroup
 	// under Universal Representation, so its pods get a schedulingGroup too.
 	basicJob := newJob(2, 5, 6, batch.NonIndexedCompletion)
-	basicPodGroupName := computePodGroupName(computeWorkloadName(basicJob), podGroupTemplateName(basicJob))
+	basicPodGroupName := computePodGroupName(computeWorkloadName(basicJob), podGroupTemplateName(basicJob), basicJob.UID)
+
+	twoTemplateWorkload := makeWorkload(gangJob)
+	twoTemplateWorkload.Spec.PodGroupTemplates = append(twoTemplateWorkload.Spec.PodGroupTemplates, schedulingv1beta1.PodGroupTemplate{Name: "extra"})
 
 	testCases := map[string]struct {
 		job              *batch.Job
@@ -7627,24 +7630,22 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 		workloadWithJob bool
 
 		wantSchedulingGroupName string
-		wantPodGroupOwnerRef    bool
 		wantCreations           int32
+		wantErr                 bool
 	}{
-		"gang-eligible job with PodGroup: pods get schedulingGroup and ownerRef": {
+		"gang-eligible job with PodGroup: pods get schedulingGroup without PodGroup ownerRef": {
 			job:              gangJob,
 			workloadWithJob:  true,
 			existingWorkload: gangWorkload,
 			existingPodGroup: gangPodGroup,
 
 			wantSchedulingGroupName: gangPodGroup.Name,
-			wantPodGroupOwnerRef:    true,
 			wantCreations:           4,
 		},
 		"basic job: Workload/PodGroup materialized and pods get schedulingGroup": {
 			job:                     basicJob,
 			workloadWithJob:         true,
 			wantSchedulingGroupName: basicPodGroupName,
-			wantPodGroupOwnerRef:    true,
 			wantCreations:           2,
 		},
 		"job with pre-existing schedulingGroup: preserved without PodGroup ownerRef": {
@@ -7678,6 +7679,13 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				return makePodGroup(j, wl)
 			}(),
 			wantCreations: 0,
+		},
+		"unsupported Workload structure blocks pod creation": {
+			job:              gangJob,
+			workloadWithJob:  true,
+			existingWorkload: twoTemplateWorkload,
+			wantErr:          true,
+			wantCreations:    0,
 		},
 		"feature gate disabled: gang-eligible job creates pods without scheduling objects": {
 			job: func() *batch.Job {
@@ -7722,8 +7730,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			}
 
 			err := jm.syncJob(ctx, testutil.GetKey(tc.job, t))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("syncJob() error = %v, wantErr %v", err, tc.wantErr)
 			}
 
 			if int32(len(fakePodControl.Templates)) != tc.wantCreations {
@@ -7747,15 +7755,11 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 					t.Errorf("pod template [%d]: expected nil schedulingGroup, got %v", i, tmpl.Spec.SchedulingGroup)
 				}
 
-				hasPGOwnerRef := false
-				for _, ref := range tmpl.OwnerReferences {
-					if ref.Kind == "PodGroup" {
-						hasPGOwnerRef = true
-						break
-					}
+				if slices.ContainsFunc(tmpl.OwnerReferences, func(ref metav1.OwnerReference) bool { return ref.Kind == "PodGroup" }) {
+					t.Errorf("pod template [%d]: ownerReferences = %+v, want no PodGroup owner", i, tmpl.OwnerReferences)
 				}
-				if tc.wantPodGroupOwnerRef != hasPGOwnerRef {
-					t.Errorf("pod template [%d]: PodGroup ownerRef present = %v, want %v", i, hasPGOwnerRef, tc.wantPodGroupOwnerRef)
+				if ref := fakePodControl.ControllerRefs[i]; ref.Kind != "Job" || ref.UID != tc.job.UID {
+					t.Errorf("pod [%d]: controllerRef = %+v, want the Job", i, ref)
 				}
 			}
 		})

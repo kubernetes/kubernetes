@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -156,6 +157,7 @@ func ValidateJobCreate(job *batch.Job, opts JobValidationOptions) field.ErrorLis
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, nil, field.NewPath("spec"), opts.PodValidationOptions)...)
+	allErrs = append(allErrs, validateSchedAndDelegateAnnotations(&job.ObjectMeta, nil, &job.Spec, nil, field.NewPath("spec", "scheduling"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -629,6 +631,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateSchedAndDelegateAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, &job.Spec, &oldJob.Spec, field.NewPath("spec", "scheduling"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -702,6 +705,38 @@ func validateSchedulingAndSchedulingGroup(spec, oldSpec *batch.JobSpec, fldPath 
 	}
 	return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
 		"must not be set together with template.spec.schedulingGroup")}
+}
+
+// validateSchedAndDelegateAnnotations rejects spec.scheduling when the object
+// also carries a workload-name or group-template-name annotation.
+func validateSchedAndDelegateAnnotations(meta, oldMeta *metav1.ObjectMeta, spec,
+	oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil {
+		return nil
+	}
+	annotation := delegationAnnotation(meta)
+	if annotation == "" {
+		return nil
+	}
+	if oldSpec != nil && oldSpec.Scheduling != nil && delegationAnnotation(oldMeta) != "" {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+		fmt.Sprintf("must not be set together with the %s annotation", annotation))}
+}
+
+// delegationAnnotation returns the first external-Workload
+// annotation present on meta.
+func delegationAnnotation(meta *metav1.ObjectMeta) string {
+	if meta == nil {
+		return ""
+	}
+	for _, key := range []string{apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation} {
+		if _, ok := meta.Annotations[key]; ok {
+			return key
+		}
+	}
+	return ""
 }
 
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability
@@ -1020,10 +1055,14 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 // oldSpec is nil on create, non-nil on update.
 func ValidateJobTemplateSpec(spec, oldSpec *batch.JobTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	var oldJobSpec *batch.JobSpec
+	var oldMeta *metav1.ObjectMeta
 	if oldSpec != nil {
 		oldJobSpec = &oldSpec.Spec // +k8s:verify-mutation:reason=clone
+		oldMeta = &oldSpec.ObjectMeta
 	}
 	allErrs := validateJobSpec(&spec.Spec, oldJobSpec, fldPath.Child("spec"), opts)
+	// The CronJob controller copies jobTemplate annotations onto each Job it creates.
+	allErrs = append(allErrs, validateSchedAndDelegateAnnotations(&spec.ObjectMeta, oldMeta, &spec.Spec, oldJobSpec, fldPath.Child("spec", "scheduling"))...)
 
 	// jobtemplate will always have the selector automatically generated
 	if spec.Spec.Selector != nil {
