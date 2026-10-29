@@ -536,6 +536,12 @@ const (
 	// Enables adding the ImageVolume's digest to the pod's status.
 	ImageVolumeWithDigest featuregate.Feature = "ImageVolumeWithDigest"
 
+	// owner: @karthik-k-n
+	// kep: http://kep.k8s.io/3953
+	//
+	// Enables In Place Node resource resize along with In-Place Pod Vertical Scaling.
+	InPlaceNodeResourceResize featuregate.Feature = "InPlaceNodeResourceResize"
+
 	// owner: @ndixita
 	// kep: https://kep.k8s.io/5419
 	//
@@ -1593,6 +1599,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	InPlaceNodeResourceResize: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InPlacePodLevelResourcesVerticalScaling: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2495,6 +2505,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ImageVolume: {},
 
 	ImageVolumeWithDigest: {ImageVolume},
+
+	InPlaceNodeResourceResize: {},
 
 	InPlacePodLevelResourcesVerticalScaling: {PodLevelResources, NodeDeclaredFeatures},
 
