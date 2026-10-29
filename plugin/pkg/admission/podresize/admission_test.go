@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -255,6 +256,7 @@ func TestResizeAdmission(t *testing.T) {
 			plugin, err := NewPlugin()
 			require.NoError(t, err)
 			plugin.SetExternalKubeInformerFactory(informerFactory)
+			plugin.InspectFeatureGates(utilfeature.DefaultFeatureGate)
 			plugin.inPlacePodVerticalScalingEnabled = true
 
 			stopCh := make(chan struct{})
@@ -419,9 +421,13 @@ func TestValidateRequestsWithinAllocatable(t *testing.T) {
 		},
 	}
 
+	plugin, err := NewPlugin()
+	require.NoError(t, err)
+	plugin.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateRequestsWithinAllocatable(tc.pod, tc.allocatable)
+			err := plugin.validateRequestsWithinAllocatable(tc.pod, tc.allocatable)
 
 			if (err != nil) != tc.expectedErr {
 				t.Fatalf("ValidateRequestsWithinAllocatable() error = %v, expectedErr %v", err, tc.expectedErr)

@@ -4076,8 +4076,10 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
-		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in node resource descriptions.
+		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.EnableAllFeatures()}
+		req := resourcehelper.PodRequests(&pod, opts)
+		limit := resourcehelper.PodLimits(&pod, opts)
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
 		fractionCpuReq := percentOf(cpuReq.MilliValue(), allocatable.Cpu().MilliValue())
 		fractionCpuLimit := percentOf(cpuLimit.MilliValue(), allocatable.Cpu().MilliValue())
@@ -4131,8 +4133,9 @@ func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.Res
 	for _, pod := range podList.Items {
 		// Use the same accounting as the per-pod rows above so that the totals
 		// agree with them while a pod is being resized in place.
-		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
-		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.EnableAllFeatures()}
+		podReqs := resourcehelper.PodRequests(&pod, opts)
+		podLimits := resourcehelper.PodLimits(&pod, opts)
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()

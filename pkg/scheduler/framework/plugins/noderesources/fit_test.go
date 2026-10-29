@@ -739,7 +739,7 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
 
-			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
+			opts := ResourceRequestsOptions{Features: plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}}
 			state := computePodResourceRequest(test.pod, opts)
 			gotInsufficientResources := helper.FitsRequest(&state.Resource, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts, test.pod)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
@@ -1457,7 +1457,7 @@ func TestEventsToRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableDRAExtendedResource: test.enableDRAExtendedResource}
+			fp := &Fit{fts: plfeature.Features{EnableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, EnableDRAExtendedResource: test.enableDRAExtendedResource}}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
@@ -1641,6 +1641,7 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnablePodLevelResources:                            true,
 				EnableInPlacePodVerticalScaling:                    true,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
@@ -2119,7 +2120,7 @@ func TestIsFit(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node, nil, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
+			if got := isFit(tc.pod, tc.node, nil, ResourceRequestsOptions{Features: plfeature.Features{EnablePodLevelResources: tc.podLevelResourcesEnabled}}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -2338,7 +2339,7 @@ func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 			if tc.draExtendedResourceEnabled {
 				draManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
 			}
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, draManager, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, draManager, ResourceRequestsOptions{Features: plfeature.Features{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}}); got != tc.expected {
 				tCtx.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -2950,10 +2951,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 
 	for _, tc := range tests {
 		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
-			opts := ResourceRequestsOptions{
+			fts := plfeature.Features{
 				EnableDRANodeAllocatableResources: tc.enableDRANodeAllocatableResources,
 			}
-			result := computePodResourceRequest(tc.pod, opts)
+			result := computePodResourceRequest(tc.pod, ResourceRequestsOptions{Features: fts})
 
 			if diff := cmp.Diff(tc.expected.Resource, result.Resource); diff != "" {
 				tCtx.Errorf("computePodResourceRequest() returned diff (-want +got):\n%s", diff)

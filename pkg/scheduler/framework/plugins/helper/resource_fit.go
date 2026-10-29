@@ -26,14 +26,12 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
-// ResourceRequestsOptions contains feature gate flags for resource request computation.
+// ResourceRequestsOptions contains options for resource request computation.
 type ResourceRequestsOptions struct {
-	EnablePodLevelResources                            bool
-	EnableDRAExtendedResource                          bool
-	EnableDRANodeAllocatableResources                  bool
-	EnableInPlacePodVerticalScalingSchedulerPreemption bool
+	feature.Features
 }
 
 // ShouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
@@ -89,10 +87,10 @@ func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 // Result: CPU: 3, Memory: 3G
 func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) framework.Resource {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
+	// TODO(pravk03): Evaluate excluding DRANodeAllocatableResources for unassigned pods, to avoid
+	// using stale NodeAllocatableResourceClaimStatuses (e.g. after a failed binding).
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
+		Features: opts.ResourceFeatures(),
 	})
 	var result framework.Resource
 	result.SetMaxResource(reqs)

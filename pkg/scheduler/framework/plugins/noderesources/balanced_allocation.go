@@ -87,7 +87,7 @@ func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.Cycle
 	state := &balancedAllocationPreScoreState{
 		podRequests: podRequests,
 	}
-	if ba.enableDRAExtendedResource {
+	if ba.fts.EnableDRAExtendedResource {
 		draPreScoreState, status := getDRAPreScoredParams(ba.draManager, ba.resources)
 		if status != nil {
 			return status
@@ -120,11 +120,8 @@ func (ba *BalancedAllocation) Name() string {
 
 // Filtering and scoring based on the container resources and overheads.
 func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
-	}
-	if pl.enableDRAExtendedResource {
+	opts := ResourceRequestsOptions{Features: pl.fts}
+	if pl.fts.EnableDRAExtendedResource {
 		podRequest := computePodResourceRequest(pod, opts)
 		for rName, rQuant := range podRequest.ScalarResources {
 			// Skip in case request quantity is zero
@@ -151,7 +148,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 		if ba.isBestEffortPod(s.podRequests) {
 			return 0, nil
 		}
-		if ba.enableDRAExtendedResource {
+		if ba.fts.EnableDRAExtendedResource {
 			draPreScoreState, status := getDRAPreScoredParams(ba.draManager, ba.resources)
 			if status != nil {
 				return 0, status
@@ -189,15 +186,12 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                            BalancedAllocationName,
-			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-			enablePodLevelResources:         fts.EnablePodLevelResources,
-			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-			scorer:                          balancedResourceScorer,
-			useRequested:                    true,
-			resources:                       args.Resources,
-			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-			draManager: h.SharedDRAManager(),
+			Name:         BalancedAllocationName,
+			fts:          fts,
+			scorer:       balancedResourceScorer,
+			useRequested: true,
+			resources:    args.Resources,
+			draManager:   h.SharedDRAManager(),
 		},
 	}, nil
 }
