@@ -562,12 +562,15 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 
 			var beforeSetupMem, afterSetupMem runtime.MemStats
 			runtime.ReadMemStats(&beforeSetupMem)
-			tCtx, server := setupAPIServer(tCtx)
+			tCtx, server, podInformer := setupAPIServer(tCtx)
 			runtime.ReadMemStats(&afterSetupMem)
 			setupAllocBytes := float64(afterSetupMem.TotalAlloc - beforeSetupMem.TotalAlloc)
 
 			ensureDefaultServiceAccount(tCtx)
 			pods := seedPods(tCtx, sc.seedPods)
+			if len(pods) > 0 {
+				waitForResourceVersion(tCtx, podInformer, pods[len(pods)-1].ResourceVersion)
+			}
 
 			reqContentType := sc.requestContentType
 			if reqContentType == "" && sc.body != nil {

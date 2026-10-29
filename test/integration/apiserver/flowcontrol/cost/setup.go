@@ -21,9 +21,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/ktesting"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -31,10 +35,13 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler) {
+func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler, cache.SharedIndexInformer) {
 	tCtx.Helper()
 
-	var handler http.Handler
+	var (
+		handler     http.Handler
+		podInformer cache.SharedIndexInformer
+	)
 
 	client, _, tearDownFn := framework.StartTestServer(tCtx, tCtx, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
@@ -45,6 +52,7 @@ func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler) {
 			generic := cfg.ControlPlane.Generic
 			generic.LoopbackClientConfig.QPS = -1
 			bearer := "Bearer " + generic.LoopbackClientConfig.BearerToken
+			podInformer = cfg.ControlPlane.VersionedInformers.Core().V1().Pods().Informer()
 
 			prevBuildChain := generic.BuildHandlerChainFunc
 			generic.BuildHandlerChainFunc = func(apiHandler http.Handler, c *genericapiserver.Config) http.Handler {
@@ -58,8 +66,26 @@ func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler) {
 		},
 	})
 	tCtx.Cleanup(tearDownFn)
+	if !cache.WaitForCacheSync(tCtx.Done(), podInformer.HasSynced) {
+		tCtx.Fatalf("timed out waiting for pod informer cache sync")
+	}
 	tCtx = tCtx.WithClients(nil, nil, client, nil)
-	return tCtx, handler
+	return tCtx, handler, podInformer
+}
+
+func waitForResourceVersion(tCtx ktesting.TContext, informer cache.SharedIndexInformer, minRV string) {
+	tCtx.Helper()
+	target, err := strconv.ParseUint(minRV, 10, 64)
+	if err != nil {
+		tCtx.Fatalf("failed to parse resourceVersion %q: %v", minRV, err)
+	}
+	err = wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		rv, err := strconv.ParseUint(informer.LastSyncResourceVersion(), 10, 64)
+		return err == nil && rv >= target, nil
+	})
+	if err != nil {
+		tCtx.Fatalf("timed out waiting for pod informer resourceVersion >= %d (last=%q): %v", target, informer.LastSyncResourceVersion(), err)
+	}
 }
 
 // responseSink is a non-buffering http.ResponseWriter so measurement only
