@@ -41,13 +41,8 @@ func newDisruptionController(ctx context.Context, controllerContext ControllerCo
 		return nil, err
 	}
 
-	config, err := controllerContext.NewClientConfig("disruption-controller")
-	if err != nil {
-		return nil, err
-	}
-
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
-	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := controllerContext.ClientBuilder.ScaleClient("disruption-controller", controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, err
 	}

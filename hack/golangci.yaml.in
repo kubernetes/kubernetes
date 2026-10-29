@@ -86,6 +86,12 @@ linters:
         text: should not be used because managedFields was removed
         path: _test.go$
 
+      # The client builders implement Config themselves.
+      - linters:
+          - forbidigo
+        text: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+        path: staging/src/k8s.io/controller-manager/pkg/clientbuilder/
+
       # Adding unversioned feature gates is allowed in tests
       - linters:
           - forbidigo
@@ -263,6 +269,10 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.(Config|ConfigOrDie)$
+          pkg: ^k8s\.io/(controller-manager/pkg/clientbuilder|cloud-provider)$
+          msg: ControllerClientBuilder.Config and ConfigOrDie are deprecated because a raw config can bypass the controller manager's transport wrappers; build clients through the builder (see clientbuilder.TypedClientBuilder)
+          # Exceptions are listed above under rules.
         - pattern: \.AnnotatedEventf$
           # https://github.com/kubernetes/kubernetes/pull/137270
           msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."

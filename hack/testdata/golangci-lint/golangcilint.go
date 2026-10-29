@@ -47,6 +47,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/client-go/rest"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting" // depguard issue: ktesting is allowed only in test files
 )
@@ -110,6 +113,32 @@ func Ineffassign() int {
 
 func Forbidigo() [16]byte {
 	return md5.Sum(nil) // forbidigo issue: md5 is oudated, insecure
+}
+
+func ForbidigoClientBuilderConfig(builder clientbuilder.ControllerClientBuilder) (*rest.Config, error) {
+	return builder.Config("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoClientBuilderConfigOrDie(builder clientbuilder.ControllerClientBuilder) *rest.Config {
+	return builder.ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoTypedClientBuilderConfig(builder clientbuilder.TypedClientBuilder) *rest.Config {
+	return builder.WithDropManagedFields().ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoCloudProviderClientBuilderConfig(builder cloudprovider.ControllerClientBuilder) *rest.Config {
+	return builder.ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+// configHolder has a Config method of its own, which the forbidigo rule for
+// the client builders must not report.
+type configHolder struct{}
+
+func (configHolder) Config(string) *rest.Config { return nil }
+
+func ConfigOnAnotherType() *rest.Config {
+	return configHolder{}.Config("controller")
 }
 
 func Modernize(a, b int) int {

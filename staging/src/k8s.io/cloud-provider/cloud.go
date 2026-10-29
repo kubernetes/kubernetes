@@ -29,11 +29,22 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// ControllerClientBuilder allows you to get clients and configs for controllers
+// ControllerClientBuilder allows you to get clients for controllers.
 // Please note a copy also exists in pkg/controller/client_builder.go
 // TODO: Make this depend on the separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
+	// Config returns a client config for the named controller.
+	//
+	// Deprecated: build clients through the builder so that they inherit the
+	// controller manager's client configuration and transport wrappers; a
+	// client built from a raw config bypasses them. The builder the cloud
+	// controller manager passes to Initialize also implements
+	// k8s.io/controller-manager/pkg/clientbuilder.TypedClientBuilder, which
+	// constructs the other client types; assert to it when one is needed.
 	Config(name string) (*restclient.Config, error)
+	// ConfigOrDie is Config, exiting the process on error.
+	//
+	// Deprecated: see Config.
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
