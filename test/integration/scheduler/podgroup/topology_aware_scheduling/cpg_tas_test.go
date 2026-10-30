@@ -3390,7 +3390,7 @@ func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 	}, opts...)
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-tas", opts...)
-	ns := testCtx.NS.Name
+	ns := testCtx.Namespace()
 
 	if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
 		t.Fatal(err)
@@ -3404,15 +3404,15 @@ func runCPGTestScenarioManually(t *testing.T, tt scenario) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithOptions(
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, "cpg-tas", nil),
 		0,
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncSchedulerInformerFactory(testCtx)
-	if err := stepsframework.RunSteps(testCtx, t, testCtx.NS.Name, tt.steps); err != nil {
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
+	if err := stepsframework.RunSteps(testCtx, t, testCtx.Namespace(), tt.steps); err != nil {
 		t.Fatal(err)
 	}
 }

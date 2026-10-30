@@ -1157,22 +1157,21 @@ func TestPodGroupScheduling(t *testing.T) {
 					continue
 				}
 				t.Run(tt.name, func(t *testing.T) {
-					nsCtx := schedulerutils.WithNewNamespace(t, sharedAPICtx, "podgroup-scheduling")
 					// Attribute scheduler logs to the test case rather than the feature-gate combination.
 					tCtx := ktesting.Init(t)
-					nsCtx.Ctx = tCtx
-					testCtx := testutils.InitTestSchedulerWithOptions(t, nsCtx, 0,
+					nsCtx := schedulerutils.WithNewNamespace(t, sharedAPICtx, "podgroup-scheduling").WithLogger(tCtx.Logger())
+					testCtx := schedulerutils.InitTestSchedulerWithOptions(t, nsCtx, 0,
 						// disable backoff
 						scheduler.WithPodMaxBackoffSeconds(0),
 						scheduler.WithPodInitialBackoffSeconds(0))
-					testutils.SyncSchedulerInformerFactory(testCtx)
+					schedulerutils.SyncSchedulerInformerFactory(testCtx)
 					done := make(chan struct{})
 					go func() {
 						testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 						close(done)
 					}()
 
-					ns := testCtx.NS.Name
+					ns := testCtx.Namespace()
 					tCtx.CleanupCtx(func(cleanupCtx ktesting.TContext) {
 						testCtx.SchedulerCloseFn()
 						<-done
@@ -1180,7 +1179,7 @@ func TestPodGroupScheduling(t *testing.T) {
 						if testCtx.DynInformerFactory != nil {
 							testCtx.DynInformerFactory.Shutdown()
 						}
-						cleanupPodGroupTestResources(t, cleanupCtx, testCtx.ClientSet, ns)
+						cleanupPodGroupTestResources(t, cleanupCtx, testCtx.Client(), ns)
 					})
 
 					nodes := []*v1.Node{node}
@@ -1302,9 +1301,9 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "wap-inv",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
-			_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			_, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
@@ -1312,40 +1311,40 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 			// 1. Create low priority pods
 			for _, p := range lowPods {
 				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
 
 			// 2. Create workload
-			if _, err := cs.SchedulingV1beta1().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().Workloads(ns).Create(testCtx, workload, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create workload: %v", err)
 			}
 
 			// 3. Create PodGroup
 			pg.Namespace = ns
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PodGroup: %v", err)
 			}
 
 			// 4. Create high priority pods
 			for _, p := range highPods {
 				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 
 			// 5. Verify that WorkloadAwarePreemption was called
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				for _, pod := range lowPods {
 					events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
 						FieldSelector: "involvedObject.name=" + pod.Name,
@@ -1451,9 +1450,9 @@ func TestPostFilterNotCalled(t *testing.T) {
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithProfiles(cfg.Profiles...),
 			)
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
-			_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			_, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
@@ -1461,41 +1460,41 @@ func TestPostFilterNotCalled(t *testing.T) {
 			// 1. Create low priority pods
 			for _, p := range lowPods {
 				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
 
 			// 2. Create workload
-			if _, err := cs.SchedulingV1beta1().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().Workloads(ns).Create(testCtx, workload, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create workload: %v", err)
 			}
 
 			// 3. Create PodGroup
 			pg.Namespace = ns
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PodGroup: %v", err)
 			}
 
 			// 4. Create high priority pods
 			for _, p := range highPods {
 				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 
 			// 5. Wait for high priority pod to be marked as unschedulable
 			for _, p := range highPods {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+				err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 					schedulerutils.PodUnschedulable(cs, ns, p.Name))
 				if err != nil {
 					t.Fatalf("failed to wait for pod %s to be unschedulable: %v", p.Name, err)
@@ -1591,19 +1590,19 @@ func TestPodGroupPostFilterIteration(t *testing.T) {
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithProfiles(cfg.Profiles...),
 			)
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 
 			pg.Namespace = ns
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PodGroup: %v", err)
 			}
 
 			pgLister := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister()
-			err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(testCtx, 10*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				_, err := pgLister.PodGroups(ns).Get(pg.Name)
 				return err == nil, nil
 			})
@@ -1613,14 +1612,14 @@ func TestPodGroupPostFilterIteration(t *testing.T) {
 
 			for _, p := range highPods {
 				p.Namespace = ns
-				_, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+				_, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 
 			}
 
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				if mockPlugin1.getCount() == 1 && mockPlugin2.getCount() == 1 {
 					return true, nil
 				}
