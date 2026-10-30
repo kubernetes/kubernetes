@@ -427,12 +427,12 @@ func quantityAccessorCases() []accessorCase {
 	}
 }
 
-// parseErrorCase covers input ParseQuantity accepts today but should reject.
+// parseErrorCase pins whether ParseQuantity rejects an input, and the input's
+// Value when it doesn't.
 type parseErrorCase struct {
 	name  string
 	input string
 
-	// Today ParseQuantity accepts it with the value below; the fix should error.
 	wantParseError    bool
 	wantValueIfParsed int64
 	parseTODO         string
@@ -448,6 +448,7 @@ func quantityParseErrorCases() []parseErrorCase {
 			input:             "1e4294967297",
 			wantParseError:    false,
 			wantValueIfParsed: 10,
+			parseTODO:         "want math.MaxInt64 once the exponent saturates instead of wrapping",
 		},
 		{
 			// A scale of math.MinInt32 is still rejected: its negation
@@ -455,6 +456,7 @@ func quantityParseErrorCases() []parseErrorCase {
 			name:           "exponent-narrowing-to-min-int32",
 			input:          "1e2147483648",
 			wantParseError: true,
+			parseTODO:      "want it to parse once the exponent saturates instead of wrapping",
 		},
 	}
 }

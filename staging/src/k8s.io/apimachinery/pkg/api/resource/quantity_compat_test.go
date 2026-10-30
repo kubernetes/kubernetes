@@ -34,6 +34,7 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 		{in: "-1e4294967296", wantValue: -1, wantFitsI64: true, wantString: "-1e4294967296"},
 		{in: "1e-4294967296", wantValue: 1, wantFitsI64: true, wantString: "1e-4294967296"},
 		{in: "1e8589934592", wantValue: 1, wantFitsI64: true, wantString: "1e8589934592"},
+		{in: "1e-9223372036854775808", wantValue: 1, wantFitsI64: true, wantString: "1e-9223372036854775808"},
 
 		// Fraction digits move the scale off the exponent, so these are the
 		// spellings at 2147483648 that a <=1.37 apiserver could write. None
