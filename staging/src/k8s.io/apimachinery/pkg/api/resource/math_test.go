@@ -283,6 +283,9 @@ func TestQuantityDocExamples(t *testing.T) {
 		// Parsing rounds away from zero below nano.
 		{"0.9n", "1n"},
 		{"-0.9n", "-1n"},
+		// An exponent outside the int32 range saturates at the edge of that range.
+		{"1e4294967297", "10e2147483646"}, // 1e2147483647, in canonical form
+		{"1e-4294967297", "1e-9"},
 	} {
 		q := MustParse(tc.in)
 		if got := q.String(); got != tc.want {

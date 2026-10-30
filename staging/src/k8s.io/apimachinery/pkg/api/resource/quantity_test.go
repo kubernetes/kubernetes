@@ -885,16 +885,7 @@ func TestQuantityParse(t *testing.T) {
 		".e-10",
 		"-.Pi",
 		"Ei",
-
-		// an exponent that narrows to a scale of math.MinInt32 is rejected,
-		// because negating that scale overflows int32
-		// TODO: These should parse: 1e2147483648 as 1e2147483647, 1e-2147483648 as 1n,
-		// the zeros as 0, and the last one exactly.
-		"1e2147483648",
-		"1e-2147483648",
-		"0e2147483648",
-		"0e-2147483648",
-		"12345678901234567890.25e2147483648",
+		"e4294967297", // the scale doesn't fit in an int32
 
 		// an exponent past the int64 range is rejected
 		"1e9223372036854775808",
@@ -912,35 +903,95 @@ func TestQuantityParse(t *testing.T) {
 	}
 }
 
-func TestInterpretExponentInt32Bounds(t *testing.T) {
-	// interpret parses the exponent at 64 bits and narrows it to the int32
-	// scale, the way a <=1.37 apiserver did, so that objects it wrote keep
-	// decoding. The exception is a scale of math.MinInt32, whose negation
-	// overflows int32. This checks interpret's suffix-layer behaviour only,
-	// not what the rest of ParseQuantity does with an accepted exponent.
+func TestParseSuffix(t *testing.T) {
+	// parseSuffix rejects anything outside the Quantity grammar and clamps
+	// large exponents.
 	cases := []struct {
-		suffix  string
-		wantExp int32
-		wantOK  bool
+		suffix    string
+		wantScale widenedScale
+		wantOK    bool
 	}{
 		{"e14", 14, true},
-		{"E2147483647", 2147483647, true},     // MaxInt32
-		{"E-2147483647", -2147483647, true},   // -MaxInt32
-		{"E2147483648", math.MinInt32, true},  // narrows to MinInt32; ParseQuantity rejects that scale
-		{"E-2147483648", math.MinInt32, true}, // narrows to MinInt32 as well
-		{"E4294967297", 1, true},              // 2^32 + 1 narrows to 1
-		{"E8589934592", 0, true},              // 2^33 narrows to 0
-		{"E9223372036854775807", -1, true},    // MaxInt64 narrows to -1
-		{"E9223372036854775808", 0, false},    // MaxInt64 + 1, past int64: ParseInt range error
-		{"E6024865272343", -973843945, true},  // far past int32, narrows
+		{"E2147483647", 2147483647, true},                 // MaxInt32
+		{"E-2147483647", -2147483647, true},               // -MaxInt32
+		{"E2147483648", 2147483648, true},                 // MaxInt32 + 1
+		{"E-2147483648", -2147483648, true},               // MinInt32
+		{"E-2147483649", math.MinInt32, true},             // MinInt32 - 1
+		{"E4294967294", 2 * math.MaxInt32, true},          // 2*MaxInt32
+		{"E4294967295", 2 * math.MaxInt32, true},          // 2*MaxInt32 + 1
+		{"E4294967297", 2 * math.MaxInt32, true},          // 2^32 + 1
+		{"E8589934592", 2 * math.MaxInt32, true},          // 2^33
+		{"E9223372036854775807", 2 * math.MaxInt32, true}, // MaxInt64
+		{"E9223372036854775808", 0, false},                // MaxInt64 + 1, past int64: ParseInt range error
+		{"E-9223372036854775808", math.MinInt32, true},    // MinInt64
+		{"E-9223372036854775809", 0, false},               // MinInt64 - 1, past int64: ParseInt range error
+		{"E6024865272343", 2 * math.MaxInt32, true},       // far past int32
+
+		// suffixes outside the Quantity grammar are rejected
+		{"Zi", 0, false},
+		{"Yi", 0, false},
+		{"Z", 0, false},
+		{"Y", 0, false},
+		{"R", 0, false},
+		{"Q", 0, false},
+		{"K", 0, false},
+		{"ki", 0, false},
+		{"e", 0, false},
+		{"e-", 0, false},
+		{"e1.5", 0, false},
 	}
 	for _, tc := range cases {
-		base, exp, format, ok := quantitySuffixer.interpret(suffix(tc.suffix))
-		if ok != tc.wantOK || (ok && (exp != tc.wantExp || base != 10 || format != DecimalExponent)) {
-			t.Errorf("interpret(%q) = (base=%d, exp=%d, %v, ok=%t), want exp=%d ok=%t",
-				tc.suffix, base, exp, format, ok, tc.wantExp, tc.wantOK)
+		got, ok := parseSuffix(tc.suffix)
+		want := suffixValue{format: DecimalExponent, decimalScale: tc.wantScale}
+		if ok != tc.wantOK || (ok && got != want) {
+			t.Errorf("parseSuffix(%q) = (%+v, ok=%t), want scale=%d ok=%t",
+				tc.suffix, got, ok, tc.wantScale, tc.wantOK)
 		}
 	}
+}
+
+func TestSuffixRoundTrip(t *testing.T) {
+	// Every suffix the write functions produce must parse back to the same multiplier.
+	check := func(written []byte, want suffixValue) {
+		t.Helper()
+		if got, ok := parseSuffix(string(written)); !ok || got != want {
+			t.Errorf("parseSuffix(%q) = (%+v, ok=%t), want %+v", written, got, ok, want)
+		}
+	}
+
+	written := 0
+	for exponent := Scale(-30); exponent <= 30; exponent++ {
+		if s, ok := decimalSISuffix(exponent); ok {
+			written++
+			check(s, suffixValue{format: DecimalSI, decimalScale: widenScale(exponent)})
+		}
+	}
+	// The loop above should reach every suffix in the table.
+	if written != len(decimalSISuffixes) {
+		t.Errorf("decimalSISuffix wrote %d suffixes, want %d", written, len(decimalSISuffixes))
+	}
+
+	written = 0
+	for exponent := int32(-10); exponent <= 10; exponent++ {
+		if s, ok := binarySISuffix(exponent); ok {
+			written++
+			want := suffixValue{format: BinarySI, binaryExponent: exponent}
+			if exponent == 0 {
+				// The empty suffix for 1024^0 parses as DecimalSI.
+				want = suffixValue{format: DecimalSI}
+			}
+			check(s, want)
+		}
+	}
+	if written != len(binarySISuffixes) {
+		t.Errorf("binarySISuffix wrote %d suffixes, want %d", written, len(binarySISuffixes))
+	}
+
+	for _, exponent := range []Scale{math.MinInt32, -9, -1, 1, 18, 21, math.MaxInt32} {
+		check(decimalExponentSuffix(exponent), suffixValue{format: DecimalExponent, decimalScale: widenScale(exponent)})
+	}
+	// The empty suffix parses as DecimalSI.
+	check(decimalExponentSuffix(0), suffixValue{format: DecimalSI})
 }
 
 func TestQuantityRoundUp(t *testing.T) {
@@ -5651,50 +5702,51 @@ func TestParseQuantity(t *testing.T) {
 		{input: "1.Pi", wantAsInt64: nil, wantAsDec: ptrDec("1125899906842624"), canonical: "1Pi", want: Quantity{d: scaledDec("1125899906842624", 0), Format: BinarySI}},
 		{input: "007.50e-10", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		{input: "-0.0Pi", wantAsInt64: nil, wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{d: scaledDec("0", 1), Format: BinarySI}},
-		// Exponents outside the int32 range.
-		// TODO: These wrap around int32, the way earlier releases did, so most of them parse
-		// as a value nowhere near the one written. They should saturate instead, unless digits
-		// after the decimal point bring the scale back into range.
-		// exponents just past the int32 range
-		{input: "1e2147483649", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
-		{input: "1e-2147483649", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1, scale: 2147483647}, Format: DecimalExponent}},
-		{input: "-1e2147483649", wantAsInt64: nil, wantAsDec: ptrDec("-0.000000001"), canonical: "-1e-9", want: Quantity{d: scaledDec("-1", 9), Format: DecimalExponent}},
-		{input: "-1e-2147483649", wantAsInt64: nil, wantAsDec: new(scaledDec("-1", -2147483647)), canonical: "-10e2147483646", want: Quantity{i: int64Amount{value: -1, scale: 2147483647}, Format: DecimalExponent}},
-		// exponents near 2^32, where the exponent wraps back to a small scale
-		{input: "1e4294967295", wantAsInt64: nil, wantAsDec: ptrDec("0.1"), canonical: "100e-3", want: Quantity{i: int64Amount{value: 1, scale: -1}, Format: DecimalExponent}},
-		{input: "1e4294967297", wantAsInt64: ptr.To[int64](10), wantAsDec: ptrDec("10"), canonical: "10", want: Quantity{i: int64Amount{value: 1, scale: 1}, Format: DecimalExponent}},
-		{input: "1e4294967306", wantAsInt64: ptr.To[int64](10000000000), wantAsDec: ptrDec("10000000000"), canonical: "10e9", want: Quantity{i: int64Amount{value: 1, scale: 10}, Format: DecimalExponent}},
-		{input: "1e-4294967295", wantAsInt64: ptr.To[int64](10), wantAsDec: ptrDec("10"), canonical: "10", want: Quantity{i: int64Amount{value: 1, scale: 1}, Format: DecimalExponent}},
-		{input: "1e-4294967297", wantAsInt64: nil, wantAsDec: ptrDec("0.1"), canonical: "100e-3", want: Quantity{i: int64Amount{value: 1, scale: -1}, Format: DecimalExponent}},
-		{input: "-1e4294967297", wantAsInt64: ptr.To[int64](-10), wantAsDec: ptrDec("-10"), canonical: "-10", want: Quantity{i: int64Amount{value: -1, scale: 1}, Format: DecimalExponent}},
-		{input: "1E4294967297", wantAsInt64: ptr.To[int64](10), wantAsDec: ptrDec("10"), canonical: "10", want: Quantity{i: int64Amount{value: 1, scale: 1}, Format: DecimalExponent}},
+		// Exponents outside the int32 range. Once digits after the decimal point are accounted for,
+		// the scale saturates at the edge of that range. A value too large keeps its digits at the
+		// largest scale, and a value too small rounds away from zero to 1n or -1n.
+		// exponents just past the int32 range, and math.MinInt32, which used to be rejected
+		{input: "1e2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "1e-2147483648", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: "1e2147483649", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "1e-2147483649", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: "-1e2147483649", wantAsInt64: nil, wantAsDec: new(scaledDec("-1", -2147483647)), canonical: "-10e2147483646", want: Quantity{d: scaledDec("-1", -2147483647), Format: DecimalExponent}},
+		{input: "-1e-2147483649", wantAsInt64: nil, wantAsDec: ptrDec("-0.000000001"), canonical: "-1e-9", want: Quantity{d: scaledDec("-1", 9), Format: DecimalExponent}},
+		// exponents near 2^32, where earlier releases wrapped back to a small scale
+		{input: "1e4294967295", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "1e4294967297", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "1e4294967306", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "1e-4294967295", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: "1e-4294967297", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: "-1e4294967297", wantAsInt64: nil, wantAsDec: new(scaledDec("-1", -2147483647)), canonical: "-10e2147483646", want: Quantity{d: scaledDec("-1", -2147483647), Format: DecimalExponent}},
+		{input: "1E4294967297", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
 		// exponents at the int64 limits
-		{input: "1e9223372036854775807", wantAsInt64: nil, wantAsDec: ptrDec("0.1"), canonical: "100e-3", want: Quantity{i: int64Amount{value: 1, scale: -1}, Format: DecimalExponent}},
-		{input: "123456789012345678901234567890e9223372036854775807", wantAsInt64: nil, wantAsDec: ptrDec("12345678901234567890123456789"), canonical: "12345678901234567890123456789", want: Quantity{d: scaledDec("12345678901234567890123456789", 0), Format: DecimalExponent}}, // rounding to 29 digits adds 1 to an exponent already at the int64 limit
-		{input: "1.5e-9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("1.5"), canonical: "1500e-3", want: Quantity{i: int64Amount{value: 15, scale: -1}, Format: DecimalExponent}},                                                                                       // the digit after the decimal point subtracts 1 from an exponent already at the int64 limit
-		// zero with an exponent past the int32 range
-		{input: "0e4294967296", wantAsInt64: ptr.To[int64](0), wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{i: int64Amount{value: 0, scale: 0}, Format: DecimalExponent}},
-		{input: "0e-4294967297", wantAsInt64: nil, wantAsDec: ptrDec("0.0"), canonical: "0", want: Quantity{i: int64Amount{value: 0, scale: -1}, Format: DecimalExponent}},
-		// a number with no digits, which parses as 0 when the wrapped scale takes the int64 fast path
-		{input: "e4294967297", wantAsInt64: ptr.To[int64](0), wantAsDec: ptrDec("0"), canonical: "0", want: Quantity{i: int64Amount{value: 0, scale: 1}, Format: DecimalExponent}},
+		{input: "1e9223372036854775807", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},
+		{input: "123456789012345678901234567890e9223372036854775807", wantAsInt64: nil, wantAsDec: new(scaledDec("12345678901234567890123456789", -2147483647)), canonical: "123456789012345678901234567890e2147483646", want: Quantity{d: scaledDec("12345678901234567890123456789", -2147483647), Format: DecimalExponent}}, // rounding to 29 digits adds 1 to an exponent already at the int64 limit
+		{input: "1.5e-9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},                                                                                                                                             // the digit after the decimal point subtracts 1 from an exponent already at the int64 limit
+		// zero, with an exponent of math.MinInt32 or past the int32 range
+		{input: "0e2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("0", -2147483647)), canonical: "0", want: Quantity{d: scaledDec("0", -2147483647), Format: DecimalExponent}},
+		{input: "0e-2147483648", wantAsInt64: nil, wantAsDec: ptrDec("0.000000000"), canonical: "0", want: Quantity{d: scaledDec("0", 9), Format: DecimalExponent}},
+		{input: "0e4294967296", wantAsInt64: nil, wantAsDec: new(scaledDec("0", -2147483647)), canonical: "0", want: Quantity{d: scaledDec("0", -2147483647), Format: DecimalExponent}},
+		{input: "0e-4294967297", wantAsInt64: nil, wantAsDec: ptrDec("0.000000000"), canonical: "0", want: Quantity{d: scaledDec("0", 9), Format: DecimalExponent}},
 		// digits after the decimal point pull the scale back into range, with few enough digits for an int64
 		{input: "1.5e2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("15", -2147483647)), canonical: "150e2147483646", want: Quantity{i: int64Amount{value: 15, scale: 2147483647}, Format: DecimalExponent}},
 		{input: "0.5e2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("5", -2147483647)), canonical: "50e2147483646", want: Quantity{i: int64Amount{value: 5, scale: 2147483647}, Format: DecimalExponent}},
 		{input: "0.00000000000000001e2147483664", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1, scale: 2147483647}, Format: DecimalExponent}}, // digits after the decimal point bring the scale back to the largest one
 		// a digit after the decimal point that leaves the scale outside the int32 range
-		{input: "1.5e4294967296", wantAsInt64: nil, wantAsDec: ptrDec("1.5"), canonical: "1500e-3", want: Quantity{i: int64Amount{value: 15, scale: -1}, Format: DecimalExponent}},
-		{input: "12.5e-4294967296", wantAsInt64: nil, wantAsDec: ptrDec("12.5"), canonical: "12500e-3", want: Quantity{i: int64Amount{value: 125, scale: -1}, Format: DecimalExponent}},
+		{input: "1.5e4294967296", wantAsInt64: nil, wantAsDec: new(scaledDec("15", -2147483647)), canonical: "150e2147483646", want: Quantity{d: scaledDec("15", -2147483647), Format: DecimalExponent}},
+		{input: "12.5e-4294967296", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		// more digits than an int64 holds
-		{input: "12345678901234567890e4294967296", wantAsInt64: nil, wantAsDec: ptrDec("12345678901234567890"), canonical: "12345678901234567890", want: Quantity{d: scaledDec("12345678901234567890", 0), Format: DecimalExponent}},
-		{input: "12345678901234567890e-4294967296", wantAsInt64: nil, wantAsDec: ptrDec("12345678901234567890"), canonical: "12345678901234567890", want: Quantity{d: scaledDec("12345678901234567890", 0), Format: DecimalExponent}},
-		{input: "0.0000000000000000000001e2147483669", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},             // TODO: digits after the decimal point should bring the scale back to the largest one
-		{input: "0." + strings.Repeat("0", 9999) + "1e2147493647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}}, // TODO: digits after the decimal point should bring the scale back from far past the int32 range
-		{input: "123456789012345678901234567890e4294967296", wantAsInt64: nil, wantAsDec: ptrDec("123456789012345678901234567890"), canonical: "123456789012345678901234567890", want: Quantity{d: scaledDec("12345678901234567890123456789", -1), Format: DecimalExponent}},
-		// TODO: edge case that wraps before serialization to canonical form
-		{input: "1.25e-2147483647", wantAsInt64: nil, wantAsDec: new(scaledDec("125", -2147483647)), canonical: "1250e2147483646", want: Quantity{i: int64Amount{value: 125, scale: 2147483647}, Format: DecimalExponent}},
-		// TODO: the exponent wraps around int32, so this tiny value parses as 1e2147483647.
-		{input: ".1e-2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{i: int64Amount{value: 1, scale: 2147483647}, Format: DecimalExponent}},
-		// with more digits than an int64 holds, these take the inf.Dec path, which already rounds them to 1n
+		{input: "12345678901234567890.25e2147483648", wantAsInt64: nil, wantAsDec: new(scaledDec("1234567890123456789025", -2147483646)), canonical: "1234567890123456789025e2147483646", want: Quantity{d: scaledDec("1234567890123456789025", -2147483646), Format: DecimalExponent}},
+		{input: "0.0000000000000000000001e2147483669", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}},             // digits after the decimal point bring the scale back to the largest one
+		{input: "0." + strings.Repeat("0", 9999) + "1e2147493647", wantAsInt64: nil, wantAsDec: new(scaledDec("1", -2147483647)), canonical: "10e2147483646", want: Quantity{d: scaledDec("1", -2147483647), Format: DecimalExponent}}, // digits after the decimal point bring the scale back from far past the int32 range
+		{input: "12345678901234567890e4294967296", wantAsInt64: nil, wantAsDec: new(scaledDec("12345678901234567890", -2147483647)), canonical: "123456789012345678900e2147483646", want: Quantity{d: scaledDec("12345678901234567890", -2147483647), Format: DecimalExponent}},
+		{input: "12345678901234567890e-4294967296", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: "123456789012345678901234567890e4294967296", wantAsInt64: nil, wantAsDec: new(scaledDec("12345678901234567890123456789", -2147483647)), canonical: "123456789012345678901234567890e2147483646", want: Quantity{d: scaledDec("12345678901234567890123456789", -2147483647), Format: DecimalExponent}},
+		// digits after the decimal point take these tiny values to a scale of math.MinInt32 or
+		// below, so they round to 1n, whether they have few digits or more than an int64 holds
+		{input: "1.25e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
+		{input: ".1e-2147483648", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		{input: "12345678901234567890.5e-2147483647", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 		{input: "9.999999999999999999e-2147483640", wantAsInt64: nil, wantAsDec: ptrDec("0.000000001"), canonical: "1e-9", want: Quantity{d: scaledDec("1", 9), Format: DecimalExponent}},
 	}

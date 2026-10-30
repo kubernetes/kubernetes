@@ -17,184 +17,106 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"strconv"
 )
 
-type suffix string
-
-// suffixer can interpret and construct suffixes.
-type suffixer interface {
-	interpret(suffix) (base, exponent int32, fmt Format, ok bool)
-	construct(base, exponent int32, fmt Format) (s suffix, ok bool)
-	constructBytes(base, exponent int32, fmt Format) (s []byte, ok bool)
+// suffixValue represents a quantity suffix, which has a multiplier value and a Format.
+type suffixValue struct {
+	format Format
+	// decimalScale is the value multiplier for decimal suffixes, represented as
+	// a 10^n scale value. It's the exponent value that was parsed, capped to fit
+	// the widenedScale range. Note that this can be outside the Scale range. It
+	// must not be saturated to the Scale range until after offsetting it for any
+	// digits after the decimal point from the parsed quantity.
+	decimalScale widenedScale
+	// binaryExponent is the value multiplier for BinarySI suffixes (1024^n).
+	binaryExponent int32
 }
 
-// quantitySuffixer handles suffixes for all three formats that quantity
-// can handle.
-var quantitySuffixer = newSuffixer()
-
-type bePair struct {
-	base, exponent int32
-}
-
-type listSuffixer struct {
-	suffixToBE      map[suffix]bePair
-	beToSuffix      map[bePair]suffix
-	beToSuffixBytes map[bePair][]byte
-}
-
-func (ls *listSuffixer) addSuffix(s suffix, pair bePair) {
-	if ls.suffixToBE == nil {
-		ls.suffixToBE = map[suffix]bePair{}
-	}
-	if ls.beToSuffix == nil {
-		ls.beToSuffix = map[bePair]suffix{}
-	}
-	if ls.beToSuffixBytes == nil {
-		ls.beToSuffixBytes = map[bePair][]byte{}
-	}
-	ls.suffixToBE[s] = pair
-	ls.beToSuffix[pair] = s
-	ls.beToSuffixBytes[pair] = []byte(s)
-}
-
-func (ls *listSuffixer) lookup(s suffix) (base, exponent int32, ok bool) {
-	pair, ok := ls.suffixToBE[s]
-	if !ok {
-		return 0, 0, false
-	}
-	return pair.base, pair.exponent, true
-}
-
-func (ls *listSuffixer) construct(base, exponent int32) (s suffix, ok bool) {
-	s, ok = ls.beToSuffix[bePair{base, exponent}]
-	return
-}
-
-func (ls *listSuffixer) constructBytes(base, exponent int32) (s []byte, ok bool) {
-	s, ok = ls.beToSuffixBytes[bePair{base, exponent}]
-	return
-}
-
-type suffixHandler struct {
-	decSuffixes listSuffixer
-	binSuffixes listSuffixer
-}
-
-type fastLookup struct {
-	*suffixHandler
-}
-
-func (l fastLookup) interpret(s suffix) (base, exponent int32, format Format, ok bool) {
+// parseSuffix returns the value of the suffix s, or false if s isn't a valid suffix.
+func parseSuffix(s string) (suffixValue, bool) {
 	switch s {
-	case "":
-		return 10, 0, DecimalSI, true
 	case "n":
-		return 10, -9, DecimalSI, true
+		return suffixValue{format: DecimalSI, decimalScale: -9}, true
 	case "u":
-		return 10, -6, DecimalSI, true
+		return suffixValue{format: DecimalSI, decimalScale: -6}, true
 	case "m":
-		return 10, -3, DecimalSI, true
+		return suffixValue{format: DecimalSI, decimalScale: -3}, true
+	case "":
+		return suffixValue{format: DecimalSI}, true
 	case "k":
-		return 10, 3, DecimalSI, true
+		return suffixValue{format: DecimalSI, decimalScale: 3}, true
 	case "M":
-		return 10, 6, DecimalSI, true
+		return suffixValue{format: DecimalSI, decimalScale: 6}, true
 	case "G":
-		return 10, 9, DecimalSI, true
-	}
-	return l.suffixHandler.interpret(s)
-}
-
-func newSuffixer() suffixer {
-	sh := &suffixHandler{}
-
-	// IMPORTANT: if you change this section you must change fastLookup
-
-	sh.binSuffixes.addSuffix("Ki", bePair{2, 10})
-	sh.binSuffixes.addSuffix("Mi", bePair{2, 20})
-	sh.binSuffixes.addSuffix("Gi", bePair{2, 30})
-	sh.binSuffixes.addSuffix("Ti", bePair{2, 40})
-	sh.binSuffixes.addSuffix("Pi", bePair{2, 50})
-	sh.binSuffixes.addSuffix("Ei", bePair{2, 60})
-	// Don't emit an error when trying to produce
-	// a suffix for 2^0.
-	sh.decSuffixes.addSuffix("", bePair{2, 0})
-
-	sh.decSuffixes.addSuffix("n", bePair{10, -9})
-	sh.decSuffixes.addSuffix("u", bePair{10, -6})
-	sh.decSuffixes.addSuffix("m", bePair{10, -3})
-	sh.decSuffixes.addSuffix("", bePair{10, 0})
-	sh.decSuffixes.addSuffix("k", bePair{10, 3})
-	sh.decSuffixes.addSuffix("M", bePair{10, 6})
-	sh.decSuffixes.addSuffix("G", bePair{10, 9})
-	sh.decSuffixes.addSuffix("T", bePair{10, 12})
-	sh.decSuffixes.addSuffix("P", bePair{10, 15})
-	sh.decSuffixes.addSuffix("E", bePair{10, 18})
-
-	return fastLookup{sh}
-}
-
-func (sh *suffixHandler) construct(base, exponent int32, fmt Format) (s suffix, ok bool) {
-	switch fmt {
-	case DecimalSI:
-		return sh.decSuffixes.construct(base, exponent)
-	case BinarySI:
-		return sh.binSuffixes.construct(base, exponent)
-	case DecimalExponent:
-		if base != 10 {
-			return "", false
-		}
-		if exponent == 0 {
-			return "", true
-		}
-		return suffix("e" + strconv.FormatInt(int64(exponent), 10)), true
-	}
-	return "", false
-}
-
-func (sh *suffixHandler) constructBytes(base, exponent int32, format Format) (s []byte, ok bool) {
-	switch format {
-	case DecimalSI:
-		return sh.decSuffixes.constructBytes(base, exponent)
-	case BinarySI:
-		return sh.binSuffixes.constructBytes(base, exponent)
-	case DecimalExponent:
-		if base != 10 {
-			return nil, false
-		}
-		if exponent == 0 {
-			return nil, true
-		}
-		result := make([]byte, 8)
-		result[0] = 'e'
-		number := strconv.AppendInt(result[1:1], int64(exponent), 10)
-		if &result[1] == &number[0] {
-			return result[:1+len(number)], true
-		}
-		result = append(result[:1], number...)
-		return result, true
-	}
-	return nil, false
-}
-
-func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt Format, ok bool) {
-	// Try lookup tables first
-	if b, e, ok := sh.decSuffixes.lookup(suffix); ok {
-		return b, e, DecimalSI, true
-	}
-	if b, e, ok := sh.binSuffixes.lookup(suffix); ok {
-		return b, e, BinarySI, true
+		return suffixValue{format: DecimalSI, decimalScale: 9}, true
+	case "T":
+		return suffixValue{format: DecimalSI, decimalScale: 12}, true
+	case "P":
+		return suffixValue{format: DecimalSI, decimalScale: 15}, true
+	case "E":
+		return suffixValue{format: DecimalSI, decimalScale: 18}, true
+	case "Ki":
+		return suffixValue{format: BinarySI, binaryExponent: 1}, true
+	case "Mi":
+		return suffixValue{format: BinarySI, binaryExponent: 2}, true
+	case "Gi":
+		return suffixValue{format: BinarySI, binaryExponent: 3}, true
+	case "Ti":
+		return suffixValue{format: BinarySI, binaryExponent: 4}, true
+	case "Pi":
+		return suffixValue{format: BinarySI, binaryExponent: 5}, true
+	case "Ei":
+		return suffixValue{format: BinarySI, binaryExponent: 6}, true
 	}
 
-	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
-		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 64)
+	if len(s) > 1 && (s[0] == 'E' || s[0] == 'e') {
+		parsed, err := strconv.ParseInt(s[1:], 10, 64)
 		if err != nil {
-			return 0, 0, DecimalExponent, false
+			return suffixValue{}, false
 		}
-		// Stored objects keep the spelling they were given, so narrowing
-		// rather than rejecting is what keeps them decodable.
-		return 10, int32(parsed), DecimalExponent, true
+		// Clamp so scale arithmetic can't overflow.
+		scale := widenedScale(min(max(parsed, math.MinInt32), 2*math.MaxInt32))
+		return suffixValue{format: DecimalExponent, decimalScale: scale}, true
 	}
 
-	return 0, 0, DecimalExponent, false
+	return suffixValue{}, false
+}
+
+// decimalSISuffixes holds the DecimalSI suffixes.
+var decimalSISuffixes = [...][]byte{
+	[]byte("n"), []byte("u"), []byte("m"), []byte(""), []byte("k"),
+	[]byte("M"), []byte("G"), []byte("T"), []byte("P"), []byte("E"),
+}
+
+// decimalSISuffix returns the DecimalSI suffix for 10^exponent, or false otherwise.
+func decimalSISuffix(exponent Scale) ([]byte, bool) {
+	if exponent < Nano || exponent > Exa || exponent%3 != 0 {
+		return nil, false
+	}
+	return decimalSISuffixes[(exponent-Nano)/3], true
+}
+
+// binarySISuffixes holds the BinarySI suffixes (1024^n).
+var binarySISuffixes = [...][]byte{
+	nil, []byte("Ki"), []byte("Mi"), []byte("Gi"), []byte("Ti"), []byte("Pi"), []byte("Ei"),
+}
+
+// binarySISuffix returns the BinarySI suffix for 1024^exponent, or false otherwise.
+func binarySISuffix(exponent int32) ([]byte, bool) {
+	if exponent < 0 || int(exponent) >= len(binarySISuffixes) {
+		return nil, false
+	}
+	return binarySISuffixes[exponent], true
+}
+
+// decimalExponentSuffix returns the DecimalExponent suffix for 10^exponent, such as "e3".
+func decimalExponentSuffix(exponent Scale) []byte {
+	if exponent == 0 {
+		return nil
+	}
+	// Eight bytes fits most exponents.
+	result := append(make([]byte, 0, 8), 'e')
+	return strconv.AppendInt(result, int64(exponent), 10)
 }
