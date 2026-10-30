@@ -197,13 +197,17 @@ func TestPodGroupTemplateName(t *testing.T) {
 			deploymentName: strings.Repeat("a", 56) + "bcdefgh",
 			want:           strings.Repeat("a", 56) + "b-pgt-0",
 		},
-		"trailing dash is trimmed after truncation": {
-			deploymentName: strings.Repeat("a", 56) + "-" + strings.Repeat("b", 20),
-			want:           strings.Repeat("a", 56) + "-pgt-0",
+		"dots are replaced with hyphens": {
+			deploymentName: "app.v1",
+			want:           "app-v1-pgt-0",
 		},
-		"trailing dot is trimmed after truncation": {
-			deploymentName: strings.Repeat("a", 56) + "." + strings.Repeat("b", 20),
-			want:           strings.Repeat("a", 56) + "-pgt-0",
+		"multiple dots are replaced with hyphens": {
+			deploymentName: "app.v1.4.0",
+			want:           "app-v1-4-0-pgt-0",
+		},
+		"dot at truncation boundary is replaced with a hyphen": {
+			deploymentName: strings.Repeat("a", 56) + ".daily",
+			want:           strings.Repeat("a", 56) + "--pgt-0",
 		},
 	}
 	for name, tc := range tests {

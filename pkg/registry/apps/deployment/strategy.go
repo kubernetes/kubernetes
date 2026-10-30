@@ -91,8 +91,14 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 // DeclarativeValidationConfig declares the options referenced by this type's tags,
 // mapped to whether each is enabled.
 func (deploymentStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment)
+	if !enabled {
+		if old, ok := oldObj.(*apps.Deployment); ok && old != nil && old.Spec.Scheduling != nil {
+			enabled = true
+		}
+	}
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
-		string(features.WorkloadWithDeployment): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment),
+		string(features.WorkloadWithDeployment): enabled,
 	}}
 }
 

@@ -350,18 +350,21 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			continue
 		}
 		testCases := map[string]struct {
-			oldScheduling *apps.DeploymentSchedulingConfiguration
-			scheduling    *apps.DeploymentSchedulingConfiguration
-			expectedErrs  field.ErrorList
+			oldScheduling                *apps.DeploymentSchedulingConfiguration
+			scheduling                   *apps.DeploymentSchedulingConfiguration
+			enableWorkloadWithDeployment bool
+			expectedErrs                 field.ErrorList
 		}{
 			"adding scheduling after creation is immutable": {
-				scheduling: &apps.DeploymentSchedulingConfiguration{},
+				enableWorkloadWithDeployment: true,
+				scheduling:                   &apps.DeploymentSchedulingConfiguration{},
 				expectedErrs: field.ErrorList{
 					field.Invalid(schedulingPath, nil, "").WithOrigin("update"),
 				},
 			},
 			"adding policy is immutable": {
-				oldScheduling: &apps.DeploymentSchedulingConfiguration{},
+				enableWorkloadWithDeployment: true,
+				oldScheduling:                &apps.DeploymentSchedulingConfiguration{},
 				scheduling: &apps.DeploymentSchedulingConfiguration{
 					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
@@ -372,6 +375,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"changing constraints is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
 					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
@@ -387,6 +391,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"switching disruption mode is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
 					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
@@ -408,6 +413,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"changing a resource claim name is immutable": {
+				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
 					ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
 						{Name: "claim", ResourceClaimName: new("rc-a")},
@@ -423,6 +429,20 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				},
 			},
 			"gang minCount change is valid": {
+				enableWorkloadWithDeployment: true,
+				oldScheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+					},
+				},
+				scheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(2))},
+					},
+				},
+			},
+			"gang minCount change is valid when gate off and old already scheduled": {
+				enableWorkloadWithDeployment: false,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{
 					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
@@ -438,8 +458,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		for name, tc := range testCases {
 			t.Run(name, func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:        true,
-					features.WorkloadWithDeployment: true,
+					features.GenericWorkload:        tc.enableWorkloadWithDeployment,
+					features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
 				})
 				old := mkSchedulingDeployment(tc.oldScheduling)
 				old.ResourceVersion = "1"

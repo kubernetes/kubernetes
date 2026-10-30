@@ -60,12 +60,11 @@ func shouldManageWorkloadForDeployment(d *apps.Deployment) bool {
 // podGroupTemplateName is a DNS label (63 bytes), tighter than the Workload name.
 func podGroupTemplateName(d *apps.Deployment) string {
 	const suffix = "-pgt-0"
-	prefix := d.Name
-	if max := validation.DNS1123LabelMaxLength - len(suffix); len(prefix) > max {
-		prefix = prefix[:max]
+	templateName := strings.ReplaceAll(d.Name, ".", "-") + suffix
+	if len(templateName) > validation.DNS1123LabelMaxLength {
+		templateName = templateName[:validation.DNS1123LabelMaxLength-len(suffix)] + suffix
 	}
-	prefix = strings.TrimRight(prefix, ".-")
-	return prefix + suffix
+	return templateName
 }
 
 // buildWorkloadForDeployment compiles the Deployment's scheduling configuration into a Workload.

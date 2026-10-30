@@ -176,10 +176,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 	}
 	dc.podIndexer = podInformer.Informer().GetIndexer()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
-		if workloadInformer == nil {
-			return nil, fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.WorkloadWithDeployment)
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && workloadInformer != nil {
 		dc.workloadLister = workloadInformer.Lister()
 		dc.workloadListerSynced = workloadInformer.Informer().HasSynced
 	}
@@ -650,7 +647,7 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	}
 
 	// Reconcile once before rollout or scaling logic can mutate ReplicaSets.
-	if shouldManageWorkloadForDeployment(d) {
+	if dc.workloadLister != nil && shouldManageWorkloadForDeployment(d) {
 		if _, err := dc.ensureWorkloadForDeployment(ctx, d); err != nil {
 			return fmt.Errorf("failed to ensure Workload for Deployment %s: %w", d.Name, err)
 		}

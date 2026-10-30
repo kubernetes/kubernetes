@@ -211,6 +211,9 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
 		return rsc, nil
 	}
+	if workloadInformer == nil || podGroupInformer == nil {
+		return rsc, nil
+	}
 	if err := rsc.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
 		return nil, err
 	}
