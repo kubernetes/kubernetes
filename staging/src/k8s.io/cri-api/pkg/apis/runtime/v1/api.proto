@@ -174,12 +174,19 @@ service RuntimeService {
     // Requires RuntimeFeatures.pod_checkpoint_restore_cancellation.
     rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
 
-    // RestorePod prepares a pod sandbox and containers from a checkpoint. The
-    // caller must set a deadline on the call. On success, every returned
-    // container must be in the CREATED state and must not have executed the
-    // restored process; the caller invokes its pre-start hooks and then calls
-    // StartContainer for each returned ID. On error, the runtime must remove
-    // any sandbox and containers created by the call before returning.
+    // RestorePod prepares a pod sandbox and containers from a checkpoint.
+    // The caller must set a deadline and a unique operation_id. On success,
+    // every returned container must be CREATED and must not have executed the
+    // restored process; the caller invokes pre-start hooks and StartContainer.
+    // On failure the runtime must roll back created resources. Cancellation
+    // or deadline expiry before successful preparation is committed must abort
+    // preparation and start rollback independently of the original RPC context,
+    // even if the caller is gone. Successful preparation and cancellation must
+    // be coordinated so normal context closure after a successful RestorePod
+    // or subsequent StartContainer call does not roll back its resources.
+    // A client-side error does not acknowledge rollback: the caller must use
+    // CancelPodOperation before releasing resources or runtime-use protection.
+    // Requires RuntimeFeatures.pod_checkpoint_restore_cancellation.
     rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
 
     // CancelPodOperation cancels and settles an identified checkpoint or
