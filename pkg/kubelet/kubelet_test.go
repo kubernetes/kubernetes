@@ -251,6 +251,7 @@ func newTestKubeletWithImageList(
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	kubelet.kubeletConfiguration.PodRestoreTimeout.Duration = 5 * time.Minute
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
@@ -564,6 +565,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
 		token.NewManager(kubelet.kubeClient),

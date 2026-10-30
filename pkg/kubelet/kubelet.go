@@ -862,6 +862,7 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		klet.podStartupLatencyTracker,
 		kubeDeps.TracerProvider,
 		tokenManager,
@@ -2533,7 +2534,7 @@ func (kl *Kubelet) podRestoreSync(pod *v1.Pod, podStatus *kubecontainer.PodStatu
 // settlePodRestore keeps a failed operation recoverable until the runtime has
 // fenced its ID and confirmed that rollback no longer uses Pod resources.
 func (kl *Kubelet) settlePodRestore(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (string, error) {
-	return kl.settlePodRestoreWithTimeout(ctx, pod, podStatus, 5*time.Minute)
+	return kl.settlePodRestoreWithTimeout(ctx, pod, podStatus, kl.kubeletConfiguration.PodRestoreTimeout.Duration)
 }
 
 func (kl *Kubelet) settlePodRestoreWithTimeout(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, timeout time.Duration) (string, error) {

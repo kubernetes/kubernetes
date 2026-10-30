@@ -207,6 +207,8 @@ type kubeGenericRuntimeManager struct {
 	// Records first initContainer start time and last initContainer finish time
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder
 
+	// podRestoreTimeout bounds the RestorePod CRI call. The CRI client's
+	// default request timeout is too short for restores of large Pods.
 	podRestoreTimeout time.Duration
 
 	// restoresInFlightLock guards restoresInFlight.
@@ -264,6 +266,7 @@ func NewKubeGenericRuntimeManager(
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor *float64,
 	memoryReservationPolicy kubeletconfiginternal.MemoryReservationPolicy,
+	podRestoreTimeout time.Duration,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
 	tokenManager *token.Manager,
@@ -299,9 +302,9 @@ func NewKubeGenericRuntimeManager(
 		getNodeAllocatable:           getNodeAllocatable,
 		memoryThrottlingFactor:       memoryThrottlingFactor,
 		memoryReservationPolicy:      memoryReservationPolicy,
+		podRestoreTimeout:            podRestoreTimeout,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
-		podRestoreTimeout:            5 * time.Minute,
 		restoresInFlight:             make(map[string]struct{}),
 	}
 

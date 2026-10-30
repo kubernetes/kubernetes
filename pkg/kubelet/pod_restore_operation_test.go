@@ -171,6 +171,7 @@ func TestRestoreOrphanRecoveryWaitsForCleanupAcknowledgement(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
 	kl.podManager.SetPods(nil)
 	runtime.PodList = nil
+	kl.kubeletConfiguration.PodRestoreTimeout.Duration = time.Minute
 	require.NoError(t, kl.SetPodRestoreState(pod.UID, kubecontainer.PodRestoreStarted))
 	acknowledged, calls := false, 0
 	runtime.CancelPodOperationFunc = func(cancelCtx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
@@ -253,6 +254,7 @@ func TestRestoreMarkerProtectsPodWithoutRestoreSpec(t *testing.T) {
 					runtime.PodStatus.SandboxStatuses[0].Metadata = &runtimeapi.PodSandboxMetadata{}
 					require.Nil(t, pod.Spec.RestoreFrom)
 					require.Empty(t, pod.Finalizers)
+					kl.kubeletConfiguration.PodRestoreTimeout.Duration = time.Minute
 					require.NoError(t, kl.SetPodRestoreState(pod.UID, initial))
 					acknowledged, calls := false, 0
 					runtime.CancelPodOperationFunc = func(_ context.Context, request *runtimeapi.CancelPodOperationRequest) error {
