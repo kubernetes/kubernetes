@@ -1297,7 +1297,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 
@@ -1373,7 +1377,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 
@@ -1450,7 +1458,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
-			ss = waitForStatus(ctx, c, ss)
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				ss = set
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision == set.Status.UpdateRevision, nil
+			})
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 
