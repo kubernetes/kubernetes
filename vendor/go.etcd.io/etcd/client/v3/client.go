@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -504,11 +504,11 @@ func (c *Client) roundRobinQuorumBackoff(waitBetween time.Duration, jitterFracti
 
 // minSupportedVersion returns the minimum version supported, which is the previous minor release.
 func minSupportedVersion() *semver.Version {
-	ver := semver.Must(semver.NewVersion(version.Version))
+	ver := semver.MustParse(version.Version)
 	// consider only major and minor version
-	ver = &semver.Version{Major: ver.Major, Minor: ver.Minor}
+	ver = semver.New(ver.Major(), ver.Minor(), 0, "", "")
 	for i := range version.AllVersions {
-		if version.AllVersions[i].Equal(*ver) {
+		if version.AllVersions[i].Equal(ver) {
 			if i == 0 {
 				return ver
 			}
@@ -545,7 +545,7 @@ func (c *Client) checkVersion() (err error) {
 				return
 			}
 
-			if vs.LessThan(*minSupportedVersion()) {
+			if vs.LessThan(minSupportedVersion()) {
 				rerr = ErrOldCluster
 			}
 			errc <- rerr

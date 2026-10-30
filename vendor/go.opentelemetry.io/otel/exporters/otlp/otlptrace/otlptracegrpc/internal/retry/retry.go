@@ -17,7 +17,7 @@ import (
 	"github.com/cenkalti/backoff/v5"
 )
 
-// DefaultConfig are the recommended defaults to use.
+// DefaultConfig is the recommended default configuration.
 var DefaultConfig = Config{
 	Enabled:         true,
 	InitialInterval: 5 * time.Second,
@@ -25,42 +25,40 @@ var DefaultConfig = Config{
 	MaxElapsedTime:  time.Minute,
 }
 
-// Config defines configuration for retrying batches in case of export failure
-// using an exponential backoff.
+// Config defines configuration for retrying batches after an export failure
+// using exponential backoff.
 type Config struct {
-	// Enabled indicates whether to not retry sending batches in case of
-	// export failure.
+	// Enabled indicates whether to retry sending batches after an export
+	// failure.
 	Enabled bool
-	// InitialInterval the time to wait after the first failure before
+	// InitialInterval is the time to wait after the first failure before
 	// retrying.
 	InitialInterval time.Duration
-	// MaxInterval is the upper bound on backoff interval. Once this value is
-	// reached the delay between consecutive retries will always be
-	// `MaxInterval`.
+	// MaxInterval is the upper bound on the backoff interval before
+	// randomization. Once this value is reached, the base interval remains at
+	// MaxInterval.
 	MaxInterval time.Duration
 	// MaxElapsedTime is the maximum amount of time (including retries) spent
-	// trying to send a request/batch.  Once this value is reached, the data
-	// is discarded.
+	// trying to send a request/batch. Once this value is reached, retrying stops.
 	MaxElapsedTime time.Duration
 }
 
 // RequestFunc wraps a request with retry logic.
 type RequestFunc func(context.Context, func(context.Context) error) error
 
-// EvaluateFunc returns if an error is retry-able and if an explicit throttle
-// duration should be honored that was included in the error.
+// EvaluateFunc reports whether an error is retryable and returns any explicit
+// throttle duration to honor.
 //
-// The function must return true if the error argument is retry-able,
-// otherwise it must return false for the first return parameter.
+// The function must return true as its first return value if the error
+// argument is retryable; otherwise, it must return false.
 //
-// The function must return a non-zero time.Duration if the error contains
-// explicit throttle duration that should be honored, otherwise it must return
-// a zero valued time.Duration.
+// The function must return a nonzero time.Duration if the error contains an
+// explicit throttle duration that should be honored; otherwise, it must return
+// the zero value for time.Duration.
 type EvaluateFunc func(error) (bool, time.Duration)
 
-// RequestFunc returns a RequestFunc using the evaluate function to determine
-// if requests can be retried and based on the exponential backoff
-// configuration of c.
+// RequestFunc returns a RequestFunc that uses evaluate to determine whether
+// requests can be retried and uses c to configure exponential backoff.
 func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 	if !c.Enabled {
 		return func(ctx context.Context, fn func(context.Context) error) error {
@@ -96,7 +94,7 @@ func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 
 			// Check if context is canceled before attempting to wait and retry.
 			if ctx.Err() != nil {
-				return fmt.Errorf("%w: %w", ctx.Err(), err)
+				return fmt.Errorf("%w: %w", context.Cause(ctx), err)
 			}
 
 			if maxElapsedTime != 0 && time.Since(startTime) > maxElapsedTime {
@@ -119,12 +117,12 @@ func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 	}
 }
 
-// Allow override for testing.
+// waitFunc can be overridden for testing.
 var waitFunc = wait
 
-// wait takes the caller's context, and the amount of time to wait.  It will
-// return nil if the timer fires before or at the same time as the context's
-// deadline.  This indicates that the call can be retried.
+// wait blocks until delay elapses or ctx is done. If both happen
+// simultaneously, wait favors the elapsed delay and returns nil to indicate
+// that the call can be retried.
 func wait(ctx context.Context, delay time.Duration) error {
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

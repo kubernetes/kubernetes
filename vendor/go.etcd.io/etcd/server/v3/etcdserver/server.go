@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -92,6 +92,10 @@ const (
 	HealthInterval = 5 * time.Second
 
 	purgeFileInterval = 30 * time.Second
+
+	// maxSnapDBFiles is the maximum number of snap db files to retain.
+	// It's no longer configurable now that --max-snapshots is removed.
+	maxSnapDBFiles = 5
 
 	// max number of in-flight snapshot messages etcdserver allows to have
 	// This number is more than enough for most clusters with 5 machines.
@@ -596,12 +600,9 @@ func (s *EtcdServer) start() {
 
 func (s *EtcdServer) purgeFile() {
 	lg := s.Logger()
-	var dberrc, serrc, werrc <-chan error
-	var dbdonec, sdonec, wdonec <-chan struct{}
-	if s.Cfg.MaxSnapFiles > 0 {
-		dbdonec, dberrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap.db", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
-		sdonec, serrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
-	}
+	var dberrc, werrc <-chan error
+	var dbdonec, wdonec <-chan struct{}
+	dbdonec, dberrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap.db", maxSnapDBFiles, purgeFileInterval, s.stopping)
 	if s.Cfg.MaxWALFiles > 0 {
 		wdonec, werrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.WALDir(), "wal", s.Cfg.MaxWALFiles, purgeFileInterval, s.stopping)
 	}
@@ -609,16 +610,11 @@ func (s *EtcdServer) purgeFile() {
 	select {
 	case e := <-dberrc:
 		lg.Fatal("failed to purge snap db file", zap.Error(e))
-	case e := <-serrc:
-		lg.Fatal("failed to purge snap file", zap.Error(e))
 	case e := <-werrc:
 		lg.Fatal("failed to purge wal file", zap.Error(e))
 	case <-s.stopping:
 		if dbdonec != nil {
 			<-dbdonec
-		}
-		if sdonec != nil {
-			<-sdonec
 		}
 		if wdonec != nil {
 			<-wdonec
@@ -956,7 +952,9 @@ func (s *EtcdServer) Cleanup() {
 		s.authStore.Close()
 	}
 	if s.be != nil {
+		s.bemu.Lock()
 		s.be.Close()
+		s.bemu.Unlock()
 	}
 	if s.compactor != nil {
 		s.compactor.Stop()
@@ -964,8 +962,16 @@ func (s *EtcdServer) Cleanup() {
 }
 
 func (s *EtcdServer) Defragment() error {
-	s.bemu.Lock()
-	defer s.bemu.Unlock()
+	// Hold bemu as a reader, not a writer, for the whole call. This still excludes a
+	// concurrent backend swap (applySnapshot takes bemu.Lock()), so a non-blocking
+	// Defrag() can never run against a backend that's being replaced out from under it.
+	// But unlike Lock(), RLock() lets it run alongside the many other RLock() holders
+	// -- notably Backend(), which applyAll() calls on every batch of applied raft
+	// entries via VerifyBackendConsistency(). Taking bemu.Lock() here would serialize
+	// the single-threaded apply pipeline behind the entire Defrag() call (bulk-copy
+	// phase included), turning a non-blocking defrag back into a fully blocking one.
+	s.bemu.RLock()
+	defer s.bemu.RUnlock()
 	return s.be.Defrag()
 }
 
@@ -1052,7 +1058,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, toApply *toApply) {
 	// Eventually the new consistent_index value coming from snapshot is overwritten
 	// by the old value.
 	s.consistIndex.SetBackend(newbe)
-	verifySnapshotIndex(toApply.snapshot, s.consistIndex.ConsistentIndex())
 
 	// always recover lessor before kv. When we recover the mvcc.KV it will reattach keys to its leases.
 	// If we recover mvcc.KV first, it will attach the keys to the wrong lessor before it recovers.
@@ -1160,16 +1165,6 @@ func (s *EtcdServer) NewUberApplier() apply.UberApplier {
 		WarningApplyDuration:         s.Cfg.WarningApplyDuration,
 	}
 	return apply.NewUberApplier(opts)
-}
-
-func verifySnapshotIndex(snapshot *raftpb.Snapshot, cindex uint64) {
-	verify.Verify("consistent_index isn't equal to snapshot index", func() (bool, map[string]any) {
-		return cindex == snapshot.Metadata.GetIndex(),
-			map[string]any{
-				"consistent_index": cindex,
-				"snapshot_index":   snapshot.Metadata.GetIndex(),
-			}
-	})
 }
 
 func verifyConsistentIndexIsLatest(snapshot *raftpb.Snapshot, cindex uint64) {
@@ -2082,7 +2077,6 @@ func (s *EtcdServer) applyConfChange(cc *raftpb.ConfChange, ep *etcdProgress, sh
 // TODO: non-blocking snapshot
 func (s *EtcdServer) snapshot(ep *etcdProgress, toDisk bool) {
 	lg := s.Logger()
-	d := GetMembershipInfoInV2Format(lg, s.cluster)
 	if toDisk {
 		s.Logger().Info(
 			"triggering snapshot",
@@ -2105,8 +2099,7 @@ func (s *EtcdServer) snapshot(ep *etcdProgress, toDisk bool) {
 		s.KV().Commit()
 	}
 
-	// For backward compatibility, generate v2 snapshot from v3 state.
-	snap, err := s.r.raftStorage.CreateSnapshot(ep.appliedi, ep.confState, d)
+	snap, err := s.r.raftStorage.CreateSnapshot(ep.appliedi, ep.confState, nil)
 	if err != nil {
 		// the snapshot was done asynchronously with the progress of raft.
 		// raft might have already got a newer snapshot.
@@ -2120,7 +2113,7 @@ func (s *EtcdServer) snapshot(ep *etcdProgress, toDisk bool) {
 	verifyConsistentIndexIsLatest(snap, s.consistIndex.ConsistentIndex())
 
 	if toDisk {
-		// SaveSnap saves the snapshot to file and appends the corresponding WAL entry.
+		// SaveSnap appends the corresponding WAL entry.
 		if err = s.r.storage.SaveSnap(snap); err != nil {
 			lg.Panic("failed to save snapshot", zap.Error(err))
 		}

@@ -17,7 +17,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/version"
@@ -44,8 +44,8 @@ func unsafeValidate(lg *zap.Logger, tx backend.UnsafeReader) error {
 }
 
 func localBinaryVersion() semver.Version {
-	v := semver.New(version.Version)
-	return semver.Version{Major: v.Major, Minor: v.Minor}
+	v := semver.MustParse(version.Version)
+	return *semver.New(v.Major(), v.Minor(), 0, "", "")
 }
 
 // Migrate updates storage schema to provided target version.
@@ -66,9 +66,9 @@ func UnsafeMigrate(lg *zap.Logger, tx backend.UnsafeReadWriter, w wal.Version, t
 	if err != nil {
 		return fmt.Errorf("cannot create migration plan: %w", err)
 	}
-	if target.LessThan(current) {
+	if target.LessThan(&current) {
 		minVersion := w.MinimalEtcdVersion()
-		if minVersion != nil && target.LessThan(*minVersion) {
+		if minVersion != nil && target.LessThan(minVersion) {
 			// Occasionally we may see this error during downgrade test due to ClusterVersionSet,
 			// which is harmless. Please read https://github.com/etcd-io/etcd/pull/13405#discussion_r1890378185.
 			return fmt.Errorf("cannot downgrade storage, WAL contains newer entries, as the target version (%s) is lower than the version (%s) detected from WAL logs",
@@ -111,7 +111,7 @@ func schemaChangesForVersion(v semver.Version, isUpgrade bool) ([]schemaChange, 
 	// changes should be taken from higher version
 	higherV := v
 	if isUpgrade {
-		higherV = semver.Version{Major: v.Major, Minor: v.Minor + 1}
+		higherV = *semver.New(v.Major(), v.Minor()+1, 0, "", "")
 	}
 
 	actions, found := schemaChanges[higherV]
@@ -132,6 +132,7 @@ var (
 			addNewField(Meta, MetaStorageVersionName, emptyStorageVersion),
 		},
 		version.V3_7: {},
+		version.V3_8: {},
 	}
 	// emptyStorageVersion is used for v3.6 Step for the first time, in all other version StoragetVersion should be set by migrator.
 	// Adding a addNewField for StorageVersion we can reuse logic to remove it when downgrading to v3.5

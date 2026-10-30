@@ -15,6 +15,8 @@
 package clientv3
 
 import (
+	"fmt"
+
 	"google.golang.org/protobuf/proto"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -172,7 +174,7 @@ func mustInt64(val any) int64 {
 	if v, ok := val.(int); ok {
 		return int64(v)
 	}
-	panic("bad value")
+	panic(fmt.Sprintf("bad value %v of type %T", val, val))
 }
 
 // mustInt64orLeaseID panics if val isn't a LeaseID, int or int64. It returns an

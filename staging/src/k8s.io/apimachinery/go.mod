@@ -39,6 +39,7 @@ require (
 	github.com/go-openapi/swag/jsonutils v0.29.2 // indirect
 	github.com/go-openapi/swag/pools v0.29.2 // indirect
 	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
+	github.com/go-openapi/testify/enable/yaml/v2 v2.8.0 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/onsi/gomega v1.44.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

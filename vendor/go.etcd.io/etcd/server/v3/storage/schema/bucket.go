@@ -58,6 +58,14 @@ var (
 	AllBuckets = []backend.Bucket{Key, Meta, Lease, Alarm, Cluster, Members, MembersRemoved, Auth, AuthUsers, AuthRoles}
 )
 
+func init() {
+	for _, bk := range AllBuckets {
+		if bk.IsSafeRangeBucket() {
+			backend.RegisterSafeRangeBucket(bk.Name())
+		}
+	}
+}
+
 type bucket struct {
 	id              backend.BucketID
 	name            []byte

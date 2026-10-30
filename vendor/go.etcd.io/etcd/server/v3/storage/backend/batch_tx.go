@@ -45,6 +45,26 @@ type Bucket interface {
 	IsSafeRangeBucket() bool
 }
 
+// safeRangeBucketNames records, by raw bucket name, which buckets are known to never overwrite
+// an existing key (see Bucket.IsSafeRangeBucket). This package intentionally has no knowledge of
+// concrete bucket names, so higher-level packages that construct Bucket values (e.g. schema) are
+// expected to call RegisterSafeRangeBucket for any bucket where IsSafeRangeBucket() is true.
+//
+// Non-blocking defrag's stop-the-world catch-up phase uses this to decide whether a bucket can
+// be caught up with a simple "keys greater than the last one copied" range scan, or must be
+// fully re-copied because it can be mutated in place.
+var safeRangeBucketNames sync.Map // map[string]struct{}
+
+// RegisterSafeRangeBucket records that a bucket is append-only, i.e. IsSafeRangeBucket() == true.
+func RegisterSafeRangeBucket(name []byte) {
+	safeRangeBucketNames.Store(string(name), struct{}{})
+}
+
+func isRegisteredSafeRangeBucket(name []byte) bool {
+	_, ok := safeRangeBucketNames.Load(string(name))
+	return ok
+}
+
 type BatchTx interface {
 	Lock()
 	Unlock()

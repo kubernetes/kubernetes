@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 
@@ -33,7 +33,6 @@ import (
 	"go.etcd.io/etcd/api/v3/version"
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/v2store"
 	"go.etcd.io/etcd/server/v3/etcdserver/errors"
 )
 
@@ -172,14 +171,14 @@ func getMembersVersions(lg *zap.Logger, cl *membership.RaftCluster, local types.
 // if the downgrade enabled status is true, the version window is [oneMinorHigher, oneMinorHigher]
 // if the downgrade is not enabled, the version window is [MinClusterVersion, localVersion]
 func allowedVersionRange(downgradeEnabled bool) (minV *semver.Version, maxV *semver.Version) {
-	minV = semver.Must(semver.NewVersion(version.MinClusterVersion))
-	maxV = semver.Must(semver.NewVersion(version.Version))
-	maxV = &semver.Version{Major: maxV.Major, Minor: maxV.Minor}
+	minV = semver.MustParse(version.MinClusterVersion)
+	maxV = semver.MustParse(version.Version)
+	maxV = semver.New(maxV.Major(), maxV.Minor(), 0, "", "")
 
 	if downgradeEnabled {
 		// Todo: handle the case that downgrading from higher major version(e.g. downgrade from v4.0 to v3.x)
-		maxV.Minor = maxV.Minor + 1
-		minV = &semver.Version{Major: maxV.Major, Minor: maxV.Minor}
+		maxV = semver.New(maxV.Major(), maxV.Minor()+1, 0, "", "")
+		minV = semver.New(maxV.Major(), maxV.Minor(), 0, "", "")
 	}
 	return minV, maxV
 }
@@ -216,7 +215,7 @@ func isCompatibleWithVers(lg *zap.Logger, vers map[string]*version.Versions, loc
 			)
 			continue
 		}
-		if clusterv.LessThan(*minV) {
+		if clusterv.LessThan(minV) {
 			lg.Warn(
 				"cluster version of remote member is not compatible; too low",
 				zap.String("remote-member-id", id),
@@ -225,7 +224,7 @@ func isCompatibleWithVers(lg *zap.Logger, vers map[string]*version.Versions, loc
 			)
 			return false
 		}
-		if maxV.LessThan(*clusterv) {
+		if maxV.LessThan(clusterv) {
 			lg.Warn(
 				"cluster version of remote member is not compatible; too high",
 				zap.String("remote-member-id", id),
@@ -436,23 +435,13 @@ func getDowngradeEnabled(lg *zap.Logger, m *membership.Member, rt http.RoundTrip
 func convertToClusterVersion(v string) (*semver.Version, error) {
 	ver, err := semver.NewVersion(v)
 	if err != nil {
-		// allow input version format Major.Minor
+		// allow input version format Major.Minor()
 		ver, err = semver.NewVersion(v + ".0")
 		if err != nil {
 			return nil, errors.ErrWrongDowngradeVersionFormat
 		}
 	}
 	// cluster version only keeps major.minor, remove patch version
-	ver = &semver.Version{Major: ver.Major, Minor: ver.Minor}
+	ver = semver.New(ver.Major(), ver.Minor(), 0, "", "")
 	return ver, nil
-}
-
-func GetMembershipInfoInV2Format(lg *zap.Logger, cl *membership.RaftCluster) []byte {
-	st := v2store.New(StoreClusterPrefix, StoreKeysPrefix)
-	cl.Store(st)
-	d, err := st.SaveNoCopy()
-	if err != nil {
-		lg.Panic("failed to save v2 store", zap.Error(err))
-	}
-	return d
 }

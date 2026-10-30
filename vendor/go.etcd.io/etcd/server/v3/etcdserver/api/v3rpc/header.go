@@ -47,6 +47,9 @@ func (h *header) fill(rh *pb.ResponseHeader) {
 // fillWithoutRevision populates pb.ResponseHeader except for Revision.
 // Streaming handlers use this because the pinned read revision must be set
 // by the handler rather than silently replaced with the live store revision.
+//
+// leader_id is the serving member's advisory leader view. It can be zero and
+// is neither atomic with raft_term nor a guarantee that the leader remains leader.
 func (h *header) fillWithoutRevision(rh *pb.ResponseHeader) {
 	if rh == nil {
 		panic("unexpected nil resp.Header")
@@ -54,4 +57,5 @@ func (h *header) fillWithoutRevision(rh *pb.ResponseHeader) {
 	rh.ClusterId = uint64(h.clusterID)
 	rh.MemberId = uint64(h.memberID)
 	rh.RaftTerm = h.sg.Term()
+	rh.LeaderId = uint64(h.sg.Leader())
 }

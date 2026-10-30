@@ -17,7 +17,7 @@ package apply
 import (
 	"context"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -269,10 +269,10 @@ func (a *applierV3backend) RoleList(r *pb.AuthRoleListRequest) (*pb.AuthRoleList
 
 func (a *applierV3backend) ClusterVersionSet(r *membershippb.ClusterVersionSetRequest, shouldApplyV3 membership.ShouldApplyV3) {
 	prevVersion := a.options.Cluster.Version()
-	newVersion := semver.Must(semver.NewVersion(r.Ver))
+	newVersion := semver.MustParse(r.Ver)
 	a.options.Cluster.SetVersion(newVersion, api.UpdateCapability, shouldApplyV3)
 	// Force snapshot after cluster version downgrade.
-	if prevVersion != nil && newVersion.LessThan(*prevVersion) {
+	if prevVersion != nil && newVersion.LessThan(prevVersion) {
 		lg := a.options.Logger
 		if lg != nil {
 			lg.Info("Cluster version downgrade detected, forcing snapshot",
@@ -309,5 +309,6 @@ func (a *applierV3backend) newHeader() *pb.ResponseHeader {
 		MemberId:  uint64(a.options.RaftStatus.MemberID()),
 		Revision:  a.options.KV.Rev(),
 		RaftTerm:  a.options.RaftStatus.Term(),
+		LeaderId:  uint64(a.options.RaftStatus.Leader()),
 	}
 }

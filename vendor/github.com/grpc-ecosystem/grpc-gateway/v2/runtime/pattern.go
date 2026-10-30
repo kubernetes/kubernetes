@@ -43,6 +43,20 @@ type Pattern struct {
 	tailLen int
 	// verb is the VERB part of the path pattern. It is empty if the pattern does not have VERB part.
 	verb string
+	// strictDeepWildcard makes a deep wildcard ("**") preceded by a segment require at least one
+	// remaining path component.
+	strictDeepWildcard bool
+}
+
+// PatternOpt configures optional behavior of a Pattern.
+type PatternOpt func(*Pattern)
+
+// WithStrictDeepWildcard makes a deep wildcard ("**") that is preceded by another
+// segment refuse to match zero path segments. For example, "/v3/files/{path=**}"
+// will not match "/v3/files". A bare "**" with nothing preceding it still matches
+// zero segments. See https://github.com/grpc-ecosystem/grpc-gateway/issues/5771.
+func WithStrictDeepWildcard() PatternOpt {
+	return func(p *Pattern) { p.strictDeepWildcard = true }
 }
 
 // NewPattern returns a new Pattern from the given definition values.
@@ -51,6 +65,12 @@ type Pattern struct {
 // "version" must be 1 for now.
 // It returns an error if the given definition is invalid.
 func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, error) {
+	return NewPatternWithOptions(version, ops, pool, verb)
+}
+
+// NewPatternWithOptions is like NewPattern but additionally accepts options that modify
+// the matching behavior of the returned Pattern, e.g. WithStrictDeepWildcard.
+func NewPatternWithOptions(version int, ops []int, pool []string, verb string, opts ...PatternOpt) (Pattern, error) {
 	if version != 1 {
 		grpclog.Errorf("unsupported version: %d", version)
 		return Pattern{}, ErrInvalidPattern
@@ -129,14 +149,18 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 		}
 		typedOps = append(typedOps, op)
 	}
-	return Pattern{
+	pat := Pattern{
 		ops:       typedOps,
 		pool:      pool,
 		vars:      vars,
 		stacksize: maxstack,
 		tailLen:   tailLen,
 		verb:      verb,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(&pat)
+	}
+	return pat, nil
 }
 
 // MustPattern is a helper function which makes it easier to call NewPattern in variable initialization.
@@ -196,6 +220,16 @@ func (p Pattern) MatchAndEscape(components []string, verb string, unescapingMode
 				return nil, ErrNotMatch
 			}
 			end -= p.tailLen
+			if p.strictDeepWildcard && pos > 0 && pos == end {
+				// A deep wildcard ("**") is allowed to match zero path segments when it is
+				// the first thing being matched in the pattern (pos == 0). But once a literal
+				// or variable segment has already consumed a component, "**" needs the request
+				// path to continue past that segment — it cannot succeed with nothing left to
+				// consume at all (though an empty trailing segment, e.g. from a trailing slash,
+				// still counts as a real component and is fine).
+				// See https://github.com/grpc-ecosystem/grpc-gateway/issues/5771.
+				return nil, ErrNotMatch
+			}
 			c := strings.Join(components[pos:end], "/")
 			if c, err = unescape(c, unescapingMode, true); err != nil {
 				return nil, err

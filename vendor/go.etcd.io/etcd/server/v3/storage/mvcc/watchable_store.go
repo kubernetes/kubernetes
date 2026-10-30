@@ -283,6 +283,7 @@ func (s *watchableStore) syncVictimsLoop() {
 
 // moveVictims tries to update watches with already pending event data
 func (s *watchableStore) moveVictims() (moved int) {
+	// gofail: var beforeMoveVictims struct{}
 	s.mu.Lock()
 	victims := s.victims
 	s.victims = nil
@@ -344,6 +345,7 @@ func (s *watchableStore) moveVictims() (moved int) {
 //  3. use minimum revision to get all key-value pairs and send those events to watchers
 //  4. remove synced watchers in set from unsynced group and move to synced group
 func (s *watchableStore) syncWatchers() int {
+	// gofail: var beforeSyncWatchers struct{}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -513,6 +515,7 @@ func (s *watchableStore) progressAll(watchers map[WatchID]*watcher) bool {
 }
 
 func (s *watchableStore) progressIfSync(watchers map[WatchID]*watcher, responseWatchID WatchID) bool {
+	// gofail: var beforeProgressIfSync struct{}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

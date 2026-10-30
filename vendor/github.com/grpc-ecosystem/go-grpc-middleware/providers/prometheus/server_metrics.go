@@ -43,7 +43,7 @@ func NewServerMetrics(opts ...ServerMetricsOption) *ServerMetrics {
 	if config.enableHistogram {
 		histogramLabels := append(defaultLabels, config.contextLabels...)
 		serverHandledHistogram = prometheus.NewHistogramVec(
-			histogramOptions(config.histogramOpts).apply(prometheus.HistogramOpts{
+			histogramOptions(config.histogramOpts).apply(&prometheus.HistogramOpts{
 				Name:    "grpc_server_handling_seconds",
 				Help:    "Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.",
 				Buckets: prometheus.DefBuckets,
@@ -57,22 +57,26 @@ func NewServerMetrics(opts ...ServerMetricsOption) *ServerMetrics {
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_server_started_total",
 				Help: "Total number of RPCs started on the server.",
-			}), startedLabels),
+			}), startedLabels,
+		),
 		serverHandledCounter: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_server_handled_total",
 				Help: "Total number of RPCs completed on the server, regardless of success or failure.",
-			}), handledLabels),
+			}), handledLabels,
+		),
 		serverStreamMsgReceived: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_server_msg_received_total",
 				Help: "Total number of RPC stream messages received on the server.",
-			}), streamLabels),
+			}), streamLabels,
+		),
 		serverStreamMsgSent: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_server_msg_sent_total",
 				Help: "Total number of gRPC stream messages sent by the server.",
-			}), streamLabels),
+			}), streamLabels,
+		),
 		serverHandledHistogram: serverHandledHistogram,
 		contextLabelNames:      config.contextLabels,
 	}
@@ -130,7 +134,6 @@ func (m *ServerMetrics) preRegisterMethod(serviceName string, mInfo *grpc.Method
 
 	// Build complete label value arrays
 	startedLabels := append([]string{methodType, serviceName, methodName}, contextLabels...)
-	handledLabels := append([]string{methodType, serviceName, methodName}, contextLabels...)
 	streamLabels := append([]string{methodType, serviceName, methodName}, contextLabels...)
 
 	// These are just references (no increments), as just referencing will create the labels but not set values.
@@ -141,7 +144,7 @@ func (m *ServerMetrics) preRegisterMethod(serviceName string, mInfo *grpc.Method
 		_, _ = m.serverHandledHistogram.GetMetricWithLabelValues(streamLabels...)
 	}
 	for _, code := range interceptors.AllCodes {
-		handledLabelsWithCode := append(handledLabels, code.String())
+		handledLabelsWithCode := append([]string{methodType, serviceName, methodName, code.String()}, contextLabels...)
 		_, _ = m.serverHandledCounter.GetMetricWithLabelValues(handledLabelsWithCode...)
 	}
 }

@@ -201,6 +201,14 @@ func (a CheckWriteAction) OnWrite(ce *CheckedEntry, _ []Field) {
 
 var _ CheckWriteHook = CheckWriteAction(0)
 
+// CheckPreWriteHook is a function that transforms an Entry and its Fields
+// before they are written to cores. Register one on a CheckedEntry with the
+// Before method.
+//
+// Pre-write hooks run in the order they were added, before any Core's Write
+// method is called. They may modify the Entry and Fields freely.
+type CheckPreWriteHook func(Entry, []Field) (Entry, []Field)
+
 // CheckedEntry is an Entry together with a collection of Cores that have
 // already agreed to log it.
 //
@@ -213,6 +221,7 @@ type CheckedEntry struct {
 	dirty       bool // best-effort detection of pool misuse
 	after       CheckWriteHook
 	cores       []Core
+	before      []CheckPreWriteHook
 }
 
 func (ce *CheckedEntry) reset() {
@@ -225,6 +234,10 @@ func (ce *CheckedEntry) reset() {
 		ce.cores[i] = nil
 	}
 	ce.cores = ce.cores[:0]
+	for i := range ce.before {
+		ce.before[i] = nil
+	}
+	ce.before = ce.before[:0]
 }
 
 // Write writes the entry to the stored Cores, returns any errors, and returns
@@ -253,9 +266,14 @@ func (ce *CheckedEntry) Write(fields ...Field) {
 	}
 	ce.dirty = true
 
+	ent := ce.Entry
+	for i := range ce.before {
+		ent, fields = ce.before[i](ent, fields)
+	}
+
 	var err error
 	for i := range ce.cores {
-		err = multierr.Append(err, ce.cores[i].Write(ce.Entry, fields))
+		err = multierr.Append(err, ce.cores[i].Write(ent, fields))
 	}
 	if err != nil && ce.ErrorOutput != nil {
 		_, _ = fmt.Fprintf(
@@ -293,6 +311,18 @@ func (ce *CheckedEntry) AddCore(ent Entry, core Core) *CheckedEntry {
 // Deprecated: Use [CheckedEntry.After] instead.
 func (ce *CheckedEntry) Should(ent Entry, should CheckWriteAction) *CheckedEntry {
 	return ce.After(ent, should)
+}
+
+// Before adds a pre-write hook that transforms the Entry and Fields before
+// they are written to any registered Cores. Multiple hooks run in the order
+// they were added. It's safe to call this on nil CheckedEntry references.
+func (ce *CheckedEntry) Before(ent Entry, hook CheckPreWriteHook) *CheckedEntry {
+	if ce == nil {
+		ce = getCheckedEntry()
+		ce.Entry = ent
+	}
+	ce.before = append(ce.before, hook)
+	return ce
 }
 
 // After sets this CheckEntry's CheckWriteHook, which will be called after this

@@ -29,7 +29,7 @@ func stripTrailingDigits(s string, digits int) string {
 			return s[:i]
 		}
 		i++
-		if i+digits >= len(s) {
+		if digits >= len(s)-i {
 			return s
 		}
 		return s[:i+digits]

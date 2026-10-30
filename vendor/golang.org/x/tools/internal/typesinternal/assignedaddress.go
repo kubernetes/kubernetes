@@ -76,8 +76,8 @@ outer:
 						// The receiver may be an embedded field, so we need
 						// to get the inner-most type (right before the method
 						// call in seln.Index())
-						for _, idx := range seln.Index()[:len(seln.Index())-1] {
-							t = t.Underlying().(*types.Struct).Field(idx).Type()
+						for field := range ImplicitFieldSelections(seln) {
+							t = field.Type()
 						}
 						if !is[*types.Pointer](t.Underlying()) {
 							return true // takes address of receiver

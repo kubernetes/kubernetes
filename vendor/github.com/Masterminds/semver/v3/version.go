@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -48,7 +49,15 @@ var (
 
 	// ErrInvalidPrerelease is returned when the pre-release is an invalid format
 	ErrInvalidPrerelease = errors.New("invalid prerelease string")
+
+	// ErrVersionTooLong is returned when a version string exceeds the
+	// maximum allowed length.
+	ErrVersionTooLong = fmt.Errorf("version string is too long (max %d bytes)", MaxVersionLen)
 )
+
+// MaxVersionLen is the maximum allowed length of a version string. This guards
+// against unbounded input causing excessive memory allocations during parsing.
+const MaxVersionLen = 256
 
 // semVerRegex is the regular expression used to parse a semantic version.
 // This is not the official regex from the semver spec. It has been modified to allow for loose handling
@@ -92,6 +101,10 @@ func StrictNewVersion(v string) (*Version, error) {
 
 	if len(v) == 0 {
 		return nil, ErrEmptyString
+	}
+
+	if len(v) > MaxVersionLen {
+		return nil, ErrVersionTooLong
 	}
 
 	// Split the parts into [0]major, [1]minor, and [2]patch,prerelease,build
@@ -161,6 +174,9 @@ func StrictNewVersion(v string) (*Version, error) {
 // attempts to convert it to SemVer. If you want  to validate it was a strict
 // semantic version at parse time see StrictNewVersion().
 func NewVersion(v string) (*Version, error) {
+	if len(v) > MaxVersionLen {
+		return nil, ErrVersionTooLong
+	}
 	if CoerceNewVersion {
 		return coerceNewVersion(v)
 	}
@@ -289,6 +305,8 @@ func coerceNewVersion(v string) (*Version, error) {
 
 // New creates a new instance of Version with each of the parts passed in as
 // arguments instead of parsing a version string.
+// Note, New does not validate prerelease or metadata. Incorrect information can
+// be passed in.
 func New(major, minor, patch uint64, pre, metadata string) *Version {
 	v := Version{
 		major:    major,
@@ -301,6 +319,7 @@ func New(major, minor, patch uint64, pre, metadata string) *Version {
 
 	v.original = v.String()
 
+	// TODO: In the next semver major version validate the pre and metadata. Return error if there is one.
 	return &v
 }
 
@@ -388,6 +407,9 @@ func (v Version) IncPatch() Version {
 	} else {
 		vNext.metadata = ""
 		vNext.pre = ""
+		if v.patch == math.MaxUint64 {
+			panic("patch version increment would overflow uint64")
+		}
 		vNext.patch = v.patch + 1
 	}
 	vNext.original = v.originalVPrefix() + "" + vNext.String()
@@ -404,6 +426,9 @@ func (v Version) IncMinor() Version {
 	vNext.metadata = ""
 	vNext.pre = ""
 	vNext.patch = 0
+	if v.minor == math.MaxUint64 {
+		panic("minor version increment would overflow uint64")
+	}
 	vNext.minor = v.minor + 1
 	vNext.original = v.originalVPrefix() + "" + vNext.String()
 	return vNext
@@ -421,6 +446,9 @@ func (v Version) IncMajor() Version {
 	vNext.pre = ""
 	vNext.patch = 0
 	vNext.minor = 0
+	if v.major == math.MaxUint64 {
+		panic("major version increment would overflow uint64")
+	}
 	vNext.major = v.major + 1
 	vNext.original = v.originalVPrefix() + "" + vNext.String()
 	return vNext
@@ -568,7 +596,16 @@ func (v Version) MarshalText() ([]byte, error) {
 // Scan implements the SQL.Scanner interface.
 func (v *Version) Scan(value interface{}) error {
 	var s string
-	s, _ = value.(string)
+	switch t := value.(type) {
+	case string:
+		s = t
+	case []byte:
+		s = string(t)
+	case nil:
+		return fmt.Errorf("cannot scan nil into Version")
+	default:
+		return fmt.Errorf("unsupported Scan type %T", value)
+	}
 	temp, err := NewVersion(s)
 	if err != nil {
 		return err

@@ -28,6 +28,9 @@ func Parse(tmpl string) (Compiler, error) {
 	if err != nil {
 		return template{}, InvalidTemplateError{tmpl: tmpl, msg: err.Error()}
 	}
+	if err := expectPChars(verb); err != nil {
+		return template{}, InvalidTemplateError{tmpl: tmpl, msg: fmt.Sprintf("invalid verb: %v", err)}
+	}
 
 	return template{
 		segments: segs,

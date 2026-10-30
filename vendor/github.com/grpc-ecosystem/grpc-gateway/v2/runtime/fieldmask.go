@@ -65,14 +65,16 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 				}
 
 				if isProtobufAnyMessage(fd.Message()) && !fd.IsList() {
-					_, hasTypeField := v.(map[string]interface{})["@type"]
-					if hasTypeField {
-						queue = append(queue, fieldMaskPathItem{path: k})
-						continue
-					} else {
+					vm, _ := v.(map[string]interface{})
+					if _, hasTypeField := vm["@type"]; !hasTypeField {
 						return nil, fmt.Errorf("could not find field @type in %q in message %q", k, item.msg.Descriptor().FullName())
 					}
-
+					newPath := string(fd.FullName().Name())
+					if item.path != "" {
+						newPath = item.path + "." + newPath
+					}
+					queue = append(queue, fieldMaskPathItem{path: newPath})
+					continue
 				}
 
 				child := fieldMaskPathItem{
@@ -126,7 +128,7 @@ func isDynamicProtoMessage(md protoreflect.MessageDescriptor) bool {
 // passed in name and json value.
 func buildPathsBlindly(name string, in interface{}) []string {
 	m, ok := in.(map[string]interface{})
-	if !ok {
+	if !ok || len(m) == 0 {
 		return []string{name}
 	}
 
@@ -143,10 +145,10 @@ func buildPathsBlindly(name string, in interface{}) []string {
 			continue
 		}
 		for k, v := range m {
-			if mi, ok := v.(map[string]interface{}); ok {
+			if mi, ok := v.(map[string]interface{}); ok && len(mi) > 0 {
 				queue = append(queue, fieldMaskPathItem{path: cur.path + "." + k, node: mi})
 			} else {
-				// This is not a struct, so there are no more levels to descend.
+				// No populated object remains, so there are no more levels to descend.
 				curPath := cur.path + "." + k
 				paths = append(paths, curPath)
 			}

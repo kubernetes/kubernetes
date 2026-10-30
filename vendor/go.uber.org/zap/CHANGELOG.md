@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.28.0 (27 Apr 2026)
+Enhancements:
+* [#1534][]: Add `zapcore.CheckPreWriteHook` and `CheckedEntry.Before` method for transforming entries before they are written to any Cores.
+
 ## 1.27.1 (19 Nov 2025) 
 Enhancements:
 * [#1501][]: prevent `Object` from panicking on nils 

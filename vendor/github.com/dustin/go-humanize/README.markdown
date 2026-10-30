@@ -1,4 +1,4 @@
-# Humane Units [![Build Status](https://travis-ci.org/dustin/go-humanize.svg?branch=master)](https://travis-ci.org/dustin/go-humanize) [![GoDoc](https://godoc.org/github.com/dustin/go-humanize?status.svg)](https://godoc.org/github.com/dustin/go-humanize)
+# Humane Units [![Build Status](https://travis-ci.org/dustin/go-humanize.svg?branch=master)](https://travis-ci.org/dustin/go-humanize) [![GoDoc](https://godoc.org/github.com/dustin/go-humanize?status.svg)](https://godoc.org/github.com/dustin/go-humanize) [![Coverage](https://img.shields.io/badge/coverage-report-brightgreen)](https://dustin.github.io/go-humanize/)
 
 Just a few functions for helping humanize times and sizes.
 
@@ -7,6 +7,9 @@ Just a few functions for helping humanize times and sizes.
 
 See [godoc](https://pkg.go.dev/github.com/dustin/go-humanize) for
 complete documentation.
+
+See the [test coverage report](https://dustin.github.io/go-humanize/) for
+coverage details.
 
 ## Sizes
 

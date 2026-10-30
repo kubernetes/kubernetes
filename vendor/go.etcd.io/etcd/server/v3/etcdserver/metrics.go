@@ -16,9 +16,11 @@ package etcdserver
 
 import (
 	goruntime "runtime"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/version"
@@ -191,6 +193,25 @@ func init() {
 	}).Set(1)
 }
 
+var enableAllRuntimeMetricsOnce sync.Once
+
+// EnableAllRuntimeMetrics swaps client_golang's default Go collector for one
+// exposing the full runtime/metrics set (scheduler latency, mutex contention,
+// GC CPU share).
+func EnableAllRuntimeMetrics(lg *zap.Logger) {
+	enableAllRuntimeMetricsOnce.Do(func() {
+		if !prometheus.Unregister(collectors.NewGoCollector()) {
+			lg.Warn("failed to unregister the default Go collector, all runtime metrics will not be exposed")
+			return
+		}
+		if err := prometheus.Register(collectors.NewGoCollector(
+			collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll),
+		)); err != nil {
+			lg.Warn("failed to register the Go collector with all runtime metrics", zap.Error(err))
+		}
+	})
+}
+
 func monitorFileDescriptor(lg *zap.Logger, done <-chan struct{}) {
 	// This ticker will check File Descriptor Requirements ,and count all fds in used.
 	// And recorded some logs when in used >= limit/5*4. Just recorded message.
@@ -200,14 +221,14 @@ func monitorFileDescriptor(lg *zap.Logger, done <-chan struct{}) {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 	for {
-		used, err := runtime.FDUsage()
-		if err != nil {
+		used, err := runtime.FDUsage() //nolint:staticcheck // SA4023: FDUsage always errors on non-linux by design; on linux it can return nil
+		if err != nil {                //nolint:staticcheck // SA4023: FDUsage always errors on non-linux by design; on linux it can return nil
 			lg.Warn("failed to get file descriptor usage", zap.Error(err))
 			return
 		}
 		fdUsed.Set(float64(used))
-		limit, err := runtime.FDLimit()
-		if err != nil {
+		limit, err := runtime.FDLimit() //nolint:staticcheck // SA4023: FDLimit always errors on non-linux by design; on linux it can return nil
+		if err != nil {                 //nolint:staticcheck // SA4023: FDLimit always errors on non-linux by design; on linux it can return nil
 			lg.Warn("failed to get file descriptor limit", zap.Error(err))
 			return
 		}

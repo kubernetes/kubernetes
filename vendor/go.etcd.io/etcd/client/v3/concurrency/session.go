@@ -45,9 +45,16 @@ func NewSession(client *v3.Client, opts ...SessionOption) (*Session, error) {
 		opt(ops, lg)
 	}
 
+	sessionCreationCtx := ops.ctx
+	if ops.creationTimeout > 0 {
+		var creationCancel context.CancelFunc
+		sessionCreationCtx, creationCancel = context.WithTimeout(ops.ctx, ops.creationTimeout)
+		defer creationCancel()
+	}
+
 	id := ops.leaseID
 	if id == v3.NoLease {
-		resp, err := client.Grant(ops.ctx, int64(ops.ttl))
+		resp, err := client.Grant(sessionCreationCtx, int64(ops.ttl))
 		if err != nil {
 			return nil, err
 		}
@@ -115,9 +122,10 @@ func (s *Session) Close() error {
 }
 
 type sessionOptions struct {
-	ttl     int
-	leaseID v3.LeaseID
-	ctx     context.Context
+	ttl             int
+	leaseID         v3.LeaseID
+	ctx             context.Context
+	creationTimeout time.Duration
 }
 
 // SessionOption configures Session.
@@ -131,6 +139,19 @@ func WithTTL(ttl int) SessionOption {
 			so.ttl = ttl
 		} else {
 			lg.Warn("WithTTL(): TTL should be > 0, preserving current TTL", zap.Int64("current-session-ttl", int64(so.ttl)))
+		}
+	}
+}
+
+// WithCreationTimeout configures the timeout for creating a new session.
+// If timeout is <= 0, no timeout will be used, and the creating new session
+// will be blocked forever until the etcd server is reachable.
+func WithCreationTimeout(timeout time.Duration) SessionOption {
+	return func(so *sessionOptions, lg *zap.Logger) {
+		if timeout > 0 {
+			so.creationTimeout = timeout
+		} else {
+			lg.Warn("WithCreationTimeout(): timeout should be > 0, preserving current timeout", zap.Int64("current-session-timeout", int64(so.creationTimeout)))
 		}
 	}
 }

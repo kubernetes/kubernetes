@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -225,6 +225,30 @@ func bootstrapSnapshot(cfg config.ServerConfig) *snap.Snapshotter {
 			zap.Error(err),
 		)
 	}
+
+	if err := fileutil.RemoveMatchFile(cfg.Logger, cfg.SnapDir(), func(fileName string) bool {
+		return strings.HasPrefix(strings.ToLower(fileName), "db.tmp")
+	}); err != nil {
+		cfg.Logger.Error(
+			"failed to remove orphaned defragmentation file in snapshot directory",
+			zap.String("path", cfg.SnapDir()),
+			zap.Error(err),
+		)
+	}
+
+	// TODO: we can remove this code in the next release etcd v3.9
+	if err := fileutil.RemoveMatchFile(cfg.Logger, cfg.SnapDir(), func(fileName string) bool {
+		return strings.HasSuffix(strings.ToLower(fileName), ".snap")
+	}); err != nil {
+		cfg.Logger.Error(
+			"failed to remove v2 snapshot file(s) in snapshot directory",
+			zap.String("path", cfg.SnapDir()),
+			zap.Error(err),
+		)
+	} else {
+		cfg.Logger.Info("cleaned up all legacy v2 snapshot files")
+	}
+
 	return snap.New(cfg.Logger, cfg.SnapDir())
 }
 
@@ -483,7 +507,7 @@ func (c *bootstrappedCluster) Finalize(cfg config.ServerConfig, s *bootstrappedS
 }
 
 func (c *bootstrappedCluster) databaseFileMissing(s *bootstrappedStorage) bool {
-	v3Cluster := c.cl.Version() != nil && !c.cl.Version().LessThan(semver.Version{Major: 3})
+	v3Cluster := c.cl.Version() != nil && !c.cl.Version().LessThan(semver.New(3, 0, 0, "", ""))
 	return v3Cluster && !s.backend.beExist
 }
 

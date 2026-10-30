@@ -73,6 +73,17 @@ var (
 		Buckets: prometheus.ExponentialBuckets(.1, 2, 13),
 	})
 
+	defragBlockingSec = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "disk",
+		Name:      "backend_defrag_blocking_duration_seconds",
+		Help:      "The latency distribution of the stop-the-world phase of non-blocking backend defragmentation, during which client requests are blocked.",
+
+		// lowest bucket start of upper bound 0.001 sec (1 ms) with factor 2
+		// highest bucket start of 0.001 sec * 2^13 == 8.192 sec
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+	})
+
 	snapshotTransferSec = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "etcd",
 		Subsystem: "disk",
@@ -98,6 +109,7 @@ func init() {
 	prometheus.MustRegister(spillSec)
 	prometheus.MustRegister(writeSec)
 	prometheus.MustRegister(defragSec)
+	prometheus.MustRegister(defragBlockingSec)
 	prometheus.MustRegister(snapshotTransferSec)
 	prometheus.MustRegister(isDefragActive)
 }

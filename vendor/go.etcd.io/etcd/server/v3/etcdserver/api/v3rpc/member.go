@@ -107,8 +107,10 @@ func (cs *ClusterServer) MemberPromote(ctx context.Context, r *pb.MemberPromoteR
 	return &pb.MemberPromoteResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 }
 
+// header includes leader_id so clients can learn this member's leader view from
+// a Cluster RPC instead of a separate Status request. See #22268.
 func (cs *ClusterServer) header() *pb.ResponseHeader {
-	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.MemberID()), RaftTerm: cs.server.Term()}
+	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.MemberID()), RaftTerm: cs.server.Term(), LeaderId: uint64(cs.server.Leader())}
 }
 
 func membersToProtoMembers(membs []*membership.Member) []*pb.Member {

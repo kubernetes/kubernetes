@@ -60,8 +60,7 @@ type ServerConfig struct {
 	// follower to catch up.
 	SnapshotCatchUpEntries uint64
 
-	MaxSnapFiles uint
-	MaxWALFiles  uint
+	MaxWALFiles uint
 
 	// BackendBatchInterval is the maximum time before commit the backend transaction.
 	BackendBatchInterval time.Duration
@@ -192,9 +191,6 @@ type ServerConfig struct {
 
 	// MaxLearners sets a limit to the number of learner members that can exist in the cluster membership.
 	MaxLearners int `json:"max-learners"`
-
-	// V2Deprecation defines a phase of v2store deprecation process.
-	V2Deprecation V2DeprecationEnum `json:"v2-deprecation"`
 
 	// LocalAddress is the local IP address to use when communicating with a peer.
 	LocalAddress string `json:"local-address"`

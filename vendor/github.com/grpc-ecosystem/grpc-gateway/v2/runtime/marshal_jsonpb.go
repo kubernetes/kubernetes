@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strconv"
 
@@ -311,6 +312,12 @@ func decodeNonProtoField(d *json.Decoder, unmarshaler protojson.UnmarshalOptions
 			// TODO(yugui) Should use proto.StructProperties?
 			return fmt.Errorf("unmarshaling of symbolic enum %q not supported: %T", repr, rv.Interface())
 		case float64:
+			// Enum values are int32 on the wire. A fractional or out-of-range
+			// number would otherwise be silently truncated/wrapped into a bogus
+			// enum here, unlike protojson which rejects it, so reject it too.
+			if v != math.Trunc(v) || v < math.MinInt32 || v > math.MaxInt32 {
+				return fmt.Errorf("%v is not a valid value for enum %T", repr, rv.Interface())
+			}
 			rv.Set(reflect.ValueOf(int32(v)).Convert(rv.Type()))
 			return nil
 		default:

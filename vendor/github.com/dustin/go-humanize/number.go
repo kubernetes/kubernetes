@@ -42,11 +42,12 @@ var (
 )
 
 // FormatFloat produces a formatted number as string based on the following user-specified criteria:
+//
 // * thousands separator
 // * decimal separator
 // * decimal precision
 //
-// Usage: s := RenderFloat(format, n)
+// Usage: s := FormatFloat(format, n)
 // The format parameter tells how to render the number n.
 //
 // See examples: http://play.golang.org/p/LXc1Ddm1lJ
@@ -111,7 +112,7 @@ func FormatFloat(format string, n float64) string {
 			//        +0000
 			if formatIndx[0] == 0 {
 				if format[formatIndx[0]] != '+' {
-					panic("RenderFloat(): invalid positive sign directive")
+					panic("FormatFloat(): invalid positive sign directive")
 				}
 				positiveStr = "+"
 				formatIndx = formatIndx[1:]
@@ -125,7 +126,7 @@ func FormatFloat(format string, n float64) string {
 			// 000,000.00
 			if len(formatIndx) == 2 {
 				if (formatIndx[1] - formatIndx[0]) != 4 {
-					panic("RenderFloat(): thousands separator directive must be followed by 3 digit-specifiers")
+					panic("FormatFloat(): thousands separator directive must be followed by 3 digit-specifiers")
 				}
 				thousandStr = string(format[formatIndx[0]])
 				formatIndx = formatIndx[1:]
@@ -160,7 +161,7 @@ func FormatFloat(format string, n float64) string {
 	intf, fracf := math.Modf(n + renderFloatPrecisionRounders[precision])
 
 	// generate integer part string
-	intStr := strconv.FormatInt(int64(intf), 10)
+	intStr := strconv.FormatFloat(intf, 'f', 0, 64)
 
 	// add thousand separator if required
 	if len(thousandStr) > 0 {

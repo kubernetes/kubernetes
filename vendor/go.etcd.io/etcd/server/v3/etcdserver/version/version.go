@@ -17,7 +17,7 @@ package version
 import (
 	"context"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +45,7 @@ func (m *Manager) DowngradeValidate(ctx context.Context, targetVersion *semver.V
 	}
 	cv := m.s.GetClusterVersion()
 	allowedTargetVersion := allowedDowngradeVersion(cv)
-	if !targetVersion.Equal(*allowedTargetVersion) {
+	if !targetVersion.Equal(allowedTargetVersion) {
 		return ErrInvalidDowngradeTargetVersion
 	}
 
