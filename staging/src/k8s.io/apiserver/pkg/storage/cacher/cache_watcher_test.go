@@ -302,7 +302,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{})
-		w.setBookmarkAfterResourceVersion(0)
+		w.setBookmarkAfterResourceVersion(0, nil)
 		return w
 	}
 
@@ -446,7 +446,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 		{Object: &v1.Pod{}, ResourceVersion: 2},
 	}
 	w = newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{})
-	w.setBookmarkAfterResourceVersion(10)
+	w.setBookmarkAfterResourceVersion(10, nil)
 	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
 	go w.process(context.Background())
 
@@ -519,7 +519,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	w = newCacheWatcher(2, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), fakeClock, "", watchSelector{})
-	w.setBookmarkAfterResourceVersion(10)
+	w.setBookmarkAfterResourceVersion(10, nil)
 	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
 	go w.process(ctx)
 	watchInitializationSignal.Wait()
@@ -617,7 +617,7 @@ apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, filterAny, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, id, watchSelector{})
-		w.setBookmarkAfterResourceVersion(10)
+		w.setBookmarkAfterResourceVersion(10, nil)
 		return w
 	}
 
