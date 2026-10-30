@@ -737,8 +737,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.get(ctx, key, opts.ResourceVersion)
-	if err != nil {
+	obj, exists, err := c.get(ctx, key, opts.ResourceVersion, opts.IgnoreNotFound)
+	if err != nil && !storage.IsNotFound(err) {
 		return err
 	}
 	// Get long processing is >500ms, however wait for fresh cache timeout is 3s so want to avoid traces just showing waits.
@@ -748,26 +748,26 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		objVal.Set(reflect.ValueOf(obj).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
-		if !opts.IgnoreNotFound {
-			return storage.NewKeyNotFoundError(key, int64(readResourceVersion))
-		}
 	}
-	return nil
+	return err
 }
 
-func (c *Cacher) get(ctx context.Context, key string, resourceVersion string) (runtime.Object, bool, uint64, error) {
+func (c *Cacher) get(ctx context.Context, key string, resourceVersion string, ignoreNotFound bool) (runtime.Object, bool, error) {
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, resourceVersion, key)
 	if err != nil {
-		return nil, false, 0, err
+		return nil, false, err
 	}
 	if !exists {
-		return nil, false, readResourceVersion, nil
+		if ignoreNotFound {
+			return nil, false, nil
+		}
+		return nil, false, storage.NewKeyNotFoundError(key, int64(readResourceVersion))
 	}
 	elem, ok := obj.(*store.Element)
 	if !ok {
-		return nil, false, 0, fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		return nil, false, fmt.Errorf("non *store.Element returned from storage: %v", obj)
 	}
-	return elem.Object, true, readResourceVersion, nil
+	return elem.Object, true, nil
 }
 
 // computeListLimit determines whether the cacher should
