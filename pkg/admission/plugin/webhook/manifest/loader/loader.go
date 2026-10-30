@@ -21,13 +21,18 @@ limitations under the License.
 package loader
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	stagingloader "k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/loader"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -134,7 +139,9 @@ func defaultAndValidateVWC(config *admissionregistrationv1.ValidatingWebhookConf
 	if err := scheme.Convert(config, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
-	if errs := validation.ValidateValidatingWebhookConfiguration(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingWebhookConfiguration(internalObj)
+	errs = validateDeclaratively(internalObj, errs)
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
 	resultConfig := &admissionregistrationv1.ValidatingWebhookConfiguration{}
@@ -154,7 +161,9 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 	if err := scheme.Convert(config, internalObj, nil); err != nil {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
-	if errs := validation.ValidateMutatingWebhookConfiguration(internalObj); len(errs) > 0 {
+	errs := validation.ValidateMutatingWebhookConfiguration(internalObj)
+	errs = validateDeclaratively(internalObj, errs)
+	if len(errs) > 0 {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
 	resultConfig := &admissionregistrationv1.MutatingWebhookConfiguration{}
@@ -163,4 +172,12 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 	}
 	*config = *resultConfig
 	return nil
+}
+
+func validateDeclaratively(obj runtime.Object, errs field.ErrorList) field.ErrorList {
+	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
+		APIGroup:   admissionregistrationv1.GroupName,
+		APIVersion: admissionregistrationv1.SchemeGroupVersion.Version,
+	})
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }

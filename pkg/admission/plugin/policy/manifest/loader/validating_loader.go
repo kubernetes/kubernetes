@@ -19,13 +19,18 @@ limitations under the License.
 package loader
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	policyloader "k8s.io/apiserver/pkg/admission/plugin/policy/manifest/loader"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -126,7 +131,8 @@ func defaultAndValidateVAP(policy *admissionregistrationv1.ValidatingAdmissionPo
 	if err := scheme.Convert(policy, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: conversion error: %w", policy.Name, err)
 	}
-	if errs := validation.ValidateValidatingAdmissionPolicy(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingAdmissionPolicy(internalObj)
+	if errs = validateDeclaratively(internalObj, errs); len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: %w", policy.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.ValidatingAdmissionPolicy{}
@@ -145,7 +151,9 @@ func defaultAndValidateVAPB(binding *admissionregistrationv1.ValidatingAdmission
 	if err := scheme.Convert(binding, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: conversion error: %w", binding.Name, err)
 	}
-	if errs := validation.ValidateValidatingAdmissionPolicyBinding(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingAdmissionPolicyBinding(internalObj)
+	errs = validateDeclaratively(internalObj, errs)
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: %w", binding.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}
@@ -154,4 +162,12 @@ func defaultAndValidateVAPB(binding *admissionregistrationv1.ValidatingAdmission
 	}
 	*binding = *resultObj
 	return nil
+}
+
+func validateDeclaratively(obj runtime.Object, errs field.ErrorList) field.ErrorList {
+	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
+		APIGroup:   admissionregistrationv1.GroupName,
+		APIVersion: admissionregistrationv1.SchemeGroupVersion.Version,
+	})
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
