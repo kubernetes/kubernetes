@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -65,14 +66,16 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 				}
 
 				if isProtobufAnyMessage(fd.Message()) && !fd.IsList() {
-					_, hasTypeField := v.(map[string]interface{})["@type"]
-					if hasTypeField {
-						queue = append(queue, fieldMaskPathItem{path: k})
-						continue
-					} else {
+					vm, _ := v.(map[string]interface{})
+					if _, hasTypeField := vm["@type"]; !hasTypeField {
 						return nil, fmt.Errorf("could not find field @type in %q in message %q", k, item.msg.Descriptor().FullName())
 					}
-
+					newPath := string(fd.FullName().Name())
+					if item.path != "" {
+						newPath = item.path + "." + newPath
+					}
+					queue = append(queue, fieldMaskPathItem{path: newPath})
+					continue
 				}
 
 				child := fieldMaskPathItem{
@@ -96,10 +99,10 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 					queue = append(queue, child)
 				}
 			}
-		case ok && len(m) == 0:
-			fallthrough
 		case len(item.path) > 0:
-			// otherwise, it's a leaf node so print its path
+			// otherwise, it's a leaf node (an empty object counts as one) so
+			// print its path. The root has no path: an empty body such as {}
+			// sets nothing, and an empty path is not a valid FieldMask path.
 			fm.Paths = append(fm.Paths, item.path)
 		}
 	}
@@ -126,30 +129,55 @@ func isDynamicProtoMessage(md protoreflect.MessageDescriptor) bool {
 // passed in name and json value.
 func buildPathsBlindly(name string, in interface{}) []string {
 	m, ok := in.(map[string]interface{})
-	if !ok {
+	if !ok || len(m) == 0 {
 		return []string{name}
 	}
 
+	// A google.protobuf.Struct/Value field carries arbitrary client JSON, so
+	// its nesting depth is attacker controlled. Keep each queue entry pointing
+	// at its parent and its own segment rather than carrying the full path
+	// string, so a path is concatenated once at the leaf (O(depth)) instead of
+	// rebuilding the growing prefix at every level (O(depth^2)). A deeply
+	// nested object otherwise makes this allocate quadratically in the depth
+	// while producing only a handful of paths.
+	type pathNode struct {
+		parent  *pathNode
+		segment string
+	}
+	type queueItem struct {
+		path *pathNode
+		node map[string]any
+	}
+
 	var paths []string
-	queue := []fieldMaskPathItem{{path: name, node: m}}
+	queue := []queueItem{{path: &pathNode{segment: name}, node: m}}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
 
-		m, ok := cur.node.(map[string]interface{})
-		if !ok {
-			// This should never happen since we should always check that we only add
-			// nodes of type map[string]interface{} to the queue.
-			continue
-		}
-		for k, v := range m {
-			if mi, ok := v.(map[string]interface{}); ok {
-				queue = append(queue, fieldMaskPathItem{path: cur.path + "." + k, node: mi})
-			} else {
-				// This is not a struct, so there are no more levels to descend.
-				curPath := cur.path + "." + k
-				paths = append(paths, curPath)
+		for k, v := range cur.node {
+			child := &pathNode{parent: cur.path, segment: k}
+			if mi, ok := v.(map[string]any); ok && len(mi) > 0 {
+				queue = append(queue, queueItem{path: child, node: mi})
+				continue
 			}
+			// No populated object remains, so there are no more levels to
+			// descend. Walk back to the root to materialize the path once.
+			var segments []string
+			n := 0
+			for p := child; p != nil; p = p.parent {
+				segments = append(segments, p.segment)
+				n += len(p.segment) + 1
+			}
+			var b strings.Builder
+			b.Grow(n - 1)
+			for i := len(segments) - 1; i >= 0; i-- {
+				b.WriteString(segments[i])
+				if i > 0 {
+					b.WriteByte('.')
+				}
+			}
+			paths = append(paths, b.String())
 		}
 	}
 	return paths

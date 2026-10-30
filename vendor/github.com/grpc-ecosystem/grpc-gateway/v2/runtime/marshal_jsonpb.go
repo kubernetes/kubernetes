@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strconv"
 
@@ -251,16 +252,31 @@ func decodeNonProtoField(d *json.Decoder, unmarshaler protojson.UnmarshalOptions
 			return fmt.Errorf("unsupported type of map field key: %v", rv.Type().Key())
 		}
 
-		m := make(map[string]*json.RawMessage)
-		if err := d.Decode(&m); err != nil {
+		var raw json.RawMessage
+		if err := d.Decode(&raw); err != nil {
 			return err
 		}
+		m := make(map[string]*json.RawMessage)
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return err
+		}
+		// encoding/json keeps the last value of a repeated key, while protojson
+		// rejects a duplicate map key, also when two spellings convert to the
+		// same key (e.g. "1" and "01"). Reject both here too.
+		if k, ok := duplicateObjectKey(raw); ok {
+			return fmt.Errorf("duplicate map key %q", k)
+		}
+		seen := make(map[any]struct{}, len(m))
 		for k, v := range m {
 			result := conv.Call([]reflect.Value{reflect.ValueOf(k)})
 			if err := result[1].Interface(); err != nil {
 				return err.(error)
 			}
 			bk := result[0]
+			if _, ok := seen[bk.Interface()]; ok {
+				return fmt.Errorf("duplicate map key %q", k)
+			}
+			seen[bk.Interface()] = struct{}{}
 			bv := reflect.New(rv.Type().Elem())
 			if v == nil {
 				null := json.RawMessage("null")
@@ -311,6 +327,12 @@ func decodeNonProtoField(d *json.Decoder, unmarshaler protojson.UnmarshalOptions
 			// TODO(yugui) Should use proto.StructProperties?
 			return fmt.Errorf("unmarshaling of symbolic enum %q not supported: %T", repr, rv.Interface())
 		case float64:
+			// Enum values are int32 on the wire. A fractional or out-of-range
+			// number would otherwise be silently truncated/wrapped into a bogus
+			// enum here, unlike protojson which rejects it, so reject it too.
+			if v != math.Trunc(v) || v < math.MinInt32 || v > math.MaxInt32 {
+				return fmt.Errorf("%v is not a valid value for enum %T", repr, rv.Interface())
+			}
 			rv.Set(reflect.ValueOf(int32(v)).Convert(rv.Type()))
 			return nil
 		default:
@@ -318,6 +340,32 @@ func decodeNonProtoField(d *json.Decoder, unmarshaler protojson.UnmarshalOptions
 		}
 	}
 	return d.Decode(v)
+}
+
+// duplicateObjectKey returns the first key that appears more than once in the
+// JSON object in data.
+func duplicateObjectKey(data []byte) (string, bool) {
+	d := json.NewDecoder(bytes.NewReader(data))
+	if t, err := d.Token(); err != nil || t != json.Delim('{') {
+		return "", false
+	}
+	seen := make(map[string]struct{})
+	for d.More() {
+		t, err := d.Token()
+		if err != nil {
+			return "", false
+		}
+		k, _ := t.(string)
+		if _, ok := seen[k]; ok {
+			return k, true
+		}
+		seen[k] = struct{}{}
+		var v json.RawMessage
+		if err := d.Decode(&v); err != nil {
+			return "", false
+		}
+	}
+	return "", false
 }
 
 type protoEnum interface {

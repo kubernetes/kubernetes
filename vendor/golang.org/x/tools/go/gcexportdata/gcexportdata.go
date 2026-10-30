@@ -38,8 +38,8 @@
 //
 // The [NewImporter], [Find], and [NewReader] functions are deprecated
 // and should not be used in new code.
-// The [WriteBundle] and [ReadBundle] functions are experimental, and
-// there is an open proposal to deprecate them (https://go.dev/issue/69573).
+// The [WriteBundle] and [ReadBundle] functions are obsolete experiments
+// and are no longer supported (https://go.dev/issue/69573).
 package gcexportdata
 
 import (
@@ -175,11 +175,13 @@ func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, 
 
 		case 'i':
 			// indexed, produced by cmd/compile till go1.19,
-			// and also by [Write].
+			// and also by [Write]. Starting with go1.28,
+			// go list -export runs cmd/export, which emits this format.
 			return gcimporter.IImportData(fset, imports, data[1:], path)
 
 		case 'u':
-			// unified, produced by cmd/compile since go1.20
+			// unified, produced by cmd/compile since go1.20.
+			// Produced by go list -export from go1.20 to go1.27.
 			_, pkg, err := gcimporter.UImportData(fset, imports, data[1:], path)
 			return pkg, err
 
@@ -200,28 +202,12 @@ func Write(out io.Writer, fset *token.FileSet, pkg *types.Package) error {
 	return gcimporter.IExportData(out, fset, pkg)
 }
 
-// ReadBundle reads an export bundle from in, decodes it, and returns type
-// information for the packages.
-// File position information is added to fset.
-//
-// ReadBundle may inspect and add to the imports map to ensure that references
-// within the export bundle to other packages are consistent.
-//
-// On return, the state of the reader is undefined.
-//
-// Experimental: This API is experimental and may change in the future.
+// Deprecated: ReadBundle is an unsupported obsolete experimental API. It returns an error.
 func ReadBundle(in io.Reader, fset *token.FileSet, imports map[string]*types.Package) ([]*types.Package, error) {
-	data, err := readAll(in)
-	if err != nil {
-		return nil, fmt.Errorf("reading export bundle: %v", err)
-	}
-	return gcimporter.IImportBundle(fset, imports, data)
+	return nil, fmt.Errorf("ReadBundle is an unsupported obsolete experimental API")
 }
 
-// WriteBundle writes encoded type information for the specified packages to out.
-// The FileSet provides file position information for named objects.
-//
-// Experimental: This API is experimental and may change in the future.
-func WriteBundle(out io.Writer, fset *token.FileSet, pkgs []*types.Package) error {
-	return gcimporter.IExportBundle(out, fset, pkgs)
+// Deprecated: WriteBundle is an unsupported obsolete experimental API. It returns an error.
+func WriteBundle(io.Writer, *token.FileSet, []*types.Package) error {
+	return fmt.Errorf("WriteBundle is an unsupported obsolete experimental API")
 }
