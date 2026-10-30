@@ -66,6 +66,8 @@ var _ numaOrSocketsFirstFuncs = (*socketsFirstForResize)(nil)
 // Within each NUMA node (already sorted by sortAvailableNUMANodes):
 // 1. First, UncoreCaches with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available UncoreCaches
+// Compared with the add operation, cpuAccumulator.sortAvailableUncoreCaches only sorts all available UncoreCaches
+// within each sorted NUMA node, since there is no existing allocation to stay contiguous with.
 func (a *cpuAccumulatorForResize) sortAvailableUncoreCaches() []int {
 	var result []int
 	added := cpuset.New()
@@ -93,6 +95,8 @@ func (a *cpuAccumulatorForResize) sortAvailableUncoreCaches() []int {
 // For resize operation, this function sorts NUMA nodes in a specific order to maintain topology continuity.
 // 1. First, NUMA nodes with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available NUMA nodes
+// Compared with the add operation, cpuAccumulator.sortAvailableNUMANodes only sorts all available NUMA nodes,
+// since there is no existing allocation to stay contiguous with.
 func (n *numaFirstForResize) sortAvailableNUMANodes() []int {
 	var result []int
 
@@ -116,6 +120,8 @@ func (n *numaFirstForResize) sortAvailableNUMANodes() []int {
 // Within each NUMA node (already sorted by sortAvailableNUMANodes):
 // 1. First, sockets with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available sockets
+// Compared with the add operation, cpuAccumulator.sortAvailableSockets only sorts all available Sockets
+// within each sorted NUMA node, since there is no existing allocation to stay contiguous with.
 func (n *numaFirstForResize) sortAvailableSockets() []int {
 	var result []int
 
@@ -141,6 +147,8 @@ func (n *numaFirstForResize) sortAvailableSockets() []int {
 // Within each socket (already sorted by sortAvailableSockets):
 // 1. First, cores with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available cores
+// Compared with the add operation, cpuAccumulator.sortAvailableCores only sorts all available cores
+// within each sorted Socket, since there is no existing allocation to stay contiguous with.
 func (n *numaFirstForResize) sortAvailableCores() []int {
 	var result []int
 
@@ -166,6 +174,8 @@ func (n *numaFirstForResize) sortAvailableCores() []int {
 // Within each socket (already sorted by sortAvailableSockets):
 // 1. First, NUMA nodes with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available NUMA nodes
+// Compared with the add operation, cpuAccumulator.sortAvailableNUMANodes only sorts all available NUMA nodes
+// within each sorted Socket, since there is no existing allocation to stay contiguous with.
 func (s *socketsFirstForResize) sortAvailableNUMANodes() []int {
 	var result []int
 
@@ -190,6 +200,8 @@ func (s *socketsFirstForResize) sortAvailableNUMANodes() []int {
 // For resize operation, this function sorts sockets in a specific order to maintain topology continuity.
 // 1. First, sockets with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available sockets
+// Compared with the add operation, cpuAccumulator.sortAvailableSockets only sorts all available Sockets,
+// since there is no existing allocation to stay contiguous with.
 func (s *socketsFirstForResize) sortAvailableSockets() []int {
 	var result []int
 
@@ -214,6 +226,8 @@ func (s *socketsFirstForResize) sortAvailableSockets() []int {
 // Within each NUMA node (already sorted by sortAvailableNUMANodes):
 // 1. First, cores with allocated CPUs for this container (retained CPUs)
 // 2. Then, other available cores
+// Compared with the add operation, cpuAccumulator.sortAvailableCores only sorts all available cores
+// within each sorted NUMA node, since there is no existing allocation to stay contiguous with.
 func (s *socketsFirstForResize) sortAvailableCores() []int {
 	var result []int
 
@@ -361,8 +375,8 @@ func (a *cpuAccumulatorForResize) isFullUncoreCache(uncoreID int) bool {
 
 // Sort all free CPUs for resize.
 //
-// First, uses sortAvailableCores() to determine the core ordering.
-// Then, sorts CPUs within each core by numerical ID. (Same as sortAvailableCPUsPacked)
+// First, uses sortAvailableCores to determine the core ordering.
+// Then, sorts CPUs within each core by numerical ID. (Same as cpuAccumulator.sortAvailableCPUsPacked)
 func (a *cpuAccumulatorForResize) sortAvailableCPUsPacked() []int {
 	var result []int
 	for _, core := range a.sortAvailableCores() {
@@ -378,8 +392,8 @@ func (a *cpuAccumulatorForResize) sortAvailableCPUsPacked() []int {
 //     CPUs round-robin across those cores so sibling threads are only used
 //     once every physical core has contributed a CPU.
 //
-// Same as sortAvailableCPUsSpread(), except sockets are ordered with
-// sortAvailableSockets() to keep retained CPUs' sockets first.
+// Same as cpuAccumulator.sortAvailableCPUsSpread, except sockets are ordered with
+// cpuAccumulatorForResize.sortAvailableSockets to keep retained CPUs' sockets first.
 func (a *cpuAccumulatorForResize) sortAvailableCPUsSpread() []int {
 	var result []int
 	for _, socket := range a.sortAvailableSockets() {
