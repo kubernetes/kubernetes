@@ -249,7 +249,12 @@ type RuntimeServiceClient interface {
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// caller cancels the call or its deadline expires, the runtime must stop
+	// the restore and remove the sandbox and containers created by the call,
+	// even if it finished preparing them and the caller no longer waits for
+	// the response. A runtime without Pod restore support must return
+	// Unimplemented without starting any work.
 	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
@@ -881,7 +886,12 @@ type RuntimeServiceServer interface {
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// caller cancels the call or its deadline expires, the runtime must stop
+	// the restore and remove the sandbox and containers created by the call,
+	// even if it finished preparing them and the caller no longer waits for
+	// the response. A runtime without Pod restore support must return
+	// Unimplemented without starting any work.
 	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
