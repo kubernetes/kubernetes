@@ -640,8 +640,9 @@ func computeWorkloadName(job *batch.Job) string {
 }
 
 // computePodGroupName is kept as a controller-local adapter for existing callers.
+// TODO: pass the owner UID once it is threaded through.
 func computePodGroupName(workloadName, templateName string) string {
-	return workloadbuilder.GeneratePodGroupName(workloadName, templateName)
+	return workloadbuilder.GeneratePodGroupName(workloadName, templateName, "")
 }
 
 // addSchedulingInformers wires up Workload and PodGroup informers
