@@ -17,9 +17,12 @@ limitations under the License.
 package upgrade
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestEnforceVersionPolicies(t *testing.T) {
@@ -257,4 +260,31 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnforceVersionPoliciesMinimumVersionError(t *testing.T) {
+	// The cluster runs a patch release above the minimum supported control plane version
+	// and the version to upgrade to is below that minimum.
+	minimumControlPlaneVersion := constants.MinimumControlPlaneVersion
+	clusterVersion := minimumControlPlaneVersion.WithPatch(3)
+	newK8sVersion := minimumControlPlaneVersion.WithPreRelease("alpha.0")
+	vg := &fakeVersionGetter{
+		clusterVersion: clusterVersion.String(),
+		kubeletVersion: clusterVersion.String(),
+		kubeadmVersion: clusterVersion.String(),
+	}
+
+	skewErrs := EnforceVersionPolicies(vg, newK8sVersion.String(), newK8sVersion, true, true)
+	if skewErrs == nil {
+		t.Fatal("expected errors but got none")
+	}
+	for _, err := range skewErrs.Mandatory {
+		if strings.Contains(err.Error(), "minimum supported version") {
+			if !strings.Contains(err.Error(), minimumControlPlaneVersion.String()) {
+				t.Errorf("expected the error to name the minimum supported version %q, got: %v", minimumControlPlaneVersion, err)
+			}
+			return
+		}
+	}
+	t.Errorf("expected a minimum supported version error, got: %v", skewErrs.Mandatory)
 }
