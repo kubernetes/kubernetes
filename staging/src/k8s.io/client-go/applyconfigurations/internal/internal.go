@@ -7474,11 +7474,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: startTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: volumeHealth
+    - name: volumeStatuses
       type:
         list:
           elementType:
-            namedType: io.k8s.api.core.v1.PodVolumeHealth
+            namedType: io.k8s.api.core.v1.PodVolumeStatus
           elementRelationship: associative
           keys:
           - name
@@ -7510,21 +7510,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.PodSpec
       default: {}
-- name: io.k8s.api.core.v1.PodVolumeHealth
+- name: io.k8s.api.core.v1.PodVolumeStatus
   map:
     fields:
-    - name: healthConditions
+    - name: healthStatus
       type:
-        list:
-          elementType:
-            namedType: io.k8s.api.core.v1.VolumeHealthCondition
-          elementRelationship: associative
-          keys:
-          - status
-          - reason
-    - name: lastTransitionTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+        namedType: io.k8s.api.core.v1.VolumeHealthStatus
     - name: name
       type:
         scalar: string

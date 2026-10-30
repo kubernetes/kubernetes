@@ -867,8 +867,8 @@ func (in PodTemplateSpec) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodVolumeHealth) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.PodVolumeHealth"
+func (in PodVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodVolumeStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
