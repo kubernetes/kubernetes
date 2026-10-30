@@ -136,3 +136,8 @@ func (f *FakeVolumeManager) GetVolumesReportedInUse() []v1.UniqueVolumeName {
 func (f *FakeVolumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
 	return nil
 }
+
+// GetPodVolumeStatuses is not implemented
+func (f *FakeVolumeManager) GetPodVolumeStatuses(allocatedPod, desiredPod *v1.Pod) []v1.PodVolumeStatus {
+	return nil
+}

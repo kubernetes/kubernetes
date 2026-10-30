@@ -457,7 +457,8 @@ func newTestKubeletWithImageList(
 		volumetest.NewBlockVolumePathHandler(),
 		kubelet.statusManager,
 		0,
-		kubelet.actuatedState)
+		kubelet.actuatedState,
+		nil)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */

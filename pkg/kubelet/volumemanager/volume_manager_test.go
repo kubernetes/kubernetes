@@ -44,8 +44,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
@@ -325,6 +328,7 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		volumetest.NewBlockVolumePathHandler(),
 		nil,
 		0,
+		nil,
 		nil)
 
 	tCtx := ktesting.Init(t)
@@ -533,6 +537,7 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		fakePathHandler,
 		nil,
 		0,
+		nil,
 		nil)
 
 	return vm
@@ -1037,6 +1042,7 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				volumetest.NewBlockVolumePathHandler(),
 				nil,
 				0,
+				nil,
 				nil)
 
 			// Test ResizeEphemeralVolume
@@ -1063,4 +1069,165 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 
 		})
 	}
+}
+
+func TestGetPodVolumeStatuses(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir := t.TempDir()
+
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+	require.NoError(t, plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost))
+
+	actuatedState, err := state.NewStateCheckpoint(logger, tmpDir, "test_actuated_state_status", nil)
+	require.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			UID:       "pod-uid-status-1",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "vol-mounted",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "vol-pending",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "vol-hostpath",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/tmp/host"},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol-mounted", MountPath: "/mnt/mounted"},
+						{Name: "vol-pending", MountPath: "/mnt/pending"},
+						{Name: "vol-hostpath", MountPath: "/mnt/host"},
+					},
+				},
+			},
+		},
+	}
+
+	desiredPod := pod.DeepCopy()
+	desiredPod.Spec.Volumes = append(desiredPod.Spec.Volumes,
+		v1.Volume{
+			Name: "vol-deferred",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm-deferred"}},
+			},
+		},
+		v1.Volume{
+			Name: "vol-desired-hostpath",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/desired-host"},
+			},
+		},
+	)
+
+	podManager := kubepod.NewBasicPodManager()
+	podManager.SetPods([]*v1.Pod{pod})
+
+	var syncNotified []kubetypes.UID
+	vm := NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		nil,
+		plugMgr,
+		fakeVolumeHost.GetMounter(),
+		hostutil.NewFakeHostUtil(nil),
+		tmpDir,
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0,
+		actuatedState,
+		func(_ klog.Logger, podUID kubetypes.UID) {
+			syncNotified = append(syncNotified, podUID)
+		},
+	).(*volumeManager)
+
+	// Record initial pod (without Spec.Volumes, matching KeepOnlyResourceValues) and mount vol-mounted via SetPodVolume.
+	vmState := vm.actuatedState.(state.State)
+	initialPod := pod.DeepCopy()
+	initialPod.Spec.Volumes = nil
+	initialPod.Spec.Containers[0].VolumeMounts = initialPod.Spec.Containers[0].VolumeMounts[:1]
+	require.NoError(t, vmState.SetPod(logger, initialPod))
+	require.NoError(t, vmState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+	require.Equal(t, []kubetypes.UID{pod.UID}, syncNotified, "first SetPodVolume should notify pod sync")
+
+	// Remounting an already-recorded volume must not re-trigger pod sync.
+	require.NoError(t, vmState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+	require.Equal(t, []kubetypes.UID{pod.UID}, syncNotified, "remount of already-recorded volume should not notify pod sync")
+
+	require.NoError(t, actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[2]))
+
+	statuses := vm.GetPodVolumeStatuses(pod, desiredPod)
+	expected := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-deferred",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+		{
+			Name:      "vol-mounted",
+			HostPhase: v1.PodVolumeHostMounted,
+		},
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expected, statuses)
+
+	// Remove vol-mounted from pod.Spec.Volumes while it is still in actuatedState -> Unmounting.
+	podAfterRemove := pod.DeepCopy()
+	podAfterRemove.Spec.Volumes = podAfterRemove.Spec.Volumes[1:]
+	podAfterRemove.Spec.Containers[0].VolumeMounts = podAfterRemove.Spec.Containers[0].VolumeMounts[1:]
+
+	statusesAfterRemove := vm.GetPodVolumeStatuses(podAfterRemove, podAfterRemove)
+	expectedAfterRemove := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-mounted",
+			HostPhase: v1.PodVolumeHostUnmounting,
+		},
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expectedAfterRemove, statusesAfterRemove)
+
+	// Once container restarts without vol-mounted and ASOW removes vol-mounted from actuatedState -> <removed>, and pod sync fires.
+	require.NoError(t, vmState.SetContainer(logger, pod.UID, podutil.Containers, podAfterRemove.Spec.Containers[0]))
+	require.NoError(t, vmState.RemovePodVolume(logger, pod.UID, "vol-mounted"))
+	require.Equal(t, []kubetypes.UID{pod.UID, pod.UID}, syncNotified, "RemovePodVolume of mounted volume should notify pod sync")
+
+	// Removing an already-absent volume must not re-trigger pod sync.
+	require.NoError(t, vmState.RemovePodVolume(logger, pod.UID, "vol-mounted"))
+	require.Equal(t, []kubetypes.UID{pod.UID, pod.UID}, syncNotified)
+
+	statusesAfterTeardown := vm.GetPodVolumeStatuses(podAfterRemove, podAfterRemove)
+	expectedAfterTeardown := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expectedAfterTeardown, statusesAfterTeardown)
 }

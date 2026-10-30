@@ -1092,6 +1092,16 @@ func NewMainKubelet(ctx context.Context,
 		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 	}
 
+	var triggerPodSync func(klog.Logger, types.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		triggerPodSync = func(logger klog.Logger, podUID types.UID) {
+			if klet.pleg != nil {
+				klet.RequestPodReinspect(podUID)
+				klet.RequestPodRelist(logger, podUID)
+			}
+		}
+	}
+
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
@@ -1106,7 +1116,8 @@ func NewMainKubelet(ctx context.Context,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
 		kubeCfg.VolumeStatsAggPeriod.Duration,
-		actuatedState)
+		actuatedState,
+		triggerPodSync)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 

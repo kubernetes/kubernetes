@@ -167,6 +167,9 @@ type VolumeManager interface {
 	// This is intended for volumes that support online resizing and require
 	// strict coordination with container runtime operations.
 	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// GetPodVolumeStatuses returns the host-level mount status of supported dynamic volumes for the pod.
+	GetPodVolumeStatuses(allocatedPod, desiredPod *v1.Pod) []v1.PodVolumeStatus
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -204,7 +207,15 @@ func NewVolumeManager(
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler,
 	volumeHealthStatusUpdater volumehealth.StatusUpdater,
 	volumeHealthProbeInterval time.Duration,
-	actuatedState state.State) VolumeManager {
+	actuatedState state.State,
+	triggerPodSync func(klog.Logger, k8stypes.UID)) VolumeManager {
+
+	if actuatedState != nil && triggerPodSync != nil {
+		actuatedState = &notifyingActuatedState{
+			State:          actuatedState,
+			triggerPodSync: triggerPodSync,
+		}
+	}
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()
 	vm := &volumeManager{
@@ -753,4 +764,102 @@ func findVolumeInPodSpec(pod *v1.Pod, volumeName string) *v1.Volume {
 		}
 	}
 	return nil
+}
+
+// notifyingActuatedState wraps state.State so VolumeManager notifies the kubelet sync loop
+// whenever a pod's recorded host volume membership changes (mount or unmount completion),
+// without firing on periodic remounts of already-recorded volumes.
+type notifyingActuatedState struct {
+	state.State
+	triggerPodSync func(klog.Logger, k8stypes.UID)
+}
+
+func (s *notifyingActuatedState) SetPodVolume(logger klog.Logger, podUID k8stypes.UID, volume v1.Volume) error {
+	vols, _ := s.State.GetPodVolumes(podUID)
+	alreadyPresent := slices.ContainsFunc(vols, func(v v1.Volume) bool { return v.Name == volume.Name })
+	if err := s.State.SetPodVolume(logger, podUID, volume); err != nil {
+		return err
+	}
+	if !alreadyPresent && s.triggerPodSync != nil {
+		s.triggerPodSync(logger, podUID)
+	}
+	return nil
+}
+
+func (s *notifyingActuatedState) RemovePodVolume(logger klog.Logger, podUID k8stypes.UID, volumeName string) error {
+	vols, _ := s.State.GetPodVolumes(podUID)
+	wasPresent := slices.ContainsFunc(vols, func(v v1.Volume) bool { return v.Name == volumeName })
+	if err := s.State.RemovePodVolume(logger, podUID, volumeName); err != nil {
+		return err
+	}
+	if wasPresent && s.triggerPodSync != nil {
+		s.triggerPodSync(logger, podUID)
+	}
+	return nil
+}
+
+// GetPodVolumeStatuses returns the host-level mount status of supported dynamic volumes for the pod.
+// TODO(KEP-6395): Revisit reporting VolumeStatuses for other volume types prior to beta.
+func (vm *volumeManager) GetPodVolumeStatuses(allocatedPod, desiredPod *v1.Pod) []v1.PodVolumeStatus {
+	if allocatedPod == nil {
+		return nil
+	}
+
+	actuatedVolumes := sets.New[string]()
+	if vm.actuatedState != nil {
+		if vols, ok := vm.actuatedState.GetPodVolumes(allocatedPod.UID); ok {
+			for i := range vols {
+				if podutil.IsSupportedDynamicVolumeSource(&vols[i].VolumeSource) {
+					actuatedVolumes.Insert(vols[i].Name)
+				}
+			}
+		}
+	}
+
+	seenVolumes := sets.New[string]()
+	var statuses []v1.PodVolumeStatus
+	for i := range allocatedPod.Spec.Volumes {
+		vol := &allocatedPod.Spec.Volumes[i]
+		if !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		seenVolumes.Insert(vol.Name)
+		phase := v1.PodVolumeHostPending
+		if actuatedVolumes.Has(vol.Name) {
+			phase = v1.PodVolumeHostMounted
+		}
+		statuses = append(statuses, v1.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: phase,
+		})
+	}
+
+	for _, volName := range sets.List(actuatedVolumes) {
+		if !seenVolumes.Has(volName) {
+			seenVolumes.Insert(volName)
+			statuses = append(statuses, v1.PodVolumeStatus{
+				Name:      volName,
+				HostPhase: v1.PodVolumeHostUnmounting,
+			})
+		}
+	}
+
+	if desiredPod != nil {
+		for i := range desiredPod.Spec.Volumes {
+			vol := &desiredPod.Spec.Volumes[i]
+			if seenVolumes.Has(vol.Name) || !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+				continue
+			}
+			seenVolumes.Insert(vol.Name)
+			statuses = append(statuses, v1.PodVolumeStatus{
+				Name:      vol.Name,
+				HostPhase: v1.PodVolumeHostPending,
+			})
+		}
+	}
+
+	slices.SortFunc(statuses, func(a, b v1.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return statuses
 }

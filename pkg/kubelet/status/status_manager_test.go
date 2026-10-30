@@ -573,6 +573,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		"ObservedGeneration",
 		"Resources",
 		"VolumeHealth",
+		"VolumeStatuses",
 	)
 
 	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
@@ -789,6 +790,18 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
 			t.Error("Resources: change should be detected but was ignored")
+		}
+
+		// Test VolumeStatuses
+		modified = base.DeepCopy()
+		modified.VolumeStatuses = []v1.PodVolumeStatus{
+			{
+				Name:      "vol1",
+				HostPhase: v1.PodVolumeHostMounted,
+			},
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("VolumeStatuses: change should be detected but was ignored")
 		}
 	})
 }
