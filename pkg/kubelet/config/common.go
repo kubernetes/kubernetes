@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -27,7 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/registry/rest"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -118,6 +121,15 @@ var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not u
 // A static pod tried to use a resource claim.
 var ErrStaticPodTriedToUseResourceClaims = errors.New("static pods may not use ResourceClaims")
 
+// validateStaticPod runs the handwritten and declarative validation the API server applies on
+// create, because a rejected mirror pod does not stop the static pod from running.
+func validateStaticPod(logger klog.Logger, pod *api.Pod) field.ErrorList {
+	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
+	errs := validation.ValidatePodCreate(pod, opts)
+	ctx := klog.NewContext(context.Background(), logger)
+	return rest.ValidateDeclarativelyForManifest(ctx, legacyscheme.Scheme, v1.SchemeGroupVersion, pod, errs, rest.DeclarativeValidationConfig{})
+}
+
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
@@ -144,8 +156,7 @@ func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) 
 	if err = defaultFn(logger, newPod); err != nil {
 		return true, pod, err
 	}
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, nil, &newPod.ObjectMeta, nil)
-	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+	if errs := validateStaticPod(logger, newPod); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
@@ -193,8 +204,7 @@ func tryDecodePodList(logger klog.Logger, data []byte, defaultFn defaultFunc) (p
 		if err = defaultFn(logger, newPod); err != nil {
 			return true, pods, err
 		}
-		opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, nil, &newPod.ObjectMeta, nil)
-		if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+		if errs := validateStaticPod(logger, newPod); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

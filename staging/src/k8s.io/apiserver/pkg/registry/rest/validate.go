@@ -429,6 +429,14 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	return errs
 }
 
+// ValidateDeclarativelyForManifest runs ValidateDeclarativelyWithMigrationChecks as a create, for
+// objects validated outside a REST request, such as static manifests. gv is the API version whose
+// declarative validation applies, and config should match the one the kind's REST strategy uses.
+func ValidateDeclarativelyForManifest(ctx context.Context, scheme *runtime.Scheme, gv schema.GroupVersion, obj runtime.Object, errs field.ErrorList, config DeclarativeValidationConfig) field.ErrorList {
+	ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{APIGroup: gv.Group, APIVersion: gv.Version})
+	return ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, config)
+}
+
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.
 func RecordDuplicateValidationErrors(ctx context.Context, qualifiedKind schema.GroupKind, errs field.ErrorList) {
 	logger := klog.FromContext(ctx)
