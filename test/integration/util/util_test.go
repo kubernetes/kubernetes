@@ -17,58 +17,38 @@ limitations under the License.
 package util
 
 import (
+	"strings"
 	"testing"
 	"time"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TestInitTestAPIServerContextCanceledBeforeCleanup verifies the normal
-// (non-explicit) shutdown path: testCtx.Ctx gets canceled as soon as the
-// test function returns. The cancellation itself runs via
-// context.AfterFunc, in parallel with (not necessarily before) any
-// t.Cleanup callback, so a cleanup callback which depends on it must wait
-// for it instead of checking it just once.
+// TestInitTestAPIServerContextCanceledBeforeCleanup verifies that the returned
+// ktesting.TContext gets canceled when the test completes and cleanup runs.
 func TestInitTestAPIServerContextCanceledBeforeCleanup(t *testing.T) {
 	testCtx := InitTestAPIServer(t, "normal-shutdown", nil)
 
 	t.Cleanup(func() {
 		select {
-		case <-testCtx.Ctx.Done():
+		case <-testCtx.Done():
 			// Canceled, as expected.
 		case <-time.After(30 * time.Second):
-			t.Error("testCtx.Ctx was not canceled by the time cleanup ran")
+			t.Error("testCtx was not canceled by the time cleanup ran")
 		}
 	})
 }
 
-// TestInitTestAPIServerCloseFnCancelsCallerContext verifies that calling
-// testCtx.CloseFn explicitly (i.e. before the test itself ends and the
-// top-level context gets canceled through test cleanup) cancels
-// testCtx.Ctx. Callers rely on that context to know when to stop any
-// goroutines they started with it, so CloseFn must cancel it directly
-// instead of only canceling the apiserver's own, detached context.
-//
-// Note that this is not properly supported by InitTestAPIServer: the
-// automatic cleanup in CleanupTest fails when tests call CloseFn (API server
-// shuts down before cleanup) or CleanupTest itself (cleanup runs twice,
-// second invocation fails). The test works around that with a fake client.
-func TestInitTestAPIServerCloseFnCancelsCallerContext(t *testing.T) {
-	testCtx := InitTestAPIServer(t, "close-fn-cancel", nil)
+// TestInitTestAPIServerTContext verifies that InitTestAPIServer returns a ktesting.TContext
+// with clients, REST config, and namespace properly initialized.
+func TestInitTestAPIServerTContext(t *testing.T) {
+	testCtx := InitTestAPIServer(t, "tcontext", nil)
 
-	// Explicit shutdown, simulating a caller which stops the server
-	// before its test function returns.
-	testCtx.CloseFn()
-
-	select {
-	case <-testCtx.Ctx.Done():
-		// Canceled, as expected.
-	case <-time.After(30 * time.Second):
-		t.Fatal("testCtx.Ctx was not canceled by CloseFn")
+	if testCtx.Client() == nil {
+		t.Errorf("testCtx.Client() is nil")
 	}
-
-	// Prevent failures when CleanupTest runs as cleanup callback.
-	testCtx.ClientSet = fake.NewClientset(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testCtx.NS.Name}})
+	if testCtx.RESTConfig() == nil {
+		t.Errorf("testCtx.RESTConfig() is nil")
+	}
+	if !strings.HasPrefix(testCtx.Namespace(), "tcontext") {
+		t.Errorf("testCtx.Namespace() = %q, expected prefix %q", testCtx.Namespace(), "tcontext")
+	}
 }

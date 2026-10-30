@@ -100,7 +100,7 @@ type CoreResourceEnqueueTestCase struct {
 	// TriggerFn is the function that triggers the event to move Pods.
 	// It returns the map keyed with ClusterEvents to be triggered by this function,
 	// and valued with the number of triggering of the event.
-	TriggerFn func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error)
+	TriggerFn func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error)
 	// WantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 	WantRequeuedPods sets.Set[string]
 	// WantScheduledPods is the set of Pods that are expected to be successfully scheduled after triggerFn and requeueing.
@@ -133,11 +133,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
 			st.MakePod().Name("pod2").Toleration(v1.TaintNodeNotReady).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeChange event by increasing CPU capacity.
 			// It makes Pod2 schedulable.
 			// Pod1 is not requeued because the Node is still unready and it doesn't have the required toleration.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -155,9 +155,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 will be rejected by the PodAffinity plugin.
 			st.MakePod().Label("anti", "anti").Name("pod2").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			node := st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -174,11 +174,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 will be rejected by the NodeAffinity plugin.
 			st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event to change label.
 			// It causes pod1 to be requeued.
 			// It causes pod2 not to be requeued.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node1").Label("group", "b").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node1").Label("group", "b").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -196,10 +196,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - The pod will be blocked by the NodeAffinity plugin for node2, therefore we know NodeAffinity will be queried for qhint for both testing nodes.
 			st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"a"}, st.NodeSelectorTypeMatchExpressions).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event to add new label.
 			// It won't cause pod to be requeued, because there was a match already before the update, meaning this plugin wasn't blocking the scheduling.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("node1").Label("group", "a").Label("node", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("node1").Label("group", "a").Label("node", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -216,11 +216,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 will be rejected by the NodeAffinity plugin.
 			st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"c"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeAdd event with the awaited label.
 			// It causes pod1 to be requeued.
 			// It causes pod2 not to be requeued.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("group", "b").Obj(), metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, st.MakeNode().Name("fake-node2").Label("group", "b").Obj(), metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -236,10 +236,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 			st.MakePod().Name("pod2").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a PodUpdate event by adding a toleration to Pod1.
 			// It makes Pod1 schedulable. Pod2 is not requeued because of not having toleration.
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodToleration}: 1}, nil
@@ -256,10 +256,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").Toleration("taint-key2").Container("image").Obj(),
 			st.MakePod().Name("pod3").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that changes the existing taint to a taint that matches the toleration that pod1 has.
 			// It makes Pod1 schedulable. Pod2 and pod3 are not requeued because of not having the corresponding toleration.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the Node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: 1}, nil
@@ -275,10 +275,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Toleration("taint-key").Container("image").Obj(),
 			st.MakePod().Name("pod2").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeCreated event with the taint.
 			// It makes Pod1 schedulable. Pod2 is not requeued because of not having toleration.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, st.MakeNode().Name("fake-node2").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create the Node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -293,10 +293,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a PodUpdate event by reducing cpu requested by pod1.
 			// It makes Pod1 schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateResize(testCtx.Ctx, "pod1", st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).UpdateResize(testCtx, "pod1", st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to resize the pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
@@ -315,10 +315,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 request will be rejected because there are not enough free resources on the Node
 			st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an assigned Pod1 delete event.
 			// It makes Pod2 schedulable.
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
@@ -336,11 +336,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeCreated event.
 			// It makes Pod1 schedulable. Pod2 is not requeued because of having too high requests.
 			node := st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -358,10 +358,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases the CPU capacity of fake-node.
 			// It makes Pod1 schedulable. Pod2 is not requeued because of having too high requests.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -379,9 +379,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "5", "example.com/gpu": "1"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -399,9 +399,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "5", "example.com/gpu": "1"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -419,9 +419,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{"example.com/gpu": "1"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -450,10 +450,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1,
 			// but it requeues, because the DynamicResourceAllocation plugin might handle the extended resource.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -472,9 +472,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Container("image").Obj(),
 			st.MakePod().Name("pod2").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/othergpu": "1"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a DeviceClass Create event that has the extended resource name that matches pod's resource request.
-			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Create(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")}}, metav1.CreateOptions{}); err != nil {
+			gpuResource := "example.com/gpu"
+			if _, err := testCtx.Client().ResourceV1().DeviceClasses().Create(testCtx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: &gpuResource}}, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create the fake-class: %w", err)
 			}
 
@@ -495,9 +496,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Container("image").Obj(),
 			st.MakePod().Name("pod2").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/othergpu": "1"}).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a DeviceClass Update event that adds the extended resource name that matches pod's resource request.
-			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Update(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")}}, metav1.UpdateOptions{}); err != nil {
+			gpuResource := "example.com/gpu"
+			if _, err := testCtx.Client().ResourceV1().DeviceClasses().Update(testCtx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: &gpuResource}}, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the fake-class: %w", err)
 			}
 
@@ -517,9 +519,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases unrealted (not requested) memory capacity of fake-node1, which should not requeue Pod1.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -537,9 +539,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases the requested CPU capacity of fake-node1, which should requeue Pod1.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -561,9 +563,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod2 is unschedulable because Pod1 saturated ResourcePods limit in fake-node2. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
 			st.MakePod().Name("pod2").NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event that increases the allowed Pods number of fake-node1, which should requeue Pod2.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "3"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "3"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
@@ -578,8 +580,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("key", "val").Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, st.MakePod().Name("pod1").Label("key", "val").Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
@@ -600,10 +602,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// - Pod1 will be rejected by the NodeAffinity plugin and NodeResourcesFit plugin.
 			st.MakePod().Label("unscheduled", "plugins").Name("pod1").NodeAffinityIn("metadata.name", []string{"fake-node"}, st.NodeSelectorTypeMatchFields).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// We will trigger UpdateNodeAllocatable and UpdateNodeLabel events which work for
 			// the NodeResourcesFit and NodeAffinity plugins respectively.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("metadata.name", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, st.MakeNode().Name("fake-node").Label("metadata.name", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 
@@ -627,9 +629,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("anti2", "anti2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
 
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Delete the pod's label 'anti1' which will make it match pod2's antiAffinity.
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, st.MakePod().Name("pod1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
@@ -650,9 +652,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod4").Label("anti2", "anti2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
 
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Delete pod1 which will make pod3 schedulable because pod3's antiAffinity won't match pod1 anymore.
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
@@ -673,9 +675,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod4").Label("anti2", "anti2").Container("image").Obj(),
 		},
 
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Delete pod1 which will make pod3 schedulable because pod1's antiAffinity won't match pod3 anymore.
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
@@ -695,9 +697,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").PodAffinityExists("bbb", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
 		},
 
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Add label to the pod which will make it match pod2's podAffinity.
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
@@ -715,9 +717,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").PodAffinityExists("ccc", "region", st.PodAffinityWithRequiredReq).Container("image").Obj(),
 		},
 
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Create the node which will make it match pod1's podAffinity.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("zone", "zone1").Obj(), metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, st.MakeNode().Name("fake-node2").Label("zone", "zone1").Obj(), metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create fake-node2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -741,10 +743,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// This Pod doesn't have any label so that this PodAffinity doesn't match this Pod itself.
 			st.MakePod().Name("pod4").PodAffinityExists("affinity1", "region", st.PodAffinityWithRequiredReq).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Add "node" label to the node which may make pod2 schedulable.
 			// Update "region" label to the node which may make pod4 schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("region", "region-2").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("region", "region-2").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -764,10 +766,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "service", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "other", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Remove "node" label from the node which will make it not match pod2's podAntiAffinity.
 			// Change "service" label from service-a to service-b which may pod3 schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("service", "service-b").Label("region", "fake-node").Label("other", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node").Label("service", "service-b").Label("region", "fake-node").Label("other", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -786,9 +788,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").PodAntiAffinityExists("anti1", "zone", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 			st.MakePod().Name("pod3").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Create the node which will make pod2, pod3 be schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(), metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(), metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create fake-node2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -807,11 +809,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Obj(),
 			st.MakePod().Name("pod4").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8081}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an assigned Pod delete event.
 			// Because Pod1 and Pod3 have common port, deleting Pod1 makes Pod3 schedulable.
 			// By setting GracePeriodSeconds to 0, allowing Pod3 to be requeued immediately after Pod1 is deleted.
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete Pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
@@ -828,11 +830,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeCreated event.
 			// It makes Pod2 schedulable.
 			node := st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -846,10 +848,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeUpdate event to change the Node to ready.
 			// It makes Pod1 schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Unschedulable(false).Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node").Unschedulable(false).Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: 1}, nil
@@ -863,11 +865,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeCreated event.
 			// It makes Pod1 schedulable.
 			node := st.MakeNode().Name("fake-node2").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -881,10 +883,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a NodeCreated event, but with unschedulable node, which wouldn't make Pod1 schedulable.
 			node := st.MakeNode().Name("fake-node2").Unschedulable(true).Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -904,11 +906,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key2", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key2").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an assigned Pod add event.
 			// It should requeue pod3 only because this pod only has key1 label that pod3's topologyspread checks, and doesn't have key2 label that pod4's one does.
 			pod := st.MakePod().Name("pod5").Label("key1", "val").Node("fake-node").Container("image").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
 			}
 
@@ -929,11 +931,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key2", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key2").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an assigned Pod update event.
 			// It should requeue pod3 only because this updated pod had key1 label,
 			// and it's related only to the label selector that pod3's topologyspread has.
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("key3", "val").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, st.MakePod().Name("pod1").Label("key3", "val").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodUpdate: 1}, nil
@@ -953,10 +955,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(2)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key2", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key2").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an assigned Pod delete event.
 			// It should requeue pod3 only because this pod only has key1 label that pod3's topologyspread checks, and doesn't have key2 label that pod4's one does.
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete Pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
@@ -979,11 +981,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(2)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(2)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an Node add event.
 			// It should requeue pod3 only because this node only has node label, and doesn't have zone label that pod4's topologyspread requires.
 			node := st.MakeNode().Name("fake-node3").Label("node", "fake-node").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -1011,7 +1013,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod8").Label("key1", "val").SpreadConstraint(1, "other", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod9").Label("key1", "val").SpreadConstraint(1, "service", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an Node update event.
 			// It should requeue pod5 because it deletes the "node" label from fake-node2.
 			// It should requeue pod6 because the update adds the "zone" label to fake-node2.
@@ -1019,7 +1021,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			// It should not requeue pod8 because the update does not add the "other" label.
 			// It should requeue pod9 because the update changes the value of "service" label.
 			node := st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Label("region", "fake-node").Label("service", "service-b").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, node, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -1042,10 +1044,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an NodeTaint delete event.
 			// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
-			if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node2", metav1.DeleteOptions{}); err != nil {
+			if err := testCtx.Client().CoreV1().Nodes().Delete(testCtx, "fake-node2", metav1.DeleteOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Delete}: 1}, nil
@@ -1069,11 +1071,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
 			st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Toleration("aaa").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger an NodeTaint update event.
 			// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
 			node := st.MakeNode().Name("fake-node3").Label("zone", "fake-node").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, node, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: 1}, nil
@@ -1115,13 +1117,13 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pv2 := st.MakePersistentVolume().Name("pv2").Label(v1.LabelTopologyZone, "us-west1-a").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Create(testCtx.Ctx, pv2, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumes().Create(testCtx, pv2, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create pv2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Add}: 1}, nil
@@ -1170,13 +1172,13 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pv2 := st.MakePersistentVolume().Name("pv2").Label(v1.LabelTopologyZone, "us-west1-a").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv2, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumes().Update(testCtx, pv2, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pv2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
@@ -1219,7 +1221,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 			st.MakePod().Name("pod3").Container("image").PVC("pvc3").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc2").
 				Annotation(volume.AnnBindCompleted, "true").
@@ -1227,7 +1229,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc2, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Create(testCtx, pvc2, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to add pvc2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
@@ -1276,7 +1278,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 			st.MakePod().Name("pod3").Container("image").PVC("pvc3").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc2").
 				Annotation(volume.AnnBindCompleted, "true").
@@ -1284,7 +1286,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Update(testCtx.Ctx, pvc2, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Update(testCtx, pvc2, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pvc2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Update}: 1}, nil
@@ -1326,13 +1328,13 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			sc1 := st.MakeStorageClass().
 				Name("sc1").
 				VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
 				Provisioner("p").
 				Obj()
-			if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Create(testCtx.Ctx, sc1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().StorageClasses().Create(testCtx, sc1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create sc1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Add}: 1}, nil
@@ -1381,14 +1383,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pv2 := st.MakePersistentVolume().Name("pv2").
 				Labels(map[string]string{v1.LabelTopologyZone: "us-east1", "unrelated": "unrelated"}).
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv2, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumes().Update(testCtx, pv2, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pv2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
@@ -1411,7 +1413,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				Annotation(volume.AnnBindCompleted, "true").
@@ -1419,7 +1421,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc2, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Create(testCtx, pvc2, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to add pvc1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
@@ -1454,8 +1456,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc1").Obj(),
 			st.MakePod().Name("pod3").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
@@ -1489,9 +1491,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			node := st.MakeNode().Name("fake-node2").Label(v1.LabelTopologyZone, "us-east-1a").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
@@ -1529,9 +1531,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			node := st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("aaa", "ccc").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, node, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
@@ -1563,8 +1565,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.CoreV1().PersistentVolumes().Delete(testCtx.Ctx, "pv1", metav1.DeleteOptions{}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().CoreV1().PersistentVolumes().Delete(testCtx, "pv1", metav1.DeleteOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to delete pv1: %w", err)
 			}
 			pv1 := st.MakePersistentVolume().
@@ -1574,7 +1576,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Create(testCtx.Ctx, pv1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumes().Create(testCtx, pv1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create pv: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Add}: 1}, nil
@@ -1605,7 +1607,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pv1 := st.MakePersistentVolume().
 				Name("pv1").
 				NodeAffinityIn(v1.LabelTopologyZone, []string{"us-east-1a"}).
@@ -1613,7 +1615,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv1, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumes().Update(testCtx, pv1, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pv: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
@@ -1646,8 +1648,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Delete(testCtx.Ctx, "pvc1", metav1.DeleteOptions{}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Delete(testCtx, "pvc1", metav1.DeleteOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to delete pvc1: %w", err)
 			}
 			pvc1 := st.MakePersistentVolumeClaim().
@@ -1657,7 +1659,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Create(testCtx, pvc1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create pvc: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
@@ -1690,7 +1692,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc1 := st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				VolumeName("pv1").
@@ -1699,7 +1701,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
 
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Update(testCtx.Ctx, pvc1, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Update(testCtx, pvc1, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pvc: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Update}: 1}, nil
@@ -1728,13 +1730,13 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			sc1 := st.MakeStorageClass().
 				Name("sc1").
 				VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
 				Provisioner("p").
 				Obj()
-			if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Create(testCtx.Ctx, sc1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().StorageClasses().Create(testCtx, sc1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create storageclass: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Add}: 1}, nil
@@ -1777,7 +1779,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			sc1 := st.MakeStorageClass().
 				Name("sc1").
 				VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
@@ -1790,7 +1792,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 					},
 				}).
 				Obj()
-			if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Update(testCtx.Ctx, sc1, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().StorageClasses().Update(testCtx, sc1, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update storageclass: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Update}: 1}, nil
@@ -1834,7 +1836,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			sc1 := st.MakeStorageClass().
 				Name("sc1").
 				Label("key", "updated").
@@ -1848,7 +1850,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 					},
 				}).
 				Obj()
-			if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Update(testCtx.Ctx, sc1, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().StorageClasses().Update(testCtx, sc1, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update storageclass: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Update}: 1}, nil
@@ -1876,10 +1878,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			csinode1 := st.MakeCSINode().Name("fake-node").Obj()
 
-			if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(testCtx.Ctx, csinode1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSINodes().Create(testCtx, csinode1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create CSINode: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Add}: 1}, nil
@@ -1911,15 +1913,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// When updating CSINodes by using MakeCSINode, an error occurs because the resourceVersion is not specified. Therefore, the actual CSINode is retrieved.
-			csinode, err := testCtx.ClientSet.StorageV1().CSINodes().Get(testCtx.Ctx, "fake-node", metav1.GetOptions{})
+			csinode, err := testCtx.Client().StorageV1().CSINodes().Get(testCtx, "fake-node", metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get CSINode: %w", err)
 			}
 
 			metav1.SetMetaDataAnnotation(&csinode.ObjectMeta, v1.MigratedPluginsAnnotationKey, "value")
-			if _, err := testCtx.ClientSet.StorageV1().CSINodes().Update(testCtx.Ctx, csinode, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSINodes().Update(testCtx, csinode, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update CSINode: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Update}: 1}, nil
@@ -1958,15 +1960,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				},
 			).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// When updating CSIDrivers by using MakeCSIDriver, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIDrivers is retrieved.
-			csidriver, err := testCtx.ClientSet.StorageV1().CSIDrivers().Get(testCtx.Ctx, "csidriver", metav1.GetOptions{})
+			csidriver, err := testCtx.Client().StorageV1().CSIDrivers().Get(testCtx, "csidriver", metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get CSIDriver: %w", err)
 			}
 			csidriver.Spec.StorageCapacity = ptr.To(false)
 
-			if _, err := testCtx.ClientSet.StorageV1().CSIDrivers().Update(testCtx.Ctx, csidriver, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSIDrivers().Update(testCtx, csidriver, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update CSIDriver: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIDriver, ActionType: fwk.Update}: 1}, nil
@@ -2005,15 +2007,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				},
 			).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// When updating CSIDrivers by using MakeCSIDriver, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIDrivers is retrieved.
-			csidriver, err := testCtx.ClientSet.StorageV1().CSIDrivers().Get(testCtx.Ctx, "csidriver", metav1.GetOptions{})
+			csidriver, err := testCtx.Client().StorageV1().CSIDrivers().Get(testCtx, "csidriver", metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get CSIDriver: %w", err)
 			}
 			csidriver.Spec.StorageCapacity = ptr.To(true)
 
-			if _, err := testCtx.ClientSet.StorageV1().CSIDrivers().Update(testCtx.Ctx, csidriver, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSIDrivers().Update(testCtx, csidriver, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update CSIDriver: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIDriver, ActionType: fwk.Update}: 1}, nil
@@ -2049,9 +2051,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			csc := st.MakeCSIStorageCapacity().Name("csc").StorageClassName("sc1").Capacity(resource.NewQuantity(10, resource.BinarySI)).Obj()
-			if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Create(testCtx.Ctx, csc, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSIStorageCapacities(testCtx.Namespace()).Create(testCtx, csc, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create CSIStorageCapacity: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Add}: 1}, nil
@@ -2090,15 +2092,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// When updating CSIStorageCapacities by using MakeCSIStorageCapacity, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIStorageCapacities is retrieved.
-			csc, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Get(testCtx.Ctx, "csc", metav1.GetOptions{})
+			csc, err := testCtx.Client().StorageV1().CSIStorageCapacities(testCtx.Namespace()).Get(testCtx, "csc", metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get CSIStorageCapacity: %w", err)
 			}
 			csc.Capacity = resource.NewQuantity(20, resource.BinarySI)
 
-			if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Update(testCtx.Ctx, csc, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSIStorageCapacities(testCtx.Namespace()).Update(testCtx, csc, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update CSIStorageCapacity: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Update}: 1}, nil
@@ -2135,15 +2137,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// When updating CSIStorageCapacities by using MakeCSIStorageCapacity, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIStorageCapacities is retrieved.
-			csc, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Get(testCtx.Ctx, "csc", metav1.GetOptions{})
+			csc, err := testCtx.Client().StorageV1().CSIStorageCapacities(testCtx.Namespace()).Get(testCtx, "csc", metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get CSIStorageCapacity: %w", err)
 			}
 			csc.Capacity = resource.NewQuantity(5, resource.BinarySI)
 
-			if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Update(testCtx.Ctx, csc, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSIStorageCapacities(testCtx.Namespace()).Update(testCtx, csc, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update CSIStorageCapacity: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Update}: 1}, nil
@@ -2180,9 +2182,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			csinode1 := st.MakeCSINode().Name("csinode").Obj()
-			if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(testCtx.Ctx, csinode1, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().StorageV1().CSINodes().Create(testCtx, csinode1, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create CSINode: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Add}: 1}, nil
@@ -2235,8 +2237,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete Pod: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
@@ -2282,7 +2284,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc := st.MakePersistentVolumeClaim().
 				Name("pvc2").
 				Annotation(volume.AnnBindCompleted, "true").
@@ -2290,7 +2292,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
-			if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().PersistentVolumeClaims(testCtx.Namespace()).Create(testCtx, pvc, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to add pvc2: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
@@ -2334,8 +2336,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.StorageV1().VolumeAttachments().Delete(testCtx.Ctx, "volumeattachment1", metav1.DeleteOptions{}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().StorageV1().VolumeAttachments().Delete(testCtx, "volumeattachment1", metav1.DeleteOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to delete VolumeAttachment: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.VolumeAttachment, ActionType: fwk.Delete}: 1}, nil
@@ -2419,8 +2421,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				},
 			).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.StorageV1().VolumeAttachments().Delete(testCtx.Ctx, "volumeattachment1", metav1.DeleteOptions{}); err != nil {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			if err := testCtx.Client().StorageV1().VolumeAttachments().Delete(testCtx, "volumeattachment1", metav1.DeleteOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to delete VolumeAttachment: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.VolumeAttachment, ActionType: fwk.Delete}: 1}, nil
@@ -2437,14 +2439,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.Client().CoreV1().Nodes().Get(testCtx, "node-1", metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			updatedNode := node.DeepCopy()
 			updatedNode.Status.DeclaredFeatures = []string{"FeatureA"}
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().UpdateStatus(testCtx, updatedNode, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node status: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 1}, nil
@@ -2461,8 +2463,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.Client().CoreV1().Nodes().Get(testCtx, "node-1", metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -2471,7 +2473,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				updatedNode.Labels = make(map[string]string)
 			}
 			updatedNode.Labels["foo"] = "bar"
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, updatedNode, metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update node status: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 0}, nil
@@ -2488,15 +2490,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Get(testCtx, "pod1", metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			updatedPod := pod.DeepCopy()
 			// Modify toleration so that we no longer require the feature.
 			updatedPod.Spec.Tolerations[0].TolerationSeconds = ptr.To(int64(0))
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
@@ -2513,15 +2515,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Get(testCtx, "pod1", metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			updatedPod := pod.DeepCopy()
 			updatedPod.Labels = make(map[string]string)
 			updatedPod.Labels["foo"] = "bar"
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Update(testCtx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
@@ -2541,9 +2543,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pod := st.MakePod().Name("pod3").Container("image").PodGroupName("pg1").Obj()
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventUnscheduledPodAdd: 1}, nil
@@ -2562,9 +2564,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pg := st.MakePodGroup().Name("pg1").MinCount(1).WorkloadRef("w", "t").Obj()
-			if _, err := testCtx.ClientSet.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.Client().SchedulingV1beta1().PodGroups(testCtx.Namespace()).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PodGroup, ActionType: fwk.Add}: 1}, nil
@@ -2637,18 +2639,18 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	// Use zero backoff seconds to bypass backoffQ.
 	// It's intended to not start the scheduler's queue, and hence to
 	// not start any flushing logic. We will pop and schedule the Pods manually later.
-	testCtx := testutils.InitTestSchedulerWithOptions(
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
 		0,
 		opts...,
 	)
-	testutils.SyncSchedulerInformerFactory(testCtx)
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
 
 	testCtx.Scheduler.SchedulingQueue.Run(logger)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	cs, ns, ctx := testCtx.Client(), testCtx.Namespace(), testCtx
 	// Create one Node with a taint.
 	for _, node := range tt.InitialNodes {
 		if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -2663,7 +2665,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 
 	for _, csinode := range tt.InitialCSINodes {
-		if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(ctx, csinode, metav1.CreateOptions{}); err != nil {
+		if _, err := testCtx.Client().StorageV1().CSINodes().Create(ctx, csinode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a CSINode %q: %v", csinode.Name, err)
 		}
 	}
@@ -2687,7 +2689,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 
 	for _, sc := range tt.InitialStorageClasses {
-		if _, err := cs.StorageV1().StorageClasses().Create(testCtx.Ctx, sc, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.StorageV1().StorageClasses().Create(testCtx, sc, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a StorageClass %q: %v", sc.Name, err)
 		}
 	}
@@ -2707,7 +2709,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 
 	for _, pg := range tt.InitialPodGroups {
 		pg.Namespace = ns
-		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a PodGroup %q: %v", pg.Name, err)
 		}
 	}
@@ -2749,7 +2751,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 
 		// Pop all pods out. They should become unschedulable.
 		for i := 0; i < len(tt.Pods); i++ {
-			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+			testCtx.Scheduler.ScheduleOne(testCtx)
 		}
 		// Wait for the tt.Pods to be still present in the scheduling (unschedulable) queue.
 		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
@@ -2811,14 +2813,14 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	if tt.WantScheduledPods.Len() > 0 {
 		t.Log("Waiting for pods to be scheduled")
 		for range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
-			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+			testCtx.Scheduler.ScheduleOne(testCtx)
 		}
 		// Verify that the scheduled status of every Pod in tt.Pods matches tt.WantScheduledPods
 		var scheduledPods sets.Set[string]
 		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			scheduledPods = sets.Set[string]{} // reset
 			for _, podInfo := range tt.Pods {
-				pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, podInfo.Name, metav1.GetOptions{})
+				pod, err := testCtx.Client().CoreV1().Pods(testCtx.Namespace()).Get(ctx, podInfo.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}

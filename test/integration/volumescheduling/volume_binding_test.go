@@ -36,11 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutil "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -50,7 +52,7 @@ type testConfig struct {
 	ns       string
 	stop     <-chan struct{}
 	teardown func()
-	testCtx  *testutil.TestContext
+	testCtx  *schedulerutils.TestContext
 }
 
 var (
@@ -989,8 +991,8 @@ func TestCapacity(t *testing.T) {
 func TestRescheduleProvisioning(t *testing.T) {
 	testCtx := testutil.InitTestAPIServer(t, "reschedule-volume-provision", nil)
 
-	clientset := testCtx.ClientSet
-	ns := testCtx.NS.Name
+	clientset := testCtx.Client()
+	ns := testCtx.Namespace()
 
 	defer func() {
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
@@ -1029,9 +1031,9 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Start controller.
-	go ctrl.Run(testCtx.Ctx)
-	informerFactory.Start(testCtx.Ctx.Done())
-	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	go ctrl.Run(testCtx)
+	informerFactory.StartWithContext(testCtx)
+	informerFactory.WaitForCacheSync(testCtx.Done())
 
 	// Validate that the annotation is removed by controller for provision reschedule.
 	if err := waitForProvisionAnn(clientset, pvc, false); err != nil {
@@ -1040,21 +1042,21 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
-	testutil.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx)
 
-	clientset := testCtx.ClientSet
-	ns := testCtx.NS.Name
+	clientset := testCtx.Client()
+	ns := testCtx.Namespace()
 
-	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, testCtx.TContext, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(testCtx.Ctx)
+	go ctrl.Run(testCtx)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(testCtx.Ctx.Done())
-	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	informerFactory.StartWithContext(testCtx)
+	informerFactory.WaitForCacheSync(testCtx.Done())
 
 	// Create shared objects
 	// Create nodes
@@ -1075,7 +1077,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   testCtx.Ctx.Done(),
+		stop:   testCtx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
@@ -1083,8 +1085,8 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	}
 }
 
-func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
-	clientset := testCtx.ClientSet
+func initPVController(t *testing.T, testCtx ktesting.TContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+	clientset := testCtx.Client()
 	// Informers factory for controllers
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 
@@ -1127,7 +1129,7 @@ func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDela
 		NodeInformer:              informerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: true,
 	}
-	ctrl, err := persistentvolume.NewController(testCtx.Ctx, params)
+	ctrl, err := persistentvolume.NewController(testCtx, params)
 	if err != nil {
 		return nil, nil, err
 	}

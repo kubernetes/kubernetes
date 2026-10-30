@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -788,16 +789,16 @@ func TestCPGQueueing(t *testing.T) {
 				features.CompositePodGroup:               true,
 			})
 
-			testCtx := testutils.InitTestSchedulerWithOptions(
+			testCtx := schedulerutils.InitTestSchedulerWithOptions(
 				t,
 				testutils.InitTestAPIServer(t, "podgroup-queueing", nil),
 				0,
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
-			testutils.SyncSchedulerInformerFactory(testCtx)
+			schedulerutils.SyncSchedulerInformerFactory(testCtx)
 			go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
-			ns := testCtx.NS.Name
+			ns := testCtx.Namespace()
 
 			if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
 				t.Fatal(err)

@@ -842,7 +842,7 @@ func TestPodGroupQueueing(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				var testCtx *testutils.TestContext
+				var testCtx *schedulerutils.TestContext
 				if tt.podInjector != nil || tt.bindingFailing != nil {
 					var piPlugin *podInjectorPlugin
 					var bfPlugin *bindingFailingPlugin
@@ -886,7 +886,7 @@ func TestPodGroupQueueing(t *testing.T) {
 						scheduler.WithPodMaxBackoffSeconds(0),
 						scheduler.WithPodInitialBackoffSeconds(0))
 				}
-				ns := testCtx.NS.Name
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{
@@ -989,15 +989,15 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				testCtx := testutils.InitTestSchedulerWithOptions(
+				testCtx := schedulerutils.InitTestSchedulerWithOptions(
 					t,
 					testutils.InitTestAPIServer(t, "podgroup-queueing", nil),
 					0,
 					scheduler.WithPodInitialBackoffSeconds(0),
 					scheduler.WithPodMaxBackoffSeconds(0),
 				)
-				testutils.SyncSchedulerInformerFactory(testCtx)
-				ns := testCtx.NS.Name
+				schedulerutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{
@@ -1248,7 +1248,7 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 					scheduler.WithPodInitialBackoffSeconds(10),
 					scheduler.WithPodMaxBackoffSeconds(20),
 				)
-				testCtx := testutils.InitTestSchedulerWithOptions(
+				testCtx := schedulerutils.InitTestSchedulerWithOptions(
 					t,
 					testutils.InitTestAPIServer(t, "podgroup-ordering", nil),
 					0,
@@ -1257,8 +1257,8 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 				if piPlugin != nil {
 					piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
 				}
-				testutils.SyncSchedulerInformerFactory(testCtx)
-				ns := testCtx.NS.Name
+				schedulerutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{
