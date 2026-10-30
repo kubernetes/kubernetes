@@ -678,7 +678,7 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 		bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(requestedWatchRV, requiredResourceVersion, cacheInterval.resourceVersion, opts)
 	}
 	// Update the bookMarkAfterResourceVersion
-	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
+	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion, cacheInterval)
 	return cacheInterval, nil
 }
 
