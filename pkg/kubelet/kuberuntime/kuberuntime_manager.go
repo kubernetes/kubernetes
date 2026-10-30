@@ -33,6 +33,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -1319,6 +1320,61 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	return nil
 }
 
+// computeContainerVolumeMountAction determines whether a running container needs to be restarted
+// in-place due to dynamic volumeMount changes. Returns whether to keep (true) or restart (false) the container.
+func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx context.Context, pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		return true
+	}
+	if kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
+		return true
+	}
+
+	container := pod.Spec.Containers[containerIdx]
+	if container.DynamicVolumePolicy == nil || container.DynamicVolumePolicy.RestartPolicy != v1.DynamicVolumeRestartContainer {
+		return true
+	}
+
+	actuatedMounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, container.Name)
+	if !found {
+		return true
+	}
+	if (len(actuatedMounts) == 0 && len(container.VolumeMounts) == 0) || apiequality.Semantic.DeepEqual(actuatedMounts, container.VolumeMounts) {
+		return true
+	}
+
+	logger := klog.FromContext(ctx)
+	actuatedPodVolumes, _ := m.actuatedState.GetPodVolumes(pod.UID)
+	for _, vm := range container.VolumeMounts {
+		if slices.ContainsFunc(actuatedMounts, func(am v1.VolumeMount) bool { return am.Name == vm.Name }) {
+			continue
+		}
+		var podVol *v1.Volume
+		for i := range pod.Spec.Volumes {
+			if pod.Spec.Volumes[i].Name == vm.Name {
+				podVol = &pod.Spec.Volumes[i]
+				break
+			}
+		}
+		if podVol != nil && podVol.Image != nil {
+			continue
+		}
+		if !slices.ContainsFunc(actuatedPodVolumes, func(v v1.Volume) bool { return v.Name == vm.Name }) {
+			logger.V(4).Info("Deferring container restart for dynamic volumeMount change until volume is mounted on host",
+				"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", vm.Name)
+			return true
+		}
+	}
+
+	changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
+		name:      kubeContainerStatus.Name,
+		container: &pod.Spec.Containers[containerIdx],
+		message:   fmt.Sprintf("Container %s volumeMounts changed, will be restarted", container.Name),
+	}
+	changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restartAllContainers bool) podActions {
 	logger := klog.FromContext(ctx)
@@ -1496,6 +1552,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
+		} else if !m.computeContainerVolumeMountAction(ctx, pod, idx, containerStatus, &changes) {
+			// computeContainerVolumeMountAction returns false when dynamic volume policy requires
+			// restarting this container (queuing it in ContainersToKill and ContainersToStart).
+			// If a container resize is also requested concurrently, recreating the container in
+			// startContainer applies the new container resources, and startingResizedContainer
+			// below sets UpdatePodResources = true so pod-level cgroups are resized.
+			// When computeContainerVolumeMountAction returns true (no volumeMount change or mount
+			// deferred), execution falls through to computePodResizeAction below.
+			continue
 		} else if !m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue

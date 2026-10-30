@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	csitrans "k8s.io/csi-translation-lib"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -216,6 +217,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			blockVolumePathHandler)),
+		actuatedState: actuatedState,
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -306,6 +308,9 @@ type volumeManager struct {
 
 	// intreeToCSITranslator translates in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	// actuatedState tracks the actuated pod state on the node.
+	actuatedState state.Reader
 }
 
 type VolumeAttachLimitExceededError struct {
@@ -442,6 +447,40 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	// Remount plugins for which this is true. (Atomically updating volumes,
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && vm.actuatedState != nil {
+		if actuatedPod, ok := vm.actuatedState.GetPod(pod.UID); ok && actuatedPod != nil && actuatedPod.Name != "" {
+			actuatedVolumeSet := sets.New[string]()
+			for c := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+				for _, m := range c.VolumeMounts {
+					actuatedVolumeSet.Insert(m.Name)
+				}
+			}
+			var requiredVolumes, dynamicVolumes []string
+			for _, v := range expectedVolumes {
+				if actuatedVolumeSet.Has(v) {
+					requiredVolumes = append(requiredVolumes, v)
+				} else {
+					dynamicVolumes = append(dynamicVolumes, v)
+				}
+			}
+			if len(dynamicVolumes) > 0 {
+				expectedVolumes = requiredVolumes
+				// Best-effort short poll for newly added dynamic volumes so fast local mounts
+				// can be actuated in the same SyncPod pass without blocking the entire pod if
+				// a dynamic volume fails to mount (e.g. missing ConfigMap/Secret).
+				_ = wait.PollUntilContextTimeout(
+					ctx,
+					podAttachAndMountRetryInterval,
+					2*time.Second,
+					true,
+					vm.verifyVolumesMountedFunc(uniquePodName, dynamicVolumes))
+				if len(expectedVolumes) == 0 {
+					return nil
+				}
+			}
+		}
+	}
 
 	err := wait.PollUntilContextTimeout(
 		ctx,

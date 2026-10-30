@@ -193,6 +193,12 @@ func TestGetBackoffKey(t *testing.T) {
 			c.Resources.Requests[v1.ResourceCPU] = resource.MustParse("200m")
 			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
 				"Updating the resources should change the key")
+
+			podCopy = pod.DeepCopy()
+			c = &podCopy.Spec.Containers[0]
+			c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{Name: "vol1", MountPath: "/mnt/vol1"})
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the volumeMounts should change the key")
 		})
 	}
 }
