@@ -1935,26 +1935,31 @@ func newStatefulSetWithLabels(replicas int32, name string, uid types.UID, labels
 
 func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 	testCases := []struct {
+		name                   string
 		maxUnavailable         *intstr.IntOrString
-		replicaCount           int
+		updateRangeCount       int
 		expectedMaxUnavailable int
 	}{
 		// it wouldn't hurt to also test 0 and 0%, even if they should have been forbidden by API validation.
-		{maxUnavailable: nil, replicaCount: 10, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromInt32(3)), replicaCount: 10, expectedMaxUnavailable: 3},
-		{maxUnavailable: ptr.To(intstr.FromInt32(3)), replicaCount: 0, expectedMaxUnavailable: 3},
-		{maxUnavailable: ptr.To(intstr.FromInt32(0)), replicaCount: 0, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("10%")), replicaCount: 25, expectedMaxUnavailable: 2},
-		{maxUnavailable: ptr.To(intstr.FromString("100%")), replicaCount: 5, expectedMaxUnavailable: 5},
-		{maxUnavailable: ptr.To(intstr.FromString("50%")), replicaCount: 5, expectedMaxUnavailable: 2},
-		{maxUnavailable: ptr.To(intstr.FromString("10%")), replicaCount: 5, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("1%")), replicaCount: 0, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("0%")), replicaCount: 0, expectedMaxUnavailable: 1},
+		{name: "nil defaults to 1", maxUnavailable: nil, updateRangeCount: 10, expectedMaxUnavailable: 1},
+		{name: "absolute 3", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 10, expectedMaxUnavailable: 3},
+		{name: "absolute 3 with empty range", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 0, expectedMaxUnavailable: 3},
+		{name: "absolute 0 clamped to 1", maxUnavailable: new(intstr.FromInt32(0)), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		{name: "10% of 25", maxUnavailable: new(intstr.FromString("10%")), updateRangeCount: 25, expectedMaxUnavailable: 2},
+		{name: "100% of 5", maxUnavailable: new(intstr.FromString("100%")), updateRangeCount: 5, expectedMaxUnavailable: 5},
+		{name: "50% of 5", maxUnavailable: new(intstr.FromString("50%")), updateRangeCount: 5, expectedMaxUnavailable: 2},
+		{name: "10% of 5 rounds down to 0 then clamp 1", maxUnavailable: new(intstr.FromString("10%")), updateRangeCount: 5, expectedMaxUnavailable: 1},
+		{name: "1% of empty range", maxUnavailable: new(intstr.FromString("1%")), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		{name: "0% of empty range", maxUnavailable: new(intstr.FromString("0%")), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		// Partition-scoped range: e.g. Replicas=10, Partition=8 → update range size 2.
+		{name: "50% of partition range size 2", maxUnavailable: new(intstr.FromString("50%")), updateRangeCount: 2, expectedMaxUnavailable: 1},
+		{name: "100% of partition range size 2", maxUnavailable: new(intstr.FromString("100%")), updateRangeCount: 2, expectedMaxUnavailable: 2},
+		{name: "absolute ignores range size", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 2, expectedMaxUnavailable: 3},
 	}
 
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			gotMaxUnavailable, err := getStatefulSetMaxUnavailable(tc.maxUnavailable, tc.replicaCount)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotMaxUnavailable, err := getStatefulSetMaxUnavailable(tc.maxUnavailable, tc.updateRangeCount)
 			if err != nil {
 				t.Fatal(err)
 			}
