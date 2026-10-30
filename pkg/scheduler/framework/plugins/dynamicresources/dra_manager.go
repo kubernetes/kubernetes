@@ -300,6 +300,33 @@ func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 	return result, nil
 }
 
+// collectAllocatedClaims gathers allocated claims from the assume cache and returns
+// them both as a slice and as a UID-indexed map, together with a post-collection
+// allocatedDevices revision snapshot for consistency checks in GatherAllocatedState.
+func (c *claimTracker) collectAllocatedClaims(enabledSharedConsumableCapacity bool) ([]*resourceapi.ResourceClaim, map[types.UID]*resourceapi.ResourceClaim, int64, error) {
+	claimsByUID := make(map[types.UID]*resourceapi.ResourceClaim)
+	if !enabledSharedConsumableCapacity {
+		return nil, claimsByUID, c.allocatedDevices.getRevision(), nil
+	}
+
+	claims, err := c.List()
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	for _, claim := range claims {
+		if claim.Status.Allocation != nil {
+			claimsByUID[claim.UID] = claim
+		}
+	}
+
+	allocatedClaims := make([]*resourceapi.ResourceClaim, 0, len(claimsByUID))
+	for _, claim := range claimsByUID {
+		allocatedClaims = append(allocatedClaims, claim)
+	}
+
+	return allocatedClaims, claimsByUID, c.allocatedDevices.getRevision(), nil
+}
+
 // errClaimTrackerConcurrentModification gets returned if ListAllAllocatedDevices
 // or GatherAllocatedState need to be retried.
 //
@@ -378,6 +405,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	enabledSharedConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity)
 
 	allocated, revision1 := c.allocatedDevices.get()
 	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
@@ -385,8 +413,12 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if err != nil {
 		return nil, err
 	}
+	allocatedClaims, claimsByUID, revision4, err := c.collectAllocatedClaims(enabledSharedConsumableCapacity)
+	if err != nil {
+		return nil, err
+	}
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision2 || revision2 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
@@ -412,6 +444,9 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 				return nil, err
 			}
 		}
+		if enabledSharedConsumableCapacity && claim != nil && claim.Status.Allocation != nil {
+			claimsByUID[claim.UID] = claim
+		}
 		foreachAllocatedDevice(claim,
 			func(deviceID structured.DeviceID) { // dedicatedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -427,12 +462,19 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 				aggregatedCapacity.Insert(capacity)
 			})
 	}
+	if enabledSharedConsumableCapacity {
+		allocatedClaims = allocatedClaims[:0]
+		for _, claim := range claimsByUID {
+			allocatedClaims = append(allocatedClaims, claim)
+		}
+	}
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
 			AllocatedDevices:         allocated,
 			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
 			AggregatedCapacity:       aggregatedCapacity,
+			AllocatedClaims:          allocatedClaims,
 		}, nil
 	}
 

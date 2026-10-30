@@ -146,7 +146,7 @@ func (in *DeviceCounterConsumption) DeepCopyInto(out *DeviceCounterConsumption) 
 	in.CounterSet.DeepCopyInto(&out.CounterSet)
 	if in.Counters != nil {
 		in, out := &in.Counters, &out.Counters
-		*out = make(map[string]v1.Counter, len(*in))
+		*out = make(map[string]v1.CounterRequirement, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}

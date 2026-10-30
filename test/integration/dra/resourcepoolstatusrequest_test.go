@@ -66,6 +66,18 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				// test/integration/auth/. The test API server uses AlwaysAllow authorizer.
 			},
 		},
+		"consumption-policy-enabled": {
+			features: map[featuregate.Feature]bool{
+				features.DRAResourcePoolStatus:       true,
+				features.DRAPartitionableDevices:     true,
+				features.DRAPartitionableDevicesType: true,
+				features.DRAConsumableCapacity:       true,
+				features.DRASharedConsumableCapacity: true,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("PartitionSummary", testPartitionSummary)
+			},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
@@ -285,7 +297,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"profile": {StringValue: new(profile)}},
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet: "gpu-0",
-				Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(cost)}},
+				Counters:   map[string]resourceapi.CounterRequirement{"memory": {Value: new(resource.MustParse(cost))}},
 			}},
 		}
 	}
@@ -298,7 +310,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 			NodeName: &nodeName,
 			SharedCounters: []resourceapi.CounterSet{{
 				Name:     "gpu-0",
-				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("80Gi")}},
+				Counters: map[string]resourceapi.Counter{"memory": {Value: new(resource.MustParse("80Gi"))}},
 			}},
 		},
 	}
@@ -315,6 +327,20 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 				partitionDevice("half-1", "Half", "40Gi"),
 			},
 		},
+	}
+	wantHalfTotal := int32(2)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity) {
+		counter := counterSlice.Spec.SharedCounters[0].Counters["memory"]
+		counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+			Default:     new(resource.MustParse("40Gi")),
+			ValidValues: []resource.Quantity{resource.MustParse("40Gi"), resource.MustParse("80Gi")},
+		}
+		counterSlice.Spec.SharedCounters[0].Counters["memory"] = counter
+		// Different raw costs resolve to the same 40Gi partition cost. Only two fit.
+		deviceSlice.Spec.Devices[1] = partitionDevice("half-0", "Half", "20Gi")
+		deviceSlice.Spec.Devices[2] = partitionDevice("half-1", "Half", "30Gi")
+		deviceSlice.Spec.Devices = append(deviceSlice.Spec.Devices, partitionDevice("half-2", "Half", "20Gi"))
+		wantHalfTotal = 3
 	}
 	for _, s := range []*resourceapi.ResourceSlice{counterSlice, deviceSlice} {
 		created := must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, s, metav1.CreateOptions{})
@@ -351,8 +377,8 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 	if got["Full"] != [2]int32{1, 1} {
 		tCtx.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
 	}
-	if got["Half"] != [2]int32{2, 2} {
-		tCtx.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
+	if got["Half"] != [2]int32{wantHalfTotal, 2} {
+		tCtx.Errorf("Half {total,allocatable} = %v, want [%d 2]", got["Half"], wantHalfTotal)
 	}
 }
 

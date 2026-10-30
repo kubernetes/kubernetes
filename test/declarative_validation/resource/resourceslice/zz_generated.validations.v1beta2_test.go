@@ -99,6 +99,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.devices[*].consumesCounters[*].counters[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "zeroOrOneOf"},
+			},
 			"spec.devices[*].nodeAllocatableResources[*].mapping": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},

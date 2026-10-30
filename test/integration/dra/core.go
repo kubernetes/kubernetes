@@ -282,7 +282,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 							{
 								Name: "gpu-0",
 								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
+									"mem": {Value: mustParseQuantityPtr("1")},
 								},
 							},
 						},
@@ -311,8 +311,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 								Name: "gpu",
 								ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 									CounterSet: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.CounterRequirement{
+										"mem": {Value: mustParseQuantityPtr("1")},
 									},
 									CompatibilityGroups: []string{"compat-group-1", "compat-group-2"},
 								}},

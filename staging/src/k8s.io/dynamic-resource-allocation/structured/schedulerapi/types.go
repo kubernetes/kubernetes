@@ -93,6 +93,7 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	AllocatedClaims    []*resourceapi.ResourceClaim
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.

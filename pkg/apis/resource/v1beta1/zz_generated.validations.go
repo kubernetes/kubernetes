@@ -541,6 +541,89 @@ func Validate_CapacityRequirements(
 	return errs
 }
 
+var zeroOrOneOfMembershipFor_k8s_io_api_resource_v1beta1_CounterRequirement_ = validate.NewUnionMembership(validate.NewUnionMember("value"), validate.NewUnionMember("valueFrom"))
+
+// Validate_CounterRequirement validates an instance of CounterRequirement according
+// to declarative validation rules in the API schema.
+func Validate_CounterRequirement(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1beta1.CounterRequirement) (errs field.ErrorList) {
+
+	if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_resource_v1beta1_CounterRequirement_,
+		func(obj *resourcev1beta1.CounterRequirement) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Value != nil
+		},
+		func(obj *resourcev1beta1.CounterRequirement) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.ValueFrom != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field resourcev1beta1.CounterRequirement.Value
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta1.CounterRequirement) *resource.Quantity {
+				return oldObj.Value
+			})
+		errs = append(errs, fn(fldPath.Child("value"), obj.Value, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1beta1.CounterRequirement.ValueFrom
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1beta1.CounterValueFrom,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta1.CounterRequirement) *resourcev1beta1.CounterValueFrom {
+				return oldObj.ValueFrom
+			})
+		errs = append(errs, fn(fldPath.Child("valueFrom"), obj.ValueFrom, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
 func Validate_CounterSet(
@@ -1728,7 +1811,7 @@ func Validate_DeviceCounterConsumption(
 	{ // field resourcev1beta1.DeviceCounterConsumption.Counters
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj map[string]resourcev1beta1.Counter,
+			obj, oldObj map[string]resourcev1beta1.CounterRequirement,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1748,10 +1831,14 @@ func Validate_DeviceCounterConsumption(
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_CounterRequirement); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceCounterConsumption) map[string]resourcev1beta1.Counter {
+			func(oldObj *resourcev1beta1.DeviceCounterConsumption) map[string]resourcev1beta1.CounterRequirement {
 				return oldObj.Counters
 			})
 		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
@@ -2367,6 +2454,45 @@ func Validate_DeviceRequestAllocationResult(
 				return oldObj.SkipNodeOperations
 			})
 		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1beta1.DeviceRequestAllocationResult.ConsumedCounters
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1beta1.CounterSetConsumption,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *resourcev1beta1.CounterSetConsumption, b *resourcev1beta1.CounterSetConsumption) bool {
+					return a.CounterSet == b.CounterSet
+				}).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []resourcev1beta1.CounterSetConsumption {
+				return oldObj.ConsumedCounters
+			})
+		errs = append(errs, fn(fldPath.Child("consumedCounters"), obj.ConsumedCounters, oldVal, oldObj != nil)...)
 	}
 
 	return errs

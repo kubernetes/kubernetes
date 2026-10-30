@@ -83,6 +83,18 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
+// ResolveCounterConsumption resolves an amount using the allocator's rounding
+// and consumption policy checks. The boolean is false when the resolved amount
+// violates the policy; an error indicates that resolution failed.
+// A nil requested value selects the policy default or the counter's full value.
+// The caller must check the resolved amount against available counters.
+func ResolveCounterConsumption(requestedValue *resource.Quantity, counter resourceapi.Counter, features Features) (resource.Quantity, bool, error) {
+	if !features.SharedConsumableCapacity {
+		counter.ConsumptionPolicy = nil
+	}
+	return experimental.ResolveCounterConsumption(requestedValue, counter, features.FractionalCapacityRange)
+}
+
 // Allocator calculates how to allocate a set of unallocated claims which use
 // structured parameters.
 //

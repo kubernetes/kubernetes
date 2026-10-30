@@ -1034,7 +1034,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1_CapacityRequestPolicyRange(ref),
 		resourcev1.CapacityRequirements{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1_CapacityRequirements(ref),
 		resourcev1.Counter{}.OpenAPIModelName():                                                                         schema_k8sio_api_resource_v1_Counter(ref),
+		resourcev1.CounterRequirement{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_CounterRequirement(ref),
 		resourcev1.CounterSet{}.OpenAPIModelName():                                                                      schema_k8sio_api_resource_v1_CounterSet(ref),
+		resourcev1.CounterSetConsumption{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1_CounterSetConsumption(ref),
+		resourcev1.CounterValueFrom{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_CounterValueFrom(ref),
 		resourcev1.Device{}.OpenAPIModelName():                                                                          schema_k8sio_api_resource_v1_Device(ref),
 		resourcev1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1_DeviceAllocationConfiguration(ref),
 		resourcev1.DeviceAllocationResult{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_DeviceAllocationResult(ref),
@@ -1103,7 +1106,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta1_CapacityRequestPolicyRange(ref),
 		resourcev1beta1.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref),
 		resourcev1beta1.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta1_Counter(ref),
+		resourcev1beta1.CounterRequirement{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta1_CounterRequirement(ref),
 		resourcev1beta1.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta1_CounterSet(ref),
+		resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_CounterSetConsumption(ref),
+		resourcev1beta1.CounterValueFrom{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_CounterValueFrom(ref),
 		resourcev1beta1.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta1_Device(ref),
 		resourcev1beta1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		resourcev1beta1.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
@@ -1149,7 +1155,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta2_CapacityRequestPolicyRange(ref),
 		resourcev1beta2.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref),
 		resourcev1beta2.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta2_Counter(ref),
+		resourcev1beta2.CounterRequirement{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_CounterRequirement(ref),
 		resourcev1beta2.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta2_CounterSet(ref),
+		resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_CounterSetConsumption(ref),
+		resourcev1beta2.CounterValueFrom{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_CounterValueFrom(ref),
 		resourcev1beta2.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta2_Device(ref),
 		resourcev1beta2.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref),
 		resourcev1beta2.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref),
@@ -48205,7 +48214,7 @@ func schema_k8sio_api_resource_v1_CapacityRequestPolicy(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicy defines how requests consume device capacity.\n\nMust not set more than one ValidRequestValues.",
+				Description: "CapacityRequestPolicy defines how requests consume device capacity and how devices consume counters.\n\nIt is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy. For counter consumption, capacity means the available counter value, and a request means the device's required counter amount. Both uses share default selection, rounding and range arithmetic, including the DRAFractionalCapacityRange feature gate and the rules described by CapacityRequestPolicyRange.\n\nMust not set more than one ValidRequestValues.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"default": {
@@ -48313,7 +48322,7 @@ func schema_k8sio_api_resource_v1_Counter(ref common.ReferenceCallback) common.O
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "Counter describes a quantity that is available in a counter set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
@@ -48322,12 +48331,45 @@ func schema_k8sio_api_resource_v1_Counter(ref common.ReferenceCallback) common.O
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"consumptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "consumptionPolicy defines how devices consume this counter. The consumed amount is rounded up according to the policy and must satisfy its limits.\n\nIf unset, devices can consume any amount up to the available counter value. If and only if the required amount is unspecified, then the policy default is used (if set) or the full counter value (if not set).",
+							Ref:         ref(resourcev1.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_CounterRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterRequirement describes how much of a counter a device consumes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "value defines the statically consumed amount.\n\nExactly one of value or valueFrom must be specified.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "valueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -48366,6 +48408,66 @@ func schema_k8sio_api_resource_v1_CounterSet(ref common.ReferenceCallback) commo
 		},
 		Dependencies: []string{
 			resourcev1.Counter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records one allocation's resolved valueFrom consumption from one counter set. The containing DeviceRequestAllocationResult identifies the allocated device and its pool.\n\nFor example, two allocations sharing a device may consume 2Gi and 3Gi from a \"memory\" counter. Each result records only its own amount; together they consume 5Gi. Releasing the first allocation leaves 3Gi charged. If the device also consumes one fixed \"slots\" counter, that charge is accounted for separately from current ResourceSlices. With unchanged slice definitions, the fixed charge remains until the last non-admin allocation is released.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counterSet identifies a counter set in the pool named by the containing allocation result.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counters records this allocation's resolved quantity for each counter in the set. The map contains at most 32 counters; each quantity must be non-negative.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -49160,7 +49262,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.CounterRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49190,7 +49292,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 			},
 		},
 		Dependencies: []string{
-			resourcev1.Counter{}.OpenAPIModelName()},
+			resourcev1.CounterRequirement{}.OpenAPIModelName()},
 	}
 }
 
@@ -49415,12 +49517,33 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"counterSet",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "consumedCounters records resolved valueFrom consumption for the single device identified by this allocation result, grouped by counter set in that device's pool. Each result records only its own request-dependent amounts. The scheduler sums these amounts across non-admin allocation results, including multiple shares of the same device. Releasing one allocation releases its recorded amounts without changing those of other allocations.\n\nQuantities are resolved at allocation time from the matching claim capacity requests, including consumptionPolicy rounding. They may therefore be greater than the requested amounts. If the claim omits a mapped capacity request, consumption uses the shared counter's policy default, or its full value when no default is defined. All resolved valueFrom counters are included, even when their quantity is zero.\n\nThe recorded amounts and counter-set references remain authoritative if ResourceSlice mappings, defaults, or policies change. A mapping change does not move an existing allocation's consumption to a different counter set. DRA drivers can use these amounts without access to ResourceSlices.\n\nFixed counter consumption is not recorded here. The scheduler determines fixed consumption from current ResourceSlices, including consumptionPolicy rounding, and counts it once per (driver, pool, device) while any non-admin allocation of that device remains. Current fixed consumption is added to the recorded request-dependent consumption; changing a counter from valueFrom to value does not replace the recorded amounts.\n\nCurrent shared-counter values still define the total budget. Reducing a counter below its recorded consumption prevents further counter consumption; existing allocation results are not changed. If an allocated device's definition is missing, or a recorded positive amount refers to a missing counter set or counter, further counter-consuming allocations from that pool are blocked. A recorded zero amount does not require a current counter-set or counter definition.\n\nThis field is populated only for non-admin allocations when DRASharedConsumableCapacity is enabled. An absent field means that no request-dependent consumption was recorded, including for allocations made before the feature was enabled. If an existing allocation has no recorded consumption but its current device definition uses valueFrom, further counter-consuming allocations from that pool are blocked because the allocation-time amount is unknown.\n\nThe list contains at most 2 counter sets, keyed by counterSet. Its order has no correspondence to the order of counter sets or devices in ResourceSlices.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1.CounterSetConsumption{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -51777,7 +51900,7 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequestPolicy(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicy defines how requests consume device capacity.\n\nMust not set more than one ValidRequestValues.",
+				Description: "CapacityRequestPolicy defines how requests consume device capacity and how devices consume counters.\n\nIt is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy. For counter consumption, capacity means the available counter value, and a request means the device's required counter amount. Both uses share default selection, rounding and range arithmetic, including the DRAFractionalCapacityRange feature gate and the rules described by CapacityRequestPolicyRange.\n\nMust not set more than one ValidRequestValues.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"default": {
@@ -51885,7 +52008,7 @@ func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "Counter describes a quantity that is available in a counter set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
@@ -51894,12 +52017,45 @@ func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) com
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"consumptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "consumptionPolicy defines how devices consume this counter. The consumed amount is rounded up according to the policy and must satisfy its limits.\n\nIf unset, devices can consume any amount up to the available counter value. If and only if the required amount is unspecified, then the policy default is used (if set) or the full counter value (if not set).",
+							Ref:         ref(resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterRequirement describes how much of a counter a device consumes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "value defines the statically consumed amount.\n\nExactly one of value or valueFrom must be specified.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "valueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1beta1.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -51938,6 +52094,66 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			resourcev1beta1.Counter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records one allocation's resolved valueFrom consumption from one counter set. The containing DeviceRequestAllocationResult identifies the allocated device and its pool.\n\nFor example, two allocations sharing a device may consume 2Gi and 3Gi from a \"memory\" counter. Each result records only its own amount; together they consume 5Gi. Releasing the first allocation leaves 3Gi charged. If the device also consumes one fixed \"slots\" counter, that charge is accounted for separately from current ResourceSlices. With unchanged slice definitions, the fixed charge remains until the last non-admin allocation is released.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counterSet identifies a counter set in the pool named by the containing allocation result.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counters records this allocation's resolved quantity for each counter in the set. The map contains at most 32 counters; each quantity must be non-negative.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -52588,7 +52804,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.CounterRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52618,7 +52834,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.Counter{}.OpenAPIModelName()},
+			resourcev1beta1.CounterRequirement{}.OpenAPIModelName()},
 	}
 }
 
@@ -52927,12 +53143,33 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"counterSet",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "consumedCounters records resolved valueFrom consumption for the single device identified by this allocation result, grouped by counter set in that device's pool. Each result records only its own request-dependent amounts. The scheduler sums these amounts across non-admin allocation results, including multiple shares of the same device. Releasing one allocation releases its recorded amounts without changing those of other allocations.\n\nQuantities are resolved at allocation time from the matching claim capacity requests, including consumptionPolicy rounding. They may therefore be greater than the requested amounts. If the claim omits a mapped capacity request, consumption uses the shared counter's policy default, or its full value when no default is defined. All resolved valueFrom counters are included, even when their quantity is zero.\n\nThe recorded amounts and counter-set references remain authoritative if ResourceSlice mappings, defaults, or policies change. A mapping change does not move an existing allocation's consumption to a different counter set. DRA drivers can use these amounts without access to ResourceSlices.\n\nFixed counter consumption is not recorded here. The scheduler determines fixed consumption from current ResourceSlices, including consumptionPolicy rounding, and counts it once per (driver, pool, device) while any non-admin allocation of that device remains. Current fixed consumption is added to the recorded request-dependent consumption; changing a counter from valueFrom to value does not replace the recorded amounts.\n\nCurrent shared-counter values still define the total budget. Reducing a counter below its recorded consumption prevents further counter consumption; existing allocation results are not changed. If an allocated device's definition is missing, or a recorded positive amount refers to a missing counter set or counter, further counter-consuming allocations from that pool are blocked. A recorded zero amount does not require a current counter-set or counter definition.\n\nThis field is populated only for non-admin allocations when DRASharedConsumableCapacity is enabled. An absent field means that no request-dependent consumption was recorded, including for allocations made before the feature was enabled. If an existing allocation has no recorded consumption but its current device definition uses valueFrom, further counter-consuming allocations from that pool are blocked because the allocation-time amount is unknown.\n\nThe list contains at most 2 counter sets, keyed by counterSet. Its order has no correspondence to the order of counter sets or devices in ResourceSlices.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -54075,7 +54312,7 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequestPolicy(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicy defines how requests consume device capacity.\n\nMust not set more than one ValidRequestValues.",
+				Description: "CapacityRequestPolicy defines how requests consume device capacity and how devices consume counters.\n\nIt is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy. For counter consumption, capacity means the available counter value, and a request means the device's required counter amount. Both uses share default selection, rounding and range arithmetic, including the DRAFractionalCapacityRange feature gate and the rules described by CapacityRequestPolicyRange.\n\nMust not set more than one ValidRequestValues.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"default": {
@@ -54183,7 +54420,7 @@ func schema_k8sio_api_resource_v1beta2_Counter(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "Counter describes a quantity that is available in a counter set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
@@ -54192,12 +54429,45 @@ func schema_k8sio_api_resource_v1beta2_Counter(ref common.ReferenceCallback) com
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"consumptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "consumptionPolicy defines how devices consume this counter. The consumed amount is rounded up according to the policy and must satisfy its limits.\n\nIf unset, devices can consume any amount up to the available counter value. If and only if the required amount is unspecified, then the policy default is used (if set) or the full counter value (if not set).",
+							Ref:         ref(resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterRequirement describes how much of a counter a device consumes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "value defines the statically consumed amount.\n\nExactly one of value or valueFrom must be specified.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "valueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1beta2.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -54236,6 +54506,66 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			resourcev1beta2.Counter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records one allocation's resolved valueFrom consumption from one counter set. The containing DeviceRequestAllocationResult identifies the allocated device and its pool.\n\nFor example, two allocations sharing a device may consume 2Gi and 3Gi from a \"memory\" counter. Each result records only its own amount; together they consume 5Gi. Releasing the first allocation leaves 3Gi charged. If the device also consumes one fixed \"slots\" counter, that charge is accounted for separately from current ResourceSlices. With unchanged slice definitions, the fixed charge remains until the last non-admin allocation is released.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counterSet identifies a counter set in the pool named by the containing allocation result.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "counters records this allocation's resolved quantity for each counter in the set. The map contains at most 32 counters; each quantity must be non-negative.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -55030,7 +55360,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.CounterRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55060,7 +55390,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.Counter{}.OpenAPIModelName()},
+			resourcev1beta2.CounterRequirement{}.OpenAPIModelName()},
 	}
 }
 
@@ -55285,12 +55615,33 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"counterSet",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "consumedCounters records resolved valueFrom consumption for the single device identified by this allocation result, grouped by counter set in that device's pool. Each result records only its own request-dependent amounts. The scheduler sums these amounts across non-admin allocation results, including multiple shares of the same device. Releasing one allocation releases its recorded amounts without changing those of other allocations.\n\nQuantities are resolved at allocation time from the matching claim capacity requests, including consumptionPolicy rounding. They may therefore be greater than the requested amounts. If the claim omits a mapped capacity request, consumption uses the shared counter's policy default, or its full value when no default is defined. All resolved valueFrom counters are included, even when their quantity is zero.\n\nThe recorded amounts and counter-set references remain authoritative if ResourceSlice mappings, defaults, or policies change. A mapping change does not move an existing allocation's consumption to a different counter set. DRA drivers can use these amounts without access to ResourceSlices.\n\nFixed counter consumption is not recorded here. The scheduler determines fixed consumption from current ResourceSlices, including consumptionPolicy rounding, and counts it once per (driver, pool, device) while any non-admin allocation of that device remains. Current fixed consumption is added to the recorded request-dependent consumption; changing a counter from valueFrom to value does not replace the recorded amounts.\n\nCurrent shared-counter values still define the total budget. Reducing a counter below its recorded consumption prevents further counter consumption; existing allocation results are not changed. If an allocated device's definition is missing, or a recorded positive amount refers to a missing counter set or counter, further counter-consuming allocations from that pool are blocked. A recorded zero amount does not require a current counter-set or counter definition.\n\nThis field is populated only for non-admin allocations when DRASharedConsumableCapacity is enabled. An absent field means that no request-dependent consumption was recorded, including for allocations made before the feature was enabled. If an existing allocation has no recorded consumption but its current device definition uses valueFrom, further counter-consuming allocations from that pool are blocked because the allocation-time amount is unknown.\n\nThe list contains at most 2 counter sets, keyed by counterSet. Its order has no correspondence to the order of counter sets or devices in ResourceSlices.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

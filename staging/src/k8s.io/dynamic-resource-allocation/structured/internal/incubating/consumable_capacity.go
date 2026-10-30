@@ -186,37 +186,42 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 // calculateConsumedCapacity returns valid capacity to be consumed regarding the requested capacity and device capacity policy.
 //
 // If no requestPolicy, return capacity.Value.
-// If no requestVal, fill the quantity by fillEmptyRequest function
+// If no requestVal, fill the quantity by fillEmptyRequestQuantity.
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
 func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity *draapi.DeviceCapacity, fractionalCapacityRange bool) (resource.Quantity, error) {
+	return calculateConsumedQuantity(requestedVal, capacity.Value, capacity.RequestPolicy, fractionalCapacityRange)
+}
+
+// calculateConsumedQuantity returns valid consumed amount for a request,
+// according to the advertised quantity and optional request policy.
+func calculateConsumedQuantity(requestedVal *resource.Quantity, total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy, fractionalCapacityRange bool) (resource.Quantity, error) {
 	if requestedVal == nil {
-		return fillEmptyRequest(capacity), nil
+		return fillEmptyRequestQuantity(total, requestPolicy), nil
 	}
 	// Must be checked before rounding: the request policy can round a negative
 	// request up to a valid value, which would hide it from the caller's check.
 	if requestedVal.Sign() < 0 {
 		return resource.Quantity{}, fmt.Errorf("%w: request %s", errNegativeCapacity, requestedVal.String())
 	}
-	if capacity.RequestPolicy == nil {
+	if requestPolicy == nil {
 		return *requestedVal, nil
 	}
 	switch {
-	case capacity.RequestPolicy.ValidRange != nil && capacity.RequestPolicy.ValidRange.Min != nil:
-		return roundUpRange(requestedVal, capacity.RequestPolicy.ValidRange, fractionalCapacityRange)
-	case capacity.RequestPolicy.ValidValues != nil:
-		return roundUpValidValues(requestedVal, capacity.RequestPolicy.ValidValues), nil
+	case requestPolicy.ValidRange != nil && requestPolicy.ValidRange.Min != nil:
+		return roundUpRange(requestedVal, requestPolicy.ValidRange, fractionalCapacityRange)
+	case requestPolicy.ValidValues != nil:
+		return roundUpValidValues(requestedVal, requestPolicy.ValidValues), nil
 	}
 	return *requestedVal, nil
 }
 
-// fillEmptyRequest
-// return requestPolicy.default if defined.
-// Otherwise, return capacity value.
-func fillEmptyRequest(capacity *draapi.DeviceCapacity) resource.Quantity {
-	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
-		return *capacity.RequestPolicy.Default
+// fillEmptyRequestQuantity returns the default request quantity if defined,
+// otherwise it returns the full advertised quantity.
+func fillEmptyRequestQuantity(total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy) resource.Quantity {
+	if requestPolicy != nil && requestPolicy.Default != nil {
+		return *requestPolicy.Default
 	}
-	return capacity.Value
+	return total
 }
 
 // roundUpRange rounds the requestedVal up to fit within the specified validRange.
