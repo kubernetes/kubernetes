@@ -2351,7 +2351,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false)
+		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2456,7 +2456,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, false)
+		status := getPhase(logger, test.pod, statusInfo, false, false, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2700,7 +2700,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized)
+		status := getPhase(logger, test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2814,7 +2814,7 @@ func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2915,7 +2915,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3020,7 +3020,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, false)
+		status := getPhase(logger, test.pod, statusInfo, false, false, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3233,7 +3233,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(logger, test.pod, statusInfo, false, test.podHasInitialized, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3347,7 +3347,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(logger, test.pod, test.pod.Status.ContainerStatuses, false, false, "")
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3478,7 +3478,7 @@ func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true, "")
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
@@ -3552,7 +3552,7 @@ func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, true, "")
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
@@ -3804,7 +3804,94 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(logger, pod, tc.statuses, false, true)
+			phase := getPhase(logger, pod, tc.statuses, false, true, "")
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
+	}
+}
+
+func TestPodPhaseWithDynamicContainers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	spec := func(restartPolicy v1.RestartPolicy, names ...string) v1.PodSpec {
+		s := v1.PodSpec{RestartPolicy: restartPolicy}
+		for _, name := range names {
+			s.Containers = append(s.Containers, v1.Container{Name: name})
+		}
+		return s
+	}
+	tests := []struct {
+		name           string
+		disableGate    bool
+		podIsTerminal  bool
+		notInitialized bool
+		spec           v1.PodSpec
+		statuses       []v1.ContainerStatus
+		previousPhase  v1.PodPhase
+		expectedPhase  v1.PodPhase
+	}{{
+		name:          "added container waiting in running pod",
+		spec:          spec(v1.RestartPolicyAlways, "a", "added"),
+		statuses:      []v1.ContainerStatus{runningState("a"), waitingState("added")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodRunning,
+	}, {
+		name:          "added container waiting after the other container succeeded",
+		spec:          spec(v1.RestartPolicyNever, "a", "added"),
+		statuses:      []v1.ContainerStatus{succeededState("a"), waitingState("added")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodRunning,
+	}, {
+		name:          "added container waiting in pending pod",
+		spec:          spec(v1.RestartPolicyAlways, "a", "added"),
+		statuses:      []v1.ContainerStatus{runningState("a"), waitingState("added")},
+		previousPhase: v1.PodPending,
+		expectedPhase: v1.PodPending,
+	}, {
+		name:          "added container waiting with gate disabled",
+		disableGate:   true,
+		spec:          spec(v1.RestartPolicyAlways, "a", "added"),
+		statuses:      []v1.ContainerStatus{runningState("a"), waitingState("added")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodPending,
+	}, {
+		name:          "added container waiting in terminal pod",
+		podIsTerminal: true,
+		spec:          spec(v1.RestartPolicyNever, "a", "added"),
+		statuses:      []v1.ContainerStatus{succeededState("a"), waitingState("added")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodPending,
+	}, {
+		name:           "containers waiting in recreated sandbox",
+		notInitialized: true,
+		spec:           spec(v1.RestartPolicyAlways, "a", "added"),
+		statuses:       []v1.ContainerStatus{waitingState("a"), waitingState("added")},
+		previousPhase:  v1.PodRunning,
+		expectedPhase:  v1.PodPending,
+	}, {
+		name:          "removed container still running",
+		spec:          spec(v1.RestartPolicyNever, "a"),
+		statuses:      []v1.ContainerStatus{succeededState("a"), runningState("removed")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodRunning,
+	}, {
+		name:          "removed container stopped",
+		spec:          spec(v1.RestartPolicyNever, "a"),
+		statuses:      []v1.ContainerStatus{succeededState("a"), failedState("removed")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodSucceeded,
+	}, {
+		name:          "removed container still running with gate disabled",
+		disableGate:   true,
+		spec:          spec(v1.RestartPolicyNever, "a"),
+		statuses:      []v1.ContainerStatus{succeededState("a"), runningState("removed")},
+		previousPhase: v1.PodRunning,
+		expectedPhase: v1.PodSucceeded,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, !tc.disableGate)
+			pod := &v1.Pod{Spec: tc.spec, Status: v1.PodStatus{ContainerStatuses: tc.statuses}}
+			phase := getPhase(logger, pod, tc.statuses, tc.podIsTerminal, !tc.notInitialized, tc.previousPhase)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
@@ -7267,6 +7354,160 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 		go func() {
 			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, podutil.Containers, false)
 		}()
+	}
+}
+
+func TestConvertToAPIContainerStatusesByType(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{{Name: "init"}},
+		Containers:     []v1.Container{{Name: "main"}},
+		EphemeralContainers: []v1.EphemeralContainer{{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"},
+		}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	now := time.Now()
+	status := func(name, id string, state kubecontainer.State, age time.Duration) *kubecontainer.Status {
+		return &kubecontainer.Status{
+			Name:      name,
+			ID:        kubecontainer.ContainerID{Type: "test", ID: id},
+			State:     state,
+			CreatedAt: now.Add(-age),
+		}
+	}
+	inSpec := []*kubecontainer.Status{
+		status("init", "init-id", kubecontainer.ContainerStateExited, 3*time.Minute),
+		status("main", "main-id", kubecontainer.ContainerStateRunning, 2*time.Minute),
+		status("debug", "debug-id", kubecontainer.ContainerStateRunning, time.Minute),
+	}
+
+	// Each expected map is container name -> container ID.
+	tests := []struct {
+		name              string
+		statuses          []*kubecontainer.Status
+		expectedMain      map[string]string
+		expectedInit      map[string]string
+		expectedEphemeral map[string]string
+	}{{
+		name:              "in-spec containers",
+		statuses:          inSpec,
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name:              "container missing from the spec",
+		statuses:          append(append([]*kubecontainer.Status{}, inSpec...), status("removed", "removed-id", kubecontainer.ContainerStateExited, time.Minute)),
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id", "removed": "test://removed-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			podStatus := &kubecontainer.PodStatus{
+				ID:                pod.UID,
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				ContainerStatuses: test.statuses,
+			}
+			var ecSpecs []v1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			for _, tc := range []struct {
+				containerType podutil.ContainerType
+				containers    []v1.Container
+				expected      map[string]string
+			}{
+				{podutil.InitContainers, pod.Spec.InitContainers, test.expectedInit},
+				{podutil.Containers, pod.Spec.Containers, test.expectedMain},
+				{podutil.EphemeralContainers, ecSpecs, test.expectedEphemeral},
+			} {
+				statuses := kl.convertToAPIContainerStatuses(tCtx, pod, podStatus, nil, tc.containers, nil, true, tc.containerType, false)
+				actual := map[string]string{}
+				for _, s := range statuses {
+					actual[s.Name] = s.ContainerID
+				}
+				assert.Equal(t, tc.expected, actual, "container type %v", tc.containerType)
+			}
+		})
+	}
+}
+
+// A container removed from the spec is no longer allocated, so its status has no
+// AllocatedResources. While it runs, it reports the resources it was started with.
+func TestConvertToAPIContainerStatusesRemovedContainerResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Containers:    []v1.Container{{Name: "main"}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	cpu := v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}
+	oldStatuses := []v1.ContainerStatus{{
+		Name:               "removed",
+		ContainerID:        "test://removed-id",
+		State:              v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		Resources:          &v1.ResourceRequirements{Requests: cpu, Limits: cpu},
+		AllocatedResources: cpu,
+	}}
+	actuated := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("150m"), v1.ResourceMemory: resource.MustParse("64Mi")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("150m")},
+	}
+	// The CPU comes from the CRI, and the memory request, which the CRI doesn't report, from the record.
+	wantRunning := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("64Mi")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+	}
+	now := time.Now()
+	tests := []struct {
+		name          string
+		state         kubecontainer.State
+		disableGate   bool
+		noActuated    bool
+		wantResources *v1.ResourceRequirements
+	}{
+		{name: "running", state: kubecontainer.ContainerStateRunning, wantResources: &wantRunning},
+		{name: "exited", state: kubecontainer.ContainerStateExited},
+		{name: "running without the gate", state: kubecontainer.ContainerStateRunning, disableGate: true},
+		{name: "running without an actuated record", state: kubecontainer.ContainerStateRunning, noActuated: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, !tc.disableGate)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			if !tc.noActuated {
+				require.NoError(t, testKubelet.kubelet.actuatedState.SetContainerResources(tCtx.Logger(), pod.UID, "removed", podutil.Containers, actuated))
+			}
+			podStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:      "removed",
+					ID:        kubecontainer.ContainerID{Type: "test", ID: "removed-id"},
+					State:     tc.state,
+					CreatedAt: now.Add(-time.Minute),
+					// The CRI reports the resources of a running container.
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest: new(resource.MustParse("200m")),
+						CPULimit:   new(resource.MustParse("200m")),
+					},
+				}},
+			}
+			statuses := testKubelet.kubelet.convertToAPIContainerStatuses(tCtx, pod, podStatus, oldStatuses, pod.Spec.Containers, nil, false, podutil.Containers, false)
+			removed, ok := podutil.GetContainerStatus(statuses, "removed")
+			require.True(t, ok)
+			assert.Equal(t, tc.wantResources, removed.Resources)
+			assert.Nil(t, removed.AllocatedResources)
+		})
 	}
 }
 

@@ -98,6 +98,21 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 			spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "1234"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+				// A container removed from the spec is unready while it is killed, but doesn't
+				// make the pod unready.
+				getNotReadyStatus("removed"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionTrue, "", ""),
+		},
+		{
+			spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "1234"},
 					{Name: "5678"},
 				},
 			},

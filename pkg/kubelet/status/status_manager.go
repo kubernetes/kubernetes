@@ -1514,7 +1514,12 @@ func (m *manager) needsReconcile(logger klog.Logger, uid types.UID, status v1.Po
 // Related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
-	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers) + len(pod.Spec.EphemeralContainers); containers > 0 {
+	regularContainers := len(pod.Spec.Containers)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		// Statuses of containers removed from the spec are still reported, and share the budget.
+		regularContainers = max(regularContainers, len(status.ContainerStatuses))
+	}
+	if containers := regularContainers + len(pod.Spec.InitContainers) + len(pod.Spec.EphemeralContainers); containers > 0 {
 		bytesPerStatus = bytesPerStatus / containers
 	}
 	normalizeTimeStamp := func(t *metav1.Time) {

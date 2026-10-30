@@ -828,6 +828,36 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	}
 }
 
+func TestStatusNormalizationBudgetsRemovedContainers(t *testing.T) {
+	message := strings.Repeat("x", kubecontainer.MaxPodTerminationMessageLogLength)
+	terminated := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Message: message}},
+		}
+	}
+	for _, tc := range []struct {
+		name          string
+		enabled       bool
+		expectedBytes int
+	}{
+		{name: "gate enabled", enabled: true, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength / 3},
+		{name: "gate disabled", enabled: false, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.enabled)
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "a"}}}}
+			status := &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+				terminated("a"), terminated("removed-1"), terminated("removed-2"),
+			}}
+			normalizeStatus(pod, status)
+			for _, s := range status.ContainerStatuses {
+				assert.Len(t, s.State.Terminated.Message, tc.expectedBytes, s.Name)
+			}
+		})
+	}
+}
+
 func TestStatusNormalizeTimeStamp(t *testing.T) {
 	pod := v1.Pod{
 		Spec: v1.PodSpec{},
