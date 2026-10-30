@@ -60,6 +60,8 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 // limited to three decimal places: "18446744073709551616" keeps its value, and
 // "1.2345" keeps its precision (String reports it as "1234500u"). Parsing does
 // cap a binarySI quantity, silently, at 2^63-1: "8Ei" parses as 2^63-1.
+// Parsing keeps at most 29 significant digits, enough for any int64 value at
+// nano precision, and rounds any precision beyond this away from zero.
 // Parsing also preserves a value only down to nano, rounding a finer non-zero
 // value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
 // may overflow on top of that: see Value, MilliValue and ScaledValue.
