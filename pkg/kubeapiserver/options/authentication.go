@@ -220,7 +220,7 @@ func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticat
 		o.ServiceAccounts = &ServiceAccountAuthenticationOptions{}
 	}
 	o.ServiceAccounts.Lookup = true
-	o.ServiceAccounts.ExtendExpiration = true
+	o.ServiceAccounts.ExtendExpiration = false
 	o.ServiceAccounts.MaxExtendedExpiration = serviceaccount.ExpirationExtensionSeconds * time.Second
 	return o
 }
