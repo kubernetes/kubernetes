@@ -80,7 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
-	sc "k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
 )
 
@@ -2639,10 +2638,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			return err
 		}
 
-		metrics.StartedContainersTotal.WithLabelValues(metricLabel).Inc()
-		if sc.HasWindowsHostProcessRequest(pod, spec.container) {
-			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
-		}
+		countFailure := countContainerStart(pod, spec.container, metricLabel)
 		logger.V(4).Info("Creating container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
 
 		// We fail late here to populate the "ErrImagePull" and "ImagePullBackOff" correctly to the end user.
@@ -2657,10 +2653,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		if err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
-			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
-			if sc.HasWindowsHostProcessRequest(pod, spec.container) {
-				metrics.StartedHostProcessContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
-			}
+			countFailure(err)
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
