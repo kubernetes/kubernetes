@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -697,6 +698,65 @@ func (r *malformedRestoreResponseRuntime) RestorePod(ctx context.Context, reques
 		response.RestoredContainers[0].ContainerId = r.otherContainerID
 	}
 	return response, err
+}
+
+// waitingRestoreRuntime waits in RestorePod until the call's context ends, as
+// a runtime that is still restoring a large Pod would.
+type waitingRestoreRuntime struct {
+	internalapi.RuntimeService
+	deadline     time.Time
+	cancelCaller context.CancelFunc
+}
+
+func (r *waitingRestoreRuntime) RestorePod(ctx context.Context, _ *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	r.deadline, _ = ctx.Deadline()
+	if r.cancelCaller != nil {
+		r.cancelCaller()
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestRestorePodSandboxUsesRestoreTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		timeout time.Duration
+		cancel  bool
+		wantErr error
+	}{
+		{name: "deadline expires", timeout: 50 * time.Millisecond, wantErr: context.DeadlineExceeded},
+		{name: "caller cancels", timeout: 30 * time.Second, cancel: true, wantErr: context.Canceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.podRestoreTimeout = tc.timeout
+			ctx, cancel := context.WithCancel(tCtx)
+			defer cancel()
+			restoreRuntime := &waitingRestoreRuntime{RuntimeService: m.runtimeService}
+			if tc.cancel {
+				restoreRuntime.cancelCaller = cancel
+			}
+			m.runtimeService = restoreRuntime
+			pod := newTestPod()
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+
+			start := time.Now()
+			_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+			require.WithinDuration(t, start.Add(tc.timeout), restoreRuntime.deadline, 5*time.Second, "RestorePod must use podRestoreTimeout, not the CRI client default")
+			require.ErrorIs(t, err, tc.wantErr)
+			// The runtime may have done part of the work, so the restore is not retried.
+			require.Empty(t, kubecontainer.RestoreErrorReason(err))
+			if tc.cancel {
+				require.NotContains(t, err.Error(), "podRestoreTimeout", "a cancelled restore did not time out")
+			} else {
+				require.ErrorContains(t, err, "RestorePod did not finish within 50ms (the node's podRestoreTimeout)")
+			}
+			require.Empty(t, fakeRuntime.RestoredPods)
+			require.NotContains(t, fakeRuntime.Called, "StartContainer")
+		})
+	}
 }
 
 func TestRestorePodSandboxCleansOnlyItsSandboxAfterInvalidResponse(t *testing.T) {

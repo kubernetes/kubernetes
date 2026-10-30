@@ -116,6 +116,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logManager:         logs.NewStubContainerLogManager(),
 		podLogsDirectory:   fakePodLogsDirectory,
 		actuatedState:      state.NewStateMemory(logger, nil, keepOnlyResourceValues),
+		podRestoreTimeout:  time.Minute,
 		restoresInFlight:   make(map[string]struct{}),
 	}
 

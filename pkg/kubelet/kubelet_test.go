@@ -562,6 +562,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
 		token.NewManager(kubelet.kubeClient),

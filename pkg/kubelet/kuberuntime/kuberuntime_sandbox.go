@@ -238,10 +238,17 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		return nil, message, err
 	}
 
-	// Call the CRI RestorePod RPC.
+	// Call the CRI RestorePod RPC. Only this call gets podRestoreTimeout;
+	// without a deadline, the CRI client would apply its shorter default.
 	restoreStarted = true
-	restoreResponse, err := m.runtimeService.RestorePod(ctx, restoreRequest)
+	restoreCtx, cancelRestore := context.WithTimeout(ctx, m.podRestoreTimeout)
+	restoreResponse, err := m.runtimeService.RestorePod(restoreCtx, restoreRequest)
+	restoreTimedOut := errors.Is(restoreCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil
+	cancelRestore()
 	if err != nil {
+		if restoreTimedOut {
+			err = fmt.Errorf("RestorePod did not finish within %v (the node's podRestoreTimeout): %w", m.podRestoreTimeout, err)
+		}
 		message := fmt.Sprintf("Failed to restore pod sandbox from checkpoint %q for pod %q: %v", checkpointPath, format.Pod(pod), err)
 		logger.Error(err, "Failed to restore pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointPath", checkpointPath)
 		return nil, message, err
