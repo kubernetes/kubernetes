@@ -19,7 +19,11 @@ package env
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
+	"testing"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func ExampleIsEnvironmentArgument_true() {
@@ -93,4 +97,90 @@ func ExampleParseEnv_bad_fourth() {
 	fmt.Println(ParseEnv(bad, r))
 	// Output:
 	// [] [] false "..ENV" is not a valid key name: must not start with '..'
+}
+
+func TestParseEnvStdin(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expectedEnv []v1.EnvVar
+	}{
+		{
+			name:  "Case 1: Hash inside a simple value",
+			input: "TOKEN=ab#cd\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "TOKEN", Value: "ab#cd"},
+			},
+		},
+		{
+			name:  "Case 2: Hash inside a database URL",
+			input: "DB_URL=postgres://u:p@h/db#x\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "DB_URL", Value: "postgres://u:p@h/db#x"},
+			},
+		},
+		{
+			name:  "Case 3: Hash inside a password",
+			input: "PASSWORD=hello#world\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "PASSWORD", Value: "hello#world"},
+			},
+		},
+		{
+			name:  "Case 4: Full-line comments",
+			input: "# This is a comment\nTOKEN=abc\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "TOKEN", Value: "abc"},
+			},
+		},
+		{
+			name:  "Case 5: Comment with leading whitespace",
+			input: "   # This is a comment\nTOKEN=abc\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "TOKEN", Value: "abc"},
+			},
+		},
+		{
+			name:  "Case 6: Inline comments preserved as value under Option A semantics",
+			input: "MESSAGE=hello # comment\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "MESSAGE", Value: "hello # comment"},
+			},
+		},
+		{
+			name:  "Case 7: Multiple assignments",
+			input: "TOKEN=ab#cd\nPASSWORD=hello#world\nREGION=india\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "TOKEN", Value: "ab#cd"},
+				{Name: "PASSWORD", Value: "hello#world"},
+				{Name: "REGION", Value: "india"},
+			},
+		},
+		{
+			name:  "Empty lines and lines with whitespace are ignored",
+			input: "\n   \n\t\nTOKEN=abc\n\n",
+			expectedEnv: []v1.EnvVar{
+				{Name: "TOKEN", Value: "abc"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := strings.NewReader(tc.input)
+			env, remove, usedStdin, err := ParseEnv([]string{"-"}, r)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !usedStdin {
+				t.Errorf("expected usedStdin to be true")
+			}
+			if len(remove) != 0 {
+				t.Errorf("expected no removed variables, got %v", remove)
+			}
+			if !reflect.DeepEqual(env, tc.expectedEnv) {
+				t.Errorf("expected env %+v, got %+v", tc.expectedEnv, env)
+			}
+		})
+	}
 }
