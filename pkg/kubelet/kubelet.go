@@ -1086,7 +1086,8 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup volumeManager
 	var vmPodManager volumemanager.PodManager = klet.podManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 		// The volume manager should only ever be aware of the 'allocated' pod.
 		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 	}

@@ -25,8 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
 )
 
@@ -168,6 +171,26 @@ func (rc *reconciler) unmountVolumes(logger klog.Logger) {
 			}
 			if err == nil {
 				logger.Info(mountedVolume.GenerateMsgDetailed("operationExecutor.UnmountVolume started", ""))
+			}
+		}
+	}
+	// Volumes whose TearDown is a no-op and have no per-pod directory on disk (such as Image
+	// volumes after a kubelet restart) are not reconstructed into actualStateOfWorld, so remove
+	// them from actuatedState once absent from both desired and actual state.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && rc.actuatedState != nil {
+		for _, uid := range rc.actuatedState.GetPodUIDs() {
+			podName := volumetypes.UniquePodName(uid)
+			vols, _ := rc.actuatedState.GetPodVolumes(uid)
+			for _, vol := range vols {
+				if VolumeRequiresUnmount(vol) {
+					continue
+				}
+				if !rc.desiredStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) &&
+					!rc.actualStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) {
+					if err := rc.actuatedState.RemovePodVolume(logger, uid, vol.Name); err != nil {
+						logger.Error(err, "Failed to remove unmounted volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					}
+				}
 			}
 		}
 	}

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,11 +39,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -2635,4 +2640,58 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 
 	// assert volume unmount succeed
 	waitForUnmount(t, generatedVolumeName, podName, asw)
+}
+
+func TestUnmountVolumesRemovesNonUnmountVolumeFromActuatedState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, actuatedState)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		&record.FakeRecorder{},
+		volumetesting.NewBlockVolumePathHandler()))
+	rc := NewReconciler(
+		kubeClient,
+		true,
+		reconcilerLoopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		volumePluginMgr,
+		kubeletPodsDir,
+		actuatedState).(*reconciler)
+
+	podUID := k8stypes.UID("pod-img-uid")
+	imgVol := v1.Volume{
+		Name: "img-vol",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"},
+		},
+	}
+	edVol := v1.Volume{
+		Name: "ed-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
+	require.NoError(t, actuatedState.SetPodVolume(logger, podUID, imgVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, podUID, edVol))
+
+	rc.unmountVolumes(logger)
+
+	vols, ok := actuatedState.GetPodVolumes(podUID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{edVol}, vols)
 }
