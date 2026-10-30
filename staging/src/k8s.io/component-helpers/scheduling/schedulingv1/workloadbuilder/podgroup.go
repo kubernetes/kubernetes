@@ -46,6 +46,9 @@ func newPodGroup(workload *schedulingv1beta1.Workload, tmpl *schedulingv1beta1.P
 	if tmpl.Priority != nil {
 		spec.Priority = new(*tmpl.Priority)
 	}
+	if tmpl.PreemptionPolicy != nil {
+		spec.PreemptionPolicy = new(*tmpl.PreemptionPolicy)
+	}
 
 	return &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,6 +79,9 @@ func newCompositePodGroup(workload *schedulingv1beta1.Workload, tmpl *scheduling
 	}
 	if tmpl.Priority != nil {
 		spec.Priority = new(*tmpl.Priority)
+	}
+	if tmpl.PreemptionPolicy != nil {
+		spec.PreemptionPolicy = new(*tmpl.PreemptionPolicy)
 	}
 
 	return &schedulingv1beta1.CompositePodGroup{
