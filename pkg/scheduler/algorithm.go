@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -467,18 +469,30 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	}
 
 	errCh := parallelize.NewResultChannel[error]()
+	var mu sync.Mutex
 	var feasibleNodesLen int32
+	var nextNodeIndex atomic.Int32
+	var committedIdx int
+	committedMinRank := math.MaxInt
+	var minFeasibleRankAtomic atomic.Int64
+	minFeasibleRankAtomic.Store(math.MaxInt64)
+	stopOnHigherRank := !a.opportunisticBatchingEnabled() && !hasExtenderFilters(schedFramework)
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
 
-	type nodeStatus struct {
-		node   string
+	type nodeResult struct {
+		done   bool
 		status *fwk.Status
 	}
-	result := make([]*nodeStatus, numAllNodes)
-	checkNode := func(i int) {
+	results := make([]nodeResult, numAllNodes)
+	checkNode := func(_ int) {
+		i := int(nextNodeIndex.Add(1) - 1)
 		// We check the nodes starting from nextStartIndex.
 		rankedNode := getRankedNode(i)
+		if stopOnHigherRank && int64(rankedNode.Rank) > minFeasibleRankAtomic.Load() {
+			cancel(errors.New("findNodesThatPassFilters has found feasible nodes of lower rank"))
+			return
+		}
 		nodeInfo := rankedNode.NodeInfo
 		status := schedFramework.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == fwk.Error {
@@ -487,17 +501,44 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 			})
 			return
 		}
-		if status.IsSuccess() {
-			length := atomic.AddInt32(&feasibleNodesLen, 1)
-			if length > numNodesToFind {
-				cancel(errors.New("findNodesThatPassFilters has found enough nodes"))
-				atomic.AddInt32(&feasibleNodesLen, -1)
-			} else {
-				feasibleNodes[length-1] = rankedNode
+		if stopOnHigherRank && status.IsSuccess() {
+			for {
+				curMin := minFeasibleRankAtomic.Load()
+				if int64(rankedNode.Rank) >= curMin || minFeasibleRankAtomic.CompareAndSwap(curMin, int64(rankedNode.Rank)) {
+					break
+				}
 			}
-		} else {
-			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
+
+		mu.Lock()
+		results[i] = nodeResult{done: true, status: status}
+		for committedIdx < numAllNodes && feasibleNodesLen < numNodesToFind {
+			rankedCandidate := getRankedNode(committedIdx)
+			if stopOnHigherRank && rankedCandidate.Rank > committedMinRank {
+				cancel(errors.New("findNodesThatPassFilters has found feasible nodes of lower rank"))
+				break
+			}
+			res := results[committedIdx]
+			if !res.done {
+				break
+			}
+			committedIdx++
+			if res.status.IsSuccess() {
+				if feasibleNodesLen == 0 {
+					committedMinRank = rankedCandidate.Rank
+				}
+				feasibleNodes[feasibleNodesLen] = rankedCandidate
+				feasibleNodesLen++
+				if feasibleNodesLen >= numNodesToFind {
+					cancel(errors.New("findNodesThatPassFilters has found enough nodes"))
+					break
+				}
+			} else {
+				diagnosis.NodeToStatus.Set(rankedCandidate.NodeInfo.Node().Name, res.status)
+				diagnosis.AddPluginStatus(res.status)
+			}
+		}
+		mu.Unlock()
 	}
 
 	beginCheckNode := time.Now()
@@ -510,22 +551,9 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	}()
 
 	// Stops searching for more nodes once the configured number of feasible nodes
-	// are found.
-	// TODO(#142718): When nodes are ranked and numNodesToFind < numAllNodes, Parallelizer().Until
-	// dispatches workers in chunks across multiple ranks concurrently and continues filtering nodes
-	// with Rank > minRank until numNodesToFind is reached, even though prioritizeNodes later discards
-	// them. Evaluate ranked nodes sequentially by rank (e.g. claiming indices via an atomic counter)
-	// and potentially stop (if opportunistic batching is disabled) once higher-rank nodes don't need
-	// to be evaluated.
+	// are found or once higher-rank nodes are reached after finding a feasible lower-rank node.
 	schedFramework.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
-	for _, item := range result {
-		if item == nil {
-			continue
-		}
-		diagnosis.NodeToStatus.Set(item.node, item.status)
-		diagnosis.AddPluginStatus(item.status)
-	}
 	if err := errCh.Receive(); err != nil {
 		statusCode = fwk.Error
 		return feasibleNodes, err
