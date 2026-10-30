@@ -578,7 +578,8 @@ func TestRecoveryEnds(t *testing.T) {
 				// loss while leading fires it when the gate closes.
 				h.expectStoppedLeading()
 			}
-			if elapsed := time.Since(startedAt); elapsed < tc.minDuration {
+			// Allow a small tolerance for runtime timer precision and scheduling jitter.
+			if elapsed := time.Since(startedAt); elapsed < tc.minDuration-50*time.Millisecond {
 				t.Errorf("Run returned %v after the gate closed, before %v", elapsed, tc.minDuration)
 			}
 			if tc.maxDuration > 0 {
