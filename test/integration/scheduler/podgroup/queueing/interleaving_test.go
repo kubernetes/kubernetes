@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -807,16 +808,16 @@ func TestPodGroupInterleaving(t *testing.T) {
 						features.CompositePodGroup:               cpgEnabled,
 					})
 
-					testCtx := testutils.InitTestSchedulerWithOptions(
+					testCtx := schedulerutils.InitTestSchedulerWithOptions(
 						t,
 						testutils.InitTestAPIServer(t, "pg-interleaving", nil),
 						0,
 						scheduler.WithPodInitialBackoffSeconds(0),
 						scheduler.WithPodMaxBackoffSeconds(0),
 					)
-					testutils.SyncSchedulerInformerFactory(testCtx)
+					schedulerutils.SyncSchedulerInformerFactory(testCtx)
 
-					ns := testCtx.NS.Name
+					ns := testCtx.Namespace()
 
 					if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
 						t.Fatal(err)

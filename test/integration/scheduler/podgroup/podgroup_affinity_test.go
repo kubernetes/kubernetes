@@ -158,7 +158,7 @@ func TestPodGroupSchedulingWithPodAntiAffinity(t *testing.T) {
 					// disable backoff
 					scheduler.WithPodMaxBackoffSeconds(0),
 					scheduler.WithPodInitialBackoffSeconds(0))
-				ns := testCtx.NS.Name
+				ns := testCtx.Namespace()
 
 				commonSteps := []stepsframework.Step{
 					{
