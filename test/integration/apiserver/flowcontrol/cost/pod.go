@@ -19,6 +19,7 @@ package cost
 import (
 	_ "embed"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -125,7 +126,7 @@ func ensureDefaultServiceAccount(tCtx ktesting.TContext) {
 // kube-apiserver's podStrategy.PrepareForCreate resets pod.Status on creation,
 // so a second write to /status is required to populate the exemplar's status
 // payload and kubelet managedFields entry (~10KB total stored size).
-func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel string) *v1.Pod {
+func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel string, extraBytes int) *v1.Pod {
 	tCtx.Helper()
 	const ns = metav1.NamespaceDefault
 	pod := exemplarPod.DeepCopy()
@@ -134,6 +135,9 @@ func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel str
 	pod.Spec.NodeName = nodeName
 	if deploymentLabel != "" {
 		pod.Labels["name"] = deploymentLabel
+	}
+	if extraBytes > 0 {
+		pod.Annotations["bench.k8s.io/payload"] = strings.Repeat("x", extraBytes)
 	}
 
 	created, err := tCtx.Client().CoreV1().Pods(ns).Create(tCtx, pod, metav1.CreateOptions{FieldManager: "seed-client"})
@@ -148,7 +152,7 @@ func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel str
 	return updated
 }
 
-func seedPods(tCtx ktesting.TContext, count int) []*v1.Pod {
+func seedPods(tCtx ktesting.TContext, count, extraBytes int) []*v1.Pod {
 	tCtx.Helper()
 	pods := make([]*v1.Pod, count)
 	for i := range count {
@@ -157,7 +161,11 @@ func seedPods(tCtx ktesting.TContext, count int) []*v1.Pod {
 			nodeName = fmt.Sprintf("kind-worker%d", i%10)
 			deploymentLabel = fmt.Sprintf("small-deployment-%02d", i%10)
 		}
-		pods[i] = seedExemplarPod(tCtx, fmt.Sprintf("pod-%03d", i), nodeName, deploymentLabel)
+		extra := extraBytes
+		if extra > 0 {
+			extra += i
+		}
+		pods[i] = seedExemplarPod(tCtx, fmt.Sprintf("pod-%03d", i), nodeName, deploymentLabel, extra)
 	}
 	if _, err := tCtx.Client().CoreV1().Pods(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{}); err != nil {
 		tCtx.Fatalf("waiting for watch cache sync failed: %v", err)
