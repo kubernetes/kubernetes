@@ -666,7 +666,7 @@ func TestWatch(t *testing.T) {
 				t.Cleanup(terminate)
 				store := &createWrapper{CacheDelegator: cacher}
 				storagetesting.RunTestWatchResync(ctx, t, store, true, compactWatch(cacher, server.V3Client.Client), func() {
-					fakeClock.Step(100 * time.Millisecond)
+					fakeClock.Step(2 * time.Second)
 				})
 			})
 			// These tests override WatchList and must finish before the parallel subtests start.
