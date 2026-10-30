@@ -9188,9 +9188,6 @@ func TestAllocator(t *testing.T,
 			node:                            node(node1, region1),
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
-			},
 		},
 		"check-combinations-within-single-request-single-pool-multiple-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil,
@@ -9210,9 +9207,6 @@ func TestAllocator(t *testing.T,
 			node:                            node(node1, region1),
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
-			},
 		},
 		"check-combinations-within-single-request-multiple-pools-multiple-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil,
@@ -9234,9 +9228,6 @@ func TestAllocator(t *testing.T,
 			node:                            node(node1, region1),
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
-			},
 		},
 		"check-combinations-within-single-request-many-pools": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil,
@@ -9260,9 +9251,6 @@ func TestAllocator(t *testing.T,
 			node:                            node(node1, region1),
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
-			},
 		},
 		"check-combinations-with-backtracking": {
 			claimsToAllocate: objects(claimWithRequests(
@@ -9298,9 +9286,6 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req2, driverA, pool1, device1, false),
 			)},
 			expectNumAllocateOneInvocations: 12,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 14,
-			},
 		},
 		"check-combinations-with-backtracking-across-slices-and-pools": {
 			features: Features{
@@ -9349,9 +9334,6 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req2, driverA, pool1, device1, false),
 			)},
 			expectNumAllocateOneInvocations: 12,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 14,
-			},
 		},
 		"check-combinations-with-prioritized-list": {
 			features: Features{
@@ -9400,9 +9382,6 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req2SubReq1, driverA, pool1, device1, false),
 			)},
 			expectNumAllocateOneInvocations: 26,
-			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 32,
-			},
 		},
 
 		// "derived-attributes" is the primary test case. It mirrors the

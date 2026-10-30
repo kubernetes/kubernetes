@@ -213,7 +213,7 @@ var availableAllocators = []struct {
 			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		},
 		nodeMatches: stable.NodeMatches,
 	},

@@ -1168,7 +1168,7 @@ func (m *matchAttributeConstraint) matches(request *requestData) bool {
 }
 
 // lookupAttribute is the unified entry point for attribute resolution
-// in the experimental allocator. It implements the lookup precedence:
+// in the allocator. It implements the lookup precedence:
 //  1. If the attribute is defined as a derived attribute on the request,
 //     it compiles/evaluates the CEL expression, caches it in the
 //     request scope, and returns the synthesized virtual attribute.
