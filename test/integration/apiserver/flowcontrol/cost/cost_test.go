@@ -75,6 +75,16 @@ func BenchmarkRequestCost(b *testing.B) {
 			acceptContentTypes: allReadFormats,
 		},
 		{
+			method:             "GET",
+			options:            "rv=0 45KB",
+			httpMethod:         http.MethodGet,
+			path:               podPath,
+			query:              "resourceVersion=0",
+			seedPods:           1,
+			extraBytes:         35 * 1024,
+			acceptContentTypes: allReadFormats,
+		},
+		{
 			method:             "LIST",
 			options:            `N=100 rv=""`,
 			httpMethod:         http.MethodGet,
@@ -107,6 +117,16 @@ func BenchmarkRequestCost(b *testing.B) {
 			path:               podsPath,
 			query:              "resourceVersion=0",
 			seedPods:           100,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
+			options:            "N=100 rv=0 45KB",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "resourceVersion=0",
+			seedPods:           100,
+			extraBytes:         35 * 1024,
 			acceptContentTypes: allReadFormats,
 		},
 		{
@@ -532,6 +552,7 @@ type requestScenario struct {
 	path               string
 	query              string
 	seedPods           int
+	extraBytes         int
 	requestContentType string
 	acceptContentTypes []contentType
 	body               func(mediaType string, pod *v1.Pod) []byte
@@ -567,7 +588,7 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 			setupAllocBytes := float64(afterSetupMem.TotalAlloc - beforeSetupMem.TotalAlloc)
 
 			ensureDefaultServiceAccount(tCtx)
-			pods := seedPods(tCtx, sc.seedPods)
+			pods := seedPods(tCtx, sc.seedPods, sc.extraBytes)
 			if len(pods) > 0 {
 				waitForResourceVersion(tCtx, podInformer, pods[len(pods)-1].ResourceVersion)
 			}
