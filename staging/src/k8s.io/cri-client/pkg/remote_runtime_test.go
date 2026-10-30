@@ -21,6 +21,7 @@ import (
 	"errors"
 	"os"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -29,7 +30,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
@@ -136,6 +139,7 @@ func TestCheckpointPod(t *testing.T) {
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(10)))
 	request := &kubeapi.CheckpointPodRequest{
 		PodSandboxId: "sandbox-id",
+		OperationId:  "checkpoint-operation-id",
 		OutputPath:   "/var/lib/kubelet/pod-checkpoints/checkpoint",
 		ContainerIds: []string{"container-one", "container-two"},
 		Options:      map[string]string{"example.runtime/checkpoint-mode": "sensitive-checkpoint-option"},
@@ -167,6 +171,7 @@ func TestRestorePod(t *testing.T) {
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(10)))
 	request := &kubeapi.RestorePodRequest{
 		CheckpointPath: "/var/lib/kubelet/pod-checkpoints/checkpoint",
+		OperationId:    "restore-operation-id",
 		Config: &kubeapi.PodSandboxConfig{
 			Metadata: &kubeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid"},
 		},
@@ -209,6 +214,125 @@ func TestRestorePod(t *testing.T) {
 	require.ErrorContains(t, err, "restore failed")
 	_, err = rtSvc.RestorePod(context.Background(), nil)
 	require.ErrorContains(t, err, "requires non-nil")
+}
+
+func TestRestorePodAlreadyExistsDoesNotRetry(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	request := &kubeapi.RestorePodRequest{
+		OperationId:    "restore-operation-id",
+		CheckpointPath: "/var/lib/kubelet/pod-checkpoints/checkpoint",
+		Config: &kubeapi.PodSandboxConfig{
+			Metadata: &kubeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid", Attempt: 1},
+		},
+		ContainerConfigs: []*kubeapi.ContainerConfig{{Metadata: &kubeapi.ContainerMetadata{Name: "app"}}},
+	}
+	callsBefore := len(fakeRuntime.RuntimeService.GetCalls())
+	fakeRuntime.RuntimeService.InjectError("RestorePod", status.Error(codes.AlreadyExists, "restore identity is already admitted"))
+
+	response, err := rtSvc.RestorePod(context.Background(), request)
+
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Nil(t, response)
+	assert.Equal(t, []string{"RestorePod"}, fakeRuntime.RuntimeService.GetCalls()[callsBefore:])
+	require.Len(t, fakeRuntime.RuntimeService.RestoredPods, 1)
+	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.RestoredPods[0]))
+}
+
+func TestCancelPodOperation(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	for _, kind := range []kubeapi.PodOperationType{kubeapi.PodOperationType_POD_CHECKPOINT, kubeapi.PodOperationType_POD_RESTORE} {
+		request := &kubeapi.CancelPodOperationRequest{OperationId: "operation-id", OperationType: kind}
+		original := proto.Clone(request)
+		deadline := time.Now().Add(time.Minute)
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		err := rtSvc.CancelPodOperation(ctx, request)
+		cancel()
+		require.NoError(t, err)
+		assert.True(t, proto.Equal(original, request))
+		assert.True(t, proto.Equal(original, fakeRuntime.RuntimeService.CanceledPodOperations[len(fakeRuntime.RuntimeService.CanceledPodOperations)-1]))
+		assert.WithinDuration(t, deadline, fakeRuntime.RuntimeService.CancelPodOperationDeadline, time.Second)
+	}
+
+	request := &kubeapi.CancelPodOperationRequest{OperationId: "operation-id", OperationType: kubeapi.PodOperationType_POD_CHECKPOINT}
+	require.NoError(t, rtSvc.CancelPodOperation(context.Background(), request))
+	assert.True(t, fakeRuntime.RuntimeService.CancelPodOperationDeadline.After(time.Now()), "a caller without a deadline must still get a bounded RPC")
+	fakeRuntime.RuntimeService.InjectError("CancelPodOperation", errors.New("cleanup is still pending"))
+	require.ErrorContains(t, rtSvc.CancelPodOperation(context.Background(), request), "cleanup is still pending")
+	calls := len(fakeRuntime.RuntimeService.CanceledPodOperations)
+	for _, invalid := range []*kubeapi.CancelPodOperationRequest{
+		nil,
+		{OperationType: kubeapi.PodOperationType_POD_CHECKPOINT},
+		{OperationId: "operation-id"},
+		{OperationId: "operation-id", OperationType: kubeapi.PodOperationType(99)},
+	} {
+		require.Error(t, rtSvc.CancelPodOperation(context.Background(), invalid))
+	}
+	assert.Len(t, fakeRuntime.RuntimeService.CanceledPodOperations, calls, "invalid cancellation must not reach the runtime")
+}
+
+func TestCancelPodOperationWaitsForAcknowledgement(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	entered := make(chan struct{}, 2)
+	completed := make(chan struct{}, 2)
+	release := make(chan struct{})
+	allowCompletion := sync.OnceFunc(func() { close(release) })
+	defer allowCompletion()
+	fakeRuntime.RuntimeService.CancelPodOperationFunc = func(_ context.Context, _ *kubeapi.CancelPodOperationRequest) error {
+		entered <- struct{}{}
+		// A real runtime may still be joining a writer after the transport
+		// cancels. Only this release represents confirmed completion.
+		<-release
+		completed <- struct{}{}
+		return nil
+	}
+	request := &kubeapi.CancelPodOperationRequest{OperationId: "restore-id", OperationType: kubeapi.PodOperationType_POD_RESTORE}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first := make(chan error, 1)
+	go func() { first <- rtSvc.CancelPodOperation(ctx, request) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancellation request did not reach runtime")
+	}
+	cancel()
+	select {
+	case err := <-first:
+		require.ErrorContains(t, err, "canceled")
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled client did not return")
+	}
+	assert.Empty(t, completed, "client cancellation must not be interpreted as runtime completion")
+
+	ctx, cancelRetry := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelRetry()
+	second := make(chan error, 1)
+	go func() { second <- rtSvc.CancelPodOperation(ctx, request) }()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("retry did not reach runtime")
+	}
+	select {
+	case err := <-second:
+		t.Fatalf("completion returned before acknowledgement: %v", err)
+	default:
+	}
+	allowCompletion()
+	select {
+	case err := <-second:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("completion was not acknowledged")
+	}
+	for range 2 {
+		select {
+		case <-completed:
+		case <-ctx.Done():
+			t.Fatal("runtime handler did not complete")
+		}
+	}
 }
 
 // TestTracerProviderPropagation verifies that the otelgrpc stats handler

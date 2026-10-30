@@ -345,6 +345,14 @@ func (f *RemoteRuntime) CheckpointPod(ctx context.Context, req *kubeapi.Checkpoi
 	return &kubeapi.CheckpointPodResponse{}, nil
 }
 
+// CancelPodOperation forwards cancellation to the fake runtime service.
+func (f *RemoteRuntime) CancelPodOperation(ctx context.Context, req *kubeapi.CancelPodOperationRequest) (*kubeapi.CancelPodOperationResponse, error) {
+	if err := f.RuntimeService.CancelPodOperation(ctx, req); err != nil {
+		return nil, err
+	}
+	return &kubeapi.CancelPodOperationResponse{}, nil
+}
+
 // RestorePod restores a pod sandbox from a checkpoint.
 func (f *RemoteRuntime) RestorePod(ctx context.Context, req *kubeapi.RestorePodRequest) (*kubeapi.RestorePodResponse, error) {
 	response, err := f.RuntimeService.RestorePod(ctx, req)

@@ -1183,8 +1183,9 @@ func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runti
 
 	// The checkpoint is bounded by the caller's context deadline (the kubelet
 	// sets it from PodCheckpoint.spec.timeoutSeconds, clamped to its configured
-	// ceiling) rather than a request field (KEP-5823). The default runtime
-	// request timeout applies only when the caller did not set a deadline.
+	// ceiling). Expiry only cancels the client call; CancelPodOperation confirms
+	// runtime completion. The default request timeout applies only when the
+	// caller did not set a deadline.
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.timeout)
@@ -1214,6 +1215,29 @@ func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runti
 	return nil
 }
 
+// CancelPodOperation cancels an operation and confirms runtime cleanup.
+func (r *remoteRuntimeService) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	if request == nil {
+		return errors.New("CancelPodOperation requires non-nil CancelPodOperationRequest parameter")
+	}
+	if request.OperationId == "" {
+		return errors.New("CancelPodOperation requires a non-empty operation ID")
+	}
+	if request.OperationType != runtimeapi.PodOperationType_POD_CHECKPOINT && request.OperationType != runtimeapi.PodOperationType_POD_RESTORE {
+		return fmt.Errorf("CancelPodOperation requires a checkpoint or restore operation type, got %v", request.OperationType)
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+	_, err := r.runtimeClient.CancelPodOperation(ctx, request)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "CancelPodOperation from runtime service failed", "operationType", request.OperationType)
+	}
+	return err
+}
+
 // RestorePod restores a pod sandbox from a checkpoint
 func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
 	if options == nil {
@@ -1228,8 +1252,8 @@ func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimea
 	)
 
 	// As with CheckpointPod, the restore is bounded by the caller's context
-	// deadline rather than a request field (KEP-5823). The default runtime
-	// request timeout applies only when the caller did not set a deadline.
+	// deadline. Expiry does not confirm rollback; CancelPodOperation does. The
+	// default runtime request timeout applies only without a caller deadline.
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.timeout)

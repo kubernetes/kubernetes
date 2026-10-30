@@ -2601,6 +2601,10 @@ func (m *kubeGenericRuntimeManager) CheckpointContainer(ctx context.Context, opt
 	return m.runtimeService.CheckpointContainer(ctx, options)
 }
 
+func (m *kubeGenericRuntimeManager) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	return m.runtimeService.CancelPodOperation(ctx, request)
+}
+
 func (m *kubeGenericRuntimeManager) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return m.runtimeService.ListMetricDescriptors(ctx)
 }
