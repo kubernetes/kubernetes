@@ -25,13 +25,10 @@ import (
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	stagingloader "k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/loader"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
@@ -140,7 +137,7 @@ func defaultAndValidateVWC(config *admissionregistrationv1.ValidatingWebhookConf
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
 	errs := validation.ValidateValidatingWebhookConfiguration(internalObj)
-	errs = validateDeclaratively(internalObj, errs)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
 	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
@@ -162,7 +159,7 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 		return fmt.Errorf("MutatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
 	errs := validation.ValidateMutatingWebhookConfiguration(internalObj)
-	errs = validateDeclaratively(internalObj, errs)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
 	if len(errs) > 0 {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
@@ -172,12 +169,4 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 	}
 	*config = *resultConfig
 	return nil
-}
-
-func validateDeclaratively(obj runtime.Object, errs field.ErrorList) field.ErrorList {
-	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
-		APIGroup:   admissionregistrationv1.GroupName,
-		APIVersion: admissionregistrationv1.SchemeGroupVersion.Version,
-	})
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
