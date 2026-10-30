@@ -2448,6 +2448,10 @@ func TestBinarySIStringAtLargeScales(t *testing.T) {
 		{intQuantity(1, 71, BinarySI), "100e69"},
 		{intQuantity(-1, 70, BinarySI), "-10e69"},
 		{binarySISum("1Ki", "1e2147483646"), "1000000000000000000000000000010e2147483616"},
+		{*NewDecimalQuantity(*inf.NewDec(10, math.MinInt32), BinarySI), "1000e2147483646"},
+		{intQuantity(1, math.MaxInt32, BinarySI), "10e2147483646"},
+		{intQuantity(1, math.MaxInt32-2, BinarySI), "100e2147483643"},
+		{intQuantity(-1, math.MaxInt32, BinarySI), "-10e2147483646"},
 	} {
 		for _, asDec := range []bool{false, true} {
 			q := tc.in
