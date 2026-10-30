@@ -37,8 +37,18 @@ func TestStorageCreate(t *testing.T) {
 	storagetesting.RunTestCreate(t.Context(), t, newTestStorage(), func(context.Context, *testing.T, string) {})
 }
 
+func increaseRVFunc(s *ModelStorage) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.state.ResourceVersion++
+		return int64(s.state.ResourceVersion)
+	}
+}
+
 func TestStorageGet(t *testing.T) {
-	storagetesting.RunTestGet(t.Context(), t, newTestStorage())
+	s := newTestStorage()
+	storagetesting.RunTestGet(t.Context(), t, s, increaseRVFunc(s))
 }
 
 func TestStorageGetListRecursivePrefix(t *testing.T) {
@@ -95,16 +105,10 @@ func TestStorageGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 
 func TestStorageCompactRevision(t *testing.T) {
 	s := newTestStorage()
-	increaseRV := func(ctx context.Context, t *testing.T) int64 {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.state.ResourceVersion++
-		return int64(s.state.ResourceVersion)
-	}
 	compact := func(ctx context.Context, t *testing.T, resourceVersion string) {
 		require.NoError(t, s.Compact(resourceVersion))
 	}
-	storagetesting.RunTestCompactRevision(t.Context(), t, s, increaseRV, compact)
+	storagetesting.RunTestCompactRevision(t.Context(), t, s, increaseRVFunc(s), compact)
 }
 
 func TestStorageListContinuation(t *testing.T) {

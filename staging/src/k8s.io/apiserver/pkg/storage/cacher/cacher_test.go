@@ -119,9 +119,9 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestGet(ctx, t, cacher)
+	storagetesting.RunTestGet(ctx, t, cacher, increaseRVFunc(server.V3Client.Client))
 }
 
 func TestDeleteOnce(t *testing.T) {
