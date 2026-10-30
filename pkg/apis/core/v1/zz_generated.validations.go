@@ -2346,7 +2346,7 @@ func Validate_VolumeHealthStatus(
 	return errs
 }
 
-var symbolsForVolumeHealthStatusType = sets.New(corev1.VolumeHealthDataLoss, corev1.VolumeHealthDegraded, corev1.VolumeHealthInaccessible)
+var symbolsForVolumeHealthStatusType = sets.New(corev1.VolumeHealthDataLoss, corev1.VolumeHealthDegraded, corev1.VolumeHealthGood, corev1.VolumeHealthInaccessible, corev1.VolumeHealthUnknown)
 
 // Validate_VolumeHealthStatusType validates an instance of VolumeHealthStatusType according
 // to declarative validation rules in the API schema.

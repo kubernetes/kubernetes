@@ -2852,8 +2852,8 @@ func (VolumeDevice) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeHealthCondition = map[string]string{
-	"":        "VolumeHealthCondition represents an adverse health condition reported for a volume.",
-	"status":  "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.",
+	"":        "VolumeHealthCondition represents an adverse health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
+	"status":  "status is the machine-parseable health category. Possible values are : - \"Unknown\": the driver is reporting a unknown health condition. Volume should not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\" : the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purpose.",
 	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
 	"message": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 }

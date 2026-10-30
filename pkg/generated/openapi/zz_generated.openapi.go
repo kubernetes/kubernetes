@@ -33550,16 +33550,16 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+				Description: "VolumeHealthCondition represents an adverse health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.",
+							Description: "status is the machine-parseable health category. Possible values are : - \"Unknown\": the driver is reporting a unknown health condition. Volume should not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\" : the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purpose.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Healthy\"` indicates the volume is healthy and there are no issues with it.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.\n - `\"Unknown\"` indicates that driver is returning a health status which is not recognized by Kubernetes. Volume should not be considered healthy.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"DataLoss", "Degraded", "Inaccessible"},
+							Enum:        []interface{}{"DataLoss", "Degraded", "Healthy", "Inaccessible", "Unknown"},
 						},
 					},
 					"reason": {
