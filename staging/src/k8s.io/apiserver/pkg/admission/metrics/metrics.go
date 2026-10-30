@@ -242,7 +242,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Subsystem:      subsystem,
 			Name:           "webhook_request_total",
 			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
 
