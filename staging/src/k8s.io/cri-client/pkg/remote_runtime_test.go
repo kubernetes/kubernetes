@@ -29,7 +29,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
@@ -209,6 +211,28 @@ func TestRestorePod(t *testing.T) {
 	require.ErrorContains(t, err, "restore failed")
 	_, err = rtSvc.RestorePod(context.Background(), nil)
 	require.ErrorContains(t, err, "requires non-nil")
+}
+
+func TestRestorePodAlreadyExistsDoesNotRetry(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	request := &kubeapi.RestorePodRequest{
+		CheckpointPath: "/var/lib/kubelet/pod-checkpoints/checkpoint",
+		Config: &kubeapi.PodSandboxConfig{
+			Metadata: &kubeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid", Attempt: 1},
+		},
+		ContainerConfigs: []*kubeapi.ContainerConfig{{Metadata: &kubeapi.ContainerMetadata{Name: "app"}}},
+	}
+	callsBefore := len(fakeRuntime.RuntimeService.GetCalls())
+	fakeRuntime.RuntimeService.InjectError("RestorePod", status.Error(codes.AlreadyExists, "pod sandbox already exists"))
+
+	response, err := rtSvc.RestorePod(context.Background(), request)
+
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Nil(t, response)
+	assert.Equal(t, []string{"RestorePod"}, fakeRuntime.RuntimeService.GetCalls()[callsBefore:])
+	require.Len(t, fakeRuntime.RuntimeService.RestoredPods, 1)
+	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.RestoredPods[0]))
 }
 
 // TestTracerProviderPropagation verifies that the otelgrpc stats handler

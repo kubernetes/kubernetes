@@ -238,6 +238,11 @@ type RuntimeServiceClient interface {
 	// container has been captured, and resume all of them before returning on
 	// success, error, or deadline expiry. This produces one consistent
 	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// If the caller cancels the call or its deadline expires, the runtime must
+	// stop the checkpoint, resume the selected containers, and stop writing to
+	// output_path, even when the caller no longer waits for the response. A
+	// runtime without Pod checkpoint support must return Unimplemented without
+	// starting any work.
 	CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error)
 	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
 	// caller must set a deadline on the call. On success, every returned
@@ -865,6 +870,11 @@ type RuntimeServiceServer interface {
 	// container has been captured, and resume all of them before returning on
 	// success, error, or deadline expiry. This produces one consistent
 	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// If the caller cancels the call or its deadline expires, the runtime must
+	// stop the checkpoint, resume the selected containers, and stop writing to
+	// output_path, even when the caller no longer waits for the response. A
+	// runtime without Pod checkpoint support must return Unimplemented without
+	// starting any work.
 	CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error)
 	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
 	// caller must set a deadline on the call. On success, every returned
