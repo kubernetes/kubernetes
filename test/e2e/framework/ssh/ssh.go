@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -185,19 +186,33 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 		result.User = os.Getenv("USER")
 	}
 
+	client, err := framework.LoadClientset()
+	if err != nil {
+		return result, fmt.Errorf("error creating client to resolve SSH addresses: %w", err)
+	}
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return result, fmt.Errorf("error listing nodes to resolve SSH addresses: %w", err)
+	}
+
 	bastion := os.Getenv(sshBastionEnvKey)
 	if bastion == "" {
-		client, err := framework.LoadClientset()
-		if err != nil {
-			return result, fmt.Errorf("error creating client to discover SSH bastion: %w", err)
-		}
-		bastion, err = controlPlaneBastion(ctx, client)
+		bastion, err = controlPlaneBastion(nodes)
 		if err != nil {
 			return result, err
 		}
 	}
 
-	stdout, stderr, code, err := runSSHCommandViaBastion(ctx, cmd, result.User, bastion, host, signer)
+	// The bastion is inside the cluster network, where a node's external IP
+	// is not necessarily reachable: on AWS the connection leaves through the
+	// internet gateway and the node's security group rejects it. Dial the
+	// node's internal IP from the bastion instead.
+	target := internalHost(nodes, host)
+	if target != host {
+		framework.Logf("SSH to %s via bastion %s: using internal address %s", host, bastion, target)
+	}
+
+	stdout, stderr, code, err := runSSHCommandViaBastion(ctx, cmd, result.User, bastion, target, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
@@ -205,11 +220,9 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 	return result, err
 }
 
-func controlPlaneBastion(ctx context.Context, client clientset.Interface) (string, error) {
-	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return "", fmt.Errorf("error listing nodes to discover SSH bastion: %w", err)
-	}
+// controlPlaneBastion returns the SSH address of the first control-plane node
+// that has an external IP.
+func controlPlaneBastion(nodes *v1.NodeList) (string, error) {
 	for _, node := range nodes.Items {
 		_, isControlPlane := node.Labels[framework.ControlPlaneLabel]
 		for _, taint := range node.Spec.Taints {
@@ -225,6 +238,27 @@ func controlPlaneBastion(ctx context.Context, client clientset.Interface) (strin
 		}
 	}
 	return "", fmt.Errorf("no control-plane node with an external IP found; set %s to an SSH bastion address (host:port)", sshBastionEnvKey)
+}
+
+// internalHost returns the "<internal IP>:<port>" address of the node whose
+// external IP is the host part of host. Any other host is returned unchanged.
+func internalHost(nodes *v1.NodeList, host string) string {
+	ip, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return host
+	}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if !slices.Contains(framework.GetNodeExternalIPs(node), ip) {
+			continue
+		}
+		for _, addr := range node.Status.Addresses {
+			if addr.Type == v1.NodeInternalIP && addr.Address != "" {
+				return net.JoinHostPort(addr.Address, port)
+			}
+		}
+	}
+	return host
 }
 
 // runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
