@@ -557,10 +557,11 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 	return createdClaim, nil
 }
 
-// patchPodExtendedResourceClaimStatus updates the pod's status with information about
-// the extended resource claim.
+// patchPodExtendedResourceClaimStatus registers a status mutator to update the pod's status
+// with information about the extended resource claim.
 func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 	ctx context.Context,
+	cs fwk.CycleState,
 	pod *v1.Pod,
 	claim *resourceapi.ResourceClaim,
 	nodeName string,
@@ -574,16 +575,13 @@ func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 		return fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
 	}
 
-	podStatusCopy := pod.Status.DeepCopy()
-	podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
-		RequestMappings:   cer,
-		ResourceClaimName: claim.Name,
-	}
-	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
-	if err != nil {
-		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
-	}
-	return nil
+	return framework.AddPodStatusMutator(cs, func(baseStatus, targetStatus *v1.PodStatus) error {
+		targetStatus.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+			RequestMappings:   cer,
+			ResourceClaimName: claim.Name,
+		}
+		return nil
+	})
 }
 
 // unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim
