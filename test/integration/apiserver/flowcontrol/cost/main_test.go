@@ -17,20 +17,12 @@ limitations under the License.
 package cost
 
 import (
-	"flag"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-func init() {
-	// Each iteration resets 100 pods while the benchmark timer is stopped, so
-	// default to 1x iteration unless overridden via -benchtime on the CLI.
-	testing.Init()
-	_ = flag.Set("test.benchtime", "1x")
-}
 
 func TestMain(m *testing.M) {
 	klog.SetLogger(logr.Discard())

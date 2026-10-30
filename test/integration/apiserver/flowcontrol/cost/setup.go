@@ -95,6 +95,7 @@ type responseSink struct {
 	header       http.Header
 	code         int
 	bytesWritten int
+	errBody      []byte
 }
 
 func newResponseSink() *responseSink {
@@ -107,6 +108,9 @@ func (s *responseSink) WriteHeader(code int) { s.code = code }
 
 func (s *responseSink) Write(b []byte) (int, error) {
 	s.bytesWritten += len(b)
+	if s.code >= 300 {
+		s.errBody = append(s.errBody, b...)
+	}
 	return len(b), nil
 }
 
@@ -118,13 +122,7 @@ func (s *responseSink) CloseNotify() <-chan bool { return nil }
 
 func runHTTP(tb testutils.TB, server http.Handler, method, path, contentType, accept string, body []byte) int {
 	tb.Helper()
-	var bodyReader *bytes.Reader
-	if body != nil {
-		bodyReader = bytes.NewReader(body)
-	} else {
-		bodyReader = bytes.NewReader(nil)
-	}
-	req := httptest.NewRequest(method, path, bodyReader).WithContext(context.Background())
+	req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(context.Background())
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -135,7 +133,7 @@ func runHTTP(tb testutils.TB, server http.Handler, method, path, contentType, ac
 	sink := newResponseSink()
 	server.ServeHTTP(sink, req)
 	if sink.code < 200 || sink.code >= 300 {
-		tb.Fatalf("%s %s (%s) returned HTTP %d", method, path, accept, sink.code)
+		tb.Fatalf("%s %s (%s) returned HTTP %d: %s", method, path, accept, sink.code, sink.errBody)
 	}
 	return sink.bytesWritten
 }

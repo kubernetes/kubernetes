@@ -24,7 +24,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -41,8 +44,8 @@ import (
 
 // BenchmarkRequestCost measures per-request heap allocations (B/op and allocs/op),
 // request duration, HTTP request/response sizes, server setup allocations, and
-// post-GC retained heap/runtime memory for kube-apiserver operations using the
-// 10KB exemplar pod across request methods, options, and wire formats.
+// post-GC retained heap/runtime memory for concurrent kube-apiserver read and
+// dry-run write operations against N=1000 seeded exemplar pods.
 func BenchmarkRequestCost(b *testing.B) {
 	framework.FixBenchmarkJSONOutput(b)
 	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -52,8 +55,13 @@ func BenchmarkRequestCost(b *testing.B) {
 	})
 
 	const (
-		podPath  = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods/pod-000"
-		podsPath = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods"
+		perfDashMetricName = "BenchmarkRequestCostV2"
+		podCount           = 1000
+		podPath            = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods/pod-000"
+		unboundPodPath     = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods/pod-999"
+		podsPath           = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods"
+		largePodPath       = "/api/v1/namespaces/" + largePodNamespace + "/pods/pod-000"
+		largePodsPath      = "/api/v1/namespaces/" + largePodNamespace + "/pods"
 	)
 
 	scenarios := []requestScenario{
@@ -62,7 +70,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv=""`,
 			httpMethod:         http.MethodGet,
 			path:               podPath,
-			seedPods:           1,
 			acceptContentTypes: allReadFormats,
 		},
 		{
@@ -71,295 +78,255 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodGet,
 			path:               podPath,
 			query:              "resourceVersion=0",
-			seedPods:           1,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "GET",
 			options:            "rv=0 45KB",
 			httpMethod:         http.MethodGet,
-			path:               podPath,
+			path:               largePodPath,
 			query:              "resourceVersion=0",
-			seedPods:           1,
 			extraBytes:         35 * 1024,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            `N=100 rv=""`,
+			options:            `rv=""`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			seedPods:           100,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            `N=100 rv="" labelSelector`,
+			options:            `rv="" labelSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "labelSelector=name=small-deployment-00",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            `N=100 rv="" nodeSelector`,
+			options:            `rv="" nodeSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "fieldSelector=spec.nodeName=kind-worker0",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=0",
+			options:            "rv=0",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=0",
-			seedPods:           100,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=0 45KB",
+			options:            "rv=0 45KB",
 			httpMethod:         http.MethodGet,
-			path:               podsPath,
+			path:               largePodsPath,
 			query:              "resourceVersion=0",
-			seedPods:           100,
 			extraBytes:         35 * 1024,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=0 labelSelector",
+			options:            "rv=0 labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=0&labelSelector=name=small-deployment-00",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=0 nodeSelector",
+			options:            "rv=0 nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=Exact",
+			options:            "rv=Exact",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact",
-			seedPods:           100,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=Exact labelSelector",
+			options:            "rv=Exact labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact&labelSelector=name=small-deployment-00",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 rv=Exact nodeSelector",
+			options:            "rv=Exact nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact&fieldSelector=spec.nodeName=kind-worker0",
-			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "LIST",
-			options:            "N=100 limit=100",
+			options:            "limit=100",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "limit=100",
-			seedPods:           100,
 			acceptContentTypes: allReadFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=0 rv=""`,
-			httpMethod:         http.MethodGet,
-			path:               podsPath,
-			query:              "watch=true&timeoutSeconds=1",
-			acceptContentTypes: watchFormats,
-		},
-		{
-			method:             "WATCH",
-			options:            "N=1 fieldSelector",
+			options:            "fieldSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&fieldSelector=metadata.name=pod-000&timeoutSeconds=1",
-			seedPods:           1,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv=""`,
+			options:            `rv=""`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" labelSelector`,
+			options:            `rv="" labelSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" nodeSelector`,
+			options:            `rv="" nodeSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0",
+			options:            "rv=0",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 labelSelector",
+			options:            "rv=0 labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&labelSelector=name=small-deployment-00&timeoutSeconds=1",
-			seedPods:           1000,
+			query:              "resourceVersion=0&labelSelector=name=small-deployment-00&timeoutSeconds=1",
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 nodeSelector",
+			options:            "rv=0 nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
-			seedPods:           1000,
+			query:              "resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=LATEST_RV",
+			options:            "rv=LATEST_RV",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=LATEST_RV&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=FIRST_RV",
+			options:            "rv=FIRST_RV",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=FIRST_RV&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=FIRST_RV labelSelector",
+			options:            "rv=FIRST_RV labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=FIRST_RV&labelSelector=name=small-deployment-00&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=FIRST_RV nodeSelector",
+			options:            "rv=FIRST_RV nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=FIRST_RV&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" sendInitialEvents=false`,
+			options:            `rv="" sendInitialEvents=false`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&sendInitialEvents=false&resourceVersionMatch=NotOlderThan&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 sendInitialEvents=false",
+			options:            "rv=0 sendInitialEvents=false",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&sendInitialEvents=false&resourceVersionMatch=NotOlderThan&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" WatchList`,
+			options:            `rv="" WatchList`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" WatchList labelSelector`,
+			options:            `rv="" WatchList labelSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            `N=100 rv="" WatchList nodeSelector`,
+			options:            `rv="" WatchList nodeSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 WatchList",
+			options:            "rv=0 WatchList",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&timeoutSeconds=1",
-			seedPods:           100,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 WatchList labelSelector",
+			options:            "rv=0 WatchList labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
 			method:             "WATCH",
-			options:            "N=100 rv=0 WatchList nodeSelector",
+			options:            "rv=0 WatchList nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
-			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -375,14 +342,13 @@ func BenchmarkRequestCost(b *testing.B) {
 			method:             "POST",
 			options:            "binding",
 			httpMethod:         http.MethodPost,
-			path:               podPath + "/binding",
+			path:               unboundPodPath + "/binding",
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			acceptContentTypes: writeFormats,
 			body: staticObjectBody(b, &v1.Binding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:   metav1.NamespaceDefault,
-					Name:        "pod-000",
+					Name:        "pod-999",
 					Annotations: map[string]string{"bench.k8s.io/patch": "true"},
 				},
 				Target: v1.ObjectReference{
@@ -396,7 +362,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "eviction",
 			httpMethod:         http.MethodPost,
 			path:               podPath + "/eviction",
-			seedPods:           1,
 			acceptContentTypes: writeFormats,
 			body: staticObjectBody(b, &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -411,7 +376,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPut,
 			path:               podPath,
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			acceptContentTypes: writeFormats,
 			body: func(mediaType string, pod *v1.Pod) []byte {
 				updated := pod.DeepCopy()
@@ -428,7 +392,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPut,
 			path:               podPath + "/status",
 			query:              "fieldManager=kubelet",
-			seedPods:           1,
 			acceptContentTypes: writeFormats,
 			body: func(mediaType string, pod *v1.Pod) []byte {
 				updated := pod.DeepCopy()
@@ -442,7 +405,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			requestContentType: string(types.StrategicMergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"metadata":{"annotations":{"bench.k8s.io/patch":"true"}}}`),
@@ -453,7 +415,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			requestContentType: string(types.StrategicMergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"spec":{"tolerations":[{"key":"node.kubernetes.io/not-ready","operator":"Exists","effect":"NoExecute","tolerationSeconds":900},{"key":"node.kubernetes.io/unreachable","operator":"Exists","effect":"NoExecute","tolerationSeconds":900},{"key":"bench.k8s.io/taint","operator":"Exists","effect":"NoSchedule"}]}}`),
@@ -464,7 +425,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			requestContentType: string(types.MergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"metadata":{"annotations":{"bench.k8s.io/patch":"true"}}}`),
@@ -475,7 +435,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
 			query:              "fieldManager=bench",
-			seedPods:           1,
 			requestContentType: string(types.JSONPatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`[{"op":"add","path":"/metadata/annotations/bench.k8s.io~1patch","value":"true"}]`),
@@ -486,7 +445,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
 			query:              "fieldManager=bench&force=true",
-			seedPods:           1,
 			requestContentType: string(types.ApplyYAMLPatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"apiVersion":"v1","kind":"Pod","metadata":{"name":"pod-000","annotations":{"bench.k8s.io/patch":"true"}}}`),
@@ -497,7 +455,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath + "/status",
 			query:              "fieldManager=kubelet",
-			seedPods:           1,
 			requestContentType: string(types.StrategicMergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"status":{"message":"updated-status"}}`),
@@ -508,7 +465,6 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodPatch,
 			path:               podPath + "/status",
 			query:              "fieldManager=kubelet",
-			seedPods:           1,
 			requestContentType: string(types.StrategicMergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"status":{"phase":"Running","podIP":"10.244.7.83","podIPs":[{"ip":"10.244.7.83"}],"conditions":[{"type":"Ready","status":"True","reason":"ContainersReady","lastTransitionTime":"2026-04-23T12:24:00Z"}],"containerStatuses":[{"name":"main","ready":true,"started":true,"restartCount":0,"image":"registry.k8s.io/pause:3.9","imageID":"registry.k8s.io/pause@sha256:1234","containerID":"containerd://main1","state":{"running":{"startedAt":"2026-04-23T12:24:00Z"}}}]}}`),
@@ -519,29 +475,63 @@ func BenchmarkRequestCost(b *testing.B) {
 			httpMethod:         http.MethodDelete,
 			path:               podPath,
 			query:              "gracePeriodSeconds=0",
-			seedPods:           1,
 			acceptContentTypes: writeFormats,
 		},
 		{
 			method:             "DELETECOLLECTION",
-			options:            "N=100",
+			options:            "gracePeriod=0",
 			httpMethod:         http.MethodDelete,
 			path:               podsPath,
 			query:              "gracePeriodSeconds=0",
-			seedPods:           100,
 			acceptContentTypes: writeFormats,
 		},
 	}
 
 	report := perfData{Version: "v1"}
-	for _, sc := range scenarios {
-		b.Run(fmt.Sprintf("Method=%s/Options=%s", sc.method, sc.options), func(b *testing.B) {
+	b.Run(fmt.Sprintf("N=%d", podCount), func(b *testing.B) {
+		framework.FixBenchmarkJSONOutput(b)
+		tCtx := ktesting.Init(b)
+
+		var beforeSetupMem, afterSetupMem runtime.MemStats
+		runtime.ReadMemStats(&beforeSetupMem)
+		tCtx, server, podInformer := setupAPIServer(tCtx)
+		runtime.ReadMemStats(&afterSetupMem)
+		setupAllocBytes := float64(afterSetupMem.TotalAlloc - beforeSetupMem.TotalAlloc)
+
+		ensureNamespace(tCtx, metav1.NamespaceDefault)
+		pods := seedPods(tCtx, metav1.NamespaceDefault, podCount, 0)
+		waitForResourceVersion(tCtx, podInformer, pods[len(pods)-1].ResourceVersion)
+
+		b.Run("DryRun=true", func(b *testing.B) {
 			framework.FixBenchmarkJSONOutput(b)
-			report.DataItems = append(report.DataItems, benchmarkScenario(b, sc)...)
+			// Seed 45KB pods in a separate namespace after default-namespace scenarios
+			// so their watchCache state does not inflate retained heap or advance RV
+			// ahead of LATEST_RV.
+			seedLargePods := sync.OnceValue(func() []*v1.Pod {
+				ensureNamespace(tCtx, largePodNamespace)
+				p := seedPods(tCtx, largePodNamespace, podCount, 35*1024)
+				waitForResourceVersion(tCtx, podInformer, p[len(p)-1].ResourceVersion)
+				return p
+			})
+			for _, largePayload := range []bool{false, true} {
+				for _, sc := range scenarios {
+					if (sc.extraBytes > 0) != largePayload {
+						continue
+					}
+					b.Run(fmt.Sprintf("Method=%s/Options=%s", sc.method, sc.options), func(b *testing.B) {
+						framework.FixBenchmarkJSONOutput(b)
+						targetPods := pods
+						if largePayload {
+							targetPods = seedLargePods()
+						}
+						report.DataItems = append(report.DataItems, benchmarkScenario(b, server, sc, targetPods, podCount, setupAllocBytes)...)
+					})
+				}
+			}
 		})
-	}
+	})
 	if artifacts := os.Getenv("ARTIFACTS"); artifacts != "" && len(report.DataItems) > 0 {
-		writePerfData(b, artifacts, report)
+		writePerfData(b, artifacts, perfDashMetricName, report)
 	}
 }
 
@@ -551,7 +541,6 @@ type requestScenario struct {
 	httpMethod         string
 	path               string
 	query              string
-	seedPods           int
 	extraBytes         int
 	requestContentType string
 	acceptContentTypes []contentType
@@ -571,139 +560,85 @@ type dataItem struct {
 	Labels map[string]string  `json:"labels,omitempty"`
 }
 
-func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
+func benchmarkScenario(b *testing.B, server http.Handler, sc requestScenario, pods []*v1.Pod, podCount int, setupAllocBytes float64) []dataItem {
 	var items []dataItem
-	requestLabel := fmt.Sprintf("%s %s", sc.method, sc.options)
+	nStr := strconv.Itoa(podCount)
 
 	for _, wf := range sc.acceptContentTypes {
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
 			framework.FixBenchmarkJSONOutput(b)
 			b.ReportAllocs()
-			tCtx := ktesting.Init(b)
-
-			var beforeSetupMem, afterSetupMem runtime.MemStats
-			runtime.ReadMemStats(&beforeSetupMem)
-			tCtx, server, podInformer := setupAPIServer(tCtx)
-			runtime.ReadMemStats(&afterSetupMem)
-			setupAllocBytes := float64(afterSetupMem.TotalAlloc - beforeSetupMem.TotalAlloc)
-
-			ensureDefaultServiceAccount(tCtx)
-			pods := seedPods(tCtx, sc.seedPods, sc.extraBytes)
-			if len(pods) > 0 {
-				waitForResourceVersion(tCtx, podInformer, pods[len(pods)-1].ResourceVersion)
-			}
 
 			reqContentType := sc.requestContentType
 			if reqContentType == "" && sc.body != nil {
 				reqContentType = wf.accept
 			}
 			fullPath := buildRequestPath(sc, pods)
+			if sc.httpMethod != http.MethodGet {
+				fullPath = withDryRun(fullPath)
+			}
 			var payload []byte
 			if sc.body != nil {
-				var pod *v1.Pod
-				if len(pods) > 0 {
-					pod = pods[0]
-				}
-				payload = sc.body(wf.accept, pod)
+				payload = sc.body(wf.accept, pods[0])
 			}
 
-			// Warm lazy schema, converter, and per-namespace admission caches
-			// before measurements; dryRun=All prevents mutating seeded state so
-			// measured writes still execute against the intended precondition.
-			warmupPath := fullPath
-			if sc.httpMethod != http.MethodGet {
-				warmupPath = withDryRun(fullPath)
-			}
-			runHTTP(b, server, sc.httpMethod, warmupPath, reqContentType, wf.accept, payload)
+			// Warm lazy schema, converter, sync.Pool, and per-namespace admission
+			// caches before measurements start.
+			runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
 
-			var startMem, endMem, postGCMem runtime.MemStats
-			var responseBytes int
-			for i := 0; b.Loop(); i++ {
-				if i == 0 {
-					runtime.ReadMemStats(&startMem)
+			var (
+				startMem, endMem, postGCMem runtime.MemStats
+				totalResponseBytes          atomic.Int64
+			)
+			runtime.ReadMemStats(&startMem)
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					n := runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+					totalResponseBytes.Add(int64(n))
 				}
-				responseBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
-			}
+			})
+			b.StopTimer()
 			runtime.ReadMemStats(&endMem)
 			debug.FreeOSMemory()
 			runtime.ReadMemStats(&postGCMem)
 
-			heapInuseBytes := float64(postGCMem.HeapInuse)
-			heapAllocBytes := float64(postGCMem.HeapAlloc)
-			runtimeInuseBytes := float64(postGCMem.Sys - postGCMem.HeapReleased)
-			heapReleasedBytes := float64(postGCMem.HeapReleased)
-			heapFragBytes := float64(postGCMem.HeapInuse - postGCMem.HeapAlloc)
+			respBytesPerOp := float64(totalResponseBytes.Load()) / float64(b.N)
+			metrics := []struct {
+				benchUnit string
+				name      string
+				unit      string
+				val       float64
+			}{
+				{"", "Allocated bytes per operation", "B", float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)},
+				{"", "Allocations per operation", "1", float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)},
+				{"", "Duration per operation", "ns", float64(b.Elapsed().Nanoseconds()) / float64(b.N)},
+				{"request-B/op", "Request body bytes per operation", "B", float64(len(payload))},
+				{"response-B/op", "Response body bytes per operation", "B", respBytesPerOp},
+				{"setup-alloc-B", "Server setup allocated bytes", "B", setupAllocBytes},
+				{"heap-inuse-B", "Retained heap inuse bytes", "B", float64(postGCMem.HeapInuse)},
+				{"heap-alloc-B", "Retained heap alloc bytes", "B", float64(postGCMem.HeapAlloc)},
+				{"runtime-inuse-B", "Retained runtime inuse bytes", "B", float64(postGCMem.Sys - postGCMem.HeapReleased)},
+				{"heap-released-B", "Heap released bytes", "B", float64(postGCMem.HeapReleased)},
+				{"heap-frag-B", "Heap span fragmentation bytes", "B", float64(postGCMem.HeapInuse - postGCMem.HeapAlloc)},
+			}
 
-			b.ReportMetric(float64(len(payload)), "request-B/op")
-			b.ReportMetric(float64(responseBytes), "response-B/op")
-			b.ReportMetric(setupAllocBytes, "setup-alloc-B")
-			b.ReportMetric(heapInuseBytes, "heap-inuse-B")
-			b.ReportMetric(heapAllocBytes, "heap-alloc-B")
-			b.ReportMetric(runtimeInuseBytes, "runtime-inuse-B")
-			b.ReportMetric(heapReleasedBytes, "heap-released-B")
-			b.ReportMetric(heapFragBytes, "heap-frag-B")
-
-			if b.N > 0 {
-				allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
-				allocs := float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
-				durationNs := float64(b.Elapsed().Nanoseconds()) / float64(b.N)
-				items = append(items,
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocated bytes per operation"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: allocBytes},
+			for _, m := range metrics {
+				if m.benchUnit != "" {
+					b.ReportMetric(m.val, m.benchUnit)
+				}
+				items = append(items, dataItem{
+					Labels: map[string]string{
+						"N":       nStr,
+						"DryRun":  "true",
+						"Method":  sc.method,
+						"Options": sc.options,
+						"Format":  wf.name,
+						"Metric":  m.name,
 					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocations per operation"},
-						Unit:   "1",
-						Data:   map[string]float64{wf.name: allocs},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Duration per operation"},
-						Unit:   "ns",
-						Data:   map[string]float64{wf.name: durationNs},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Request body bytes per operation"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: float64(len(payload))},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Response body bytes per operation"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: float64(responseBytes)},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Server setup allocated bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: setupAllocBytes},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained heap inuse bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: heapInuseBytes},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained heap alloc bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: heapAllocBytes},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Retained runtime inuse bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: runtimeInuseBytes},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Heap released bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: heapReleasedBytes},
-					},
-					dataItem{
-						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Heap span fragmentation bytes"},
-						Unit:   "B",
-						Data:   map[string]float64{wf.name: heapFragBytes},
-					},
-				)
+					Unit: m.unit,
+					Data: map[string]float64{wf.name: m.val},
+				})
 			}
 		})
 	}
@@ -711,13 +646,12 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 	return items
 }
 
-func writePerfData(tb testing.TB, artifactsDir string, data perfData) {
+func writePerfData(tb testing.TB, artifactsDir, metricName string, data perfData) {
 	tb.Helper()
 	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
 		tb.Fatalf("failed to create artifacts dir %s: %v", artifactsDir, err)
 	}
-	testName := strings.ReplaceAll(tb.Name(), "/", "_")
-	path := filepath.Join(artifactsDir, fmt.Sprintf("GenericPrometheusQuery %s_%s.json", testName, time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	path := filepath.Join(artifactsDir, fmt.Sprintf("GenericPrometheusQuery %s_%s.json", metricName, time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		tb.Fatalf("failed to marshal perf data: %v", err)
