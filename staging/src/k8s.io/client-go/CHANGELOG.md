@@ -4,6 +4,23 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### metadatainformer and dynamic informer factory: add missing StartWithContext and WaitForCacheSyncWithContext
+
+These methods already exist in informers.SharedInformerFactory. Because the
+factories here key informers by group/version/resource,
+WaitForCacheSyncWithContext returns the new cache.GVRSyncResult instead of
+cache.SyncResult.
+
+Start and WaitForCacheSync are now marked with //logcheck:context. Consumers
+which use the logcheck linter must switch to the *WithContext variants.
+Mock implementations of these interfaces need to be extended.
+
+```
+- ./dynamic/dynamicinformer.DynamicSharedInformerFactory.WaitForCacheSyncWithContext: added
+- ./metadata/metadatainformer.SharedInformerFactory.StartWithContext: added
+- ./metadata/metadatainformer.SharedInformerFactory.WaitForCacheSyncWithContext: added
+```
+
 ### SharedInformer: add SetShardSelector
 
 Mock implementations of the SharedInformer or SharedIndexInformer interfaces

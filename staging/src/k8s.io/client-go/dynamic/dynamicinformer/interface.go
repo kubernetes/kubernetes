@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // DynamicSharedInformerFactory provides access to a shared informer and lister for dynamic client
@@ -29,7 +30,7 @@ type DynamicSharedInformerFactory interface {
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
 	//
-	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
+	//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
 
 	// StartWithContext initializes all requested informers. They are handled in goroutines
@@ -41,7 +42,13 @@ type DynamicSharedInformerFactory interface {
 
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
+	//
+	//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool
+
+	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced
+	// or the context gets canceled.
+	WaitForCacheSyncWithContext(ctx context.Context) cache.GVRSyncResult
 
 	// Shutdown marks a factory as shutting down. At that point no new
 	// informers can be started anymore and Start will return without
