@@ -2483,7 +2483,7 @@
       "properties": {
         "disruptionMode": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode",
-          "description": "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used."
+          "description": "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used. The All mode requires a gang schedulingPolicy. disruptionMode affects scheduler preemption only. It does not affect eviction or PodDisruptionBudgets."
         },
         "resourceClaims": {
           "description": "resourceClaims defines which ResourceClaims may be shared among Pods in the Deployment. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup.",
@@ -2538,7 +2538,7 @@
         },
         "scheduling": {
           "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentSchedulingConfiguration",
-          "description": "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for policy.gang.minCount."
+          "description": "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for schedulingPolicy.gang.minCount.\n\n- The scheduling field can only be set when the Deployment is created. - A gang schedulingPolicy requires strategy.type Recreate. - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount. - template.spec.schedulingGroup must be unset."
         },
         "selector": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",

@@ -471,7 +471,12 @@ type DeploymentSpec struct {
 	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
 	// Deployment uses standard pod-by-pod scheduling.
 	// This field is alpha-level and requires the WorkloadWithDeployment feature gate.
-	// Once set, this field is immutable except for policy.gang.minCount.
+	// Once set, this field is immutable except for schedulingPolicy.gang.minCount.
+	//
+	// - The scheduling field can only be set when the Deployment is created.
+	// - A gang schedulingPolicy requires strategy.type Recreate.
+	// - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount.
+	// - template.spec.schedulingGroup must be unset.
 	//
 	// +featureGate=WorkloadWithDeployment
 	// +optional
@@ -568,6 +573,9 @@ type DeploymentSchedulingConfiguration struct {
 	// disruptionMode defines the mode in which the Deployment's pods can be disrupted.
 	// One of Single or All.
 	// If omitted, standard per-pod disruption behavior is used.
+	// The All mode requires a gang schedulingPolicy.
+	// disruptionMode affects scheduler preemption only. It does not affect
+	// eviction or PodDisruptionBudgets.
 	//
 	// +optional
 	// +k8s:optional

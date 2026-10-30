@@ -8099,7 +8099,7 @@ func schema_k8sio_api_apps_v1_DeploymentSchedulingConfiguration(ref common.Refer
 					},
 					"disruptionMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used.",
+							Description: "disruptionMode defines the mode in which the Deployment's pods can be disrupted. One of Single or All. If omitted, standard per-pod disruption behavior is used. The All mode requires a gang schedulingPolicy. disruptionMode affects scheduler preemption only. It does not affect eviction or PodDisruptionBudgets.",
 							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}.OpenAPIModelName()),
 						},
 					},
@@ -8203,7 +8203,7 @@ func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) commo
 					},
 					"scheduling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for policy.gang.minCount.",
+							Description: "scheduling defines the Workload-aware Scheduling configuration for this Deployment. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When spec.scheduling is omitted, no Workload or PodGroup is created and the Deployment uses standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithDeployment feature gate. Once set, this field is immutable except for schedulingPolicy.gang.minCount.\n\n- The scheduling field can only be set when the Deployment is created. - A gang schedulingPolicy requires strategy.type Recreate. - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount. - template.spec.schedulingGroup must be unset.",
 							Ref:         ref(appsv1.DeploymentSchedulingConfiguration{}.OpenAPIModelName()),
 						},
 					},

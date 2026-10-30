@@ -710,6 +710,11 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 	return allErrs
 }
 
+// validateDeploymentSchedulingUpdate enforces the spec.scheduling immutability
+// constraint that declarative validation cannot express: the basic/gang policy
+// variant is frozen after creation. Only schedulingPolicy.gang.minCount may change.
+// Adding or removing the scheduling or schedulingPolicy fields themselves is handled by
+// declarative validation, so this only guards an in-place variant switch.
 func validateDeploymentSchedulingUpdate(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	if spec.Scheduling == nil || oldSpec == nil || oldSpec.Scheduling == nil {
 		return nil

@@ -39,6 +39,9 @@ type DeploymentSchedulingConfigurationApplyConfiguration struct {
 	// disruptionMode defines the mode in which the Deployment's pods can be disrupted.
 	// One of Single or All.
 	// If omitted, standard per-pod disruption behavior is used.
+	// The All mode requires a gang schedulingPolicy.
+	// disruptionMode affects scheduler preemption only. It does not affect
+	// eviction or PodDisruptionBudgets.
 	DisruptionMode *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
