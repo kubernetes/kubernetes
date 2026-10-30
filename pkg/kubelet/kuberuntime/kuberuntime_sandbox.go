@@ -38,14 +38,15 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
-func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
+// preparePodSandboxConfig generates the sandbox config and creates the Pod log
+// directory. On failure, it returns a message for the Pod's sync result.
+func (m *kubeGenericRuntimeManager) preparePodSandboxConfig(ctx context.Context, pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, string, error) {
 	logger := klog.FromContext(ctx)
 	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
-		return "", message, err
+		return nil, message, err
 	}
 
 	// Create pod logs directory
@@ -53,6 +54,16 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	if err != nil {
 		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
+		return nil, message, err
+	}
+	return podSandboxConfig, "", nil
+}
+
+// createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
+func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
+	logger := klog.FromContext(ctx)
+	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt)
+	if err != nil {
 		return "", message, err
 	}
 
