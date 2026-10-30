@@ -3121,10 +3121,18 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			}
 
 			pod := st.MakePod().Name("1").UID("1").Obj()
-			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tf.BuildNodeInfos(tt.nodes), tt.filteredNodesStatuses)
+			nodeInfos := tf.BuildNodeInfos(tt.nodes)
+			rankedNodes := make([]framework.NodeWithRank, len(nodeInfos))
+			expectedRanks := make(map[string]int, len(nodeInfos))
+			for i, n := range nodeInfos {
+				rank := i + 1
+				rankedNodes[i] = framework.NodeWithRank{NodeInfo: n, Rank: rank}
+				expectedRanks[n.Node().Name] = rank
+			}
+			got, err := findNodesThatPassExtenders(ctx, extenders, pod, rankedNodes, tt.filteredNodesStatuses)
 			nodes := make([]*v1.Node, len(got))
 			for i := 0; i < len(got); i++ {
-				nodes[i] = got[i].Node()
+				nodes[i] = got[i].NodeInfo.Node()
 			}
 			if tt.expectsErr {
 				if err == nil {
@@ -3136,6 +3144,12 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 				}
 				if diff := cmp.Diff(tt.expectedNodes, nodes); diff != "" {
 					t.Errorf("filtered nodes (-want,+got):\n%s", diff)
+				}
+				for _, r := range got {
+					nodeName := r.NodeInfo.Node().Name
+					if r.Rank != expectedRanks[nodeName] {
+						t.Errorf("node %q rank = %d, want %d", nodeName, r.Rank, expectedRanks[nodeName])
+					}
 				}
 				if diff := nodeToStatusDiff(tt.expectedStatuses, tt.filteredNodesStatuses); diff != "" {
 					t.Errorf("filtered statuses (-want,+got):\n%s", diff)
@@ -4664,7 +4678,11 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			nodesscores, err := prioritizeNodes(ctx, schedFramework, state, test.pod, nodeInfos)
+			rankedNodes := make([]framework.NodeWithRank, len(nodeInfos))
+			for i, n := range nodeInfos {
+				rankedNodes[i] = framework.NodeWithRank{NodeInfo: n}
+			}
+			nodesscores, err := prioritizeNodes(ctx, schedFramework, state, test.pod, rankedNodes)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -5248,7 +5266,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			}
 			gotNodeNames := make([]string, len(gotNodes))
 			for i, n := range gotNodes {
-				gotNodeNames[i] = n.Node().Name
+				gotNodeNames[i] = n.NodeInfo.Node().Name
 			}
 			if diff := cmp.Diff(tt.wantNodeList, gotNodeNames, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected nodes (-want, +got):\n%s", diff)

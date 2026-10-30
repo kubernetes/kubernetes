@@ -45,6 +45,12 @@ type WaitForAnyPodsScheduled struct {
 	NumUnschedulable int
 }
 
+// WaitForAnyPodsRemoved specifies parameters for waiting until a given number of pods from the list are removed.
+type WaitForAnyPodsRemoved struct {
+	Pods       []string
+	NumRemoved int
+}
+
 type Groups struct {
 	PodGroups          []string
 	CompositePodGroups []string
@@ -187,6 +193,8 @@ type Step struct {
 	WaitForPodsScheduled []string
 	// WaitForPodsRemoved is use to wait for pods to be removed.
 	WaitForPodsRemoved []string
+	// WaitForAnyPodsRemoved is used to wait for a given number of pods from the list to be removed.
+	WaitForAnyPodsRemoved *WaitForAnyPodsRemoved
 	// WaitForAnyPodsScheduled is use to wait for any pod in the pod group to be scheduled.
 	WaitForAnyPodsScheduled *WaitForAnyPodsScheduled
 	// WaitForGroupsScheduled is used to wait for PodGroups and CompositePodGroups to have Scheduled condition.
@@ -714,6 +722,27 @@ func waitForPodsRemoved(testCtx *testutils.TestContext, ns string, podNames []st
 	return nil
 }
 
+func waitForAnyPodsRemoved(testCtx *testutils.TestContext, ns string, waitAny *WaitForAnyPodsRemoved) error {
+	cs := testCtx.ClientSet
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(ctx context.Context) (bool, error) {
+			removedCount := 0
+			for _, podName := range waitAny.Pods {
+				if ok, err := testutils.PodDeleted(ctx, cs, ns, podName)(ctx); err != nil {
+					return false, err
+				} else if ok {
+					removedCount++
+				}
+			}
+			return removedCount == waitAny.NumRemoved, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for %d pods out of %v to be removed: %w", waitAny.NumRemoved, waitAny.Pods, err)
+	}
+	return nil
+}
+
 func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny *WaitForAnyPodsScheduled) error {
 	cs := testCtx.ClientSet
 	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
@@ -941,6 +970,8 @@ func RunSteps(testCtx *testutils.TestContext, t utiltesting.TB, ns string, steps
 			err = waitForPodsScheduled(testCtx, ns, step.WaitForPodsScheduled)
 		case step.WaitForPodsRemoved != nil:
 			err = waitForPodsRemoved(testCtx, ns, step.WaitForPodsRemoved)
+		case step.WaitForAnyPodsRemoved != nil:
+			err = waitForAnyPodsRemoved(testCtx, ns, step.WaitForAnyPodsRemoved)
 		case step.WaitForAnyPodsScheduled != nil:
 			err = waitForAnyPodsScheduled(testCtx, ns, step.WaitForAnyPodsScheduled)
 		case step.WaitForGroupsScheduled != nil:

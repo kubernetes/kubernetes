@@ -293,6 +293,10 @@ func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroup
 	return pl.inj.PodGroupPostFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PodGroupPostFilterStatus), injectReason)
 }
 
+func (pl *TestPlugin) RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
+	return nil, fwk.NewStatus(fwk.Code(pl.inj.RankNodesStatus), injectReason)
+}
+
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 	return &TestCloseErrorPlugin{name: testCloseErrorPlugin}, nil
 }
@@ -1139,6 +1143,261 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 
+			for i, p := range tc.plugins {
+				if p.called != tc.expectedCalled[i] {
+					t.Errorf("Expected plugin %s called=%v, got %v", p.name, tc.expectedCalled[i], p.called)
+				}
+			}
+		})
+	}
+}
+
+type mockPodGroupPostFilterOnlyPlugin struct {
+	name string
+}
+
+func (p *mockPodGroupPostFilterOnlyPlugin) Name() string { return p.name }
+
+func (p *mockPodGroupPostFilterOnlyPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+func (p *mockPodGroupPostFilterOnlyPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (p *mockPodGroupPostFilterOnlyPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+}
+
+type mockRankNodesPlugin struct {
+	name   string
+	ranked []framework.NodeWithRank
+	status *fwk.Status
+	called bool
+}
+
+func (p *mockRankNodesPlugin) Name() string { return p.name }
+
+func (p *mockRankNodesPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+func (p *mockRankNodesPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+func (p *mockRankNodesPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (p *mockRankNodesPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+}
+
+func (p *mockRankNodesPlugin) RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
+	p.called = true
+	return p.ranked, p.status
+}
+
+func TestNewFramework_RankNodes(t *testing.T) {
+	tests := []struct {
+		name                      string
+		genericWorkloadEnabled    bool
+		implementsRankNodes       bool
+		disablePodGroupPostFilter bool
+		disableReserve            bool
+		wantRankNodes             bool
+	}{
+		{
+			name:                   "GenericWorkload enabled, PodGroupPostFilter and Reserve enabled, plugin implements RankNodesPlugin",
+			genericWorkloadEnabled: true,
+			implementsRankNodes:    true,
+			wantRankNodes:          true,
+		},
+		{
+			name:                   "GenericWorkload disabled, PodGroupPostFilter and Reserve enabled, plugin implements RankNodesPlugin",
+			genericWorkloadEnabled: false,
+			implementsRankNodes:    true,
+			wantRankNodes:          false,
+		},
+		{
+			name:                   "GenericWorkload enabled, PodGroupPostFilter and Reserve enabled, plugin does not implement RankNodesPlugin",
+			genericWorkloadEnabled: true,
+			implementsRankNodes:    false,
+			wantRankNodes:          false,
+		},
+		{
+			name:                      "GenericWorkload enabled, PodGroupPostFilter disabled, Reserve enabled",
+			genericWorkloadEnabled:    true,
+			implementsRankNodes:       true,
+			disablePodGroupPostFilter: true,
+			wantRankNodes:             false,
+		},
+		{
+			name:                   "GenericWorkload enabled, PodGroupPostFilter enabled, Reserve disabled",
+			genericWorkloadEnabled: true,
+			implementsRankNodes:    true,
+			disableReserve:         true,
+			wantRankNodes:          false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.genericWorkloadEnabled,
+			})
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			reg := Registry{}
+			const pluginName = names.DefaultPreemption
+			if err := reg.Register(pluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+				if tc.implementsRankNodes {
+					return &mockRankNodesPlugin{name: pluginName}, nil
+				}
+				return &mockPodGroupPostFilterOnlyPlugin{name: pluginName}, nil
+			}); err != nil {
+				t.Fatalf("Failed to register plugin: %v", err)
+			}
+
+			plugins := &config.Plugins{}
+			if tc.disablePodGroupPostFilter {
+				plugins.PostFilter = config.PluginSet{
+					Enabled: []config.Plugin{{Name: pluginName}},
+				}
+			} else {
+				plugins.PodGroupPostFilter = config.PluginSet{
+					Enabled: []config.Plugin{{Name: pluginName}},
+				}
+			}
+			if !tc.disableReserve {
+				plugins.Reserve = config.PluginSet{
+					Enabled: []config.Plugin{{Name: pluginName}},
+				}
+			}
+			profile := config.KubeSchedulerProfile{
+				Plugins: plugins,
+			}
+
+			f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			rankNodesPlugins := f.(*frameworkImpl).rankNodesPlugins
+			if tc.wantRankNodes {
+				if len(rankNodesPlugins) != 1 || rankNodesPlugins[0].Name() != pluginName {
+					t.Errorf("Expected %s in rankNodesPlugins, got: %v", pluginName, rankNodesPlugins)
+				}
+			} else if len(rankNodesPlugins) != 0 {
+				t.Errorf("Expected empty rankNodesPlugins, got: %v", rankNodesPlugins)
+			}
+		})
+	}
+}
+
+func TestRunRankNodesPlugins(t *testing.T) {
+	n1 := framework.NewNodeInfo()
+	n1.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
+	n2 := framework.NewNodeInfo()
+	n2.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}})
+	ranked := []framework.NodeWithRank{
+		{NodeInfo: n2, Rank: 0},
+		{NodeInfo: n1, Rank: 1},
+	}
+
+	tests := []struct {
+		name           string
+		plugins        []*mockRankNodesPlugin
+		expectedRanked []framework.NodeWithRank
+		expectedStatus *fwk.Status
+		expectedCalled []bool
+	}{
+		{
+			name:           "no plugins registered",
+			plugins:        nil,
+			expectedRanked: nil,
+			expectedStatus: nil,
+		},
+		{
+			name: "first plugin returns Skip, second returns ranked nodes",
+			plugins: []*mockRankNodesPlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Skip)},
+				{name: "p2", ranked: ranked, status: nil},
+			},
+			expectedRanked: ranked,
+			expectedStatus: nil,
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "all plugins return Skip",
+			plugins: []*mockRankNodesPlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Skip)},
+				{name: "p2", status: fwk.NewStatus(fwk.Skip)},
+			},
+			expectedRanked: nil,
+			expectedStatus: nil,
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "first plugin succeeds, second is not called",
+			plugins: []*mockRankNodesPlugin{
+				{name: "p1", ranked: ranked, status: nil},
+				{name: "p2", status: nil},
+			},
+			expectedRanked: ranked,
+			expectedStatus: nil,
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "plugin returns Error, stops and returns error",
+			plugins: []*mockRankNodesPlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Error, "rank failure")},
+				{name: "p2", status: nil},
+			},
+			expectedRanked: nil,
+			expectedStatus: fwk.AsStatus(fmt.Errorf("running RankNodes plugin %q: %w", "p1", errors.New("rank failure"))).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "plugin returns unexpected status code, stops and returns error",
+			plugins: []*mockRankNodesPlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unexpected unschedulable")},
+				{name: "p2", status: nil},
+			},
+			expectedRanked: nil,
+			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status code (%v) from RankNodes plugin %q: %v", fwk.Unschedulable, "p1", "unexpected unschedulable")).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			f := &frameworkImpl{
+				rankNodesPlugins: make([]framework.RankNodesPlugin, len(tc.plugins)),
+			}
+			for i, p := range tc.plugins {
+				f.rankNodesPlugins[i] = p
+			}
+
+			gotRanked, status := f.RunRankNodesPlugins(ctx, framework.NewCycleState(), &v1.Pod{}, []fwk.NodeInfo{n1, n2})
+
+			if diff := cmp.Diff(tc.expectedStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+			if len(gotRanked) != len(tc.expectedRanked) {
+				t.Fatalf("len(gotRanked) = %d, want %d", len(gotRanked), len(tc.expectedRanked))
+			}
+			for i := range gotRanked {
+				if gotRanked[i].NodeInfo.Node().Name != tc.expectedRanked[i].NodeInfo.Node().Name || gotRanked[i].Rank != tc.expectedRanked[i].Rank {
+					t.Errorf("gotRanked[%d] = (%s, %d), want (%s, %d)",
+						i, gotRanked[i].NodeInfo.Node().Name, gotRanked[i].Rank,
+						tc.expectedRanked[i].NodeInfo.Node().Name, tc.expectedRanked[i].Rank)
+				}
+			}
 			for i, p := range tc.plugins {
 				if p.called != tc.expectedCalled[i] {
 					t.Errorf("Expected plugin %s called=%v, got %v", p.name, tc.expectedCalled[i], p.called)
@@ -4526,6 +4785,14 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PodGroupPostFilter",
 			wantStatus:         fwk.Success,
 		},
+		{
+			name: "RankNodes - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunRankNodesPlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
+			wantExtensionPoint: "RankNodes",
+			wantStatus:         fwk.Success,
+		},
 
 		{
 			name:               "PreFilter - Error",
@@ -4624,6 +4891,15 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PodGroupPostFilter",
 			wantStatus:         fwk.Error,
 		},
+		{
+			name: "RankNodes - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunRankNodesPlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
+			inject:             injectedResult{RankNodesStatus: int(fwk.Error)},
+			wantExtensionPoint: "RankNodes",
+			wantStatus:         fwk.Error,
+		},
 	}
 
 	for _, tt := range tests {
@@ -4680,6 +4956,9 @@ func TestRecordingMetrics(t *testing.T) {
 
 			if tt.wantExtensionPoint == "PlacementFeasible" {
 				f.(*frameworkImpl).placementFeasiblePlugins = []fwk.PlacementFeasiblePlugin{plugin}
+			}
+			if tt.wantExtensionPoint == "RankNodes" {
+				f.(*frameworkImpl).rankNodesPlugins = []framework.RankNodesPlugin{plugin}
 			}
 
 			tt.action(ctx, f)
@@ -5077,6 +5356,7 @@ type injectedResult struct {
 	PlacementFeasibleStatus  int                           `json:"placementFeasibleStatus,omitempty"`
 	PodGroupPostFilterStatus int                           `json:"podGroupPostFilterStatus,omitempty"`
 	PodGroupPostFilterResult *fwk.PodGroupPostFilterResult `json:"podGroupPostFilterResult,omitempty"`
+	RankNodesStatus          int                           `json:"rankNodesStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {

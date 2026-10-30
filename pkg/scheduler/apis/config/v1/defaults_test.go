@@ -394,6 +394,11 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.DefaultBinder},
 								},
 							},
+							Reserve: configv1.PluginSet{
+								Disabled: []configv1.Plugin{
+									{Name: names.DefaultPreemption},
+								},
+							},
 						},
 						PluginConfig: pluginConfigs,
 					},

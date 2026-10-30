@@ -162,6 +162,23 @@ type SortedScoredNodes interface {
 	UnorderedList() []fwk.NodePluginScores
 }
 
+// NodeWithRank associates a NodeInfo with a non-negative integer rank.
+// Lower rank values represent better nodes (rank 0 is best).
+type NodeWithRank struct {
+	NodeInfo fwk.NodeInfo
+	Rank     int
+}
+
+// RankNodesPlugin is an interface for plugins that rank candidate nodes
+// before Filter during PodGroup scheduling cycles.
+type RankNodesPlugin interface {
+	fwk.Plugin
+	// RankNodes ranks the given nodes for the pod. Nodes should be returned
+	// ordered by non-decreasing Rank (0 is best). If the plugin does not wish
+	// to rank nodes for this cycle, it may return a Skip status.
+	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -182,6 +199,13 @@ type Framework interface {
 	// and gang scheduling optimizations.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
 	SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature
+
+	// RunRankNodesPlugins runs the set of configured RankNodes plugins.
+	// It returns the ranked nodes from the first plugin that returns a Success status,
+	// or a non-success Status if any plugin returns a status other than Success or Skip.
+	// If no plugin ranks the nodes (e.g., all return Skip or none are configured),
+	// it returns a nil slice and a nil Status.
+	RunRankNodesPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

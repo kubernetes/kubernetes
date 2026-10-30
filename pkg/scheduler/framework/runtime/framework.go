@@ -44,6 +44,7 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -76,6 +77,7 @@ type frameworkImpl struct {
 	permitPlugins             []fwk.PermitPlugin
 	batchablePlugins          []fwk.SignPlugin
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
+	rankNodesPlugins          []framework.RankNodesPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
@@ -522,6 +524,25 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.computeBatchablePlugins()
 	}
 
+	// Put default preemption as the only RankNodesPlugin
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		hasPodGroupPostFilter := slices.ContainsFunc(f.podGroupPostFilterPlugins, func(pl fwk.PodGroupPostFilterPlugin) bool {
+			return pl.Name() == names.DefaultPreemption
+		})
+		hasReserve := slices.ContainsFunc(f.reservePlugins, func(pl fwk.ReservePlugin) bool {
+			return pl.Name() == names.DefaultPreemption
+		})
+		if !hasPodGroupPostFilter {
+			logger.V(2).Info("GenericWorkload is enabled, but default preemption PodGroupPostFilter plugin is not enabled. Node ranking will not be used.")
+		} else if !hasReserve {
+			logger.V(2).Info("GenericWorkload is enabled, but default preemption Reserve plugin is not enabled. Node ranking will not be used.")
+		} else if rnp, ok := f.pluginsMap[names.DefaultPreemption].(framework.RankNodesPlugin); ok {
+			f.rankNodesPlugins = append(f.rankNodesPlugins, rnp)
+		} else {
+			logger.V(2).Info("GenericWorkload is enabled, but default preemption plugin does not fulfill RankNodesPlugin interface. Node ranking will not be used.")
+		}
+	}
+
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
 			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {
@@ -948,6 +969,52 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignatu
 	return sigBytes
 }
 
+// RunRankNodesPlugins runs the set of configured RankNodes plugins.
+// It returns the ranked nodes from the first plugin that returns a Success status,
+// or a non-success Status if any plugin returns a status other than Success or Skip.
+// If no plugin ranks the nodes (e.g., all return Skip or none are configured),
+// it returns a nil slice and a nil Status.
+func (f *frameworkImpl) RunRankNodesPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (_ []framework.NodeWithRank, status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.RankNodes, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "RankNodes")
+	}
+	for _, pl := range f.rankNodesPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		rankedNodes, plStatus := f.runRankNodesPlugin(ctx, pl, state, pod, nodes)
+		if plStatus.IsSkip() {
+			continue
+		}
+		if plStatus.IsSuccess() {
+			return rankedNodes, nil
+		}
+		if plStatus.IsError() {
+			return nil, fwk.AsStatus(fmt.Errorf("running RankNodes plugin %q: %w", pl.Name(), plStatus.AsError())).WithPlugin(pl.Name())
+		}
+		return nil, fwk.AsStatus(fmt.Errorf("unexpected status code (%v) from RankNodes plugin %q: %v", plStatus.Code(), pl.Name(), plStatus.Message())).WithPlugin(pl.Name())
+	}
+	return nil, nil
+}
+
+func (f *frameworkImpl) runRankNodesPlugin(ctx context.Context, pl framework.RankNodesPlugin, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.RankNodes(ctx, state, pod, nodes)
+	}
+	startTime := time.Now()
+	rankedNodes, status := pl.RankNodes(ctx, state, pod, nodes)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.RankNodes, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return rankedNodes, status
+}
+
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success/Skip.
@@ -1241,6 +1308,13 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+
+	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
+	// neither reuse node hints cached from the normal pass nor bypass RankNodes when
+	// dynamic victim condemnations change node ranks across pods in the group.
+	// TODO(#142718): Implement support for batching with RankNodes during preemption.
+	f.batch.SetDisabled(true)
+	defer f.batch.SetDisabled(false)
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()

@@ -4211,7 +4211,7 @@ type mockPodGroupEvaluator struct {
 	status *fwk.Status
 }
 
-func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	return nil, m.status
 }
 
@@ -4693,6 +4693,282 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 
 			if diff := cmp.Diff(expectedAssignments, actualAssignments); diff != "" {
 				t.Fatalf("Unexpected assignments (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type testPreemptionVictim struct {
+	preemption.Victim
+	pdbViolations int
+}
+
+func (v *testPreemptionVictim) NumPDBViolations() int {
+	return v.pdbViolations
+}
+
+func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
+	type victimSpec struct {
+		pods          []*v1.Pod
+		priority      int32
+		keyType       fwk.EntityKeyType
+		pdbViolations int
+	}
+	type rankedNode struct {
+		Node string
+		Rank int
+	}
+
+	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Obj()
+	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Obj()
+
+	tests := []struct {
+		name                       string
+		nodeNames                  []string
+		victims                    []victimSpec
+		withoutPreemptionState     bool
+		expectedRankNodesCode      fwk.Code
+		expectedInitialRanked      []rankedNode
+		reserveNode                string
+		expectedRankedAfterReserve []rankedNode
+	}{
+		{
+			name:                   "normal scheduling cycle without PodGroupPreemptionState returns Skip",
+			nodeNames:              []string{"node-1", "node-2"},
+			withoutPreemptionState: true,
+			expectedRankNodesCode:  fwk.Skip,
+		},
+		{
+			name:      "all candidate nodes have zero victims",
+			nodeNames: []string{"node-1", "node-2", "node-3"},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-1", Rank: 0},
+				{Node: "node-2", Rank: 0},
+				{Node: "node-3", Rank: 0},
+			},
+		},
+		{
+			name:      "tied victim sets (CompareVictimSets == 0) receive identical ranks and preserve input order",
+			nodeNames: []string{"node-high", "node-tie-1", "node-tie-2"},
+			victims: []victimSpec{
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-1").UID("victim-tie-1").Node("node-tie-1").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-2").UID("victim-tie-2").Node("node-tie-2").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-tie-1", Rank: 1},
+				{Node: "node-tie-2", Rank: 1},
+				{Node: "node-high", Rank: 2},
+			},
+		},
+		{
+			name:      "multiple victims on a single node sorted by MoreImportantVictim",
+			nodeNames: []string{"node-multi", "node-mid"},
+			victims: []victimSpec{
+				// Listed before victim-low so iterating potentialVictims backward visits victim-low first;
+				// NewPodGroupPreemptionState must sort node-multi's victims by MoreImportantVictim (prio 20 before prio 5)
+				// so node-multi is recognized as more costly than node-mid (prio 15).
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-multi").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-low").UID("victim-low").Node("node-multi").Priority(5).Obj()},
+					priority: 5,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-mid").UID("victim-mid").Node("node-mid").Priority(15).Obj()},
+					priority: 15,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-mid", Rank: 1},
+				{Node: "node-multi", Rank: 2},
+			},
+		},
+		{
+			name:      "free node, standalone pod, multi-node PodGroup, and higher-priority pod with Reserve and Unreserve",
+			nodeNames: []string{"node-high", "node-pg-1", "node-pg-2", "node-pod", "node-free"},
+			victims: []victimSpec{
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods: []*v1.Pod{
+						st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg-1").Priority(10).PodGroupName("pg-victim").Obj(),
+						st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg-2").Priority(10).PodGroupName("pg-victim").Obj(),
+					},
+					priority: 10,
+					keyType:  fwk.PodGroupKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pod", Rank: 1},
+				{Node: "node-pg-1", Rank: 2},
+				{Node: "node-pg-2", Rank: 2},
+				{Node: "node-high", Rank: 3},
+			},
+			reserveNode: "node-pg-1",
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-pg-1", Rank: 0},
+				{Node: "node-pg-2", Rank: 0},
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pod", Rank: 1},
+				{Node: "node-high", Rank: 2},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nodes := make([]*v1.Node, 0, len(tt.nodeNames))
+			for _, name := range tt.nodeNames {
+				nodes = append(nodes, st.MakeNode().Name(name).Obj())
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			fts := feature.Features{EnableGenericWorkload: true}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			client := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			f, err := tf.NewFramework(ctx, registeredPlugins, "",
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, true, false)),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return preemption.NewPreemptionManager(fh, fts)
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, fts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nodeInfos := make([]fwk.NodeInfo, 0, len(nodes))
+			for _, n := range nodes {
+				ni, err := snapshot.NodeInfos().Get(n.Name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				nodeInfos = append(nodeInfos, ni)
+			}
+
+			if tt.withoutPreemptionState {
+				normalState := framework.NewCycleState()
+				if _, status := pl.RankNodes(ctx, normalState, preemptor1, nodeInfos); status.Code() != tt.expectedRankNodesCode {
+					t.Fatalf("expected RankNodes status code %v, got %v", tt.expectedRankNodesCode, status.Code())
+				}
+				return
+			}
+
+			var allVictims []fwk.PreemptionVictim
+			for _, entry := range tt.victims {
+				podInfos := make([]fwk.PodInfo, 0, len(entry.pods))
+				for _, p := range entry.pods {
+					pi, err := framework.NewPodInfo(p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					podInfos = append(podInfos, pi)
+				}
+				v, err := preemption.NewVictim(podInfos, entry.priority, entry.keyType)
+				if err != nil {
+					t.Fatal(err)
+				}
+				allVictims = append(allVictims, &testPreemptionVictim{
+					Victim:        v,
+					pdbViolations: entry.pdbViolations,
+				})
+			}
+
+			preemptState := preemption.NewPodGroupPreemptionState(allVictims)
+			pgState := framework.NewCycleState()
+			preemptState.WriteToPodGroupCycleState(pgState)
+			newCycleStateWithPreemption := func() fwk.CycleState {
+				s := framework.NewCycleState()
+				s.SetPodGroupCycleState(pgState)
+				return s
+			}
+
+			rankAllNodes := func(state fwk.CycleState, pod *v1.Pod) []rankedNode {
+				ranked, status := pl.RankNodes(ctx, state, pod, nodeInfos)
+				if status.Code() != tt.expectedRankNodesCode {
+					t.Fatalf("RankNodes status code = %v, want %v", status.Code(), tt.expectedRankNodesCode)
+				}
+				got := make([]rankedNode, 0, len(ranked))
+				for _, nr := range ranked {
+					got = append(got, rankedNode{
+						Node: nr.NodeInfo.Node().Name,
+						Rank: nr.Rank,
+					})
+				}
+				return got
+			}
+
+			state1 := newCycleStateWithPreemption()
+			gotInitialRanked := rankAllNodes(state1, preemptor1)
+			if diff := cmp.Diff(tt.expectedInitialRanked, gotInitialRanked); diff != "" {
+				t.Errorf("Initial ranked nodes mismatch (-want, +got):\n%s", diff)
+			}
+
+			if tt.reserveNode == "" {
+				return
+			}
+
+			if status := pl.Reserve(ctx, state1, preemptor1, tt.reserveNode); !status.IsSuccess() {
+				t.Fatalf("Reserve failed: %v", status)
+			}
+
+			state2 := newCycleStateWithPreemption()
+			gotAfterReserve := rankAllNodes(state2, preemptor2)
+			if diff := cmp.Diff(tt.expectedRankedAfterReserve, gotAfterReserve); diff != "" {
+				t.Errorf("Ranked nodes after Reserve mismatch (-want, +got):\n%s", diff)
+			}
+
+			pl.Unreserve(ctx, state1, preemptor1, tt.reserveNode)
+			state3 := newCycleStateWithPreemption()
+			gotAfterUnreserve := rankAllNodes(state3, preemptor2)
+			if diff := cmp.Diff(tt.expectedInitialRanked, gotAfterUnreserve); diff != "" {
+				t.Errorf("Ranked nodes after Unreserve mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}

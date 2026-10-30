@@ -74,6 +74,10 @@ func applyFeatureGates(config *v1.Plugins) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		applyGangScheduling(config)
+	} else {
+		// DefaultPreemption is listed in MultiPoint.Enabled and implements ReservePlugin
+		// only for PodGroup preemption, so disable its Reserve extension when GenericWorkload is off.
+		config.Reserve.Disabled = append(config.Reserve.Disabled, v1.Plugin{Name: names.DefaultPreemption})
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		applyTopologyAwareWorkloadScheduling(config)

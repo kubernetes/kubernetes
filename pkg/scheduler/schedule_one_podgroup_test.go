@@ -7162,7 +7162,7 @@ func TestBuildPodGroupSchedulingFunc(t *testing.T) {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
-			pgSchedulingFunc := sched.buildPodGroupSchedulingFunc(schedFwk, podGroupInfo)
+			pgSchedulingFunc := sched.buildPodGroupSchedulingFunc(schedFwk, framework.NewCycleState(), podGroupInfo)
 			// Run pgSchedulingFunc multiple times to verify that ProposedAssignments
 			// returns pods in deterministic tree-walk order instead of random map order.
 			for range 20 {
