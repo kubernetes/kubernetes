@@ -5685,3 +5685,291 @@ func TestGetDifferentUIDPreCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestPatchAggregatedPodStatus(t *testing.T) {
+	tests := []struct {
+		name              string
+		initialStatus     v1.PodStatus
+		setupMutators     func(state fwk.CycleState)
+		patchError        error
+		expectError       bool
+		expectedPatches   int
+		expectedSubstr    []string
+		expectedNewStatus func(t *testing.T, status *v1.PodStatus)
+	}{
+		{
+			name: "no mutators registered, no patch sent",
+			setupMutators: func(state fwk.CycleState) {
+				// nothing registered
+			},
+			expectedPatches: 0,
+		},
+		{
+			name: "single mutator modifies conditions",
+			initialStatus: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+			setupMutators: func(state fwk.CycleState) {
+				err := framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					target.Conditions = append(target.Conditions, v1.PodCondition{
+						Type:   "PluginA",
+						Status: v1.ConditionTrue,
+					})
+					return nil
+				})
+				if err != nil {
+					t.Fatalf("AddPodStatusMutator failed: %v", err)
+				}
+			},
+			expectedPatches: 1,
+			expectedSubstr:  []string{`"type":"PluginA"`, `"status":"True"`},
+			expectedNewStatus: func(t *testing.T, status *v1.PodStatus) {
+				if len(status.Conditions) != 1 || status.Conditions[0].Type != "PluginA" {
+					t.Errorf("Unexpected conditions: %+v", status.Conditions)
+				}
+			},
+		},
+		{
+			name: "multiple mutators aggregated into a single patch",
+			initialStatus: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+			setupMutators: func(state fwk.CycleState) {
+				_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					target.Conditions = append(target.Conditions, v1.PodCondition{
+						Type:   "PluginA",
+						Status: v1.ConditionTrue,
+					})
+					return nil
+				})
+				_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					target.NominatedNodeName = "node-1"
+					return nil
+				})
+			},
+			expectedPatches: 1,
+			expectedSubstr:  []string{`"type":"PluginA"`, `"nominatedNodeName":"node-1"`},
+			expectedNewStatus: func(t *testing.T, status *v1.PodStatus) {
+				if len(status.Conditions) != 1 || status.Conditions[0].Type != "PluginA" {
+					t.Errorf("Unexpected conditions: %+v", status.Conditions)
+				}
+				if status.NominatedNodeName != "node-1" {
+					t.Errorf("Unexpected NominatedNodeName: %s", status.NominatedNodeName)
+				}
+			},
+		},
+		{
+			name: "base status modified to force patch of assumed fields",
+			initialStatus: v1.PodStatus{
+				NominatedNodeName: "pre-assumed-node",
+			},
+			setupMutators: func(state fwk.CycleState) {
+				_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					base.NominatedNodeName = ""
+					target.NominatedNodeName = "real-node"
+					return nil
+				})
+			},
+			expectedPatches: 1,
+			expectedSubstr:  []string{`"nominatedNodeName":"real-node"`},
+			expectedNewStatus: func(t *testing.T, status *v1.PodStatus) {
+				if status.NominatedNodeName != "real-node" {
+					t.Errorf("Unexpected NominatedNodeName: %s", status.NominatedNodeName)
+				}
+			},
+		},
+		{
+			name: "mutator returns error, patch aborted",
+			setupMutators: func(state fwk.CycleState) {
+				_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					return errors.New("mutator failure")
+				})
+			},
+			expectError:     true,
+			expectedPatches: 0,
+		},
+		{
+			name: "api server patch error",
+			setupMutators: func(state fwk.CycleState) {
+				_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+					target.NominatedNodeName = "node-1"
+					return nil
+				})
+			},
+			patchError:      errors.New("apiserver patch rejected"),
+			expectError:     true,
+			expectedPatches: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			pod := st.MakePod().Name("test-pod").Namespace("default").Obj()
+			pod.Status = tt.initialStatus
+
+			client := clientsetfake.NewClientset(pod)
+			var patchCount int
+			var capturedPatches []string
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				patchAction := action.(clienttesting.PatchAction)
+				if patchAction.GetSubresource() == "status" {
+					patchCount++
+					capturedPatches = append(capturedPatches, string(patchAction.GetPatch()))
+					if tt.patchError != nil {
+						return true, nil, tt.patchError
+					}
+				}
+				return true, pod, nil
+			})
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"test-profile",
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			sched := &Scheduler{}
+			state := framework.NewCycleState()
+			mutators := framework.NewPodStatusMutators()
+			state.Write(framework.PodStatusMutatorsKey, mutators)
+
+			tt.setupMutators(state)
+
+			status := sched.patchAggregatedPodStatus(ctx, fwk, state, pod)
+			if tt.expectError {
+				if status.IsSuccess() {
+					t.Errorf("Expected error but got success")
+				}
+			} else {
+				if !status.IsSuccess() {
+					t.Errorf("Expected success but got error: %v", status.AsError())
+				}
+			}
+
+			if patchCount != tt.expectedPatches {
+				t.Errorf("Expected %d patches, got %d", tt.expectedPatches, patchCount)
+			}
+
+			for _, sub := range tt.expectedSubstr {
+				found := false
+				for _, p := range capturedPatches {
+					if strings.Contains(p, sub) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected patch to contain %q, but got patches: %v", sub, capturedPatches)
+				}
+			}
+
+			if tt.expectedNewStatus != nil {
+				tt.expectedNewStatus(t, &pod.Status)
+			}
+		})
+	}
+}
+
+func TestBindingCycleAggregatesPodStatusUpdates(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pod := st.MakePod().Name("pod-1").Namespace("default").UID("uid-1").Obj()
+
+	client := clientsetfake.NewClientset(pod)
+	var patchCount int
+	var capturedPatches []string
+	var bindCount int
+
+	client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patchAction := action.(clienttesting.PatchAction)
+		if patchAction.GetSubresource() == "status" {
+			patchCount++
+			capturedPatches = append(capturedPatches, string(patchAction.GetPatch()))
+		}
+		return true, pod, nil
+	})
+	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() == "binding" {
+			bindCount++
+		}
+		return true, nil, nil
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	q := internalqueue.NewSchedulingQueue(nil, informerFactory)
+	fakeFwk, err := NewFakeFramework(
+		ctx,
+		q,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		"test-profile",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create fake framework: %v", err)
+	}
+
+	fakeFwk.waitOnPermitFn = func(_ context.Context, _ *v1.Pod) *fwk.Status {
+		return fwk.NewStatus(fwk.Success)
+	}
+	fakeFwk.runPreBindPluginsFn = func(_ context.Context, state fwk.CycleState, _ *v1.Pod, _ string) *fwk.Status {
+		// Plugin 1 mutates conditions
+		_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+			target.Conditions = append(target.Conditions, v1.PodCondition{
+				Type:   "Plugin1Condition",
+				Status: v1.ConditionTrue,
+			})
+			return nil
+		})
+		// Plugin 2 mutates nominated node name
+		_ = framework.AddPodStatusMutator(state, func(base, target *v1.PodStatus) error {
+			target.NominatedNodeName = "target-node"
+			return nil
+		})
+		return fwk.NewStatus(fwk.Success)
+	}
+
+	state := framework.NewCycleState()
+	podsToActivate := framework.NewPodsToActivate()
+	state.Write(framework.PodsToActivateKey, podsToActivate)
+	state.Write(framework.PodStatusMutatorsKey, framework.NewPodStatusMutators())
+
+	sched := &Scheduler{
+		client:          client,
+		SchedulingQueue: q,
+	}
+
+	assumedPodInfo := queuedPodInfoForPod(pod)
+	scheduleResult := ScheduleResult{SuggestedHost: "node-1"}
+
+	status := sched.bindingCycle(ctx, state, fakeFwk, scheduleResult, assumedPodInfo, time.Now(), podsToActivate)
+	if !status.IsSuccess() {
+		t.Fatalf("bindingCycle failed: %v", status.AsError())
+	}
+
+	if patchCount != 1 {
+		t.Errorf("Expected exactly 1 patch action on status, got %d", patchCount)
+	}
+	if bindCount != 1 {
+		t.Errorf("Expected exactly 1 bind action, got %d", bindCount)
+	}
+
+	if len(capturedPatches) == 1 {
+		patch := capturedPatches[0]
+		if !strings.Contains(patch, "Plugin1Condition") || !strings.Contains(patch, "target-node") {
+			t.Errorf("Patch does not contain aggregated updates from both plugins: %s", patch)
+		}
+	}
+}

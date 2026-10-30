@@ -394,6 +394,9 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
+	podStatusMutators := framework.NewPodStatusMutators()
+	state.Write(framework.PodStatusMutatorsKey, podStatusMutators)
+
 	podGroupCycleState := placementCycleState.GetPodGroupCycleState()
 	// Marks this cycle as a pod group scheduling cycle.
 	state.SetPodGroupCycleState(podGroupCycleState)

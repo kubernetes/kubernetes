@@ -20,6 +20,8 @@ package framework
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -152,6 +154,66 @@ func (s *PodsToActivate) Clone() fwk.StateData {
 // NewPodsToActivate instantiates a PodsToActivate object.
 func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
+
+// PodStatusMutatorsKey is a reserved state key for accumulating Pod status modifications during PreBind.
+var PodStatusMutatorsKey fwk.StateKey = "kubernetes.io/pod-status-mutators"
+
+// PodStatusMutatorFunc defines a function that applies modifications to a Pod's status.
+// baseStatus represents the base status before mutation, and targetStatus represents the desired status to be patched.
+type PodStatusMutatorFunc func(baseStatus, targetStatus *v1.PodStatus) error
+
+// PodStatusMutators stores accumulated status mutator functions from PreBind plugins.
+type PodStatusMutators struct {
+	sync.Mutex
+	mutators []PodStatusMutatorFunc
+}
+
+// Add adds a mutator function to the list of mutators.
+func (m *PodStatusMutators) Add(mutator PodStatusMutatorFunc) {
+	m.Lock()
+	defer m.Unlock()
+	m.mutators = append(m.mutators, mutator)
+}
+
+// Mutators returns a copy of the registered mutator functions.
+func (m *PodStatusMutators) Mutators() []PodStatusMutatorFunc {
+	m.Lock()
+	defer m.Unlock()
+	copied := make([]PodStatusMutatorFunc, len(m.mutators))
+	copy(copied, m.mutators)
+	return copied
+}
+
+// Clone just returns the same state.
+func (m *PodStatusMutators) Clone() fwk.StateData {
+	return m
+}
+
+// NewPodStatusMutators instantiates a PodStatusMutators object.
+func NewPodStatusMutators() *PodStatusMutators {
+	return &PodStatusMutators{mutators: make([]PodStatusMutatorFunc, 0, 2)}
+}
+
+// AddPodStatusMutator registers a status mutator in CycleState for the current binding cycle.
+// If PodStatusMutators was not previously initialized in CycleState, it initializes it.
+func AddPodStatusMutator(state fwk.CycleState, mutator PodStatusMutatorFunc) error {
+	data, err := state.Read(PodStatusMutatorsKey)
+	if err != nil {
+		if errors.Is(err, fwk.ErrNotFound) {
+			mutators := NewPodStatusMutators()
+			mutators.Add(mutator)
+			state.Write(PodStatusMutatorsKey, mutators)
+			return nil
+		}
+		return fmt.Errorf("reading %q from CycleState: %w", PodStatusMutatorsKey, err)
+	}
+	mutators, ok := data.(*PodStatusMutators)
+	if !ok {
+		return fmt.Errorf("unexpected type in CycleState for %s: %T", PodStatusMutatorsKey, data)
+	}
+	mutators.Add(mutator)
+	return nil
 }
 
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.
