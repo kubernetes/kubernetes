@@ -726,7 +726,7 @@ func Validate_StorageHealthCondition(
 	return errs
 }
 
-var symbolsForStorageHealthStatusType = sets.New(storagev1beta1.StorageDegraded, storagev1beta1.StorageUnreachable)
+var symbolsForStorageHealthStatusType = sets.New(storagev1beta1.StorageDegraded, storagev1beta1.StorageHealthUnknown, storagev1beta1.StorageHealthy, storagev1beta1.StorageUnreachable)
 
 // Validate_StorageHealthStatusType validates an instance of StorageHealthStatusType according
 // to declarative validation rules in the API schema.

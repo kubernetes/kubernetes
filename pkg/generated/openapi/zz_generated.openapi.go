@@ -60529,7 +60529,7 @@ func schema_k8sio_api_storage_v1_StorageHealth(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -60553,16 +60553,16 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Description: "StorageHealthCondition represents a health condition reported by a CSI driver for its storage backend on a node.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"Healthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"Healthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that driver is returning a health status which is not recognized by kubelet. Health of storage subsystem should not be considered healthy.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"StorageDegraded", "StorageUnreachable"},
+							Enum:        []interface{}{"Healthy", "StorageDegraded", "StorageHealthUnknown", "StorageUnreachable"},
 						},
 					},
 					"reason": {
@@ -62243,7 +62243,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealth(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62267,16 +62267,16 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Description: "StorageHealthCondition represents a health condition reported by a CSI driver for its storage backend on a node.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"Healthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"Healthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that driver is returning a health status which is not recognized by kubelet. Health of storage subsystem should not be considered healthy.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"StorageDegraded", "StorageUnreachable"},
+							Enum:        []interface{}{"Healthy", "StorageDegraded", "StorageHealthUnknown", "StorageUnreachable"},
 						},
 					},
 					"reason": {

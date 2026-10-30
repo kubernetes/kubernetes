@@ -27,11 +27,20 @@ import (
 // StorageHealthConditionApplyConfiguration represents a declarative configuration of the StorageHealthCondition type for use
 // with apply.
 //
-// StorageHealthCondition represents an adverse health condition reported
+// StorageHealthCondition represents a health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthConditionApplyConfiguration struct {
 	// status is the health status category.
-	// One of "StorageUnreachable", "StorageDegraded".
+	// Possible values are:
+	// - "StorageHealthUnknown": the reported health status is not recognized; the backend must not be considered healthy.
+	// - "StorageUnreachable": the storage backend is unreachable.
+	// - "StorageDegraded": the storage backend is functioning with reduced capability.
+	// - "Healthy": the storage backend is healthy as seen from this node.
+	//
+	// Additional values may be introduced as the CSI specification evolves.
+	// Writers that do not recognize a status may classify it as StorageHealthUnknown.
+	// Readers that do not recognize a status must use it only for health reporting
+	// and observability.
 	Status *storagev1beta1.StorageHealthStatusType `json:"status,omitempty"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// Maximum permitted length of a reason is 256 bytes.
