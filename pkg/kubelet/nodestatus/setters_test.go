@@ -37,12 +37,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -452,7 +449,6 @@ func TestMachineInfo(t *testing.T) {
 		expectNode                           *v1.Node
 		expectEvents                         []testEvent
 		disableLocalStorageCapacityIsolation bool
-		featureGateDependencies              []featuregate.Feature
 	}{
 		{
 			desc:    "machine identifiers, basic capacity and allocatable",
@@ -897,23 +893,10 @@ func TestMachineInfo(t *testing.T) {
 					},
 				},
 			},
-			featureGateDependencies: []featuregate.Feature{features.NodeSwap},
 		},
 	}
 
 	for _, tc := range cases {
-		featureGatesMissing := false
-		for _, featureGateDependency := range tc.featureGateDependencies {
-			if !utilfeature.DefaultFeatureGate.Enabled(featureGateDependency) {
-				featureGatesMissing = true
-				break
-			}
-		}
-
-		if featureGatesMissing {
-			continue
-		}
-
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			machineInfoFunc := func() (*cadvisorapi.MachineInfo, error) {
