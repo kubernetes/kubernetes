@@ -821,6 +821,19 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
+		// Disable scheduler resize preemption on the node so this test exercises Kubelet's
+		// priority-ordered deferred resize retries without the scheduler preempting lower-priority pods.
+		// With InPlacePodVerticalScalingSchedulerPreemption disabled, the apiserver drops the field without an error.
+		patchDisablePreemption := []byte(`{"spec": {"podPreemptionPolicy": {"disableResizePreemption": ["e2e-test-disable-preemption"]}}}`)
+		_, err := f.ClientSet.CoreV1().Nodes().Patch(ctx, node.Name, types.StrategicMergePatchType, patchDisablePreemption, metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch node to disable resize preemption")
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			patchReset := []byte(`{"spec": {"podPreemptionPolicy": null}}`)
+			if _, err := f.ClientSet.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, patchReset, metav1.PatchOptions{}); err != nil {
+				framework.Logf("Best-effort patch to reset podPreemptionPolicy on node %s failed: %v", node.Name, err)
+			}
+		})
+
 		// Divide the available CPU into 20 parts:
 		// Pod 1 starts with 15 parts, Pods 2-5 start with 1 part each (19 parts total).
 		// When Pods 2-5 are resized to 15 parts, total requested becomes 33 parts (> 20 parts, deferred).
@@ -1243,10 +1256,14 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 		midPriPod = createdPods[1]
 		preemptor = createdPods[2]
 
-		// Resize midPriPod to 45% CPU and preemptor to 50% CPU
-		// midPriPod target (45%) + preemptor target (50%) = 95% <= 100% node capacity (midPriPod is NOT evicted)
-		midPriTargetCPU := resource.NewMilliQuantity(int64(float64(availableMillis)*0.45), resource.DecimalSI)
-		preemptorTargetCPU := resource.NewMilliQuantity(int64(float64(availableMillis)*0.50), resource.DecimalSI)
+		// Resize midPriPod to 60% CPU and preemptor to 60% CPU.
+		// Both desired targets together (60% + 60% = 120%) exceed 100% node capacity,
+		// but midPriPod's allocated CPU (20%) + preemptor's target CPU (60%) = 80% <= 100%.
+		// Preemption reprieve uses midPriPod's allocated resources (20%) rather than its
+		// unactuated desired resources (60%), so only victim (50%) is preempted and midPriPod
+		// is preserved in the Deferred state until capacity is freed.
+		midPriTargetCPU := resource.NewMilliQuantity(int64(float64(availableMillis)*0.60), resource.DecimalSI)
+		preemptorTargetCPU := resource.NewMilliQuantity(int64(float64(availableMillis)*0.60), resource.DecimalSI)
 
 		patchMidPriToDeferred := fmt.Sprintf(`{
 			"spec": {
@@ -1269,13 +1286,13 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			}
 		}`, preemptorTargetCPU.MilliValue(), preemptorTargetCPU.MilliValue())
 
-		ginkgo.By(fmt.Sprintf("Resize mid-priority pod '%s' to 45%% CPU (exceeds free node capacity, should defer)", midPriPod.Name))
+		ginkgo.By(fmt.Sprintf("Resize mid-priority pod '%s' to 60%% CPU (exceeds free node capacity, should defer)", midPriPod.Name))
 		midPriPod, err = f.ClientSet.CoreV1().Pods(midPriPod.Namespace).Patch(ctx,
 			midPriPod.Name, types.StrategicMergePatchType, []byte(patchMidPriToDeferred), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch mid-pri pod for resize")
 		waitForPodDeferred(ctx, f, midPriPod)
 
-		ginkgo.By(fmt.Sprintf("Resize high-priority preemptor pod '%s' to 50%% CPU (exceeds free node capacity, should defer)", preemptor.Name))
+		ginkgo.By(fmt.Sprintf("Resize high-priority preemptor pod '%s' to 60%% CPU (exceeds free node capacity, should defer)", preemptor.Name))
 		preemptor, err = f.ClientSet.CoreV1().Pods(preemptor.Namespace).Patch(ctx,
 			preemptor.Name, types.StrategicMergePatchType, []byte(patchPreemptorToDeferred), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch preemptor pod for resize")
@@ -1305,8 +1322,15 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			},
 		}
 		podresize.WaitForPodResizeActuation(ctx, f, podClient, preemptor, expectedPreemptorResized)
+		actuatedPreemptor, err := podClient.Get(ctx, preemptor.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get actuated preemptor pod")
+		gomega.Expect(helpers.IsPodResizeSchedulerEvaluationCompleted(actuatedPreemptor)).To(gomega.BeFalseBecause("SchedulerEvaluationCompleted condition should be absent once resize is actuated"))
 
-		ginkgo.By(fmt.Sprintf("Verify that mid-priority pod '%s' is preserved and successfully actuated after victim eviction", midPriPod.Name))
+		ginkgo.By(fmt.Sprintf("Verify that mid-priority pod '%s' was reprieved and its resize is still deferred", midPriPod.Name))
+		waitForPodDeferred(ctx, f, midPriPod)
+
+		ginkgo.By(fmt.Sprintf("Delete preemptor pod '%s' and verify mid-priority pod '%s' resize to 60%% CPU is actuated", preemptor.Name, midPriPod.Name))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, preemptor), "failed to delete preemptor pod")
 		expectedMidPriResized := []podresize.ResizableContainerInfo{
 			{
 				Name:      "cc",

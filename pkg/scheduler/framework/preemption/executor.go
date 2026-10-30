@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -63,6 +64,8 @@ type ExecutorPreemptor interface {
 	Priority() int32
 	// Type returns the type of the preemptor.
 	Type() fwk.EntityKeyType
+	// IsResize returns true if the preemptor is a deferred resize pod.
+	IsResize() bool
 }
 
 // Executor is responsible for actuating the preemption process based on the provided candidate.
@@ -166,7 +169,10 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 // ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of victims to be evicted.
 // victims to be evicted.
 func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.PreemptionCandidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
-	podPreemptor := &podExecutorPreemptor{Pod: preemptorPod}
+	podPreemptor := &podExecutorPreemptor{
+		Pod:      preemptorPod,
+		isResize: e.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(preemptorPod),
+	}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podPreemptor, pluginName)
 		return nil
@@ -230,14 +236,15 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
+		operation := metrics.OperationToLabel(preemptor.IsResize())
 		defer func() {
-			metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), result).Observe(metrics.SinceInSeconds(startTime))
+			metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), result, operation).Observe(metrics.SinceInSeconds(startTime))
 		}()
 		defer func() {
 			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		}()
 		defer func() {
-			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result, operation).Inc()
 		}()
 		defer func() {
 			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
@@ -315,7 +322,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	startTime := time.Now()
 	metricsResult := metrics.GoroutineResultSuccess
 	defer func() {
-		metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metricsResult).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metricsResult, metrics.OperationToLabel(preemptor.IsResize())).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	fh := e.fh
@@ -357,7 +364,11 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
 	if preemptor.Type() == fwk.PodKeyType {
-		metrics.PreemptionVictims.Observe(numVictims)
+		if preemptor.IsResize() {
+			metrics.ResizePreemptionVictims.Observe(numVictims)
+		} else {
+			metrics.PreemptionVictims.Observe(numVictims)
+		}
 	} else {
 		preemptorLabel := metrics.EntityTypeToLabel(preemptor.Type())
 		metrics.WorkloadPreemptionVictims.WithLabelValues(preemptorLabel).Observe(numVictims)
@@ -370,7 +381,7 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 
 	numPDBViolations := float64(candidate.Victims().NumPDBViolations)
 	if numPDBViolations > 0 {
-		metrics.PreemptionPDBViolations.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Add(numPDBViolations)
+		metrics.PreemptionPDBViolations.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metrics.OperationToLabel(preemptor.IsResize())).Add(numPDBViolations)
 	}
 }
 
@@ -485,6 +496,7 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, prio
 // podExecutorPreemptor is a wrapper around single pod used by preemption execution.
 type podExecutorPreemptor struct {
 	*v1.Pod
+	isResize bool
 }
 
 func (p *podExecutorPreemptor) UID() types.UID {
@@ -509,6 +521,10 @@ func (p *podExecutorPreemptor) Priority() int32 {
 
 func (p *podExecutorPreemptor) Type() fwk.EntityKeyType {
 	return fwk.PodKeyType
+}
+
+func (p *podExecutorPreemptor) IsResize() bool {
+	return p.isResize
 }
 
 // podGroupExecutorPreemptor is a wrapper around PodGroupInfo used by preemption execution.
@@ -544,4 +560,8 @@ func (p *podGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
 
 func (p *podGroupExecutorPreemptor) Type() fwk.EntityKeyType {
 	return p.GetType()
+}
+
+func (p *podGroupExecutorPreemptor) IsResize() bool {
+	return false
 }

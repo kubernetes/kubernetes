@@ -29,6 +29,8 @@ type Entity interface {
 	Size() int
 	// Type returns the entity type (e.g. "pod", "podgroup", or "compositepodgroup").
 	Type() fwk.EntityKeyType
+	// IsResize returns true if the entity represents a deferred in-place pod resize.
+	IsResize() bool
 }
 
 // MetricRecorder represents a metric recorder which maintains a metric through Add(), Remove(), Update(), and Clear().
@@ -48,7 +50,7 @@ var _ MetricRecorder = &QueuedEntitiesRecorder{}
 // QueuedEntitiesRecorder is an implementation of MetricRecorder.
 type QueuedEntitiesRecorder struct {
 	pods     metrics.GaugeMetric
-	entities func(entityType string) metrics.GaugeMetric
+	entities func(entityType, operation string) metrics.GaugeMetric
 }
 
 // NewActiveEntitiesRecorder returns ActivePods and ActiveEntities in a Prometheus metric fashion.
@@ -99,31 +101,38 @@ func EntityTypeToLabel(entityType fwk.EntityKeyType) string {
 // Add records the addition of an entity.
 // It increments pending pods and queued entities metric counters.
 func (r *QueuedEntitiesRecorder) Add(entity Entity) {
-	r.pods.Add(float64(entity.Size()))
-	r.entities(EntityTypeToLabel(entity.Type())).Inc()
+	if !entity.IsResize() {
+		r.pods.Add(float64(entity.Size()))
+	}
+	r.entities(EntityTypeToLabel(entity.Type()), OperationToLabel(entity.IsResize())).Inc()
 }
 
 // Remove records the removal of an entity.
 // It decrements pending pods and queued entities metric counters.
 func (r *QueuedEntitiesRecorder) Remove(entity Entity) {
-	r.pods.Add(-float64(entity.Size()))
-	r.entities(EntityTypeToLabel(entity.Type())).Dec()
+	if !entity.IsResize() {
+		r.pods.Add(-float64(entity.Size()))
+	}
+	r.entities(EntityTypeToLabel(entity.Type()), OperationToLabel(entity.IsResize())).Dec()
 }
 
 // Update records the update of an entity.
 // It updates pending pods metric counter only.
 // It shouldn't update queued entities metric, because the entity type cannot be changed, and an entity will always be a single object.
 func (r *QueuedEntitiesRecorder) Update(oldEntity, newEntity Entity) {
-	diff := newEntity.Size() - oldEntity.Size()
-	r.pods.Add(float64(diff))
+	if !newEntity.IsResize() {
+		diff := newEntity.Size() - oldEntity.Size()
+		r.pods.Add(float64(diff))
+	}
 }
 
 // Clear resets pending pods and queued entities metric counters to 0.
 func (r *QueuedEntitiesRecorder) Clear() {
 	r.pods.Set(float64(0))
-	r.entities(Pod).Set(float64(0))
-	r.entities(PodGroup).Set(float64(0))
-	r.entities(CompositePodGroup).Set(float64(0))
+	r.entities(Pod, OperationInitialPlacement).Set(float64(0))
+	r.entities(Pod, OperationPodResize).Set(float64(0))
+	r.entities(PodGroup, OperationInitialPlacement).Set(float64(0))
+	r.entities(CompositePodGroup, OperationInitialPlacement).Set(float64(0))
 }
 
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread

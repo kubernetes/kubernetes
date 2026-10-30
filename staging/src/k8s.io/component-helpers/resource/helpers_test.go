@@ -5426,9 +5426,30 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 	if IsPodResizeInfeasible(pod) {
 		t.Errorf("expected IsPodResizeInfeasible to be false")
 	}
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false")
+	}
 	pod.Status.Conditions[0].Reason = "Other"
 	if IsPodResizeDeferred(pod) {
 		t.Errorf("expected IsPodResizeDeferred to be false")
+	}
+
+	pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+		Type:   v1.SchedulerEvaluationCompleted,
+		Status: v1.ConditionTrue,
+		Reason: v1.PodReasonDeferredPodResize,
+	})
+	if !IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be true")
+	}
+	pod.Status.Conditions[1].Reason = "Other"
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when reason is not DeferredPodResize")
+	}
+	pod.Status.Conditions[1].Reason = v1.PodReasonDeferredPodResize
+	pod.Status.Conditions[1].Status = v1.ConditionFalse
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when status is False")
 	}
 
 	if !SupportedPodLevelResources().Has(v1.ResourceCPU) {

@@ -33,6 +33,8 @@ type Item interface {
 	Size() int
 	// Type returns the type of the item, used for metrics. Refers to the scheduling entity, which is either 'pod' or 'podgroup'.
 	Type() fwk.EntityKeyType
+	// IsResize returns true if the item represents a deferred in-place pod resize.
+	IsResize() bool
 }
 
 // KeyFunc is a function type to get the key from an object.

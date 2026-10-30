@@ -18,15 +18,33 @@ package deferredpodscheduling
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
+
+func init() {
+	metrics.Register()
+}
 
 func TestDeferredPodScheduling_PreFilter(t *testing.T) {
 	tests := []struct {
@@ -339,45 +357,168 @@ func TestDeferredPodScheduling_isSchedulableAfterNodeAdd(t *testing.T) {
 	}
 }
 
-func TestDeferredPodScheduling_Permit(t *testing.T) {
+func TestDeferredPodScheduling_Bind(t *testing.T) {
+	deferredPod := st.MakePod().Namespace("default").Name("pod1").UID("uid1").Node("node1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nonDeferredPod := st.MakePod().Namespace("default").Name("pod1").UID("uid1").Node("node1").Obj()
+	evaluatedPod := st.MakePod().Namespace("default").Name("pod1").UID("uid1").Node("node1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+	recreatedPod := st.MakePod().Namespace("default").Name("pod1").UID("uid2").Node("node1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	resizedPod := deferredPod.DeepCopy()
+	resizedPod.Generation++
+
 	tests := []struct {
-		name       string
-		pod        *v1.Pod
-		gateOn     bool
-		wantStatus *fwk.Status
+		name      string
+		pod       *v1.Pod
+		cachedPod *v1.Pod // nil if the pod is missing from the lister
+		gateOn    bool
+		patchErr  error
+		wantCode  fwk.Code
+		wantPatch bool
+		// wantCondition is whether the API pod has SchedulerEvaluationCompleted afterwards.
+		wantCondition bool
 	}{
 		{
-			name: "feature gate off, deferred pod -> success/nil",
-			pod: st.MakePod().Name("pod1").Node("node1").
-				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			gateOn:     false,
-			wantStatus: nil,
+			name:      "feature gate off, deferred pod -> skip",
+			pod:       deferredPod,
+			cachedPod: deferredPod,
+			wantCode:  fwk.Skip,
 		},
 		{
-			name:       "feature gate on, non-deferred pod -> success/nil",
-			pod:        st.MakePod().Name("pod1").Node("node1").Obj(),
-			gateOn:     true,
-			wantStatus: nil,
+			name:      "feature gate on, non-deferred pod -> skip",
+			pod:       nonDeferredPod,
+			cachedPod: nonDeferredPod,
+			gateOn:    true,
+			wantCode:  fwk.Skip,
 		},
 		{
-			name: "feature gate on, deferred pod -> reject with UnschedulableAndUnresolvable",
-			pod: st.MakePod().Name("pod1").Node("node1").
-				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			gateOn:     true,
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod resize fits, waiting for Kubelet actuation"),
+			name:          "feature gate on, deferred pod -> patches SchedulerEvaluationCompleted and returns nil",
+			pod:           deferredPod,
+			cachedPod:     deferredPod,
+			gateOn:        true,
+			wantPatch:     true,
+			wantCondition: true,
+		},
+		{
+			name:      "feature gate on, deferred pod no longer deferred in lister -> skips patch and returns nil",
+			pod:       deferredPod,
+			cachedPod: nonDeferredPod,
+			gateOn:    true,
+		},
+		{
+			name:          "feature gate on, condition already set in lister -> skips patch and returns nil",
+			pod:           deferredPod,
+			cachedPod:     evaluatedPod,
+			gateOn:        true,
+			wantCondition: true,
+		},
+		{
+			name:      "feature gate on, pod recreated -> skips patch and returns nil",
+			pod:       deferredPod,
+			cachedPod: recreatedPod,
+			gateOn:    true,
+		},
+		{
+			name:   "feature gate on, pod deleted -> skips patch and returns nil",
+			pod:    deferredPod,
+			gateOn: true,
+		},
+		{
+			name:      "feature gate on, spec changed in lister -> error, so the binding cycle requeues the pod",
+			pod:       deferredPod,
+			cachedPod: resizedPod,
+			gateOn:    true,
+			wantCode:  fwk.Error,
+		},
+		{
+			name:      "feature gate on, patch fails -> error, so the binding cycle requeues the pod",
+			pod:       deferredPod,
+			cachedPod: deferredPod,
+			gateOn:    true,
+			patchErr:  errors.New("injected patch error"),
+			wantCode:  fwk.Error,
+			wantPatch: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pl := &DeferredPodScheduling{
-				enableInPlacePodVerticalScalingSchedulerPreemption: tt.gateOn,
-			}
-			status, _ := pl.Permit(context.Background(), nil, tt.pod, "node1")
-			if !statusEqual(status, tt.wantStatus) {
-				t.Errorf("Permit status = %v, want %v", status, tt.wantStatus)
-			}
-		})
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", tt.name, asyncAPICallsEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				var objs []runtime.Object
+				if tt.cachedPod != nil {
+					objs = append(objs, tt.cachedPod.DeepCopy())
+				}
+				client := fake.NewClientset(objs...)
+				if tt.patchErr != nil {
+					client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						return true, nil, tt.patchErr
+					})
+				}
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				for _, obj := range objs {
+					if err := informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(obj); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				var apiDispatcher *apidispatcher.APIDispatcher
+				if asyncAPICallsEnabled {
+					apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
+					apiDispatcher.Run(logger)
+					defer apiDispatcher.Close()
+				}
+				fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+					frameworkruntime.WithClientSet(client),
+					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithAPIDispatcher(apiDispatcher),
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if asyncAPICallsEnabled {
+					ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+					fh.SetAPICacher(apicache.New(queue, nil))
+				}
+
+				pl := &DeferredPodScheduling{
+					handle: fh,
+					enableInPlacePodVerticalScalingSchedulerPreemption: tt.gateOn,
+				}
+				status := pl.Bind(ctx, nil, tt.pod.DeepCopy(), "node1")
+				if status.Code() != tt.wantCode {
+					t.Errorf("Bind status = %v, want code %v", status, tt.wantCode)
+				}
+
+				patched := false
+				for _, action := range client.Actions() {
+					if action.GetVerb() == "patch" {
+						patched = true
+					}
+				}
+				if patched != tt.wantPatch {
+					t.Errorf("patched = %v, want %v", patched, tt.wantPatch)
+				}
+				if tt.cachedPod == nil {
+					return
+				}
+
+				updatedPod, err := client.CoreV1().Pods(tt.pod.Namespace).Get(ctx, tt.pod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				gotCondition := resource.IsPodResizeSchedulerEvaluationCompleted(updatedPod)
+				if gotCondition != tt.wantCondition {
+					t.Errorf("IsPodResizeSchedulerEvaluationCompleted = %v, want %v", gotCondition, tt.wantCondition)
+				}
+			})
+		}
 	}
 }
 

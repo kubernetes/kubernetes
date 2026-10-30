@@ -42,6 +42,8 @@ const (
 	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
+	// AssignedPodResize is the event when an assigned pod with a deferred resize is added to the scheduling queue.
+	AssignedPodResize = "AssignedPodResize"
 )
 
 var (
@@ -81,7 +83,6 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod b
 	podChangeExtractors := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
-		extractPodScaleUp,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
 		extractPodGeneratedResourceClaimChange,
@@ -109,6 +110,7 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)
@@ -123,31 +125,6 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 		if oldReq.MilliValue() > newReq.MilliValue() {
 			// The resource request of rName is scaled down.
 			return fwk.UpdatePodScaleDown
-		}
-	}
-
-	return fwk.None
-}
-
-// extractPodScaleUp interprets the update of a pod and returns PodRequestScaledUp event if any pod's resource request(s) is scaled up.
-func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
-	opt := resource.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-	}
-	newPodRequests := resource.PodRequests(newPod, opt)
-	oldPodRequests := resource.PodRequests(oldPod, opt)
-
-	for rName, newReq := range newPodRequests {
-		oldReq, ok := oldPodRequests[rName]
-		if !ok {
-			// The resource request of rName is added.
-			return fwk.UpdatePodScaleUp
-		}
-
-		if newReq.MilliValue() > oldReq.MilliValue() {
-			// The resource request of rName is scaled up.
-			return fwk.UpdatePodScaleUp
 		}
 	}
 

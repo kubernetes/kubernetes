@@ -3897,6 +3897,11 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// SchedulerEvaluationCompleted indicates that the scheduler has completed its evaluation
+	// (and any required preemption) for a deferred resize of an already-scheduled pod.
+	// This condition is only ever set with status True. Rather than transitioning to False, it is
+	// removed by the kubelet once it re-evaluates the resize, or if the resize is no longer deferred.
+	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
@@ -3934,6 +3939,10 @@ const (
 	// PodReasonError reason in PodResizeInProgress pod condition indicates that an error occurred while
 	// actuating the resize.
 	PodReasonError = "Error"
+
+	// PodReasonDeferredPodResize reason in SchedulerEvaluationCompleted pod condition indicates
+	// that the scheduler has completed feasibility evaluation or preemption for a deferred pod resize.
+	PodReasonDeferredPodResize = "DeferredPodResize"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -7028,7 +7037,7 @@ type NodeSpec struct {
 	DoNotUseExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 
 	// podPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +featureGate=InPlacePodVerticalScalingSchedulerPreemption
 	// +optional
 	// +k8s:optional
@@ -7041,7 +7050,7 @@ type NodePodPreemptionPolicy struct {
 	// disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
 	// that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
 	// If this list is non-empty, resize-induced preemption is disabled on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +listType=set
 	// +k8s:listType=set
 	// +optional

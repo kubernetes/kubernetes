@@ -358,6 +358,17 @@ func IsPodResizeDeferred(pod *v1.Pod) bool {
 	return false
 }
 
+// IsPodResizeSchedulerEvaluationCompleted returns true if the pod condition SchedulerEvaluationCompleted
+// is set to true with reason DeferredPodResize.
+func IsPodResizeSchedulerEvaluationCompleted(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.SchedulerEvaluationCompleted {
+			return condition.Status == v1.ConditionTrue && condition.Reason == v1.PodReasonDeferredPodResize
+		}
+	}
+	return false
+}
+
 // applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values
 func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.ResourceList {
 	cp := v1.ResourceList{}

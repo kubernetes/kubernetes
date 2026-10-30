@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -84,6 +85,17 @@ type frameworkImpl struct {
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
+
+	resizePreFilterPlugins  []fwk.PreFilterPlugin
+	resizeFilterPlugins     []fwk.FilterPlugin
+	resizePostFilterPlugins []fwk.PostFilterPlugin
+	resizePreScorePlugins   []fwk.PreScorePlugin
+	resizeScorePlugins      []fwk.ScorePlugin
+	resizeReservePlugins    []fwk.ReservePlugin
+	resizePreBindPlugins    []fwk.PreBindPlugin
+	resizeBindPlugins       []fwk.BindPlugin
+	resizePostBindPlugins   []fwk.PostBindPlugin
+	resizePermitPlugins     []fwk.PermitPlugin
 
 	clientSet                      clientset.Interface
 	kubeConfig                     *restclient.Config
@@ -536,6 +548,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	// Logs Enabled Plugins at each extension point, taking default plugins, given config, and multipoint into consideration
 	logger.V(2).Info("the scheduler starts to work with those plugins", "Plugins", *f.ListPlugins())
 	f.setInstrumentedPlugins()
+	f.setResizePlugins()
 	return f, nil
 }
 
@@ -577,6 +590,45 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 			metric:      metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.Score, f.profileName),
 		}
 	}
+}
+
+// setResizePlugins populates the per-profile plugin lists used for deferred in-place pod resizes.
+func (f *frameworkImpl) setResizePlugins() {
+	f.resizePreFilterPlugins = relevantPlugins(f.preFilterPlugins, f.pluginsMap)
+	f.resizeFilterPlugins = relevantPlugins(f.filterPlugins, f.pluginsMap)
+	f.resizePostFilterPlugins = relevantPlugins(f.postFilterPlugins, f.pluginsMap)
+	f.resizePreScorePlugins = relevantPlugins(f.preScorePlugins, f.pluginsMap)
+	f.resizeScorePlugins = relevantPlugins(f.scorePlugins, f.pluginsMap)
+	f.resizeReservePlugins = relevantPlugins(f.reservePlugins, f.pluginsMap)
+	f.resizePreBindPlugins = relevantPlugins(f.preBindPlugins, f.pluginsMap)
+	f.resizeBindPlugins = relevantPlugins(f.bindPlugins, f.pluginsMap)
+	f.resizePostBindPlugins = relevantPlugins(f.postBindPlugins, f.pluginsMap)
+	f.resizePermitPlugins = relevantPlugins(f.permitPlugins, f.pluginsMap)
+}
+
+func relevantPlugins[T fwk.Plugin](plugins []T, pluginsMap map[string]fwk.Plugin) []T {
+	var relevant []T
+	for _, pl := range plugins {
+		raw := fwk.Plugin(pl)
+		if mapped, ok := pluginsMap[pl.Name()]; ok {
+			raw = mapped
+		}
+		if framework.IsRelevantForPodResize(raw) {
+			relevant = append(relevant, pl)
+		}
+	}
+	return relevant
+}
+
+func (f *frameworkImpl) isPodResize(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && pod != nil && resource.IsPodResizeDeferred(pod)
+}
+
+func pluginsForPod[T fwk.Plugin](f *frameworkImpl, pod *v1.Pod, all, resize []T) []T {
+	if f.isPodResize(pod) {
+		return resize
+	}
+	return all
 }
 
 func (f *frameworkImpl) SetPodNominator(n fwk.PodNominator) {
@@ -973,7 +1025,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 		logger = klog.LoggerWithName(logger, "PreFilter")
 	}
 	var returnStatus *fwk.Status
-	for _, pl := range f.preFilterPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.preFilterPlugins, f.resizePreFilterPlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1042,7 +1094,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "PreFilterExtension")
 	}
-	for _, pl := range f.preFilterPlugins {
+	for _, pl := range pluginsForPod(f, podToSchedule, f.preFilterPlugins, f.resizePreFilterPlugins) {
 		if pl.PreFilterExtensions() == nil || state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
@@ -1087,7 +1139,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "PreFilterExtension")
 	}
-	for _, pl := range f.preFilterPlugins {
+	for _, pl := range pluginsForPod(f, podToSchedule, f.preFilterPlugins, f.resizePreFilterPlugins) {
 		if pl.PreFilterExtensions() == nil || state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
@@ -1137,7 +1189,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
-	for _, pl := range f.filterPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.filterPlugins, f.resizeFilterPlugins) {
 		if state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
@@ -1192,7 +1244,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state fwk.Cycl
 	var result *fwk.PostFilterResult
 	var reasons []string
 	var rejectorPlugin string
-	for _, pl := range f.postFilterPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.postFilterPlugins, f.resizePostFilterPlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1392,7 +1444,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "PreScore")
 	}
-	for _, pl := range f.preScorePlugins {
+	for _, pl := range pluginsForPod(f, pod, f.preScorePlugins, f.resizePreScorePlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1432,7 +1484,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	allNodePluginScores := make([]fwk.NodePluginScores, len(nodes))
-	plugins := f.nonSkippedScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(pod, state)
 	if len(plugins) == 0 {
 		for i, nodeInfo := range nodes {
 			allNodePluginScores[i] = fwk.NodePluginScores{
@@ -1494,7 +1546,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 }
 
 func (f *frameworkImpl) RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status) {
-	plugins := f.nonSkippedScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(pod, state)
 	if len(plugins) == 0 {
 		return nil, nil
 	}
@@ -1520,7 +1572,7 @@ func (f *frameworkImpl) runRawScorePlugins(ctx context.Context, state fwk.CycleS
 
 func (f *frameworkImpl) NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
 	scores []fwk.NodePluginScores) *fwk.Status {
-	plugins := f.nonSkippedScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(pod, state)
 	if len(plugins) == 0 {
 		for i := range scores {
 			scores[i].Scores = make([]fwk.PluginScore, 0)
@@ -1606,9 +1658,10 @@ func (f *frameworkImpl) normalizeScores(ctx context.Context, state fwk.CycleStat
 }
 
 // nonSkippedScorePlugins returns score plugins that have not been marked for skipping in the cycle state.
-func (f *frameworkImpl) nonSkippedScorePlugins(state fwk.CycleState) []fwk.ScorePlugin {
-	plugins := make([]fwk.ScorePlugin, 0, len(f.scorePlugins))
-	for _, pl := range f.scorePlugins {
+func (f *frameworkImpl) nonSkippedScorePlugins(pod *v1.Pod, state fwk.CycleState) []fwk.ScorePlugin {
+	scorePlugins := pluginsForPod(f, pod, f.scorePlugins, f.resizeScorePlugins)
+	plugins := make([]fwk.ScorePlugin, 0, len(scorePlugins))
+	for _, pl := range scorePlugins {
 		if !state.GetSkipScorePlugins().Has(pl.Name()) {
 			plugins = append(plugins, pl)
 		}
@@ -1830,7 +1883,7 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		return nil
 	}
 
-	pluginGroups := f.getPreBindPluginGroups(state, skippedPlugins, parallelPlugins)
+	pluginGroups := groupPreBindPlugins(pluginsForPod(f, pod, f.preBindPlugins, f.resizePreBindPlugins), skippedPlugins, parallelPlugins)
 	for _, plugins := range pluginGroups {
 		// If there is just a single plugin in the group, running it in a separate goroutine
 		// does not provide any benefit.
@@ -1858,9 +1911,13 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 // into groups of plugins that can be run in parallel.
 // The returned value consists of non-skipped plugins only.
 func (f *frameworkImpl) getPreBindPluginGroups(state fwk.CycleState, skippedPlugins, parallelPlugins sets.Set[string]) [][]fwk.PreBindPlugin {
+	return groupPreBindPlugins(f.preBindPlugins, skippedPlugins, parallelPlugins)
+}
+
+func groupPreBindPlugins(preBindPlugins []fwk.PreBindPlugin, skippedPlugins, parallelPlugins sets.Set[string]) [][]fwk.PreBindPlugin {
 	var groups [][]fwk.PreBindPlugin
 	var group []fwk.PreBindPlugin
-	for _, pl := range f.preBindPlugins {
+	for _, pl := range preBindPlugins {
 		if parallelPlugins.Has(pl.Name()) {
 			if !skippedPlugins.Has(pl.Name()) {
 				group = append(group, pl)
@@ -1910,7 +1967,7 @@ func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.Cycl
 	skipPlugins := sets.New[string]()
 	parallelPlugins := sets.New[string]()
 	returningStatus := fwk.NewStatus(fwk.Skip)
-	for _, pl := range f.preBindPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.preBindPlugins, f.resizePreBindPlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1956,7 +2013,8 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Bind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	if len(f.bindPlugins) == 0 {
+	bindPlugins := pluginsForPod(f, pod, f.bindPlugins, f.resizeBindPlugins)
+	if len(bindPlugins) == 0 {
 		return fwk.NewStatus(fwk.Skip, "")
 	}
 	logger := klog.FromContext(ctx)
@@ -1964,7 +2022,7 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "Bind")
 	}
-	for _, pl := range f.bindPlugins {
+	for _, pl := range bindPlugins {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2010,7 +2068,7 @@ func (f *frameworkImpl) RunPostBindPlugins(ctx context.Context, state fwk.CycleS
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "PostBind")
 	}
-	for _, pl := range f.postBindPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.postBindPlugins, f.resizePostBindPlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2046,7 +2104,7 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.
 		logger = klog.LoggerWithName(logger, "Reserve")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for _, pl := range f.reservePlugins {
+	for _, pl := range pluginsForPod(f, pod, f.reservePlugins, f.resizeReservePlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2092,8 +2150,9 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fw
 		logger = klog.LoggerWithName(logger, "Unreserve")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
-		pl := f.reservePlugins[i]
+	reservePlugins := pluginsForPod(f, pod, f.reservePlugins, f.resizeReservePlugins)
+	for i := len(reservePlugins) - 1; i >= 0; i-- {
+		pl := reservePlugins[i]
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2131,7 +2190,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 		logger = klog.LoggerWithName(logger, "Permit")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for _, pl := range f.permitPlugins {
+	for _, pl := range pluginsForPod(f, pod, f.permitPlugins, f.resizePermitPlugins) {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2322,7 +2381,9 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	startTime := time.Now()
 	s := <-waitingPod.s
-	metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !resource.IsPodResizeDeferred(pod) {
+		metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}
 
 	if !s.IsSuccess() {
 		if s.IsRejected() {

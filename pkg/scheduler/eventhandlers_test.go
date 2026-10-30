@@ -2132,3 +2132,213 @@ func TestRecreatedPodGroupQueueingHints(t *testing.T) {
 		})
 	}
 }
+
+func TestEventHandlers_DeferredResizePodGroupMember(t *testing.T) {
+	member := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").Obj()
+	deferredMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluatedMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+
+	tests := []struct {
+		name          string
+		initialPod    *v1.Pod
+		updatedPod    *v1.Pod
+		deletePod     bool
+		expectInQueue bool
+		// expectMember is whether the pod still counts toward its pod group,
+		// both in the cache's assigned pods and in the gang's quorum.
+		expectMember bool
+	}{
+		{
+			name:          "add assigned member with deferred resize",
+			initialPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:          "assigned member transitions to deferred resize",
+			initialPod:    member,
+			updatedPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:         "assigned member transitions out of deferred resize",
+			initialPod:   deferredMember,
+			updatedPod:   member,
+			expectMember: true,
+		},
+		{
+			name:         "scheduler evaluation completes for assigned member with deferred resize",
+			initialPod:   deferredMember,
+			updatedPod:   evaluatedMember,
+			expectMember: true,
+		},
+		{
+			name:          "SchedulerEvaluationCompleted removed from assigned member that is still deferred",
+			initialPod:    evaluatedMember,
+			updatedPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:       "delete assigned member with deferred resize",
+			initialPod: deferredMember,
+			deletePod:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                              true,
+				features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// The sentinel only requeues on EventUnscheduledPodAdd, so it reaches activeQ
+			// only if a handler broadcasts that event.
+			sentinel := &framework.QueuedPodInfo{
+				PodInfo: &framework.PodInfo{
+					Pod: st.MakePod().Name("sentinel").Namespace("ns1").UID("sentinel").SchedulerName(testSchedulerName).Obj(),
+				},
+				QueueingParams: framework.QueueingParams{
+					UnschedulablePlugins: sets.New("fooPlugin"),
+				},
+			}
+			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+				testSchedulerName: {
+					framework.EventUnscheduledPodAdd: {
+						{
+							PluginName: "fooPlugin",
+							QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+								return fwk.Queue, nil
+							},
+						},
+					},
+				},
+			}
+			sched := &Scheduler{
+				Cache: internalcache.New(ctx, nil, true /* GenericWorkload */, false /* CompositePodGroup */),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, newDefaultQueueSort(),
+					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithPodInitialBackoffDuration(0),
+					internalqueue.WithPodMaxBackoffDuration(0),
+				),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
+				logger:                   logger,
+				Profiles:                 profile.Map{testSchedulerName: nil},
+			}
+
+			sched.addPodGroup(st.MakePodGroup().Namespace("ns1").Name("pg1").MinCount(1).Obj())
+			sched.SchedulingQueue.Add(ctx, sentinel.Pod)
+			if _, err := sched.SchedulingQueue.Pop(logger); err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, sentinel, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+				t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+			}
+
+			sched.addPod(tt.initialPod)
+			if tt.updatedPod != nil {
+				sched.updatePod(tt.initialPod, tt.updatedPod)
+			}
+			if tt.deletePod {
+				sched.deletePod(tt.initialPod)
+			}
+
+			// GetPod would look a pod group member up in its group, but deferred pods are queued individually.
+			pendingPods, _ := sched.SchedulingQueue.PendingPods()
+			inQueue := false
+			for _, p := range pendingPods {
+				if p.UID == tt.initialPod.UID {
+					inQueue = true
+				}
+			}
+			if inQueue != tt.expectInQueue {
+				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", inQueue, tt.expectInQueue)
+			}
+			for _, p := range sched.SchedulingQueue.PodsInActiveQ() {
+				if p.UID == sentinel.Pod.UID {
+					t.Errorf("Sentinel pod moved to activeQ: a handler broadcast %s for an assigned pod", framework.EventUnscheduledPodAdd.Label())
+				}
+			}
+
+			pgs, err := sched.Cache.PodGroupStates().Get("ns1", "pg1")
+			if err != nil {
+				t.Fatalf("Failed to get pod group state: %v", err)
+			}
+			if inAssigned := pgs.AssignedPods().Has(tt.initialPod.UID); inAssigned != tt.expectMember {
+				t.Errorf("Unexpected pod in AssignedPods of PodGroupState: got %v, want %v", inAssigned, tt.expectMember)
+			}
+			readiness, err := sched.podGroupHierarchyTracker.FindRootGroupReadiness(fwk.PodGroupKey("ns1", "pg1"))
+			if err != nil || readiness == nil {
+				t.Fatalf("Failed to get pod group readiness: readiness=%v, err=%v", readiness, err)
+			}
+			if readiness.IsReady != tt.expectMember {
+				t.Errorf("Unexpected gang readiness with minCount=1: got %v, want %v", readiness.IsReady, tt.expectMember)
+			}
+		})
+	}
+}
+
+func TestEventHandlers_SchedulerEvaluationCompleted(t *testing.T) {
+	deferred := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluated := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+
+	tests := []struct {
+		name          string
+		initialPod    *v1.Pod
+		updatedPod    *v1.Pod // nil for an add event
+		expectInQueue bool
+	}{
+		{
+			name:       "add: evaluated deferred resize",
+			initialPod: evaluated,
+		},
+		{
+			name:       "update: scheduler evaluation completes",
+			initialPod: deferred,
+			updatedPod: evaluated,
+		},
+		{
+			name:          "update: condition removed while the resize is still deferred",
+			initialPod:    evaluated,
+			updatedPod:    deferred,
+			expectInQueue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, false, false /* CompositePodGroup */),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+				Profiles:        profile.Map{testSchedulerName: nil},
+			}
+
+			sched.addPod(tt.initialPod)
+			if tt.updatedPod != nil {
+				sched.updatePod(tt.initialPod, tt.updatedPod)
+			}
+
+			pod := tt.initialPod
+			if _, inQueue := sched.SchedulingQueue.GetPod(ctx, pod.Name, pod.Namespace, pod.Spec.SchedulingGroup); inQueue != tt.expectInQueue {
+				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", inQueue, tt.expectInQueue)
+			}
+		})
+	}
+}
