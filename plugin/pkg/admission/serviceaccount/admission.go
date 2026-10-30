@@ -38,6 +38,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/ptr"
@@ -145,10 +146,19 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if shouldIgnore(a) {
 		return nil
 	}
-	if a.GetOperation() != admission.Create {
-		// we only mutate pods during create requests
+	switch {
+	case a.GetOperation() == admission.Create:
+		return s.admitCreate(ctx, a, o)
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "dynamic":
+		s.admitDynamicUpdate(a)
+		return nil
+	default:
+		// we only mutate pods during create and dynamic update requests
 		return nil
 	}
+}
+
+func (s *Plugin) admitCreate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// Don't modify the spec of mirror pods.
@@ -187,18 +197,25 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	if shouldIgnore(a) {
 		return nil
 	}
-
 	pod := a.GetObject().(*api.Pod)
-
-	if a.GetOperation() == admission.Update && a.GetSubresource() == "ephemeralcontainers" {
+	switch {
+	case a.GetOperation() == admission.Create:
+		return s.validateCreate(pod, a)
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "ephemeralcontainers":
 		return s.limitEphemeralContainerSecretReferences(pod, a)
-	}
-
-	if a.GetOperation() != admission.Create {
-		// we only validate pod specs during create requests
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "dynamic":
+		oldPod, ok := a.GetOldObject().(*api.Pod)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected an old pod but got a %T", a.GetOldObject()))
+		}
+		return s.limitDynamicContainerSecretReferences(pod, oldPod, a)
+	default:
+		// we only validate pod specs during create, ephemeral container, and dynamic update requests
 		return nil
 	}
+}
 
+func (s *Plugin) validateCreate(pod *api.Pod, a admission.Attributes) error {
 	// Mirror pods have restrictions on what they can reference
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
@@ -244,7 +261,8 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 }
 
 func shouldIgnore(a admission.Attributes) bool {
-	if a.GetResource().GroupResource() != api.Resource("pods") || (a.GetSubresource() != "" && a.GetSubresource() != "ephemeralcontainers") {
+	subresource := a.GetSubresource()
+	if a.GetResource().GroupResource() != api.Resource("pods") || (subresource != "" && subresource != "ephemeralcontainers" && subresource != "dynamic") {
 		return true
 	}
 	obj := a.GetObject()
@@ -322,10 +340,7 @@ func (s *Plugin) getServiceAccount(namespace string, name string) (*corev1.Servi
 
 func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
-	mountableSecrets := sets.NewString()
-	for _, s := range serviceAccount.Secrets {
-		mountableSecrets.Insert(s.Name)
-	}
+	mountableSecrets := mountableSecretNames(serviceAccount)
 	for _, volume := range pod.Spec.Volumes {
 		source := volume.VolumeSource
 		if source.Secret == nil {
@@ -338,36 +353,14 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 	}
 
 	for _, container := range pod.Spec.InitContainers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("init container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
+		if err := limitContainerSecretReferences("init container", container.Name, container.Env, container.EnvFrom, mountableSecrets, serviceAccount.Name); err != nil {
+			return err
 		}
 	}
 
 	for _, container := range pod.Spec.Containers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
+		if err := limitContainerSecretReferences("container", container.Name, container.Env, container.EnvFrom, mountableSecrets, serviceAccount.Name); err != nil {
+			return err
 		}
 	}
 
@@ -385,40 +378,130 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 }
 
 func (s *Plugin) limitEphemeralContainerSecretReferences(pod *api.Pod, a admission.Attributes) error {
-	// Require ephemeral container pods to have service accounts
+	serviceAccount, err := s.serviceAccountEnforcingMountableSecrets(pod, a)
+	if serviceAccount == nil {
+		return err
+	}
+	// Ensure all secrets the ephemeral containers reference are allowed by the service account
+	mountableSecrets := mountableSecretNames(serviceAccount)
+	for _, container := range pod.Spec.EphemeralContainers {
+		if err := limitContainerSecretReferences("ephemeral container", container.Name, container.Env, container.EnvFrom, mountableSecrets, serviceAccount.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// limitDynamicContainerSecretReferences checks the secret references of containers added through
+// the dynamic subresource. Added containers can't add volumes or image pull secrets.
+func (s *Plugin) limitDynamicContainerSecretReferences(pod, oldPod *api.Pod, a admission.Attributes) error {
+	var added []*api.Container
+	for pair := range pods.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old == nil {
+			added = append(added, pair.New)
+		}
+	}
+	if len(added) == 0 {
+		return nil
+	}
+	serviceAccount, err := s.serviceAccountEnforcingMountableSecrets(pod, a)
+	if serviceAccount == nil {
+		return err
+	}
+	mountableSecrets := mountableSecretNames(serviceAccount)
+	for _, container := range added {
+		if err := limitContainerSecretReferences("container", container.Name, container.Env, container.EnvFrom, mountableSecrets, serviceAccount.Name); err != nil {
+			return admission.NewForbidden(a, err)
+		}
+	}
+	return nil
+}
+
+// serviceAccountEnforcingMountableSecrets returns the service account of a pod being updated, or
+// nil if mountable secrets aren't enforced for it.
+func (s *Plugin) serviceAccountEnforcingMountableSecrets(pod *api.Pod, a admission.Attributes) (*corev1.ServiceAccount, error) {
 	if len(pod.Spec.ServiceAccountName) == 0 {
-		return admission.NewForbidden(a, fmt.Errorf("no service account specified for pod %s/%s", a.GetNamespace(), pod.Name))
+		return nil, admission.NewForbidden(a, fmt.Errorf("no service account specified for pod %s/%s", a.GetNamespace(), pod.Name))
 	}
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %w", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return nil, admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %w", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if !s.enforceMountableSecrets(serviceAccount) {
-		return nil
+		return nil, nil
 	}
-	// Ensure all secrets the ephemeral containers reference are allowed by the service account
-	mountableSecrets := sets.NewString()
+	return serviceAccount, nil
+}
+
+func mountableSecretNames(serviceAccount *corev1.ServiceAccount) sets.Set[string] {
+	mountableSecrets := sets.New[string]()
 	for _, s := range serviceAccount.Secrets {
 		mountableSecrets.Insert(s.Name)
 	}
-	for _, container := range pod.Spec.EphemeralContainers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("ephemeral container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
+	return mountableSecrets
+}
+
+// limitContainerSecretReferences ensures the environment of a container only references secrets
+// the service account allows. kind describes the container in errors, e.g. "init container".
+func limitContainerSecretReferences(kind, name string, env []api.EnvVar, envFrom []api.EnvFromSource, mountableSecrets sets.Set[string], serviceAccountName string) error {
+	for _, env := range env {
+		if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil && !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
+			return fmt.Errorf("%s %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", kind, name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccountName)
 		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("ephemeral container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
+	}
+	for _, envFrom := range envFrom {
+		if envFrom.SecretRef != nil && !mountableSecrets.Has(envFrom.SecretRef.Name) {
+			return fmt.Errorf("%s %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", kind, name, envFrom.SecretRef.Name, serviceAccountName)
 		}
 	}
 	return nil
+}
+
+// admitDynamicUpdate mounts the pod's existing service account token volume into containers
+// added through the dynamic subresource, as mountServiceAccountToken would have at creation. The
+// automount decision was made at creation, so the token volume is never added here: added
+// containers can only reference volumes the pod already has.
+func (s *Plugin) admitDynamicUpdate(a admission.Attributes) {
+	if !s.MountServiceAccountToken {
+		return
+	}
+	pod := a.GetObject().(*api.Pod)
+	oldPod, ok := a.GetOldObject().(*api.Pod)
+	if !ok {
+		return
+	}
+	tokenVolumeName := ""
+	for _, volume := range pod.Spec.Volumes {
+		if strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-") {
+			tokenVolumeName = volume.Name
+			break
+		}
+	}
+	if tokenVolumeName == "" {
+		return
+	}
+	for pair := range pods.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old != nil {
+			continue
+		}
+		container := pair.New
+		existingContainerMount := false
+		for _, volumeMount := range container.VolumeMounts {
+			// Existing mounts at the default mount path prevent mounting of the API token
+			if volumeMount.MountPath == DefaultAPITokenMountPath {
+				existingContainerMount = true
+				break
+			}
+		}
+		if !existingContainerMount {
+			container.VolumeMounts = append(container.VolumeMounts, api.VolumeMount{
+				Name:      tokenVolumeName,
+				ReadOnly:  true,
+				MountPath: DefaultAPITokenMountPath,
+			})
+		}
+	}
 }
 
 func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) {

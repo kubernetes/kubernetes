@@ -871,7 +871,9 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 		limitRange corev1.LimitRange
 		old        *api.Pod // nil means create
 		pod        api.Pod
-		wantErr    bool
+		// subresource defaults to "resize" for updates.
+		subresource string
+		wantErr     bool
 	}{
 		{
 			name:       "unchanged container above the max is not checked",
@@ -995,6 +997,45 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 			pod:        pod(cpu("2", "2")),
 			wantErr:    true,
 		},
+		{
+			name:        "dynamic: added container above the max is rejected",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("500m", "500m"))),
+			pod:         pod(cpu("500m", "500m"), cpu("2", "2")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: added container within the max is allowed alongside an unchanged container above it",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("2", "2"))),
+			pod:         pod(cpu("2", "2"), cpu("500m", "500m")),
+		},
+		{
+			name:        "dynamic: added container pushing the pod total above the max is rejected",
+			limitRange:  podMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("1", "1"))),
+			pod:         pod(cpu("1", "1"), cpu("1500m", "1500m")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: removing a container that drops the pod total below the min is rejected",
+			limitRange:  podMinCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("1", "1"), cpu("1", "1"))),
+			pod:         pod(cpu("1", "1")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: resized container above the max is rejected",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("500m", "500m"))),
+			pod:         pod(cpu("2", "2")),
+			wantErr:     true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1009,6 +1050,9 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 			var opts runtime.Object = &metav1.CreateOptions{}
 			if tc.old != nil {
 				oldObj, subresource, op, opts = tc.old, "resize", admission.Update, &metav1.UpdateOptions{}
+				if tc.subresource != "" {
+					subresource = tc.subresource
+				}
 			}
 			attrs := admission.NewAttributesRecord(&tc.pod, oldObj, api.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, api.Resource("pods").WithVersion("version"), subresource, op, opts, false, nil)
 			err = handler.Validate(t.Context(), attrs, nil)
@@ -1016,6 +1060,67 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestLimitRangerDefaultsDynamicContainers checks that containers added through the dynamic
+// subresource get the LimitRange defaults and are then validated against its constraints.
+func TestLimitRangerDefaultsDynamicContainers(t *testing.T) {
+	limitRange := validLimitRange()
+	handler, informerFactory, err := newHandlerForTest(newMockClientForTest([]corev1.LimitRange{limitRange}))
+	if err != nil {
+		t.Fatalf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	defaulted := getResourceRequirements(getComputeResourceList("50m", "5Mi"), getComputeResourceList("75m", "10Mi"))
+	oldPod := validPod("pod", 1, defaulted)
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.Containers = append(newPod.Spec.Containers, api.Container{Name: "added", Image: "foo"})
+
+	attrs := admission.NewAttributesRecord(newPod, &oldPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs, nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if !apiequality.Semantic.DeepEqual(defaulted, newPod.Spec.Containers[1].Resources) {
+		t.Errorf("added container resources not defaulted: got %v, want %v", newPod.Spec.Containers[1].Resources, defaulted)
+	}
+	if !apiequality.Semantic.DeepEqual(defaulted, newPod.Spec.Containers[0].Resources) {
+		t.Errorf("existing container resources changed: got %v, want %v", newPod.Spec.Containers[0].Resources, defaulted)
+	}
+	verifyAnnotation(t, newPod, "LimitRanger plugin set: cpu, memory request for container added; cpu, memory limit for container added")
+	if err := handler.Validate(t.Context(), attrs, nil); err != nil {
+		t.Errorf("Validate() error: %v", err)
+	}
+
+	// The pod-level max of 200m cpu is exceeded by a third defaulted container.
+	tooMany := newPod.DeepCopy()
+	tooMany.Spec.Containers = append(tooMany.Spec.Containers, api.Container{Name: "added-2", Image: "foo"}, api.Container{Name: "added-3", Image: "foo"})
+	attrs = admission.NewAttributesRecord(tooMany, newPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := handler.Admit(t.Context(), attrs, nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if err := handler.Validate(t.Context(), attrs, nil); err == nil {
+		t.Error("expected Validate() to reject containers exceeding the pod max")
+	}
+
+	// Containers that predate the LimitRange keep their resources on a dynamic update.
+	undefaultedPod := validPod("pod", 1, api.ResourceRequirements{})
+	for name, update := range map[string]func(*api.Pod){
+		"image update": func(p *api.Pod) { p.Spec.Containers[0].Image = "new-image" },
+		"container add": func(p *api.Pod) {
+			p.Spec.Containers = append(p.Spec.Containers, api.Container{Name: "added", Image: "foo"})
+		},
+	} {
+		newPod := undefaultedPod.DeepCopy()
+		update(newPod)
+		attrs = admission.NewAttributesRecord(newPod, &undefaultedPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("%s: Admit() error: %v", name, err)
+		}
+		if !apiequality.Semantic.DeepEqual(undefaultedPod.Spec.Containers[0].Resources, newPod.Spec.Containers[0].Resources) {
+			t.Errorf("%s: existing container resources changed to %v", name, newPod.Spec.Containers[0].Resources)
+		}
 	}
 }
 

@@ -112,8 +112,14 @@ func (l *LimitRanger) ValidateInitialization() error {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	// Defaults are applied to containers when they are created, so a pods/dynamic update only
+	// defaults the containers it adds. A resize keeps defaulting all containers, as it always has.
+	var oldObj runtime.Object
+	if a.GetSubresource() == "dynamic" {
+		oldObj = a.GetOldObject()
+	}
 	return l.runLimitFunc(a, func(limitRange *corev1.LimitRange) error {
-		return l.actions.MutateLimit(limitRange, a.GetResource().Resource, a.GetObject())
+		return l.actions.MutateLimit(limitRange, a.GetResource().Resource, a.GetObject(), oldObj)
 	})
 }
 
@@ -289,6 +295,11 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 		annotations = mergeContainerResources(&pod.Spec.InitContainers[i], defaultRequirements, "init container", annotations)
 	}
 
+	setLimitRangerAnnotation(pod, annotations)
+}
+
+// setLimitRangerAnnotation records the defaults that were applied, if any.
+func setLimitRangerAnnotation(pod *api.Pod, annotations []string) {
 	if len(annotations) > 0 {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = make(map[string]string)
@@ -395,9 +406,12 @@ var _ LimitRangerActions = &DefaultLimitRangerActions{}
 // against enumerated constraints on the LimitRange.  It may modify
 // the incoming object to apply default resource requirements if not
 // specified, and enumerated on the LimitRange
-func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
+func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, resourceName string, obj, oldObj runtime.Object) error {
 	switch resourceName {
 	case "pods":
+		if oldPod, ok := oldObj.(*api.Pod); ok {
+			return podMutateAddedContainersLimitFunc(limitRange, obj.(*api.Pod), oldPod)
+		}
 		return PodMutateLimitFunc(limitRange, obj.(*api.Pod))
 	}
 	return nil
@@ -422,8 +436,9 @@ func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange,
 // Also ignores any call that has a subresource defined.
 func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) bool {
 	// Handle in-place vertical scaling of pods, where users modify container
-	// resources using the resize subresource.
-	if a.GetSubresource() == "resize" && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
+	// resources using the resize subresource, and dynamic containers, where users
+	// can additionally add and remove containers using the dynamic subresource.
+	if (a.GetSubresource() == "resize" || a.GetSubresource() == "dynamic") && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
 		return true
 	}
 
@@ -432,9 +447,10 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 		return false
 	}
 
-	// Since containers and initContainers cannot currently be added, removed, or updated, it is unnecessary
-	// to mutate and validate limitrange on pod updates. Trying to mutate containers or initContainers on a pod
-	// update request will always fail pod validation because those fields are immutable once the object is created.
+	// Since containers and initContainers cannot be added or removed through the main resource, and their
+	// resources can't be updated through it, it is unnecessary to mutate and validate limitrange on pod updates.
+	// Trying to mutate containers or initContainers on a pod update request will always fail pod validation
+	// because those fields are immutable on the main resource once the object is created.
 	if a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
 		return false
 	}
@@ -503,6 +519,20 @@ func unchangedRequest(resourceName api.ResourceName, requests, oldRequests api.R
 func PodMutateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 	defaultResources := defaultContainerResourceRequirements(limitRange)
 	mergePodResourceRequirements(pod, &defaultResources)
+	return nil
+}
+
+// podMutateAddedContainersLimitFunc applies the default resource requirements of the LimitRange
+// to the main containers in pod that are not in oldPod.
+func podMutateAddedContainersLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) error {
+	defaultResources := defaultContainerResourceRequirements(limitRange)
+	annotations := []string{}
+	for i := range pod.Spec.Containers {
+		if containerByName(oldPod.Spec.Containers, pod.Spec.Containers[i].Name) == nil {
+			annotations = mergeContainerResources(&pod.Spec.Containers[i], &defaultResources, "container", annotations)
+		}
+	}
+	setLimitRangerAnnotation(pod, annotations)
 	return nil
 }
 

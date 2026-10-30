@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1018,3 +1019,107 @@ func testGenerateName(n string) string {
 }
 
 var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
+
+func TestDynamicContainers(t *testing.T) {
+	ns := "myns"
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	if err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: DefaultServiceAccountName, Namespace: ns},
+		Secrets:    []corev1.ObjectReference{{Name: "allowed"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tokenMount := api.VolumeMount{Name: generatedVolumeName, ReadOnly: true, MountPath: DefaultAPITokenMountPath}
+	secretEnv := func(secret string) []api.EnvVar {
+		return []api.EnvVar{{Name: "SECRET", ValueFrom: &api.EnvVarSource{SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: secret}, Key: "key"}}}}
+	}
+	basePod := func(withTokenVolume bool) *api.Pod {
+		pod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "myname", Namespace: ns},
+			Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				// Stored containers aren't re-checked, even if they no longer comply.
+				Containers: []api.Container{{Name: "existing", Env: secretEnv("disallowed")}},
+			},
+		}
+		if withTokenVolume {
+			pod.Spec.Volumes = []api.Volume{{Name: generatedVolumeName, VolumeSource: api.VolumeSource{Projected: TokenVolumeSource()}}}
+			pod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{tokenMount}
+		}
+		return pod
+	}
+	withAdded := func(pod *api.Pod, c api.Container) *api.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.Containers = append(pod.Spec.Containers, c)
+		return pod
+	}
+
+	testCases := []struct {
+		name             string
+		oldPod, pod      *api.Pod
+		expectErr        bool
+		expectAddedMount []api.VolumeMount
+	}{{
+		name:             "added container mounts the token volume",
+		oldPod:           basePod(true),
+		pod:              withAdded(basePod(true), api.Container{Name: "added"}),
+		expectAddedMount: []api.VolumeMount{tokenMount},
+	}, {
+		name:   "added container doesn't mount a token without a token volume",
+		oldPod: basePod(false),
+		pod:    withAdded(basePod(false), api.Container{Name: "added"}),
+	}, {
+		name:   "added container keeps its own mount at the token path",
+		oldPod: basePod(true),
+		pod: withAdded(basePod(true), api.Container{Name: "added", VolumeMounts: []api.VolumeMount{
+			{Name: generatedVolumeName, MountPath: DefaultAPITokenMountPath},
+		}}),
+		expectAddedMount: []api.VolumeMount{{Name: generatedVolumeName, MountPath: DefaultAPITokenMountPath}},
+	}, {
+		name:             "added container referencing an allowed secret",
+		oldPod:           basePod(true),
+		pod:              withAdded(basePod(true), api.Container{Name: "added", Env: secretEnv("allowed")}),
+		expectAddedMount: []api.VolumeMount{tokenMount},
+	}, {
+		name:      "added container referencing a disallowed secret",
+		oldPod:    basePod(true),
+		pod:       withAdded(basePod(true), api.Container{Name: "added", Env: secretEnv("disallowed")}),
+		expectErr: true,
+	}, {
+		name:      "added container referencing a disallowed secret through envFrom",
+		oldPod:    basePod(true),
+		pod:       withAdded(basePod(true), api.Container{Name: "added", EnvFrom: []api.EnvFromSource{{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "disallowed"}}}}}),
+		expectErr: true,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := admission.NewAttributesRecord(tc.pod, tc.oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(t.Context(), attrs, nil); err != nil {
+				t.Fatalf("Unexpected Admit() error: %v", err)
+			}
+			err := admit.Validate(t.Context(), attrs, nil)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected Validate() error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectAddedMount, tc.pod.Spec.Containers[1].VolumeMounts, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected added container volume mounts (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.oldPod.Spec.Containers[0], tc.pod.Spec.Containers[0]); diff != "" {
+				t.Errorf("existing container changed (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.oldPod.Spec.Volumes, tc.pod.Spec.Volumes); diff != "" {
+				t.Errorf("volumes changed (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

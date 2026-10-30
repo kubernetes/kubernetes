@@ -1337,6 +1337,50 @@ func TestPodEvaluatorHandles(t *testing.T) {
 			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "resize", admission.Update, nil, false, nil),
 			want:  true,
 		},
+		{
+			name:  "update-dynamic-image",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Image: "new"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Image: "old"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-dynamic-add-container-without-resources",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "added"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-dynamic-remove-container-without-resources",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "removed"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name: "update-dynamic-add-container-with-resources",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "added", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: true,
+		},
+		{
+			name: "update-dynamic-remove-container-same-totals",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}, {Name: "removed"}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: false,
+		},
+		{
+			name: "update-dynamic-resize",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: true,
+		},
+		{
+			name:  "update-dynamic-activeDeadlineSeconds-from-nil",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](1)}}, &corev1.Pod{}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
