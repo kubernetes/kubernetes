@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -93,8 +95,9 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
-	// Only validate updates to the custom "resize" subresource.
-	if a.GetSubresource() != "resize" {
+	// Only validate updates to the subresources that can resize the pod.
+	subresource := a.GetSubresource()
+	if subresource != "resize" && subresource != "dynamic" {
 		return nil
 	}
 	pod, ok := a.GetObject().(*core.Pod)
@@ -121,10 +124,6 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
-	return p.validatePodResize(pod, a)
-}
-
-func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error {
 	node, err := p.nodeLister.Get(pod.Spec.NodeName)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -134,16 +133,49 @@ func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error 
 	}
 
 	// If the node is not a linux node, reject the update.
+	// TODO(KEP-5972): reevaluate Windows support for beta. Until then, every pods/dynamic update is
+	// rejected on non-linux nodes.
 	if err := validateLinuxNode(node); err != nil {
 		return resizeValidationError(a, err, ReasonUnsupportedPlatform)
 	}
 
 	// If the new requests are larger than the node allocatable, reject the update.
-	if err := validateNodeAllocatable(pod, node); err != nil {
-		return resizeValidationError(a, err, ReasonNodeCapacity)
+	if requestsChanged(oldPod, pod) {
+		if err := validateNodeAllocatable(pod, node); err != nil {
+			return resizeValidationError(a, err, ReasonNodeCapacity)
+		}
 	}
 
 	return nil
+}
+
+// requestsChanged returns true if the update changes the pod's requests: the pod-level requests
+// or the requests of a container changed, or a container with requests was added or removed.
+func requestsChanged(oldPod, pod *core.Pod) bool {
+	podRequests := func(p *core.Pod) core.ResourceList {
+		if p.Spec.Resources == nil {
+			return nil
+		}
+		return p.Spec.Resources.Requests
+	}
+	if !apiequality.Semantic.DeepEqual(podRequests(oldPod), podRequests(pod)) {
+		return true
+	}
+	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.InitContainers|podutil.Containers) {
+		switch {
+		case pair.Old == nil:
+			if len(pair.New.Resources.Requests) > 0 {
+				return true
+			}
+		case pair.New == nil:
+			if len(pair.Old.Resources.Requests) > 0 {
+				return true
+			}
+		case !apiequality.Semantic.DeepEqual(pair.New.Resources.Requests, pair.Old.Resources.Requests):
+			return true
+		}
+	}
+	return false
 }
 
 // Returns nil if the pod's resource requests fit within the node's allocatable, err otherwise.

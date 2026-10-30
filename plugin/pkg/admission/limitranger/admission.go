@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/lru"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -50,6 +51,9 @@ import (
 
 const (
 	limitRangerAnnotation = "kubernetes.io/limit-ranger"
+	// limitRangerAuditAnnotation records, on updates, the limitRangerAnnotation value for the
+	// defaults that were applied, which the pod itself doesn't keep.
+	limitRangerAuditAnnotation = "limitranger.admission.k8s.io/limit-ranger"
 	// PluginName indicates name of admission plugin.
 	PluginName = "LimitRanger"
 )
@@ -112,9 +116,46 @@ func (l *LimitRanger) ValidateInitialization() error {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	return l.runLimitFunc(a, func(limitRange *corev1.LimitRange) error {
+	err = l.runLimitFunc(a, func(limitRange *corev1.LimitRange) error {
 		return l.actions.MutateLimit(limitRange, a.GetResource().Resource, a.GetObject())
 	})
+	if err != nil {
+		return err
+	}
+	l.preserveLimitAnnotation(ctx, a)
+	return nil
+}
+
+// preserveLimitAnnotation keeps the pod's LimitRanger annotation unchanged on updates, as resizes
+// do since the resize subresource drops metadata changes. A changed value is recorded as an audit
+// annotation instead.
+func (l *LimitRanger) preserveLimitAnnotation(ctx context.Context, a admission.Attributes) {
+	if !l.actions.SupportsAttributes(a) {
+		return
+	}
+	pod, _ := a.GetObject().(*api.Pod)
+	oldPod, _ := a.GetOldObject().(*api.Pod)
+	if pod == nil || oldPod == nil {
+		return
+	}
+	newValue := pod.Annotations[limitRangerAnnotation]
+	oldValue, hasOldAnnotation := oldPod.Annotations[limitRangerAnnotation]
+	if newValue == oldValue {
+		return
+	}
+	if newValue != "" {
+		if err := a.AddAnnotation(limitRangerAuditAnnotation, newValue); err != nil {
+			klog.FromContext(ctx).Error(err, "Failed to set admission audit annotation", "key", limitRangerAuditAnnotation, "value", newValue)
+		}
+	}
+	if !hasOldAnnotation {
+		delete(pod.Annotations, limitRangerAnnotation)
+		return
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[limitRangerAnnotation] = oldValue
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
@@ -422,8 +463,9 @@ func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange,
 // Also ignores any call that has a subresource defined.
 func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) bool {
 	// Handle in-place vertical scaling of pods, where users modify container
-	// resources using the resize subresource.
-	if a.GetSubresource() == "resize" && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
+	// resources using the resize subresource, and dynamic containers, where users
+	// can additionally add and remove containers using the dynamic subresource.
+	if (a.GetSubresource() == "resize" || a.GetSubresource() == "dynamic") && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
 		return true
 	}
 
@@ -432,9 +474,10 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 		return false
 	}
 
-	// Since containers and initContainers cannot currently be added, removed, or updated, it is unnecessary
-	// to mutate and validate limitrange on pod updates. Trying to mutate containers or initContainers on a pod
-	// update request will always fail pod validation because those fields are immutable once the object is created.
+	// Since containers and initContainers cannot be added or removed through the main resource, and their
+	// resources can't be updated through it, it is unnecessary to mutate and validate limitrange on pod updates.
+	// Trying to mutate containers or initContainers on a pod update request will always fail pod validation
+	// because those fields are immutable on the main resource once the object is created.
 	if a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
 		return false
 	}

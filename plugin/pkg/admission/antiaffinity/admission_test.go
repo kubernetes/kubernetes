@@ -283,3 +283,22 @@ func TestOtherResources(t *testing.T) {
 		}
 	}
 }
+
+func TestDynamicSubresource(t *testing.T) {
+	handler := NewInterPodAntiAffinity()
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{TopologyKey: "invalid"}},
+				},
+			},
+		},
+	}
+	for subresource, expectErr := range map[string]bool{"": true, "dynamic": true, "status": false} {
+		attrs := admission.NewAttributesRecord(pod, pod, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := handler.Validate(t.Context(), attrs, nil); (err != nil) != expectErr {
+			t.Errorf("subresource %q: expected error %v, got %v", subresource, expectErr, err)
+		}
+	}
+}
