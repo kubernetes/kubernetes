@@ -2847,6 +2847,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"dont-add-allocation-timestamp": {
+			enableDRAExtendedResource:         true,
 			disableDRADeviceBindingConditions: true,
 			pod:                               podWithClaimName,
 			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
@@ -4146,6 +4147,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				})
 			}
 			if tc.disableDRADeviceBindingConditions {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, false)
 			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
@@ -5180,6 +5182,7 @@ func TestAllocatorSelection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, featureGate, version.MustParse("1.37"))
 			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
 			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
 			features := AllocatorFeatures(fts)
