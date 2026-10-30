@@ -7024,6 +7024,132 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	}
 }
 
+func TestConvertToAPIContainerStatusesByType(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{{Name: "init"}},
+		Containers:     []v1.Container{{Name: "main"}},
+		EphemeralContainers: []v1.EphemeralContainer{{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"},
+		}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	now := time.Now()
+	status := func(name, id string, state kubecontainer.State, age time.Duration) *kubecontainer.Status {
+		return &kubecontainer.Status{
+			Name:      name,
+			ID:        kubecontainer.ContainerID{Type: "test", ID: id},
+			State:     state,
+			CreatedAt: now.Add(-age),
+		}
+	}
+	inSpec := []*kubecontainer.Status{
+		status("init", "init-id", kubecontainer.ContainerStateExited, 3*time.Minute),
+		status("main", "main-id", kubecontainer.ContainerStateRunning, 2*time.Minute),
+		status("debug", "debug-id", kubecontainer.ContainerStateRunning, time.Minute),
+	}
+
+	// Each expected map is container name -> container ID.
+	tests := []struct {
+		name              string
+		statuses          []*kubecontainer.Status
+		expectedMain      map[string]string
+		expectedInit      map[string]string
+		expectedEphemeral map[string]string
+	}{{
+		name:              "in-spec containers",
+		statuses:          inSpec,
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name:              "container missing from the spec",
+		statuses:          append(append([]*kubecontainer.Status{}, inSpec...), status("removed", "removed-id", kubecontainer.ContainerStateExited, time.Minute)),
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id", "removed": "test://removed-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			podStatus := &kubecontainer.PodStatus{
+				ID:                pod.UID,
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				ContainerStatuses: test.statuses,
+			}
+			var ecSpecs []v1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			for _, tc := range []struct {
+				containerType podutil.ContainerType
+				containers    []v1.Container
+				expected      map[string]string
+			}{
+				{podutil.InitContainers, pod.Spec.InitContainers, test.expectedInit},
+				{podutil.Containers, pod.Spec.Containers, test.expectedMain},
+				{podutil.EphemeralContainers, ecSpecs, test.expectedEphemeral},
+			} {
+				statuses := kl.convertToAPIContainerStatuses(tCtx, pod, podStatus, nil, tc.containers, nil, true, tc.containerType, false)
+				actual := map[string]string{}
+				for _, s := range statuses {
+					actual[s.Name] = s.ContainerID
+				}
+				assert.Equal(t, tc.expected, actual, "container type %v", tc.containerType)
+			}
+		})
+	}
+}
+
+// A container removed from the spec is no longer allocated and its resources no longer count, so
+// its status has no resources, even if its old status had some from when it was in the spec.
+func TestConvertToAPIContainerStatusesRemovedContainerResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Containers:    []v1.Container{{Name: "main"}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	cpu := v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}
+	oldStatuses := []v1.ContainerStatus{{
+		Name:               "removed",
+		ContainerID:        "test://removed-id",
+		State:              v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		Resources:          &v1.ResourceRequirements{Requests: cpu, Limits: cpu},
+		AllocatedResources: cpu,
+	}}
+	now := time.Now()
+	for _, state := range []kubecontainer.State{kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateExited} {
+		t.Run(string(state), func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			podStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:      "removed",
+					ID:        kubecontainer.ContainerID{Type: "test", ID: "removed-id"},
+					State:     state,
+					CreatedAt: now.Add(-time.Minute),
+					// The CRI reports the resources of a running container.
+					Resources: &kubecontainer.ContainerResources{CPURequest: ptr.To(resource.MustParse("100m"))},
+				}},
+			}
+			statuses := testKubelet.kubelet.convertToAPIContainerStatuses(tCtx, pod, podStatus, oldStatuses, pod.Spec.Containers, nil, false, podutil.Containers, false)
+			removed, ok := podutil.GetContainerStatus(statuses, "removed")
+			require.True(t, ok)
+			assert.Nil(t, removed.Resources)
+			assert.Nil(t, removed.AllocatedResources)
+		})
+	}
+}
+
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")

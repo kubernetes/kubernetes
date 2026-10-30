@@ -2344,6 +2344,17 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	return resources
 }
 
+// hasContainer returns whether the pod spec has a container with the given name among the
+// container types in mask.
+func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, mask) {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
 func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
@@ -2721,8 +2732,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
-		if _, ok := statuses[cName]; !ok {
-			// This would also ignore the infra container.
+		// Names are unique across container types, and only regular containers can be removed
+		// from the spec, so a regular container that isn't in the spec at all was removed.
+		removed := containerType == podutil.Containers &&
+			!slices.ContainsFunc(containers, func(c v1.Container) bool { return c.Name == cName }) &&
+			!hasContainer(pod, cName, podutil.InitContainers|podutil.EphemeralContainers)
+		// statuses starts out with an entry for each container in the spec list for this type.
+		if _, ok := statuses[cName]; !ok && !removed {
 			continue
 		}
 		if containerSeen[cName] >= 2 {
@@ -2765,6 +2781,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if containerSeen[cName] == 0 {
+			// This also creates the entry for a container removed from the spec.
+			// TODO(KEP-5972): revisit removed-container status GC and ContainerStateUnknown handling.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State

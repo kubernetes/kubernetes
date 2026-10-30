@@ -2602,10 +2602,19 @@ func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
 			},
 			expectedState: map[string]v1.ContainerState{
 				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+				// Not in the spec, so reported as a removed container.
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
 			},
 			expectedLastTerminationState: map[string]v1.ContainerState{
 				"failed": {Terminated: &v1.ContainerStateTerminated{
 					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
 					ContainerID: emptyContainerID,
 				}},
 			},
@@ -2630,10 +2639,19 @@ func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
 					ExitCode:    1,
 					ContainerID: emptyContainerID,
 				}},
+				// Not in the spec, so reported as a removed container.
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
 			},
 			expectedLastTerminationState: map[string]v1.ContainerState{
 				"failed": {Terminated: &v1.ContainerStateTerminated{
 					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
 					ContainerID: emptyContainerID,
 				}},
 			},
