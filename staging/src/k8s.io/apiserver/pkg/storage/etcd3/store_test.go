@@ -123,8 +123,8 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestGet(ctx, t, store)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestGet(ctx, t, store, increaseRVFunc(client.Client))
 }
 
 func TestUnconditionalDelete(t *testing.T) {

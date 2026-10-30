@@ -737,21 +737,27 @@ func TestGetCacheBypass(t *testing.T) {
 
 	result := &example.Pod{}
 
-	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.InjectGetListError(errDummy)
-	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
-		IgnoreNotFound:  true,
-		ResourceVersion: "0",
-	}, result)
-	if err != nil {
-		t.Errorf("Get with RV=0 should be served from cache: %v", err)
+	tcs := []struct {
+		resourceVersion string
+		expectBypass    bool
+	}{
+		{resourceVersion: "", expectBypass: true},
+		{resourceVersion: "0", expectBypass: false},
+		{resourceVersion: "100", expectBypass: false},
 	}
-
-	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
+	for _, tc := range tcs {
+		t.Run(fmt.Sprintf("RV=%s", tc.resourceVersion), func(t *testing.T) {
+			newTestGetCacheBypass(t, delegator, result, tc.resourceVersion, tc.expectBypass)
+		})
+	}
+}
+func newTestGetCacheBypass(t *testing.T, delegator *CacheDelegator, result *example.Pod, resourceVersion string, expectBypass bool) {
+	err := delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
-		ResourceVersion: "",
+		ResourceVersion: resourceVersion,
 	}, result)
-	if !errors.Is(err, errDummy) {
+	if errors.Is(err, errDummy) != expectBypass {
 		t.Errorf("Get without RV=0 should bypass cacher: %v", err)
 	}
 }

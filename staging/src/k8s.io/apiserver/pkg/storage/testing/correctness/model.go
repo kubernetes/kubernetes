@@ -123,14 +123,14 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpList:
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
-		if !s.equalWriteResponse(expected, output) {
+		if !s.equalResponse(expected, output) {
 			return false, s, nil
 		}
 		return true, next, change
 	}
 }
 
-func (s *Model) equalWriteResponse(expected, output Response) bool {
+func (s *Model) equalResponse(expected, output Response) bool {
 	if reflect.DeepEqual(expected, output) {
 		return true
 	}
@@ -188,7 +188,7 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch GetReadConsistency(opts) {
 	case ConsistencyConsistent:
-		return reflect.DeepEqual(expected, output)
+		return s.equalResponse(expected, output)
 	case ConsistencyNotOlderThan:
 		if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && storage.IsTooLargeResourceVersion(output.Err) {
 			return true
