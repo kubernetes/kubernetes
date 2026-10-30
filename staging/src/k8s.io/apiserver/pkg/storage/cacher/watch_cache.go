@@ -418,53 +418,83 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 	return keys, nil
 }
 
-// NOTICE: Structure follows the shouldDelegateList function in
-// staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+type readConsistency string
+
+const (
+	consistencyConsistent   readConsistency = "Consistent"
+	consistencyExact        readConsistency = "Exact"
+	consistencyNotOlderThan readConsistency = "NotOlderThan"
+)
+
 func (w *watchCache) waitUntilFreshAndListRecursive(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
 	// The RV semantic below is for Recursive List, non-recursive lists should use waitUntilFreshAndListNonRecursive.
 	recursive := true
-	var continueKey string
-	var snap store.Snapshot
-	matchValues := opts.Predicate.MatcherIndex(ctx)
-	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
+	semantic, listRV, continueKey, matchValues, err := listReadConsistency(ctx, key, w.config.versioner, opts)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
-		snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
-	case metav1.ResourceVersionMatchNotOlderThan:
-		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
-	case "":
-		var continueRV int64
-		// Continue
-		if len(opts.Predicate.Continue) > 0 {
-			continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, key)
-			if err != nil {
-				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
-			}
-			if continueRV > 0 {
-				snap, err = w.waitAndGetExactSnapshot(ctx, uint64(continueRV))
-			} else {
-				// Don't pass matchValues as they don't support continueKey
-				matchValues = nil
-				snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
-			}
-		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			// Legacy exact match
-			snap, err = w.waitAndGetExactSnapshot(ctx, listRV)
-		} else if opts.ResourceVersion == "" {
-			snap, index, err = w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
-		} else {
-			snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
-		}
-	default:
-		snap, index, err = w.waitAndGetLatestSnapshot(ctx, recursive, listRV, matchValues)
-	}
+	snap, index, err := w.waitAndReadSnapshot(ctx, semantic, listRV, recursive, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	return listResp{ResourceVersion: snap.ResourceVersion(), Range: snap.RangePrefix(key, continueKey)}, index, nil
+}
+
+// NOTICE: Structure follows the shouldDelegateList function in
+// staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+func listReadConsistency(ctx context.Context, keyPrefix string, versioner storage.Versioner, opts storage.ListOptions) (semantic readConsistency, listRV uint64, continueKey string, matchValues []storage.MatchValue, err error) {
+	matchValues = opts.Predicate.MatcherIndex(ctx)
+	listRV, err = versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return "", 0, "", nil, err
+	}
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		semantic = consistencyExact
+	case metav1.ResourceVersionMatchNotOlderThan:
+		semantic = consistencyNotOlderThan
+	case "":
+		var continueRV int64
+		// Continue
+		if len(opts.Predicate.Continue) > 0 {
+			continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
+			if err != nil {
+				return "", 0, "", nil, errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+			}
+			if continueRV > 0 {
+				listRV = uint64(continueRV)
+				semantic = consistencyExact
+			} else {
+				// Don't pass matchValues as they don't support continueKey
+				matchValues = nil
+				semantic = consistencyConsistent
+			}
+		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			// Legacy exact match
+			semantic = consistencyExact
+		} else if opts.ResourceVersion == "" {
+			semantic = consistencyConsistent
+		} else {
+			semantic = consistencyNotOlderThan
+		}
+	default:
+		semantic = consistencyNotOlderThan
+	}
+	return semantic, listRV, continueKey, matchValues, nil
+}
+
+func (w *watchCache) waitAndReadSnapshot(ctx context.Context, semantic readConsistency, resourceVersion uint64, recursive bool, matchValues []storage.MatchValue) (snap store.Snapshot, index string, err error) {
+	switch semantic {
+	case consistencyExact:
+		snap, err = w.waitAndGetExactSnapshot(ctx, resourceVersion)
+		return snap, "", err
+	case consistencyConsistent:
+		return w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+	case consistencyNotOlderThan:
+		return w.waitAndGetLatestSnapshot(ctx, recursive, resourceVersion, matchValues)
+	default:
+		return nil, "", fmt.Errorf("unknown RV semantic: %s", semantic)
+	}
 }
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
