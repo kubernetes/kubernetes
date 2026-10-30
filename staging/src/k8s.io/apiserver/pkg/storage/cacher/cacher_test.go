@@ -133,7 +133,7 @@ func TestDeleteOnce(t *testing.T) {
 func TestUpdateOnce(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestUpdateOnce(ctx, t, cacher, examplev1ProtoCodec)
+	storagetesting.RunTestUpdateOnce(ctx, t, cacher, etcd3testing.PathPrefix(), examplev1ProtoCodec)
 }
 
 type testTransformer struct {

@@ -352,7 +352,7 @@ func TestDeleteOnce(t *testing.T) {
 
 func TestUpdateOnce(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestUpdateOnce(ctx, t, store, store.codec)
+	storagetesting.RunTestUpdateOnce(ctx, t, store, "", store.codec)
 }
 
 func TestList(t *testing.T) {
