@@ -49,8 +49,9 @@ import (
 // and tracks how many times its QueueingHintFn is called.
 type preQueueingHintPlugin struct {
 	queueingHintCalls atomic.Int64
-	// targetPod is the pod that PreQueueingHintFn will return.
-	targetPod types.NamespacedName
+	// targetPod is the pod that PreQueueingHintFn returns. The test changes it
+	// between events while the scheduler reads it.
+	targetPod atomic.Pointer[types.NamespacedName]
 }
 
 var _ fwk.FilterPlugin = &preQueueingHintPlugin{}
@@ -75,7 +76,7 @@ func (pl *preQueueingHintPlugin) EventsToRegister(_ context.Context) ([]fwk.Clus
 			QueueingHintFn: pl.queueingHint,
 			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
 				// Only return the target pod.
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{pl.targetPod}}, nil
+				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{*pl.targetPod.Load()}}, nil
 			},
 		},
 	}, nil
@@ -88,7 +89,8 @@ func (pl *preQueueingHintPlugin) queueingHint(logger klog.Logger, pod *v1.Pod, o
 
 // TestPreQueueingHintNarrowsPodSet verifies that when PreQueueingHintFn is
 // registered and the feature gate is enabled, only the targeted pod's
-// QueueingHintFn is invoked on a matching event.
+// QueueingHintFn is invoked on a matching event, and that a pod left out of
+// that narrowed hint is still requeued by a later event.
 func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -115,8 +117,8 @@ func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 
 			testCtx := testutils.InitTestAPIServer(t, "prequeueinghint", nil)
 
-			targetPod := types.NamespacedName{Name: "pod-1", Namespace: testCtx.NS.Name}
-			plugin := &preQueueingHintPlugin{targetPod: targetPod}
+			plugin := &preQueueingHintPlugin{}
+			plugin.targetPod.Store(&types.NamespacedName{Name: "pod-1", Namespace: testCtx.NS.Name})
 
 			registry := frameworkruntime.Registry{
 				plugin.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
@@ -148,6 +150,12 @@ func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
+			// A pod attempted before the node is cached fails with no rejector
+			// plugins, so it goes to backoffQ instead of the unschedulable pool
+			// and the label update below may miss it.
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
+				t.Fatal(err)
+			}
 
 			// Create 3 pods that will all be unschedulable.
 			for i := 1; i <= 3; i++ {
@@ -171,9 +179,13 @@ func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 				}
 			}
 
-			// Wait for all 3 pods to be attempted and become unschedulable.
-			if err := schedulerutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-3", Namespace: testCtx.NS.Name}}, 30*time.Second); err != nil {
-				t.Fatalf("pod-3 not unschedulable: %v", err)
+			// Wait for all 3 pods to be attempted and become unschedulable, so the
+			// event below is evaluated against all of them.
+			for i := 1; i <= 3; i++ {
+				pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), Namespace: testCtx.NS.Name}}
+				if err := schedulerutils.WaitForPodUnschedulableWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 30*time.Second); err != nil {
+					t.Fatalf("%s not unschedulable: %v", pod.Name, err)
+				}
 			}
 
 			// Reset the counter.
@@ -182,16 +194,36 @@ func TestPreQueueingHintNarrowsPodSet(t *testing.T) {
 			// Trigger a node label update event (matches the plugin's EventsToRegister).
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Labels["some-label"] = "some-value"
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, nodeCopy, metav1.UpdateOptions{}); err != nil {
+			updatedNode, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, nodeCopy, metav1.UpdateOptions{})
+			if err != nil {
 				t.Fatal(err)
 			}
 
-			// Wait for the scheduler to process the event.
-			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
-				return plugin.queueingHintCalls.Load() == tt.wantHintCalls, nil
+			// Wait for the scheduler to start processing the event.
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				return plugin.queueingHintCalls.Load() >= 1, nil
 			})
 			if err != nil {
-				t.Errorf("timed out waiting for QueueingHintFn calls: got %d, want %d", plugin.queueingHintCalls.Load(), tt.wantHintCalls)
+				t.Fatalf("timed out waiting for QueueingHintFn call: %v", err)
+			}
+			// MoveAllToActiveOrBackoffQueue holds the queue write lock across all
+			// entity evaluations for an event; acquiring RLock via UnschedulablePods
+			// blocks until the full event pass completes.
+			_ = testCtx.Scheduler.SchedulingQueue.UnschedulablePods()
+			if got := plugin.queueingHintCalls.Load(); got != tt.wantHintCalls {
+				t.Errorf("got %d QueueingHintFn calls, want %d", got, tt.wantHintCalls)
+			}
+
+			// pod-2 was left out of the narrowed hint above. A later event that
+			// hints it must still requeue it, and it schedules once the node has
+			// the label.
+			plugin.targetPod.Store(&types.NamespacedName{Name: "pod-2", Namespace: testCtx.NS.Name})
+			updatedNode.Labels["enable-scheduling"] = "true"
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Namespace: testCtx.NS.Name}}); err != nil {
+				t.Errorf("pod-2 not scheduled after the second event: %v", err)
 			}
 		})
 	}

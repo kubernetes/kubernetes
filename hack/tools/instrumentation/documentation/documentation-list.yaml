@@ -6681,8 +6681,8 @@
     endpoint: /metrics
 - name: pre_queueing_hint_evaluations_total
   subsystem: scheduler
-  help: Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods
-    or narrowed).
+  help: Number of PreQueueingHint evaluations by plugin and result (narrowed, all_pods,
+    or prequeueing_hint_fn_error).
   type: Counter
   stabilityLevel: ALPHA
   labels:
