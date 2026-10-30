@@ -29,13 +29,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// retryAfterJitterFactor adds up to 10% of a Retry-After wait at random
-// before the next attempt. The server sends the same Retry-After to every
-// client it rejects in a given second, so exact waits bring them all back
-// together (https://github.com/kubernetes/kubernetes/issues/105521). Any
-// jitter breaks that lockstep, because each client's phase then drifts
-// independently on every retry, while the added latency grows with the
-// percentage; 10% keeps the worst case at a tenth of the server's wait.
+// retryAfterJitterFactor adds up to 10% of the retry wait at random before
+// the next attempt. The server sends the same Retry-After to every client it
+// rejects in a given second, so exact waits bring them all back together
+// (https://github.com/kubernetes/kubernetes/issues/105521). The jitter is
+// meant to spread those retries; the added latency grows with the fraction,
+// and 10% keeps the worst case at a tenth of the server's wait.
 const retryAfterJitterFactor = 0.1
 
 // IsRetryableErrorFunc allows the client to provide its own function
@@ -226,14 +225,16 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	}
 
 	// if we are here, we have made attempt(s) at least once before.
-	retryWait := r.retryAfter.Wait
-	if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientRetryAfterJitter) {
-		retryWait = wait.Jitter(retryWait, retryAfterJitterFactor)
-	}
-	delay := retryWait
+	delay := r.retryAfter.Wait
 	if request.backoff != nil {
 		if backoffDelay := request.backoff.CalculateBackoffWithContext(ctx, url); backoffDelay > delay {
 			delay = backoffDelay
+		}
+		// Jitter the delay that wins, not only Retry-After: a cohort held at
+		// the same backoff ceiling is in lockstep too, so the sleep may exceed
+		// that ceiling by the jitter fraction.
+		if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientRetryAfterJitter) {
+			delay = wait.Jitter(delay, retryAfterJitterFactor)
 		}
 		request.backoff.SleepWithContext(ctx, delay)
 	}

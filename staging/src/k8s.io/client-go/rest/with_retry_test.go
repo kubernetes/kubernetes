@@ -423,11 +423,17 @@ func TestBeforeJittersRetryAfter(t *testing.T) {
 			maxSleep: retryAfter + time.Duration(retryAfterJitterFactor*float64(retryAfter)),
 		},
 		{
-			name:     "a larger backoff delay wins",
-			enabled:  true,
+			name:     "gate off keeps the exact larger backoff delay",
 			backoff:  10 * time.Second,
 			minSleep: 10 * time.Second,
 			maxSleep: 10 * time.Second,
+		},
+		{
+			name:     "gate on jitters the larger backoff delay",
+			enabled:  true,
+			backoff:  10 * time.Second,
+			minSleep: 10 * time.Second,
+			maxSleep: 10*time.Second + time.Duration(retryAfterJitterFactor*float64(10*time.Second)),
 		},
 	}
 	for _, test := range tests {
@@ -445,10 +451,10 @@ func TestBeforeJittersRetryAfter(t *testing.T) {
 				if got < test.minSleep || got > test.maxSleep {
 					t.Fatalf("sleep %v outside [%v, %v]", got, test.minSleep, test.maxSleep)
 				}
-				jittered = jittered || got > retryAfter
+				jittered = jittered || got > test.minSleep
 			}
 			if test.minSleep != test.maxSleep && !jittered {
-				t.Errorf("no sleep exceeded the Retry-After of %v in 1000 attempts", retryAfter)
+				t.Errorf("no sleep exceeded the minimum of %v in 1000 attempts", test.minSleep)
 			}
 		})
 	}
