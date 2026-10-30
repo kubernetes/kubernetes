@@ -126,6 +126,12 @@ function create-master-instance-internal() {
     retries=30
     sleep_sec=60
   fi
+  # Set by create-master-in-region: retry every error, since the next zone is the fallback.
+  local retry_all_errors=false
+  if [[ -n "${MASTER_CREATE_ATTEMPTS_PER_ZONE:-}" ]]; then
+    retries="${MASTER_CREATE_ATTEMPTS_PER_ZONE}"
+    retry_all_errors=true
+  fi
 
   local -r master_name="${1}"
   local -r address="${2:-}"
@@ -193,7 +199,7 @@ function create-master-instance-internal() {
       return 0
     else
       echo "${result}" >&2
-      if [[ ! "${result}" =~ "try again later" ]]; then
+      if [[ "${retry_all_errors}" != "true" && ! "${result}" =~ "try again later" ]]; then
         echo "Failed to create master instance due to non-retryable error" >&2
         return 1
       fi
