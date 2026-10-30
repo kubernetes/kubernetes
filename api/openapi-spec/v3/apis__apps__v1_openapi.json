@@ -5207,10 +5207,10 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeHealthStatus": {
-        "description": "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+        "description": "VolumeHealthStatus contains health information for a volume reported by a CSI controller or node plugin.",
         "properties": {
           "healthConditions": {
-            "description": "healthConditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+            "description": "healthConditions is the set of adverse conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
             },
@@ -5229,7 +5229,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "lastTransitionTime is when the current set of conditions first appeared."
+            "description": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field."
           }
         },
         "type": "object"

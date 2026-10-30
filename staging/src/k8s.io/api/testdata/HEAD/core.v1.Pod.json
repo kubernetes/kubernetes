@@ -2229,17 +2229,19 @@
         ]
       }
     ],
-    "volumeHealth": [
+    "volumeStatuses": [
       {
         "name": "nameValue",
-        "healthConditions": [
-          {
-            "status": "statusValue",
-            "reason": "reasonValue",
-            "message": "messageValue"
-          }
-        ],
-        "lastTransitionTime": "2003-01-01T01:01:01Z"
+        "healthStatus": {
+          "healthConditions": [
+            {
+              "status": "statusValue",
+              "reason": "reasonValue",
+              "message": "messageValue"
+            }
+          ],
+          "lastTransitionTime": "2002-01-01T01:01:01Z"
+        }
       }
     ]
   }

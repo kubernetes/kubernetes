@@ -2037,7 +2037,7 @@ var map_PodStatus = map[string]string{
 	"allocatedResources":                   "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
 	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
 	"nodeAllocatableResourceClaimStatuses": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-	"volumeHealth":                         "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+	"volumeStatuses":                       "VolumeStatuses contains the status of individual volumes used by this pod. This is an ALPHA field.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
@@ -2074,15 +2074,14 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
 }
 
-var map_PodVolumeHealth = map[string]string{
-	"":                   "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
-	"name":               "name matches an entry in pod.spec.volumes.",
-	"healthConditions":   "healthConditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
-	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
+var map_PodVolumeStatus = map[string]string{
+	"":             "PodVolumeStatus represents the status of an individual volume used by a pod.",
+	"name":         "name matches an entry in pod.spec.volumes.",
+	"healthStatus": "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet.",
 }
 
-func (PodVolumeHealth) SwaggerDoc() map[string]string {
-	return map_PodVolumeHealth
+func (PodVolumeStatus) SwaggerDoc() map[string]string {
+	return map_PodVolumeStatus
 }
 
 var map_PortStatus = map[string]string{
@@ -2863,9 +2862,9 @@ func (VolumeHealthCondition) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeHealthStatus = map[string]string{
-	"":                   "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
-	"healthConditions":   "healthConditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
-	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
+	"":                   "VolumeHealthStatus contains health information for a volume reported by a CSI controller or node plugin.",
+	"healthConditions":   "healthConditions is the set of adverse conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+	"lastTransitionTime": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field.",
 }
 
 func (VolumeHealthStatus) SwaggerDoc() map[string]string {

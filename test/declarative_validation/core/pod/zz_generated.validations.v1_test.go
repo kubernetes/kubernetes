@@ -118,27 +118,27 @@ func init() {
 			"status.nodeAllocatableResourceClaimStatuses[*].resourceClaimName": {
 				{ErrorType: "FieldValueRequired"},
 			},
-			"status.volumeHealth[*]": {
+			"status.volumeStatuses[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.volumeHealth[*].healthConditions": {
+			"status.volumeStatuses[*].healthStatus.healthConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
-			"status.volumeHealth[*].healthConditions[*]": {
+			"status.volumeStatuses[*].healthStatus.healthConditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.volumeHealth[*].healthConditions[*].message": {
+			"status.volumeStatuses[*].healthStatus.healthConditions[*].message": {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
-			"status.volumeHealth[*].healthConditions[*].reason": {
+			"status.volumeStatuses[*].healthStatus.healthConditions[*].reason": {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
-			"status.volumeHealth[*].healthConditions[*].status": {
+			"status.volumeStatuses[*].healthStatus.healthConditions[*].status": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
-			"status.volumeHealth[*].name": {
+			"status.volumeStatuses[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},
 		},
