@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -147,3 +148,35 @@ var FeaturesAll = Features{
 	PartitionableDevices:    true,
 	PrioritizedList:         true,
 }
+
+// DeviceAllocation describes one device the allocator is about to include
+// in a claim's allocation result. All fields hold final values:
+// ConsumedCapacity has already been rounded up per the device's
+// requestPolicy, so a constraint sees the same numbers that end up in
+// DeviceRequestAllocationResult.
+type DeviceAllocation struct {
+	Claim            *resourceapi.ResourceClaim
+	Request          string // "<request>" or "<request>/<subrequest>"
+	DeviceClassName  string
+	Device           DeviceID
+	ConsumedCapacity map[resourceapi.QualifiedName]resource.Quantity
+	AdminAccess      bool
+}
+
+// AllocationConstraint is a caller-supplied constraint that participates
+// in the allocator's backtracking search. Add returns false to reject the
+// candidate. When the search later backtracks over an accepted candidate,
+// Remove is called with the same DeviceAllocation. Remove is not called for
+// allocations retained in the final result.
+type AllocationConstraint interface {
+	Add(allocation DeviceAllocation) bool
+	Remove(allocation DeviceAllocation)
+}
+
+// NewAllocationConstraintFunc is called once per Allocate. Each returned
+// constraint applies to every candidate allocation for every claim passed to
+// that call, in slice order. The provider may be called concurrently by
+// different Allocate calls, but each returned constraint is used only by the
+// call for which it was created.
+type NewAllocationConstraintFunc func(ctx context.Context, node *v1.Node,
+	claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error)
