@@ -23456,7 +23456,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}
 }
 
-func TestValidatePodVolumeHealth(t *testing.T) {
+func TestValidatePodVolumeStatus(t *testing.T) {
 	podSpec := &core.PodSpec{
 		Volumes: []core.Volume{
 			{Name: "vol1"},
@@ -23465,52 +23465,58 @@ func TestValidatePodVolumeHealth(t *testing.T) {
 	}
 	tests := []struct {
 		name         string
-		volumeHealth []core.PodVolumeHealth
+		volumeHealth []core.PodVolumeStatus
 		isErr        bool
 		expectedErr  string
 	}{
 		{
 			name: "valid volume health",
-			volumeHealth: []core.PodVolumeHealth{
+			volumeHealth: []core.PodVolumeStatus{
 				{
 					Name: "vol1",
-					HealthConditions: []core.VolumeHealthCondition{
+					HealthStatus: &core.VolumeHealthStatus{HealthConditions: []core.VolumeHealthCondition{
 						{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
-					},
+					}},
 				},
 			},
 		},
 		{
 			name: "volume name not in spec",
-			volumeHealth: []core.PodVolumeHealth{
+			volumeHealth: []core.PodVolumeStatus{
 				{
 					Name: "nonexistent",
-					HealthConditions: []core.VolumeHealthCondition{
+					HealthStatus: &core.VolumeHealthStatus{HealthConditions: []core.VolumeHealthCondition{
 						{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
-					},
+					}},
 				},
 			},
 			isErr:       true,
-			expectedErr: "volumeHealth[0].name",
+			expectedErr: "status.volumeStatuses[0].name",
 		},
 		{
 			name: "invalid reason format",
-			volumeHealth: []core.PodVolumeHealth{
+			volumeHealth: []core.PodVolumeStatus{
 				{
 					Name: "vol1",
-					HealthConditions: []core.VolumeHealthCondition{
+					HealthStatus: &core.VolumeHealthStatus{HealthConditions: []core.VolumeHealthCondition{
 						{Status: core.VolumeHealthDegraded, Reason: "invalid;val"},
-					},
+					}},
 				},
 			},
 			isErr:       true,
-			expectedErr: "volumeHealth[0].healthConditions[0].reason",
+			expectedErr: "status.volumeStatuses[0].healthStatus.healthConditions[0].reason",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := validatePodVolumeHealth(tt.volumeHealth, podSpec, field.NewPath("volumeHealth"))
+			oldPod := &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default", ResourceVersion: "1"},
+				Spec:       *podSpec,
+			}
+			newPod := oldPod.DeepCopy()
+			newPod.Status.VolumeStatuses = tt.volumeHealth
+			errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 			if tt.isErr && len(errs) == 0 {
 				t.Errorf("expected error but got none")
 			}

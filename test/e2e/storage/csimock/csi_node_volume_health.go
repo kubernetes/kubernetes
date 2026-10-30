@@ -141,7 +141,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 						}
 						return podVolumeHealthMatches(updated, test.nodeAbnormalVolumeHealth), nil
 					})
-					framework.ExpectNoError(waitErr, "pod.status.volumeHealth should reflect NodeGetVolumeHealth")
+					framework.ExpectNoError(waitErr, "pod.status.volumeStatuses[*].healthStatus should reflect NodeGetVolumeHealth")
 				}
 			})
 		}
@@ -229,16 +229,19 @@ func expectedCSICallsSeen(
 }
 
 func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
-	var entry *v1.PodVolumeHealth
-	for i := range pod.Status.VolumeHealth {
-		vh := &pod.Status.VolumeHealth[i]
-		if vh.Name != "" {
-			entry = vh
+	if len(pod.Status.VolumeStatuses) == 0 {
+		return !abnormal
+	}
+	var entry *v1.VolumeHealthStatus
+	for i := range pod.Status.VolumeStatuses {
+		vh := &pod.Status.VolumeStatuses[i]
+		if vh.Name != "" && vh.HealthStatus != nil {
+			entry = vh.HealthStatus
 			break
 		}
 	}
 	if !abnormal {
-		// Healthy: either no VolumeHealth entry, or an entry with empty conditions.
+		// Healthy: either no health report, or a report with empty conditions.
 		return entry == nil || len(entry.HealthConditions) == 0
 	}
 	if entry == nil || len(entry.HealthConditions) == 0 {
