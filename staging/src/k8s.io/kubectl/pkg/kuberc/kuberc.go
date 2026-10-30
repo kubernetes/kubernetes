@@ -438,7 +438,8 @@ func getExplicitKuberc(args []string) (string, error) {
 			}
 			return "", fmt.Errorf("kuberc file is not found")
 		} else if strings.Contains(arg, "--kuberc=") {
-			parg := strings.Split(arg, "=")
+			// Split only on the first "=", since the path itself may contain "=".
+			parg := strings.SplitN(arg, "=", 2)
 			if len(parg) > 1 && parg[1] != "" {
 				kubercPath = parg[1]
 				break
