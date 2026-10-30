@@ -1524,7 +1524,7 @@ func TestPodGroupDependentRequiredValidation(t *testing.T) {
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-validation",
 		scheduler.WithPodMaxBackoffSeconds(1),
 		scheduler.WithPodInitialBackoffSeconds(1))
-	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+	cs, ns := testCtx.Client(), testCtx.NS.Name
 
 	// Case 1: ParentCompositePodGroupName set and WorkloadRef set -> Should PASS
 	pgPass := &schedulingapi.PodGroup{
@@ -1541,7 +1541,7 @@ func TestPodGroupDependentRequiredValidation(t *testing.T) {
 		},
 	}
 
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgPass, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pgPass, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Expected PodGroup with ParentCompositePodGroupName and WorkloadRef to be created successfully, got error: %v", err)
 	}
 
@@ -1556,7 +1556,7 @@ func TestPodGroupDependentRequiredValidation(t *testing.T) {
 		},
 	}
 
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgFail, metav1.CreateOptions{}); err == nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pgFail, metav1.CreateOptions{}); err == nil {
 		t.Fatalf("Expected creation of PodGroup with ParentCompositePodGroupName and no WorkloadRef to fail, but it passed")
 	}
 }

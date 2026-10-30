@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/ktesting"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
@@ -124,7 +123,7 @@ func TestSchedulingGates(t *testing.T) {
 				defer testCtx.Scheduler.APIDispatcher.Close()
 			}
 
-			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+			cs, ns, ctx := testCtx.Client(), testCtx.NS.Name, testCtx
 
 			// Create node, so we can schedule pods.
 			node := st.MakeNode().Name("node").Obj()
@@ -151,7 +150,7 @@ func TestSchedulingGates(t *testing.T) {
 
 			// Schedule pods.
 			for _, podName := range tt.schedule {
-				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				testCtx.Scheduler.ScheduleOne(testCtx)
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Fatalf("Failed to schedule %s", podName)
 				}
@@ -182,7 +181,7 @@ func TestSchedulingGates(t *testing.T) {
 
 			// Schedule pods which no longer have gates.
 			for _, podName := range tt.rmGates {
-				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				testCtx.Scheduler.ScheduleOne(testCtx)
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Fatalf("Failed to schedule %s", podName)
 				}
@@ -219,15 +218,15 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Start API Server with apiextensions supported.
 	server := apiservertesting.StartTestServerOrDie(
-		t, apiservertesting.NewDefaultTestServerOptions(),
+		tCtx, apiservertesting.NewDefaultTestServerOptions(),
 		[]string{"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition", "--runtime-config=api/all=true"},
 		testfwk.SharedEtcd(),
 	)
-	testCtx := &testutils.TestContext{}
-	ctx, cancel := context.WithCancel(context.Background())
-	testCtx.Ctx = ctx
+	testCtx := &testutils.TestContext{
+		TContext: tCtx.WithRESTConfig(server.ClientConfig).WithCancel(),
+	}
 	testCtx.CloseFn = func() {
-		cancel()
+		testCtx.Cancel("must shut down, apiserver is being torn down")
 		server.TearDownFn()
 	}
 
@@ -264,7 +263,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		},
 	}
 	var err error
-	fooCRD, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(testCtx.Ctx, fooCRD, metav1.CreateOptions{})
+	fooCRD, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(testCtx, fooCRD, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,9 +285,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 			},
 		}}})
 
-	testCtx.KubeConfig = server.ClientConfig
-	testCtx.ClientSet = kubernetes.NewForConfigOrDie(server.ClientConfig)
-	testCtx.NS, err = testCtx.ClientSet.CoreV1().Namespaces().Create(testCtx.Ctx, &v1.Namespace{
+	testCtx.NS, err = testCtx.Client().CoreV1().Namespaces().Create(testCtx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cr-enqueue-%v", string(uuid.NewUUID()))}}, metav1.CreateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("Failed to integration test ns: %v", err)
@@ -310,7 +307,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	defer testutils.CleanupTest(tCtx, testCtx)
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	cs, ns, ctx := testCtx.Client(), testCtx.NS.Name, testCtx
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -411,9 +408,9 @@ func TestRequeueByBindFailure(t *testing.T) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	cs, ns, ctx := testCtx.Client(), testCtx.NS.Name, testCtx
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create Node %q: %v", node.Name, err)
@@ -500,9 +497,9 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	cs, ns, ctx := testCtx.Client(), testCtx.NS.Name, testCtx
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create Node %q: %v", node.Name, err)
@@ -626,7 +623,7 @@ func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	// Set initial backoff to 1000s to make sure pod won't go to the activeQ after being requeued.
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pop-from-backoffq", scheduler.WithPodInitialBackoffSeconds(1000), scheduler.WithPodMaxBackoffSeconds(1000))
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	cs, ns, ctx := testCtx.Client(), testCtx.NS.Name, testCtx
 
 	// Create node, so we can schedule pods.
 	node := st.MakeNode().Name("node").Obj()

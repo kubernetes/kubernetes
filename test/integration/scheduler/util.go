@@ -126,16 +126,16 @@ func InitTestSchedulerForFrameworkTest(t ktesting.TB, testCtx *testutils.TestCon
 	}
 
 	teardown := func() {
-		err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+		err := testCtx.Client().CoreV1().Nodes().DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("error while deleting all nodes: %v", err)
 		}
-		err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+		err = testCtx.Client().CoreV1().Pods(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("error while deleting pod: %v", err)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-			err = testCtx.ClientSet.SchedulingV1beta1().PodGroups(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+			err = testCtx.Client().SchedulingV1beta1().PodGroups(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 			if err != nil {
 				t.Errorf("error while deleting podgroups: %v", err)
 			}
@@ -143,7 +143,7 @@ func InitTestSchedulerForFrameworkTest(t ktesting.TB, testCtx *testutils.TestCon
 		// Wait for all pods to be deleted, or will failed to create same name pods
 		// required in other test cases.
 		err = wait.PollUntilContextTimeout(testCtx.SchedulerCtx, time.Millisecond, wait.ForeverTestTimeout, true,
-			PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name))
+			PodsCleanedUp(testCtx.SchedulerCtx, testCtx.Client(), testCtx.NS.Name))
 		if err != nil {
 			t.Errorf("error while waiting for all pods to be deleted: %v", err)
 		}
@@ -291,16 +291,15 @@ func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Schedule
 // multiple subtests share one API server to avoid the per-subtest startup cost.
 func WithNewNamespace(t utiltesting.TB, parent *testutils.TestContext, nsPrefix string) *testutils.TestContext {
 	t.Helper()
-	child := &testutils.TestContext{
-		ClientSet:  parent.ClientSet,
-		KubeConfig: parent.KubeConfig,
-		Ctx:        parent.Ctx,
-		CloseFn:    func() {}, // API server is owned by parent; do not tear it down here.
-	}
-	child.NS = framework.CreateNamespaceOrDie(child.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
+	childNS := framework.CreateNamespaceOrDie(parent.Client(), nsPrefix+string(uuid.NewUUID()), t)
 	t.Cleanup(func() {
-		framework.DeleteNamespaceOrDie(child.ClientSet, child.NS, t)
+		framework.DeleteNamespaceOrDie(parent.Client(), childNS, t)
 	})
+	child := &testutils.TestContext{
+		TContext: parent.TContext.WithNamespace(childNS.Name),
+		CloseFn:  func() {}, // API server is owned by parent; do not tear it down here.
+		NS:       childNS,
+	}
 	return child
 }
 
@@ -344,34 +343,34 @@ func PodScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // InitDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
 func InitDisruptionController(t utiltesting.TB, testCtx *testutils.TestContext) *disruption.DisruptionController {
-	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, 12*time.Hour)
+	informers := informers.NewSharedInformerFactory(testCtx.Client(), 12*time.Hour)
 
-	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
+	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.Client().Discovery())
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-	config := restclient.CopyConfig(testCtx.KubeConfig)
-	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(testCtx.ClientSet.Discovery())
+	config := restclient.CopyConfig(testCtx.RESTConfig())
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(testCtx.Client().Discovery())
 	scaleClient, err := scale.NewForConfig(config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error in create scaleClient: %v", err)
 	}
 
 	dc := disruption.NewDisruptionController(
-		testCtx.Ctx,
+		testCtx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
-		testCtx.ClientSet,
+		testCtx.Client(),
 		mapper,
 		scaleClient,
-		testCtx.ClientSet.Discovery())
+		testCtx.Client().Discovery())
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-	go dc.Run(testCtx.Ctx, 1)
+	go dc.Run(testCtx, 1)
 	return dc
 }
 
@@ -480,11 +479,11 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 // nodes to be present in scheduler cache.
 func CreateAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	existingNodes := testCtx.Scheduler.Cache.NodeCount()
-	nodes, err := createNodes(testCtx.ClientSet, prefix, wrapper, numNodes)
+	nodes, err := createNodes(testCtx.Client(), prefix, wrapper, numNodes)
 	if err != nil {
 		return nodes, fmt.Errorf("cannot create nodes: %w", err)
 	}
-	return nodes, WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, numNodes+existingNodes)
+	return nodes, WaitForNodesInCache(testCtx, testCtx.Scheduler, numNodes+existingNodes)
 }
 
 // WaitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
@@ -679,8 +678,8 @@ func WaitForPodSchedulingGated(ctx context.Context, cs clientset.Interface, pod 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
 func WaitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
-	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 60*time.Second, false, func(context.Context) (bool, error) {
-		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(testCtx.Ctx, metav1.ListOptions{})
+	return wait.PollUntilContextTimeout(testCtx, time.Second, 60*time.Second, false, func(context.Context) (bool, error) {
+		pdbList, err := testCtx.Client().PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(testCtx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -707,7 +706,7 @@ func WaitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisrupt
 
 // WaitCachedPodsStable waits until scheduler cache has the given pods.
 func WaitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error {
-	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 30*time.Second, false, func(context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(testCtx, time.Second, 30*time.Second, false, func(context.Context) (bool, error) {
 		cachedPods, err := testCtx.Scheduler.Cache.PodCount()
 		if err != nil {
 			return false, err
@@ -716,7 +715,7 @@ func WaitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error 
 			return false, nil
 		}
 		for _, p := range pods {
-			actualPod, err1 := testCtx.ClientSet.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+			actualPod, err1 := testCtx.Client().CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
 			if err1 != nil {
 				return false, err1
 			}
@@ -774,10 +773,10 @@ func NextEntityOrDie(t utiltesting.TB, testCtx *testutils.TestContext) scheduler
 	t.Helper()
 
 	var entity schedulerframework.QueuedEntityInfo
-	logger := klog.FromContext(testCtx.Ctx)
+	logger := klog.FromContext(testCtx)
 	// NextEntity() is a blocking operation. Wrap it in timeout() to avoid relying on
 	// default go testing timeout (10m) to abort.
-	if err := timeout(testCtx.Ctx, time.Second*5, func() {
+	if err := timeout(testCtx, time.Second*5, func() {
 		entity, _ = testCtx.Scheduler.NextEntity(logger)
 	}); err != nil {
 		t.Fatalf("Timed out waiting for the entity to be popped: %v", err)

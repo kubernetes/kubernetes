@@ -194,9 +194,9 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 	)
 	defer testCtx.SchedulerCloseFn()
 	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
-	cs := testCtx.ClientSet
+	cs := testCtx.Client()
 
 	for idx, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -212,11 +212,11 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			if tt.nodePreemptionPolicy != nil {
 				nodeObject.Spec.PodPreemptionPolicy = tt.nodePreemptionPolicy
 			}
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 			defer func() {
-				_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+				_ = cs.CoreV1().Nodes().Delete(testCtx, nodeName, metav1.DeleteOptions{})
 			}()
 
 			// Create and run existing pods (if any) on nodeName
@@ -235,7 +235,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			tt.preemptorConfig.NodeName = nodeName
 			tt.preemptorConfig.Namespace = testCtx.NS.Name
 			preemptorPod := initPausePod(tt.preemptorConfig)
-			preemptorPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+			preemptorPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, preemptorPod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create preemptor pod: %v", err)
 			}
@@ -269,7 +269,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 					},
 				},
 			}
-			preemptorPod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, preemptorPod, metav1.UpdateOptions{})
+			preemptorPod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, preemptorPod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to update status of preemptor pod: %v", err)
 			}
@@ -277,7 +277,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			// Wait for expected evictions (if any) or timeout
 			if len(tt.expectEvictedNames) > 0 {
 				for _, name := range tt.expectEvictedNames {
-					err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+					err = wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false,
 						podIsGettingEvicted(cs, testCtx.NS.Name, name))
 					if err != nil {
 						t.Errorf("Expected pod %q to be evicted/deleted, but it was not", name)
@@ -287,7 +287,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 				// Wait to confirm NO evictions happen
 				time.Sleep(500 * time.Millisecond)
 				for _, p := range pods {
-					livePod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+					livePod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, p.Name, metav1.GetOptions{})
 					if err == nil && livePod.DeletionTimestamp != nil {
 						t.Errorf("Expected pod %q NOT to be evicted/deleted, but its DeletionTimestamp is set", p.Name)
 					}
@@ -295,7 +295,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			}
 
 			// Verify NominatedNodeName on preemptor pod status (retains empty for deferred pods)
-			updatedPreemptor, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, preemptorPod.Name, metav1.GetOptions{})
+			updatedPreemptor, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, preemptorPod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Failed to get updated preemptor pod: %v", err)
 			}
@@ -305,7 +305,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 
 			// Verify the pod remains parked in the scheduler queue
 			queue := testCtx.Scheduler.SchedulingQueue
-			_, found := queue.GetPod(testCtx.Ctx, preemptorPod.Name, preemptorPod.Namespace, nil)
+			_, found := queue.GetPod(testCtx, preemptorPod.Name, preemptorPod.Namespace, nil)
 			if !found {
 				t.Errorf("Expected preemptor pod to be found in scheduling queue")
 			}
@@ -322,13 +322,13 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 
 			// Cleanup
 			pods = append(pods, preemptorPod)
-			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+			testutils.CleanupPods(testCtx, cs, t, pods)
 		})
 	}
 }
 
 func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext, idx int, nodeCPUCapacity, otherPodCPURequest, deferredPodCPURequest, deferredPodCPUAllocated string, disableResizePreemption bool) (*v1.Pod, *v1.Pod, *v1.Pod) {
-	cs := testCtx.ClientSet
+	cs := testCtx.Client()
 
 	nodeName1 := fmt.Sprintf("hint-node1-%d", idx)
 	nodeName2 := fmt.Sprintf("hint-node2-%d", idx)
@@ -343,7 +343,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 			DisableResizePreemption: []string{"test-policy"},
 		}
 	}
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject1, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject1, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create node1: %v", err)
 	}
 
@@ -352,7 +352,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		v1.ResourcePods: "32",
 		v1.ResourceCPU:  "500m",
 	}).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject2, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject2, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create node2: %v", err)
 	}
 
@@ -396,7 +396,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		},
 	})
 	pod.Namespace = testCtx.NS.Name
-	pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -426,14 +426,14 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 			},
 		},
 	}
-	pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+	pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update status: %v", err)
 	}
 
 	// Wait until deferred-pod fails scheduling and is parked in Unschedulable queue.
 	queue := testCtx.Scheduler.SchedulingQueue
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 5*time.Second, false, func(context.Context) (bool, error) {
 		unsched := queue.UnschedulablePods()
 		for _, p := range unsched {
 			if p.Name == pod.Name {
@@ -468,7 +468,7 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 	)
 	defer testCtx.SchedulerCloseFn()
 	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
 	tests := []struct {
 		name               string
@@ -580,21 +580,21 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 			}
 			pod, other, irrelevant := setUpPreemptionTestWithContext(t, testCtx, idx, nodeCap, otherReq, defReq, "50m", false)
 
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 			queue := testCtx.Scheduler.SchedulingQueue
 
-			queuedPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+			queuedPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 			if !found {
 				t.Fatalf("Pod not found in queue")
 			}
 			initialAttempts := queuedPod.Attempts
 
-			if err := tc.trigger(testCtx.Ctx, cs, testCtx.NS.Name, pod, other, irrelevant); err != nil {
+			if err := tc.trigger(testCtx, cs, testCtx.NS.Name, pod, other, irrelevant); err != nil {
 				t.Fatalf("Failed triggering event: %v", err)
 			}
 
 			if tc.expectIncrement {
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+				err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 					qPod, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 					return found && qPod.Attempts > initialAttempts, nil
 				})
@@ -603,13 +603,13 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 				}
 			} else {
 				time.Sleep(300 * time.Millisecond)
-				qPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+				qPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 				if found && qPod.Attempts > initialAttempts {
 					t.Fatalf("Expected attempts not to increment, but went from %d to %d", initialAttempts, qPod.Attempts)
 				}
 			}
 
-			testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
+			testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod, other, irrelevant})
 		})
 	}
 }
@@ -633,15 +633,15 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 	)
 	defer testCtx.SchedulerCloseFn()
 	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
 	t.Run("disabling node preemption policy does not wake queue", func(t *testing.T) {
 		pod, other, irrelevant := setUpPreemptionTestWithContext(t, testCtx, 0, "200m", "200m", "100m", "50m", false)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to be in queue initially")
 		}
@@ -649,34 +649,34 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 
 		// Disable preemption on assigned node
 		nodeName := pod.Spec.NodeName
-		n, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, nodeName, metav1.GetOptions{})
+		n, err := cs.CoreV1().Nodes().Get(testCtx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get node: %v", err)
 		}
 		n.Spec.PodPreemptionPolicy = &v1.NodePodPreemptionPolicy{
 			DisableResizePreemption: []string{"test-policy"},
 		}
-		if _, err := cs.CoreV1().Nodes().Update(testCtx.Ctx, n, metav1.UpdateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Update(testCtx, n, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("Failed to update node to disable preemption: %v", err)
 		}
 
 		// Verify pod attempts do not increment (QHint skipped)
 		time.Sleep(300 * time.Millisecond)
-		qPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+		qPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 		if !found || qPod.Attempts > initialAttempts {
 			t.Fatalf("Expected attempts not to increment, but went from %d to %d (or pod was lost)", initialAttempts, qPod.Attempts)
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod, other, irrelevant})
 	})
 
 	t.Run("enabling node preemption policy wakes queue", func(t *testing.T) {
 		pod, other, irrelevant := setUpPreemptionTestWithContext(t, testCtx, 1, "200m", "200m", "100m", "50m", true)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to still be in queue")
 		}
@@ -684,17 +684,17 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 
 		// Now re-enable preemption on node (clear DisableResizePreemption)
 		nodeName := pod.Spec.NodeName
-		n, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, nodeName, metav1.GetOptions{})
+		n, err := cs.CoreV1().Nodes().Get(testCtx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get node: %v", err)
 		}
 		n.Spec.PodPreemptionPolicy = nil
-		if _, err := cs.CoreV1().Nodes().Update(testCtx.Ctx, n, metav1.UpdateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Update(testCtx, n, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("Failed to update node to enable preemption: %v", err)
 		}
 
 		// Verify pod is retried (attempts incremented)
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 			qPod, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			return found && qPod.Attempts > initialAttempts, nil
 		})
@@ -702,16 +702,16 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 			t.Fatalf("Expected attempts to increment after re-enabling node preemption policy")
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod, other, irrelevant})
 	})
 
 	t.Run("irrelevant node preemption policy change ignores queue", func(t *testing.T) {
 		pod, other, irrelevant := setUpPreemptionTestWithContext(t, testCtx, 2, "200m", "200m", "100m", "50m", false)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to be in queue initially")
 		}
@@ -719,24 +719,24 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 
 		// Update irrelevant node2
 		nodeName2 := fmt.Sprintf("hint-node2-%d", 2)
-		n, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, nodeName2, metav1.GetOptions{})
+		n, err := cs.CoreV1().Nodes().Get(testCtx, nodeName2, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get node2: %v", err)
 		}
 		n.Spec.PodPreemptionPolicy = &v1.NodePodPreemptionPolicy{
 			DisableResizePreemption: []string{"test-policy"},
 		}
-		if _, err := cs.CoreV1().Nodes().Update(testCtx.Ctx, n, metav1.UpdateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Update(testCtx, n, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("Failed to update node2: %v", err)
 		}
 
 		time.Sleep(300 * time.Millisecond)
-		qPod, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil)
+		qPod, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil)
 		if !found || qPod.Attempts > initialAttempts {
 			t.Fatalf("Expected attempts not to increment and pod to remain in queue for irrelevant node update")
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod, other, irrelevant})
 	})
 }
 
@@ -756,14 +756,14 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		// Start ONLY the API Server (no scheduler yet!)
 		testCtx := testutils.InitTestAPIServer(t, "deferred-handlers-test", nil)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 
 		// Create node
 		nodeObject := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods: "32",
 			v1.ResourceCPU:  "200m",
 		}).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
@@ -777,7 +777,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			},
 		})
 		pod.Namespace = testCtx.NS.Name
-		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -807,7 +807,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				},
 			},
 		}
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to update status: %v", err)
 		}
@@ -820,7 +820,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		// Verify the pod was immediately enqueued on startup by the AddPod handler!
 		queue := testCtx.Scheduler.SchedulingQueue
 		var found bool
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, found = queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
@@ -828,7 +828,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Expected pod to be queued automatically by AddPod handler on scheduler startup, err: %v, found: %t", err, found)
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod})
 	})
 
 	t.Run("UpdatePod handler enqueues pod when it transitions to deferred resize", func(t *testing.T) {
@@ -852,7 +852,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		testutils.SyncSchedulerInformerFactory(testCtx)
 
 		// Note: we don't start the scheduling loop (Scheduler.Run), only informers & queue!
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 
 		// Create node
@@ -860,7 +860,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			v1.ResourcePods: "32",
 			v1.ResourceCPU:  "200m",
 		}).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
@@ -874,7 +874,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			},
 		})
 		pod.Namespace = testCtx.NS.Name
-		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -886,19 +886,19 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		}
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to update status: %v", err)
 		}
 
 		// Verify the pod is NOT in the scheduling queue
 		time.Sleep(300 * time.Millisecond)
-		if _, found := queue.GetPod(testCtx.Ctx, pod.Name, pod.Namespace, nil); found {
+		if _, found := queue.GetPod(testCtx, pod.Name, pod.Namespace, nil); found {
 			t.Fatalf("Expected pod to not be in scheduling queue initially")
 		}
 
 		// Now update status to add the deferred condition
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get pod: %v", err)
 		}
@@ -920,14 +920,14 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				},
 			},
 		}
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to transition status: %v", err)
 		}
 
 		// Verify the pod was enqueued automatically by the UpdatePod event handler!
 		var found bool
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, found = queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
@@ -935,7 +935,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Expected pod to be enqueued automatically by UpdatePod handler on deferred status transition")
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod})
 	})
 
 	t.Run("UpdatePod handler removes pod from queue when deferred condition is cleared", func(t *testing.T) {
@@ -958,14 +958,14 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		defer testCtx.SchedulerCloseFn()
 		testutils.SyncSchedulerInformerFactory(testCtx)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 
 		nodeObject := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods: "32",
 			v1.ResourceCPU:  "200m",
 		}).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
@@ -978,7 +978,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			},
 		})
 		pod.Namespace = testCtx.NS.Name
-		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -995,12 +995,12 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				Reason: v1.PodReasonDeferred,
 			},
 		}
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to update status: %v", err)
 		}
 
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
@@ -1008,7 +1008,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Expected pod to be in queue after transitioning to deferred")
 		}
 
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get pod: %v", err)
 		}
@@ -1018,11 +1018,11 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		}
-		if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("Failed to update status clearing deferred condition: %v", err)
 		}
 
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			return !found, nil
 		})
@@ -1030,7 +1030,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Expected pod to be removed from queue after deferred condition cleared")
 		}
 
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod})
+		testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{pod})
 	})
 
 	t.Run("DeletePod handler removes pod from both cache and scheduling queue when deleted", func(t *testing.T) {
@@ -1053,7 +1053,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		defer testCtx.SchedulerCloseFn()
 		testutils.SyncSchedulerInformerFactory(testCtx)
 
-		cs := testCtx.ClientSet
+		cs := testCtx.Client()
 		queue := testCtx.Scheduler.SchedulingQueue
 		cache := testCtx.Scheduler.Cache
 
@@ -1062,7 +1062,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			v1.ResourcePods: "32",
 			v1.ResourceCPU:  "200m",
 		}).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, nodeObject, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, nodeObject, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
@@ -1076,7 +1076,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			},
 		})
 		pod.Namespace = testCtx.NS.Name
-		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -1106,13 +1106,13 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				},
 			},
 		}
-		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{})
+		pod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to update status: %v", err)
 		}
 
 		// Wait for pod to be enqueued and in cache
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, foundInQueue := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			_, errCache := cache.GetPod(pod)
 			return foundInQueue && errCache == nil, nil
@@ -1122,12 +1122,12 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Delete the pod
-		if err := cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}); err != nil {
+		if err := cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}); err != nil {
 			t.Fatalf("Failed to delete pod: %v", err)
 		}
 
 		// Verify the pod is removed from both queue and cache by DeletePod event handler
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, foundInQueue := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 			_, errCache := cache.GetPod(pod)
 			return !foundInQueue && errCache != nil, nil

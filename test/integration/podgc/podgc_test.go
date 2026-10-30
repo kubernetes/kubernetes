@@ -66,7 +66,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			testCtx := setup(t, "podgc-orphaned")
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -82,7 +82,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 					},
 				},
 			}
-			node, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			node, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create node '%v', err: %v", node.Name, err)
 			}
@@ -101,27 +101,27 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 				},
 			}
 
-			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
-			defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
+			defer testutils.RemovePodFinalizers(testCtx, testCtx.Client(), t, *pod)
 
 			pod.Status.Phase = test.phase
-			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.Client().CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx, pod, metav1.UpdateOptions{}); err != nil {
 				t.Fatalf("Error %v, while setting phase %v for pod: %v", err, test.phase, klog.KObj(pod))
 			}
 
 			// we delete the node to orphan the pod
-			err = cs.CoreV1().Nodes().Delete(testCtx.Ctx, pod.Spec.NodeName, metav1.DeleteOptions{})
+			err = cs.CoreV1().Nodes().Delete(testCtx, pod.Spec.NodeName, metav1.DeleteOptions{})
 			if err != nil {
 				t.Fatalf("Failed to delete node: %v, err: %v", pod.Spec.NodeName, err)
 			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
-			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, pod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Error: '%v' while updating pod info: '%v'", err, klog.KObj(pod))
 			}
@@ -158,7 +158,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			testCtx := setup(t, "podgc-out-of-service")
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -174,7 +174,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 					},
 				},
 			}
-			node, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			node, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create node '%v', err: %v", node.Name, err)
 			}
@@ -198,21 +198,21 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				pod.ObjectMeta.Finalizers = []string{"test.k8s.io/finalizer"}
 			}
 
-			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
 			if test.withFinalizer {
-				defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
+				defer testutils.RemovePodFinalizers(testCtx, testCtx.Client(), t, *pod)
 			}
 
 			// trigger termination of the pod, but with long grace period so that it is not removed immediately
-			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](300)})
+			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](300)})
 			if err != nil {
 				t.Fatalf("Error: '%v' while deleting pod: '%v'", err, klog.KObj(pod))
 			}
 			// wait until the pod is terminating
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
@@ -225,7 +225,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				// wait until the pod phase is set as expected
 				err = wait.Poll(time.Second, time.Second*15, func() (bool, error) {
 					var e error
-					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx, pod.Name, metav1.GetOptions{})
 					if e != nil {
 						return true, e
 					}
@@ -242,7 +242,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				// wait until the pod is deleted
 				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
 					var e error
-					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx, pod.Name, metav1.GetOptions{})
 					if e == nil {
 						return pod == nil, nil
 					}
@@ -339,22 +339,22 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			testCtx := setup(t, "podgc-orphaned")
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			pod := test.pod
 			pod.Namespace = testCtx.NS.Namespace
-			pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+			pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
-			defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
+			defer testutils.RemovePodFinalizers(testCtx, testCtx.Client(), t, *pod)
 
 			// getting evicted due to NodeName being "non-existing-node"
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
-			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, pod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Error: '%v' while updating pod info: '%v'", err, klog.KObj(pod))
 			}
@@ -374,10 +374,10 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 
 func setup(t *testing.T, name string) *testutils.TestContext {
 	testCtx := testutils.InitTestAPIServer(t, name, nil)
-	externalInformers := informers.NewSharedInformerFactory(testCtx.ClientSet, time.Second)
+	externalInformers := informers.NewSharedInformerFactory(testCtx.Client(), time.Second)
 
-	podgc := podgc.NewPodGCInternal(testCtx.Ctx,
-		testCtx.ClientSet,
+	podgc := podgc.NewPodGCInternal(testCtx,
+		testCtx.Client(),
 		externalInformers.Core().V1().Pods(),
 		externalInformers.Core().V1().Nodes(),
 		0,
@@ -385,9 +385,9 @@ func setup(t *testing.T, name string) *testutils.TestContext {
 		time.Second)
 
 	// Waiting for all controllers to sync
-	externalInformers.Start(testCtx.Ctx.Done())
-	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+	externalInformers.Start(testCtx.Done())
+	externalInformers.WaitForCacheSync(testCtx.Done())
 
-	go podgc.Run(testCtx.Ctx)
+	go podgc.Run(testCtx)
 	return testCtx
 }

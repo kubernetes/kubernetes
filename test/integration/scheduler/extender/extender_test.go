@@ -288,7 +288,7 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 
 func TestSchedulerExtender(t *testing.T) {
 	testCtx := testutils.InitTestAPIServer(t, "scheduler-extender", nil)
-	clientSet := testCtx.ClientSet
+	clientSet := testCtx.Client()
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -356,7 +356,7 @@ func TestSchedulerExtender(t *testing.T) {
 
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithExtenders(extenders...))
 	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 
 	DoTestPodScheduling(testCtx.NS, t, clientSet)
 }

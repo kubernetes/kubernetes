@@ -104,17 +104,17 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				},
 			}
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			// Build clientset and informers for controllers.
-			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+			externalClientConfig := restclient.CopyConfig(testCtx.RESTConfig())
 			externalClientConfig.QPS = -1
 			externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
-				testCtx.Ctx,
+				testCtx,
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -133,32 +133,32 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			}
 
 			// Waiting for all controllers to sync
-			externalInformers.Start(testCtx.Ctx.Done())
-			externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+			externalInformers.Start(testCtx.Done())
+			externalInformers.WaitForCacheSync(testCtx.Done())
 
 			// Run all controllers
-			go nc.Run(testCtx.Ctx)
+			go nc.Run(testCtx)
 
 			// Start TaintManager
 			if test.startStandaloneTaintEvictionController {
 				tm, _ := tainteviction.New(
-					testCtx.Ctx,
-					testCtx.ClientSet,
+					testCtx,
+					testCtx.Client(),
 					externalInformers.Core().V1().Pods(),
 					externalInformers.Core().V1().Nodes(),
 					names.TaintEvictionController,
 				)
-				go tm.Run(testCtx.Ctx)
+				go tm.Run(testCtx)
 			}
 
 			for index := range nodes {
-				nodes[index], err = cs.CoreV1().Nodes().Create(testCtx.Ctx, nodes[index], metav1.CreateOptions{})
+				nodes[index], err = cs.CoreV1().Nodes().Create(testCtx, nodes[index], metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create node, err: %v", err)
 				}
 			}
 
-			testPod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, testPod, metav1.CreateOptions{})
+			testPod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, testPod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Test Failed: error: %v, while creating pod", err)
 			}
@@ -167,14 +167,14 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Errorf("Failed to taint node in test %s <%s>, err: %v", name, nodes[nodeIndex].Name, err)
 			}
 
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*20, true, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
+			err = wait.PollUntilContextTimeout(testCtx, time.Second, time.Second*20, true, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
 			if err != nil && test.wantPodEvicted {
 				t.Fatalf("Test Failed: error %v while waiting for pod %q to be evicted", err, klog.KObj(testPod))
 			} else if !wait.Interrupted(err) && !test.wantPodEvicted {
 				t.Fatalf("Test Failed: unexpected eviction of pod %q", klog.KObj(testPod))
 			}
 
-			testPod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, testPod.Name, metav1.GetOptions{})
+			testPod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, testPod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Test Failed: error: %q, while getting updated pod", err)
 			}
@@ -272,18 +272,18 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
 			// Build clientset and informers for controllers.
-			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+			externalClientConfig := restclient.CopyConfig(testCtx.RESTConfig())
 			externalClientConfig.QPS = -1
 			externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
-				testCtx.Ctx,
+				testCtx,
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -302,21 +302,21 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			// Waiting for all controllers to sync
-			externalInformers.Start(testCtx.Ctx.Done())
-			externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+			externalInformers.Start(testCtx.Done())
+			externalInformers.WaitForCacheSync(testCtx.Done())
 
 			// Run the controller
-			go nc.Run(testCtx.Ctx)
+			go nc.Run(testCtx)
 
 			// Start TaintEvictionController
 			tm, _ := tainteviction.New(
-				testCtx.Ctx,
-				testCtx.ClientSet,
+				testCtx,
+				testCtx.Client(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
 				names.TaintEvictionController,
 			)
-			go tm.Run(testCtx.Ctx)
+			go tm.Run(testCtx)
 
 			nodeRes := v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4000m"),
@@ -350,7 +350,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					})
 				}
 				nodes = append(nodes, node)
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create node: %q, err: %v", klog.KObj(node), err)
 				}
 			}
@@ -362,19 +362,19 @@ func TestTaintBasedEvictions(t *testing.T) {
 					test.pod.Spec.Tolerations[0].TolerationSeconds = &test.tolerationSeconds
 				}
 
-				test.pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
+				test.pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx, test.pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error: %q, while creating pod %q", err, klog.KObj(test.pod))
 				}
 			}
 
-			if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, nodes[nodeIndex], test.nodeTaints); err != nil {
+			if err := testutils.WaitForNodeTaints(testCtx, cs, nodes[nodeIndex], test.nodeTaints); err != nil {
 				t.Errorf("Failed to taint node %q, err: %v", klog.KObj(nodes[nodeIndex]), err)
 			}
 
 			if test.pod != nil {
 				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
-					pod, err := cs.CoreV1().Pods(test.pod.Namespace).Get(testCtx.Ctx, test.pod.Name, metav1.GetOptions{})
+					pod, err := cs.CoreV1().Pods(test.pod.Namespace).Get(testCtx, test.pod.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
@@ -389,10 +389,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 					return false, nil
 				})
 				if err != nil {
-					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, test.pod.Name, metav1.GetOptions{})
+					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx, test.pod.Name, metav1.GetOptions{})
 					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.expectedWaitForPodCondition, pod)
 				}
-				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{test.pod})
+				testutils.CleanupPods(testCtx, cs, t, []*v1.Pod{test.pod})
 			}
 			testutils.CleanupNodes(cs, t)
 		})

@@ -140,7 +140,7 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 				ns := testCtx.NS.Name
 
 				for _, pvcName := range sets.List(sets.New("pvc-1", tt.secondPodPVC)) {
-					if err := createBoundRWOPPVC(testCtx.ClientSet, ns, pvcName); err != nil {
+					if err := createBoundRWOPPVC(testCtx.Client(), ns, pvcName); err != nil {
 						t.Fatal(err)
 					}
 				}
