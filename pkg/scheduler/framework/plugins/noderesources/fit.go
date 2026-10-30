@@ -492,14 +492,17 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 
 	// The node's allocatable is insufficient for the pod regardless of what else runs on it.
 	if !fitsEmptyNode(pod, modifiedNode, draManager, opts) {
-		// Check if the pod's nominated node just transitioned from "fitting" to "not fitting" (e.g., node shrunk).
-		// If so, the Fit filter will now return UnschedulableAndUnresolvable here.
-		// We re-queue the pod so it can attempt preemption on a different node.
-		// We strictly check this transition to avoid requeue storms on subsequent node shrinks.
+		// Check if the pod's nominated node just transitioned from "fitting" to "not fitting"
+		// for native resources (CPU, memory, ephemeral-storage).
 		//
+		// Note: ScalarResources are excluded because device-plugin restarts can transiently drop capacity to 0,
+		// which would cause spurious double-preemptions on the nominated node.
 		// Note: This optimization covers pod-by-pod preemption only. PodGroups waiting
 		// for victims do not benefit because PodGroupEvaluator lacks an "UnschedulableAndUnresolvable" escape path.
-		if pod.Status.NominatedNodeName == modifiedNode.Name && fitsEmptyNode(pod, originalNode, draManager, opts) {
+		if pod.Spec.SchedulingGroup == nil &&
+			pod.Status.NominatedNodeName == modifiedNode.Name &&
+			!fitsNativeResourcesOnEmptyNode(pod, modifiedNode, opts) &&
+			fitsEmptyNode(pod, originalNode, draManager, opts) {
 			logger.V(5).Info("nominated node can no longer accommodate the pod, re-queuing so it can preempt elsewhere", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 			return fwk.Queue, nil
 		}
@@ -604,6 +607,22 @@ func fitsEmptyNode(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, 
 	nodeInfo.SetNode(node)
 
 	return len(Fits(pod, nodeInfo, draManager, opts)) == 0
+}
+
+// fitsNativeResourcesOnEmptyNode checks whether the pod's native resource requests (CPU, memory,
+// ephemeral-storage) fit within the node's allocatable, ignoring any pods already running on the
+// node and ignoring ScalarResources.
+func fitsNativeResourcesOnEmptyNode(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions) bool {
+	if node == nil {
+		return false
+	}
+	podRequest := computePodResourceRequest(pod, opts)
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(node)
+	allocatable := nodeInfo.Allocatable
+	return podRequest.MilliCPU <= allocatable.GetMilliCPU() &&
+		podRequest.Memory <= allocatable.GetMemory() &&
+		podRequest.EphemeralStorage <= allocatable.GetEphemeralStorage()
 }
 
 // Filter invoked at the filter extension point.

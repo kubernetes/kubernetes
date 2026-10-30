@@ -1786,7 +1786,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: fwk.Queue,
 		},
-		"queue-nominated-pod-when-nominated-node-scalar-resource-decreases": {
+		"skip-queue-nominated-pod-when-nominated-node-scalar-resource-decreases": {
 			pod: func() *v1.Pod {
 				p := newResourcePod(framework.Resource{
 					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2},
@@ -1800,7 +1800,23 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
 				extendedResourceA: "1",
 			}).Obj(),
-			expectedHint: fwk.Queue,
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-podgroup-pod-when-nominated-node-memory-decreases": {
+			pod: func() *v1.Pod {
+				p := st.MakePod().PodGroupName("my-group").Req(map[v1.ResourceName]string{
+					v1.ResourceMemory: "4",
+				}).Obj()
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-nominated-pod-when-non-requested-resource-decreases-on-nominated-node": {
 			pod: func() *v1.Pod {
@@ -2219,6 +2235,69 @@ func TestFitsEmptyNode(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			if got := fitsEmptyNode(tc.pod, tc.node, nil, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
+				t.Errorf("expected: %v, got: %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestFitsNativeResourcesOnEmptyNode(t *testing.T) {
+	testCases := map[string]struct {
+		pod      *v1.Pod
+		node     *v1.Node
+		expected bool
+	}{
+		"nil node": {
+			pod:      &v1.Pod{},
+			expected: false,
+		},
+		"insufficient CPU": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expected: false,
+		},
+		"insufficient memory": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "4"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Obj(),
+			expected: false,
+		},
+		"insufficient ephemeral-storage": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "2Gi"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).Obj(),
+			expected: false,
+		},
+		"sufficient native resources": {
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			node: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "4",
+			}).Obj(),
+			expected: true,
+		},
+		"scalar resource over-capacity does not block": {
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				extendedResourceA: "10",
+			}).Obj(),
+			node: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				extendedResourceA: "1",
+			}).Obj(),
+			expected: true,
+		},
+		"zero native requests fit any node": {
+			pod:      newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}}),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{extendedResourceA: "2"}).Obj(),
+			expected: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := fitsNativeResourcesOnEmptyNode(tc.pod, tc.node, ResourceRequestsOptions{}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})

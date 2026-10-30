@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -48,7 +49,7 @@ import (
 // fires Queue in this case so the pod is not stuck waiting for the original
 // victims to finish terminating on a node that can never host it.
 func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
-	testCtx := testutils.InitTestSchedulerWithNS(t, "node-allocatable-decrease")
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "node-allocatable-decrease")
 	defer testCtx.SchedulerCloseFn()
 
 	cs := testCtx.ClientSet
@@ -207,7 +208,7 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 //     and preempts the victim on node-b instead.
 //  5. The target eventually binds to node-b.
 func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
-	testCtx := testutils.InitTestSchedulerWithNS(t, "nominated-node-shrink")
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "nominated-node-shrink")
 	defer testCtx.SchedulerCloseFn()
 
 	cs := testCtx.ClientSet
@@ -260,7 +261,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	}
 
 	// The scheduler always nominates node-a first (lowest-priority victim).
-	if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, target); err != nil {
+	if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, target); err != nil {
 		t.Fatalf("target pod did not get NominatedNodeName: %v", err)
 	}
 	target, err = cs.CoreV1().Pods(ns).Get(testCtx.Ctx, target.Name, metav1.GetOptions{})
@@ -320,7 +321,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 			t.Fatalf("failed to force-delete victim-%s: %v", nodeName, err)
 		}
 	}
-	if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, target); err != nil {
+	if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, cs, target); err != nil {
 		t.Fatalf("target pod did not schedule after victims were removed: %v", err)
 	}
 	finalTarget, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, target.Name, metav1.GetOptions{})
