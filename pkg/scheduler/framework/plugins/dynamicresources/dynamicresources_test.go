@@ -1432,6 +1432,136 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
 }
 
+// TestUnreserveSharedPendingAllocation covers two Pods of a PodGroup which
+// share a pending allocation. The first Pod stores the allocation in PreBind
+// and then times out waiting for binding conditions. The second Pod fails in
+// PreBind because the claim is already allocated. The claim is reserved for
+// the PodGroup, so Unreserve does not update it and nothing refreshes the
+// assume cache afterwards. The stored allocation must stay in the assume cache
+// when the Pod which releases the pending allocation last is not the one which
+// stored it, even when the informer copy is the claim from before PreBind.
+func TestUnreserveSharedPendingAllocation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAWorkloadResourceClaims: true,
+		features.GenericWorkload:           true,
+	})
+	feats := feature.Features{
+		EnableDRAAdminAccess:               true,
+		EnableDRADeviceBindingConditions:   true,
+		EnableDRAResourceClaimDeviceStatus: true,
+		EnableDRASchedulerFilterTimeout:    true,
+		EnableDRAWorkloadResourceClaims:    true,
+	}
+	args := getDefaultDynamicResourcesArgs()
+	// Time out quickly in PreBind. There's no controller which sets the
+	// binding conditions.
+	args.BindingTimeout = &metav1.Duration{Duration: time.Second}
+	testCtx := setup(tCtx, args, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{fabricSlice}, feats, false, nil)
+
+	pods := []*v1.Pod{groupedPodWithClaimName, groupedPodWithClaimName2}
+	states := make([]*framework.CycleState, len(pods))
+	podGroupCycleState := framework.NewCycleState()
+	for i, pod := range pods {
+		states[i] = framework.NewCycleState()
+		states[i].SetPodGroupCycleState(podGroupCycleState)
+		_, status := testCtx.p.PreFilter(tCtx, states[i], pod, testCtx.nodeInfos)
+		require.True(tCtx, status.IsSuccess(), "PreFilter %s: %v", pod.Name, status.AsError())
+		status = testCtx.p.Filter(tCtx, states[i], pod, testCtx.nodeInfos[0])
+		require.True(tCtx, status.IsSuccess(), "Filter %s: %v", pod.Name, status.AsError())
+		status = testCtx.p.Reserve(tCtx, states[i], pod, nodeName)
+		require.True(tCtx, status.IsSuccess(), "Reserve %s: %v", pod.Name, status.AsError())
+	}
+	for _, state := range states {
+		// PodGroup cycle state is cleared before asynchronous binding.
+		state.SetPodGroupCycleState(nil)
+	}
+	claimBeforePreBind, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get claim before PreBind")
+
+	status := testCtx.p.PreBind(tCtx, states[0], pods[0], nodeName)
+	require.ErrorIs(tCtx, status.AsError(), ErrDeviceBindingTimeout, "PreBind of the Pod which stores the allocation")
+	status = testCtx.p.PreBind(tCtx, states[1], pods[1], nodeName)
+	require.ErrorContains(tCtx, status.AsError(), "got allocated elsewhere in the meantime", "PreBind of the other Pod")
+	storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get claim")
+	require.NotNil(tCtx, storedClaim.Status.Allocation, "allocation stored by PreBind")
+	testCtx.assumeAheadOfInformer(tCtx, claimBeforePreBind, storedClaim)
+
+	testCtx.p.Unreserve(tCtx, states[0], pods[0], nodeName)
+	testCtx.p.Unreserve(tCtx, states[1], pods[1], nodeName)
+
+	assert.Empty(tCtx, testCtx.listInFlightClaims(), "in-flight claims")
+	assumedClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
+	tCtx.ExpectNoError(err, "get claim from assume cache")
+	assert.NotNil(tCtx, assumedClaim.Status.Allocation, "allocation in the assume cache")
+	allocatedDevices, err := testCtx.draManager.ResourceClaims().ListAllAllocatedDevices()
+	tCtx.ExpectNoError(err, "list allocated devices")
+	device := storedClaim.Status.Allocation.Devices.Results[0]
+	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
+}
+
+// TestUnreserveExtendedResourceClaimAfterAllocationInPreBind covers PreBind
+// creating the extended resource claim and storing its allocation, then
+// failing to patch the Pod status. Unreserve cannot delete the claim because
+// removing the finalizer fails, so the claim stays allocated in the API server
+// and nothing refreshes the assume cache afterwards. The stored allocation must
+// stay in the assume cache even when the informer copy is the created claim
+// without it.
+func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	feats := feature.Features{
+		EnableDRAAdminAccess:               true,
+		EnableDRADeviceBindingConditions:   true,
+		EnableDRAResourceClaimDeviceStatus: true,
+		EnableDRASchedulerFilterTimeout:    true,
+		EnableDRAExtendedResource:          true,
+	}
+	failFinalizerRemoval := &cgotesting.SimpleReactor{
+		Verb:     "update",
+		Resource: "resourceclaims",
+		Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+			claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim)
+			if ok && action.GetSubresource() == "" && !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
+				return true, nil, apierrors.NewBadRequest("remove finalizer error")
+			}
+			return false, nil, nil
+		},
+	}
+	// failPatch makes PreBind fail when patching the Pod status.
+	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, nil, []*resourceapi.DeviceClass{deviceClassWithExtendResourceName}, nil, []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName}, feats, true, []cgotesting.Reactor{failFinalizerRemoval})
+	pod := podWithExtendedResourceName
+
+	_, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, testCtx.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status.AsError())
+	status = testCtx.p.Filter(tCtx, testCtx.state, pod, testCtx.nodeInfos[0])
+	require.True(tCtx, status.IsSuccess(), "Filter: %v", status.AsError())
+	status = testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName)
+	require.True(tCtx, status.IsSuccess(), "Reserve: %v", status.AsError())
+	status = testCtx.p.PreBind(tCtx, testCtx.state, pod, nodeName)
+	require.ErrorContains(tCtx, status.AsError(), "patch error", "PreBind")
+
+	state, err := getStateData(testCtx.state)
+	tCtx.ExpectNoError(err, "get state data")
+	createdClaim := state.claims.extendedResourceClaim()
+	storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, createdClaim.Name, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get claim")
+	require.NotNil(tCtx, storedClaim.Status.Allocation, "allocation stored by PreBind")
+	testCtx.assumeAheadOfInformer(tCtx, createdClaim, storedClaim)
+
+	testCtx.p.Unreserve(tCtx, testCtx.state, pod, nodeName)
+
+	assert.Empty(tCtx, testCtx.listInFlightClaims(), "in-flight claims")
+	assumedClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, createdClaim.Name)
+	tCtx.ExpectNoError(err, "get claim from assume cache")
+	assert.NotNil(tCtx, assumedClaim.Status.Allocation, "allocation in the assume cache")
+	allocatedDevices, err := testCtx.draManager.ResourceClaims().ListAllAllocatedDevices()
+	tCtx.ExpectNoError(err, "list allocated devices")
+	device := storedClaim.Status.Allocation.Devices.Results[0]
+	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
+}
+
 func testPlugin(tCtx ktesting.TContext) {
 	testcases := map[string]testPluginCase{
 		"empty": {
@@ -2624,6 +2754,44 @@ func testPlugin(tCtx ktesting.TContext) {
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
 		},
+		"extended-resource-name-status-update-failure": {
+			// PreBind creates the claim and adds the finalizer, then storing
+			// the allocation fails. Unreserve cannot delete the claim. The
+			// allocation must never show up in the assume cache.
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						if action.GetSubresource() == "status" {
+							return true, nil, apierrors.NewBadRequest("claim status update error")
+						}
+						if claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim); ok && !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
+							return true, nil, apierrors.NewBadRequest("remove finalizer error")
+						}
+						return false, nil, nil
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
+					assumedClaim:   st.FromResourceClaim(extendedResourceClaim).Allocation(nil).Obj(),
+					added:          []metav1.Object{st.FromResourceClaim(extendedResourceClaim).Allocation(nil).Obj()},
+					status:         fwk.AsStatus(errors.New("claim status update error")),
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: st.FromResourceClaim(extendedResourceClaim).Allocation(nil).Obj(),
+				},
+			},
+		},
 		"extended-resource-name-with-resources-has-claim": {
 			enableDRAExtendedResource: true,
 			pod:                       podWithExtendedResourceName,
@@ -2966,6 +3134,60 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 					// From PreBind itself, when checking isPodReadyForBinding times out.
 					status: fwk.AsStatus(errors.New("device binding timeout")),
+				},
+			},
+		},
+		"unreserve-after-allocation-in-prebind-other-claim-fails": {
+			// PreBind stores the allocation of the first claim, then fails
+			// for the second one. Unreserve cannot remove the reservation,
+			// so the allocation of the first claim must stay in the assume
+			// cache.
+			pod:       podWithTwoClaimNames,
+			claims:    []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
+			classes:   []*resourceapi.DeviceClass{deviceClass},
+			objs:      []apiruntime.Object{largeWorkerNodeSlice},
+			failPatch: true,
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim)
+						if ok && claim.Name == claimName2 && action.GetSubresource() == "status" {
+							return true, nil, apierrors.NewBadRequest("claim status update error")
+						}
+						return false, nil, nil
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						allocatedClaim,
+						st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj(),
+					},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{
+						addAllocationTimestamp(allocatedClaim),
+						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
+					},
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name == claimName2 {
+								// Only the finalizer got added before the status update failed.
+								out := in.DeepCopy()
+								out.Finalizers = append(out.Finalizers, resourceapi.Finalizer)
+								return out
+							}
+							return addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames))
+						},
+					},
+					status: fwk.AsStatus(errors.New("claim status update error")),
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
 				},
 			},
 		},
@@ -4551,6 +4773,30 @@ func (tc *testContext) listInFlightClaims() []metav1.Object {
 	}
 	sortObjects(inFlightClaims)
 	return inFlightClaims
+}
+
+// assumeAheadOfInformer puts the assume cache into the state which it has when
+// PreBind assumed assumedClaim before the informer delivered that version: the
+// assume cache then drops the informer event because its ResourceVersion is not
+// newer, so informerClaim remains the informer copy. Which one comes first
+// depends on timing, so tests which need this state must force it.
+//
+// A claim created now acts as a barrier: once it shows up in the assume cache,
+// all earlier informer events have been processed and none of them can replace
+// the informer copy afterwards.
+func (tc *testContext) assumeAheadOfInformer(tCtx ktesting.TContext, informerClaim, assumedClaim *resourceapi.ResourceClaim) {
+	tCtx.Helper()
+	barrier, err := tc.client.ResourceV1().ResourceClaims(informerClaim.Namespace).Create(tCtx, st.MakeResourceClaim().GenerateName("barrier-").Namespace(informerClaim.Namespace).Obj(), metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create barrier claim")
+	err = wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, time.Minute, true, func(context.Context) (bool, error) {
+		_, err := tc.draManager.ResourceClaims().Get(barrier.Namespace, barrier.Name)
+		return err == nil, nil
+	})
+	tCtx.ExpectNoError(err, "wait for barrier claim in assume cache")
+	claimsCache := tc.draManager.resourceClaimTracker.cache
+	assumecache.DeleteTestObject(claimsCache, assumedClaim)
+	assumecache.AddTestObject(claimsCache, informerClaim)
+	tCtx.ExpectNoError(claimsCache.Assume(assumedClaim), "assume claim")
 }
 
 // updateAPIServer modifies objects and stores any changed object in the API server.
