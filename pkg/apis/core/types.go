@@ -750,7 +750,7 @@ const (
 	VolumeHealthGood VolumeHealthStatusType = "Healthy"
 )
 
-// VolumeHealthCondition represents an adverse health condition reported for a volume.
+// VolumeHealthCondition represents an health condition reported for a volume.
 // Both pod and PVC reuse this type to report volume health in their status fields.
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
