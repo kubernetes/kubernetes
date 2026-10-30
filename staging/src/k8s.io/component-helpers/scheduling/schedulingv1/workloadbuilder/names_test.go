@@ -200,3 +200,76 @@ func TestGeneratePodGroupName(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateNamesWithDottedPrefixes(t *testing.T) {
+	testCases := []struct {
+		name     string
+		generate func(string) string
+	}{
+		{
+			name: "workload",
+			generate: func(name string) string {
+				return GenerateWorkloadName(name, types.UID("uid-1"))
+			},
+		},
+		{
+			name: "podgroup with empty workload",
+			generate: func(name string) string {
+				return GeneratePodGroupName("", name)
+			},
+		},
+		{
+			name: "podgroup with empty template",
+			generate: func(name string) string {
+				return GeneratePodGroupName(name, "")
+			},
+		},
+		{
+			name: "podgroup with short workload",
+			generate: func(name string) string {
+				return GeneratePodGroupName("workload", name)
+			},
+		},
+		{
+			name: "podgroup with short template",
+			generate: func(name string) string {
+				return GeneratePodGroupName(name, "template")
+			},
+		},
+		{
+			name: "podgroup with long workload and template",
+			generate: func(name string) string {
+				return GeneratePodGroupName(name, name)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Move a label separator through every position in a valid maximum-length
+			// subdomain so truncation must preserve validity at label boundaries.
+			for dot := 1; dot < validation.DNS1123SubdomainMaxLength-1; dot++ {
+				name := dnsSubdomainPart(dot, "a") + "." + dnsSubdomainPart(validation.DNS1123SubdomainMaxLength-dot-1, "b")
+				if errs := validation.IsDNS1123Subdomain(name); len(errs) > 0 {
+					t.Fatalf("invalid input name: %v", errs)
+				}
+				generated := tc.generate(name)
+				if errs := validation.IsDNS1123Subdomain(generated); len(errs) > 0 {
+					t.Errorf("dot at %d: generated name %q is not a DNS subdomain: %v", dot, generated, errs)
+				}
+			}
+		})
+	}
+}
+
+// dnsSubdomainPart fills the requested length without exceeding the label limit.
+func dnsSubdomainPart(length int, character string) string {
+	var result strings.Builder
+	for length > validation.DNS1123LabelMaxLength {
+		result.WriteString(strings.Repeat(character, validation.DNS1123LabelMaxLength-1))
+		result.WriteByte('.')
+		length -= validation.DNS1123LabelMaxLength
+	}
+	result.WriteString(strings.Repeat(character, length))
+	return result.String()
+}
