@@ -55,8 +55,8 @@ func runControlPlane(c workflow.RunData) error {
 	initCfg, upgradeCfg, client, patchesDir := data.InitCfg(), data.Cfg(), data.Client(), data.PatchesDir()
 
 	if data.DryRun() {
-		fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q", initCfg.KubernetesVersion)
-		return upgrade.DryRunStaticPodUpgrade(patchesDir, initCfg)
+		fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q\n", initCfg.KubernetesVersion)
+		return upgrade.DryRunStaticPodUpgrade(patchesDir, initCfg, data.EtcdUpgrade())
 	}
 
 	fmt.Printf("[upgrade/control-plane] Upgrading your static Pod-hosted control plane to version %q (timeout: %v)...\n",

@@ -52,6 +52,19 @@ func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, log
 	}, nil
 }
 
+func fakeFetchInitConfigWithLocalEtcd(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
+	return &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.0.1",
+			Etcd: kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					DataDir: "/var/lib/etcd",
+				},
+			},
+		},
+	}, nil
+}
+
 func TestRunDiff(t *testing.T) {
 	// create a temporary file with valid ClusterConfiguration
 	testUpgradeDiffConfigContents := []byte(fmt.Sprintf(`
@@ -86,12 +99,14 @@ diff:
 	}
 
 	testCases := []struct {
-		name            string
-		args            []string
-		setManifestPath bool
-		manifestPath    string
-		cfgPath         string
-		expectedError   bool
+		name             string
+		args             []string
+		setManifestPath  bool
+		manifestPath     string
+		etcdManifestPath string
+		fetchInitConfig  FetchInitConfigurationFunc
+		cfgPath          string
+		expectedError    bool
 	}{
 		{
 			name:            "valid: run diff with empty config path on valid manifest path",
@@ -99,6 +114,24 @@ diff:
 			setManifestPath: true,
 			manifestPath:    testUpgradeDiffManifest,
 			expectedError:   false,
+		},
+		{
+			name:             "valid: run diff with local etcd on valid manifest paths",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: testUpgradeDiffManifest,
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    false,
+		},
+		{
+			name:             "invalid: local etcd but bad etcd manifest path",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: "bad-path",
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    true,
 		},
 		{
 			name:            "valid: run diff on valid manifest path",
@@ -137,7 +170,12 @@ diff:
 				flags.controllerManagerManifestPath = tc.manifestPath
 				flags.schedulerManifestPath = tc.manifestPath
 			}
-			if err := runDiff(cmd.Flags(), flags, tc.args, fakeFetchInitConfig); (err != nil) != tc.expectedError {
+			flags.etcdManifestPath = tc.etcdManifestPath
+			fetchInitConfig := tc.fetchInitConfig
+			if fetchInitConfig == nil {
+				fetchInitConfig = fakeFetchInitConfig
+			}
+			if err := runDiff(cmd.Flags(), flags, tc.args, fetchInitConfig); (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
 			}
 		})

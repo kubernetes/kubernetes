@@ -678,13 +678,19 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
-func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration) error {
+func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) error {
 	dryRunManifestDir, err := constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-dryrun", klog.Warningf)
 	if err != nil {
 		return err
 	}
 
 	defer os.RemoveAll(dryRunManifestDir)
+	// etcd upgrade is done prior to other control plane components; the etcd phase prints the manifest in dry-run mode
+	if internalcfg.Etcd.Local != nil && etcdUpgrade {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(dryRunManifestDir, patchesDir, internalcfg.NodeRegistration.Name, &internalcfg.ClusterConfiguration, &internalcfg.LocalAPIEndpoint, true /* isDryRun */); err != nil {
+			return err
+		}
+	}
 	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, patchesDir, internalcfg, true /* isDryRun */); err != nil {
 		return err
 	}
