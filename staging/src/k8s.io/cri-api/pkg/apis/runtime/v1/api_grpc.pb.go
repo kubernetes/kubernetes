@@ -248,7 +248,11 @@ type RuntimeServiceClient interface {
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// deadline expires or the call is cancelled, the runtime must stop the
+	// restore and remove any sandbox and containers created by the call, even
+	// if it has finished preparing them, because the caller treats the restore
+	// as failed and does not start or remove what it never received.
 	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
@@ -879,7 +883,11 @@ type RuntimeServiceServer interface {
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// deadline expires or the call is cancelled, the runtime must stop the
+	// restore and remove any sandbox and containers created by the call, even
+	// if it has finished preparing them, because the caller treats the restore
+	// as failed and does not start or remove what it never received.
 	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
