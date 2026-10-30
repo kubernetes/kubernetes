@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	"k8s.io/cloud-provider/events"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -546,7 +547,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 		return err
 	}
 
-	cnc.recorder.Event(copyNode, v1.EventTypeNormal, "Synced", "Node synced successfully")
+	cnc.recorder.Event(copyNode, v1.EventTypeNormal, events.NodeSynced, "Node synced successfully")
 	initialNodeSyncDelay.Observe(time.Since(curNode.ObjectMeta.CreationTimestamp.Time).Seconds())
 	return nil
 }

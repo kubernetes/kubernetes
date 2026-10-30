@@ -47,6 +47,7 @@ import (
 	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/events"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/controller-manager/pkg/features"
@@ -461,7 +462,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 									Name:       string(nodeName),
 									UID:        node.UID,
 									Namespace:  "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", "%s", msg,
+								}, v1.EventTypeWarning, events.FailedToCreateRoute, "%s", msg,
 							)
 							klog.V(4).Info(msg)
 							return err

@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
+	"k8s.io/cloud-provider/events"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
@@ -339,7 +340,7 @@ func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 	cachedService.state = service
 	op, err := c.syncLoadBalancerIfNeeded(ctx, service, key)
 	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
+		c.eventRecorder.Eventf(service, v1.EventTypeWarning, events.SyncLoadBalancerFailed, "Error syncing load balancer: %v", err)
 		return err
 	}
 	if op == deleteLoadBalancer {
@@ -381,7 +382,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		}
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
-			c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+			c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletingLoadBalancer, "Deleting load balancer")
 			if err := c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service); err != nil {
 				if err == cloudprovider.ImplementedElsewhere {
 					klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error on deletion", key, c.cloud.ProviderName())
@@ -395,12 +396,12 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		if err := c.removeFinalizer(service); err != nil {
 			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
 		}
-		c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+		c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletedLoadBalancer, "Deleted load balancer")
 	} else {
 		// Create or update the load balancer if service wants one.
 		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
-		c.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
+		c.eventRecorder.Event(service, v1.EventTypeNormal, events.EnsuringLoadBalancer, "Ensuring load balancer")
 		// Always add a finalizer prior to creating load balancers, this ensures Services
 		// can't be deleted until all corresponding load balancer resources are also deleted.
 		if err := c.addFinalizer(service); err != nil {
@@ -422,7 +423,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
 		}
 
-		c.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
+		c.eventRecorder.Event(service, v1.EventTypeNormal, events.EnsuredLoadBalancer, "Ensured load balancer")
 	}
 
 	if err := c.patchStatus(service, previousStatus, newStatus); err != nil {
@@ -445,7 +446,7 @@ func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service
 	}
 	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 	if len(nodes) == 0 {
-		c.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
+		c.eventRecorder.Event(service, v1.EventTypeWarning, events.UnAvailableLoadBalancer, "There are no available nodes for LoadBalancer")
 	}
 	c.storeLastSyncedNodes(service, nodes)
 	// - Not all cloud providers support all protocols and the next step is expected to return
@@ -836,9 +837,9 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 	if err == nil {
 		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 		if len(hosts) == 0 {
-			c.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
+			c.eventRecorder.Event(service, v1.EventTypeWarning, events.UnAvailableLoadBalancer, "There are no available nodes for LoadBalancer")
 		} else {
-			c.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+			c.eventRecorder.Event(service, v1.EventTypeNormal, events.UpdatedLoadBalancer, "Updated load balancer with new hosts")
 		}
 		return nil
 	}
@@ -855,7 +856,7 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 		return nil
 	}
 
-	c.eventRecorder.Eventf(service, v1.EventTypeWarning, "UpdateLoadBalancerFailed", "Error updating load balancer with new hosts %v [node names limited, total number of nodes: %d], error: %v", loggableNodeNames(hosts), len(hosts), err)
+	c.eventRecorder.Eventf(service, v1.EventTypeWarning, events.UpdateLoadBalancerFailed, "Error updating load balancer with new hosts %v [node names limited, total number of nodes: %d], error: %v", loggableNodeNames(hosts), len(hosts), err)
 	return err
 }
 
@@ -922,12 +923,12 @@ func (c *Controller) processLoadBalancerDelete(ctx context.Context, service *v1.
 	if !wantsLoadBalancer(service) {
 		return nil
 	}
-	c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+	c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletingLoadBalancer, "Deleting load balancer")
 	if err := c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service); err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeleteLoadBalancerFailed", "Error deleting load balancer: %v", err)
+		c.eventRecorder.Eventf(service, v1.EventTypeWarning, events.DeleteLoadBalancerFailed, "Error deleting load balancer: %v", err)
 		return err
 	}
-	c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+	c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletedLoadBalancer, "Deleted load balancer")
 	return nil
 }
 
