@@ -350,6 +350,9 @@ type KubeletConfiguration struct {
 	// is allocated or formatted by the kubelet.
 	// +optional
 	PodCheckpointStorage *PodCheckpointStorageConfiguration
+	// podRestoreTimeout is the maximum duration the kubelet waits for the
+	// RestorePod CRI call when it restores a Pod from a checkpoint.
+	PodRestoreTimeout metav1.Duration
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
