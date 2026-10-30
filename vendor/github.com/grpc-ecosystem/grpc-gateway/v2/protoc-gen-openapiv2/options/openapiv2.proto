@@ -537,11 +537,11 @@ message JSONSchema {
   double multiple_of = 10;
   // Maximum represents an inclusive upper limit for a numeric instance. The
   // value of MUST be a number,
-  double maximum = 11;
+  optional double maximum = 11;
   bool exclusive_maximum = 12;
   // minimum represents an inclusive lower limit for a numeric instance. The
   // value of MUST be a number,
-  double minimum = 13;
+  optional double minimum = 13;
   bool exclusive_minimum = 14;
   uint64 max_length = 15;
   uint64 min_length = 16;

@@ -244,9 +244,8 @@ func (c Cursor) Enclosing(types ...ast.Node) iter.Seq[Cursor] {
 		panic("Cursor.Enclosing called on Root node")
 	}
 
-	mask := maskOf(types)
-
 	return func(yield func(Cursor) bool) {
+		mask := maskOf(types)
 		events := c.in.events
 		for i := c.index; i >= 0; i = events[i].parent {
 			if events[i].typ&mask != 0 && !yield(Cursor{c.in, i}) {

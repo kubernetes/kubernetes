@@ -8,10 +8,6 @@
       "github.com/google/cel-go": {
         "version": "v0.29.2",
         "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
-      },
-      "github.com/grpc-ecosystem/grpc-gateway/v2": {
-        "version": "v2.29.0",
-        "reason": "pin to v2.29.0 until grpc-gateway drops go-openapi, see grpc-ecosystem/grpc-gateway#7343 and #7325; v2.30.0 pulls in go-openapi analysis, spec, strfmt and validate"
       }
     },
     "unwantedModules": {
@@ -168,7 +164,8 @@
       "golang.org/x/exp": [
         "cel.dev/cel-go",
         "github.com/antlr4-go/antlr/v4",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2"
+        "github.com/grpc-ecosystem/go-grpc-middleware/v2",
+        "github.com/grpc-ecosystem/grpc-gateway/v2"
       ],
       "gopkg.in/yaml.v3": [
         "github.com/coreos/go-semver",

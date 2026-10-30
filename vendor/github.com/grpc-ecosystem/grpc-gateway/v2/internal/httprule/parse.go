@@ -18,6 +18,50 @@ func (e InvalidTemplateError) Error() string {
 
 // Parse parses the string representation of path template
 func Parse(tmpl string) (Compiler, error) {
+	return parse(tmpl)
+}
+
+// Segment is a top-level segment of a parsed path template.
+type Segment struct {
+	// FieldPath is the field path bound by a variable segment, e.g. "name"
+	// for "{name=projects/*}". It is empty for literal and wildcard segments.
+	FieldPath string
+	// Value is the literal or wildcard ("*" or "**") of a non-variable
+	// segment, or the pattern of a variable segment, e.g. "projects/*" for
+	// "{name=projects/*}". A variable without an explicit pattern, such as
+	// "{name}", has the pattern "*".
+	Value string
+}
+
+// SplitTemplate parses the string representation of path template and
+// returns its top-level segments and its verb. The root template "/" has no
+// segments.
+func SplitTemplate(tmpl string) (segments []Segment, verb string, err error) {
+	t, err := parse(tmpl)
+	if err != nil {
+		return nil, "", err
+	}
+	for _, s := range t.segments {
+		switch s := s.(type) {
+		case literal:
+			if s == eof {
+				continue
+			}
+			segments = append(segments, Segment{Value: string(s)})
+		case variable:
+			pattern := make([]string, 0, len(s.segments))
+			for _, vs := range s.segments {
+				pattern = append(pattern, vs.String())
+			}
+			segments = append(segments, Segment{FieldPath: s.path, Value: strings.Join(pattern, "/")})
+		default:
+			segments = append(segments, Segment{Value: s.String()})
+		}
+	}
+	return segments, t.verb, nil
+}
+
+func parse(tmpl string) (template, error) {
 	if !strings.HasPrefix(tmpl, "/") {
 		return template{}, InvalidTemplateError{tmpl: tmpl, msg: "no leading /"}
 	}
@@ -27,6 +71,9 @@ func Parse(tmpl string) (Compiler, error) {
 	segs, err := p.topLevelSegments()
 	if err != nil {
 		return template{}, InvalidTemplateError{tmpl: tmpl, msg: err.Error()}
+	}
+	if err := expectPChars(verb); err != nil {
+		return template{}, InvalidTemplateError{tmpl: tmpl, msg: fmt.Sprintf("invalid verb: %v", err)}
 	}
 
 	return template{

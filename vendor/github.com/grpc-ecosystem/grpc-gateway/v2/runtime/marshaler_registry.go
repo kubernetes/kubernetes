@@ -44,6 +44,18 @@ func MarshalerForRequest(mux *ServeMux, r *http.Request) (inbound Marshaler, out
 	}
 
 	for _, contentTypeVal := range r.Header[contentTypeHeader] {
+		// A header that is already exactly a registered media type -- "application/json",
+		// which is what clients send -- needs no parsing. mime.ParseMediaType allocates a
+		// parameter map even when the value carries no parameters, and it would return this
+		// value unchanged, so the lookup below would be the same one.
+		//
+		// This is also what the Accept loop above already does: the registry is keyed by the
+		// strings passed to WithMarshalerOption, and that loop matches the header value
+		// against them directly.
+		if m, ok := mux.marshalers.mimeMap[contentTypeVal]; ok {
+			inbound = m
+			break
+		}
 		contentType, _, err := mime.ParseMediaType(contentTypeVal)
 		if err != nil {
 			grpclog.Errorf("Failed to parse Content-Type %s: %v", contentTypeVal, err)

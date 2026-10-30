@@ -44,6 +44,9 @@ import (
 //	var x int     => IsAssignedOrAddressTaken(x) = false
 //	x := 1        => IsAssignedOrAddressTaken(x) = false
 //
+// For some ill-formed code, such as a non-identifier on the LHS of :=, or when
+// the type of x in x[i] or x[i:j] is unknown, we conservatively return true.
+//
 // TODO(adonovan): revisit the surprising behavior for declarations.
 func IsAssignedOrAddressTaken(info *types.Info, cur inspector.Cursor) bool {
 	// Unfortunately we can't simply use info.Types[e].Assignable()
@@ -76,8 +79,8 @@ outer:
 						// The receiver may be an embedded field, so we need
 						// to get the inner-most type (right before the method
 						// call in seln.Index())
-						for _, idx := range seln.Index()[:len(seln.Index())-1] {
-							t = t.Underlying().(*types.Struct).Field(idx).Type()
+						for field := range ImplicitFieldSelections(seln) {
+							t = field.Type()
 						}
 						if !is[*types.Pointer](t.Underlying()) {
 							return true // takes address of receiver
@@ -89,7 +92,11 @@ outer:
 		case edge.IndexExpr_X, edge.SliceExpr_X:
 			// If x[i] or x[i:j] is an lvalue,
 			// then x is an lvalue iff x is an array.
-			if !is[*types.Array](info.TypeOf(cur.Node().(ast.Expr)).Underlying()) {
+			t := info.TypeOf(cur.Node().(ast.Expr))
+			if t == nil || t == types.Typ[types.Invalid] {
+				return true // no type information (ill-typed code); be conservative
+			}
+			if !is[*types.Array](t.Underlying()) {
 				return false
 			}
 		default:
@@ -102,7 +109,10 @@ outer:
 		if assign.Tok != token.DEFINE {
 			return true // x = j or x += j
 		}
-		id := cur.Node().(*ast.Ident)
+		id, ok := cur.Node().(*ast.Ident)
+		if !ok {
+			return true // ill-formed, e.g. (x) := 1; be conservative
+		}
 		// Re-assigned identifiers are recorded in the Uses map.
 		if _, ok := info.Uses[id]; ok {
 			return true // reassignment of x (x, y := 1, 2)
