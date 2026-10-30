@@ -749,6 +749,66 @@ func (r *malformedRestoreResponseRuntime) RestorePod(ctx context.Context, reques
 	return response, err
 }
 
+// waitingRestoreRuntime waits in RestorePod until the call's context ends, as
+// a runtime that is still restoring a large Pod would.
+type waitingRestoreRuntime struct {
+	internalapi.RuntimeService
+	deadline     time.Time
+	cancelCaller context.CancelFunc
+}
+
+func (r *waitingRestoreRuntime) RestorePod(ctx context.Context, _ *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	r.deadline, _ = ctx.Deadline()
+	if r.cancelCaller != nil {
+		r.cancelCaller()
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestRestorePodSandboxUsesRestoreTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		timeout time.Duration
+		cancel  bool
+		wantErr error
+	}{
+		{name: "deadline expires", timeout: 50 * time.Millisecond, wantErr: context.DeadlineExceeded},
+		{name: "caller cancels", timeout: 30 * time.Second, cancel: true, wantErr: context.Canceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.podRestoreTimeout = tc.timeout
+			ctx, cancel := context.WithCancel(tCtx)
+			defer cancel()
+			restoreRuntime := &waitingRestoreRuntime{RuntimeService: m.runtimeService}
+			if tc.cancel {
+				restoreRuntime.cancelCaller = cancel
+			}
+			m.runtimeService = restoreRuntime
+			pod := newTestPod()
+			pod.Finalizers = []string{"node.k8s.io/pod-restore-protection"}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+
+			start := time.Now()
+			_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+			require.WithinDuration(t, start.Add(tc.timeout), restoreRuntime.deadline, 5*time.Second, "RestorePod must use podRestoreTimeout, not the CRI client default")
+			require.ErrorIs(t, err, tc.wantErr)
+			// The runtime may have done part of the work, so the restore is not retried.
+			require.Empty(t, kubecontainer.RestoreErrorReason(err))
+			if tc.cancel {
+				require.NotContains(t, err.Error(), "podRestoreTimeout", "a cancelled restore did not time out")
+			} else {
+				require.ErrorContains(t, err, "RestorePod did not finish within 50ms (the node's podRestoreTimeout)")
+			}
+			require.Empty(t, fakeRuntime.RestoredPods)
+			require.NotContains(t, fakeRuntime.Called, "StartContainer")
+		})
+	}
+}
+
 func TestRestorePodSandboxCleansOnlyItsSandboxAfterInvalidResponse(t *testing.T) {
 	ctx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
@@ -1512,6 +1572,52 @@ func (r *restoreStartBoundaryRuntime) StartContainer(ctx context.Context, contai
 		return r.afterStart()
 	}
 	return nil
+}
+
+func TestRestorePodSandboxPreservesSuccessfulRPCBoundaries(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, time.Minute)
+	defer cancel()
+	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	m.podRestoreTimeout = 30 * time.Second
+	runtime := &restoreStartBoundaryRuntime{RuntimeService: m.runtimeService}
+	runtime.beforeStart = func(startCtx context.Context) error {
+		require.ErrorIs(t, runtime.restoreContext.Err(), context.Canceled, "the preparation RPC context must be released after success")
+		require.NoError(t, startCtx.Err(), "later starts must use the live Pod worker context")
+		deadline, ok := startCtx.Deadline()
+		require.True(t, ok)
+		podDeadline, _ := ctx.Deadline()
+		require.Equal(t, podDeadline, deadline, "podRestoreTimeout must not shorten the separate start calls")
+		for _, previous := range runtime.startContexts {
+			require.ErrorIs(t, previous.Err(), context.Canceled, "a completed start RPC must release its own context")
+		}
+		return nil
+	}
+	m.runtimeService = runtime
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	pod.Finalizers = []string{"node.k8s.io/pod-restore-protection"}
+	second := pod.Spec.Containers[0].DeepCopy()
+	second.Name = "second"
+	pod.Spec.Containers = append(pod.Spec.Containers, *second)
+
+	_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+	require.NoError(t, err)
+	require.NoError(t, ctx.Err())
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+	require.Len(t, runtime.startedIDs, 2)
+	for _, rpcCtx := range runtime.startContexts {
+		require.ErrorIs(t, rpcCtx.Err(), context.Canceled)
+	}
+	for _, id := range runtime.startedIDs {
+		require.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, fakeRuntime.Containers[id].State)
+	}
+	require.NotContains(t, fakeRuntime.GetCalls(), "StopPodSandbox")
+	require.NotContains(t, fakeRuntime.GetCalls(), "CancelPodOperation")
+	state, err := m.runtimeHelper.ReadPodRestoreState(pod.UID)
+	require.NoError(t, err)
+	require.Equal(t, kubecontainer.PodRestoreAdopted, state)
 }
 
 func TestRestorePodSandboxRetainsOwnershipAfterInterruptedStart(t *testing.T) {

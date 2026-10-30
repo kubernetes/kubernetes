@@ -878,6 +878,7 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		klet.podStartupLatencyTracker,
 		kubeDeps.TracerProvider,
 		tokenManager,
@@ -2635,7 +2636,7 @@ func (kl *Kubelet) podRestoreSync(pod *v1.Pod, podStatus *kubecontainer.PodStatu
 // settlePodRestore keeps a failed operation recoverable until the runtime has
 // fenced its ID and confirmed that rollback no longer uses Pod resources.
 func (kl *Kubelet) settlePodRestore(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (string, error) {
-	return kl.settlePodRestoreWithTimeout(ctx, pod, podStatus, 5*time.Minute)
+	return kl.settlePodRestoreWithTimeout(ctx, pod, podStatus, kl.kubeletConfiguration.PodRestoreTimeout.Duration)
 }
 
 func (kl *Kubelet) settlePodRestoreWithTimeout(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, timeout time.Duration) (string, error) {
@@ -2681,12 +2682,12 @@ func (kl *Kubelet) settlePodRestoreWithTimeout(ctx context.Context, pod *v1.Pod,
 }
 
 // podRestoreCleanupUnconfirmed reports whether a deleted Pod has waited
-// 5 minutes past its deletion timestamp for the runtime to confirm
+// podRestoreTimeout past its deletion timestamp for the runtime to confirm
 // restore cleanup. Only the API Pod stops waiting then: the saved
 // cleanup-pending state keeps protecting node-local resources, and orphan
 // recovery keeps calling CancelPodOperation.
 func (kl *Kubelet) podRestoreCleanupUnconfirmed(pod *v1.Pod) bool {
-	if pod.DeletionTimestamp == nil || kl.clock.Since(pod.DeletionTimestamp.Time) < 5*time.Minute {
+	if pod.DeletionTimestamp == nil || kl.clock.Since(pod.DeletionTimestamp.Time) < kl.kubeletConfiguration.PodRestoreTimeout.Duration {
 		return false
 	}
 	state, err := kl.ReadPodRestoreState(pod.UID)
@@ -2721,7 +2722,7 @@ func (kl *Kubelet) settleTerminatingPodRestore(ctx context.Context, pod *v1.Pod,
 	if !kl.podRestoreCleanupUnconfirmed(pod) {
 		return false, err
 	}
-	timeout := 5 * time.Minute
+	timeout := kl.kubeletConfiguration.PodRestoreTimeout.Duration
 	if _, condition := podutil.GetPodCondition(apiPodStatus, v1.PodRestored); condition == nil || condition.Status == v1.ConditionUnknown {
 		kl.recorder.WithLogger(klog.FromContext(ctx)).Eventf(pod, v1.EventTypeWarning, events.RestoreCleanupUnconfirmed, "Runtime did not confirm restore cleanup within %v after the Pod's deletion timestamp; the node keeps the Pod's resources until it does: %v", timeout, err)
 	}

@@ -86,6 +86,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: podCheckpointStorage requires positive capacities and headroom below capacity, and maxOperations between 1 and 1024"))
 		}
 	}
+	if kc.PodRestoreTimeout.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podRestoreTimeout must be greater than 0"))
+	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemCgroups (--system-cgroups) was specified and cgroupRoot (--cgroup-root) was not specified"))
 	}

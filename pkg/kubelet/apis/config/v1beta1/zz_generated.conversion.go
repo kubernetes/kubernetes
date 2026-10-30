@@ -637,6 +637,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.PodCheckpointTimeout = in.PodCheckpointTimeout
 	out.PodCheckpointStorage = (*config.PodCheckpointStorageConfiguration)(unsafe.Pointer(in.PodCheckpointStorage))
+	out.PodRestoreTimeout = in.PodRestoreTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
@@ -852,6 +853,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.PodCheckpointTimeout = in.PodCheckpointTimeout
 	out.PodCheckpointStorage = (*configv1beta1.PodCheckpointStorageConfiguration)(unsafe.Pointer(in.PodCheckpointStorage))
+	out.PodRestoreTimeout = in.PodRestoreTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR

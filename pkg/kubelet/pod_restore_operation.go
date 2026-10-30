@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -85,7 +84,7 @@ func (kl *Kubelet) recoverOrphanedPodRestores(ctx context.Context) {
 			pod := &v1.Pod{}
 			pod.UID = uid
 			// Keep each orphan attempt short; later passes retry uncertainty.
-			timeout := min(5*time.Minute, podCheckpointAPITimeout)
+			timeout := min(kl.kubeletConfiguration.PodRestoreTimeout.Duration, podCheckpointAPITimeout)
 			if _, err := kl.settlePodRestoreWithTimeout(ctx, pod, nil, timeout); err != nil {
 				kl.restoreRecoveryBackOff.Next(string(uid), kl.clock.Now())
 				klog.FromContext(ctx).Error(err, "Orphaned restore runtime recovery remains pending", "podUID", uid)

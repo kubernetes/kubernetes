@@ -555,6 +555,20 @@ type KubeletConfiguration struct {
 	// captures on this node. No storage is allocated or formatted by the kubelet.
 	// +optional
 	PodCheckpointStorage *PodCheckpointStorageConfiguration `json:"podCheckpointStorage,omitempty"`
+	// podRestoreTimeout is the maximum duration the kubelet waits for the
+	// RestorePod CRI call when it restores a Pod from a PodCheckpoint. A restore
+	// that does not finish in time enters cleanup. The Pod moves to Failed after
+	// runtime rollback is confirmed; cleanup can outlive this deadline. A deleted
+	// Pod stops waiting for that confirmation once this duration has passed
+	// after its deletion timestamp, and its restore fails, but the node keeps
+	// the Pod's resources until the runtime confirms cleanup.
+	// Restore time grows with the checkpointed memory and depends on disk
+	// throughput, so raise this value on nodes that restore Pods with large
+	// memory footprints. Other CRI calls keep using runtimeRequestTimeout.
+	// Requires the PodLevelCheckpointRestore feature gate to be enabled.
+	// Default: "5m"
+	// +optional
+	PodRestoreTimeout metav1.Duration `json:"podRestoreTimeout,omitempty"`
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to

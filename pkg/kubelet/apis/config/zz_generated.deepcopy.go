@@ -400,6 +400,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(PodCheckpointStorageConfiguration)
 		**out = **in
 	}
+	out.PodRestoreTimeout = in.PodRestoreTimeout
 	out.CPUCFSQuotaPeriod = in.CPUCFSQuotaPeriod
 	if in.MaxParallelImagePulls != nil {
 		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls

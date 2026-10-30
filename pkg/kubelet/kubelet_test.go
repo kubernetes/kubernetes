@@ -251,6 +251,7 @@ func newTestKubeletWithImageList(
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	kubelet.kubeletConfiguration.PodRestoreTimeout.Duration = 5 * time.Minute
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
@@ -572,6 +573,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
 		token.NewManager(kubelet.kubeClient),
@@ -9951,7 +9953,8 @@ func TestDeletedRestorePodTerminatesWithoutCleanupConfirmation(t *testing.T) {
 	kl.volumeManager = volumes
 	claims := &restoreUnprepareContainerManager{ContainerManager: kl.containerManager}
 	kl.containerManager = claims
-	const bound = 5 * time.Minute
+	kl.kubeletConfiguration.PodRestoreTimeout.Duration = 2 * time.Minute
+	bound := kl.kubeletConfiguration.PodRestoreTimeout.Duration
 	pod := podWithUIDNameNs("restore-uid", "restore", "ns")
 	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
 	pod.Finalizers = []string{nodeapi.PodRestoreProtectionFinalizer}
@@ -9987,6 +9990,7 @@ func TestDeletedRestorePodTerminatesWithoutCleanupConfirmation(t *testing.T) {
 	require.Equal(t, v1.ConditionFalse, condition.Status)
 	require.Equal(t, nodeapi.PodRestoreReasonCleanupUnconfirmed, condition.Reason)
 	require.Contains(t, condition.Message, "injected cleanup failure")
+	require.Contains(t, condition.Message, bound.String())
 	require.Len(t, recorder.Events, 1)
 	require.Contains(t, <-recorder.Events, "Warning "+events.RestoreCleanupUnconfirmed+" ")
 

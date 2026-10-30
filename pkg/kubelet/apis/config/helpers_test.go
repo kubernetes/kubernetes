@@ -289,6 +289,7 @@ var (
 		"PodCheckpointStorage.MinAvailableBytes",
 		"PodCheckpointStorage.MinAvailableInodes",
 		"PodCheckpointStorage.MaxOperations",
+		"PodRestoreTimeout.Duration",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
 		"SeccompDefault",
