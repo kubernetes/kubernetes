@@ -644,9 +644,19 @@ func TestWatch(t *testing.T) {
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withClock(fakeClock))
 				t.Cleanup(terminate)
 				store := &createWrapper{CacheDelegator: cacher}
-				storagetesting.RunTestWatchResync(ctx, t, store, true, compactWatch(cacher, server.V3Client.Client), func() {
+				resync := func() {
+					time.Sleep(50 * time.Millisecond)
+					fakeClock.Step(100 * time.Millisecond)
+					time.Sleep(50 * time.Millisecond)
 					fakeClock.Step(2 * time.Second)
-				})
+					time.Sleep(50 * time.Millisecond)
+				}
+				triggerBookmarks := func() {
+					time.Sleep(50 * time.Millisecond)
+					fakeClock.Step(defaultBookmarkFrequency + time.Second)
+					time.Sleep(50 * time.Millisecond)
+				}
+				storagetesting.RunTestWatchResync(ctx, t, store, true, compactWatch(cacher, server.V3Client.Client), resync, triggerBookmarks)
 			})
 			// These tests override WatchList and must finish before the parallel subtests start.
 			t.Run("WatchSemantics", func(t *testing.T) {

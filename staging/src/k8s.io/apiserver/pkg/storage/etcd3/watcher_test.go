@@ -174,7 +174,7 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("WatchResync", func(t *testing.T) {
 		ctx, store, client := testSetup(t)
-		storagetesting.RunTestWatchResync(ctx, t, store, false, compactStorage(store, client.Client), nil)
+		storagetesting.RunTestWatchResync(ctx, t, store, false, compactStorage(store, client.Client), nil, nil)
 	})
 }
 
