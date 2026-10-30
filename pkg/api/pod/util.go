@@ -1117,7 +1117,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
-		podStatus.VolumeHealth = nil
+		podStatus.VolumeStatuses = nil
 	}
 }
 
@@ -1146,7 +1146,12 @@ func volumeHealthInUse(podStatus *api.PodStatus) bool {
 	if podStatus == nil {
 		return false
 	}
-	return len(podStatus.VolumeHealth) > 0
+	for _, volumeStatus := range podStatus.VolumeStatuses {
+		if volumeStatus.HealthStatus != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {

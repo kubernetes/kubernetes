@@ -572,7 +572,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		"AllocatedResources",
 		"ObservedGeneration",
 		"Resources",
-		"VolumeHealth",
+		"VolumeStatuses",
 	)
 
 	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
@@ -1623,19 +1623,20 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status := expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	require.NotNil(t, status.VolumeStatuses)
+	if len(status.VolumeStatuses) != 1 {
+		t.Fatalf("expected 1 volume status entry, got %d", len(status.VolumeStatuses))
 	}
-	if status.VolumeHealth[0].Name != "vol1" {
-		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+	if status.VolumeStatuses[0].Name != "vol1" {
+		t.Errorf("unexpected volume name: %q", status.VolumeStatuses[0].Name)
 	}
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
-		t.Errorf("unexpected conditions: %+v", status.VolumeHealth[0].HealthConditions)
+	if !reflect.DeepEqual(status.VolumeStatuses[0].HealthStatus.HealthConditions, unhealthy) {
+		t.Errorf("unexpected conditions: %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
-	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+	if status.VolumeStatuses[0].HealthStatus.LastTransitionTime.IsZero() {
 		t.Error("expected LastTransitionTime to be set")
 	}
-	firstTransition := status.VolumeHealth[0].LastTransitionTime
+	firstTransition := status.VolumeStatuses[0].HealthStatus.LastTransitionTime
 
 	t.Log("Same (status,reason) with different message should be a no-op.")
 	sameIdentity := []v1.VolumeHealthCondition{{
@@ -1648,10 +1649,10 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
-	if status.VolumeHealth[0].HealthConditions[0].Message != "volume path missing" {
-		t.Errorf("message should be unchanged, got %q", status.VolumeHealth[0].HealthConditions[0].Message)
+	if status.VolumeStatuses[0].HealthStatus.HealthConditions[0].Message != "volume path missing" {
+		t.Errorf("message should be unchanged, got %q", status.VolumeStatuses[0].HealthStatus.HealthConditions[0].Message)
 	}
-	if !status.VolumeHealth[0].LastTransitionTime.Equal(&firstTransition) {
+	if !status.VolumeStatuses[0].HealthStatus.LastTransitionTime.Equal(&firstTransition) {
 		t.Error("LastTransitionTime should be unchanged on no-op")
 	}
 
@@ -1660,11 +1661,12 @@ func TestSetPodVolumeHealth(t *testing.T) {
 		t.Fatal("expected update when (status,reason) changes")
 	}
 	verifyUpdates(t, m, 1)
+	assert.Equal(t, unhealthy, status.VolumeStatuses[0].HealthStatus.HealthConditions, "previous cached status must not be mutated")
 	status = expectPodStatus(t, m, pod)
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, degraded) {
-		t.Errorf("unexpected conditions after update: %+v", status.VolumeHealth[0].HealthConditions)
+	if !reflect.DeepEqual(status.VolumeStatuses[0].HealthStatus.HealthConditions, degraded) {
+		t.Errorf("unexpected conditions after update: %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
-	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+	if status.VolumeStatuses[0].HealthStatus.LastTransitionTime.IsZero() {
 		t.Error("expected LastTransitionTime to be set after condition change")
 	}
 
@@ -1674,8 +1676,8 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth[0].HealthConditions) != 0 {
-		t.Errorf("expected empty conditions, got %+v", status.VolumeHealth[0].HealthConditions)
+	if len(status.VolumeStatuses[0].HealthStatus.HealthConditions) != 0 {
+		t.Errorf("expected empty conditions, got %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
 
 	t.Log("Multiple volumes on one pod.")
@@ -1688,18 +1690,57 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 2 {
-		t.Fatalf("expected 2 VolumeHealth entries, got %d", len(status.VolumeHealth))
+	if len(status.VolumeStatuses) != 2 {
+		t.Fatalf("expected 2 volume status entries, got %d", len(status.VolumeStatuses))
 	}
-	byName := map[string]v1.PodVolumeHealth{}
-	for _, vh := range status.VolumeHealth {
+	byName := map[string]v1.PodVolumeStatus{}
+	for _, vh := range status.VolumeStatuses {
 		byName[vh.Name] = vh
 	}
-	if !reflect.DeepEqual(byName["vol1"].HealthConditions, unhealthy) {
-		t.Errorf("vol1 conditions: %+v", byName["vol1"].HealthConditions)
+	if !reflect.DeepEqual(byName["vol1"].HealthStatus.HealthConditions, unhealthy) {
+		t.Errorf("vol1 conditions: %+v", byName["vol1"].HealthStatus.HealthConditions)
 	}
-	if !reflect.DeepEqual(byName["vol2"].HealthConditions, degraded) {
-		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthConditions)
+	if !reflect.DeepEqual(byName["vol2"].HealthStatus.HealthConditions, degraded) {
+		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthStatus.HealthConditions)
+	}
+}
+
+func TestSetPodVolumeHealthEmptyConditions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume status"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		{name: "empty health status", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := getTestPod()
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 1)
+			before := expectPodStatus(t, m, pod)
+			beforeCopy := before.DeepCopy()
+
+			for _, conditions := range [][]v1.VolumeHealthCondition{nil, {}} {
+				assert.False(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+				verifyUpdates(t, m, 0)
+				assert.Equal(t, *beforeCopy, expectPodStatus(t, m, pod))
+			}
+
+			conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+			require.True(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+			verifyUpdates(t, m, 1)
+			status := expectPodStatus(t, m, pod)
+			require.NotNil(t, status.VolumeStatuses)
+			require.Len(t, status.VolumeStatuses, 1)
+			assert.Equal(t, conditions, status.VolumeStatuses[0].HealthStatus.HealthConditions)
+			assert.Equal(t, tc.volumeStatuses, before.VolumeStatuses, "input volume status must not be mutated")
+			assert.Equal(t, *beforeCopy, before, "previous cached status must not be mutated")
+		})
 	}
 }
 
@@ -1725,24 +1766,164 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	verifyUpdates(t, m, 1)
 
 	status := expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	require.NotNil(t, status.VolumeStatuses)
+	if len(status.VolumeStatuses) != 1 {
+		t.Fatalf("expected 1 volume status entry, got %d", len(status.VolumeStatuses))
 	}
 
-	// Simulate what happens on the next pod sync: SetPodStatus is called
-	// with a freshly generated status that has no VolumeHealth.
-	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume status"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "same volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 0)
 
-	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("VolumeHealth should survive SetPodStatus, got %d entries", len(status.VolumeHealth))
+			updated := expectPodStatus(t, m, pod)
+			require.NotNil(t, updated.VolumeStatuses)
+			assert.Equal(t, status.VolumeStatuses, updated.VolumeStatuses)
+		})
 	}
-	if status.VolumeHealth[0].Name != "vol1" {
-		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+
+	degraded := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		Phase: v1.PodRunning,
+		VolumeStatuses: []v1.PodVolumeStatus{{
+			Name:         "vol1",
+			HealthStatus: &v1.VolumeHealthStatus{HealthConditions: degraded},
+		}},
+	})
+	verifyUpdates(t, m, 1)
+	updated := expectPodStatus(t, m, pod)
+	require.NotNil(t, updated.VolumeStatuses)
+	require.Len(t, updated.VolumeStatuses, 1)
+	assert.Equal(t, degraded, updated.VolumeStatuses[0].HealthStatus.HealthConditions)
+	assert.Equal(t, unhealthy, status.VolumeStatuses[0].HealthStatus.HealthConditions)
+}
+
+func TestVolumeHealthPreservedWithFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, false)
+
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume statuses"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "same volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			pod.Status.VolumeStatuses = []v1.PodVolumeStatus{{
+				Name: "vol1",
+				HealthStatus: &v1.VolumeHealthStatus{
+					HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+					LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+				},
+			}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+
+			// The first update reads persisted status; subsequent updates read the cache.
+			for _, message := range []string{"first update after restart", "cached status update"} {
+				m.SetPodStatus(logger, pod, v1.PodStatus{
+					Phase:          v1.PodRunning,
+					Message:        message,
+					VolumeStatuses: tc.volumeStatuses,
+				})
+				updated := expectPodStatus(t, m, pod)
+				assert.Equal(t, message, updated.Message)
+				assert.Equal(t, pod.Status.VolumeStatuses, updated.VolumeStatuses)
+			}
+		})
 	}
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
-		t.Errorf("unexpected conditions after SetPodStatus: %+v", status.VolumeHealth[0].HealthConditions)
+}
+
+func TestPodVolumeHealthTransitionTime(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	initialConditions := []v1.VolumeHealthCondition{
+		{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"},
+		{Status: v1.VolumeHealthInaccessible, Reason: "PathMissing"},
 	}
+	initialTime := metav1.NewTime(time.Unix(123, 0))
+	for _, tc := range []struct {
+		name       string
+		conditions []v1.VolumeHealthCondition
+		changed    bool
+	}{
+		{name: "unchanged", conditions: initialConditions},
+		{name: "reordered", conditions: []v1.VolumeHealthCondition{initialConditions[1], initialConditions[0]}},
+		{name: "message only", conditions: []v1.VolumeHealthCondition{
+			{Status: v1.VolumeHealthDegraded, Reason: "SlowIO", Message: "new message"},
+			initialConditions[1],
+		}},
+		{name: "reason changed", conditions: []v1.VolumeHealthCondition{
+			{Status: v1.VolumeHealthDegraded, Reason: "DiskSlow"},
+			initialConditions[1],
+		}, changed: true},
+		{name: "recovered", changed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := getTestPod()
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			initialStatus := v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{
+				{Name: "other"},
+				{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{
+					HealthConditions:   initialConditions,
+					LastTransitionTime: initialTime,
+				}},
+			}}
+			m.SetPodStatus(logger, pod, initialStatus)
+			verifyUpdates(t, m, 1)
+			assert.Equal(t, tc.changed, m.SetPodVolumeHealth(logger, pod.UID, "vol1", tc.conditions))
+			status := expectPodStatus(t, m, pod)
+			require.Len(t, status.VolumeStatuses, 2)
+			assert.Equal(t, initialStatus.VolumeStatuses[0], status.VolumeStatuses[0])
+			health := status.VolumeStatuses[1].HealthStatus
+			require.NotNil(t, health)
+			if tc.changed {
+				assert.True(t, health.LastTransitionTime.After(initialTime.Time))
+				assert.Equal(t, tc.conditions, health.HealthConditions)
+			} else {
+				assert.Equal(t, initialStatus.VolumeStatuses[1].HealthStatus, health)
+			}
+			assert.Equal(t, initialTime, initialStatus.VolumeStatuses[1].HealthStatus.LastTransitionTime)
+		})
+	}
+}
+
+func TestVolumeHealthMergesByName(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+	health := &v1.VolumeHealthStatus{
+		HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+		LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+	}
+	m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{
+		{Name: "vol1", HealthStatus: health},
+		{Name: "vol2", HealthStatus: health.DeepCopy()},
+	}})
+	verifyUpdates(t, m, 1)
+	incoming := v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{{Name: "other"}, {Name: "vol1"}}}
+	m.SetPodStatus(logger, pod, incoming)
+	verifyUpdates(t, m, 1)
+	status := expectPodStatus(t, m, pod)
+	require.Len(t, status.VolumeStatuses, 3)
+	assert.Equal(t, v1.PodVolumeStatus{Name: "other"}, status.VolumeStatuses[0])
+	assert.Equal(t, v1.PodVolumeStatus{Name: "vol1", HealthStatus: health}, status.VolumeStatuses[1])
+	assert.Equal(t, v1.PodVolumeStatus{Name: "vol2", HealthStatus: health}, status.VolumeStatuses[2])
+	assert.Nil(t, incoming.VolumeStatuses[1].HealthStatus, "input status must not be mutated")
+	status.VolumeStatuses[1].HealthStatus.HealthConditions[0].Reason = "Changed"
+	assert.Equal(t, "SlowIO", health.HealthConditions[0].Reason)
+	assert.Equal(t, "SlowIO", status.VolumeStatuses[2].HealthStatus.HealthConditions[0].Reason)
 }
 
 func TestSetContainerStartup(t *testing.T) {

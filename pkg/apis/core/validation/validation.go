@@ -2704,7 +2704,7 @@ var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgr
 	core.PersistentVolumeClaimNodeResizeInProgress,
 	core.PersistentVolumeClaimNodeResizeInfeasible)
 
-func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func validatePodVolumeStatuses(volumeStatuses []core.PodVolumeStatus, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	volumeNames := sets.New[string]()
 	if spec != nil {
@@ -2712,12 +2712,12 @@ func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.Pod
 			volumeNames.Insert(v.Name)
 		}
 	}
-	for i, vh := range volumeHealth {
+	for i, vh := range volumeStatuses {
 		idxPath := fldPath.Index(i)
 		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
 			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
 		}
-		allErrs = append(allErrs, validateVolumeHealthConditions(vh.HealthConditions, idxPath.Child("healthConditions"))...)
+		allErrs = append(allErrs, validateVolumeHealthStatus(vh.HealthStatus, idxPath.Child("healthStatus"))...)
 	}
 	return allErrs
 }
@@ -6230,9 +6230,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
 	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
 
-	if len(newPod.Status.VolumeHealth) > 0 {
-		allErrs = append(allErrs, validatePodVolumeHealth(newPod.Status.VolumeHealth, &newPod.Spec, fldPath.Child("volumeHealth"))...)
-	}
+	allErrs = append(allErrs, validatePodVolumeStatuses(newPod.Status.VolumeStatuses, &newPod.Spec, fldPath.Child("volumeStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)

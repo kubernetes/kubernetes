@@ -870,10 +870,10 @@ type VolumeHealthCondition struct {
 }
 
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
 	// healthConditions is the set of adverse conditions reported by
-	// the CSI controller plugin. An empty list means no adverse condition.
+	// a CSI plugin. An empty list means no adverse condition.
 	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
@@ -887,36 +887,10 @@ type VolumeHealthStatus struct {
 	// +k8s:listMapKey=reason
 	// +k8s:maxItems=16
 	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,1,rep,name=healthConditions"`
-	// lastTransitionTime is when the current set of conditions first appeared.
+	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+	// Changes to condition messages do not affect this field.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,2,opt,name=lastTransitionTime"`
-}
-
-// PodVolumeHealth contains health information for a volume used by a pod,
-// reported by the CSI node plugin via the kubelet.
-type PodVolumeHealth struct {
-	// name matches an entry in pod.spec.volumes.
-	// +required
-	// +k8s:required
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// healthConditions is the set of adverse conditions reported by
-	// the CSI node plugin for this volume on this node.
-	// At most 16 conditions may be reported.
-	// +optional
-	// +listType=map
-	// +listMapKey=status
-	// +patchMergeKey=status
-	// +patchStrategy=merge
-	// +listMapKey=reason
-	// +k8s:optional
-	// +k8s:listType=map
-	// +k8s:listMapKey=status
-	// +k8s:listMapKey=reason
-	// +k8s:maxItems=16
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,2,rep,name=healthConditions"`
-	// lastTransitionTime is when the current set of conditions first appeared.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -5747,6 +5721,20 @@ type EvictionResponder struct {
 	Priority *int32 `json:"priority" protobuf:"varint,2,opt,name=priority"`
 }
 
+// PodVolumeStatus represents the status of an individual volume used by a pod.
+type PodVolumeStatus struct {
+	// name matches an entry in pod.spec.volumes.
+	// +required
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// healthStatus contains health reported by the CSI node plugin for this volume
+	// on the pod's node. Populated by the kubelet.
+	// +featureGate=CSIVolumeHealth
+	// +optional
+	// +k8s:optional
+	HealthStatus *VolumeHealthStatus `json:"healthStatus,omitempty" protobuf:"bytes,2,opt,name=healthStatus"`
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
@@ -5932,16 +5920,21 @@ type PodStatus struct {
 	// +k8s:listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 
-	// volumeHealth contains node-reported health for each volume the pod is using.
-	// Populated by the kubelet on the pod's node.
+	// VolumeHealth is tombstoned because it moved into VolumeStatus.
+	// VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+
+	// VolumeStatuses contains the status of individual volumes used by this pod.
+	// This is an ALPHA field.
 	// +featureGate=CSIVolumeHealth
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
-	VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+	VolumeStatuses []PodVolumeStatus `json:"volumeStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,23,rep,name=volumeStatuses"`
 }
 
 // +genclient

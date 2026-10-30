@@ -7049,15 +7049,15 @@ func TestGetValidationOptionsAllowSysAdminWhenPrivilegeEscalationFalse(t *testin
 func TestDropDisabledPodStatusFields_VolumeHealth(t *testing.T) {
 	podStatusWithVolumeHealth := func() *api.PodStatus {
 		return &api.PodStatus{
-			VolumeHealth: []api.PodVolumeHealth{
+			VolumeStatuses: []api.PodVolumeStatus{
 				{
 					Name: "vol1",
-					HealthConditions: []api.VolumeHealthCondition{
+					HealthStatus: &api.VolumeHealthStatus{HealthConditions: []api.VolumeHealthCondition{
 						{
 							Status: api.VolumeHealthDegraded,
 							Reason: "DiskSlow",
 						},
-					},
+					}},
 				},
 			},
 		}
@@ -7085,6 +7085,20 @@ func TestDropDisabledPodStatusFields_VolumeHealth(t *testing.T) {
 			featureGate:   false,
 			podStatus:     podStatusWithVolumeHealth(),
 			oldPodStatus:  podStatusWithoutVolumeHealth(),
+			wantPodStatus: podStatusWithoutVolumeHealth(),
+		},
+		{
+			name:          "gate=off, old=volume without health, new=with; should drop",
+			featureGate:   false,
+			podStatus:     podStatusWithVolumeHealth(),
+			oldPodStatus:  &api.PodStatus{VolumeStatuses: []api.PodVolumeStatus{{Name: "vol1"}}},
+			wantPodStatus: podStatusWithoutVolumeHealth(),
+		},
+		{
+			name:          "gate=off, old=nil, new=volume without health; should drop",
+			featureGate:   false,
+			podStatus:     &api.PodStatus{VolumeStatuses: []api.PodVolumeStatus{{Name: "vol1"}}},
+			oldPodStatus:  nil,
 			wantPodStatus: podStatusWithoutVolumeHealth(),
 		},
 		{

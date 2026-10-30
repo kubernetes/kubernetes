@@ -779,35 +779,18 @@ type VolumeHealthCondition struct {
 }
 
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
 	// conditions is the set of adverse conditions reported by
-	// the CSI controller plugin. An empty list means no adverse condition.
+	// a CSI plugin. An empty list means no adverse condition.
 	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
 	// +listMapKey=reason
 	HealthConditions []VolumeHealthCondition
-	// lastTransitionTime is when the current set of conditions first appeared.
-	// +optional
-	LastTransitionTime metav1.Time
-}
-
-// PodVolumeHealth contains health information for a volume used by a pod,
-// reported by the CSI node plugin via the kubelet.
-type PodVolumeHealth struct {
-	// name matches an entry in pod.spec.volumes.
-	Name string
-	// conditions is the set of adverse conditions reported by
-	// the CSI node plugin for this volume on this node.
-	// At most 16 conditions may be reported.
-	// +optional
-	// +listType=map
-	// +listMapKey=status
-	// +listMapKey=reason
-	HealthConditions []VolumeHealthCondition
-	// lastTransitionTime is when the current set of conditions first appeared.
+	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+	// Changes to condition messages do not affect this field.
 	// +optional
 	LastTransitionTime metav1.Time
 }
@@ -4857,6 +4840,18 @@ type EvictionResponder struct {
 	Priority *int32
 }
 
+// PodVolumeStatus represents the status of an individual volume used by a pod.
+type PodVolumeStatus struct {
+	// name matches an entry in pod.spec.volumes.
+	// +required
+	Name string
+	// healthStatus contains health reported by the CSI node plugin for this volume
+	// on the pod's node. Populated by the kubelet.
+	// +featureGate=CSIVolumeHealth
+	// +optional
+	HealthStatus *VolumeHealthStatus
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -4990,13 +4985,15 @@ type PodStatus struct {
 	// +listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
 
-	// volumeHealth contains node-reported health for each volume the pod is using.
-	// Populated by the kubelet on the pod's node.
+	// VolumeStatuses contains the status of individual volumes used by this pod.
+	// This is an ALPHA field.
 	// +featureGate=CSIVolumeHealth
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	VolumeHealth []PodVolumeHealth
+	VolumeStatuses []PodVolumeStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
