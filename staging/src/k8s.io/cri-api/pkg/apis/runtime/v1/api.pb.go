@@ -11689,7 +11689,14 @@ type CheckpointPodRequest struct {
 	// runtime must not remove the directory. A Pod checkpoint is a collection
 	// of runtime-defined files; their layout and format are opaque to the
 	// caller. The runtime must not write outside this directory and must remove
-	// partial artifacts before returning an error.
+	// partial artifacts before returning an error. All bulk data, including
+	// CRIU images, logs, writable-layer diffs, intermediate content blobs and
+	// export archives, must stay within this directory on the same filesystem,
+	// with no fallback to a global content store or runtime root on ENOSPC,
+	// EDQUOT or inode exhaustion. Bounded recovery metadata may be stored
+	// separately. Runtime cleanup and container resumption must progress even
+	// if the output filesystem is full. This applies to every runtime handler
+	// accepted by CheckpointPod.
 	OutputPath string `protobuf:"bytes,2,opt,name=output_path,json=outputPath,proto3" json:"output_path,omitempty"`
 	// IDs of the containers to include in the checkpoint. The list must be
 	// non-empty, must not contain duplicates, and must contain exactly the
@@ -11825,6 +11832,9 @@ type RestorePodRequest struct {
 	// the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
 	// enforced at API-server admission (and re-checked by the kubelet before this call);
 	// arbitrary user overrides are not permitted.
+	// The metadata tuple (namespace, name, uid, attempt) identifies the restore
+	// target. If a sandbox or another restore already uses that tuple, the
+	// runtime must return AlreadyExists without modifying its resources.
 	Config *PodSandboxConfig `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
 	// Runtime handler to use for restoring the pod sandbox and its containers.
 	// The handler selects the configured runtime implementation that interprets

@@ -172,6 +172,11 @@ service RuntimeService {
     // container has been captured, and resume all of them before returning on
     // success, error, or deadline expiry. This produces one consistent
     // pod-wide cut while ensuring the runtime never returns a frozen pod.
+    // If the caller cancels the call or its deadline expires, the runtime must
+    // stop the checkpoint, resume the selected containers, and stop writing to
+    // output_path, even when the caller no longer waits for the response. A
+    // runtime without Pod checkpoint support must return Unimplemented without
+    // starting any work.
     rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
 
     // RestorePod prepares a pod sandbox and containers from a checkpoint. The
@@ -2457,7 +2462,14 @@ message CheckpointPodRequest {
     // runtime must not remove the directory. A Pod checkpoint is a collection
     // of runtime-defined files; their layout and format are opaque to the
     // caller. The runtime must not write outside this directory and must remove
-    // partial artifacts before returning an error.
+    // partial artifacts before returning an error. All bulk data, including
+    // CRIU images, logs, writable-layer diffs, intermediate content blobs and
+    // export archives, must stay within this directory on the same filesystem,
+    // with no fallback to a global content store or runtime root on ENOSPC,
+    // EDQUOT or inode exhaustion. Bounded recovery metadata may be stored
+    // separately. Runtime cleanup and container resumption must progress even
+    // if the output filesystem is full. This applies to every runtime handler
+    // accepted by CheckpointPod.
     string output_path = 2;
     // IDs of the containers to include in the checkpoint. The list must be
     // non-empty, must not contain duplicates, and must contain exactly the
@@ -2498,6 +2510,9 @@ message RestorePodRequest {
     // the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
     // enforced at API-server admission (and re-checked by the kubelet before this call);
     // arbitrary user overrides are not permitted.
+    // The metadata tuple (namespace, name, uid, attempt) identifies the restore
+    // target. If a sandbox or another restore already uses that tuple, the
+    // runtime must return AlreadyExists without modifying its resources.
     PodSandboxConfig config = 2;
     // Runtime handler to use for restoring the pod sandbox and its containers.
     // The handler selects the configured runtime implementation that interprets
