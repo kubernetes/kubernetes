@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -343,6 +344,9 @@ func getLatestClusterVersion(kubeAPIServerVersions map[string][]string) (*versio
 		if latestVersion == nil || ver.AtLeast(latestVersion) {
 			latestVersion = ver
 		}
+	}
+	if latestVersion == nil {
+		return nil, errors.New("couldn't find any kube-apiserver Pods in the cluster")
 	}
 
 	return latestVersion, nil
