@@ -57,6 +57,12 @@ func GetStateFromObject(versioner Versioner, codec runtime.Codec, obj runtime.Ob
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get resource version: %v", err)
 	}
+	if rv == 0 {
+		// rv == 0 represents a non-existent object (e.g. from Get with IgnoreNotFound).
+		// Leave Data nil so an update producing an empty object is not short-circuited
+		// as a no-op, and avoid UpdateObject overwriting ResourceVersion from "" to "0".
+		return state, nil
+	}
 	state.Rev = int64(rv)
 	state.Meta.ResourceVersion = uint64(state.Rev)
 
