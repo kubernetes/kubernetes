@@ -637,17 +637,31 @@ type VolumeNodeResources struct {
 type StorageHealthStatusType string
 
 const (
+	// StorageHealthUnknown indicates that driver is returning a health status which is not recognized
+	// by kubelet. Health of storage subsystem should not be considered healthy.
+	StorageHealthUnknown StorageHealthStatusType = "StorageHealthUnknown"
 	// StorageUnreachable indicates the storage backend is unreachable.
 	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
 	// StorageDegraded indicates the storage backend is functioning with reduced capability.
 	StorageDegraded StorageHealthStatusType = "StorageDegraded"
+	// StorageHealthy indicates that the storage backend is healthy as seen from this node.
+	StorageHealthy StorageHealthStatusType = "Healthy"
 )
 
-// StorageHealthCondition represents an adverse health condition reported
+// StorageHealthCondition represents a health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthCondition struct {
 	// status is the health status category.
-	// One of "StorageUnreachable", "StorageDegraded".
+	// Possible values are:
+	// - "StorageHealthUnknown": the reported health status is not recognized; the backend must not be considered healthy.
+	// - "StorageUnreachable": the storage backend is unreachable.
+	// - "StorageDegraded": the storage backend is functioning with reduced capability.
+	// - "Healthy": the storage backend is healthy as seen from this node.
+	//
+	// Additional values may be introduced as the CSI specification evolves.
+	// Writers that do not recognize a status may classify it as StorageHealthUnknown.
+	// Readers that do not recognize a status must use it only for health reporting
+	// and observability.
 	Status StorageHealthStatusType
 	// reason is a brief CamelCase machine-parseable reason.
 	Reason string
@@ -669,7 +683,7 @@ type StorageHealthCondition struct {
 type StorageHealth struct {
 	// name is the CSI driver name, matching CSINodeDriver.name.
 	Name string
-	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// healthConditions are the storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=atomic
