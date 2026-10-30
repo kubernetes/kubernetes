@@ -290,8 +290,10 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
 }
 
 var validStorageHealthStatusTypes = sets.New(
+	storage.StorageHealthUnknown,
 	storage.StorageUnreachable,
 	storage.StorageDegraded,
+	storage.StorageHealthy,
 )
 
 var validStorageHealthAccessModes = sets.New(

@@ -94,7 +94,9 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 		conditionStatusTypePath := field.NewPath("status", "storageHealth").Index(0).Child("healthConditions").Index(0).Child("status")
 
 		validStorageHealthStatusTypes := []storage.StorageHealthStatusType{
+			storage.StorageHealthy,
 			storage.StorageDegraded,
+			storage.StorageHealthUnknown,
 			storage.StorageUnreachable,
 		}
 		tests := map[string]struct {
@@ -103,6 +105,24 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 		}{
 			"valid": {
 				storageHealth: []storage.StorageHealth{{Name: "foo"}},
+			},
+			"unknown health status is valid": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageHealthUnknown,
+						Reason: "UnrecognizedStatus",
+					}},
+				}},
+			},
+			"healthy status is valid": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: storage.StorageHealthy,
+						Reason: "BackendHealthy",
+					}},
+				}},
 			},
 			"name required": {
 				storageHealth: []storage.StorageHealth{{}},
