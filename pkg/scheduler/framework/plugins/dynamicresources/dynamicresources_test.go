@@ -1297,15 +1297,16 @@ type testPluginCase struct {
 	// enableDRAConsumableCapacity is set to true if the DRAConsumableCapacity feature gate is enabled.
 	enableDRAConsumableCapacity bool
 
-	enableDRAExtendedResource        bool
-	enableDRAPrioritizedList         bool
-	enableDRADeviceTaints            bool
-	enableDRAWorkloadResourceClaims  bool
-	disableDRASchedulerFilterTimeout bool
-	skipOnWindows                    string
-	failPatch                        bool
-	reactors                         []cgotesting.Reactor
-	metrics                          func(ktesting.TContext, compbasemetrics.Gatherer)
+	enableDRAExtendedResource         bool
+	enableDRAExtendedResourceCapacity bool
+	enableDRAPrioritizedList          bool
+	enableDRADeviceTaints             bool
+	enableDRAWorkloadResourceClaims   bool
+	disableDRASchedulerFilterTimeout  bool
+	skipOnWindows                     string
+	failPatch                         bool
+	reactors                          []cgotesting.Reactor
+	metrics                           func(ktesting.TContext, compbasemetrics.Gatherer)
 }
 
 func TestPlugin(t *testing.T) {
@@ -2474,6 +2475,33 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postbind: result{
 					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim2, podWithExtendedResourceName2)),
+				},
+			},
+		},
+		"extended-resource-capacity-requests-gate-disabled": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{{
+				ObjectMeta: metav1.ObjectMeta{Name: className},
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: &extendedResourceName,
+					ExtendedResourceCapacityRequests: &resourceapi.CapacityRequirements{
+						Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+							"shares": apiresource.MustParse("1"),
+						},
+					},
+				},
+			}},
+			objs: []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				filter: perNodeResult{
+					nodeName: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot use extended resource capacity requests: DRAExtendedResourceCapacity feature gate is disabled"),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -4125,6 +4153,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRASchedulerFilterTimeout:    !tc.disableDRASchedulerFilterTimeout,
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
+				EnableDRAExtendedResourceCapacity:  tc.enableDRAExtendedResourceCapacity,
 				EnableDRANodeAllocatableResources:  tc.enableDRANodeAllocatableResources,
 				EnableDRAConsumableCapacity:        tc.enableDRAConsumableCapacity,
 				EnableDRAWorkloadResourceClaims:    tc.enableDRAWorkloadResourceClaims,

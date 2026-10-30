@@ -804,6 +804,21 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("extendedResourceName"), *spec.ExtendedResourceName,
 			"must be a valid extended resource name").MarkCoveredByDeclarative().WithOrigin("format=k8s-extended-resource-name"))
 	}
+	if spec.ExtendedResourceCapacityRequests != nil && !utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
+		// The field has no effect unless devices can be partially consumed.
+		// Dropping it would silently turn the class into a whole-device request.
+		// Stored values are left alone so an unrelated update still succeeds.
+		unchanged := oldSpec != nil && apiequality.Semantic.DeepEqual(spec.ExtendedResourceCapacityRequests, oldSpec.ExtendedResourceCapacityRequests)
+		if !unchanged {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("extendedResourceCapacityRequests"), "DRAConsumableCapacity feature gate must be enabled"))
+		}
+	} else {
+		var oldCapacity *resource.CapacityRequirements
+		if oldSpec != nil {
+			oldCapacity = oldSpec.ExtendedResourceCapacityRequests
+		}
+		allErrs = append(allErrs, validateCapacityRequirements(spec.ExtendedResourceCapacityRequests, oldCapacity, fldPath.Child("extendedResourceCapacityRequests"))...)
+	}
 	return allErrs
 }
 

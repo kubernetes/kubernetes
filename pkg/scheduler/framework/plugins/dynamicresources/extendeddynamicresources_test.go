@@ -22,6 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -206,11 +208,52 @@ func Test_createRequestsAndMappings_requests(t *testing.T) {
 		},
 	}
 
+	shares := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			"shares": resource.MustParse("1"),
+		},
+	}
+	devMapWithCapacity := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+			Spec: resourceapi.DeviceClassSpec{
+				ExtendedResourceCapacityRequests: shares,
+			},
+		},
+	}
+	devReqWithCapacity := resourceapi.DeviceRequest{
+		Name: "container-0-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			Capacity:        shares,
+		},
+	}
+	podCount3 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "3",
+		}).
+		Obj()
+	devReqCount3 := resourceapi.DeviceRequest{
+		Name: "container-0-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           3,
+			Capacity:        shares,
+		},
+	}
+
 	testcases := map[string]struct {
-		pod                *v1.Pod
-		extendedResources  map[v1.ResourceName]int64
-		cache              fwk.DeviceClassResolver
-		wantDeviceRequests []resourceapi.DeviceRequest
+		pod                     *v1.Pod
+		extendedResources       map[v1.ResourceName]int64
+		cache                   fwk.DeviceClassResolver
+		capacityRequestsEnabled bool
+		wantDeviceRequests      []resourceapi.DeviceRequest
 	}{
 		"nil": {
 			pod:                pod1,
@@ -258,12 +301,35 @@ func Test_createRequestsAndMappings_requests(t *testing.T) {
 			cache:              &mockDeviceClassResolver{mapping: devMapInit},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReqSidecar, devReq5Init, devReq4Init},
 		},
+		"capacity requests copied onto each allocation": {
+			pod:                     pod1,
+			extendedResources:       res,
+			cache:                   &mockDeviceClassResolver{mapping: devMapWithCapacity},
+			capacityRequestsEnabled: true,
+			wantDeviceRequests:      []resourceapi.DeviceRequest{devReqWithCapacity},
+		},
+		"count greater than one keeps the per-allocation capacity": {
+			pod: podCount3,
+			extendedResources: map[v1.ResourceName]int64{
+				v1.ResourceName(extendedResourceName): 3,
+			},
+			cache:                   &mockDeviceClassResolver{mapping: devMapWithCapacity},
+			capacityRequestsEnabled: true,
+			wantDeviceRequests:      []resourceapi.DeviceRequest{devReqCount3},
+		},
+		"capacity requests ignored when the gate is disabled": {
+			pod:                     pod1,
+			extendedResources:       res,
+			cache:                   &mockDeviceClassResolver{mapping: devMapWithCapacity},
+			capacityRequestsEnabled: false,
+			wantDeviceRequests:      []resourceapi.DeviceRequest{devReq},
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, logger, tc.cache)
+			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, logger, tc.cache, tc.capacityRequestsEnabled)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
 				t.Fatalf("different length, want %#v, len=%v, got %#v, len=%v", tc.wantDeviceRequests, len(tc.wantDeviceRequests), gotDeviceRequests, len(gotDeviceRequests))
 			}
@@ -280,6 +346,9 @@ func Test_createRequestsAndMappings_requests(t *testing.T) {
 				}
 				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
 					t.Errorf("different count, want %#v, got %#v", r.Exactly.Count, gotDeviceRequests[i].Exactly.Count)
+				}
+				if !apiequality.Semantic.DeepEqual(r.Exactly.Capacity, gotDeviceRequests[i].Exactly.Capacity) {
+					t.Errorf("different capacity, want %#v, got %#v", r.Exactly.Capacity, gotDeviceRequests[i].Exactly.Capacity)
 				}
 			}
 		})
@@ -536,7 +605,7 @@ func Test_createRequestsAndMappings_mappings(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			_, gotReqMappings := createRequestsAndMappings(tc.pod, tc.extnededResources, logger, tc.deviceClassMapping)
+			_, gotReqMappings := createRequestsAndMappings(tc.pod, tc.extnededResources, logger, tc.deviceClassMapping, false)
 			if len(tc.wantReqMappings) != len(gotReqMappings) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
 			}

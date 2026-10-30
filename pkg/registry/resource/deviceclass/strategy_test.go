@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -200,4 +201,53 @@ func TestStrategyUpdate(t *testing.T) {
 			assert.Equal(t, expectObj, newObj)
 		})
 	}
+}
+
+func TestStrategyExtendedResourceCapacity(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	withCapacity := func() *resource.DeviceClass {
+		class := obj.DeepCopy()
+		class.Spec.ExtendedResourceCapacityRequests = &resource.CapacityRequirements{
+			Requests: map[resource.QualifiedName]apiresource.Quantity{
+				"shares": apiresource.MustParse("1"),
+			},
+		}
+		return class
+	}
+
+	t.Run("drop-when-gate-disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, false)
+		got := withCapacity()
+		Strategy.PrepareForCreate(ctx, got)
+		if errs := Strategy.Validate(ctx, got); len(errs) != 0 {
+			t.Fatalf("unexpected validation errors: %q", errs)
+		}
+		assert.Nil(t, got.Spec.ExtendedResourceCapacityRequests)
+	})
+
+	t.Run("keep-when-gate-enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, true)
+		got := withCapacity()
+		want := got.DeepCopy()
+		want.Generation = 1
+		Strategy.PrepareForCreate(ctx, got)
+		if errs := Strategy.Validate(ctx, got); len(errs) != 0 {
+			t.Fatalf("unexpected validation errors: %q", errs)
+		}
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("keep-stored-value-when-gate-disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, false)
+		oldObj := withCapacity()
+		newObj := withCapacity()
+		newObj.ResourceVersion = "4"
+		Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+		if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+			t.Fatalf("unexpected validation errors: %q", errs)
+		}
+		want := withCapacity()
+		want.ResourceVersion = "4"
+		assert.Equal(t, want, newObj)
+	})
 }

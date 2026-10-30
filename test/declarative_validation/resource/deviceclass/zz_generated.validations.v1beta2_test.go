@@ -77,6 +77,12 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
 			},
+			"spec.extendedResourceCapacityRequests.requests": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.extendedResourceCapacityRequests.requests[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.extendedResourceName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-extended-resource-name"},
 			},

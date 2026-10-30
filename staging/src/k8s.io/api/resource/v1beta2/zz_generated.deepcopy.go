@@ -610,6 +610,11 @@ func (in *DeviceClassSpec) DeepCopyInto(out *DeviceClassSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.ExtendedResourceCapacityRequests != nil {
+		in, out := &in.ExtendedResourceCapacityRequests, &out.ExtendedResourceCapacityRequests
+		*out = new(CapacityRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

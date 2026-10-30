@@ -2118,6 +2118,23 @@ type DeviceClassSpec struct {
 	// +optional
 	// +featureGate=DRAExtendedResource
 	ExtendedResourceName *string
+
+	// ExtendedResourceCapacityRequests, if set, defines the fixed capacity
+	// amounts that the scheduler requests on every ResourceClaim it synthesizes
+	// to satisfy ExtendedResourceName.
+	//
+	// The scheduler copies this value, unmodified, onto the Capacity field of
+	// every ExactDeviceRequest it synthesizes for this class. It applies to
+	// each device allocation, so a count greater than one requests that many
+	// independent allocations of this amount, not one allocation of count
+	// times this amount.
+	//
+	// This is an alpha field and requires enabling the DRAExtendedResourceCapacity
+	// and DRAConsumableCapacity feature gates.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResourceCapacity,DRAConsumableCapacity
+	ExtendedResourceCapacityRequests *CapacityRequirements
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

@@ -49062,11 +49062,17 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests, if set, defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy extendedResourceName.\n\nThe scheduler copies this value, unmodified, onto the capacity field of every ExactDeviceRequest it synthesizes for this class. It applies to each device allocation, so a count greater than one requests that many independent allocations of this amount, not one allocation of count times this amount.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity and DRAConsumableCapacity feature gates.",
+							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -52490,11 +52496,17 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests, if set, defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy extendedResourceName.\n\nThe scheduler copies this value, unmodified, onto the capacity field of every ExactDeviceRequest it synthesizes for this class. It applies to each device allocation, so a count greater than one requests that many independent allocations of this amount, not one allocation of count times this amount.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity and DRAConsumableCapacity feature gates.",
+							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -54932,11 +54944,17 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests, if set, defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy extendedResourceName.\n\nThe scheduler copies this value, unmodified, onto the capacity field of every ExactDeviceRequest it synthesizes for this class. It applies to each device allocation, so a count greater than one requests that many independent allocations of this amount, not one allocation of count times this amount.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity and DRAConsumableCapacity feature gates.",
+							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 

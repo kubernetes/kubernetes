@@ -228,10 +228,11 @@ func (DeviceClassList) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceClassSpec = map[string]string{
-	"":                     "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
-	"selectors":            "selectors must be satisfied by a device which is claimed via this class.",
-	"config":               "config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
-	"extendedResourceName": "extendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.",
+	"":                                 "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
+	"selectors":                        "selectors must be satisfied by a device which is claimed via this class.",
+	"config":                           "config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
+	"extendedResourceName":             "extendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.",
+	"extendedResourceCapacityRequests": "extendedResourceCapacityRequests, if set, defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy extendedResourceName.\n\nThe scheduler copies this value, unmodified, onto the capacity field of every ExactDeviceRequest it synthesizes for this class. It applies to each device allocation, so a count greater than one requests that many independent allocations of this amount, not one allocation of count times this amount.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity and DRAConsumableCapacity feature gates.",
 }
 
 func (DeviceClassSpec) SwaggerDoc() map[string]string {

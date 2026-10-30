@@ -239,8 +239,15 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		isBackedByDRA := cache.GetDeviceClass(rName) != nil
+		class := cache.GetDeviceClass(rName)
+		isBackedByDRA := class != nil
 		if isBackedByDRA && allocatable == 0 {
+			// A class that declares capacity requests is unsatisfiable while this
+			// scheduler has the gate off. Falling back to a whole-device request
+			// would allocate something other than what the class asks for.
+			if class.Spec.ExtendedResourceCapacityRequests != nil && !pl.fts.EnableDRAExtendedResourceCapacity {
+				return nil, nil, statusUnschedulable(logger, "cannot use extended resource capacity requests: DRAExtendedResourceCapacity feature gate is disabled", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
+			}
 			// node needs to provide the resource via DRA
 			extendedResources[rName] = rQuant
 			hasExtendedResource = true
@@ -271,7 +278,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 
 	// Each node needs its own, potentially different variant of the claim.
 	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
-	reqs, mappings := createRequestsAndMappings(pod, extendedResources, logger, cache)
+	reqs, mappings := createRequestsAndMappings(pod, extendedResources, logger, cache, pl.fts.EnableDRAExtendedResourceCapacity)
 	nodeExtendedResourceClaim.Spec.Devices.Requests = reqs
 
 	return nodeExtendedResourceClaim, mappings, nil
@@ -339,7 +346,7 @@ func partitionContainerIndices(containers []v1.Container, numInitContainers int)
 // items in reusableRequests may be nil.
 // The returned request may be nil if no additional request was required.
 // The returned mappings may be empty if this container does not use this resource.
-func createResourceRequestAndMappings(containerIndex int, container *v1.Container, rName v1.ResourceName, className string, reusableRequests []*resourceapi.DeviceRequest) (*resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
+func createResourceRequestAndMappings(containerIndex int, container *v1.Container, rName v1.ResourceName, className string, classCapacity *resourceapi.CapacityRequirements, reusableRequests []*resourceapi.DeviceRequest) (*resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
 	var mappings []v1.ContainerExtendedResourceRequest
 	creqs := container.Resources.Requests
 	if creqs == nil {
@@ -392,6 +399,9 @@ func createResourceRequestAndMappings(containerIndex int, container *v1.Containe
 			DeviceClassName: className,
 			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 			Count:           crq - sum, // the extra devices to request
+			// Applies to each allocation. Count > 1 is that many independent
+			// allocations of this amount, not one allocation of Count times it.
+			Capacity: classCapacity.DeepCopy(),
 		},
 	}
 	mappings = append(mappings, v1.ContainerExtendedResourceRequest{
@@ -403,7 +413,7 @@ func createResourceRequestAndMappings(containerIndex int, container *v1.Containe
 	return &deviceReq, mappings
 }
 
-func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, logger klog.Logger, deviceClassMapping fwk.DeviceClassResolver) ([]resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
+func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, logger klog.Logger, deviceClassMapping fwk.DeviceClassResolver, capacityRequestsEnabled bool) ([]resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
 	longLivedContainerIndices, shortLivedInitContainerIndices := partitionContainerIndices(containers, len(pod.Spec.InitContainers))
@@ -438,8 +448,12 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 		// Entries may be nil if the container at that index did not produce a request for that resource.
 		// Requests at later indices are reusable by non-sidecar initContainers at earlier indices.
 		longLivedResourceRequests := make([]*resourceapi.DeviceRequest, len(containers))
+		var classCapacity *resourceapi.CapacityRequirements
+		if capacityRequestsEnabled {
+			classCapacity = class.Spec.ExtendedResourceCapacityRequests
+		}
 		for _, i := range longLivedContainerIndices {
-			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, nil)
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, classCapacity, nil)
 			longLivedResourceRequests[i] = containerRequest                                     // might be nil
 			longLivedResourceMappings = append(longLivedResourceMappings, containerMappings...) // might be zero-length
 		}
@@ -450,7 +464,7 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 		// this set will be replaced by maxShortLivedResourceRequest.Name.
 		shortLivedRequestNames := sets.New[string]()
 		for _, i := range shortLivedInitContainerIndices {
-			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, longLivedResourceRequests[i:])
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, classCapacity, longLivedResourceRequests[i:])
 			if containerRequest != nil {
 				shortLivedRequestNames.Insert(containerRequest.Name)
 				if maxShortLivedResourceRequest == nil || maxShortLivedResourceRequest.Exactly.Count < containerRequest.Exactly.Count {

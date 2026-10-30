@@ -41,6 +41,19 @@ type DeviceClassSpecApplyConfiguration struct {
 	// If two classes are created at the same time, then the name of the class
 	// lexicographically sorted first is picked.
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty"`
+	// extendedResourceCapacityRequests, if set, defines the fixed capacity
+	// amounts that the scheduler requests on every ResourceClaim it synthesizes
+	// to satisfy extendedResourceName.
+	//
+	// The scheduler copies this value, unmodified, onto the capacity field of
+	// every ExactDeviceRequest it synthesizes for this class. It applies to
+	// each device allocation, so a count greater than one requests that many
+	// independent allocations of this amount, not one allocation of count
+	// times this amount.
+	//
+	// This is an alpha field and requires enabling the DRAExtendedResourceCapacity
+	// and DRAConsumableCapacity feature gates.
+	ExtendedResourceCapacityRequests *CapacityRequirementsApplyConfiguration `json:"extendedResourceCapacityRequests,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -80,5 +93,13 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 // If called multiple times, the ExtendedResourceName field is set to the value of the last call.
 func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceName(value string) *DeviceClassSpecApplyConfiguration {
 	b.ExtendedResourceName = &value
+	return b
+}
+
+// WithExtendedResourceCapacityRequests sets the ExtendedResourceCapacityRequests field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtendedResourceCapacityRequests field is set to the value of the last call.
+func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceCapacityRequests(value *CapacityRequirementsApplyConfiguration) *DeviceClassSpecApplyConfiguration {
+	b.ExtendedResourceCapacityRequests = value
 	return b
 }

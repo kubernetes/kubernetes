@@ -21,13 +21,17 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/deviceclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
@@ -36,6 +40,9 @@ import (
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
+			// The field is dropped on write while this gate is off, so declarative
+			// rules on it are only reachable when the gate is enabled.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, true)
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "resource.k8s.io",
 				APIVersion:        apiVersion,
@@ -165,6 +172,27 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkBeta(),
 					},
 				},
+				"valid extended resource capacity requests": {
+					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(1, "1"))),
+				},
+				"valid extended resource capacity requests, max allowed": {
+					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(32, "1"))),
+				},
+				"valid extended resource capacity requests, zero": {
+					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(1, "0"))),
+				},
+				"invalid extended resource capacity requests, too many": {
+					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(33, "1"))),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), 33, 32).WithOrigin("maxProperties"),
+					},
+				},
+				"invalid extended resource capacity requests, negative": {
+					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(1, "-1"))),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -183,6 +211,7 @@ func TestDeclarativeValidate(t *testing.T) {
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, true)
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "resource.k8s.io",
 				APIVersion:        apiVersion,
@@ -271,6 +300,24 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					update: mkDeviceClass(tweakExtendedResourceName("example.com/" + strings.Repeat("a", 64))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkBeta(),
+					},
+				},
+				"valid extended resource capacity requests update": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(1, "1"))),
+				},
+				"invalid extended resource capacity requests update, too many": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(33, "1"))),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), 33, 32).WithOrigin("maxProperties"),
+					},
+				},
+				"invalid extended resource capacity requests update, negative": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakExtendedResourceCapacityRequests(mkCapacityRequests(1, "-1"))),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
 					},
 				},
 				// TODO: Add more test cases
@@ -382,5 +429,19 @@ func tweakExtendedResourceName(name string) func(*resource.DeviceClass) {
 	return func(dc *resource.DeviceClass) {
 		nameCopy := name
 		dc.Spec.ExtendedResourceName = &nameCopy
+	}
+}
+
+func mkCapacityRequests(count int, value string) map[resource.QualifiedName]apiresource.Quantity {
+	requests := make(map[resource.QualifiedName]apiresource.Quantity, count)
+	for i := range count {
+		requests[resource.QualifiedName(fmt.Sprintf("dra.example.com/cap%d", i))] = apiresource.MustParse(value)
+	}
+	return requests
+}
+
+func tweakExtendedResourceCapacityRequests(requests map[resource.QualifiedName]apiresource.Quantity) func(*resource.DeviceClass) {
+	return func(dc *resource.DeviceClass) {
+		dc.Spec.ExtendedResourceCapacityRequests = &resource.CapacityRequirements{Requests: requests}
 	}
 }

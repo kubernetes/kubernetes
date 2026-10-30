@@ -2492,6 +2492,24 @@ type DeviceClassSpec struct {
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +k8s:beta(since: "1.37")=+k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
+
+	// extendedResourceCapacityRequests, if set, defines the fixed capacity
+	// amounts that the scheduler requests on every ResourceClaim it synthesizes
+	// to satisfy extendedResourceName.
+	//
+	// The scheduler copies this value, unmodified, onto the capacity field of
+	// every ExactDeviceRequest it synthesizes for this class. It applies to
+	// each device allocation, so a count greater than one requests that many
+	// independent allocations of this amount, not one allocation of count
+	// times this amount.
+	//
+	// This is an alpha field and requires enabling the DRAExtendedResourceCapacity
+	// and DRAConsumableCapacity feature gates.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResourceCapacity,DRAConsumableCapacity
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	ExtendedResourceCapacityRequests *CapacityRequirements `json:"extendedResourceCapacityRequests,omitempty" protobuf:"bytes,5,opt,name=extendedResourceCapacityRequests"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

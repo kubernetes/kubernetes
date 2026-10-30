@@ -20,10 +20,14 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -408,6 +412,59 @@ func TestValidateClassUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClass.ResourceVersion = "1"
 			errs := ValidateDeviceClassUpdate(scenario.update(scenario.oldClass.DeepCopy()), scenario.oldClass)
+			assertFailures(t, scenario.wantFailures, errs)
+		})
+	}
+}
+
+func TestValidateDeviceClassExtendedResourceCapacity(t *testing.T) {
+	shares := func() *resource.CapacityRequirements {
+		return &resource.CapacityRequirements{
+			Requests: map[resource.QualifiedName]apiresource.Quantity{
+				"shares": apiresource.MustParse("1"),
+			},
+		}
+	}
+	classWithCapacity := func(capacity *resource.CapacityRequirements) *resource.DeviceClass {
+		class := testClass("foo")
+		class.Spec.ExtendedResourceName = ptr.To("example.com/gpu.shared")
+		class.Spec.ExtendedResourceCapacityRequests = capacity
+		return class
+	}
+
+	scenarios := map[string]struct {
+		class                     *resource.DeviceClass
+		consumableCapacityEnabled bool
+		wantFailures              field.ErrorList
+	}{
+		"valid": {
+			class:                     classWithCapacity(shares()),
+			consumableCapacityEnabled: true,
+		},
+		"bad-capacity-key": {
+			consumableCapacityEnabled: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			class: classWithCapacity(&resource.CapacityRequirements{
+				Requests: map[resource.QualifiedName]apiresource.Quantity{
+					"1bad": apiresource.MustParse("1"),
+				},
+			}),
+		},
+		"consumable-capacity-disabled": {
+			class:                     classWithCapacity(shares()),
+			consumableCapacityEnabled: false,
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "extendedResourceCapacityRequests"), "DRAConsumableCapacity feature gate must be enabled"),
+			},
+		},
+	}
+
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityEnabled)
+			errs := ValidateDeviceClass(scenario.class)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}
