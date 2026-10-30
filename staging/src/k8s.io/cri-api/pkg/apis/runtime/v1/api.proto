@@ -164,14 +164,14 @@ service RuntimeService {
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
     // CheckpointPod creates a Pod-level checkpoint. The caller must set a
-    // deadline on the call. If the pod sandbox does not exist, the deadline is
-    // exceeded, or the checkpoint operation fails, the call returns an error.
-    // The pod sandbox and containers must be running when the call starts. The
-    // runtime must pause every selected container before capturing any of
-    // them, keep all selected containers paused until every selected
-    // container has been captured, and resume all of them before returning on
-    // success, error, or deadline expiry. This produces one consistent
-    // pod-wide cut while ensuring the runtime never returns a frozen pod.
+    // deadline and a unique operation_id. All selected containers must be
+    // running when capture starts. The runtime must pause every selected
+    // container before capturing any of them, keep them paused until all have
+    // been captured, and resume them before reporting successful completion.
+    // A cancelled, expired or disconnected call does not acknowledge cleanup.
+    // After an ambiguous result the caller must use CancelPodOperation before
+    // resuming probes, removing output_path or permitting conflicting work.
+    // Requires RuntimeFeatures.pod_checkpoint_restore_cancellation.
     rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
 
     // RestorePod prepares a pod sandbox and containers from a checkpoint. The
@@ -181,6 +181,24 @@ service RuntimeService {
     // StartContainer for each returned ID. On error, the runtime must remove
     // any sandbox and containers created by the call before returning.
     rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
+
+    // CancelPodOperation cancels and settles an identified checkpoint or
+    // abandoned restore. The caller must set a finite deadline. Success is a
+    // durable acknowledgement that this operation cannot execute again, even
+    // if the original request arrives later or either process restarts.
+    // An unknown operation ID must be durably fenced before success.
+    // For checkpoint, all capture tasks and output writers must have stopped
+    // and selected containers must have resumed or been authoritatively
+    // destroyed. For restore, this includes work admitted by subsequent
+    // StartContainer calls: new creation/start work must be fenced, admitted
+    // work and input readers must have stopped, and partially created or
+    // abandoned resources must have been removed, even if RestorePod had
+    // completed successfully.
+    // Cancellation must coordinate with the existing operation owner; repeated
+    // cancellation is idempotent. A timeout, unavailable backend, incomplete
+    // recovery or uncertain surviving work must return an error, never success.
+    // Requires RuntimeFeatures.pod_checkpoint_restore_cancellation.
+    rpc CancelPodOperation(CancelPodOperationRequest) returns (CancelPodOperationResponse) {}
 
     // GetContainerEvents gets container events from the CRI runtime
     rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
@@ -2094,6 +2112,10 @@ message RuntimeFeatures {
     // Feature gate: SecurityProfileOCI
     // See https://kep.k8s.io/6061 for more details.
     bool seccomp_profile_oci = 5;
+    // pod_checkpoint_restore_cancellation is true only when CheckpointPod,
+    // RestorePod and CancelPodOperation implement durable operation identity,
+    // cancellation fencing and confirmed completion across runtime restart.
+    bool pod_checkpoint_restore_cancellation = 6;
 }
 
 message StatusResponse {
@@ -2396,6 +2418,10 @@ message CheckpointPodRequest {
     // and values rather than silently ignore them. Options must not contain
     // secrets.
     map<string, string> options = 4;
+    // Unique caller-generated identity for this checkpoint. The runtime must
+    // persist admission before side effects and reject reuse with a different
+    // request. This ID also identifies a delayed request to CancelPodOperation.
+    string operation_id = 5;
 }
 
 // Empty: the checkpoint is written under the request's `output_path` directory,
@@ -2413,6 +2439,12 @@ message RestorePodRequest {
     // the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
     // enforced at API-server admission (and re-checked by the kubelet before this call);
     // arbitrary user overrides are not permitted.
+    // The metadata tuple (namespace, name, uid, attempt) identifies the restore
+    // target. The runtime must reserve it with operation_id before side effects.
+    // If another operation or sandbox owns that tuple, return AlreadyExists
+    // without modifying its resources or operation state. Reuse requires a
+    // fresh operation_id, stopped backend work and input readers, removed old
+    // resources, and a durable fence against the old operation executing again.
     PodSandboxConfig config = 2;
     // Runtime handler to use for restoring the pod sandbox and its containers.
     // The handler selects the configured runtime implementation that interprets
@@ -2441,6 +2473,14 @@ message RestorePodRequest {
     // devices, Linux resources, logging, and security constraints, and must
     // fail settings incompatible with the checkpoint.
     repeated ContainerConfig container_configs = 5;
+    // Unique caller-generated identity for this restore. The runtime must
+    // persist admission before side effects. If this ID was already admitted
+    // or durably fenced, return AlreadyExists, even for an identical request.
+    // A duplicate must not execute again, modify the admitted operation's
+    // resources or state, or return a cached successful restore response.
+    // The ID must remain discoverable for cancellation if the response with
+    // the sandbox ID is lost.
+    string operation_id = 6;
 }
 
 message RestoredContainer {
@@ -2597,3 +2637,20 @@ message UpdatePodSandboxResourcesRequest {
 }
 
 message UpdatePodSandboxResourcesResponse {}
+
+// PodOperationType identifies the operation settled by CancelPodOperation.
+enum PodOperationType {
+    POD_OPERATION_UNKNOWN = 0;
+    POD_CHECKPOINT = 1;
+    POD_RESTORE = 2;
+}
+
+message CancelPodOperationRequest {
+    // Identity supplied in the original CheckpointPodRequest or RestorePodRequest.
+    string operation_id = 1;
+    // Operation kind. POD_OPERATION_UNKNOWN is invalid.
+    PodOperationType operation_type = 2;
+}
+
+// Empty success acknowledges durable cancellation and confirmed completion.
+message CancelPodOperationResponse {}
