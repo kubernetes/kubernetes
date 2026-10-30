@@ -3140,8 +3140,18 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 	}
 }
 
-// cleanUp removes the specified pod finalizers, then deletes all pods and the job.
+// cleanUp deletes the job first to prevent recreation, removes the specified pod finalizers, and deletes remaining pods.
 func cleanUp(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, podFinalizersToRemove []string) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Set the propagation policy to background to ensure that the job doesn't receive any finalizer at deletion time,
+	// and delete the job first so the controller doesn't create replacement pods while pods are being deleted.
+	if err := clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+	}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
 	if err := removePodsFinalizers(ctx, clientSet, jobObj.Namespace, podFinalizersToRemove); err != nil {
 		return err
 	}
@@ -3164,11 +3174,7 @@ func cleanUp(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1
 			return err
 		}
 	}
-
-	// Set the propagation policy to background to ensure that the job doesn't receive any finalizer at deletion time
-	return clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{
-		PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
-	})
+	return nil
 }
 
 func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
