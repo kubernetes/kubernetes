@@ -25,7 +25,7 @@ package v1
 type StorageHealthApplyConfiguration struct {
 	// name is the CSI driver name, matching CSINodeDriver.name.
 	Name *string `json:"name,omitempty"`
-	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// healthConditions are the storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
 	HealthConditions []StorageHealthConditionApplyConfiguration `json:"healthConditions,omitempty"`
 }
