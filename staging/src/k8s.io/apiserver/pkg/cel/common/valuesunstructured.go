@@ -60,19 +60,14 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 		if !ok {
 			return types.NewErr("invalid data, expected a map for the provided schema with type=object")
 		}
-		if schema.IsXEmbeddedResource() || schema.Properties() != nil {
+		if schema.IsXEmbeddedResource() || schema.HasProperties() {
 			if schema.IsXEmbeddedResource() {
 				schema = schema.WithTypeAndObjectMeta()
 			}
 			return &unstructuredMap{
-				value:  m,
-				schema: schema,
-				propSchema: func(key string) (Schema, bool) {
-					if schema, ok := schema.Properties()[key]; ok {
-						return schema, true
-					}
-					return nil, false
-				},
+				value:      m,
+				schema:     schema,
+				propSchema: schema.Property,
 			}
 		}
 		if schema.AdditionalProperties() != nil && schema.AdditionalProperties().Schema() != nil {
@@ -651,7 +646,7 @@ func (t *unstructuredMap) Get(key ref.Val) ref.Val {
 }
 
 func (t *unstructuredMap) Iterator() traits.Iterator {
-	isObject := t.schema.Properties() != nil
+	isObject := t.schema.HasProperties()
 	keys := make([]ref.Val, len(t.value))
 	i := 0
 	for k := range t.value {
@@ -690,7 +685,7 @@ func (t *unstructuredMap) Size() ref.Val {
 }
 
 func (t *unstructuredMap) Find(key ref.Val) (ref.Val, bool) {
-	isObject := t.schema.Properties() != nil
+	isObject := t.schema.HasProperties()
 	keyStr, ok := key.(types.String)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(key), true
