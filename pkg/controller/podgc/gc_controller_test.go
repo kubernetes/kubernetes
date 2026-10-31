@@ -47,6 +47,9 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// testFinalizer keeps a pod around after its deletion has been accepted by the API server.
+const testFinalizer = "example.com/some-finalizer"
+
 func alwaysReady() bool { return true }
 
 func NewFromClient(ctx context.Context, kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
@@ -60,9 +63,12 @@ func NewFromClient(ctx context.Context, kubeClient clientset.Interface, terminat
 
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
-		name   string
-		phase  v1.PodPhase
-		reason string
+		name                       string
+		phase                      v1.PodPhase
+		reason                     string
+		deletionTimeStamp          *metav1.Time
+		deletionGracePeriodSeconds *int64
+		finalizers                 []string
 	}
 
 	testCases := []struct {
@@ -146,6 +152,49 @@ func TestGCTerminated(t *testing.T) {
 			threshold:       1,
 			deletedPodNames: sets.New("c"),
 		},
+		{
+			name: "pods that are only waiting for their finalizers are not deleted again",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+			},
+			threshold: 1,
+		},
+		{
+			name: "pods that are only waiting for their finalizers still count towards the threshold",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "c", phase: v1.PodSucceeded},
+			},
+			threshold:       2,
+			deletedPodNames: sets.New("c"),
+		},
+		{
+			name: "the number of deletion candidates limits the number of deleted pods",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}},
+				{name: "d", phase: v1.PodSucceeded},
+			},
+			threshold:       1,
+			deletedPodNames: sets.New("d"),
+		},
+		{
+			name: "terminated pods that are not only waiting for their finalizers are still deleted",
+			pods: []nameToPhase{
+				// the grace period still has to be shortened
+				{name: "a", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](30), finalizers: []string{testFinalizer}},
+				// nothing holds the pod back, so resending the deletion can still make it go away
+				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0)},
+				// the deletion has not been accepted yet
+				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, finalizers: []string{testFinalizer}},
+				{name: "d", phase: v1.PodSucceeded, finalizers: []string{testFinalizer}},
+			},
+			threshold:       1,
+			deletedPodNames: sets.New("a", "b", "c"),
+		},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -158,9 +207,16 @@ func TestGCTerminated(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime}},
-					Status:     v1.PodStatus{Phase: pod.phase, Reason: pod.reason},
-					Spec:       v1.PodSpec{NodeName: "node"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:                       pod.name,
+						Namespace:                  metav1.NamespaceDefault,
+						CreationTimestamp:          metav1.Time{Time: creationTime},
+						DeletionTimestamp:          pod.deletionTimeStamp,
+						DeletionGracePeriodSeconds: pod.deletionGracePeriodSeconds,
+						Finalizers:                 pod.finalizers,
+					},
+					Status: v1.PodStatus{Phase: pod.phase, Reason: pod.reason},
+					Spec:   v1.PodSpec{NodeName: "node"},
 				})
 			}
 			client := setupNewSimpleClient(nodes, pods)
@@ -186,6 +242,16 @@ func makePod(name string, nodeName string, phase v1.PodPhase) *v1.Pod {
 		Spec:   v1.PodSpec{NodeName: nodeName},
 		Status: v1.PodStatus{Phase: phase},
 	}
+}
+
+// makeForceDeletedPod returns a pod whose immediate deletion has already been accepted by
+// the API server, so that only the removal of its finalizers can make it go away.
+func makeForceDeletedPod(name string, nodeName string, phase v1.PodPhase, finalizers ...string) *v1.Pod {
+	pod := makePod(name, nodeName, phase)
+	pod.DeletionTimestamp = &metav1.Time{}
+	pod.DeletionGracePeriodSeconds = ptr.To[int64](0)
+	pod.Finalizers = finalizers
+	return pod
 }
 
 func waitForAdded(q workqueue.TypedDelayingInterface[string], depth int) error {
@@ -262,6 +328,18 @@ func TestGCOrphaned(t *testing.T) {
 			itemsInQueue:    1,
 			deletedPodNames: sets.New("a", "b", "c"),
 			patchedPodNames: sets.New("c"),
+		},
+		{
+			name:  "no nodes, pods that are only waiting for their finalizers",
+			delay: 2 * quarantineTime,
+			pods: []*v1.Pod{
+				makeForceDeletedPod("a", "deleted", v1.PodFailed, testFinalizer),
+				makePod("b", "deleted", v1.PodRunning),
+				makePod("c", "deleted", v1.PodSucceeded),
+			},
+			itemsInQueue:    1,
+			deletedPodNames: sets.New("b", "c"),
+			patchedPodNames: sets.New("b"),
 		},
 		{
 			name:  "quarantine not finished",
@@ -400,10 +478,12 @@ func TestGCOrphaned(t *testing.T) {
 
 func TestGCUnscheduledTerminating(t *testing.T) {
 	type nameToPhase struct {
-		name              string
-		phase             v1.PodPhase
-		deletionTimeStamp *metav1.Time
-		nodeName          string
+		name                       string
+		phase                      v1.PodPhase
+		deletionTimeStamp          *metav1.Time
+		deletionGracePeriodSeconds *int64
+		finalizers                 []string
+		nodeName                   string
 	}
 
 	testCases := []struct {
@@ -430,6 +510,16 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: "node"},
 			},
 		},
+		{
+			name: "Unscheduled pod that is only waiting for its finalizers must not be deleted again",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}, nodeName: ""},
+				{name: "b", phase: v1.PodPending, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}, nodeName: ""},
+				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), nodeName: ""},
+			},
+			deletedPodNames: sets.New("b", "c"),
+			patchedPodNames: sets.New("b"),
+		},
 	}
 
 	for _, test := range testCases {
@@ -442,8 +532,14 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime},
-						DeletionTimestamp: pod.deletionTimeStamp},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:                       pod.name,
+						Namespace:                  metav1.NamespaceDefault,
+						CreationTimestamp:          metav1.Time{Time: creationTime},
+						DeletionTimestamp:          pod.deletionTimeStamp,
+						DeletionGracePeriodSeconds: pod.deletionGracePeriodSeconds,
+						Finalizers:                 pod.finalizers,
+					},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
 				})
@@ -476,10 +572,12 @@ func TestGCTerminating(t *testing.T) {
 	}
 
 	type nameToPodConfig struct {
-		name              string
-		phase             v1.PodPhase
-		deletionTimeStamp *metav1.Time
-		nodeName          string
+		name                       string
+		phase                      v1.PodPhase
+		deletionTimeStamp          *metav1.Time
+		deletionGracePeriodSeconds *int64
+		finalizers                 []string
+		nodeName                   string
 	}
 
 	testCases := []struct {
@@ -582,6 +680,19 @@ func TestGCTerminating(t *testing.T) {
 			deletedPodNames: sets.New("a", "b", "c"),
 			patchedPodNames: sets.New("a"),
 		},
+		{
+			name: "pods that are only waiting for their finalizers are not deleted again",
+			nodes: []node{
+				{name: "worker", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectNoExecute}}},
+			},
+			pods: []nameToPodConfig{
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}, nodeName: "worker"},
+				{name: "b", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, deletionGracePeriodSeconds: ptr.To[int64](0), finalizers: []string{testFinalizer}, nodeName: "worker"},
+			},
+			deletedPodNames: sets.New("b"),
+			patchedPodNames: sets.New("b"),
+		},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -611,8 +722,14 @@ func TestGCTerminating(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime},
-						DeletionTimestamp: pod.deletionTimeStamp},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:                       pod.name,
+						Namespace:                  metav1.NamespaceDefault,
+						CreationTimestamp:          metav1.Time{Time: creationTime},
+						DeletionTimestamp:          pod.deletionTimeStamp,
+						DeletionGracePeriodSeconds: pod.deletionGracePeriodSeconds,
+						Finalizers:                 pod.finalizers,
+					},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
 				})
@@ -632,6 +749,119 @@ func TestGCTerminating(t *testing.T) {
 			testDeletingPodsMetrics(t, len(test.deletedPodNames), metrics.PodGCReasonTerminatingOutOfService)
 		})
 	}
+}
+
+func TestIsPodBlockedOnFinalizers(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "terminated pod that is not marked for deletion",
+			pod:  makePod("a", "node", v1.PodSucceeded),
+		},
+		{
+			name: "terminated pod whose deletion has not been accepted yet",
+			pod: func() *v1.Pod {
+				pod := makeForceDeletedPod("a", "node", v1.PodSucceeded, testFinalizer)
+				pod.DeletionGracePeriodSeconds = nil
+				return pod
+			}(),
+		},
+		{
+			name: "terminated pod that is still within its grace period",
+			pod: func() *v1.Pod {
+				pod := makeForceDeletedPod("a", "node", v1.PodSucceeded, testFinalizer)
+				pod.DeletionGracePeriodSeconds = ptr.To[int64](30)
+				return pod
+			}(),
+		},
+		{
+			name: "terminated pod without finalizers",
+			pod:  makeForceDeletedPod("a", "node", v1.PodSucceeded),
+		},
+		{
+			name: "running pod",
+			pod:  makeForceDeletedPod("a", "node", v1.PodRunning, testFinalizer),
+		},
+		{
+			name: "succeeded pod that is only waiting for its finalizers",
+			pod:  makeForceDeletedPod("a", "node", v1.PodSucceeded, testFinalizer),
+			want: true,
+		},
+		{
+			name: "failed pod that is only waiting for its finalizers",
+			pod:  makeForceDeletedPod("a", "node", v1.PodFailed, testFinalizer),
+			want: true,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isPodBlockedOnFinalizers(test.pod); got != test.want {
+				t.Errorf("isPodBlockedOnFinalizers() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+// TestGCTerminatedConverges verifies that PodGC stops force deleting terminated pods once
+// the API server has accepted their deletion, instead of retrying them on every sync.
+func TestGCTerminatedConverges(t *testing.T) {
+	resetMetrics()
+	_, ctx := ktesting.NewTestContext(t)
+
+	creationTime := time.Unix(0, 0)
+	pods := make([]*v1.Pod, 0, 3)
+	for _, name := range []string{"a", "b", "c"} {
+		creationTime = creationTime.Add(1 * time.Hour)
+		pod := makePod(name, "node", v1.PodSucceeded)
+		pod.CreationTimestamp = metav1.Time{Time: creationTime}
+		pod.Finalizers = []string{testFinalizer}
+		pods = append(pods, pod)
+	}
+	nodes := []*v1.Node{testutil.NewNode("node")}
+
+	client := setupNewSimpleClient(nodes, pods)
+	gcc, podInformer, nodeInformer := NewFromClient(ctx, client, 1)
+	if err := nodeInformer.Informer().GetStore().Add(nodes[0]); err != nil {
+		t.Fatalf("Failed to add node to the informer store: %v", err)
+	}
+	store := podInformer.Informer().GetStore()
+	for _, pod := range pods {
+		if err := store.Add(pod); err != nil {
+			t.Fatalf("Failed to add pod to the informer store: %v", err)
+		}
+	}
+
+	// Reflect what the informer observes once the API server has accepted the deletion:
+	// the pod is marked for immediate deletion but kept around by its finalizer.
+	acceptDeletion := func(pod *v1.Pod) {
+		t.Helper()
+		accepted := pod.DeepCopy()
+		accepted.DeletionTimestamp = &metav1.Time{Time: creationTime}
+		accepted.DeletionGracePeriodSeconds = ptr.To[int64](0)
+		if err := store.Update(accepted); err != nil {
+			t.Fatalf("Failed to update pod in the informer store: %v", err)
+		}
+	}
+
+	// The two oldest pods are force deleted, the threshold keeps the newest one.
+	gcc.gc(ctx)
+	verifyDeletedAndPatchedPods(t, client, sets.New("a", "b"), nil)
+	acceptDeletion(pods[0])
+	acceptDeletion(pods[1])
+
+	// a and b are only waiting for their finalizers now, so c is the only candidate left.
+	client.ClearActions()
+	gcc.gc(ctx)
+	verifyDeletedAndPatchedPods(t, client, sets.New("c"), nil)
+	acceptDeletion(pods[2])
+
+	// Nothing is left for PodGC to do until the finalizers are removed.
+	client.ClearActions()
+	gcc.gc(ctx)
+	verifyDeletedAndPatchedPods(t, client, nil, nil)
 }
 
 func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
