@@ -3139,6 +3139,101 @@ func TestRecordPendingResizesCount(t *testing.T) {
 	}
 }
 
+func TestSetPodResizePendingConditionGaugeTransition(t *testing.T) {
+	metrics.Register()
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "pod-uid"}}
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+	podUID := pod.UID
+
+	gather := func(t *testing.T, expected string) {
+		t.Helper()
+		require.NoError(t, testutil.GatherAndCompare(
+			legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_pod_pending_resizes",
+		))
+	}
+
+	// Initial set: Deferred.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg", 1)
+	gather(t, `
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+		# TYPE kubelet_pod_pending_resizes gauge
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+	`)
+
+	// Transition: Deferred -> Infeasible.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "msg", 1)
+	gather(t, `
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+		# TYPE kubelet_pod_pending_resizes gauge
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 1
+	`)
+
+	// Transition: Infeasible -> Deferred.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg", 1)
+	gather(t, `
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+		# TYPE kubelet_pod_pending_resizes gauge
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+	`)
+
+	// Same-reason update: gauge must remain stable.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "updated-msg", 1)
+	gather(t, `
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+		# TYPE kubelet_pod_pending_resizes gauge
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+	`)
+}
+
+func TestSetPodResizePendingConditionDeferredDuration(t *testing.T) {
+	metrics.Register()
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "pod-uid-dur"}}
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+	podUID := pod.UID
+
+	countInfeasibleSamples := func(t *testing.T) int {
+		t.Helper()
+		mfs, err := legacyregistry.DefaultGatherer.Gather()
+		require.NoError(t, err)
+		for _, mf := range mfs {
+			if mf.GetName() == "kubelet_pod_deferred_resize_duration_seconds" {
+				for _, metric := range mf.GetMetric() {
+					for _, lp := range metric.GetLabel() {
+						if lp.GetName() == "resolution" && lp.GetValue() == "infeasible" {
+							return int(metric.GetHistogram().GetSampleCount())
+						}
+					}
+				}
+			}
+		}
+		return 0
+	}
+
+	// Capture baseline.
+	baseline := countInfeasibleSamples(t)
+
+	// Same-reason update (Deferred -> Deferred): must not emit a new duration sample.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg", 1)
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg2", 1)
+	require.Equal(t, baseline, countInfeasibleSamples(t), "same-reason update must not emit a deferred duration observation")
+	m.ClearPodResizePendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
+
+	// Infeasible -> Deferred: must not emit a new duration sample.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "msg", 1)
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg", 1)
+	require.Equal(t, baseline, countInfeasibleSamples(t), "Infeasibl->Deferred must not emit a deferred duration observation")
+	m.ClearPodResizePendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
+
+	// Deferred -> Infeasible: must emit exactly one new duration sample with resolution=infeasible.
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "msg", 2)
+	m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "msg", 2)
+	require.Equal(t, baseline+1, countInfeasibleSamples(t), "Deferre->Infeasible must emit exactly one deferred duration observation")
+}
+
 func TestBackfillPodResizeConditions(t *testing.T) {
 	metrics.Register()
 

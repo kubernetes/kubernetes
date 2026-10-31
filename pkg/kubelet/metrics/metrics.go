@@ -241,6 +241,7 @@ const (
 	DeferredResizeResolutionAccepted   DeferredResizeResolution = "accepted"
 	DeferredResizeResolutionReverted   DeferredResizeResolution = "reverted"
 	DeferredResizeResolutionTerminated DeferredResizeResolution = "terminated"
+	DeferredResizeResolutionInfeasible DeferredResizeResolution = "infeasible"
 )
 
 const (

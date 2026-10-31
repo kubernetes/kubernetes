@@ -55,8 +55,28 @@ const (
 	TriggerReasonPodsAdded     = "pods_added"
 	TriggerReasonPodsRemoved   = "pods_removed"
 	TriggerReasonPodTerminated = "pod_terminated"
+	TriggerReasonNodeUpdated   = "node_updated"
 
 	triggerReasonPeriodic = "periodic_retry"
+)
+
+// resizeOutcome describes what handlePodResourcesResize determined for a pending resize.
+type resizeOutcome int
+
+const (
+	// resizeOutcomeNoOp means desired equals to allocated, nothing to do.
+	resizeOutcomeNoOp resizeOutcome = iota
+	// resizeOutcomeAllocated means the resize was accepted and the allocation updated.
+	resizeOutcomeAllocated
+	// resizeOutcomeDeferred means resources are insufficient right now but may free up
+	// (other pods are consuming them), retry on the normal periodic ticker.
+	resizeOutcomeDeferred
+	// resizeOutcomeCapacityInfeasible means requested > node.Allocatable in total,
+	// no eviction can help. Retry only when Node.Status.Allocatable increases.
+	resizeOutcomeCapacityInfeasible
+	// resizeOutcomeInfeasible means the resize cannot succeed regardless of capacity
+	// (e.g. policy, taint, unsupported platform).
+	resizeOutcomeInfeasible
 )
 
 // AllocationManager tracks pod resource allocations.
@@ -254,27 +274,32 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
-		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
+		outcome, err := m.handlePodResourcesResize(ctx, pod)
 		switch {
 		case err != nil:
 			logger.Error(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
 			newPendingResizes = append(newPendingResizes, uid)
-		case m.statusManager.IsPodResizeDeferred(uid):
+		case outcome == resizeOutcomeDeferred:
 			logger.V(4).Info("Pod resize is deferred; will reevaluate later", "pod", klog.KObj(pod))
 			newPendingResizes = append(newPendingResizes, uid)
-		case m.statusManager.IsPodResizeInfeasible(uid):
+		case outcome == resizeOutcomeCapacityInfeasible:
+			logger.V(4).Info("Pod resize is capacity-infeasible, will retry on node upscale", "pod", klog.KObj(pod))
+			newPendingResizes = append(newPendingResizes, uid)
+		case outcome == resizeOutcomeInfeasible:
 			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
-		default:
+		case outcome == resizeOutcomeAllocated:
 			logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
 			successfulResizes = append(successfulResizes, pod)
 			if isDeferred {
 				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
 			}
+		default: // resizeOutcomeNoOp: desired == allocated.
+			logger.V(4).Info("Pod resize is a no-op, desired matches allocated", "pod", klog.KObj(pod))
 		}
 
-		// If the pod resize status has changed, we need to update the pod status.
+		// If a new allocation was written or the resize status changed, sync the pod.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
+		if outcome == resizeOutcomeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
 			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
@@ -547,13 +572,13 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.allocated.RemoveOrphanedPods(remainingPods)
 }
 
-func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {
+func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (resizeOutcome, error) {
 	logger := klog.FromContext(ctx)
 	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-		return false, nil
+		return resizeOutcomeNoOp, nil
 	}
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
@@ -566,7 +591,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
-			return false, err
+			return resizeOutcomeDeferred, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
@@ -579,7 +604,16 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
 		}
-		return true, nil
+		return resizeOutcomeAllocated, nil
+	}
+
+	// Classify the rejection reason into an outcome.
+	outcome := resizeOutcomeDeferred
+	if reason == lifecycle.CapacityInfeasible && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceNodeResourceResize) {
+		reason = v1.PodReasonInfeasible
+		outcome = resizeOutcomeCapacityInfeasible
+	} else if reason == v1.PodReasonInfeasible {
+		outcome = resizeOutcomeInfeasible
 	}
 
 	if reason != "" && resizeRequested {
@@ -593,7 +627,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		}
 	}
 
-	return false, nil
+	return outcome, nil
 }
 
 // isResizeRequested returns whether the desired pod asks for a change to the resources of its

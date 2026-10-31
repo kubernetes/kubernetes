@@ -88,6 +88,7 @@ const (
 	OutOfMemory           = "OutOfmemory"
 	OutOfEphemeralStorage = "OutOfephemeral-storage"
 	OutOfPods             = "OutOfpods"
+	CapacityInfeasible    = "CapacityInfeasible"
 )
 
 type getNodeAnyWayFuncType func(ctx context.Context, useCache bool) (*v1.Node, error)
