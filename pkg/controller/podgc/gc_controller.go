@@ -183,6 +183,17 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 		wait.Add(1)
 		go func(pod *v1.Pod) {
 			defer wait.Done()
+			// The taint is what authorizes force-deleting this pod without waiting
+			// for kubelet, so confirm it is still set rather than trusting the cache.
+			node, err := gcc.kubeClient.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Failed to get live node before force-deleting terminating pod on out-of-service node", "pod", klog.KObj(pod), "node", klog.KRef("", pod.Spec.NodeName))
+				return
+			}
+			if nodeutil.IsNodeReady(node) || !taints.TaintKeyExists(node.Spec.Taints, v1.TaintNodeOutOfService) {
+				logger.V(4).Info("Skipping force deletion of terminating pod: node is no longer out-of-service", "pod", klog.KObj(pod), "node", klog.KRef("", pod.Spec.NodeName))
+				return
+			}
 			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingOutOfService).Inc()
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
