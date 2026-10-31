@@ -4455,6 +4455,189 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 	}
 }
 
+func TestConvertToAPIContainerStatusesVolumeMounts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	rroDisabled := v1.RecursiveReadOnlyDisabled
+
+	volMount1 := v1.VolumeMount{
+		Name:      "vol1",
+		MountPath: "/mnt/vol1",
+	}
+	volMount2 := v1.VolumeMount{
+		Name:      "vol2",
+		MountPath: "/mnt/vol2",
+		ReadOnly:  true,
+	}
+	volMountStatus1 := v1.VolumeMountStatus{
+		Name:      "vol1",
+		MountPath: "/mnt/vol1",
+	}
+	volMountStatus2 := v1.VolumeMountStatus{
+		Name:              "vol2",
+		MountPath:         "/mnt/vol2",
+		ReadOnly:          true,
+		RecursiveReadOnly: &rroDisabled,
+	}
+
+	makePod := func(mounts []v1.VolumeMount) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-pod", UID: "pod-uid"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:         "containerA",
+						Image:        "busybox",
+						VolumeMounts: mounts,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		currentStatus  *kubecontainer.PodStatus
+		previousStatus []v1.ContainerStatus
+		expectedMounts []v1.VolumeMountStatus
+	}{
+		{
+			name:           "waiting container uses spec volumeMounts",
+			pod:            makePod([]v1.VolumeMount{volMount1}),
+			currentStatus:  &kubecontainer.PodStatus{},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+		{
+			name: "running container without previousStatus uses runtime volumeMounts",
+			pod:  makePod([]v1.VolumeMount{volMount1, volMount2}),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:           kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:         "containerA",
+						State:        kubecontainer.ContainerStateRunning,
+						VolumeMounts: []v1.VolumeMount{volMount1, volMount2},
+					},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1, volMountStatus2},
+		},
+		{
+			name: "running container before restart reports runtime volumeMounts instead of updated spec",
+			pod:  makePod([]v1.VolumeMount{volMount1, volMount2}),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:           kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:         "containerA",
+						State:        kubecontainer.ContainerStateRunning,
+						VolumeMounts: []v1.VolumeMount{volMount1},
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+		{
+			name: "restarted container with added volumeMount updates status from new runtime container",
+			pod:  makePod([]v1.VolumeMount{volMount1, volMount2}),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:           kubecontainer.ContainerID{Type: "test", ID: "c2"},
+						Name:         "containerA",
+						State:        kubecontainer.ContainerStateRunning,
+						VolumeMounts: []v1.VolumeMount{volMount1, volMount2},
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1, volMountStatus2},
+		},
+		{
+			name: "restarted container with all volumeMounts removed clears old volumeMounts",
+			pod:  makePod(nil),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:           kubecontainer.ContainerID{Type: "test", ID: "c2"},
+						Name:         "containerA",
+						State:        kubecontainer.ContainerStateRunning,
+						VolumeMounts: nil,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: nil,
+		},
+		{
+			name: "container without actuated volumeMounts preserves previousStatus volumeMounts for same container ID",
+			pod:  makePod([]v1.VolumeMount{volMount1}),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			statuses := kl.convertToAPIContainerStatuses(
+				tCtx,
+				test.pod,
+				test.currentStatus,
+				test.previousStatus,
+				test.pod.Spec.Containers,
+				nil,
+				false,
+				false,
+				false,
+			)
+			require.Len(t, statuses, 1)
+			assert.Equal(t, test.expectedMounts, statuses[0].VolumeMounts)
+		})
+	}
+}
+
 func Test_generateAPIPodStatus(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",

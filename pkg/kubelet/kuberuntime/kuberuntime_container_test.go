@@ -225,8 +225,9 @@ func TestToKubeContainerStatus(t *testing.T) {
 	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
-		input    *runtimeapi.ContainerStatus
-		expected *kubecontainer.Status
+		input        *runtimeapi.ContainerStatus
+		volumeMounts []v1.VolumeMount
+		expected     *kubecontainer.Status
 	}{
 		"created container": {
 			input: &runtimeapi.ContainerStatus{
@@ -302,8 +303,53 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"running container with volume mounts": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Labels: map[string]string{
+					kubelettypes.KubernetesContainerNameLabel: meta.Name,
+				},
+			},
+			volumeMounts: []v1.VolumeMount{
+				{
+					Name:      "vol1",
+					MountPath: "/mnt/vol1",
+					ReadOnly:  true,
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Name:      meta.Name,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPURequest:    resource.NewQuantity(0, resource.DecimalSI),
+					CPULimit:      resource.NewQuantity(0, resource.DecimalSI),
+					MemoryRequest: resource.NewQuantity(0, resource.BinarySI),
+					MemoryLimit:   resource.NewQuantity(0, resource.BinarySI),
+				},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+						ReadOnly:  true,
+					},
+				},
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if len(test.volumeMounts) > 0 {
+				require.NoError(t, m.actuatedState.SetContainerVolumeMounts(tCtx.Logger(), podUID, meta.Name, podutil.Containers, test.volumeMounts))
+				t.Cleanup(func() { _ = m.actuatedState.RemovePod(tCtx.Logger(), podUID) })
+			}
 			actual := m.toKubeContainerStatus(tCtx, podUID, test.input, cid.Type)
 			assert.Equal(t, test.expected, actual, desc)
 		})
@@ -1222,4 +1268,68 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Len(t, result, 2)
 	assert.Equal(t, []string{"noexec", "nosuid"}, result[0].MountOptions)
 	assert.Empty(t, result[1].MountOptions)
+}
+
+func TestContainerVolumeMountsActuatedState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      "vol1",
+			MountPath: "/mnt/vol1",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "vol2",
+			MountPath: "/mnt/vol2",
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-uid-1",
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "c1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					VolumeMounts:    volumeMounts,
+				},
+			},
+		},
+	}
+
+	sandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+	require.NoError(t, err)
+	sandboxID, err := fakeRuntime.RunPodSandbox(tCtx, sandboxConfig, "")
+	require.NoError(t, err)
+
+	podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+	msg, err := m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	require.NoError(t, err, msg)
+
+	// Starting the container records its volumeMounts in the actuation checkpoint.
+	gotMounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, volumeMounts, gotMounts)
+
+	// Restarting the container with updated volumeMounts overwrites the actuation checkpoint.
+	updatedMounts := []v1.VolumeMount{
+		{
+			Name:      "vol3",
+			MountPath: "/mnt/vol3",
+		},
+	}
+	pod.Spec.Containers[0].VolumeMounts = updatedMounts
+	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	require.NoError(t, err, msg)
+
+	gotMounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, updatedMounts, gotMounts)
 }

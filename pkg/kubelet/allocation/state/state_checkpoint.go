@@ -135,6 +135,11 @@ func (sc *stateCheckpoint) GetContainerResources(podUID types.UID, containerName
 	return sc.cache.GetContainerResources(podUID, containerName)
 }
 
+// GetContainerVolumeMounts returns current volume mounts information for a pod's container
+func (sc *stateCheckpoint) GetContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool) {
+	return sc.cache.GetContainerVolumeMounts(podUID, containerName)
+}
+
 // GetPodLevelResources returns current resources information at pod-level
 func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
 	return sc.cache.GetPodLevelResources(podUID)
@@ -163,6 +168,15 @@ func (sc *stateCheckpoint) HasPod(podUID types.UID) bool {
 // SetContainerResources sets resources information for a pod's container
 func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
 	err := sc.cache.SetContainerResources(logger, podUID, containerName, containerType, resources)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
+// SetContainerVolumeMounts sets volume mounts information for a pod's container
+func (sc *stateCheckpoint) SetContainerVolumeMounts(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, volumeMounts []v1.VolumeMount) error {
+	err := sc.cache.SetContainerVolumeMounts(logger, podUID, containerName, containerType, volumeMounts)
 	if err != nil {
 		return err
 	}
@@ -221,6 +235,10 @@ func (sc *noopStateCheckpoint) GetContainerResources(_ types.UID, _ string) (v1.
 	return v1.ResourceRequirements{}, false
 }
 
+func (sc *noopStateCheckpoint) GetContainerVolumeMounts(_ types.UID, _ string) ([]v1.VolumeMount, bool) {
+	return nil, false
+}
+
 func (sc *noopStateCheckpoint) GetPodLevelResources(_ types.UID) (*v1.ResourceRequirements, bool) {
 	return nil, false
 }
@@ -242,6 +260,10 @@ func (sc *noopStateCheckpoint) HasPod(_ types.UID) bool {
 }
 
 func (sc *noopStateCheckpoint) SetContainerResources(_ klog.Logger, _ types.UID, _ string, _ podutil.ContainerType, _ v1.ResourceRequirements) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetContainerVolumeMounts(_ klog.Logger, _ types.UID, _ string, _ podutil.ContainerType, _ []v1.VolumeMount) error {
 	return nil
 }
 

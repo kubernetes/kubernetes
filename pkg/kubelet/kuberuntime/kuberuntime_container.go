@@ -273,8 +273,12 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources as actuated.
+	// When creating a container, mark the resources and volume mounts as actuated.
 	if err := m.setActuatedContainerResources(logger, pod, container, spec.containerType); err != nil {
+		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
+		return err.Error(), ErrCreateContainerConfig
+	}
+	if err := m.actuatedState.SetContainerVolumeMounts(logger, pod.UID, container.Name, spec.containerType, container.VolumeMounts); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -743,6 +747,8 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		}
 	}
 
+	actuatedVolumeMounts, _ := m.actuatedState.GetContainerVolumeMounts(podUID, labeledInfo.ContainerName)
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -759,6 +765,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,
 		User:                cStatusUser,
+		VolumeMounts:        actuatedVolumeMounts,
 		StopSignal:          cStatusStopSignal,
 	}
 
