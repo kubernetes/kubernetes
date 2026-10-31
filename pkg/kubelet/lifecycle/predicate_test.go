@@ -293,6 +293,11 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 	}
 }
 
+func withName(pod *v1.Pod, namespace, name string) *v1.Pod {
+	pod.Namespace, pod.Name = namespace, name
+	return pod
+}
+
 func TestGeneralPredicates(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	resourceTests := []struct {
@@ -351,13 +356,23 @@ func TestGeneralPredicates(t *testing.T) {
 			name:    "host not match",
 		},
 		{
-			pod:      newPodWithPort(123),
-			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
+			pod:      withName(newPodWithPort(123), "default", "incoming"),
+			nodeInfo: schedulerframework.NewNodeInfo(withName(newPodWithPort(123), "other", "holder")),
 			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
+			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, "node(s) port conflict for the requested pod ports (TCP/0.0.0.0:123)"}},
+			name:    "hostport conflict with pod in another namespace doesn't name the holder",
+		},
+		{
+			pod:      withName(newPodWithPort(123), "default", "incoming"),
+			nodeInfo: schedulerframework.NewNodeInfo(withName(newPodWithPort(123), "default", "holder")),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, "node(s) port conflict for the requested pod ports (TCP/0.0.0.0:123); pods with conflicting host ports: holder"}},
 			name:    "hostport conflict",
 		},
 		{
