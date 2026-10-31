@@ -44,6 +44,7 @@ type Config struct {
 	SecureServing  *apiserver.SecureServingInfo
 
 	Client             clientset.Interface
+	AsyncClient        clientset.Interface
 	KubeConfig         *restclient.Config
 	InformerFactory    informers.SharedInformerFactory
 	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
