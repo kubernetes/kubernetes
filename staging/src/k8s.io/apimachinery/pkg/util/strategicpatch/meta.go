@@ -264,7 +264,7 @@ func (s PatchMetaFromOpenAPI) LookupPatchMetadataForStruct(key string) (LookupPa
 
 func (s PatchMetaFromOpenAPI) LookupPatchMetadataForSlice(key string) (LookupPatchMeta, PatchMeta, error) {
 	if s.Schema == nil {
-		return nil, PatchMeta{}, nil
+		return &PatchMetaFromOpenAPI{}, PatchMeta{}, nil
 	}
 	sliceItem := NewSliceItem(key, s.Schema.GetPath())
 	s.Schema.Accept(sliceItem)
