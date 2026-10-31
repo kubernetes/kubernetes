@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -38,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -52,6 +53,20 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+)
+
+var (
+	// prettyParam, pathParam, and namespaceParam are shared across routes
+	// registered by APIInstaller and must not be mutated after creation.
+	prettyParam    = restful.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")
+	pathParam      = restful.PathParameter("path", "path to the resource").DataType("string")
+	namespaceParam = restful.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
+
+	// objectParamsCache caches the read-only []*restful.Parameter slice for a
+	// given struct reflect.Type across route registrations. Cached parameters are
+	// shared across WebService and Route registrations and must not be mutated
+	// after creation.
+	objectParamsCache sync.Map // map[reflect.Type][]*restful.Parameter
 )
 
 const (
@@ -467,7 +482,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
 	params := []*restful.Parameter{}
 	actions := []action{}
@@ -545,7 +559,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
 		namespacedPath := namespaceParamName + "/{namespace}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
@@ -726,6 +739,41 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
 
+	// If there is a subresource, kind should be the parent's kind.
+	var titledSubresource string
+	if isSubresource {
+		parentStorage, ok := a.group.Storage[resource]
+		if !ok {
+			return nil, nil, fmt.Errorf("missing parent storage: %q", resource)
+		}
+
+		fqParentKind, err := GetResourceKind(a.group.GroupVersion, parentStorage, a.group.Typer)
+		if err != nil {
+			return nil, nil, err
+		}
+		kind = fqParentKind.Kind
+		titledSubresource = cases.Title(language.English).String(subresource)
+	}
+
+	verbOverrider, needOverride := storage.(StorageMetricsOverride)
+
+	// accumulate endpoint-level warnings
+	var (
+		warnings       []string
+		deprecated     bool
+		removedRelease string
+	)
+	if len(actions) > 0 {
+		versionedPtrWithGVK := versionedPtr.DeepCopyObject()
+		versionedPtrWithGVK.GetObjectKind().SetGroupVersionKind(fqKindToRegister)
+		currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
+		deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
+		if deprecated {
+			removedRelease = deprecation.RemovedRelease(versionedPtrWithGVK)
+			warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
+		}
+	}
+
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -763,40 +811,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		routes := []*restful.RouteBuilder{}
 
-		// If there is a subresource, kind should be the parent's kind.
-		if isSubresource {
-			parentStorage, ok := a.group.Storage[resource]
-			if !ok {
-				return nil, nil, fmt.Errorf("missing parent storage: %q", resource)
-			}
-
-			fqParentKind, err := GetResourceKind(a.group.GroupVersion, parentStorage, a.group.Typer)
-			if err != nil {
-				return nil, nil, err
-			}
-			kind = fqParentKind.Kind
-		}
-
-		verbOverrider, needOverride := storage.(StorageMetricsOverride)
-
-		// accumulate endpoint-level warnings
-		var (
-			warnings       []string
-			deprecated     bool
-			removedRelease string
-		)
-
-		{
-			versionedPtrWithGVK := versionedPtr.DeepCopyObject()
-			versionedPtrWithGVK.GetObjectKind().SetGroupVersionKind(fqKindToRegister)
-			currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
-			deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
-			if deprecated {
-				removedRelease = deprecation.RemovedRelease(versionedPtrWithGVK)
-				warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
-			}
-		}
-
 		switch action.Verb {
 		case request.MethodGet: // Get a resource.
 			var handler restful.RouteFunction
@@ -820,8 +834,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("read"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("read"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				Writes(producedObject)
@@ -841,8 +855,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("list"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("list"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
@@ -874,8 +888,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("replace"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("replace"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
@@ -906,9 +920,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParam).
 				Consumes(supportedTypes...).
-				Operation("patch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Operation("patch"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// Patch can return 201 when a server side apply is requested
@@ -936,8 +950,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.POST(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("create"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("create"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
@@ -965,8 +979,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("delete"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("delete"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(deleteReturnType).
 				Returns(http.StatusOK, "OK", deleteReturnType).
@@ -989,8 +1003,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("deletecollection"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("deletecollection"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
@@ -1017,8 +1031,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
+				Param(prettyParam).
+				Operation("watch"+namespaced+kind+titledSubresource+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
@@ -1038,8 +1052,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+"List"+operationSuffix).
+				Param(prettyParam).
+				Operation("watch"+namespaced+kind+titledSubresource+"List"+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
@@ -1063,7 +1077,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
-					Operation("connect" + cases.Title(language.English).String(strings.ToLower(method)) + namespaced + kind + cases.Title(language.English).String(subresource) + operationSuffix).
+					Operation("connect" + cases.Title(language.English).String(strings.ToLower(method)) + namespaced + kind + titledSubresource + operationSuffix).
 					Produces("*/*").
 					Consumes("*/*").
 					Writes(connectProducedObject)
@@ -1160,42 +1174,45 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 		return err
 	}
 	st := sv.Type()
-	excludedNameSet := sets.NewString(excludedNames...)
-	switch st.Kind() {
-	case reflect.Struct:
-		for i := 0; i < st.NumField(); i++ {
-			name := st.Field(i).Name
-			sf, ok := st.FieldByName(name)
-			if !ok {
-				continue
+	var params []*restful.Parameter
+	if cached, ok := objectParamsCache.Load(st); ok {
+		params = cached.([]*restful.Parameter)
+	} else {
+		if st.Kind() == reflect.Struct {
+			params = make([]*restful.Parameter, 0, st.NumField())
+			var swaggerDoc map[string]string
+			if docable, ok := obj.(documentable); ok {
+				swaggerDoc = docable.SwaggerDoc()
 			}
-			switch sf.Type.Kind() {
-			case reflect.Interface, reflect.Struct:
-			case reflect.Pointer:
-				// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
-				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
-					continue
+			for sf := range st.Fields() {
+				switch sf.Type.Kind() {
+				case reflect.Interface, reflect.Struct:
+				case reflect.Pointer:
+					// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
+					if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
+						continue
+					}
+					fallthrough
+				default:
+					jsonTag, _ := sf.Tag.Lookup("json")
+					if len(jsonTag) == 0 {
+						continue
+					}
+					jsonName, _, _ := strings.Cut(jsonTag, ",")
+					if len(jsonName) == 0 {
+						continue
+					}
+					params = append(params, restful.QueryParameter(jsonName, swaggerDoc[jsonName]).DataType(typeToJSON(sf.Type.String())))
 				}
-				fallthrough
-			default:
-				jsonTag, _ := sf.Tag.Lookup("json")
-				if len(jsonTag) == 0 {
-					continue
-				}
-				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
-				if len(jsonName) == 0 {
-					continue
-				}
-				if excludedNameSet.Has(jsonName) {
-					continue
-				}
-				var desc string
-				if docable, ok := obj.(documentable); ok {
-					desc = docable.SwaggerDoc()[jsonName]
-				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
+		objectParamsCache.Store(st, params)
+	}
+	for _, param := range params {
+		if slices.Contains(excludedNames, param.Data().Name) {
+			continue
+		}
+		route.Param(param)
 	}
 	return nil
 }

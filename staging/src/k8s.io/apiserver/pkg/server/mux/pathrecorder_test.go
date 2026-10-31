@@ -17,12 +17,52 @@ limitations under the License.
 package mux
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
+
+func TestDuplicatePathRegistration(t *testing.T) {
+	origHandlers := utilruntime.ErrorHandlers
+	t.Cleanup(func() {
+		utilruntime.ErrorHandlers = origHandlers
+	})
+
+	var recorded []error
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(_ context.Context, err error, _ string, _ ...interface{}) {
+			recorded = append(recorded, err)
+		},
+	}
+
+	c := NewPathRecorderMux("test")
+	noop := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+
+	c.Handle("/dup", noop)
+	require.Empty(t, recorded)
+
+	c.Handle("/dup", noop)
+	require.Len(t, recorded, 1)
+	assert.Contains(t, recorded[0].Error(), `duplicate path registration of "/dup": new registration from`)
+	assert.Contains(t, recorded[0].Error(), "TestDuplicatePathRegistration")
+
+	c.HandlePrefix("/dupprefix/", noop)
+	require.Len(t, recorded, 1)
+
+	c.UnlistedHandlePrefix("/dupprefix/", noop)
+	require.Len(t, recorded, 2)
+	assert.Contains(t, recorded[1].Error(), `duplicate path registration of "/dupprefix/": new registration from`)
+
+	c.Unregister("/dup")
+	c.Handle("/dup", noop)
+	require.Len(t, recorded, 2)
+}
 
 func TestSecretHandlers(t *testing.T) {
 	c := NewPathRecorderMux("test")

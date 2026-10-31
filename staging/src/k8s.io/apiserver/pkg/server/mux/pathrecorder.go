@@ -49,10 +49,6 @@ type PathRecorderMux struct {
 
 	// exposedPaths is the list of paths that should be shown at /
 	exposedPaths []string
-
-	// pathStacks holds the stacks of all registered paths.  This allows us to show a more helpful message
-	// before the "http: multiple registrations for %s" panic.
-	pathStacks map[string]string
 }
 
 // pathHandler is an http.Handler that will satisfy requests first by exact match, then by prefix,
@@ -87,7 +83,6 @@ func NewPathRecorderMux(name string) *PathRecorderMux {
 		prefixToHandler: map[string]http.Handler{},
 		mux:             atomic.Value{},
 		exposedPaths:    []string{},
-		pathStacks:      map[string]string{},
 	}
 
 	ret.mux.Store(&pathHandler{notFoundHandler: http.NotFoundHandler()})
@@ -105,11 +100,11 @@ func (m *PathRecorderMux) ListedPaths() []string {
 }
 
 func (m *PathRecorderMux) trackCallers(path string) {
-	stack := string(debug.Stack())
-	if existingStack, ok := m.pathStacks[path]; ok {
-		utilruntime.HandleError(fmt.Errorf("duplicate path registration of %q: original registration from %v\n\nnew registration from %v", path, existingStack, stack))
+	_, inPath := m.pathToHandler[path]
+	_, inPrefix := m.prefixToHandler[path]
+	if inPath || inPrefix {
+		utilruntime.HandleError(fmt.Errorf("duplicate path registration of %q: new registration from %s", path, debug.Stack()))
 	}
-	m.pathStacks[path] = stack
 }
 
 // refreshMuxLocked creates a new mux and must be called while locked.  Otherwise the view of handlers may
@@ -157,7 +152,6 @@ func (m *PathRecorderMux) Unregister(path string) {
 
 	delete(m.pathToHandler, path)
 	delete(m.prefixToHandler, path)
-	delete(m.pathStacks, path)
 	for i := range m.exposedPaths {
 		if m.exposedPaths[i] == path {
 			m.exposedPaths = append(m.exposedPaths[:i], m.exposedPaths[i+1:]...)
