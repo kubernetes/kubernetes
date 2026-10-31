@@ -2745,6 +2745,17 @@ func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
 	}
 }
 
+func TestGenerateUpdatePodSandboxResourcesRequestClampsCPUShares(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Large cgroup v2 nodes can produce pod cgroup shares above cm.MaxShares.
+	shares := uint64(cm.MaxShares + 32*cm.SharesPerCPU)
+	req := m.generateUpdatePodSandboxResourcesRequest("123", &v1.Pod{}, &cm.ResourceConfig{CPUShares: &shares})
+	assert.Equal(t, int64(cm.MaxShares), req.Resources.CpuShares)
+}
+
 func TestUpdatePodSandboxResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager(tCtx)

@@ -2102,6 +2102,16 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
+	// A pod that kept running across a kubelet upgrade may still have the
+	// cpu.weight written at the fixed cgroup v2 shares scale. Rewrite it before
+	// the pod cgroup is read back for the resize check and status, otherwise the
+	// old weight is reported as a larger CPU request.
+	if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+		if err := kl.containerManager.NewPodContainerManager().RescaleCPUWeight(logger, pod); err != nil {
+			logger.Error(err, "Failed to rescale pod cgroup cpu.weight", "pod", klog.KObj(pod))
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
 		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {

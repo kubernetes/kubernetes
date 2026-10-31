@@ -126,3 +126,10 @@ func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, 
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
 	return nil
 }
+
+func (cm *FakePodContainerManager) RescaleCPUWeight(_ klog.Logger, _ *v1.Pod) error {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "RescaleCPUWeight")
+	return nil
+}
