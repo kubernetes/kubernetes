@@ -102,8 +102,8 @@ var (
 
 func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	// NOTE: typedefs to pointers are not supported, so we should never see a pointer here.
-	if t := util.NativeType(context.Type); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	if t := util.NativeType(context.Type); t != types.String && t != types.Int32 && t != types.Int64 {
+		return Validations{}, fmt.Errorf("can only be used on string, int32, or int64 types (%s)", rootTypeString(context.Type, t))
 	}
 
 	enum := &enumType{Name: context.Type.Name}
@@ -203,7 +203,7 @@ func (etv *enumTagValidator) Docs() TagDoc {
 		Tag:            etv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(etv.ValidScopes()),
-		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +" + etv.prefix + enumExcludeTagName + ".",
+		Description:    "Indicates that a string, int32, or int64 type is an enum. All constant values of this type are considered values in the enum unless excluded using +" + etv.prefix + enumExcludeTagName + ".",
 	}
 }
 

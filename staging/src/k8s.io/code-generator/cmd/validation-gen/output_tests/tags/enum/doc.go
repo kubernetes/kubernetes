@@ -39,6 +39,12 @@ type Struct struct {
 
 	NotEnumField    NotEnum  `json:"notEnumField"`
 	NotEnumPtrField *NotEnum `json:"notEnumPtrField"`
+
+	EnumInt32Field    EnumInt32  `json:"enumInt32Field"`
+	EnumInt32PtrField *EnumInt32 `json:"enumInt32PtrField"`
+
+	EnumInt64Field    EnumInt64  `json:"enumInt64Field"`
+	EnumInt64PtrField *EnumInt64 `json:"enumInt64PtrField"`
 }
 
 // +k8s:enum
@@ -57,6 +63,22 @@ type Enum2 string // Note: this enum has 2 values
 const (
 	E2V1 Enum2 = "e2v1"
 	E2V2 Enum2 = "e2v2"
+)
+
+// +k8s:enum
+type EnumInt32 int32
+
+const (
+	EInt32V1 EnumInt32 = 1
+	EInt32V2 EnumInt32 = 2
+)
+
+// +k8s:enum
+type EnumInt64 int64
+
+const (
+	EInt64V1 EnumInt64 = 100
+	EInt64V2 EnumInt64 = 200
 )
 
 // Note: this is not an enum because the const values are of type Enum2, and

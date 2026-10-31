@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/gengo/v2/codetags"
+	"k8s.io/gengo/v2/types"
 )
 
 func TestTypeCheck(t *testing.T) {
@@ -213,6 +214,65 @@ func TestTypeCheck(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.wantErr) {
 					t.Errorf("typeCheck() error = %v, wantErr = %v", err, tt.wantErr)
 				}
+			}
+		})
+	}
+}
+
+func TestEnumTagValidator(t *testing.T) {
+	v := &enumTagValidator{}
+	v.Init(Config{TagPrefix: "k8s:"})
+
+	tests := []struct {
+		name    string
+		typ     *types.Type
+		wantErr string
+	}{
+		{
+			name: "string type",
+			typ:  types.String,
+		},
+		{
+			name: "int32 type",
+			typ:  types.Int32,
+		},
+		{
+			name: "int64 type",
+			typ:  types.Int64,
+		},
+		{
+			name: "alias to int32",
+			typ:  &types.Type{Kind: types.Alias, Underlying: types.Int32},
+		},
+		{
+			name: "alias to int64",
+			typ:  &types.Type{Kind: types.Alias, Underlying: types.Int64},
+		},
+		{
+			name:    "int type",
+			typ:     types.Int,
+			wantErr: "can only be used on string, int32, or int64 types",
+		},
+		{
+			name:    "int16 type",
+			typ:     types.Int16,
+			wantErr: "can only be used on string, int32, or int64 types",
+		},
+		{
+			name:    "bool type",
+			typ:     types.Bool,
+			wantErr: "can only be used on string, int32, or int64 types",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := v.GetValidations(Context{Type: tt.typ}, codetags.Tag{})
+			if (len(tt.wantErr) == 0) != (err == nil) {
+				t.Fatalf("unexpected error state: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("got error %q, want %q", err.Error(), tt.wantErr)
 			}
 		})
 	}
