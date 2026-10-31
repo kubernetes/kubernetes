@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
-	"k8s.io/apiserver/pkg/server"
+	server "k8s.io/apiserver/pkg/server/serving"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 

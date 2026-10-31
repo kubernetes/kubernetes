@@ -31,7 +31,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
