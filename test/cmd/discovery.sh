@@ -18,6 +18,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# A CRD object is stored before its API is served. Creating an instance in that
+# window fails discovery, and errexit then skips the deletes below the create.
+# Later test-cmd cases share this apiserver, so a leaked CRD (singular name
+# "foo", for example) fails unrelated assertions.
+wait_for_crd_established() {
+  kubectl wait --for=condition=Established=true --timeout=30s "crd/${1}"
+}
+
 run_RESTMapper_evaluation_tests() {
   set -o nounset
   set -o errexit
@@ -47,6 +55,12 @@ run_RESTMapper_evaluation_tests() {
 run_assert_short_name_tests() {
   set -o nounset
   set -o errexit
+
+  cleanup_assert_short_name_tests() {
+    kubectl delete examples/test-crd-example --ignore-not-found=true --timeout=30s || true
+    kubectl delete customresourcedefinition examples.test.com --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_assert_short_name_tests EXIT
 
   create_and_use_new_namespace
   kube::log::status "Testing assert short name"
@@ -92,6 +106,7 @@ __EOF__
 
   # Test that we can list this new custom resource
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+  wait_for_crd_established examples.test.com
 
   kubectl create -f - << __EOF__
 apiVersion: test.com/v1
@@ -122,9 +137,8 @@ __EOF__
   output_message=$(kubectl get pod)
   kube::test::if_has_not_string "${output_message}" "test-crd-example"
 
-  # Cleanup
-  kubectl delete examples/test-crd-example
-  kubectl delete customresourcedefinition examples.test.com
+  cleanup_assert_short_name_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit
@@ -133,6 +147,12 @@ __EOF__
 run_assert_singular_name_tests() {
   set -o nounset
   set -o errexit
+
+  cleanup_assert_singular_name_tests() {
+    kubectl delete examples/test-crd-example --ignore-not-found=true --timeout=30s || true
+    kubectl delete customresourcedefinition examples.test.com --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_assert_singular_name_tests EXIT
 
   create_and_use_new_namespace
   kube::log::status "Testing assert singular name"
@@ -170,6 +190,7 @@ __EOF__
 
   # Test that we can list this new custom resource
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+  wait_for_crd_established examples.test.com
 
   kubectl create -f - << __EOF__
 apiVersion: test.com/v1
@@ -198,9 +219,8 @@ __EOF__
   output_message=$(kubectl get pod)
   kube::test::if_has_not_string "${output_message}" "test-crd-example"
 
-  # Cleanup
-  kubectl delete examples/test-crd-example
-  kubectl delete customresourcedefinition examples.test.com
+  cleanup_assert_singular_name_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit
@@ -245,11 +265,19 @@ run_crd_deletion_recreation_tests() {
   set -o nounset
   set -o errexit
 
+  cleanup_crd_deletion_recreation_tests() {
+    kubectl delete -f hack/testdata/CRD/example-crd-1-cluster-scoped-resource.yaml --ignore-not-found=true --timeout=30s || true
+    kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml --ignore-not-found=true --timeout=30s || true
+    kubectl delete customresourcedefinition examples.test.com --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_crd_deletion_recreation_tests EXIT
+
   create_and_use_new_namespace
   kube::log::status "Testing resource creation, deletion, and re-creation"
 
   output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
   kube::test::if_has_string "${output_message}" 'created'
+  wait_for_crd_established examples.test.com
   output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped-resource.yaml)
   kube::test::if_has_string "${output_message}" 'created'
   output_message=$(kubectl delete -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
@@ -260,12 +288,12 @@ run_crd_deletion_recreation_tests() {
   kubectl api-resources
   output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced.yaml)
   kube::test::if_has_string "${output_message}" 'created'
+  wait_for_crd_established examples.test.com
   output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml)
   kube::test::if_has_string "${output_message}" 'created'
 
-  # Cleanup
-  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml
-  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced.yaml
+  cleanup_crd_deletion_recreation_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit
@@ -308,6 +336,13 @@ run_ambiguous_shortname_tests() {
   set -o nounset
   set -o errexit
 
+  cleanup_ambiguous_shortname_tests() {
+    kubectl delete foos/test-crd-foo --ignore-not-found=true --timeout=30s || true
+    kubectl delete customresourcedefinition foos.bar.com --ignore-not-found=true --timeout=60s || true
+    kubectl delete customresourcedefinition examples.test.com --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_ambiguous_shortname_tests EXIT
+
   create_and_use_new_namespace
   kube::log::status "Testing ambiguous short name"
 
@@ -344,6 +379,7 @@ __EOF__
 
   # Test that we can list this new custom resource
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"foos.bar.com\"}}{{$id_field}}:{{end}}{{end}}" 'foos.bar.com:'
+  wait_for_crd_established foos.bar.com
 
   kubectl create -f - << __EOF__
 apiVersion: bar.com/v1
@@ -391,6 +427,7 @@ __EOF__
 
   # Test that we can list this new custom resource
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+  wait_for_crd_established examples.test.com
 
   output_message=$(kubectl  get examples 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'No resources found'
@@ -399,10 +436,8 @@ __EOF__
   kube::test::if_has_string "${output_message}" "test-crd-foo"
   kube::test::if_has_string "${output_message}" "short name \"exmp\" could also match lower priority resource examples.test.com"
 
-  # Cleanup
-  kubectl delete foos/test-crd-foo
-  kubectl delete customresourcedefinition foos.bar.com
-  kubectl delete customresourcedefinition examples.test.com
+  cleanup_ambiguous_shortname_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit
@@ -411,6 +446,11 @@ __EOF__
 run_explain_crd_with_additional_properties_tests() {
   set -o nounset
   set -o errexit
+
+  cleanup_explain_crd_tests() {
+    kubectl delete customresourcedefinition mock-resources.test.com --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_explain_crd_tests EXIT
 
   create_and_use_new_namespace
   kube::log::status "Testing explain with custom CRD that uses additionalProperties as non boolean field"
@@ -449,6 +489,7 @@ spec:
 __EOF__
 
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"mock-resources.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'mock-resources.test.com:'
+  wait_for_crd_established mock-resources.test.com
 
   retries=0
   max_retries=5
@@ -489,8 +530,8 @@ __EOF__
   kube::test::if_has_string "${output_message}" 'subresource'
   kube::test::if_has_string "${output_message}" 'map\[string\]\[\]string'
 
-  # Cleanup
-  kubectl delete crd mock-resources.test.com
+  cleanup_explain_crd_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit
