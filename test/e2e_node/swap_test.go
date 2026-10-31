@@ -189,7 +189,23 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 			})
 
 			ginkgo.Context("LimitedSwap", func() {
-				tempSetCurrentKubeletConfig(f, enableLimitedSwap)
+				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+					enableLimitedSwap(ctx, initialConfig)
+
+					// Under node-level pressure swap only kicks in once RAM is nearly full, just a few
+					// seconds before memory.available drops below the default 250Mi hard eviction
+					// threshold. Lower it so the stress pod is not evicted before its swap usage is seen.
+					if initialConfig.EvictionHard == nil {
+						initialConfig.EvictionHard = map[string]string{}
+					}
+					initialConfig.EvictionHard["memory.available"] = "100Mi"
+				})
+
+				// The AfterEach above restarts the kubelet to restore its config, and nothing kills the
+				// stress pods while it is down. Delete them before that, also when the test failed.
+				ginkgo.JustAfterEach(func(ctx context.Context) {
+					deleteNamespacePodsSync(ctx, f)
+				})
 
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
@@ -214,8 +230,13 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					stressSize := cloneQuantity(nodeTotalMemory)
 
 					stressPod := getStressPod(stressSize)
-					// Request will use a lot more swap memory than needed, since we don't test swap limits in this test
-					memRequest := getRequestBySwapLimit(30)
+					// The pod allocates the whole node capacity, so whatever does not fit in RAM next to
+					// the system has to go to swap, and the pod's swap limit has to be able to hold it.
+					// With a smaller limit the node runs out of memory: at best the global OOM killer
+					// fires, at worst the kernel thrashes the page cache and the node hangs for hours.
+					// Requesting 90% of the capacity gives the pod 90% of the swap while still fitting
+					// into allocatable memory.
+					memRequest := getRequestBySwapLimit(90)
 					setPodMemoryResources(stressPod, memRequest, noLimits)
 					gomega.Expect(qos.GetPodQOS(stressPod)).To(gomega.Equal(v1.PodQOSBurstable))
 
@@ -240,10 +261,6 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
-
-					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func() {
