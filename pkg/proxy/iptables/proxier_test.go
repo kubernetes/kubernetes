@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -5634,6 +5635,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	// Now force a full resync and confirm that it rewrites the older services with
 	// no comments as well.
 	fp.forceSyncProxyRules()
+	fp.syncProxyRules()
 	expectedEndpoints += 3
 
 	firstEndpoint, numEndpoints, numComments = countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
@@ -5706,6 +5708,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 
 	// force a full sync and count
 	fp.forceSyncProxyRules()
+	fp.syncProxyRules()
 	_, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
 	if numEndpoints != expectedEndpoints {
 		t.Errorf("Found wrong number of endpoints: expected %d, got %d", expectedEndpoints, numEndpoints)
@@ -6353,6 +6356,59 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
+}
+
+// restoreFailingIPTables fails the next call to RestoreAll when failNext is set.
+type restoreFailingIPTables struct {
+	*iptablestest.FakeIPTables
+	failNext atomic.Bool
+	restored chan struct{}
+}
+
+func (f *restoreFailingIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, counters utiliptables.RestoreCountersFlag) error {
+	if f.failNext.CompareAndSwap(true, false) {
+		return fmt.Errorf("iptables-restore failed")
+	}
+	err := f.FakeIPTables.RestoreAll(data, flush, counters)
+	select {
+	case f.restored <- struct{}{}:
+	default:
+	}
+	return err
+}
+
+// TestSyncProxyRulesRetry tests that a failed sync is retried when it was queued
+// by the initial sync or by a forced sync.
+func TestSyncProxyRulesRetry(t *testing.T) {
+	ipt := &restoreFailingIPTables{
+		FakeIPTables: iptablestest.NewFake(),
+		restored:     make(chan struct{}, 1),
+	}
+	fp := NewFakeProxier(ipt)
+	fp.setInitialized(false)
+	fp.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", fp.syncProxyRules, 0, 10*time.Millisecond, time.Hour)
+
+	waitForRestore := func(sync string) {
+		t.Helper()
+		select {
+		case <-ipt.restored:
+		case <-time.After(time.Second):
+			t.Fatalf("failed %s was not retried", sync)
+		}
+	}
+
+	ipt.failNext.Store(true)
+	fp.OnServiceSynced()
+	fp.OnEndpointSlicesSynced()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go fp.syncRunner.Loop(stopCh)
+	waitForRestore("initial sync")
+
+	ipt.failNext.Store(true)
+	fp.forceSyncProxyRules()
+	waitForRestore("forced sync")
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
