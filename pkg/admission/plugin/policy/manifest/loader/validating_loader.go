@@ -23,13 +23,10 @@ import (
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	policyloader "k8s.io/apiserver/pkg/admission/plugin/policy/manifest/loader"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
@@ -132,7 +129,8 @@ func defaultAndValidateVAP(policy *admissionregistrationv1.ValidatingAdmissionPo
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: conversion error: %w", policy.Name, err)
 	}
 	errs := validation.ValidateValidatingAdmissionPolicy(internalObj)
-	if errs = validateDeclaratively(internalObj, errs); len(errs) > 0 {
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: %w", policy.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.ValidatingAdmissionPolicy{}
@@ -152,7 +150,7 @@ func defaultAndValidateVAPB(binding *admissionregistrationv1.ValidatingAdmission
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: conversion error: %w", binding.Name, err)
 	}
 	errs := validation.ValidateValidatingAdmissionPolicyBinding(internalObj)
-	errs = validateDeclaratively(internalObj, errs)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
 	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: %w", binding.Name, errs.ToAggregate())
 	}
@@ -162,12 +160,4 @@ func defaultAndValidateVAPB(binding *admissionregistrationv1.ValidatingAdmission
 	}
 	*binding = *resultObj
 	return nil
-}
-
-func validateDeclaratively(obj runtime.Object, errs field.ErrorList) field.ErrorList {
-	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
-		APIGroup:   admissionregistrationv1.GroupName,
-		APIVersion: admissionregistrationv1.SchemeGroupVersion.Version,
-	})
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
