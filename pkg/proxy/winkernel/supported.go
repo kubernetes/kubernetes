@@ -23,9 +23,7 @@ import (
 
 	"github.com/Microsoft/hnslib"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -91,7 +89,7 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 		return false
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
+	if isOverlay(networkInfo) {
 		// Overlay (VXLAN) networks on Windows do not support dual-stack networking today
 		klog.InfoS("Winoverlay does not support dual-stack, falling back to single-stack")
 		return false
