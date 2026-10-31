@@ -35,15 +35,24 @@ const (
 
 	// defaultUpperBoundCapacity should be able to keep the required history.
 	defaultUpperBoundCapacity = 100 * 1024
+
+	// MinWatchCacheMaxEvents is the smallest allowed explicit override of the
+	// capacity upper bound; it cannot be below the initial capacity.
+	MinWatchCacheMaxEvents = defaultLowerBoundCapacity
 )
 
-func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration) *watchCacheHistory {
+func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration, maxEvents int) *watchCacheHistory {
+	upperBoundCapacity := capacityUpperBound(eventFreshDuration)
+	if maxEvents > 0 {
+		upperBoundCapacity = maxEvents
+	}
+
 	h := &watchCacheHistory{
 		config:             config,
 		capacity:           defaultLowerBoundCapacity,
 		cache:              make([]*watchCacheEvent, defaultLowerBoundCapacity),
 		lowerBoundCapacity: defaultLowerBoundCapacity,
-		upperBoundCapacity: capacityUpperBound(eventFreshDuration),
+		upperBoundCapacity: upperBoundCapacity,
 		startIndex:         0,
 		endIndex:           0,
 		eventFreshDuration: eventFreshDuration,
