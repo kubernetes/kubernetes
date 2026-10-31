@@ -687,6 +687,11 @@ func CleanListScope(ctx context.Context, opts *metainternalversion.ListOptions) 
 	}
 	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
 		if requestInfo.IsResourceRequest {
+			if opts != nil && opts.FieldSelector != nil {
+				if _, ok := opts.FieldSelector.RequiresExactMatch("spec.nodeName"); ok {
+					return "indexed"
+				}
+			}
 			return "cluster"
 		}
 	}
