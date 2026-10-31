@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -412,13 +413,12 @@ func mergeResourceConfig(source, update *cm.ResourceConfig) *cm.ResourceConfig {
 		}
 	}
 
-	if update.Unified != nil {
-		if merged.Unified == nil {
-			merged.Unified = make(map[string]string)
-		}
-		for k, v := range update.Unified {
-			merged.Unified[k] = v
-		}
+	if source.Unified != nil || update.Unified != nil {
+		// Copy into a fresh map: merging into source.Unified would mutate the
+		// caller's config, e.g. the desired pod resources during resize.
+		merged.Unified = make(map[string]string, len(source.Unified)+len(update.Unified))
+		maps.Copy(merged.Unified, source.Unified)
+		maps.Copy(merged.Unified, update.Unified)
 	}
 
 	return &merged
