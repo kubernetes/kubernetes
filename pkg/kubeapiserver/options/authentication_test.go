@@ -476,7 +476,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 			Lookup:                true,
 			Issuers:               []string{"http://foo.bar.com"},
 			JWKSURI:               "https://qux.com",
-			ExtendExpiration:      true,
+			ExtendExpiration:      false,
 			MaxExtendedExpiration: serviceaccount.ExpirationExtensionSeconds * time.Second,
 		},
 		TokenFile: &TokenFileAuthenticationOptions{
