@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -45,6 +44,8 @@ type FakeNominationExtensionsPlugin struct {
 	PluginName string
 	// NotEligibleReason, if set, makes PodEligibleToPreempt return false with this reason.
 	NotEligibleReason string
+	// ReleaseEvents get returned by RemoveNomination.
+	ReleaseEvents []schedulerframework.NominationEvent
 
 	mutex sync.Mutex
 	calls []string
@@ -75,20 +76,23 @@ func (pl *FakeNominationExtensionsPlugin) PreFilterExtensions() fwk.PreFilterExt
 	return nil
 }
 
-// AddNominatedPod records the call as "AddNominatedPod <pod> <node> <victims>".
-func (pl *FakeNominationExtensionsPlugin) AddNominatedPod(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
-	names := make([]string, 0, len(victims))
-	for _, victim := range victims {
-		names = append(names, klog.KObj(victim).String())
-	}
-	slices.Sort(names)
-	pl.record(fmt.Sprintf("AddNominatedPod %s %s [%s]", klog.KObj(pod), nodeName, strings.Join(names, " ")))
+// PrepareNomination records the call as "PrepareNomination <pod> <node>".
+func (pl *FakeNominationExtensionsPlugin) PrepareNomination(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+	pl.record(fmt.Sprintf("PrepareNomination %s %s", klog.KObj(pod), nodeName))
 }
 
-// RemoveNominatedPod records the call as
-// "RemoveNominatedPod <pod> <node> assigned=<pod.spec.nodeName> failed=<preemptionFailed>".
-func (pl *FakeNominationExtensionsPlugin) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
-	pl.record(fmt.Sprintf("RemoveNominatedPod %s %s assigned=%s failed=%t", klog.KObj(pod), nodeName, pod.Spec.NodeName, preemptionFailed))
+// AddNomination records the call as "AddNomination <pod> <node>".
+func (pl *FakeNominationExtensionsPlugin) AddNomination(_ context.Context, pod *v1.Pod, nodeName string) schedulerframework.NominationChangeResult {
+	pl.record(fmt.Sprintf("AddNomination %s %s", klog.KObj(pod), nodeName))
+	return schedulerframework.NominationChangeResult{}
+}
+
+// RemoveNomination records the call as
+// "RemoveNomination <pod> <node> assigned=<pod.spec.nodeName>" and returns
+// ReleaseEvents.
+func (pl *FakeNominationExtensionsPlugin) RemoveNomination(_ context.Context, pod *v1.Pod, nodeName string) schedulerframework.NominationChangeResult {
+	pl.record(fmt.Sprintf("RemoveNomination %s %s assigned=%s", klog.KObj(pod), nodeName, pod.Spec.NodeName))
+	return schedulerframework.NominationChangeResult{Events: pl.ReleaseEvents}
 }
 
 // PodEligibleToPreempt records the call as "PodEligibleToPreempt <pod> <node>".

@@ -3108,17 +3108,14 @@ type fakePodActivator struct {
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
-// TestPreemptNominationExtensions checks that plugins with
-// NominationExtensions learn about the nomination before the first victim
-// gets preempted, and that the nomination gets removed when preempting the
-// victims fails.
+// TestPreemptNominationExtensions checks that preemption only asks plugins
+// with NominationExtensions whether the pod may preempt. Preparing the
+// nomination is up to the framework, once PostFilter nominated the pod.
 func TestPreemptNominationExtensions(t *testing.T) {
 	metrics.Register()
 	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
 	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
 	eligibleCall := "PodEligibleToPreempt default/p "
-	addCall := "AddNominatedPod default/p node1 [default/v]"
-	removeCall := "RemoveNominatedPod default/p node1 assigned= failed=true"
 
 	for name, tc := range map[string]struct {
 		asyncPreemption bool
@@ -3126,20 +3123,20 @@ func TestPreemptNominationExtensions(t *testing.T) {
 		wantCalls       []string
 	}{
 		"sync": {
-			wantCalls: []string{eligibleCall, addCall},
+			wantCalls: []string{eligibleCall},
 		},
 		"sync-failure": {
 			deleteErr: errors.New("injected delete error"),
-			wantCalls: []string{eligibleCall, addCall, removeCall},
+			wantCalls: []string{eligibleCall},
 		},
 		"async": {
 			asyncPreemption: true,
-			wantCalls:       []string{eligibleCall, addCall},
+			wantCalls:       []string{eligibleCall},
 		},
 		"async-failure": {
 			asyncPreemption: true,
 			deleteErr:       errors.New("injected delete error"),
-			wantCalls:       []string{eligibleCall, addCall, removeCall},
+			wantCalls:       []string{eligibleCall},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -3212,7 +3209,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 
 			select {
 			case callsAtDeletion := <-deleted:
-				if diff := cmp.Diff([]string{eligibleCall, addCall}, callsAtDeletion); diff != "" {
+				if diff := cmp.Diff([]string{eligibleCall}, callsAtDeletion); diff != "" {
 					t.Errorf("Unexpected calls when the victim got deleted (-want, +got):\n%s", diff)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
