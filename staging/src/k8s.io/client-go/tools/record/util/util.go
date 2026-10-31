@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 
@@ -43,12 +44,21 @@ func IsKeyNotFoundError(err error) bool {
 	return statusErr != nil && statusErr.Status().Code == http.StatusNotFound
 }
 
+// eventNameCounter disambiguates events generated within the same clock tick.
+// unixNano alone is not sufficient on platforms with coarse timer resolution
+// (observed on Windows, where time.Now() can advance in ~15ms steps): two
+// distinct calls to EventRecorder.Event()/Eventf() for the same object could
+// otherwise compute the same Event name, and the second Create would be
+// silently rejected by the apiserver as AlreadyExists.
+// See https://github.com/kubernetes/kubernetes/issues/134993.
+var eventNameCounter atomic.Uint64
+
 // GenerateEventName generates a valid Event name from the referenced name and the passed UNIX timestamp.
 // The referenced Object name may not be a valid name for Events and cause the Event to fail
 // to be created, so we need to generate a new one in that case.
 // Ref: https://issues.k8s.io/127594
 func GenerateEventName(refName string, unixNano int64) string {
-	name := fmt.Sprintf("%s.%x", refName, unixNano)
+	name := fmt.Sprintf("%s.%x.%x", refName, unixNano, eventNameCounter.Add(1))
 	if errs := apimachineryvalidation.NameIsDNSSubdomain(name, false); len(errs) > 0 {
 		// Using an uuid guarantees uniqueness and correctness
 		name = uuid.New().String()
