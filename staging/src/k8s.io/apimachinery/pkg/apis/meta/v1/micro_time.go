@@ -122,12 +122,12 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	pt, err := time.Parse(RFC3339Micro, str)
+	pt, err := time.Parse(time.RFC3339, str)
 	if err != nil {
 		return err
 	}
 
-	t.Time = pt.Local()
+	t.Time = pt.Truncate(time.Microsecond).Local()
 	return nil
 }
 
@@ -141,12 +141,12 @@ func (t *MicroTime) UnmarshalCBOR(b []byte) error {
 		return nil
 	}
 
-	parsed, err := time.Parse(RFC3339Micro, *s)
+	parsed, err := time.Parse(time.RFC3339, *s)
 	if err != nil {
 		return err
 	}
 
-	t.Time = parsed.Local()
+	t.Time = parsed.Truncate(time.Microsecond).Local()
 	return nil
 }
 
@@ -162,12 +162,12 @@ func (t *MicroTime) UnmarshalQueryParameter(str string) error {
 		return nil
 	}
 
-	pt, err := time.Parse(RFC3339Micro, str)
+	pt, err := time.Parse(time.RFC3339, str)
 	if err != nil {
 		return err
 	}
 
-	t.Time = pt.Local()
+	t.Time = pt.Truncate(time.Microsecond).Local()
 	return nil
 }
 
