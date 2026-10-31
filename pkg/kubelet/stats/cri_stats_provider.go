@@ -953,7 +953,7 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 
 	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
 	if stats.Cpu != nil && stats.Cpu.UsageNanoCores != nil {
-		return &stats.Cpu.UsageNanoCores.Value
+		return p.capUsageNanoCores(&stats.Cpu.UsageNanoCores.Value)
 	}
 
 	p.mutex.RLock()
@@ -977,7 +977,7 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(logger klog.Logge
 	}
 	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
 	if stats.Cpu.UsageNanoCores != nil {
-		return &stats.Cpu.UsageNanoCores.Value
+		return p.capUsageNanoCores(&stats.Cpu.UsageNanoCores.Value)
 	}
 	// If there is no UsageNanoCores, nor UsageCoreNanoSeconds, there is no information to use
 	if stats.Cpu.UsageCoreNanoSeconds == nil {
