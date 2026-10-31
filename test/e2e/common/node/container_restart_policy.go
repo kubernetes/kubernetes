@@ -75,6 +75,82 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithNod
 			createAndValidateRestartableContainer(ctx, f, pod, podName, "main-container")
 		})
 
+		ginkgo.It("should continue probing on rule match", func(ctx context.Context) {
+			podName := "restart-rules-continue-probing-exit-code-" + string(uuid.NewUUID())
+			containerName := "container-restart-rules-continue-probing"
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  containerName,
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{
+											"/bin/sh", "-c", "touch /state/probe; test -f /state/second-run",
+										},
+									},
+								},
+								InitialDelaySeconds: 3,
+								PeriodSeconds:       2,
+								FailureThreshold:    10,
+							},
+
+							// each time the startup probe runs it creates /state/probe marker.
+							// each time the container runs it removes said /state/probe marker.
+							// this to ensure that existence of "/state/probe" at the end of the test case
+							// neccesarily means the startup probe has run after the pod restarted
+							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 42; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
+							RestartPolicy: &containerRestartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{
+									Action: v1.ContainerRestartRuleActionRestart,
+									ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+										Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+										Values:   []int32{42},
+									},
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{Name: "state", MountPath: "/state"},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "state",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating the pod")
+			e2epod.NewPodClient(f).Create(ctx, pod)
+
+			ginkgo.By("Waiting for the container to restart")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "container restarted and startup probe succeeded", 10*time.Minute, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == containerName && status.RestartCount > 0 {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for container restart and startup probe")
+			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "sleep 5; test -f /state/probe # sleep to allow probe to run"), "verify startup probe created /state/probe")
+
+			// to avoid test succeeding for the wrong reason
+			framework.ExpectNoError(e2epod.VerifyExecInPodSucceed(ctx, f, pod, "test -f /state/second-run"), "verify pod was restarted")
+		})
+
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
 			podName := "restart-rules-no-restart-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
