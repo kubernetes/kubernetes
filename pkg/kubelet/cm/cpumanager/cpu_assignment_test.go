@@ -994,9 +994,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			}
 
 			result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
-			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
-				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
-			}
+			checkError(t, tc.expErr, err)
 			if !result.Equals(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
 			}
@@ -1096,9 +1094,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 			strategy = CPUSortingStrategySpread
 		}
 		result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
-		if tc.expErr != "" && err.Error() != tc.expErr {
-			t.Errorf("testCase %q failed, expected error to be [%v] but it was [%v]", tc.description, tc.expErr, err)
-		}
+		checkError(t, tc.expErr, err)
 		if !result.Equals(tc.expResult) {
 			t.Errorf("testCase %q failed, expected result [%s] to equal [%s]", tc.description, result, tc.expResult)
 		}
@@ -1379,14 +1375,6 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	}
 }
 
-func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
-	cpus, err := cpuset.Parse(s)
-	if err != nil {
-		t.Errorf("parsing %q: %v", s, err)
-	}
-	return cpus
-}
-
 func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
 	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
 	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
@@ -1539,5 +1527,25 @@ func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
 					tc.expNUMAs, numaNodesBuilder, result)
 			}
 		})
+	}
+}
+func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
+	t.Helper()
+	cpus, err := cpuset.Parse(s)
+	if err != nil {
+		t.Errorf("parsing %q: %v", s, err)
+	}
+	return cpus
+}
+
+func checkError(t *testing.T, expErr string, err error) {
+	t.Helper()
+	switch {
+	case expErr == "" && err != nil:
+		t.Errorf("unexpected error [%v]", err)
+	case expErr != "" && err == nil:
+		t.Errorf("expected error [%v] but got nil", expErr)
+	case err != nil && err.Error() != expErr:
+		t.Errorf("expected error to be [%v] but it was [%v]", expErr, err)
 	}
 }
