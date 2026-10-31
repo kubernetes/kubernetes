@@ -17,8 +17,10 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -1158,7 +1160,7 @@ var (
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
 	// including the time spent in the waiting queue of image puller.
-	// The metric is broken down by bucketed image size.
+	// The metric is broken down by bucketed image size and pull policy.
 	ImagePullDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1167,7 +1169,7 @@ var (
 			Buckets:        imagePullDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"image_size_in_bytes"},
+		[]string{"image_size_in_bytes", "pull_policy"},
 	)
 
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
@@ -1688,4 +1690,43 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 	default:
 		return PriorityBucketVeryLow
 	}
+}
+
+// GetImageNameForMetrics strips the tag and digest from an image reference for use in metrics
+// labels. This bounds cardinality to distinct repositories regardless of tagging scheme.
+// Only a ':' after the last '/' is treated as a tag separator so registry ports are preserved.
+func GetImageNameForMetrics(image string) string {
+	if before, _, found := strings.Cut(image, "@"); found {
+		image = before
+	}
+	slash := strings.LastIndex(image, "/")
+	tail := image[slash+1:]
+	if before, _, found := strings.Cut(tail, ":"); found {
+		image = image[:slash+1] + before
+	}
+	return image
+}
+
+// ObserveImagePullDuration records an image pull duration observation. The pull policy is a metric
+// label, lowercased to match the pull_policy label of kubelet_image_manager_ensure_image_requests_total.
+// The image name is attached as an exemplar rather than a metric label, avoiding unbounded
+// cardinality growth.
+func ObserveImagePullDuration(duration float64, image string, pullPolicy string, imageSize uint64) {
+	metrics.ObserveWithExemplar(ImagePullDuration.WithLabelValues(GetImageSizeBucket(imageSize), strings.ToLower(pullPolicy)), duration, imagePullExemplarLabels(image))
+}
+
+// imagePullExemplarLabels builds the exemplar labels for an image pull observation.
+//
+// client_golang panics if the exemplar label names and values together exceed
+// metrics.ExemplarMaxRunes or contain invalid UTF-8. The image reference comes from the pod
+// spec and is not bounded, so it is truncated to the remaining rune budget (keeping the registry
+// and the start of the repository path) instead of crashing the pull path. The full reference
+// is still available in the pull event and log.
+func imagePullExemplarLabels(image string) map[string]string {
+	image = strings.ToValidUTF8(GetImageNameForMetrics(image), "\uFFFD")
+	budget := max(metrics.ExemplarMaxRunes-utf8.RuneCountInString("image"), 0)
+	if utf8.RuneCountInString(image) > budget {
+		image = string([]rune(image)[:budget])
+	}
+	return map[string]string{"image": image}
 }

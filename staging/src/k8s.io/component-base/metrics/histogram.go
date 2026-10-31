@@ -313,3 +313,20 @@ func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHisto
 func (vc *HistogramVecWithContext) ObserveSince(start time.Time, lvs ...string) func() {
 	return vc.HistogramVec.ObserveSince(start, lvs...)
 }
+
+// ExemplarMaxRunes is the maximum number of runes allowed in the label names and values of one
+// exemplar combined. Observing with a longer exemplar panics.
+const ExemplarMaxRunes = prometheus.ExemplarMaxRunes
+
+// ObserveWithExemplar records v on o with exemplar attached when o supports exemplars,
+// and without one otherwise. It lets callers attach exemplar labels without importing prometheus.
+//
+// The exemplar labels must not exceed ExemplarMaxRunes runes in total and must be valid UTF-8,
+// or the observation panics. Callers must bound labels that come from untrusted input.
+func ObserveWithExemplar(o ObserverMetric, v float64, exemplar map[string]string) {
+	if eo, ok := o.(prometheus.ExemplarObserver); ok {
+		eo.ObserveWithExemplar(v, prometheus.Labels(exemplar))
+		return
+	}
+	o.Observe(v)
+}
