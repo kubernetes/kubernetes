@@ -300,6 +300,14 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	return b
 }
 
+// WithRESTMapper allows the default RESTMapper to be overridden
+func (b *Builder) WithRESTMapper(mapper meta.RESTMapper) *Builder {
+	b.restMapperFn = func() (meta.RESTMapper, error) {
+		return mapper, nil
+	}
+	return b
+}
+
 // Unstructured updates the builder so that it will request and send unstructured
 // objects. Unstructured objects preserve all fields sent by the server in a map format
 // based on the object's JSON structure which means no data is lost when the client
