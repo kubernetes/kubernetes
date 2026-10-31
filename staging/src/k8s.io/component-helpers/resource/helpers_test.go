@@ -5408,6 +5408,154 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 	}
 }
 
+func TestPodRequestsAndLimitsDoNotDoubleCountRuntimeClassOverhead(t *testing.T) {
+	overhead := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("250m"),
+		v1.ResourceMemory: resource.MustParse("64Mi"),
+	}
+	opts := PodResourcesOptions{
+		UseStatusResources: true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: true,
+	}
+	// Status values already include overhead (from PodRequests / pod cgroup).
+	included := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("260m"),
+		v1.ResourceMemory: resource.MustParse("96Mi"),
+	}
+	includedLimits := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("270m"),
+		v1.ResourceMemory: resource.MustParse("128Mi"),
+	}
+
+	newPod := func(specCPU, specMemory, limitCPU, limitMemory string, allocated, actuated v1.ResourceList, actuatedLimits v1.ResourceList) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Overhead: overhead.DeepCopy(),
+				Containers: []v1.Container{{
+					Name: "c",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse(specCPU),
+							v1.ResourceMemory: resource.MustParse(specMemory),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse(limitCPU),
+							v1.ResourceMemory: resource.MustParse(limitMemory),
+						},
+					},
+				}},
+			},
+			Status: v1.PodStatus{
+				AllocatedResources: allocated.DeepCopy(),
+				Resources: &v1.ResourceRequirements{
+					Requests: actuated.DeepCopy(),
+					Limits:   actuatedLimits.DeepCopy(),
+				},
+			},
+		}
+	}
+
+	t.Run("steady state counts overhead once", func(t *testing.T) {
+		pod := newPod("10m", "32Mi", "20m", "64Mi", included, included, includedLimits)
+		gotReq := PodRequests(pod, opts)
+		wantReq := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("260m"),
+			v1.ResourceMemory: resource.MustParse("96Mi"),
+		}
+		if !equality.Semantic.DeepEqual(gotReq, wantReq) {
+			t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(wantReq, gotReq))
+		}
+		gotLim := PodLimits(pod, opts)
+		wantLim := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("270m"),
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+		}
+		if !equality.Semantic.DeepEqual(gotLim, wantLim) {
+			t.Errorf("PodLimits() mismatch (-want +got):\n%s", diff.Diff(wantLim, gotLim))
+		}
+		if !equality.Semantic.DeepEqual(pod.Status.AllocatedResources, included) {
+			t.Errorf("AllocatedResources mutated: %v", pod.Status.AllocatedResources)
+		}
+	})
+
+	t.Run("resize up uses spec plus overhead", func(t *testing.T) {
+		pod := newPod("500m", "32Mi", "20m", "64Mi", included, included, includedLimits)
+		got := PodRequests(pod, opts)
+		want := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("750m"),
+			v1.ResourceMemory: resource.MustParse("96Mi"),
+		}
+		if !equality.Semantic.DeepEqual(got, want) {
+			t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(want, got))
+		}
+	})
+
+	t.Run("resize down keeps the larger in-use value", func(t *testing.T) {
+		inUse := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("750m"),
+			v1.ResourceMemory: resource.MustParse("96Mi"),
+		}
+		pod := newPod("10m", "32Mi", "20m", "64Mi", inUse, inUse, includedLimits)
+		got := PodRequests(pod, opts)
+		if !equality.Semantic.DeepEqual(got, inUse) {
+			t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(inUse, got))
+		}
+	})
+
+	t.Run("exclude overhead", func(t *testing.T) {
+		pod := newPod("10m", "32Mi", "20m", "64Mi", included, included, includedLimits)
+		exclude := opts
+		exclude.ExcludeOverhead = true
+		got := PodRequests(pod, exclude)
+		want := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("10m"),
+			v1.ResourceMemory: resource.MustParse("32Mi"),
+		}
+		if !equality.Semantic.DeepEqual(got, want) {
+			t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(want, got))
+		}
+	})
+
+	t.Run("pod-level requests", func(t *testing.T) {
+		pod := newPod("10m", "32Mi", "20m", "64Mi", included, included, includedLimits)
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		}
+		pod.Status.AllocatedResources = v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("350m"),
+			v1.ResourceMemory: resource.MustParse("96Mi"),
+		}
+		pod.Status.Resources.Requests = pod.Status.AllocatedResources.DeepCopy()
+		pod.Status.Resources.Limits = v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("450m"),
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+		}
+		gotReq := PodRequests(pod, opts)
+		wantReq := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("350m"),
+			v1.ResourceMemory: resource.MustParse("96Mi"),
+		}
+		if !equality.Semantic.DeepEqual(gotReq, wantReq) {
+			t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(wantReq, gotReq))
+		}
+		gotLim := PodLimits(pod, opts)
+		wantLim := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("450m"),
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+		}
+		if !equality.Semantic.DeepEqual(gotLim, wantLim) {
+			t.Errorf("PodLimits() mismatch (-want +got):\n%s", diff.Diff(wantLim, gotLim))
+		}
+	})
+}
+
 func TestResizeConditionsAndSupportedResources(t *testing.T) {
 	pod := &v1.Pod{
 		Status: v1.PodStatus{
