@@ -1412,8 +1412,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	for i := range pod.Spec.EphemeralContainers {
 		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 
-		// Ephemeral Containers are never restarted
+		// Ephemeral Containers are never restarted.
 		if podStatus.FindContainerStatusByName(c.Name) == nil {
+			if status, ok := podutil.GetContainerStatus(pod.Status.EphemeralContainerStatuses, c.Name); ok && (status.State.Terminated != nil || status.ContainerID != "" || status.LastTerminationState.Terminated != nil) {
+				logger.V(4).Info("Ephemeral container already ran or terminated, not restarting", "pod", klog.KObj(pod), "containerName", c.Name)
+				continue
+			}
 			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 		}
 	}
