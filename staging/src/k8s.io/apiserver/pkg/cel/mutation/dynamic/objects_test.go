@@ -262,6 +262,20 @@ func TestConvertField(t *testing.T) {
 			expectError: "not string",
 		},
 		{
+			name: "invalid nested object map key type",
+			fields: map[string]ref.Val{
+				"nested": &ObjectVal{
+					objectType: types.NewObjectType("Root.nested"),
+					fields: map[string]ref.Val{
+						"badMap": types.NewRefValMap(nil, map[ref.Val]ref.Val{
+							types.Int(100): types.String("value"),
+						}),
+					},
+				},
+			},
+			expectError: "not string",
+		},
+		{
 			name: "invalid list element error",
 			fields: map[string]ref.Val{
 				"badList": types.DefaultTypeAdapter.NativeToValue([]any{
@@ -293,5 +307,57 @@ func TestConvertField(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type countingVal struct {
+	ref.Val
+	valueCalls int
+}
+
+func (c *countingVal) Value() any {
+	c.valueCalls++
+	return c.Val.Value()
+}
+
+func TestConvertFieldSingleEvaluation(t *testing.T) {
+	leaf := &countingVal{Val: types.String("nginx")}
+	obj := &ObjectVal{fields: map[string]ref.Val{"name": leaf}}
+	for range 4 {
+		obj = &ObjectVal{fields: map[string]ref.Val{"nested": obj}}
+	}
+
+	if _, err := obj.ConvertToNative(reflect.TypeFor[map[string]any]()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if leaf.valueCalls != 1 {
+		t.Errorf("expected leaf.Value() to be called once, got %d calls", leaf.valueCalls)
+	}
+}
+
+func BenchmarkConvertToNative(b *testing.B) {
+	obj := &ObjectVal{
+		fields: map[string]ref.Val{
+			"name":  types.String("nginx"),
+			"image": types.String("nginx:latest"),
+			"labels": types.NewRefValMap(nil, map[ref.Val]ref.Val{
+				types.String("app"): types.String("nginx"),
+			}),
+			"args": types.NewRefValList(nil, []ref.Val{
+				types.String("--port=8080"),
+			}),
+		},
+	}
+	for range 4 {
+		obj = &ObjectVal{fields: map[string]ref.Val{"nested": obj}}
+	}
+
+	targetType := reflect.TypeFor[map[string]any]()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := obj.ConvertToNative(targetType); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
