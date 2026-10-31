@@ -40,6 +40,7 @@ const (
 	ResizeStarted                   = "ResizeStarted"
 	ResizeError                     = "ResizeError"
 	FailedNodeDeclaredFeaturesCheck = "FailedNodeDeclaredFeaturesCheck"
+	PIDLimitCapped                  = "PIDLimitCapped"
 )
 
 // Image event reason list

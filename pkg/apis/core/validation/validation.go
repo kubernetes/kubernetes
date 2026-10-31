@@ -4602,6 +4602,8 @@ type PodValidationOptions struct {
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
 	PodLevelResourcesEnabled bool
+	// Allow pod-level PID limits (spec.resources.limits.pids).
+	AllowPodPIDLimit bool
 	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
 	// or disabled.
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
@@ -6543,10 +6545,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Part 2: Validate that changes between pod-level resources in oldPod.Spec.Resources and
 	// newPod.Spec.Resources are allowed.
 
-	isPodLevelResourcesSet := func(pod *core.Pod) bool {
-		return pod.Spec.Resources != nil &&
-			(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
-	}
+	isPodLevelResourcesSet := helper.IsPodLevelResourcesSet
 
 	newPodSpecCopy := *newPod.Spec.DeepCopy()
 
@@ -7902,10 +7901,14 @@ func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path)
 // validatePodResourceName verifies that:
 // 1. The resource name is a valid compute resource name for pod-level specification.
 // 2. The resource is supported by the PodLevelResources feature.
-func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := validateResourceName(resourceName, fldPath)
 	if len(allErrs) != 0 {
 		return allErrs
+	}
+
+	if resourceName == core.ResourcePID && !opts.AllowPodPIDLimit {
+		return append(allErrs, field.Invalid(fldPath, resourceName, "pids resource requires PerPodPIDLimit feature gate"))
 	}
 
 	if !resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(resourceName)) {
@@ -7950,6 +7953,11 @@ func validateLimitRangeTypeName(value core.LimitType, fldPath *field.Path) field
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType core.LimitType, value core.ResourceName, fldPath *field.Path) field.ErrorList {
+	// pids is only valid as a pod-level limit in pod specs; it is not
+	// enforceable through LimitRange for any limit type.
+	if value == core.ResourcePID {
+		return field.ErrorList{field.Invalid(fldPath, value, "pids is not supported in LimitRange")}
+	}
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
 		return ValidateContainerResourceName(value, fldPath)
@@ -8271,7 +8279,31 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	validateFn := func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		return validatePodResourceName(resourceName, fldPath, opts)
+	}
+	allErrs := validateResourceRequirements(requirements, validateFn, podClaimNames, fldPath, opts)
+
+	// PID-specific validation: these checks only apply at the pod level so
+	// that containers never see misleading "pids limit must be between …"
+	// errors when pids is already rejected as a non-standard container resource.
+	limPath := fldPath.Child("limits")
+	reqPath := fldPath.Child("requests")
+	for resourceName, quantity := range requirements.Limits {
+		if resourceName == core.ResourcePID {
+			allErrs = append(allErrs, validatePIDResourceValue(resourceName, quantity, limPath.Key(string(resourceName)))...)
+		}
+	}
+	for resourceName := range requirements.Requests {
+		if resourceName == core.ResourcePID {
+			fldPath := reqPath.Key(string(resourceName))
+			// pids is limit-only; reject the request without piling on
+			// range-validation errors for a field that is forbidden anyway.
+			allErrs = append(allErrs, field.Forbidden(fldPath, "pids may only be specified in limits, not requests"))
+		}
+	}
+
+	return allErrs
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
@@ -8417,6 +8449,18 @@ func validateResourceQuantityHugePageValue(name core.ResourceName, quantity reso
 		return fmt.Errorf("%s is not positive integer multiple of %s", quantity.String(), name)
 	}
 
+	return nil
+}
+
+// validatePIDResourceValue validates that pids resource values are within the allowed range.
+func validatePIDResourceValue(name core.ResourceName, quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
+	if name != core.ResourcePID {
+		return nil
+	}
+	val := quantity.Value()
+	if val < resourcehelper.MinPodPIDLimit || val > resourcehelper.MaxPodPIDLimit {
+		return field.ErrorList{field.Invalid(fldPath, quantity.String(), fmt.Sprintf("pids limit must be between %d and %d", resourcehelper.MinPodPIDLimit, resourcehelper.MaxPodPIDLimit))}
+	}
 	return nil
 }
 
