@@ -35,6 +35,16 @@ import (
 )
 
 func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
+	withAffinityNamespaceSelector := func(p *v1.Pod, team string) *v1.Pod {
+		term := &p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0]
+		term.NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"team": team}}
+		return p
+	}
+	withAntiAffinityNamespaceSelector := func(p *v1.Pod, team string) *v1.Pod {
+		term := &p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0]
+		term.NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"team": team}}
+		return p
+	}
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
@@ -191,6 +201,64 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 			oldPod: st.MakePod().Node("fake-node").UID("other").
 				PodAntiAffinityIn("service", "region", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).
 				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "add a pod matching the pending pod's affinity with namespaceSelector",
+			pod:          withAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(), "team1"),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "add a pod in a namespace not matching the namespaceSelector of the pending pod's affinity",
+			pod:          withAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(), "team1"),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team2").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "add a pod matching the namespaceSelector but not the labelSelector of the pending pod's affinity",
+			pod:          withAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(), "team1"),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "update a pod to match the pending pod's affinity with namespaceSelector",
+			pod:          withAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(), "team1"),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Namespace("subteam1.team2").Obj(),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "update a pod to not match the pending pod's anti-affinity with namespaceSelector",
+			pod:          withAntiAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(), "team1"),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "update a pod to match the pending pod's anti-affinity with namespaceSelector",
+			pod:          withAntiAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(), "team1"),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Namespace("subteam1.team1").Obj(),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "delete a pod matching the namespaceSelector but not the labelSelector of the pending pod's anti-affinity",
+			pod:          withAntiAffinityNamespaceSelector(st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(), "team1"),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "delete a pod matching the pending pod's anti-affinity with namespaceSelector",
+			pod:          withAntiAffinityNamespaceSelector(st.MakePod().Name("p").PodAntiAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(), "team1"),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name: "delete a pod whose anti-affinity with namespaceSelector matches the pending pod",
+			pod:  st.MakePod().Name("p").Label("service", "securityscan").Namespace("subteam1.team1").Obj(),
+			oldPod: withAntiAffinityNamespaceSelector(st.MakePod().Node("fake-node").UID("other").
+				PodAntiAffinityIn("service", "hostname", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(), "team1"),
 			expectedHint: fwk.Queue,
 		},
 	}
