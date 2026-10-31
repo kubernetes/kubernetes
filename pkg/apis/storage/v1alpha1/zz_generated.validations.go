@@ -119,7 +119,43 @@ func Validate_CSIStorageCapacity(
 	}
 
 	// field storagev1alpha1.CSIStorageCapacity.NodeTopology has no validation
-	// field storagev1alpha1.CSIStorageCapacity.StorageClassName has no validation
+
+	{ // field storagev1alpha1.CSIStorageCapacity.StorageClassName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1alpha1.CSIStorageCapacity) *string {
+				return &oldObj.StorageClassName
+			})
+		errs = append(errs, fn(fldPath.Child("storageClassName"), &obj.StorageClassName, oldVal, oldObj != nil)...)
+	}
+
 	// field storagev1alpha1.CSIStorageCapacity.Capacity has no validation
 	// field storagev1alpha1.CSIStorageCapacity.MaximumVolumeSize has no validation
 	return errs
