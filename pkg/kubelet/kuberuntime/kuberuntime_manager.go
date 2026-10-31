@@ -933,6 +933,15 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	}()
 
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))
+	if handled, err := m.resizePodInPlacePlatform(ctx, pod, podStatus, podContainerChanges); handled {
+		if err != nil {
+			logger.Error(err, "Platform resize failed", "pod", klog.KObj(pod))
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+			return resizeResult
+		}
+		success = true
+		return resizeResult
+	}
 	pcm := m.containerManager.NewPodContainerManager()
 	enforceCPULimits := m.cpuCFSQuota
 	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
