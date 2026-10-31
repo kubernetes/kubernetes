@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,9 +32,11 @@ import (
 	cgroupsystemd "github.com/opencontainers/cgroups/systemd"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/mount-utils"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -48,7 +51,27 @@ const (
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
+	Cgroup2MaxDescendants  string = "cgroup.max.descendants"
+	Cgroup2MaxDepth        string = "cgroup.max.depth"
+
+	procMountInfoPath = "/proc/self/mountinfo"
 )
+
+// cgroupNsdelegateEnabled reports whether the cgroup v2 hierarchy is mounted
+// with nsdelegate.
+func cgroupNsdelegateEnabled(mountInfoPath string) (bool, error) {
+	mounts, err := mount.ParseMountInfo(mountInfoPath)
+	if err != nil {
+		return false, err
+	}
+	// Walk backwards since a later mount takes precedence at the same path.
+	for _, m := range slices.Backward(mounts) {
+		if m.MountPoint == cmutil.CgroupRoot {
+			return m.FsType == "cgroup2" && slices.Contains(m.SuperOptions, "nsdelegate"), nil
+		}
+	}
+	return false, fmt.Errorf("no mount at %s in %s", cmutil.CgroupRoot, mountInfoPath)
+}
 
 var RootCgroupName = CgroupName([]string{})
 
