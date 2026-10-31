@@ -428,8 +428,8 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
 func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if lplc.NominalConcurrencyShares < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
+	if lplc.NominalConcurrencyShares != nil && *lplc.NominalConcurrencyShares < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), *lplc.NominalConcurrencyShares, "must be a non-negative integer"))
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
 
