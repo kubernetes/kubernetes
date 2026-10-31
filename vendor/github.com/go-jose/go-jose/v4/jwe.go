@@ -25,6 +25,12 @@ import (
 	"github.com/go-jose/go-jose/v4/json"
 )
 
+// MaxRecipients is the maximum number of recipients of a JWE at parse time.
+// Higher values mean more potential work done across untrusted input.
+//
+// If modifying MaxRecipients, do it before any parsing occurs.
+var MaxRecipients = 32
+
 // rawJSONWebEncryption represents a raw JWE JSON object. Used for parsing/serializing.
 type rawJSONWebEncryption struct {
 	Protected    *byteBuffer        `json:"protected,omitempty"`
@@ -84,14 +90,18 @@ func (obj JSONWebEncryption) mergedHeaders(recipient *recipientInfo) rawHeader {
 }
 
 // Get the additional authenticated data from a JWE object.
-func (obj JSONWebEncryption) computeAuthData() []byte {
+func (obj JSONWebEncryption) computeAuthData() ([]byte, error) {
 	var protected string
 
 	switch {
 	case obj.original != nil && obj.original.Protected != nil:
 		protected = obj.original.Protected.base64()
 	case obj.protected != nil:
-		protected = base64.RawURLEncoding.EncodeToString(mustSerializeJSON((obj.protected)))
+		serializedProtected, err := json.Marshal(obj.protected)
+		if err != nil {
+			return nil, err
+		}
+		protected = base64.RawURLEncoding.EncodeToString(serializedProtected)
 	default:
 		protected = ""
 	}
@@ -102,7 +112,7 @@ func (obj JSONWebEncryption) computeAuthData() []byte {
 		output = append(output, []byte(base64.RawURLEncoding.EncodeToString(obj.aad))...)
 	}
 
-	return output
+	return output, nil
 }
 
 func containsKeyAlgorithm(haystack []KeyAlgorithm, needle KeyAlgorithm) bool {
@@ -128,11 +138,10 @@ func containsContentEncryption(haystack []ContentEncryption, needle ContentEncry
 // https://datatracker.ietf.org/doc/html/rfc7516#section-3.1
 // https://datatracker.ietf.org/doc/html/rfc7516#section-3.2
 //
-// The keyAlgorithms and contentEncryption parameters are used to validate the "alg" and "enc"
-// header parameters respectively. They must be nonempty, and each "alg" or "enc" header in
-// parsed data must contain a value that is present in the corresponding parameter. That
-// includes the protected and unprotected headers as well as all recipients. To accept
-// multiple algorithms, pass a slice of all the algorithms you want to accept.
+// The keyAlgorithms and contentEncryption parameters contain the allowable algorithms in the "alg" and "enc"
+// header parameters respectively. They must be non-empty. Non-matching algorithms cause a parse error.
+//
+// Deprecated: use ParseEncryptedJSON or ParseEncryptedCompact depending on which serialization you expect.
 func ParseEncrypted(input string,
 	keyEncryptionAlgorithms []KeyAlgorithm,
 	contentEncryption []ContentEncryption,
@@ -145,9 +154,13 @@ func ParseEncrypted(input string,
 	return ParseEncryptedCompact(input, keyEncryptionAlgorithms, contentEncryption)
 }
 
-// ParseEncryptedJSON parses a message in JWE JSON Serialization.
+// ParseEncryptedJSON parses a message in JWE JSON Serialization. Messages with
+// more than [MaxRecipients] recipients are rejected.
 //
 // https://datatracker.ietf.org/doc/html/rfc7516#section-3.2
+//
+// The keyAlgorithms and contentEncryption parameters contain the allowable algorithms in the "alg" and "enc"
+// header parameters respectively. They must be non-empty. Any non-allowed algorithms will cause parsing to fail.
 func ParseEncryptedJSON(
 	input string,
 	keyEncryptionAlgorithms []KeyAlgorithm,
@@ -177,6 +190,9 @@ func (parsed *rawJSONWebEncryption) sanitized(
 	if len(contentEncryption) == 0 {
 		return nil, errors.New("go-jose/go-jose: no content encryption algorithms provided")
 	}
+	if len(parsed.Recipients) > MaxRecipients {
+		return nil, fmt.Errorf("go-jose/go-jose: too many recipients in JWE; maximum is %d", MaxRecipients)
+	}
 
 	obj := &JSONWebEncryption{
 		original:    parsed,
@@ -195,21 +211,11 @@ func (parsed *rawJSONWebEncryption) sanitized(
 		}
 	}
 
-	if parsed.Protected != nil && len(parsed.Protected.bytes()) > 0 {
-		err := json.Unmarshal(parsed.Protected.bytes(), &obj.protected)
-		if err != nil {
-			return nil, fmt.Errorf("go-jose/go-jose: invalid protected header: %s, %s", err, parsed.Protected.base64())
-		}
-	}
-
-	// Note: this must be called _after_ we parse the protected header,
-	// otherwise fields from the protected header will not get picked up.
-	var err error
-	mergedHeaders := obj.mergedHeaders(nil)
-	obj.Header, err = mergedHeaders.sanitized()
+	protected, err := parseProtectedHeader(parsed.Protected)
 	if err != nil {
-		return nil, fmt.Errorf("go-jose/go-jose: cannot sanitize merged headers: %v (%v)", err, mergedHeaders)
+		return nil, err
 	}
+	obj.protected = protected
 
 	if len(parsed.Recipients) == 0 {
 		obj.recipients = []recipientInfo{
@@ -264,6 +270,14 @@ func (parsed *rawJSONWebEncryption) sanitized(
 		}
 	}
 
+	// Note: this must be called _after_ we parse the protected header,
+	// otherwise fields from the protected header will not get picked up.
+	mergedHeaders := obj.mergedHeaders(nil)
+	obj.Header, err = mergedHeaders.sanitized()
+	if err != nil {
+		return nil, fmt.Errorf("go-jose/go-jose: cannot sanitize merged headers: %w", err)
+	}
+
 	obj.iv = parsed.Iv.bytes()
 	obj.ciphertext = parsed.Ciphertext.bytes()
 	obj.tag = parsed.Tag.bytes()
@@ -287,6 +301,9 @@ func validateAlgEnc(headers rawHeader, keyAlgorithms []KeyAlgorithm, contentEncr
 // ParseEncryptedCompact parses a message in JWE Compact Serialization.
 //
 // https://datatracker.ietf.org/doc/html/rfc7516#section-3.1
+//
+// The keyAlgorithms and contentEncryption parameters contain the allowable algorithms in the "alg" and "enc"
+// header parameters respectively. They must be non-empty. Any non-allowed algorithms will cause parsing to fail.
 func ParseEncryptedCompact(
 	input string,
 	keyAlgorithms []KeyAlgorithm,
@@ -354,7 +371,10 @@ func (obj JSONWebEncryption) CompactSerialize() (string, error) {
 		return "", ErrNotSupported
 	}
 
-	serializedProtected := mustSerializeJSON(obj.protected)
+	serializedProtected, err := json.Marshal(obj.protected)
+	if err != nil {
+		return "", err
+	}
 
 	return base64JoinWithDots(
 		serializedProtected,
@@ -366,7 +386,13 @@ func (obj JSONWebEncryption) CompactSerialize() (string, error) {
 }
 
 // FullSerialize serializes an object using the full JSON serialization format.
+//
+// It returns "" if obj cannot be serialized, for example if it has no recipients.
 func (obj JSONWebEncryption) FullSerialize() string {
+	if len(obj.recipients) == 0 {
+		return ""
+	}
+
 	raw := rawJSONWebEncryption{
 		Unprotected:  obj.unprotected,
 		Iv:           newBuffer(obj.iv),
@@ -392,8 +418,16 @@ func (obj JSONWebEncryption) FullSerialize() string {
 	}
 
 	if obj.protected != nil {
-		raw.Protected = newBuffer(mustSerializeJSON(obj.protected))
+		serializedProtected, err := json.Marshal(obj.protected)
+		if err != nil {
+			return ""
+		}
+		raw.Protected = newBuffer(serializedProtected)
 	}
 
-	return string(mustSerializeJSON(raw))
+	out, err := json.Marshal(raw)
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
