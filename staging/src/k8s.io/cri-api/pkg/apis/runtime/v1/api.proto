@@ -457,6 +457,18 @@ message UserNamespace {
     repeated IDMapping gids = 3;
 }
 
+// CgroupNamespace describes the intended cgroup namespace configuration for a container.
+message CgroupNamespace {
+    // Mode is the NamespaceMode for this CgroupNamespace.
+    // Note: NamespaceMode for CgroupNamespace currently supports only CONTAINER and NODE, not POD or TARGET.
+    // CONTAINER creates a new cgroup namespace for each container, rooted at the container's own cgroup.
+    // POD is not supported, as a cgroup namespace shared by all containers in a pod would be rooted at
+    // the cgroup of one of the containers, not at the cgroup of each container.
+    // The runtime MUST fail container creation for POD or TARGET, and for NODE with CGROUP_MOUNT_MODE_READ_WRITE
+    // when the container is not privileged.
+    NamespaceMode mode = 1;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -482,6 +494,11 @@ message NamespaceOption {
     // must be assumed.  This is done for backward compatibility with older Kubelet versions that
     // do not set a user namespace.
     UserNamespace userns_options = 5;
+    // CgroupnsOptions for this container.
+    // The struct must be nil for LinuxSandboxSecurityContext.
+    // If the struct is nil for LinuxContainerSecurityContext, the runtime's default mode
+    // must be applied for backward compatibility.
+    CgroupNamespace cgroupns_options = 6;
 }
 
 // SupplementalGroupsPolicy defines how supplemental groups 
@@ -1206,6 +1223,8 @@ enum CgroupMountMode {
     CGROUP_MOUNT_MODE_READ_ONLY = 1;
     // CGROUP_MOUNT_MODE_READ_WRITE mounts the cgroup filesystem read-write.
     // This mode requires the host to mount cgroup v2 with nsdelegate.
+    // The runtime MUST fail container creation for CGROUP_MOUNT_MODE_READ_WRITE
+    // with CgroupNamespace.Mode=NODE when the container is not privileged.
     CGROUP_MOUNT_MODE_READ_WRITE = 2;
 }
 
@@ -2040,6 +2059,10 @@ message RuntimeHandlerFeatures {
     // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
     // in Kubernetes. This means support for both, user namespaces and idmap mounts.
     bool user_namespaces = 2;
+
+    // cgroup_namespaces is set to true if the runtime handler supports CONTAINER and NODE for
+    // privileged and non-privileged containers, and fails container creation otherwise.
+    bool cgroup_namespaces = 3;
 }
 
 message RuntimeHandler {
