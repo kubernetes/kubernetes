@@ -118,11 +118,6 @@ type Controller struct {
 	// podIndexer allows looking up pods by ControllerRef UID
 	podIndexer cache.Indexer
 
-	// workloadIndexer allows looking up workloads by Job name
-	workloadIndexer cache.Indexer
-	// podGroupIndexer allows looking up pod groups by Workload name
-	podGroupIndexer cache.Indexer
-
 	// Workload/PodGroup listers and synced checks for workload APIs.
 	// These are nil when the feature gate is disabled.
 	workloadLister schedulinglisters.WorkloadLister
@@ -1032,16 +1027,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		return err
 	}
 
-	// ensure Workload and PodGroup exist for eligible Jobs.
-	// This must happen before pod management so that pods can reference the PodGroup.
-	var podGroup *schedulingv1beta1.PodGroup
-	if shouldManageWorkloadForJob(&job) {
-		_, podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
-		if err != nil {
-			return fmt.Errorf("ensuring Workload and PodGroup for Job %s/%s: %w", job.Namespace, job.Name, err)
-		}
-	}
-
 	activePods := controller.FilterActivePods(logger, pods)
 	jobCtx := &syncJobCtx{
 		job:                  &job,
@@ -1050,10 +1035,28 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		ready:                countReadyPods(activePods),
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
-		podGroup:             podGroup,
 		terminating:          ptr.To(controller.CountTerminatingPods(pods)),
 	}
 	active := int32(len(jobCtx.activePods))
+
+	// ensure Workload and PodGroup exist for eligible Jobs.
+	// This must happen before pod management so that pods can reference the PodGroup.
+	schedulingUnblocked := false
+	if shouldManageWorkloadForJob(&job) {
+		_, jobCtx.podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
+		if _, ok := errors.AsType[*schedulingBlockedError](err); ok {
+			if statusErr := jm.updateSchedulingBlockedStatus(ctx, sharedJob.Status.Conditions, jobCtx); statusErr != nil {
+				return statusErr
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("ensuring Workload and PodGroup for Job %s/%s: %w", job.Namespace, job.Name, err)
+		}
+		// No-op unless SchedulingBlocked=True was recorded by an earlier sync.
+		job.Status.Conditions, schedulingUnblocked = ensureJobConditionStatus(job.Status.Conditions, batch.JobSchedulingBlocked,
+			v1.ConditionFalse, batch.JobReasonSchedulingObjectsValid, "Scheduling objects for the Job are valid", jm.clock.Now())
+	}
+
 	newSucceededPods, newFailedPods := getNewFinishedPods(jobCtx)
 	jobCtx.succeeded = job.Status.Succeeded + int32(len(newSucceededPods)) + int32(len(jobCtx.uncounted.succeeded))
 	jobCtx.failed = job.Status.Failed + int32(nonIgnoredFailedPodsCount(jobCtx, newFailedPods)) + int32(len(jobCtx.uncounted.failed))
@@ -1202,11 +1205,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !ptr.Equal(&jobCtx.ready, job.Status.Ready)
-	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, jobCtx.terminating)
-	job.Status.Active = active
-	job.Status.Ready = &jobCtx.ready
-	job.Status.Terminating = jobCtx.terminating
+	countersChanged := setPodCounters(&job, active, jobCtx.ready, jobCtx.terminating)
+	needsStatusUpdate := suspendCondChanged || schedulingUnblocked || countersChanged
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, needsStatusUpdate)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
@@ -1842,6 +1842,23 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			// than active"), blocking finalizer removal and status flushing.
 			return active, metrics.JobSyncActionPodsCreated, nil
 		}
+		podGroup := jobCtx.podGroup
+		if podGroup != nil && podGroup.DeletionTimestamp != nil {
+			// Pods must not join the old gang. The PodGroup is recreated once it is gone.
+			logger.V(2).Info("Waiting for terminating PodGroup before creating pods", "job", klog.KObj(job), "podGroup", klog.KObj(podGroup))
+			jm.enqueueSyncJobWithDelay(logger, job, DefaultJobApiBackOff)
+			return active, metrics.JobSyncActionPodsCreated, nil
+		}
+		if podGroup != nil &&
+			slices.ContainsFunc(jobCtx.activePods, func(p *v1.Pod) bool {
+				return p.Spec.SchedulingGroup == nil
+			}) {
+			// A gang mixing grouped and ungrouped pods waits for a minCount it never reaches.
+			jm.recorder.Eventf(job, v1.EventTypeWarning, "MixedSchedulingGroup",
+				"Job %s has active pods without a schedulingGroup; creating new pods without PodGroup %s", job.Name, podGroup.Name)
+			podGroup = nil
+		}
+
 		if diff > int32(MaxPodCreateDeletePerSync) {
 			diff = int32(MaxPodCreateDeletePerSync)
 		}
@@ -1875,23 +1892,14 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
-		if jobCtx.podGroup != nil {
-			pg := jobCtx.podGroup
+		if podGroup != nil {
+			// Pods must not carry an ownerReference to the PodGroup: on
+			// background deletion of the Job, the garbage collector would keep
+			// the pods alive for the terminating PodGroup while the PodGroup
+			// protection finalizer waits for the pods, deadlocking both.
 			podTemplate.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
-				PodGroupName: &pg.Name,
+				PodGroupName: &podGroup.Name,
 			}
-			podTemplate.OwnerReferences = append(podTemplate.OwnerReferences,
-				// Non-controller ownerRef to PodGroup (the controller ownerRef
-				// points to the Job and is set by CreatePodsWithGenerateName).
-				// BlockOwnerDeletion is intentionally left nil (false) so that
-				// PodGroup deletion is not blocked by surviving pods, because
-				// the Job's cascading GC already ensures proper cleanup ordering.
-				metav1.OwnerReference{
-					APIVersion: schedulingv1beta1.SchemeGroupVersion.String(),
-					Kind:       "PodGroup",
-					Name:       pg.Name,
-					UID:        pg.UID,
-				})
 		}
 
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
@@ -2218,6 +2226,15 @@ func countReadyPods(pods []*v1.Pod) int32 {
 		}
 	}
 	return cnt
+}
+
+// setPodCounters records the pod counters on the Job status and reports whether any changed.
+func setPodCounters(job *batch.Job, active, ready int32, terminating *int32) bool {
+	changed := active != job.Status.Active || !ptr.Equal(&ready, job.Status.Ready) || !ptr.Equal(job.Status.Terminating, terminating)
+	job.Status.Active = active
+	job.Status.Ready = &ready
+	job.Status.Terminating = terminating
+	return changed
 }
 
 // This checks if we should apply PodReplacementPolicy.

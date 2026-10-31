@@ -26,7 +26,7 @@ import (
 
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
-	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	v12 "k8s.io/api/scheduling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	math_bits "math/bits"
@@ -1675,9 +1675,9 @@ func (this *JobSchedulingConfiguration) String() string {
 	}
 	repeatedStringForResourceClaims += "}"
 	s := strings.Join([]string{`&JobSchedulingConfiguration{`,
-		`SchedulingPolicy:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingPolicy), "WorkloadPodGroupSchedulingPolicy", "v1alpha3.WorkloadPodGroupSchedulingPolicy", 1) + `,`,
-		`SchedulingConstraints:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingConstraints), "WorkloadPodGroupSchedulingConstraints", "v1alpha3.WorkloadPodGroupSchedulingConstraints", 1) + `,`,
-		`DisruptionMode:` + strings.Replace(fmt.Sprintf("%v", this.DisruptionMode), "WorkloadPodGroupDisruptionMode", "v1alpha3.WorkloadPodGroupDisruptionMode", 1) + `,`,
+		`SchedulingPolicy:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingPolicy), "WorkloadPodGroupSchedulingPolicy", "v12.WorkloadPodGroupSchedulingPolicy", 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingConstraints), "WorkloadPodGroupSchedulingConstraints", "v12.WorkloadPodGroupSchedulingConstraints", 1) + `,`,
+		`DisruptionMode:` + strings.Replace(fmt.Sprintf("%v", this.DisruptionMode), "WorkloadPodGroupDisruptionMode", "v12.WorkloadPodGroupDisruptionMode", 1) + `,`,
 		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
 		`}`,
 	}, "")
@@ -3097,7 +3097,7 @@ func (m *JobSchedulingConfiguration) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.SchedulingPolicy == nil {
-				m.SchedulingPolicy = &v1alpha3.WorkloadPodGroupSchedulingPolicy{}
+				m.SchedulingPolicy = &v12.WorkloadPodGroupSchedulingPolicy{}
 			}
 			if err := m.SchedulingPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -3133,7 +3133,7 @@ func (m *JobSchedulingConfiguration) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.SchedulingConstraints == nil {
-				m.SchedulingConstraints = &v1alpha3.WorkloadPodGroupSchedulingConstraints{}
+				m.SchedulingConstraints = &v12.WorkloadPodGroupSchedulingConstraints{}
 			}
 			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -3169,7 +3169,7 @@ func (m *JobSchedulingConfiguration) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.DisruptionMode == nil {
-				m.DisruptionMode = &v1alpha3.WorkloadPodGroupDisruptionMode{}
+				m.DisruptionMode = &v12.WorkloadPodGroupDisruptionMode{}
 			}
 			if err := m.DisruptionMode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -3204,7 +3204,7 @@ func (m *JobSchedulingConfiguration) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ResourceClaims = append(m.ResourceClaims, v1alpha3.WorkloadPodGroupResourceClaim{})
+			m.ResourceClaims = append(m.ResourceClaims, v12.WorkloadPodGroupResourceClaim{})
 			if err := m.ResourceClaims[len(m.ResourceClaims)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
