@@ -582,15 +582,16 @@ message ShareableCapacityStatus {
 // devices with AllowMultipleAllocations.
 message ShareableSummaryStatus {
   // fullyAvailableDevices is the number of shareable devices with no
-  // capacity consumed.
+  // allocation other than for admin access.
   //
   // +required
   // +k8s:required
   // +k8s:minimum=0
   optional int32 fullyAvailableDevices = 1;
 
-  // partiallyAvailableDevices is the number of shareable devices with some
-  // but not all capacity consumed.
+  // partiallyAvailableDevices is the number of shareable devices with at
+  // least one allocation other than for admin access, regardless of
+  // remaining capacity.
   //
   // +required
   // +k8s:required

@@ -26,6 +26,16 @@ import (
 const (
 	// Subsystem is the subsystem name used for metrics.
 	Subsystem = "resourcepoolstatusrequest_controller"
+
+	// UnknownDriver replaces spec.driver values with no ResourceSlices, to
+	// bound label cardinality.
+	UnknownDriver = "unknown"
+
+	// Values of the result label on RequestsProcessed.
+	ResultComplete   = "complete"
+	ResultIncomplete = "incomplete"
+	ResultFailed     = "failed"
+	ResultError      = "error"
 )
 
 var (
@@ -35,10 +45,10 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      Subsystem,
 			Name:           "requests_processed_total",
-			Help:           "Total number of ResourcePoolStatusRequests processed",
+			Help:           "Total number of ResourcePoolStatusRequests processed, by result: complete, incomplete (some pools still incomplete), failed (Failed condition) or error (status write failed)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"driver_name"},
+		[]string{"driver_name", "result"},
 	)
 
 	// RequestProcessingErrors tracks the number of errors during request processing.
@@ -48,6 +58,8 @@ var (
 			Name:           "request_processing_errors_total",
 			Help:           "Total number of errors encountered while processing ResourcePoolStatusRequests",
 			StabilityLevel: metrics.ALPHA,
+			// Same as requests_processed_total{result="error"}.
+			DeprecatedVersion: "1.38.0",
 		},
 		[]string{"driver_name"},
 	)

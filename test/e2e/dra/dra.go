@@ -42,9 +42,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
@@ -300,9 +302,47 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 					StrategicMergePatchSpec: `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
 
-					// UpdateStatus is missing here. Needs to be added before graduation.
+					// The controller writes the write-once status; see the next test.
 				},
 			)
+		})
+
+		f.It("resource.k8s.io/v1alpha3 ResourcePoolStatusRequest status is written once by the controller", f.WithFeatureGate(features.DRAResourcePoolStatus), func(ctx context.Context) {
+			requests := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
+			request := &resourcealphaapi.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: f.UniqueName + "-"},
+				// No slices exist for this driver.
+				Spec: resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: f.UniqueName + ".example.com"},
+			}
+			request, err := requests.Create(ctx, request, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create ResourcePoolStatusRequest")
+			ginkgo.DeferCleanup(framework.IgnoreNotFound(requests.Delete), request.Name, metav1.DeleteOptions{})
+
+			ginkgo.By("waiting for kube-controller-manager to write the status")
+			gomega.Eventually(ctx, framework.GetObject(requests.Get, request.Name, metav1.GetOptions{})).
+				WithTimeout(time.Minute).
+				Should(gomega.HaveField("Status", gomega.HaveValue(gomega.HaveField("Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Type":   gomega.Equal(resourcealphaapi.ResourcePoolStatusRequestConditionComplete),
+					"Status": gomega.Equal(metav1.ConditionTrue),
+				}))))))
+
+			ginkgo.By("reading the status subresource")
+			written, err := f.DynamicClient.Resource(resourcealphaapi.SchemeGroupVersion.WithResource("resourcepoolstatusrequests")).Get(ctx, request.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "get status subresource")
+			poolCount, found, err := unstructured.NestedInt64(written.Object, "status", "poolCount")
+			framework.ExpectNoError(err, "read status.poolCount")
+			gomega.Expect(found).To(gomega.BeTrueBecause("status.poolCount should be set"))
+			gomega.Expect(poolCount).To(gomega.BeZero(), "no pools exist for driver %s", request.Spec.Driver)
+
+			ginkgo.By("rejecting a rewrite of the written status")
+			request, err = requests.Get(ctx, request.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get ResourcePoolStatusRequest")
+			request.Status.PoolCount = ptr.To[int32](1)
+			_, err = requests.UpdateStatus(ctx, request, metav1.UpdateOptions{})
+			gomega.Expect(apierrors.IsInvalid(err)).To(gomega.BeTrueBecause("UpdateStatus of a written status should be rejected as invalid, got: %v", err))
+
+			_, err = requests.Patch(ctx, request.Name, apitypes.MergePatchType, []byte(`{"status": {"poolCount": 1}}`), metav1.PatchOptions{}, "status")
+			gomega.Expect(apierrors.IsInvalid(err)).To(gomega.BeTrueBecause("patching a written status should be rejected as invalid, got: %v", err))
 		})
 	})
 

@@ -51433,14 +51433,14 @@ func schema_k8sio_api_resource_v1alpha3_ShareableSummaryStatus(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"fullyAvailableDevices": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+							Description: "fullyAvailableDevices is the number of shareable devices with no allocation other than for admin access.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"partiallyAvailableDevices": {
 						SchemaProps: spec.SchemaProps{
-							Description: "partiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+							Description: "partiallyAvailableDevices is the number of shareable devices with at least one allocation other than for admin access, regardless of remaining capacity.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

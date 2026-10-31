@@ -42,6 +42,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -734,6 +735,133 @@ func TestDescribePriorityClass(t *testing.T) {
 			for _, expected := range testCase.expect {
 				if !strings.Contains(out, expected) {
 					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
+	}
+}
+
+func TestDescribeResourcePoolStatusRequest(t *testing.T) {
+	created := metav1.NewTime(time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC))
+	completed := metav1.NewTime(created.Add(2 * time.Second))
+	completeCondition := metav1.Condition{
+		Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionComplete,
+		Status:             metav1.ConditionTrue,
+		Reason:             "CalculationComplete",
+		Message:            "Calculated status for 4 pools (1 incomplete)",
+		LastTransitionTime: completed,
+	}
+	request := func(status *resourcev1alpha3.ResourcePoolStatusRequestStatus) *resourcev1alpha3.ResourcePoolStatusRequest {
+		return &resourcev1alpha3.ResourcePoolStatusRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: "gpus", CreationTimestamp: created, Labels: map[string]string{"team": "ml"}},
+			Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
+				Driver:                        "gpu.example.com",
+				Limit:                         ptr.To[int32](4),
+				DefaultPartitionTypeAttribute: new("gpu.example.com/profile"),
+			},
+			Status: status,
+		}
+	}
+	quantity := func(s string) *resource.Quantity { q := resource.MustParse(s); return &q }
+
+	testCases := map[string]struct {
+		request   *resourcev1alpha3.ResourcePoolStatusRequest
+		expect    []string
+		notExpect []string
+	}{
+		"pending": {
+			request: request(nil),
+			expect: []string{
+				"Name:", "gpus",
+				"team=ml",
+				"Driver:", "gpu.example.com",
+				"Pool Name:", "<none>",
+				"Limit:", "4",
+				"Default Partition Type Attribute:", "gpu.example.com/profile",
+				"Status:", "Pending",
+			},
+			notExpect: []string{"Conditions:", "Pools:"},
+		},
+		"failed": {
+			request: request(&resourcev1alpha3.ResourcePoolStatusRequestStatus{
+				PoolCount: ptr.To[int32](0),
+				Conditions: []metav1.Condition{{
+					Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionFailed,
+					Status:             metav1.ConditionTrue,
+					Reason:             "CalculationFailed",
+					Message:            "Failed to list ResourceSlices: boom",
+					LastTransitionTime: completed,
+				}},
+			}),
+			expect:    []string{"Status:", "Failed", "CalculationFailed", "Failed to list ResourceSlices: boom"},
+			notExpect: []string{"Partition Summary:", "Shareable Summary:"},
+		},
+		"complete with every pool shape": {
+			request: request(&resourcev1alpha3.ResourcePoolStatusRequestStatus{
+				PoolCount: ptr.To[int32](6),
+				Pools: []resourcev1alpha3.PoolStatus{
+					{
+						Driver: "gpu.example.com", PoolName: "node-1", Generation: 5, NodeName: new("node-1"),
+						ResourceSliceCount: ptr.To[int32](1), TotalDevices: ptr.To[int32](4), AllocatedDevices: ptr.To[int32](2),
+						AvailableDevices: ptr.To[int32](1), UnavailableDevices: ptr.To[int32](1),
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-2", Generation: 5,
+						ValidationError: new("PoolIncomplete: pool gpu.example.com/node-2 is incomplete: observed 1/2 slices at generation 5"),
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-3", Generation: 7, NodeName: new("node-3"),
+						ResourceSliceCount: ptr.To[int32](2), TotalDevices: ptr.To[int32](3), AllocatedDevices: ptr.To[int32](1),
+						AvailableDevices: ptr.To[int32](2), UnavailableDevices: ptr.To[int32](0),
+						PartitionSummary: []resourcev1alpha3.PartitionTypeStatus{
+							{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](0)},
+							{Attribute: "gpu.example.com/profile", Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](1)},
+						},
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-4", Generation: 3, NodeName: new("node-4"),
+						ResourceSliceCount: ptr.To[int32](1), TotalDevices: ptr.To[int32](3), AllocatedDevices: ptr.To[int32](2),
+						AvailableDevices: ptr.To[int32](1), UnavailableDevices: ptr.To[int32](0),
+						ShareableSummary: &resourcev1alpha3.ShareableSummaryStatus{
+							FullyAvailableDevices:     ptr.To[int32](1),
+							PartiallyAvailableDevices: ptr.To[int32](2),
+							Capacity: []resourcev1alpha3.ShareableCapacityStatus{
+								{Name: "cores", Total: quantity("24"), Consumed: quantity("6"), Available: quantity("18")},
+								{Name: "memory", Total: quantity("240Gi"), Consumed: quantity("90Gi"), Available: quantity("150Gi")},
+							},
+						},
+					},
+				},
+				Conditions: []metav1.Condition{completeCondition},
+			}),
+			expect: []string{
+				"Status:", "Complete",
+				"Pool Count:", "6 (showing 4, truncated by limit)",
+				"CalculationComplete", "Calculated status for 4 pools (1 incomplete)",
+				"Pool", "Node", "Generation", "Slices", "Total", "Allocated", "Available", "Unavailable",
+				"node-2", "PoolIncomplete: pool gpu.example.com/node-2 is incomplete: observed 1/2 slices at generation 5",
+				"Partition Summary:", "gpu.example.com/profile", "Full", "Half",
+				"Shareable Summary:", "Fully Available", "In Use", "cores", "memory", "240Gi", "90Gi", "150Gi",
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fake := fake.NewClientset(tc.request)
+			c := &describeClient{T: t, Interface: fake}
+			d := ResourcePoolStatusRequestDescriber{c}
+			out, err := d.Describe("", tc.request.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, expected := range tc.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n%s", expected, out)
+				}
+			}
+			for _, unexpected := range tc.notExpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("did not expect %q in output:\n%s", unexpected, out)
 				}
 			}
 		})
