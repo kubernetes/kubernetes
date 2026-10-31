@@ -167,8 +167,6 @@ const (
 	Etcd
 	// InvalidRegistryImage image
 	InvalidRegistryImage
-	// IpcUtils image
-	IpcUtils
 	// GlibcDnsTesting image (formerly JessieDnsutils)
 	GlibcDnsTesting
 	// Kitten image
@@ -219,7 +217,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.11.2"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.7.1-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
-	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.4"}
 	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.1.1"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.9"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.9.0"}
