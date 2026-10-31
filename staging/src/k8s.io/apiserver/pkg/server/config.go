@@ -108,6 +108,9 @@ const (
 
 	// APIGroupPrefix is where non-legacy API group will be located.
 	APIGroupPrefix = "/apis"
+
+	// DefaultMaxResourceNameLegth is maximum length for resource name.
+	DefaultMaxResourceNameLength = 2048
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -1160,6 +1163,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = routine.WithRoutine(handler, c.LongRunningFunc)
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
+	handler = genericfilters.WithResourceNameLengthLimit(handler, DefaultMaxResourceNameLength)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	if c.LoadReporter != nil {
 		handler = loadmetrics.WithEndpointLoadMetrics(handler, c.LoadReporter)
