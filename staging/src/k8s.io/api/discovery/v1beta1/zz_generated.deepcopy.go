@@ -93,6 +93,11 @@ func (in *EndpointConditions) DeepCopyInto(out *EndpointConditions) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Processing != nil {
+		in, out := &in.Processing, &out.Processing
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -241,6 +241,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 					"10.0.1.2:80": &BaseEndpointInfo{
 						ip:          "10.0.1.2",
@@ -250,6 +251,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 					"10.0.1.3:80": &BaseEndpointInfo{
 						ip:          "10.0.1.3",
@@ -259,6 +261,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 				},
 			},
@@ -280,6 +283,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 					"10.0.1.2:80": &BaseEndpointInfo{
 						ip:          "10.0.1.2",
@@ -289,6 +293,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 					"10.0.1.1:8080": &BaseEndpointInfo{
 						ip:          "10.0.1.1",
@@ -298,6 +303,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 					"10.0.1.2:8080": &BaseEndpointInfo{
 						ip:          "10.0.1.2",
@@ -307,6 +313,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 				},
 			},
@@ -349,6 +356,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ready:       true,
 						serving:     true,
 						terminating: false,
+						processing:  true,
 					},
 				},
 			},
