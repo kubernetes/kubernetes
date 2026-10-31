@@ -602,3 +602,131 @@ func newService(name string, svcType v1.ServiceType, allocateNodePort bool) *v1.
 		},
 	}
 }
+
+// TestQuotaNodeResourceMutation verifies that ResourceQuota enforcement and
+// accounting are independent of live Node.Status.Capacity/Allocatable changes
+func TestQuotaNodeResourceMutation(t *testing.T) {
+	ctx := ktesting.Init(t)
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+	})
+	defer tearDownFn()
+
+	cs := clientset.NewForConfigOrDie(kubeConfig)
+
+	ns := framework.CreateNamespaceOrDie(cs, "quota-node-resize", t)
+	defer framework.DeleteNamespaceOrDie(cs, ns, t)
+
+	informers := informers.NewSharedInformerFactory(cs, controller.NoResyncPeriodFunc())
+	discoveryFunc := cs.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
+	qc, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, informers)
+	if err != nil {
+		t.Fatalf("failed to install quota controller: %v", err)
+	}
+	informersStarted := make(chan struct{})
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, &resourcequotacontroller.ControllerOptions{
+		QuotaClient:               cs.CoreV1(),
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		ResyncPeriod:              controller.NoResyncPeriodFunc,
+		InformerFactory:           informers,
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      qc.IgnoredResources,
+		InformersStarted:          informersStarted,
+		Registry:                  generic.NewRegistry(qc.Evaluators()),
+	})
+	if err != nil {
+		t.Fatalf("failed to create resource quota controller: %v", err)
+	}
+	go resourceQuotaController.Run(ctx, 2)
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
+	informers.Start(ctx.Done())
+	close(informersStarted)
+
+	quota := &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: ns.Name},
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{v1.ResourceRequestsMemory: resource.MustParse("4Gi")},
+		},
+	}
+	waitForQuota(t, quota, cs)
+
+	node, err := cs.CoreV1().Nodes().Create(ctx, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "quota-node"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create node: %v", err)
+	}
+	setNodeMemory := func(mem string) {
+		t.Helper()
+		n, err := cs.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get node: %v", err)
+		}
+		q := resource.MustParse(mem)
+		n.Status.Capacity = v1.ResourceList{v1.ResourceMemory: q}
+		n.Status.Allocatable = v1.ResourceList{v1.ResourceMemory: q}
+		if _, err := cs.CoreV1().Nodes().UpdateStatus(ctx, n, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("failed to update node status to %s: %v", mem, err)
+		}
+	}
+	newPod := func(name, mem string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns.Name},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "container",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse(mem)},
+					},
+				}},
+			},
+		}
+	}
+	expectExceeded := func(name, mem string) {
+		t.Helper()
+		_, err := cs.CoreV1().Pods(ns.Name).Create(ctx, newPod(name, mem), metav1.CreateOptions{})
+		if !apierrors.IsForbidden(err) {
+			t.Fatalf("expected pod %s (%s) to be rejected with Forbidden for exceeding quota, got: %v", name, mem, err)
+		}
+	}
+	expectAdmitted := func(name, mem string) {
+		t.Helper()
+		if _, err := cs.CoreV1().Pods(ns.Name).Create(ctx, newPod(name, mem), metav1.CreateOptions{}); err != nil {
+			t.Fatalf("expected pod %s (%s) to be admitted within quota, got: %v", name, mem, err)
+		}
+	}
+	usedMemory := func(mem string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceRequestsMemory: resource.MustParse(mem)}
+	}
+
+	// Node capacity grows well past the quota: an over-quota pod must still be rejected.
+	setNodeMemory("4Gi")
+	setNodeMemory("64Gi")
+	expectExceeded("over-quota-after-grow", "5Gi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("0"))
+
+	// A pod within quota is admitted and accounted.
+	expectAdmitted("within-quota-1", "1Gi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("1Gi"))
+
+	// Node shrinks below current usage: Used is untouched, and pods within the remaining quota are still admitted.
+	setNodeMemory("512Mi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("1Gi"))
+	expectAdmitted("within-quota-2", "2Gi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("3Gi"))
+
+	// Remaining headroom is 1Gi, node shrink must not have widened or narrowed it.
+	expectExceeded("over-quota-after-shrink", "2Gi")
+	expectAdmitted("within-quota-3", "1Gi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("4Gi"))
+
+	// Grow again with the quota fully used: still no headroom.
+	setNodeMemory("128Gi")
+	expectExceeded("over-quota-full", "1Mi")
+	waitForUsedResourceQuota(t, cs, ns.Name, quota.Name, usedMemory("4Gi"))
+}
