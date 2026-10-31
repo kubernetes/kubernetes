@@ -572,7 +572,9 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	}
 
 	incomingPodHasNoTerms := len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0
-	if len(s.existingClusterWideAntiAffinityCounts) == 0 && incomingPodHasNoTerms && !mustEvaluateHostScopedAntiAffinity {
+	// Pod group preemption may add victims back after PreFilter. Keep the state so
+	// their anti-affinity can be evaluated during reprieve.
+	if len(s.existingClusterWideAntiAffinityCounts) == 0 && incomingPodHasNoTerms && !mustEvaluateHostScopedAntiAffinity && !cycleState.IsPodGroupSchedulingCycle() {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
