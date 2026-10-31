@@ -17,7 +17,6 @@ limitations under the License.
 package workqueue
 
 import (
-	"sync"
 	"time"
 
 	"k8s.io/utils/clock"
@@ -210,10 +209,6 @@ func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-var globalMetricsProvider MetricsProvider = noopMetricsProvider{}
-
-var setGlobalMetricsProviderOnce sync.Once
-
 func newQueueMetrics[T comparable](mp MetricsProvider, name string, clock clock.Clock) queueMetrics[T] {
 	if len(name) == 0 || mp == (noopMetricsProvider{}) {
 		return noMetrics[T]{}
@@ -238,7 +233,7 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 	}
 
 	if provider == nil {
-		provider = globalMetricsProvider
+		provider = globalMetricsFactory.getProvider()
 	}
 
 	return &defaultRetryMetrics{
@@ -246,10 +241,11 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 	}
 }
 
-// SetProvider sets the metrics provider for all subsequently created work
-// queues. Only the first call has an effect.
+// SetProvider registers a metrics provider for all subsequently created work
+// queues that do not specify their own provider. Metrics are sent to each
+// registered provider in registration order. Existing queues are not affected.
+// Nil providers are ignored. Callers are responsible for avoiding duplicate
+// registration of the same provider.
 func SetProvider(metricsProvider MetricsProvider) {
-	setGlobalMetricsProviderOnce.Do(func() {
-		globalMetricsProvider = metricsProvider
-	})
+	globalMetricsFactory.setProvider(metricsProvider)
 }
