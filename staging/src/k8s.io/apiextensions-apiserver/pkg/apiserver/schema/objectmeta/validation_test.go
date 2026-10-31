@@ -75,7 +75,7 @@ func TestValidateEmbeddedResource(t *testing.T) {
 			invalid("metadata", "name"),
 			invalid("metadata", "namespace"),
 			invalid("metadata", "labels"),      // key
-			invalid("metadata", "labels"),      // value
+			invalid("metadata", "labels[#]"),   // value
 			invalid("metadata", "annotations"), // key
 		}},
 	}
