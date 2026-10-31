@@ -17,69 +17,124 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-// TestNodeStatusCapacityMutationAccepted verifies that the API server accepts
-// live mutations to Node.Status.Capacity and Node.Status.Allocatable via
-// UpdateStatus, and that the new values are durable — a subsequent Get returns
-// exactly what was written.
-//
-// This is the API-layer contract that KEP-3953 (In-Place Node Resource Resize)
-// depends on: the control plane must not reject or silently discard changes to
-// node capacity that a hardware-resize agent writes after boot.
-func TestNodeStatusCapacityMutationAccepted(t *testing.T) {
+// TestNodeStatusCapacityMutation verifies that the API server accepts live
+// mutations to Node.Status.Capacity and Node.Status.Allocatable via
+// UpdateStatus (PUT) and merge patches on /status, that the new values are
+// durable, and that keys not named in a partial patch are left unchanged. It also pins
+// the node resource validation that rejects malformed capacity values.
+func TestNodeStatusCapacityMutation(t *testing.T) {
 	testCtx := testutils.InitTestAPIServer(t, "node-status-mutation", nil)
 	cs := testCtx.ClientSet
-	t.Cleanup(func() { testutils.CleanupNodes(cs, t) })
+
+	const gpu = v1.ResourceName("example.com/gpu")
+	baseResources := func() v1.ResourceList {
+		return v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("4"),
+			v1.ResourceMemory: resource.MustParse("8Gi"),
+			v1.ResourcePods:   resource.MustParse("110"),
+			gpu:               resource.MustParse("2"),
+		}
+	}
+	memoryPatch := []byte(`{"status":{"capacity":{"memory":"16Gi"},"allocatable":{"memory":"16Gi"}}}`)
 
 	tests := []struct {
 		name    string
-		initial v1.ResourceList
-		updated v1.ResourceList
+		mutate  func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error)
+		want    v1.ResourceList
+		wantErr bool
 	}{
 		{
-			name: "upscale: memory and CPU increase is persisted",
-			initial: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("8Gi"),
-				v1.ResourcePods:   resource.MustParse("110"),
+			name: "upscale: cpu and memory increase via UpdateStatus is persisted",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				for _, rl := range []v1.ResourceList{node.Status.Capacity, node.Status.Allocatable} {
+					rl[v1.ResourceCPU] = resource.MustParse("8")
+					rl[v1.ResourceMemory] = resource.MustParse("16Gi")
+				}
+				return cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
 			},
-			updated: v1.ResourceList{
+			want: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("8"),
 				v1.ResourceMemory: resource.MustParse("16Gi"),
 				v1.ResourcePods:   resource.MustParse("110"),
+				gpu:               resource.MustParse("2"),
 			},
 		},
 		{
-			name: "downscale: memory and CPU decrease is persisted",
-			initial: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("8"),
+			name: "downscale: cpu and memory decrease via UpdateStatus is persisted",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				for _, rl := range []v1.ResourceList{node.Status.Capacity, node.Status.Allocatable} {
+					rl[v1.ResourceCPU] = resource.MustParse("2")
+					rl[v1.ResourceMemory] = resource.MustParse("4Gi")
+				}
+				return cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+			},
+			want: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   resource.MustParse("110"),
+				gpu:               resource.MustParse("2"),
+			},
+		},
+		{
+			name: "json merge patch: only memory is patched, other keys unchanged",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				return cs.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, memoryPatch, metav1.PatchOptions{}, "status")
+			},
+			want: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("16Gi"),
 				v1.ResourcePods:   resource.MustParse("110"),
+				gpu:               resource.MustParse("2"),
 			},
-			updated: v1.ResourceList{
+		},
+		{
+			name: "strategic merge patch: only memory is patched, other keys unchanged",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				return cs.CoreV1().Nodes().Patch(ctx, node.Name, types.StrategicMergePatchType, memoryPatch, metav1.PatchOptions{}, "status")
+			},
+			want: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("8Gi"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
 				v1.ResourcePods:   resource.MustParse("110"),
+				gpu:               resource.MustParse("2"),
 			},
+		},
+		{
+			name: "validation: fractional pods is rejected",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				node.Status.Capacity[v1.ResourcePods] = resource.MustParse("1500m")
+				return cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+			},
+			wantErr: true,
+		},
+		{
+			name: "validation: negative cpu is rejected",
+			mutate: func(ctx context.Context, cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+				node.Status.Capacity[v1.ResourceCPU] = resource.MustParse("-1")
+				return cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "resize-node-",
-				},
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "resize-node-"},
 				Status: v1.NodeStatus{
-					Capacity:    tc.initial,
-					Allocatable: tc.initial,
+					Capacity:    baseResources(),
+					Allocatable: baseResources(),
 					Conditions: []v1.NodeCondition{
 						{Type: v1.NodeReady, Status: v1.ConditionTrue},
 					},
@@ -90,26 +145,36 @@ func TestNodeStatusCapacityMutationAccepted(t *testing.T) {
 				t.Fatalf("failed to create node: %v", err)
 			}
 
-			created.Status.Capacity = tc.updated
-			created.Status.Allocatable = tc.updated
-			if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, created, metav1.UpdateOptions{}); err != nil {
-				t.Fatalf("UpdateStatus rejected the capacity mutation: %v", err)
+			_, err = tc.mutate(testCtx.Ctx, cs, created)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected mutation to be rejected by validation, but it succeeded")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("mutation rejected unexpectedly: %v", err)
 			}
 
 			got, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, created.Name, metav1.GetOptions{})
 			if err != nil {
-				t.Fatalf("failed to get node after update: %v", err)
+				t.Fatalf("failed to get node after mutation: %v", err)
 			}
-			for _, res := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
-				wantCap := tc.updated[res]
-				wantAlloc := tc.updated[res]
-				gotCap := got.Status.Capacity[res]
-				gotAlloc := got.Status.Allocatable[res]
-				if wantCap.Cmp(gotCap) != 0 {
-					t.Errorf("Capacity[%s]: want %s, got %s", res, wantCap.String(), gotCap.String())
+
+			if len(got.Status.Capacity) != len(tc.want) {
+				t.Errorf("Capacity has %d keys, want %d: %v", len(got.Status.Capacity), len(tc.want), got.Status.Capacity)
+			}
+			if len(got.Status.Allocatable) != len(tc.want) {
+				t.Errorf("Allocatable has %d keys, want %d: %v", len(got.Status.Allocatable), len(tc.want), got.Status.Allocatable)
+			}
+			for res, want := range tc.want {
+				gotCap, ok := got.Status.Capacity[res]
+				if !ok || want.Cmp(gotCap) != 0 {
+					t.Errorf("Capacity[%s]: want %s, got %s (present=%v)", res, want.String(), gotCap.String(), ok)
 				}
-				if wantAlloc.Cmp(gotAlloc) != 0 {
-					t.Errorf("Allocatable[%s]: want %s, got %s", res, wantAlloc.String(), gotAlloc.String())
+				gotAlloc, ok := got.Status.Allocatable[res]
+				if !ok || want.Cmp(gotAlloc) != 0 {
+					t.Errorf("Allocatable[%s]: want %s, got %s (present=%v)", res, want.String(), gotAlloc.String(), ok)
 				}
 			}
 		})
