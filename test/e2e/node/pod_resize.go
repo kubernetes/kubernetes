@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -1040,8 +1041,12 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), initNodeAvailableCPU.MilliValue())
 
-		nodeAllocatableMem, initNodeAvailableMem, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
+		nodeAllocatableMem, _, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
 		framework.ExpectNoError(err, "failed to get Memory resources available for allocation")
+		initNodeAvailableMem, err := waitForStableNodeAvailability(ctx, f, &node, v1.ResourceMemory)
+		if err != nil {
+			e2eskipper.Skipf("available memory on node %s did not stabilize: %v", node.Name, err)
+		}
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
 			node.Name, nodeAllocatableMem.Value(), initNodeAvailableMem.Value())
 
@@ -1416,13 +1421,124 @@ func getBestNodeForResizeTest(ctx context.Context, f *framework.Framework) (v1.N
 		}
 	}
 	gomega.Expect(found).To(gomega.BeTrueBecause("failed to find any schedulable node with available resources"))
-	return bestNode, bestAllocatable, bestAvailable
+
+	// Wait for the namespaces of earlier tests of this run to be deleted
+	// before using node availability to size the test pods: the framework
+	// deletes each test's namespace without waiting for the deletion to
+	// complete, so pods of a previously run test can still hold their
+	// resource requests on the chosen node for several seconds into this
+	// test. When such a straggler is deleted mid-test, the freed capacity
+	// allows the kubelet to actuate a resize that the test expected to
+	// remain deferred.
+	if err := waitForPriorTestsCleanedUp(ctx, f.ClientSet, f.Namespace.Name); err != nil {
+		e2eskipper.Skipf("namespaces of earlier tests of this run were not cleaned up: %v", err)
+	}
+
+	stableAvailableCPU, err := waitForStableNodeAvailability(ctx, f, &bestNode, v1.ResourceCPU)
+	if err != nil {
+		e2eskipper.Skipf("available CPU on node %s did not stabilize: %v", bestNode.Name, err)
+	}
+	return bestNode, bestAllocatable, stableAvailableCPU
+}
+
+// waitForPriorTestsCleanedUp waits until the namespaces of earlier tests of
+// the current run have been deleted, and returns an error on timeout.
+// Namespaces are matched through the e2e-run label, which the framework sets
+// on every namespace it creates, so namespaces belonging to other test
+// binaries running concurrently (for example other shards or monitoring
+// extensions) are not waited for.
+func waitForPriorTestsCleanedUp(ctx context.Context, c clientset.Interface, ownNamespace string) error {
+	nsList, err := c.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: "e2e-run=" + string(framework.RunID),
+	})
+	if err != nil {
+		return err
+	}
+	var priorTestNamespaces []string
+	for _, ns := range nsList.Items {
+		if ns.Name != ownNamespace {
+			priorTestNamespaces = append(priorTestNamespaces, ns.Name)
+		}
+	}
+	return framework.WaitForNamespacesDeleted(ctx, c, priorTestNamespaces, 2*time.Minute)
+}
+
+// availabilitySampleInterval is the delay between consecutive samples of a
+// node's available resources when waiting for the reading to stabilize.
+const availabilitySampleInterval = 5 * time.Second
+
+// waitForStableNodeAvailability returns the quantity of resourceName
+// available for allocation on the node, once the same value has been observed
+// on two consecutive samples taken availabilitySampleInterval apart, and an
+// error if the reading does not stabilize before the timeout. A transient
+// reading (for example, while workloads evicted or deleted by an earlier test
+// are being rescheduled onto the node) must not be used to size the deferred
+// resize tests' pods: the tests rely on the node remaining exactly full for
+// their duration.
+func waitForStableNodeAvailability(ctx context.Context, f *framework.Framework, node *v1.Node, resourceName v1.ResourceName) (resource.Quantity, error) {
+	var available resource.Quantity
+	stable := false
+	err := wait.PollUntilContextTimeout(ctx, availabilitySampleInterval, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		_, current, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, resourceName)
+		if err != nil {
+			return false, err
+		}
+		if stable && current.Equal(available) {
+			available = current
+			return true, nil
+		}
+		available, stable = current, true
+		return false, nil
+	})
+	return available, err
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
-		return helpers.IsPodResizeDeferred(pod), nil
+		if helpers.IsPodResizeDeferred(pod) {
+			return true, nil
+		}
+		if helpers.IsPodResizeInfeasible(pod) {
+			// Infeasible is a terminal resize state: the resize can never become deferred.
+			return false, gomega.StopTrying(fmt.Sprintf("resize of pod %s/%s was marked infeasible instead of deferred", pod.Namespace, pod.Name))
+		}
+		if resizeActuated(pod) {
+			// The kubelet accepted the resize, so it can never become deferred. This
+			// usually means node capacity changed after the test pods were created,
+			// invalidating the premise that the resized pod cannot fit on the node.
+			return false, gomega.StopTrying(fmt.Sprintf("resize of pod %s/%s was actuated instead of remaining deferred (%s). If the resources reported as available there exceed what this test measured at startup, the test premise was invalidated by capacity churn from outside the test; otherwise the kubelet actuated a resize that did not fit", pod.Namespace, pod.Name, nodeAvailabilitySummary(ctx, f, pod.Spec.NodeName)))
+		}
+		return false, nil
 	}))
+}
+
+// resizeActuated reports whether the kubelet has accepted the pod's desired
+// resource requests. status.allocatedResources is only updated to the desired
+// values once a resize is actuated; while a resize is pending, deferred or
+// infeasible it continues to reflect the previously accepted values.
+func resizeActuated(pod *v1.Pod) bool {
+	if pod.Status.AllocatedResources == nil {
+		return false
+	}
+	return apiequality.Semantic.DeepEqual(pod.Status.AllocatedResources, helpers.PodRequests(pod, helpers.PodResourcesOptions{}))
+}
+
+// nodeAvailabilitySummary describes the resources currently available for
+// allocation on the given node, for inclusion in failure messages.
+func nodeAvailabilitySummary(ctx context.Context, f *framework.Framework, nodeName string) string {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Sprintf("failed to get node %s: %v", nodeName, err)
+	}
+	_, availableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceCPU)
+	if err != nil {
+		return fmt.Sprintf("failed to get CPU available for allocation on node %s: %v", nodeName, err)
+	}
+	_, availableMemory, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceMemory)
+	if err != nil {
+		return fmt.Sprintf("failed to get memory available for allocation on node %s: %v", nodeName, err)
+	}
+	return fmt.Sprintf("node %s currently has %dm CPU and %d bytes of memory available for allocation", nodeName, availableCPU.MilliValue(), availableMemory.Value())
 }
 
 func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
