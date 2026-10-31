@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -25,15 +26,15 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// statusError is an object that can be converted into an metav1.Status
+// statusError is an object that can be converted into a metav1.Status
 type statusError interface {
 	Status() metav1.Status
 }
 
-// ErrorToAPIStatus converts an error to an metav1.Status object.
+// ErrorToAPIStatus converts an error to a metav1.Status object.
 func ErrorToAPIStatus(err error) *metav1.Status {
-	switch t := err.(type) {
-	case statusError:
+	var t statusError
+	if errors.As(err, &t) {
 		status := t.Status()
 		if len(status.Status) == 0 {
 			status.Status = metav1.StatusFailure
@@ -57,27 +58,26 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		status.APIVersion = "v1"
 		//TODO: check for invalid responses
 		return &status
-	default:
-		status := http.StatusInternalServerError
-		switch {
-		//TODO: replace me with NewConflictErr
-		case storage.IsConflict(err):
-			status = http.StatusConflict
-		}
-		// Log errors that were not converted to an error status
-		// by REST storage - these typically indicate programmer
-		// error by not using pkg/api/errors, or unexpected failure
-		// cases.
-		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
-		return &metav1.Status{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Status",
-				APIVersion: "v1",
-			},
-			Status:  metav1.StatusFailure,
-			Code:    int32(status),
-			Reason:  metav1.StatusReasonUnknown,
-			Message: err.Error(),
-		}
+	}
+
+	status := http.StatusInternalServerError
+	//TODO: replace me with NewConflictErr
+	if storage.IsConflict(err) {
+		status = http.StatusConflict
+	}
+	// Log errors that were not converted to an error status
+	// by REST storage - these typically indicate programmer
+	// error by not using pkg/api/errors, or unexpected failure
+	// cases.
+	runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %w (type %T)", err, err))
+	return &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  metav1.StatusFailure,
+		Code:    int32(status),
+		Reason:  metav1.StatusReasonUnknown,
+		Message: err.Error(),
 	}
 }
