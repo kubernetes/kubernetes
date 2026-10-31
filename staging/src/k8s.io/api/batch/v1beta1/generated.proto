@@ -117,16 +117,16 @@ message CronJobSpec {
 
 // CronJobStatus represents the current state of a cron job.
 message CronJobStatus {
-  // A list of pointers to currently running jobs.
+  // active is a list of pointers to currently running jobs.
   // +optional
   // +listType=atomic
   repeated .k8s.io.api.core.v1.ObjectReference active = 1;
 
-  // Information when was the last time the job was successfully scheduled.
+  // lastScheduleTime is the time when the job was last successfully scheduled.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScheduleTime = 4;
 
-  // Information when was the last time the job successfully completed.
+  // lastSuccessfulTime is the time when the job last successfully completed.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
 }
