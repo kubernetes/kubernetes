@@ -36,6 +36,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -48,6 +49,7 @@ type diffFlags struct {
 	apiServerManifestPath         string
 	controllerManagerManifestPath string
 	schedulerManifestPath         string
+	etcdManifestPath              string
 	newK8sVersionStr              string
 	contextLines                  int
 	kubeConfigPath                string
@@ -63,6 +65,7 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 		apiServerManifestPath:         constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory()),
 		controllerManagerManifestPath: constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory()),
 		schedulerManifestPath:         constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory()),
+		etcdManifestPath:              constants.GetStaticPodFilepath(constants.Etcd, constants.GetStaticPodDirectory()),
 	}
 
 	cmd := &cobra.Command{
@@ -154,6 +157,13 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	initCfg.ClusterConfiguration.KubernetesVersion = flags.newK8sVersionStr
 
 	specs := controlplane.GetStaticPodSpecs(&initCfg.ClusterConfiguration, &initCfg.LocalAPIEndpoint, nil)
+	// The upgrade also rewrites the etcd manifest when etcd is managed by kubeadm.
+	if initCfg.Etcd.Local != nil {
+		if err := validateManifestsPath(flags.etcdManifestPath); err != nil {
+			return err
+		}
+		specs[constants.Etcd] = etcdphase.GetEtcdPodSpec(&initCfg.ClusterConfiguration, &initCfg.LocalAPIEndpoint, initCfg.NodeRegistration.Name, nil)
+	}
 	for spec, pod := range specs {
 		var path string
 		switch spec {
@@ -163,6 +173,8 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 			path = flags.controllerManagerManifestPath
 		case constants.KubeScheduler:
 			path = flags.schedulerManifestPath
+		case constants.Etcd:
+			path = flags.etcdManifestPath
 		default:
 			klog.Errorf("[diff] unknown spec %v", spec)
 			continue
