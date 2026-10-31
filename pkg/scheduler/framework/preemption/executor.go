@@ -84,7 +84,8 @@ type Executor struct {
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
 	// PreemptPod is a function that actually preempts a specific Pod. It returns true
-	// when the victim was preempted only in scheduler memory, without a delete call.
+	// when the victim was preempted without producing a deletion event (e.g. only in
+	// scheduler memory, or when the victim was already deleted).
 	// This is exposed to be replaced during tests.
 	PreemptPod func(ctx context.Context, c fwk.PreemptionCandidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
@@ -139,7 +140,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 						return false, err
 					}
 					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-					return false, nil
+					return true, nil
 				}
 			}
 			if err := schedutil.DeletePod(ctx, fh.ClientSet(), victim); err != nil {
@@ -148,7 +149,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 					return false, err
 				}
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-				return false, nil
+				return true, nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 		} else {
