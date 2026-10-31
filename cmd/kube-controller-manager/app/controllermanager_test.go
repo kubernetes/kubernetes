@@ -238,7 +238,7 @@ func TestRunControllers(t *testing.T) {
 			ctx, cancelController := context.WithCancel(ctx)
 			cancelController()
 
-			cleanShutdown := RunControllers(ctx, controllerCtx, controllers, 0, tc.shutdownTimeout)
+			cleanShutdown := RunControllers(ctx, controllers, tc.shutdownTimeout)
 			if cleanShutdown != tc.expectedCleanTermination {
 				t.Errorf("expected clean shutdown %v, got %v", tc.expectedCleanTermination, cleanShutdown)
 			}
@@ -262,6 +262,6 @@ func runControllers(
 	if err != nil {
 		return err
 	}
-	RunControllers(ctx, controllerCtx, controllers, 0, 0)
+	RunControllers(ctx, controllers, 0)
 	return nil
 }
