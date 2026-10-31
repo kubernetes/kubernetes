@@ -3043,37 +3043,28 @@ type fakePodActivator struct {
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
-// TestPreemptNominationExtensions checks that plugins with
-// NominationExtensions learn about the nomination before the first victim
-// gets preempted, and that the nomination gets removed when preempting the
-// victims fails.
+// TestPreemptNominationExtensions checks that preemption leaves plugins with
+// NominationExtensions alone. Preparing the nomination is up to the
+// framework, once PostFilter nominated the pod.
 func TestPreemptNominationExtensions(t *testing.T) {
 	metrics.Register()
 	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
 	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
-	addCall := "AddNominatedPod default/p node1"
-	removeCall := "RemoveNominatedPod default/p node1 assigned="
 
 	for name, tc := range map[string]struct {
 		asyncPreemption bool
 		deleteErr       error
-		wantCalls       []string
 	}{
-		"sync": {
-			wantCalls: []string{addCall},
-		},
+		"sync": {},
 		"sync-failure": {
 			deleteErr: errors.New("injected delete error"),
-			wantCalls: []string{addCall, removeCall},
 		},
 		"async": {
 			asyncPreemption: true,
-			wantCalls:       []string{addCall},
 		},
 		"async-failure": {
 			asyncPreemption: true,
 			deleteErr:       errors.New("injected delete error"),
-			wantCalls:       []string{addCall, removeCall},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -3146,8 +3137,8 @@ func TestPreemptNominationExtensions(t *testing.T) {
 
 			select {
 			case callsAtDeletion := <-deleted:
-				if diff := cmp.Diff([]string{addCall}, callsAtDeletion); diff != "" {
-					t.Errorf("Unexpected calls when the victim got deleted (-want, +got):\n%s", diff)
+				if len(callsAtDeletion) > 0 {
+					t.Errorf("Unexpected calls when the victim got deleted: %v", callsAtDeletion)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Fatal("victim was not deleted")
@@ -3159,8 +3150,8 @@ func TestPreemptNominationExtensions(t *testing.T) {
 			}); err != nil {
 				t.Errorf("Waiting for the end of the preemption: %v", err)
 			}
-			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+			if calls := nominationExtensions.Calls(); len(calls) > 0 {
+				t.Errorf("Unexpected calls: %v", calls)
 			}
 		})
 	}
