@@ -58,6 +58,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-base/logs/datapol"
 )
 
 const DefaultConfigzPath = "/configz"
@@ -104,7 +105,9 @@ func Delete(name string) {
 	delete(configs, name)
 }
 
-// Set sets the ComponentConfig for this Config.
+// Set sets the ComponentConfig for this Config. It stores a redacted deep copy
+// so that any field tagged with `datapolicy` (e.g. credentials) is not served
+// over the "/configz" endpoint.
 func (v *Config) Set(val runtime.Object) error {
 	configsGuard.Lock()
 	defer configsGuard.Unlock()
@@ -121,11 +124,15 @@ func (v *Config) Set(val runtime.Object) error {
 	if gvk.Version == runtime.APIVersionInternal {
 		return fmt.Errorf("val must specify an external version")
 	}
-	v.val = val
+	redacted := val.DeepCopyObject()
+	if err := datapol.Redact(redacted); err != nil {
+		return fmt.Errorf("failed to redact sensitive fields: %w", err)
+	}
+	v.val = redacted
 	return nil
 }
 
-// MarshalJSON marshals the ComponentConfig as JSON data.
+// MarshalJSON marshals the already-redacted ComponentConfig as JSON data.
 func (v *Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.val)
 }
