@@ -203,6 +203,12 @@ func updateConsumableCapacity(slice *resourceapi.ResourceSlice, deviceNum int, u
 	slice.Spec.Devices[deviceNum].Capacity["a"] = cap
 }
 
+// spellFirstValidValueTwice turns validValues 5, 10, 100 into 5, 5.0, 100 and moves the default to 5.
+func spellFirstValidValueTwice(cap *resourceapi.DeviceCapacity) {
+	cap.RequestPolicy.Default = new(resource.MustParse("5"))
+	cap.RequestPolicy.ValidValues[1] = resource.MustParse("5.0")
+}
+
 func consumeableCapacityPath(deviceNum int) *field.Path {
 	return field.NewPath("spec", "devices").Index(deviceNum).Child("capacity").Key("a")
 }
@@ -1104,7 +1110,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				field.Invalid(consumeableCapacityPath(2).Child("requestPolicy", "validValues"), "-1", "default value is not valid according to the requestPolicy"),
 				field.Forbidden(consumeableCapacityPath(4).Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
 				field.Invalid(consumeableCapacityPath(7).Child("requestPolicy", "validRange", "default"), "1050m", "default is less than min: 1100m"),
-				field.Duplicate(consumeableCapacityPath(8).Child("requestPolicy", "validValues").Index(1), "10"),
+				field.Invalid(consumeableCapacityPath(8).Child("requestPolicy", "validValues").Index(1), "10", "values must be sorted in strictly ascending order"),
 			},
 		},
 		"consumable-capacity-fractional": {
@@ -2402,7 +2408,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		"consumable-capacity-valid-values-integer": {
 			consumableCapacityFeatureGate:      true,
 			fractionalCapacityRangeFeatureGate: false,
-			wantFailures:                       field.ErrorList{field.Duplicate(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "10")},
+			wantFailures:                       field.ErrorList{field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "10", "values must be sorted in strictly ascending order")},
 			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
@@ -2432,6 +2438,46 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			}(),
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       field.ErrorList{field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "5", "values must be sorted in strictly ascending order")},
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// A label change does not recheck the stored pair.
+				slice.Labels = map[string]string{"updated": "true"}
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate-rechecked": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       field.ErrorList{field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "5", "values must be sorted in strictly ascending order")},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// Changing the capacity validates it again, stored pair included.
+				slice.Spec.Devices[0].Capacity["b"] = resourceapi.DeviceCapacity{Value: resource.MustParse("1")}
+				return slice
+			},
 		},
 		"consumable-capacity-valid-range-out-of-int64-bound": {
 			consumableCapacityFeatureGate: true,
