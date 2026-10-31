@@ -59,6 +59,61 @@ func (_m *MockProvider) EXPECT() *MockProvider_Expecter {
 	return &MockProvider_Expecter{mock: &_m.Mock}
 }
 
+// GetCachedMachineInfo provides a mock function for the type MockProvider
+func (_mock *MockProvider) GetCachedMachineInfo() (*model.MachineInfo, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCachedMachineInfo")
+	}
+
+	var r0 *model.MachineInfo
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*model.MachineInfo, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *model.MachineInfo); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.MachineInfo)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockProvider_GetCachedMachineInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCachedMachineInfo'
+type MockProvider_GetCachedMachineInfo_Call struct {
+	*mock.Call
+}
+
+// GetCachedMachineInfo is a helper method to define mock.On call
+func (_e *MockProvider_Expecter) GetCachedMachineInfo() *MockProvider_GetCachedMachineInfo_Call {
+	return &MockProvider_GetCachedMachineInfo_Call{Call: _e.mock.On("GetCachedMachineInfo")}
+}
+
+func (_c *MockProvider_GetCachedMachineInfo_Call) Run(run func()) *MockProvider_GetCachedMachineInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockProvider_GetCachedMachineInfo_Call) Return(machineInfo *model.MachineInfo, err error) *MockProvider_GetCachedMachineInfo_Call {
+	_c.Call.Return(machineInfo, err)
+	return _c
+}
+
+func (_c *MockProvider_GetCachedMachineInfo_Call) RunAndReturn(run func() (*model.MachineInfo, error)) *MockProvider_GetCachedMachineInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCgroupCPUAndMemoryStats provides a mock function for the type MockProvider
 func (_mock *MockProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, error) {
 	ret := _mock.Called(cgroupName, updateStats)
