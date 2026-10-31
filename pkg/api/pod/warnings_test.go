@@ -1113,6 +1113,58 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
+			name: "terminationGracePeriodSeconds is zero",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(0)),
+				},
+			},
+			expected: []string{
+				`spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion`,
+			},
+		},
+		{
+			name: "terminationGracePeriodSeconds is one",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "terminationGracePeriodSeconds is zero, probe sets its own",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(0)),
+					Containers: []api.Container{{
+						Name:          "foo",
+						LivenessProbe: &api.Probe{TerminationGracePeriodSeconds: new(int64(5))},
+					}},
+				},
+			},
+			expected: []string{
+				`spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion`,
+			},
+		},
+		{
+			name:        "terminationGracePeriodSeconds changed from one to zero",
+			template:    &api.PodTemplateSpec{Spec: api.PodSpec{TerminationGracePeriodSeconds: new(int64(0))}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{TerminationGracePeriodSeconds: new(int64(1))}},
+			expected: []string{
+				`spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion`,
+			},
+		},
+		{
+			name:        "terminationGracePeriodSeconds changed from zero to one",
+			template:    &api.PodTemplateSpec{Spec: api.PodSpec{TerminationGracePeriodSeconds: new(int64(1))}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{TerminationGracePeriodSeconds: new(int64(0))}},
+			expected:    nil,
+		},
+		{
 			name: "null LabelSelector in topologySpreadConstraints",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
@@ -2034,6 +2086,63 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
 			if len(actual) > 0 {
 				t.Errorf("unexpected template-only warnings on pod: %v", actual)
+			}
+		})
+	}
+}
+
+// The warning is for the request that sets 0, not for every update of a stored 0.
+func TestZeroTerminationGracePeriodWarningOnUpdate(t *testing.T) {
+	grace := func(seconds *int64) *api.PodTemplateSpec {
+		return &api.PodTemplateSpec{Spec: api.PodSpec{TerminationGracePeriodSeconds: seconds}}
+	}
+	warning := []string{"spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion"}
+	testcases := []struct {
+		name     string
+		old, new *api.PodTemplateSpec
+		expected []string
+	}{
+		{name: "stays zero", old: grace(new(int64(0))), new: grace(new(int64(0)))},
+		{name: "set from unset", old: grace(nil), new: grace(new(int64(0))), expected: warning},
+		{name: "set from one", old: grace(new(int64(1))), new: grace(new(int64(0))), expected: warning},
+		{name: "set from negative", old: grace(new(int64(-1))), new: grace(new(int64(0))), expected: warning},
+		{name: "cleared", old: grace(new(int64(0))), new: grace(new(int64(1)))},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetWarningsForPodTemplate(t.Context(), nil, tc.new, tc.old)
+			if diff := cmp.Diff(actual, tc.expected, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("bad warning output; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestZeroTerminationGracePeriodWarningPath(t *testing.T) {
+	const message = ": 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion"
+	spec := api.PodSpec{TerminationGracePeriodSeconds: new(int64(0))}
+
+	t.Run("pod", func(t *testing.T) {
+		actual := GetWarningsForPod(t.Context(), &api.Pod{Spec: spec}, nil)
+		if diff := cmp.Diff(actual, []string{"spec.terminationGracePeriodSeconds" + message}); diff != "" {
+			t.Errorf("bad warning output; diff (-got +want)\n%s", diff)
+		}
+	})
+
+	testcases := []struct {
+		name     string
+		prefix   *field.Path
+		expected string
+	}{
+		{name: "workload template", prefix: field.NewPath("spec", "template"), expected: "spec.template.spec.terminationGracePeriodSeconds" + message},
+		// The CronJob strategy passes spec.jobTemplate.spec and pkg/api/job adds template.
+		{name: "cronjob template", prefix: field.NewPath("spec", "jobTemplate", "spec", "template"), expected: "spec.jobTemplate.spec.template.spec.terminationGracePeriodSeconds" + message},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetWarningsForPodTemplate(t.Context(), tc.prefix, &api.PodTemplateSpec{Spec: spec}, nil)
+			if diff := cmp.Diff(actual, []string{tc.expected}); diff != "" {
+				t.Errorf("bad warning output; diff (-got +want)\n%s", diff)
 			}
 		})
 	}
