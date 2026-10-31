@@ -118,6 +118,7 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 
 		httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 		httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
+		apirequest.TrackAPFClassification(ctx, fs.Name, pl.Name)
 	}
 	// estimateWork is called, if at all, after noteFn
 	estimateWork := func() flowcontrolrequest.WorkEstimate {

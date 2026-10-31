@@ -169,6 +169,14 @@ type LatencyTrackers struct {
 	// ImpersonationTracker tracks the latency incurred in resolving impersonation.
 	// This includes mode selection, authorization checks, and cache lookups.
 	ImpersonationTracker DurationTracker
+
+	// apfFlowSchema is the name of the priority & fairness FlowSchema
+	// that matched the request.
+	apfFlowSchema string
+
+	// apfPriorityLevel is the name of the priority & fairness
+	// PriorityLevelConfiguration the request was assigned to.
+	apfPriorityLevel string
 }
 
 type latencyTrackersKeyType int
@@ -280,6 +288,17 @@ func TrackAPFQueueWaitLatency(ctx context.Context, d time.Duration) {
 	}
 }
 
+// TrackAPFClassification records the priority & fairness flow schema
+// and priority level the request was classified into. No mutex lock is
+// needed because the APF filter sets it once, before the audit filter
+// reads it.
+func TrackAPFClassification(ctx context.Context, flowSchema, priorityLevel string) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.apfFlowSchema = flowSchema
+		tracker.apfPriorityLevel = priorityLevel
+	}
+}
+
 // TrackDecodeLatency is used to track latency incurred inside the function
 // that takes an object returned from the underlying storage layer
 // (etcd) and performs decoding of the response object.
@@ -312,6 +331,8 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
 		decodeLatencyKey            = "apiserver.latency.k8s.io/decode-response-object"
 		apfQueueWaitLatencyKey      = "apiserver.latency.k8s.io/apf-queue-wait"
+		apfFlowSchemaKey            = "apiserver.latency.k8s.io/apf-flow-schema"
+		apfPriorityLevelKey         = "apiserver.latency.k8s.io/apf-priority-level"
 		authenticationLatencyKey    = "apiserver.latency.k8s.io/authentication"
 		authorizationLatencyKey     = "apiserver.latency.k8s.io/authorization"
 		impersonationLatencyKey     = "apiserver.latency.k8s.io/impersonation"
@@ -355,6 +376,12 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.ImpersonationTracker.GetLatency(); latency != 0 {
 		annotations[impersonationLatencyKey] = latency.String()
+	}
+	if tracker.apfFlowSchema != "" {
+		annotations[apfFlowSchemaKey] = tracker.apfFlowSchema
+	}
+	if tracker.apfPriorityLevel != "" {
+		annotations[apfPriorityLevelKey] = tracker.apfPriorityLevel
 	}
 	return annotations
 }
