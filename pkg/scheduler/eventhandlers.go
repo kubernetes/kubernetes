@@ -348,7 +348,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
-	if hasNominatedNodeNameChanged(oldPod, newPod) {
+	// With DRAPreemption, the scheduling queue lets pods retry when the
+	// nomination ends in memory.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) && hasNominatedNodeNameChanged(oldPod, newPod) {
 		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
@@ -371,7 +373,8 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
 		// In that case, we need to notify about the release of resources that were held by different assume/nomination
-		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
+		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed. With DRAPreemption,
+		// SchedulingQueue.Delete already let pods retry which the nomination of the pod blocked.
 		return
 	}
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
@@ -389,7 +392,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	if sched.podGroupHierarchyTracker != nil {
 		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
 	}
-	if pod.Status.NominatedNodeName != "" {
+	// With DRAPreemption, pods which the nomination of the deleted pod
+	// blocked got moved by SchedulingQueue.Delete, which removed the
+	// nomination.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) && pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
 		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,

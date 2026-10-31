@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -108,6 +109,9 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 		name                  string
 		updateFunc            func(s *Scheduler)
 		wantInActiveOrBackoff sets.Set[string]
+		// wantInActiveOrBackoffWithoutDRAPreemption, if set, replaces
+		// wantInActiveOrBackoff without the DRAPreemption feature gate.
+		wantInActiveOrBackoffWithoutDRAPreemption sets.Set[string]
 	}{
 		{
 			name: "Update of a nominated node name to a different value should trigger rescheduling of lower priority pods",
@@ -117,7 +121,9 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			// With DRAPreemption, the pod itself does not retry because its nomination changed.
+			wantInActiveOrBackoff:                     sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+			wantInActiveOrBackoffWithoutDRAPreemption: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
@@ -127,7 +133,8 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff:                     sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+			wantInActiveOrBackoffWithoutDRAPreemption: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",
@@ -149,70 +156,84 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+				wantInActiveOrBackoff := tt.wantInActiveOrBackoff
+				if !draPreemption && tt.wantInActiveOrBackoffWithoutDRAPreemption != nil {
+					wantInActiveOrBackoff = tt.wantInActiveOrBackoffWithoutDRAPreemption
+				}
 
-			var objs []runtime.Object
-			for _, pod := range unschedulablePods {
-				objs = append(objs, pod)
-			}
-			client := fake.NewClientset(objs...)
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
 
-			// apiDispatcher is unused in the test, but intializing it anyway.
-			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
-			apiDispatcher.Run(logger)
-			defer apiDispatcher.Close()
+				var objs []runtime.Object
+				for _, pod := range unschedulablePods {
+					objs = append(objs, pod)
+				}
+				client := fake.NewClientset(objs...)
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				// The nominator only accepts pods which the lister knows.
+				for _, pod := range unschedulablePods {
+					if err := informerFactory.Core().V1().Pods().Informer().GetStore().Add(pod); err != nil {
+						t.Fatal(err)
+					}
+				}
 
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-			queue := internalqueue.NewPriorityQueue(
-				newDefaultQueueSort(),
-				informerFactory,
-				internalqueue.WithMetricsRecorder(recorder),
-				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
-				internalqueue.WithAPIDispatcher(apiDispatcher),
-				// disable backoff queue
-				internalqueue.WithPodInitialBackoffDuration(0),
-				internalqueue.WithPodMaxBackoffDuration(0))
-			schedulerCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+				// apiDispatcher is unused in the test, but intializing it anyway.
+				apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
 
-			// Put test pods into unschedulable queue
-			for _, pod := range unschedulablePods {
-				queue.Add(ctx, pod)
-				entity, err := queue.Pop(logger)
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(
+					newDefaultQueueSort(),
+					informerFactory,
+					internalqueue.WithMetricsRecorder(recorder),
+					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithAPIDispatcher(apiDispatcher),
+					// disable backoff queue
+					internalqueue.WithPodInitialBackoffDuration(0),
+					internalqueue.WithPodMaxBackoffDuration(0))
+				schedulerCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+
+				// Put test pods into unschedulable queue
+				for _, pod := range unschedulablePods {
+					queue.Add(ctx, pod)
+					entity, err := queue.Pop(logger)
+					if err != nil {
+						t.Fatalf("Pop failed: %v", err)
+					}
+					poppedPod := entity.(*framework.QueuedPodInfo)
+					poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+					if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+					}
+				}
+
+				s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
 				if err != nil {
-					t.Fatalf("Pop failed: %v", err)
+					t.Fatalf("Failed to initialize test scheduler: %v", err)
 				}
-				poppedPod := entity.(*framework.QueuedPodInfo)
-				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
-				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+
+				if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
+					t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
 				}
-			}
+				tt.updateFunc(s)
 
-			s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
-			if err != nil {
-				t.Fatalf("Failed to initialize test scheduler: %v", err)
-			}
-
-			if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
-				t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
-			}
-			tt.updateFunc(s)
-
-			podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
-			podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
-			if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
-				t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
-			}
-			for _, pod := range podsInActiveOrBackoff {
-				if !tt.wantInActiveOrBackoff.Has(pod.Name) {
-					t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
+				podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
+				podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
+				if len(podsInActiveOrBackoff) != len(wantInActiveOrBackoff) {
+					t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, wantInActiveOrBackoff)
 				}
-			}
-		})
+				for _, pod := range podsInActiveOrBackoff {
+					if !wantInActiveOrBackoff.Has(pod.Name) {
+						t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
+					}
+				}
+			})
+		}
 	}
 }
 
