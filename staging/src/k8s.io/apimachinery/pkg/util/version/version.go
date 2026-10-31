@@ -88,6 +88,18 @@ func parse(str string, semver bool) (*Version, error) {
 	return v, nil
 }
 
+func isNumericIdentifier(identifier string) bool {
+	if identifier == "" || (len(identifier) > 1 && identifier[0] == '0') {
+		return false
+	}
+	for i := range identifier {
+		if identifier[i] < '0' || identifier[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // HighestSupportedVersion returns the highest supported version
 // This function assumes that the highest supported version must be v1.x.
 func HighestSupportedVersion(versions []string) (*Version, error) {
@@ -372,19 +384,21 @@ func (v *Version) compareInternal(other *Version) int {
 	vPR := strings.Split(v.preRelease, ".")
 	oPR := strings.Split(other.preRelease, ".")
 	for i := 0; i < len(vPR) && i < len(oPR); i++ {
-		vNum, err := strconv.ParseUint(vPR[i], 10, 0)
-		if err == nil {
-			oNum, err := strconv.ParseUint(oPR[i], 10, 0)
-			if err == nil {
-				switch {
-				case oNum < vNum:
-					return 1
-				case oNum > vNum:
-					return -1
-				default:
-					continue
-				}
+		vNumeric := isNumericIdentifier(vPR[i])
+		oNumeric := isNumericIdentifier(oPR[i])
+		switch {
+		case vNumeric && oNumeric:
+			// Valid numeric identifiers have no leading zeroes and no size limit.
+			if len(vPR[i]) < len(oPR[i]) {
+				return -1
 			}
+			if len(vPR[i]) > len(oPR[i]) {
+				return 1
+			}
+		case vNumeric:
+			return -1
+		case oNumeric:
+			return 1
 		}
 		if oPR[i] < vPR[i] {
 			return 1
