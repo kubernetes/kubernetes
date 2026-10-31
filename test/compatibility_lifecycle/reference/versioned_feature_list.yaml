@@ -953,6 +953,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.29"
+- name: KubeAPIServerWorkloadsTrust
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: KubeletAllocatedPodsEndpoint
   versionedSpecs:
   - default: false
