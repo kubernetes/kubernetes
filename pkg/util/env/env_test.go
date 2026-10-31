@@ -54,9 +54,8 @@ func TestGetEnvAsIntOrFallback(t *testing.T) {
 	t.Setenv(key, "not-an-int")
 	returnVal, err := GetEnvAsIntOrFallback(key, 1)
 	assert.Equal(expected, returnVal)
-	if err == nil {
-		t.Error("expected error")
-	}
+	assert.ErrorContains(err, `failed to parse env var "FLOCKER_SET_VAR" as int:`)
+	assert.ErrorIs(err, strconv.ErrSyntax)
 }
 
 func TestGetEnvAsFloat64OrFallback(t *testing.T) {
@@ -77,5 +76,6 @@ func TestGetEnvAsFloat64OrFallback(t *testing.T) {
 	t.Setenv(key, "not-a-float")
 	returnVal, err := GetEnvAsFloat64OrFallback(key, 1.0)
 	assert.Equal(expected, returnVal)
-	assert.EqualError(err, "strconv.ParseFloat: parsing \"not-a-float\": invalid syntax")
+	assert.ErrorContains(err, `failed to parse env var "FLOCKER_SET_VAR" as float64:`)
+	assert.ErrorIs(err, strconv.ErrSyntax)
 }
