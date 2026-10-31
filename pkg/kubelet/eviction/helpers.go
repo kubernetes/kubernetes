@@ -1144,6 +1144,15 @@ func isHardEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.GracePeriod == time.Duration(0)
 }
 
+// evictionType returns the eviction_type metric label value (hard or soft) for the
+// given threshold, based on the same grace period check used to drive eviction behavior.
+func evictionType(threshold evictionapi.Threshold) string {
+	if isHardEvictionThreshold(threshold) {
+		return evictionTypeHard
+	}
+	return evictionTypeSoft
+}
+
 func isAllocatableEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable
 }
