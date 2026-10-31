@@ -2090,6 +2090,37 @@ func TestBody(t *testing.T) {
 	}
 }
 
+func TestNewWatchEventDecoder(t *testing.T) {
+	tests := []struct {
+		name              string
+		featureEnabled    bool
+		sendInitialEvents string
+		wantConcurrent    bool
+	}{
+		{name: "feature enabled with initial events", featureEnabled: true, sendInitialEvents: "true", wantConcurrent: true},
+		{name: "feature disabled with initial events", sendInitialEvents: "true", wantConcurrent: false},
+		{name: "feature enabled without initial events", featureEnabled: true, wantConcurrent: false},
+		{name: "feature enabled with initial events disabled", featureEnabled: true, sendInitialEvents: "false", wantConcurrent: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, tt.featureEnabled)
+			r := &Request{params: url.Values{
+				"sendInitialEvents": {tt.sendInitialEvents},
+			}}
+			stream := streaming.NewDecoder(io.NopCloser(strings.NewReader("")), scheme.Codecs.UniversalDecoder())
+			decoder := r.newWatchEventDecoder(stream, scheme.Codecs.UniversalDecoder())
+			t.Cleanup(decoder.Close)
+
+			if tt.wantConcurrent {
+				require.IsType(t, &restclientwatch.ConcurrentWatchEventDecoder{}, decoder)
+			} else {
+				require.IsType(t, &restclientwatch.Decoder{}, decoder)
+			}
+		})
+	}
+}
+
 func TestWatch(t *testing.T) {
 	tests := []struct {
 		name       string
