@@ -52,6 +52,14 @@ const (
 	kubeProxyPort = 10249
 )
 
+// Control plane pods are matched by name because kubeadm appends the node name
+// to static pod names and there is no API for identifying control plane
+// components, see https://github.com/kubernetes/enhancements/issues/5708.
+var (
+	regKubeScheduler         = regexp.MustCompile("kube-scheduler-.*")
+	regKubeControllerManager = regexp.MustCompile("kube-controller-manager-.*")
+)
+
 // MetricsGrabbingDisabledError is an error that is wrapped by the
 // different MetricsGrabber.Wrap functions when metrics grabbing is
 // not supported. Tests that check metrics data should then skip
@@ -98,8 +106,6 @@ type Grabber struct {
 func NewMetricsGrabber(ctx context.Context, c clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
 	var kubeSchedulers, kubeControllerManagers, snapshotControllers []v1.Pod
 
-	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
-	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
 	regSnapshotController := regexp.MustCompile("volume-snapshot-controller.*")
 
 	if (scheduler || controllers) && config == nil {
@@ -198,6 +204,20 @@ func leaderPod(ctx context.Context, c clientset.Interface, requested bool, lease
 // HasControlPlanePods returns true if metrics grabber was able to find control-plane pods
 func (g *Grabber) HasControlPlanePods() bool {
 	return g.kubeScheduler != "" && g.kubeControllerManager != ""
+}
+
+// MatchControlPlaneComponent identifies a kube-controller-manager or
+// kube-scheduler pod by name, the same way as NewMetricsGrabber, and returns
+// the component name and the port of its secure status server.
+func MatchControlPlaneComponent(podName string) (component string, port int, ok bool) {
+	switch {
+	case regKubeControllerManager.MatchString(podName):
+		return "kube-controller-manager", kubeControllerManagerPort, true
+	case regKubeScheduler.MatchString(podName):
+		return "kube-scheduler", kubeSchedulerPort, true
+	default:
+		return "", 0, false
+	}
 }
 
 // GrabFromKubelet returns metrics from kubelet
