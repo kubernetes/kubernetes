@@ -292,7 +292,7 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 		return []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount",
+			"--disable-admission-plugins", "ServiceAccount,PodCheckpoint",
 			"--authorization-mode=RBAC"}
 	}
 

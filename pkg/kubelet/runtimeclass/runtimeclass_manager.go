@@ -17,18 +17,27 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apinodev1 "k8s.io/api/node/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
+	"k8s.io/client-go/tools/cache"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 )
+
+// ErrNotSynced reports that the RuntimeClass cache has not completed its
+// initial list, so a missing RuntimeClass may still exist.
+var ErrNotSynced = errors.New("RuntimeClass cache has not synced")
 
 // Manager caches RuntimeClass API objects, and provides accessors to the Kubelet.
 type Manager struct {
 	informerFactory informers.SharedInformerFactory
 	lister          nodev1.RuntimeClassLister
+	hasSynced       cache.InformerSynced
 }
 
 // NewManager returns a new RuntimeClass Manager. Run must be called before the manager can be used.
@@ -36,11 +45,12 @@ func NewManager(client clientset.Interface) *Manager {
 	const resyncPeriod = 0
 
 	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
-	lister := factory.Node().V1().RuntimeClasses().Lister()
+	informer := factory.Node().V1().RuntimeClasses()
 
 	return &Manager{
 		informerFactory: factory,
-		lister:          lister,
+		lister:          informer.Lister(),
+		hasSynced:       informer.Informer().HasSynced,
 	}
 }
 
@@ -68,11 +78,49 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 
 	rc, err := m.lister.Get(name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return "", err
 		}
 		return "", fmt.Errorf("failed to lookup RuntimeClass %s: %v", name, err)
 	}
 
+	return rc.Handler, nil
+}
+
+// GetRuntimeClass returns the cached RuntimeClass with the given name. Callers
+// must not modify the returned object. It returns ErrNotSynced before the
+// initial list completes, so callers can retry instead of treating a
+// RuntimeClass that the cache has not received yet as deleted.
+func (m *Manager) GetRuntimeClass(name string) (*apinodev1.RuntimeClass, error) {
+	if !m.hasSynced() {
+		return nil, ErrNotSynced
+	}
+	return m.lister.Get(name)
+}
+
+// ValidateRestoreOptions checks restore options against the
+// allowedRestoreOptions of the named RuntimeClass and returns its handler. The
+// handler and the allowlist come from the same cached object, so a recreated
+// RuntimeClass cannot apply its allowlist to a handler from the old object.
+// Empty options need no allowlist and use the normal handler lookup.
+func (m *Manager) ValidateRestoreOptions(runtimeClassName *string, options map[string]string) (string, error) {
+	if len(options) == 0 {
+		return m.LookupRuntimeHandler(runtimeClassName)
+	}
+	if runtimeClassName == nil || *runtimeClassName == "" {
+		return "", fmt.Errorf("spec.restoreFrom.options requires spec.runtimeClassName and a RuntimeClass restore option allowlist")
+	}
+	name := *runtimeClassName
+	rc, err := m.GetRuntimeClass(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to read RuntimeClass %q for restore options: %w", name, err)
+	}
+	var allowed []string
+	if rc.PodCheckpointOptions != nil {
+		allowed = rc.PodCheckpointOptions.AllowedRestoreOptions
+	}
+	if err := checkpointutil.ValidateRuntimeOptions(options, allowed); err != nil {
+		return "", fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", name, err)
+	}
 	return rc.Handler, nil
 }

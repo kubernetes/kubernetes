@@ -30,6 +30,7 @@ var PodConditionsByKubelet = []v1.PodConditionType{
 	v1.ContainersReady,
 	v1.PodResizeInProgress,
 	v1.PodResizePending,
+	v1.PodCheckpointing,
 }
 
 // PodConditionByKubelet returns if the pod condition type is owned by kubelet
@@ -46,6 +47,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		if conditionType == v1.AllContainersRestarting {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if conditionType == v1.PodRestored {
 			return true
 		}
 	}

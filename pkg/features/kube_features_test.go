@@ -21,6 +21,7 @@ import (
 	"slices"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
@@ -95,5 +96,40 @@ func TestAllDependenciesRegistered(t *testing.T) {
 		if _, depsRegistered := registeredDependencies[f]; !depsRegistered {
 			t.Errorf("Feature %s did not register dependencies. All features must record explicit feature dependencies, even if there are none.", f)
 		}
+	}
+}
+
+func TestPodLevelCheckpointRestoreAvailability(t *testing.T) {
+	for _, tc := range []struct {
+		version   string
+		available bool
+	}{
+		{version: "1.35"},
+		{version: "1.36"},
+		{version: "1.37"},
+		{version: "1.38", available: true},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			gate := utilfeature.DefaultFeatureGate.DeepCopy()
+			if err := gate.SetEmulationVersion(version.MustParse(tc.version)); err != nil {
+				t.Fatal(err)
+			}
+			if gate.Enabled(PodLevelCheckpointRestore) {
+				t.Fatal("PodLevelCheckpointRestore must be disabled by default")
+			}
+			err := gate.Set("PodLevelCheckpointRestore=true")
+			if !tc.available {
+				if err == nil {
+					t.Fatal("PodLevelCheckpointRestore must not be enabled before 1.38")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !gate.Enabled(PodLevelCheckpointRestore) {
+				t.Fatal("PodLevelCheckpointRestore must be enabled after setting the gate")
+			}
+		})
 	}
 }

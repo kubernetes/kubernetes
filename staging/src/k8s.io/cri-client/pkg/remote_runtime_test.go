@@ -39,6 +39,8 @@ import (
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/cri-client/pkg/util"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const defaultConnectionTimeout = 15 * time.Second
@@ -131,20 +133,29 @@ func createTestRemoteRuntimeService(t *testing.T) (*fakeremote.RemoteRuntime, in
 
 func TestCheckpointPod(t *testing.T) {
 	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(10)))
 	request := &kubeapi.CheckpointPodRequest{
 		PodSandboxId: "sandbox-id",
 		OutputPath:   "/var/lib/kubelet/pod-checkpoints/checkpoint",
 		ContainerIds: []string{"container-one", "container-two"},
-		Options:      map[string]string{"example.runtime/checkpoint-mode": "fast"},
+		Options:      map[string]string{"example.runtime/checkpoint-mode": "sensitive-checkpoint-option"},
 	}
+	originalRequest := proto.Clone(request)
 	deadline := time.Now().Add(time.Minute)
-	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	ctx, cancel := context.WithDeadline(klog.NewContext(context.Background(), logger), deadline)
 	defer cancel()
 
 	require.NoError(t, rtSvc.CheckpointPod(ctx, request))
 	require.Len(t, fakeRuntime.RuntimeService.CheckpointedPods, 1)
+	assert.True(t, proto.Equal(originalRequest, request))
 	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.CheckpointedPods[0]))
 	assert.WithinDuration(t, deadline, fakeRuntime.RuntimeService.CheckpointPodDeadline, time.Second)
+
+	logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+	assert.Contains(t, logs, "[RemoteRuntimeService] CheckpointPod")
+	assert.Contains(t, logs, `podSandboxID="sandbox-id"`)
+	assert.Contains(t, logs, "containerCount=2")
+	assert.NotContains(t, logs, "sensitive-checkpoint-option")
 
 	fakeRuntime.RuntimeService.InjectError("CheckpointPod", errors.New("checkpoint failed"))
 	require.ErrorContains(t, rtSvc.CheckpointPod(context.Background(), request), "checkpoint failed")
@@ -153,30 +164,46 @@ func TestCheckpointPod(t *testing.T) {
 
 func TestRestorePod(t *testing.T) {
 	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(10)))
 	request := &kubeapi.RestorePodRequest{
 		CheckpointPath: "/var/lib/kubelet/pod-checkpoints/checkpoint",
 		Config: &kubeapi.PodSandboxConfig{
 			Metadata: &kubeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid"},
 		},
 		RuntimeHandler: "checkpoint-handler",
-		Options:        map[string]string{"example.runtime/restore-mode": "lazy"},
+		Options:        map[string]string{"example.runtime/restore-mode": "sensitive-restore-option"},
 		ContainerConfigs: []*kubeapi.ContainerConfig{
-			{Metadata: &kubeapi.ContainerMetadata{Name: "app"}},
+			{
+				Metadata: &kubeapi.ContainerMetadata{Name: "app"},
+				Envs:     []*kubeapi.KeyValue{{Key: "TOKEN", Value: []byte("sensitive-environment-value")}},
+				Args:     []string{"sensitive-argument-value"},
+			},
 		},
 	}
+	originalRequest := proto.Clone(request)
 	deadline := time.Now().Add(time.Minute)
-	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	ctx, cancel := context.WithDeadline(klog.NewContext(context.Background(), logger), deadline)
 	defer cancel()
 
 	response, err := rtSvc.RestorePod(ctx, request)
 	require.NoError(t, err)
-	assert.Equal(t, "fake-restored-pod-id", response.GetPodSandboxId())
+	sandboxID := apitest.BuildSandboxName(request.Config.Metadata)
+	assert.Equal(t, sandboxID, response.GetPodSandboxId())
 	require.Len(t, response.GetRestoredContainers(), 1)
 	assert.Equal(t, "app", response.GetRestoredContainers()[0].GetName())
-	assert.NotEmpty(t, response.GetRestoredContainers()[0].GetContainerId())
+	assert.Equal(t, apitest.BuildContainerName(request.ContainerConfigs[0].Metadata, sandboxID), response.GetRestoredContainers()[0].GetContainerId())
 	require.Len(t, fakeRuntime.RuntimeService.RestoredPods, 1)
+	assert.True(t, proto.Equal(originalRequest, request))
 	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.RestoredPods[0]))
 	assert.WithinDuration(t, deadline, fakeRuntime.RuntimeService.RestorePodDeadline, time.Second)
+
+	logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+	assert.Contains(t, logs, "[RemoteRuntimeService] RestorePod")
+	assert.Contains(t, logs, `runtimeHandler="checkpoint-handler"`)
+	assert.Contains(t, logs, "containerCount=1")
+	for _, value := range []string{"sensitive-restore-option", "sensitive-environment-value", "sensitive-argument-value"} {
+		assert.NotContains(t, logs, value)
+	}
 
 	fakeRuntime.RuntimeService.InjectError("RestorePod", errors.New("restore failed"))
 	_, err = rtSvc.RestorePod(context.Background(), request)

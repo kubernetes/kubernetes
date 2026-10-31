@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3555,4 +3557,167 @@ func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
 	require.Len(t, published.Status.ContainerStatuses, 1)
 	require.NotNil(t, published.Status.ContainerStatuses[0].State.Terminated)
 	assert.Equal(t, int32(0), published.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+}
+
+func TestPodCheckpointingAfterRestart(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Status = getReadyPodStatus()
+	pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue})
+	client := fake.NewSimpleClientset(pod)
+	m := newTestManager(client)
+	m.podManager.(mutablePodManager).UpdatePod(pod)
+
+	m.SetPodStatus(logger, pod, pod.Status)
+	cached, found := m.GetPodStatus(pod.UID)
+	require.True(t, found)
+	_, checkpointing := podutil.GetPodCondition(&cached, v1.PodCheckpointing)
+	require.Nil(t, checkpointing, "a new status manager has no active checkpoint window")
+	m.syncBatch(ctx, true)
+	updated, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, checkpointing = podutil.GetPodCondition(&updated.Status, v1.PodCheckpointing)
+	require.Nil(t, checkpointing)
+	require.True(t, podutil.IsPodReadyConditionTrue(updated.Status))
+}
+
+func TestPodCheckpointingMergesCurrentWindow(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Generation = 3
+	pod.Status = getReadyPodStatus()
+	client := fake.NewSimpleClientset(pod)
+	m := newTestManager(client)
+	m.podManager.(mutablePodManager).UpdatePod(pod)
+	m.SetPodStatus(logger, pod, pod.Status)
+	before, _ := m.GetPodStatus(pod.UID)
+	condition := &v1.PodCondition{
+		Type: v1.PodCheckpointing, Status: v1.ConditionTrue, ObservedGeneration: 3,
+		Reason: "CheckpointingPod", Message: "Checkpointing for PodCheckpoint \"checkpoint\"",
+	}
+	m.SetPodCheckpointingCondition(pod.UID, condition)
+	condition.Message = "changed after publication"
+	m.SetPodStatus(logger, pod, before)
+	active, _ := m.GetPodStatus(pod.UID)
+	_, checkpointing := podutil.GetPodCondition(&active, v1.PodCheckpointing)
+	require.NotNil(t, checkpointing)
+	require.Equal(t, v1.ConditionTrue, checkpointing.Status)
+	require.Equal(t, int64(3), checkpointing.ObservedGeneration)
+	require.Equal(t, "Checkpointing for PodCheckpoint \"checkpoint\"", checkpointing.Message)
+	require.False(t, checkpointing.LastTransitionTime.IsZero())
+	require.True(t, podutil.IsPodReadyConditionTrue(active))
+	m.syncBatch(ctx, true)
+	published, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, publishedCondition := podutil.GetPodCondition(&published.Status, v1.PodCheckpointing)
+	require.True(t, apiequality.Semantic.DeepEqual(checkpointing, publishedCondition), "published condition differs from the cached checkpoint window")
+
+	m.SetPodCheckpointingCondition(pod.UID, checkpointing)
+	again, _ := m.GetPodStatus(pod.UID)
+	_, same := podutil.GetPodCondition(&again, v1.PodCheckpointing)
+	require.Equal(t, checkpointing.LastTransitionTime, same.LastTransitionTime)
+	m.SetPodCheckpointingCondition(pod.UID, nil)
+	m.SetPodStatus(logger, pod, active)
+	finished, _ := m.GetPodStatus(pod.UID)
+	_, checkpointing = podutil.GetPodCondition(&finished, v1.PodCheckpointing)
+	require.Nil(t, checkpointing)
+	require.True(t, podutil.IsPodReadyConditionTrue(finished))
+	m.syncBatch(ctx, true)
+	published, err = client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, publishedCondition = podutil.GetPodCondition(&published.Status, v1.PodCheckpointing)
+	require.Nil(t, publishedCondition)
+
+	m.SetPodCheckpointingCondition(pod.UID, condition)
+	repeated, _ := m.GetPodStatus(pod.UID)
+	_, checkpointing = podutil.GetPodCondition(&repeated, v1.PodCheckpointing)
+	require.NotNil(t, checkpointing, "the source Pod can be checkpointed again")
+}
+
+func TestPodCheckpointingPreservesConcurrentStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	m := newTestManager(&fake.Clientset{})
+	m.SetPodStatus(logger, pod, getReadyPodStatus())
+	for _, active := range []bool{true, false} {
+		var condition *v1.PodCondition
+		if active {
+			condition = &v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue, Reason: "CheckpointingPod"}
+		}
+		stale, _ := m.GetPodStatus(pod.UID)
+		start := make(chan struct{})
+		var workers sync.WaitGroup
+		workers.Go(func() {
+			<-start
+			m.SetPodCheckpointingCondition(pod.UID, condition)
+		})
+		workers.Go(func() {
+			<-start
+			stale.Message = "new status from SyncPod"
+			m.SetPodStatus(logger, pod, stale)
+		})
+		close(start)
+		workers.Wait()
+		got, found := m.GetPodStatus(pod.UID)
+		require.True(t, found)
+		_, checkpointing := podutil.GetPodCondition(&got, v1.PodCheckpointing)
+		if active {
+			require.NotNil(t, checkpointing)
+		} else {
+			require.Nil(t, checkpointing)
+		}
+		require.Equal(t, "new status from SyncPod", got.Message)
+		require.True(t, podutil.IsPodReadyConditionTrue(got))
+	}
+}
+
+func TestPodCheckpointingDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Status = getReadyPodStatus()
+	pod.Status.Conditions = append(pod.Status.Conditions,
+		v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue},
+		v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionTrue})
+	client := fake.NewSimpleClientset(pod)
+	m := newTestManager(client)
+	m.podManager.(mutablePodManager).UpdatePod(pod)
+	m.SetPodCheckpointingCondition(pod.UID, &v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue})
+	m.SetPodStatus(logger, pod, pod.Status)
+	m.syncBatch(ctx, true)
+	updated, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, checkpointing := podutil.GetPodCondition(&updated.Status, v1.PodCheckpointing)
+	require.Nil(t, checkpointing)
+	_, restored := podutil.GetPodCondition(&updated.Status, v1.PodRestored)
+	require.NotNil(t, restored)
+	require.True(t, podutil.IsPodReadyConditionTrue(updated.Status))
+}
+
+func TestPodCheckpointingClearedWithPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	logger, _ := ktesting.NewTestContext(t)
+	for _, operation := range []string{"delete status", "remove orphan", "pod removed"} {
+		t.Run(operation, func(t *testing.T) {
+			pod := getTestPod()
+			m := newTestManager(&fake.Clientset{})
+			m.SetPodCheckpointingCondition(pod.UID, &v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue})
+			switch operation {
+			case "delete status":
+				m.deletePodStatus(pod.UID)
+			case "remove orphan":
+				m.RemoveOrphanedStatuses(logger, map[types.UID]bool{})
+			case "pod removed":
+				m.podManager.(mutablePodManager).RemovePod(pod)
+				m.RemoveOrphanedStatuses(logger, map[types.UID]bool{})
+			}
+			m.SetPodCheckpointingCondition(pod.UID, nil)
+			_, found := m.GetPodStatus(pod.UID)
+			require.False(t, found, "late checkpoint cleanup must not recreate deleted status")
+			require.Empty(t, m.podCheckpointingConditions)
+		})
+	}
 }

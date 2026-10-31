@@ -170,6 +170,71 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	require.Empty(t, containers)
 }
 
+func TestStartContainerLogSymlink(t *testing.T) {
+	for _, sidecar := range []bool{false, true} {
+		for _, tc := range []struct {
+			name       string
+			statErr    error
+			symlinkErr error
+			wantLink   bool
+		}{
+			{name: "log exists", wantLink: true},
+			{name: "log missing", statErr: os.ErrNotExist},
+			{name: "stat denied", statErr: os.ErrPermission, wantLink: true},
+			{name: "symlink denied", symlinkErr: os.ErrPermission, wantLink: true},
+		} {
+			containerName := "app"
+			if sidecar {
+				containerName = "sidecar"
+			}
+			t.Run(containerName+"/"+tc.name, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
+				fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+				require.NoError(t, err)
+				pod := newTestPod()
+				container := pod.Spec.Containers[0]
+				container.Name = containerName
+				pod.Spec.Containers = []v1.Container{container}
+				spec := containerStartSpec(&pod.Spec.Containers[0])
+				if sidecar {
+					container.RestartPolicy = &containerRestartPolicyAlways
+					container.Ports = nil
+					pod.Spec.InitContainers = []v1.Container{container}
+					spec = initContainerStartSpec(&pod.Spec.InitContainers[0])
+					pod.Spec.Containers[0].Name = "app"
+				}
+				sandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+				require.NoError(t, err)
+				sandboxID, err := m.runtimeService.RunPodSandbox(tCtx, sandboxConfig, "")
+				require.NoError(t, err)
+				expectedLog := filepath.Join(sandboxConfig.LogDirectory, containerName, "0.log")
+				fakeOS := m.osInterface.(*containertest.FakeOS)
+				fakeOS.StatFn = func(path string) (os.FileInfo, error) {
+					assert.Equal(t, expectedLog, path)
+					return nil, tc.statErr
+				}
+				var links [][2]string
+				fakeOS.SymlinkFn = func(oldname, newname string) error {
+					links = append(links, [2]string{oldname, newname})
+					return tc.symlinkErr
+				}
+
+				_, err = m.startContainer(tCtx, sandboxID, sandboxConfig, spec, pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+				require.NoError(t, err)
+				require.Len(t, fakeRuntime.Containers, 1)
+				for containerID, actual := range fakeRuntime.Containers {
+					assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, actual.State)
+					if tc.wantLink {
+						assert.Equal(t, [][2]string{{expectedLog, legacyLogSymlink(containerID, containerName, pod.Name, pod.Namespace)}}, links)
+					} else {
+						assert.Empty(t, links)
+					}
+				}
+			})
+		}
+	}
+}
+
 // TestKillContainer tests killing the container in a Pod.
 func TestKillContainer(t *testing.T) {
 	tCtx := ktesting.Init(t)

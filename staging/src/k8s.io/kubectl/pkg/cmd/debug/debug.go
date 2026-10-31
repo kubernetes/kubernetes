@@ -783,6 +783,8 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		},
 		Spec: *pod.Spec.DeepCopy(),
 	}
+	// Debugging changes the workload, so the copy cannot reuse its checkpoint.
+	copied.Spec.RestoreFrom = nil
 	// set EphemeralContainers to nil so that the copy of pod can be created
 	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly

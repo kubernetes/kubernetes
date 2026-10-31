@@ -238,13 +238,21 @@ type RuntimeServiceClient interface {
 	// container has been captured, and resume all of them before returning on
 	// success, error, or deadline expiry. This produces one consistent
 	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// If the deadline expires or the call is cancelled, the runtime must stop
+	// the checkpoint, resume the selected containers, and stop writing to
+	// output_path promptly, because the caller treats the checkpoint as failed
+	// and removes output_path.
 	CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error)
 	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
 	// caller must set a deadline on the call. On success, every returned
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// deadline expires or the call is cancelled, the runtime must stop the
+	// restore and remove any sandbox and containers created by the call, even
+	// if it has finished preparing them, because the caller treats the restore
+	// as failed and does not start or remove what it never received.
 	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
@@ -865,13 +873,21 @@ type RuntimeServiceServer interface {
 	// container has been captured, and resume all of them before returning on
 	// success, error, or deadline expiry. This produces one consistent
 	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// If the deadline expires or the call is cancelled, the runtime must stop
+	// the checkpoint, resume the selected containers, and stop writing to
+	// output_path promptly, because the caller treats the checkpoint as failed
+	// and removes output_path.
 	CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error)
 	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
 	// caller must set a deadline on the call. On success, every returned
 	// container must be in the CREATED state and must not have executed the
 	// restored process; the caller invokes its pre-start hooks and then calls
 	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// any sandbox and containers created by the call before returning. If the
+	// deadline expires or the call is cancelled, the runtime must stop the
+	// restore and remove any sandbox and containers created by the call, even
+	// if it has finished preparing them, because the caller treats the restore
+	// as failed and does not start or remove what it never received.
 	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error

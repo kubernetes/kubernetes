@@ -27,7 +27,7 @@ import (
 )
 
 // determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username string) (*runtimeapi.LinuxContainerSecurityContext, error) {
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username, runtimeHandler string) (*runtimeapi.LinuxContainerSecurityContext, error) {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
@@ -58,7 +58,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 	}
 
 	// set namespace options and supplemental groups.
-	namespaceOptions, err := runtimeutil.NamespacesForPod(ctx, pod, m.runtimeHelper, m.runtimeClassManager)
+	namespaceOptions, err := runtimeutil.NamespacesForPodWithRuntimeHandler(ctx, pod, m.runtimeHelper, runtimeHandler)
 	if err != nil {
 		return nil, err
 	}

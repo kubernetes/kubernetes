@@ -19,10 +19,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -35,6 +37,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -717,5 +721,57 @@ func TestMakeBlockVolumes(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedDevices, blkVolumes, "devices of container %+v", tc.container)
 		})
+	}
+}
+
+func TestGenerateRunContainerOptionsUsesRuntimeHandler(t *testing.T) {
+	for _, mode := range []v1.RecursiveReadOnlyMode{v1.RecursiveReadOnlyIfPossible, v1.RecursiveReadOnlyEnabled} {
+		for _, selectedSupportsRRO := range []bool{false, true} {
+			t.Run(fmt.Sprintf("mode=%s/selected-support=%t", mode, selectedSupportsRRO), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecursiveReadOnlyMounts, true)
+				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+				defer testKubelet.Cleanup()
+				kubelet := testKubelet.kubelet
+				kubelet.dnsConfigurer = createDNSConfigurer()
+				manager := runtimeclass.NewManager(rctest.NewPopulatedClient())
+				defer rctest.StartManagerSync(manager)()
+				kubelet.runtimeClassManager = manager
+				kubelet.runtimeState.setRuntimeHandlers([]kubecontainer.RuntimeHandler{
+					{Name: rctest.SandboxRuntimeHandler, SupportsRecursiveReadOnlyMounts: !selectedSupportsRRO},
+					{Name: "new-handler", SupportsRecursiveReadOnlyMounts: selectedSupportsRRO},
+				})
+				pod := podWithUIDNameNsSpec("pod-uid", "restore", "test", v1.PodSpec{
+					RuntimeClassName:   new(rctest.SandboxRuntimeClass),
+					EnableServiceLinks: new(false),
+					Containers: []v1.Container{{
+						Name: "app",
+						VolumeMounts: []v1.VolumeMount{{
+							Name: "disk", MountPath: "/data", ReadOnly: true, RecursiveReadOnly: &mode,
+						}},
+					}},
+					Volumes: []v1.Volume{{Name: "disk", VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device"}, //nolint:staticcheck // SA1019 the fake volume plugin uses the PD name as the volume name
+					}}},
+				})
+				ctx, cancel := context.WithCancel(ktesting.Init(t))
+				defer cancel()
+				go kubelet.volumeManager.Run(ctx, kubelet.sourcesReady)
+				kubelet.podManager.SetPods([]*v1.Pod{pod})
+				require.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(ctx, pod))
+
+				opts, cleanup, err := kubelet.GenerateRunContainerOptions(ctx, pod, &pod.Spec.Containers[0], "", nil, nil, "new-handler")
+				if cleanup != nil {
+					defer cleanup()
+				}
+				if mode == v1.RecursiveReadOnlyEnabled && !selectedSupportsRRO {
+					require.ErrorContains(t, err, "not supported by the runtime")
+					return
+				}
+				require.NoError(t, err)
+				require.Len(t, opts.Mounts, 1)
+				assert.True(t, opts.Mounts[0].ReadOnly)
+				assert.Equal(t, selectedSupportsRRO, opts.Mounts[0].RecursiveReadOnly)
+			})
+		}
 	}
 }

@@ -536,6 +536,27 @@ type KubeletConfiguration struct {
 	// Default: "2m"
 	// +optional
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// podCheckpointTimeout is the maximum duration the kubelet allows a Pod
+	// checkpoint operation to run before it aborts the operation. It bounds how
+	// long the Pod's containers can stay frozen: the kubelet applies it as the
+	// deadline on the CheckpointPod CRI call, and clamps a PodCheckpoint's
+	// spec.timeoutSeconds to this ceiling. Checkpoint time grows with the Pod's
+	// memory and depends on disk throughput, so raise this value on nodes that
+	// checkpoint Pods with large memory footprints.
+	// Requires the PodLevelCheckpointRestore feature gate to be enabled.
+	// Default: "5m"
+	// +optional
+	PodCheckpointTimeout metav1.Duration `json:"podCheckpointTimeout,omitempty"`
+	// podRestoreTimeout is the maximum duration the kubelet waits for the
+	// RestorePod CRI call when it restores a Pod from a PodCheckpoint. A restore
+	// that does not finish in time fails, and the Pod moves to the Failed phase.
+	// Restore time grows with the checkpointed memory and depends on disk
+	// throughput, so raise this value on nodes that restore Pods with large
+	// memory footprints. Other CRI calls keep using runtimeRequestTimeout.
+	// Requires the PodLevelCheckpointRestore feature gate to be enabled.
+	// Default: "5m"
+	// +optional
+	PodRestoreTimeout metav1.Duration `json:"podRestoreTimeout,omitempty"`
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to

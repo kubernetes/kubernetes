@@ -625,6 +625,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.PodCheckpointTimeout = in.PodCheckpointTimeout
+	out.PodRestoreTimeout = in.PodRestoreTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
@@ -838,6 +840,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.PodCheckpointTimeout = in.PodCheckpointTimeout
+	out.PodRestoreTimeout = in.PodRestoreTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR

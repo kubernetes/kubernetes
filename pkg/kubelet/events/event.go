@@ -84,6 +84,21 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	// Pod-level checkpoint/restore events and failure reasons.
+	CheckpointStarted           = "CheckpointStarted"
+	CheckpointSucceeded         = "CheckpointSucceeded"
+	CheckpointFailed            = "CheckpointFailed"
+	CheckpointingPod            = "CheckpointingPod"
+	RestoreSucceeded            = "RestoreSucceeded"
+	RestoreInterrupted          = "RestoreInterrupted"
+	CheckpointNotReady          = "CheckpointNotReady"
+	CheckpointWrongNode         = "CheckpointWrongNode"
+	PodSpecMismatch             = "PodSpecMismatch"
+	RestoreInProgress           = "RestoreInProgress"
+	RestorePolicyUnavailable    = "RestorePolicyUnavailable"
+	RestorePreparationFailed    = "RestorePreparationFailed"
+	RestorePostProcessingFailed = "RestorePostProcessingFailed"
+	RestoreFailed               = "RestoreFailed"
 )
 
 // Image manager event reason list
