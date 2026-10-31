@@ -40,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -51,6 +52,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
@@ -4876,6 +4878,190 @@ func TestStatefulSetMetrics(t *testing.T) {
 			}
 			if int(unavailableReplicasValue) != test.expectedUnavailableReplicasValue {
 				t.Errorf("Expected UnavailableReplicas gauge value %d, got %d", test.expectedUnavailableReplicasValue, int(unavailableReplicasValue))
+			}
+		})
+	}
+}
+
+// laggedClaimObjectManager models a claim informer that has not yet observed this
+// controller's own PVC writes within a sync. Updates only reach live, so a second update
+// built from the lister carries a stale resourceVersion. With lagCreates, creates also
+// only reach live, so a second create for the same claim fails with AlreadyExists.
+type laggedClaimObjectManager struct {
+	*fakeObjectManager
+	mu         sync.Mutex
+	live       map[string]*v1.PersistentVolumeClaim
+	lagCreates bool
+	creates    int
+	writes     int
+	conflicts  int
+}
+
+func (m *laggedClaimObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim, _ *apps.StatefulSet) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.live[claim.Name]; ok {
+		return apierrors.NewAlreadyExists(schema.GroupResource{Resource: "persistentvolumeclaims"}, claim.Name)
+	}
+	claim = claim.DeepCopy()
+	claim.ResourceVersion = "1"
+	m.live[claim.Name] = claim.DeepCopy()
+	m.creates++
+	if m.lagCreates {
+		return nil
+	}
+	return m.claimsIndexer.Update(claim)
+}
+
+func (m *laggedClaimObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim, _ *apps.StatefulSet) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, ref := range claim.GetOwnerReferences() {
+		if ref.APIVersion == "" || ref.Kind == "" || ref.Name == "" {
+			return fmt.Errorf("invalid ownerRefs: %s %v", claim.Name, claim.GetOwnerReferences())
+		}
+	}
+	current := m.live[claim.Name]
+	if claim.ResourceVersion != current.ResourceVersion {
+		m.conflicts++
+		return apierrors.NewConflict(schema.GroupResource{Resource: "persistentvolumeclaims"}, claim.Name, errors.New("the object has been modified"))
+	}
+	updated := claim.DeepCopy()
+	updated.ResourceVersion = "2"
+	m.live[claim.Name] = updated
+	m.writes++
+	return nil
+}
+
+func TestProcessReplicaWithLaggedClaimCache(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// preexisting creates claims without owner refs, e.g. pre-provisioned by the user. They
+		// need a retention update on Pod creation; creation-time stamping does not apply to them.
+		preexisting bool
+		// pending first creates the Pods under a Retain/Retain policy and marks them Pending,
+		// so the Delete/Delete sync reaches the retention update via createMissingPersistentVolumeClaims.
+		pending bool
+		// identityDrift drops the Pod name label from the Pending Pods, so the same sync
+		// also goes through UpdateStatefulPod.
+		identityDrift bool
+		// storageDrift deletes the claims and strips their volumes from the Pending Pods, so
+		// the same sync both creates the claims and goes through UpdateStatefulPod.
+		storageDrift bool
+		// wantCreates and wantWrites are exact: claims created by the controller are stamped at
+		// creation and need no update, while each unowned claim needs exactly one.
+		wantCreates int
+		wantWrites  int
+	}{
+		{name: "fresh claims", wantCreates: 3, wantWrites: 0},
+		{name: "preexisting claims", preexisting: true, wantWrites: 3},
+		{name: "pending pods with preexisting claims", preexisting: true, pending: true, wantWrites: 3},
+		{name: "pending pods with identity drift", preexisting: true, pending: true, identityDrift: true, wantWrites: 3},
+		{name: "pending pods with storage drift", pending: true, storageDrift: true, wantCreates: 3, wantWrites: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			set := burst(newStatefulSet(3))
+			deleteBoth := &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			set.Spec.PersistentVolumeClaimRetentionPolicy = deleteBoth
+			om, _, control := setupController(fake.NewClientset(set))
+			m := &laggedClaimObjectManager{fakeObjectManager: om, live: map[string]*v1.PersistentVolumeClaim{}}
+			recorder := record.NewFakeRecorder(100)
+			control.(*defaultStatefulSetControl).podControl = NewStatefulPodControlFromManager(m, recorder)
+
+			if tc.preexisting {
+				for ordinal := range 3 {
+					for _, claim := range getPersistentVolumeClaims(set, newStatefulSetPod(set, ordinal)) {
+						if err := m.CreateClaim(&claim, set); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			var existing []*v1.Pod
+			if tc.pending {
+				// Unowned claims already satisfy Retain/Retain, so this sync writes nothing.
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				if _, err := control.UpdateStatefulSet(tCtx, set, nil, time.Now()); err != nil {
+					t.Fatalf("UpdateStatefulSet with Retain policy: %v", err)
+				}
+				pods, err := m.podsLister.Pods(set.Namespace).List(labels.Everything())
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, pod := range pods {
+					pod := pod.DeepCopy()
+					pod.Status.Phase = v1.PodPending
+					if tc.identityDrift {
+						delete(pod.Labels, apps.StatefulSetPodNameLabel)
+					}
+					if tc.storageDrift {
+						claims := getPersistentVolumeClaims(set, pod)
+						for _, claim := range claims {
+							delete(m.live, claim.Name)
+							if err := m.claimsIndexer.Delete(&claim); err != nil {
+								t.Fatal(err)
+							}
+						}
+						pod.Spec.Volumes = slices.DeleteFunc(pod.Spec.Volumes, func(v v1.Volume) bool {
+							_, ok := claims[v.Name]
+							return ok
+						})
+					}
+					if err := m.podsIndexer.Update(pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if existing, err = m.podsLister.Pods(set.Namespace).List(labels.Everything()); err != nil {
+					t.Fatal(err)
+				}
+				set.Spec.PersistentVolumeClaimRetentionPolicy = deleteBoth
+			}
+			m.lagCreates = true
+			m.creates, m.writes, m.conflicts = 0, 0, 0
+			podCreates := m.createPodTracker.requests
+
+			if _, err := control.UpdateStatefulSet(tCtx, set, existing, time.Now()); err != nil {
+				t.Errorf("UpdateStatefulSet: %v", err)
+			}
+
+			pods, err := m.podsLister.Pods(set.Namespace).List(labels.Everything())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(pods) != 3 || m.creates != tc.wantCreates || m.writes != tc.wantWrites || m.conflicts != 0 {
+				t.Errorf("got pods=%d creates=%d writes=%d conflicts=%d, want pods=3 creates=%d writes=%d conflicts=0",
+					len(pods), m.creates, m.writes, m.conflicts, tc.wantCreates, tc.wantWrites)
+			}
+			// A Pod recreated instead of repaired would bypass the Pending path under test.
+			if tc.pending && m.createPodTracker.requests != podCreates {
+				t.Errorf("got %d Pod creates, want 0 for existing Pending Pods", m.createPodTracker.requests-podCreates)
+			}
+			for _, pod := range pods {
+				if !identityMatches(set, pod) || !storageMatches(set, pod) {
+					t.Errorf("pod %s was not repaired: identityMatches=%t storageMatches=%t", pod.Name, identityMatches(set, pod), storageMatches(set, pod))
+				}
+				for _, claim := range getPersistentVolumeClaims(set, pod) {
+					live, ok := m.live[claim.Name]
+					if !ok {
+						t.Errorf("claim %s for %s was not created", claim.Name, pod.Name)
+						continue
+					}
+					if !isClaimOwnerUpToDate(tCtx.Logger(), live, set, pod) {
+						t.Errorf("claim %s for %s has unexpected owner refs: %v", claim.Name, pod.Name, live.OwnerReferences)
+					}
+				}
+			}
+			for _, event := range collectEvents(recorder.Events) {
+				if strings.Contains(event, v1.EventTypeWarning) {
+					t.Errorf("unexpected event: %s", event)
+				}
 			}
 		})
 	}
