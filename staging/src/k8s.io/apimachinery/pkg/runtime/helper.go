@@ -253,13 +253,7 @@ type WithoutVersionDecoder struct {
 
 // Decode does not do conversion. It removes the gvk during deserialization.
 func (d WithoutVersionDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
-	if obj != nil {
-		kind := obj.GetObjectKind()
-		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(schema.GroupVersionKind{})
-	}
-	return obj, gvk, err
+	return d.Decoder.Decode(data, defaults, into)
 }
 
 type encoderWithAllocator struct {
