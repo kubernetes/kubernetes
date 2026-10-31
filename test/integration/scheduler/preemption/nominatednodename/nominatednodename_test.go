@@ -45,7 +45,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// imported from testutils
 var (
 	initPausePod   = testutils.InitPausePod
 	createNode     = schedulerutils.CreateNode

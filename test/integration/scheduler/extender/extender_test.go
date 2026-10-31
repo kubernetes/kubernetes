@@ -41,7 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// imported from testutils
 var (
 	createNode = schedulerutils.CreateNode
 )

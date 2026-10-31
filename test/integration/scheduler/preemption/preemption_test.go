@@ -49,7 +49,6 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-// imported from testutils
 var (
 	initPausePod        = testutils.InitPausePod
 	createNode          = schedulerutils.CreateNode

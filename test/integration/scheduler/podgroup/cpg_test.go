@@ -19,7 +19,6 @@ package podgroup
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
@@ -34,9 +33,6 @@ import (
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 )
-
-// _ to avoid unused import
-var _ = time.Second
 
 func makeTestPodsWithPriority(pgName string, priority int32, reqCPUs ...string) []*v1.Pod {
 	var pods []*v1.Pod
