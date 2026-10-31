@@ -179,6 +179,8 @@ func CreateGCController(ctx context.Context, tb testutils.TB, restConfig restcli
 // TestContext store necessary context info.
 // It also contains some optional parameters for InitTestScheduler.
 type TestContext struct {
+	ktesting.TContext
+
 	// DisableEventSink, if set to true before calling InitTestScheduler,
 	// will skip the eventBroadcaster.StartRecordingToSink and thus
 	// some extra goroutines which are tricky to get rid of after
@@ -186,16 +188,9 @@ type TestContext struct {
 	DisableEventSink bool
 
 	NS                 *v1.Namespace
-	ClientSet          clientset.Interface
-	KubeConfig         *restclient.Config
 	InformerFactory    informers.SharedInformerFactory
 	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 	Scheduler          *scheduler.Scheduler
-	// This is the top context when initializing the test environment.
-	// Note that this will be canceled at the time that cleanup callbacks
-	// run! Use [TContext.CleanupCtx] to schedule callbacks which have
-	// their own fresh context.
-	Ctx context.Context
 	// CloseFn will stop the apiserver and clean up the resources
 	// after itself, including shutting down its storage layer.
 	CloseFn framework.TearDownFunc
@@ -265,10 +260,10 @@ func SyncSchedulerInformerFactory(testCtx *TestContext) {
 // May only be called once and with a tCtx which is not already canceled.
 func CleanupTest(tCtx ktesting.TContext, testCtx *TestContext) {
 	// Cleanup nodes and namespaces.
-	if err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(tCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := testCtx.Client().CoreV1().Nodes().DeleteCollection(tCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		tCtx.Errorf("error while cleaning up nodes, error: %v", err)
 	}
-	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, tCtx)
+	framework.DeleteNamespaceOrDie(testCtx.Client(), testCtx.NS, tCtx)
 	// Terminate the scheduler and apiserver.
 	testCtx.CloseFn()
 }
@@ -392,9 +387,11 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 	stopCtxPropagation := context.AfterFunc(parentCtx, func() {
 		tCtx.CancelBecause(context.Cause(parentCtx))
 	})
-	testCtx := &TestContext{Ctx: parentCtx}
+	testCtx := &TestContext{
+		TContext: parentCtx,
+	}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+	_, kubeConfig, closeFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 			if options.APIEnablement.RuntimeConfig == nil {
@@ -417,12 +414,13 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 		},
 	})
 
+	testCtx.CloseFn = closeFn
+
 	// Support wrapping HTTP requests.
-	testCtx.KubeConfig.Wrap(func(transport http.RoundTripper) http.RoundTripper {
+	kubeConfig.Wrap(func(transport http.RoundTripper) http.RoundTripper {
 		return roundTripWrapper{tc: testCtx, transport: transport}
 	})
-	var err error
-	testCtx.ClientSet, err = clientset.NewForConfig(testCtx.KubeConfig)
+	clientSet, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +428,7 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 	oldCloseFn := testCtx.CloseFn
 	testCtx.CloseFn = func() {
 		// Shutdown of additional goroutines and of the apiserver run in parallel.
-		// parentCtx (== testCtx.Ctx) is the context that callers and their
+		// parentCtx (== testCtx) is the context that callers and their
 		// goroutines were given, so it must be canceled here, not the
 		// detached tCtx which only governs the apiserver's own shutdown.
 		parentCtx.Cancel("must shut down, apiserver is being torn down")
@@ -438,10 +436,14 @@ func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Inter
 	}
 
 	if nsPrefix != "default" {
-		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
+		testCtx.NS = framework.CreateNamespaceOrDie(clientSet, nsPrefix+string(uuid.NewUUID()), t)
 	} else {
-		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, "default", t)
+		testCtx.NS = framework.CreateNamespaceOrDie(clientSet, "default", t)
 	}
+
+	parentCtx = parentCtx.WithClients(kubeConfig, nil, clientSet, nil)
+	parentCtx = parentCtx.WithNamespace(testCtx.NS.Name)
+	testCtx.TContext = parentCtx
 
 	stopCtxPropagation()
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
@@ -459,25 +461,25 @@ func InitTestSchedulerWithOptions(
 	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *TestContext {
-	ctx, cancel := context.WithCancel(testCtx.Ctx)
+	ctx, cancel := context.WithCancel(testCtx)
 	testCtx.SchedulerCtx = ctx
 
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod, nil)
-	if testCtx.KubeConfig != nil {
-		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.Client(), resyncPeriod, nil)
+	if testCtx.RESTConfig() != nil {
+		dynClient := dynamic.NewForConfigOrDie(testCtx.RESTConfig())
 		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
 	}
 
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.ClientSet.EventsV1(),
+		Interface: testCtx.Client().EventsV1(),
 	})
 
-	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
+	opts = append(opts, scheduler.WithKubeConfig(testCtx.RESTConfig()))
 	testCtx.Scheduler, err = scheduler.New(
 		ctx,
-		testCtx.ClientSet,
+		testCtx.Client(),
 		testCtx.InformerFactory,
 		testCtx.DynInformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),

@@ -402,7 +402,7 @@ func TestBatchScenarios(t *testing.T) {
 			if !ok {
 				t.Fatal("Profile default-scheduler does not implement batchGetter")
 			}
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			for _, n := range tt.nodes {
 				_, err := schedulerutils.CreateNode(cs, newNode(&n))
@@ -417,13 +417,13 @@ func TestBatchScenarios(t *testing.T) {
 				prevBatched := getter.TotalBatchedPods()
 
 				p := newPod(&pd, testCtx.NS.Name)
-				createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+				createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx, p, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create pod %s/%s, error: %v",
 						p.Namespace, p.Name, err)
 				}
 
-				if err := schedulerutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, createdPod, 5*time.Second); err != nil {
+				if err := schedulerutils.WaitForPodToScheduleWithTimeout(testCtx, cs, createdPod, 5*time.Second); err != nil {
 					if !pd.expectUnschedulable {
 						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 							p.Namespace, p.Name, err)
@@ -436,7 +436,7 @@ func TestBatchScenarios(t *testing.T) {
 					t.Fatalf("Expected pod to be unschedulable but it was scheduled")
 				}
 
-				finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+				finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed to get pod %v", err)
 				}

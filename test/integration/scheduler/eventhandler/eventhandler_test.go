@@ -115,20 +115,20 @@ func TestUpdateNodeEvent(t *testing.T) {
 	)
 	defer teardown()
 
-	node, err := schedulerutils.CreateNode(testCtx.ClientSet, nodeWrapper)
+	node, err := schedulerutils.CreateNode(testCtx.Client(), nodeWrapper)
 	if err != nil {
 		t.Fatalf("Creating node error: %v", err)
 	}
 
-	pod, err := testutils.CreatePausePod(testCtx.ClientSet, podWrapper)
+	pod, err := testutils.CreatePausePod(testCtx.Client(), podWrapper)
 	if err != nil {
 		t.Fatalf("Creating pod error: %v", err)
 	}
 
-	if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+	if err := schedulerutils.WaitForPodUnschedulable(testCtx, testCtx.Client(), pod); err != nil {
 		t.Fatalf("Pod %v got scheduled: %v", pod.Name, err)
 	}
-	node, err = testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
+	node, err = testCtx.Client().CoreV1().Nodes().Get(testCtx, node.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Error while getting a node: %v", err)
 	}
@@ -137,12 +137,12 @@ func TestUpdateNodeEvent(t *testing.T) {
 	node.Labels["foo"] = "bar"
 	node.Spec.Taints = nil
 
-	_, err = testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{})
+	_, err = testCtx.Client().CoreV1().Nodes().Update(testCtx, node, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error updating the node: %v", err)
 	}
 
-	if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+	if err := schedulerutils.WaitForPodToSchedule(testCtx, testCtx.Client(), pod); err != nil {
 		t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 	}
 }
@@ -191,11 +191,11 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 			name: "Preempt nominated pod",
 			updateFunc: func(testCtx *testutils.TestContext) {
 				// Create high-priority pod and wait until it's scheduled (unnominate mid-priority pod)
-				pod, err := testutils.CreatePausePod(testCtx.ClientSet, podHigh)
+				pod, err := testutils.CreatePausePod(testCtx.Client(), podHigh)
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err = schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err = schedulerutils.WaitForPodToSchedule(testCtx, testCtx.Client(), pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 			},
@@ -203,7 +203,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		{
 			name: "Remove nominated pod",
 			updateFunc: func(testCtx *testutils.TestContext) {
-				if err := schedulerutils.DeletePod(testCtx.ClientSet, podMidNominated.Name, podMidNominated.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.Client(), podMidNominated.Name, podMidNominated.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 			},
@@ -227,48 +227,48 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				)
 				defer teardown()
 
-				_, err := schedulerutils.CreateNode(testCtx.ClientSet, testNode)
+				_, err := schedulerutils.CreateNode(testCtx.Client(), testNode)
 				if err != nil {
 					t.Fatalf("Creating node error: %v", err)
 				}
 
 				// Ensure node is present in scheduler cache.
-				if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
+				if err := schedulerutils.WaitForNodesInCache(testCtx, testCtx.Scheduler, 1); err != nil {
 					t.Fatalf("Waiting for node in cache error: %v", err)
 				}
 
 				// Create initial low-priority pod and wait until it's scheduled.
-				pod, err := testutils.CreatePausePod(testCtx.ClientSet, podLow)
+				pod, err := testutils.CreatePausePod(testCtx.Client(), podLow)
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodToSchedule(testCtx, testCtx.Client(), pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 
 				// Create mid-priority pod and wait until it becomes nominated (preempt low-priority pod) and remain uschedulable.
-				pod, err = testutils.CreatePausePod(testCtx.ClientSet, podMidNominated)
+				pod, err = testutils.CreatePausePod(testCtx.Client(), podMidNominated)
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForNominatedNodeName(testCtx, testCtx.Client(), pod); err != nil {
 					t.Errorf("NominatedNodeName field was not set for pod %v: %v", pod.Name, err)
 				}
-				if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodUnschedulable(testCtx, testCtx.Client(), pod); err != nil {
 					t.Errorf("Pod %v haven't become unschedulabe: %v", pod.Name, err)
 				}
 
 				// Remove the initial low-priority pod, which will move the nominated unschedulable pod back to the backoff queue.
-				if err := schedulerutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.Client(), podLow.Name, podLow.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 
 				// Create another low-priority pods which cannot be scheduled because the mid-priority pod is nominated on the node and the node doesn't have enough resource to have two pods both.
-				pod, err = testutils.CreatePausePod(testCtx.ClientSet, podLow)
+				pod, err = testutils.CreatePausePod(testCtx.Client(), podLow)
 				if err != nil {
 					t.Fatalf("Creating pod error: %v", err)
 				}
-				if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				if err := schedulerutils.WaitForPodUnschedulable(testCtx, testCtx.Client(), pod); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
 				}
 
@@ -280,10 +280,10 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				fakeClock.Step(2 * testBackoff)
 
 				// Expect the low-priority pod is notified about unnominated mid-pririty pod and gets scheduled, as it should fit this time.
-				if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {
+				if err := schedulerutils.WaitForPodToSchedule(testCtx, testCtx.Client(), podLow); err != nil {
 					t.Fatalf("Pod %v was not scheduled: %v", podLow.Name, err)
 				}
-				testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, cleanupPods)
+				testutils.CleanupPods(testCtx, testCtx.Client(), t, cleanupPods)
 			})
 		}
 	}

@@ -256,7 +256,7 @@ func TestNominatedNode(t *testing.T) {
 							scheduler.WithFrameworkOutOfTreeRegistry(tt.outOfTreeRegistry),
 						)
 
-						cs, ns := testCtx.ClientSet, testCtx.NS.Name
+						cs, ns := testCtx.Client(), testCtx.NS.Name
 						for _, node := range tt.initNodes {
 							if _, err := createNode(cs, node); err != nil {
 								t.Fatalf("Error creating initial node %v: %v", node.Name, err)
@@ -280,7 +280,7 @@ func TestNominatedNode(t *testing.T) {
 							// If necessary, run the post check function.
 							if len(tt.postChecks) > i && tt.postChecks[i] != nil {
 								for _, p := range pods {
-									if err := tt.postChecks[i](testCtx.Ctx, cs, p); err != nil {
+									if err := tt.postChecks[i](testCtx, cs, p); err != nil {
 										t.Fatalf("Pod %v didn't pass the postChecks[%v]: %v", p.Name, i, err)
 									}
 								}
@@ -289,7 +289,7 @@ func TestNominatedNode(t *testing.T) {
 
 						// Delete the fake node if necessary.
 						if tt.deleteFakeNode {
-							if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
+							if err := cs.CoreV1().Nodes().Delete(testCtx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 								t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
 							}
 						}
@@ -303,7 +303,7 @@ func TestNominatedNode(t *testing.T) {
 						}
 
 						// Verify if .status.nominatedNodeName is cleared.
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+						if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 							pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
 							if err != nil {
 								t.Errorf("Error getting the medium pod: %v", err)
@@ -328,7 +328,7 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	// wraps the NextEntity() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextEntity
 	testCtx.Scheduler.NextEntity = func(logger klog.Logger) (framework.QueuedEntityInfo, error) {
-		entity, _ := f(klog.FromContext(testCtx.Ctx))
+		entity, _ := f(klog.FromContext(testCtx))
 		// Scheduler.NextEntity() may return nil when scheduler is shutting down.
 		if entity != nil {
 			for pInfo := range entity.ForEachPodInfo() {
@@ -338,7 +338,7 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 		}
 		return entity, nil
 	}
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	go testCtx.Scheduler.Run(testCtx)
 	return testCtx
 }
 
@@ -411,7 +411,7 @@ func TestPreferNominatedNode(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
 
 				testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
-				cs := testCtx.ClientSet
+				cs := testCtx.Client()
 				nsName := testCtx.NS.Name
 				var err error
 				var preemptor *v1.Pod
@@ -436,7 +436,7 @@ func TestPreferNominatedNode(t *testing.T) {
 				if err != nil {
 					t.Errorf("Error while creating high priority pod: %v", err)
 				}
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 					preemptor, err = cs.CoreV1().Pods(test.pod.Namespace).Get(ctx, test.pod.Name, metav1.GetOptions{})
 					if err != nil {
 						t.Errorf("Error getting the preemptor pod info: %v", err)

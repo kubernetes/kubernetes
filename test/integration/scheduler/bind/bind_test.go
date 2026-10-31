@@ -47,7 +47,7 @@ func TestDefaultBinder(t *testing.T) {
 			}
 
 			// Add a node.
-			node, err := schedulerutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
+			node, err := schedulerutils.CreateNode(testCtx.Client(), st.MakeNode().Name("testnode").Obj())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -66,18 +66,18 @@ func TestDefaultBinder(t *testing.T) {
 			}
 			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					pod, err := schedulerutils.CreatePausePodWithResource(testCtx.ClientSet, "fixed-name", testCtx.NS.Name, nil)
+					pod, err := schedulerutils.CreatePausePodWithResource(testCtx.Client(), "fixed-name", testCtx.NS.Name, nil)
 					if err != nil {
 						t.Fatalf("Failed to create pod: %v", err)
 					}
-					defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*corev1.Pod{pod})
+					defer testutil.CleanupPods(testCtx, testCtx.Client(), t, []*corev1.Pod{pod})
 
 					podCopy := pod.DeepCopy()
 					if tc.anotherUID {
 						podCopy.UID = "another"
 					}
 
-					status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx.Ctx, framework.NewCycleState(), podCopy, node.Name)
+					status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx, framework.NewCycleState(), podCopy, node.Name)
 					if code := status.Code(); code != tc.wantStatusCode {
 						t.Errorf("Bind returned code %s, want %s", code, tc.wantStatusCode)
 					}

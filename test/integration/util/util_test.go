@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 )
 
 // TestInitTestAPIServerContextCanceledBeforeCleanup verifies the normal
-// (non-explicit) shutdown path: testCtx.Ctx gets canceled as soon as the
+// (non-explicit) shutdown path: testCtx gets canceled as soon as the
 // test function returns. The cancellation itself runs via
 // context.AfterFunc, in parallel with (not necessarily before) any
 // t.Cleanup callback, so a cleanup callback which depends on it must wait
@@ -36,10 +37,10 @@ func TestInitTestAPIServerContextCanceledBeforeCleanup(t *testing.T) {
 
 	t.Cleanup(func() {
 		select {
-		case <-testCtx.Ctx.Done():
+		case <-testCtx.Done():
 			// Canceled, as expected.
 		case <-time.After(30 * time.Second):
-			t.Error("testCtx.Ctx was not canceled by the time cleanup ran")
+			t.Error("testCtx was not canceled by the time cleanup ran")
 		}
 	})
 }
@@ -47,7 +48,7 @@ func TestInitTestAPIServerContextCanceledBeforeCleanup(t *testing.T) {
 // TestInitTestAPIServerCloseFnCancelsCallerContext verifies that calling
 // testCtx.CloseFn explicitly (i.e. before the test itself ends and the
 // top-level context gets canceled through test cleanup) cancels
-// testCtx.Ctx. Callers rely on that context to know when to stop any
+// testCtx. Callers rely on that context to know when to stop any
 // goroutines they started with it, so CloseFn must cancel it directly
 // instead of only canceling the apiserver's own, detached context.
 //
@@ -63,12 +64,36 @@ func TestInitTestAPIServerCloseFnCancelsCallerContext(t *testing.T) {
 	testCtx.CloseFn()
 
 	select {
-	case <-testCtx.Ctx.Done():
+	case <-testCtx.Done():
 		// Canceled, as expected.
 	case <-time.After(30 * time.Second):
-		t.Fatal("testCtx.Ctx was not canceled by CloseFn")
+		t.Fatal("testCtx was not canceled by CloseFn")
 	}
 
 	// Prevent failures when CleanupTest runs as cleanup callback.
-	testCtx.ClientSet = fake.NewClientset(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testCtx.NS.Name}})
+	testCtx.TContext = testCtx.WithClients(testCtx.RESTConfig(), nil, fake.NewClientset(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testCtx.NS.Name}}), nil)
+}
+
+// TestInitTestAPIServerTContext verifies that InitTestAPIServer sets up the embedded
+// ktesting.TContext with clients, namespace, and context methods.
+func TestInitTestAPIServerTContext(t *testing.T) {
+	testCtx := InitTestAPIServer(t, "tcontext", nil)
+
+	if testCtx.Client() == nil {
+		t.Errorf("testCtx.Client() is nil")
+	}
+	if testCtx.RESTConfig() == nil {
+		t.Errorf("testCtx.RESTConfig() is nil")
+	}
+	if testCtx.Namespace() != testCtx.NS.Name {
+		t.Errorf("testCtx.Namespace() = %q, want %q", testCtx.Namespace(), testCtx.NS.Name)
+	}
+
+	// Verify testCtx satisfies context.Context directly.
+	var ctx context.Context = testCtx
+	select {
+	case <-ctx.Done():
+		t.Fatal("unexpected early cancellation of testCtx as context.Context")
+	default:
+	}
 }

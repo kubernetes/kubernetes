@@ -68,7 +68,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	testCtx := testutils.InitTestAPIServer(t, "taint-node-by-condition", admission)
 
 	// Build clientset and informers for controllers.
-	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+	externalClientConfig := restclient.CopyConfig(testCtx.RESTConfig())
 	externalClientConfig.QPS = -1
 	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
@@ -76,12 +76,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	cs := testCtx.ClientSet
+	cs := testCtx.Client()
 	nsName := testCtx.NS.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
-		testCtx.Ctx,
+		testCtx,
 		externalInformers.Coordination().V1().Leases(),
 		externalInformers.Core().V1().Pods(),
 		externalInformers.Core().V1().Nodes(),
@@ -101,11 +101,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 	}
 
 	// Waiting for all controllers to sync
-	externalInformers.Start(testCtx.Ctx.Done())
-	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+	externalInformers.Start(testCtx.Done())
+	externalInformers.WaitForCacheSync(testCtx.Done())
 
 	// Run node lifecycle controller
-	go nc.Run(testCtx.Ctx)
+	go nc.Run(testCtx)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -712,11 +712,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 					},
 				}
 
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 					t.Errorf("Failed to create node, err: %v", err)
 				}
-				if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, node, test.expectedTaints); err != nil {
-					node, err = cs.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
+				if err := testutils.WaitForNodeTaints(testCtx, cs, node, test.expectedTaints); err != nil {
+					node, err = cs.CoreV1().Nodes().Get(testCtx, node.Name, metav1.GetOptions{})
 					if err != nil {
 						t.Errorf("Failed to get node <%s>", node.Name)
 					}
@@ -730,7 +730,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					pod.Spec.Tolerations = p.tolerations
 
-					createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+					createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx, pod, metav1.CreateOptions{})
 					if err != nil {
 						t.Fatalf("Failed to create pod %s/%s, error: %v",
 							pod.Namespace, pod.Name, err)
@@ -739,21 +739,21 @@ func TestTaintNodeByCondition(t *testing.T) {
 					pods = append(pods, createdPod)
 
 					if p.fits {
-						if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, cs, createdPod); err != nil {
+						if err := schedulerutils.WaitForPodToSchedule(testCtx, cs, createdPod); err != nil {
 							t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 								pod.Namespace, pod.Name, err)
 						}
 					} else {
-						if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, cs, createdPod); err != nil {
+						if err := schedulerutils.WaitForPodUnschedulable(testCtx, cs, createdPod); err != nil {
 							t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
 								pod.Namespace, pod.Name, err)
 						}
 					}
 				}
 
-				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+				testutils.CleanupPods(testCtx, cs, t, pods)
 				testutils.CleanupNodes(cs, t)
-				schedulerutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
+				schedulerutils.WaitForSchedulerCacheCleanup(testCtx, testCtx.Scheduler, t)
 
 				// Clean up scheduler context
 				if testCtx.SchedulerCloseFn != nil {

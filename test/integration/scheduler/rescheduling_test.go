@@ -154,7 +154,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Permit Plugin",
 			plugin: &PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Client(), st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -166,7 +166,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Permit Plugin with unrelated event",
 			plugin: &PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := testutils.CreatePausePod(testContext.ClientSet,
+				_, err := testutils.CreatePausePod(testContext.Client(),
 					testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
 				return err
 			},
@@ -179,7 +179,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod failed by Permit Plugin",
 			plugin: &PermitPlugin{name: "permit", statusCode: fwk.Error},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Client(), st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -189,7 +189,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Reserve Plugin",
 			plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Client(), st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -198,7 +198,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Reserve Plugin with unrelated event",
 			plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := testutils.CreatePausePod(testContext.ClientSet,
+				_, err := testutils.CreatePausePod(testContext.Client(),
 					testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
 				return err
 			},
@@ -208,7 +208,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod failed by Reserve Plugin",
 			plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Error},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Client(), st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -235,7 +235,7 @@ func TestReScheduling(t *testing.T) {
 						scheduler.WithFrameworkOutOfTreeRegistry(registry))
 					defer teardown()
 
-					pod, err := createPausePod(testCtx.ClientSet,
+					pod, err := createPausePod(testCtx.Client(),
 						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
 					if err != nil {
 						t.Fatalf("Error while creating a test pod: %v", err)
@@ -243,12 +243,12 @@ func TestReScheduling(t *testing.T) {
 
 					// The first time for scheduling, pod is error or unschedulable, controlled by wantFirstSchedulingError
 					if test.wantFirstSchedulingError {
-						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-							PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+						if err = wait.PollUntilContextTimeout(testCtx, 10*time.Millisecond, 30*time.Second, false,
+							PodSchedulingError(testCtx.Client(), pod.Namespace, pod.Name)); err != nil {
 							t.Errorf("Expected a scheduling error, but got: %v", err)
 						}
 					} else {
-						if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						if err = WaitForPodUnschedulable(testCtx, testCtx.Client(), pod); err != nil {
 							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 						}
 					}
@@ -260,16 +260,16 @@ func TestReScheduling(t *testing.T) {
 					}
 
 					if test.wantScheduled {
-						if err = WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						if err = WaitForPodToSchedule(testCtx, testCtx.Client(), pod); err != nil {
 							t.Errorf("Didn't expect the pod to be unschedulable. error: %v", err)
 						}
 					} else if test.wantError {
-						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-							PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+						if err = wait.PollUntilContextTimeout(testCtx, 10*time.Millisecond, 30*time.Second, false,
+							PodSchedulingError(testCtx.Client(), pod.Namespace, pod.Name)); err != nil {
 							t.Errorf("Expected a scheduling error, but got: %v", err)
 						}
 					} else {
-						if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						if err = WaitForPodUnschedulable(testCtx, testCtx.Client(), pod); err != nil {
 							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 						}
 					}
