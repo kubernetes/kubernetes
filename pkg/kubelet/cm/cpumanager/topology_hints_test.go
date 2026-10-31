@@ -37,14 +37,15 @@ import (
 )
 
 type testCase struct {
-	name                            string
-	pod                             v1.Pod
-	container                       v1.Container
-	assignments                     state.ContainerCPUAssignments
-	defaultCPUSet                   cpuset.CPUSet
-	expectedHints                   []topologymanager.TopologyHint
-	podLevelResourcesEnabled        bool
-	podLevelResourceManagersEnabled bool
+	name                                          string
+	pod                                           v1.Pod
+	container                                     v1.Container
+	assignments                                   state.ContainerCPUAssignments
+	defaultCPUSet                                 cpuset.CPUSet
+	expectedHints                                 []topologymanager.TopologyHint
+	podLevelResourcesEnabled                      bool
+	podLevelResourceManagersEnabled               bool
+	inPlacePodVerticalScalingExclusiveCPUsEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -235,6 +236,7 @@ func TestGetTopologyHints(t *testing.T) {
 	for _, tc := range returnTestCases() {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tc.inPlacePodVerticalScalingExclusiveCPUsEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -288,6 +290,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 	for _, tc := range returnTestCases() {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tc.inPlacePodVerticalScalingExclusiveCPUsEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
