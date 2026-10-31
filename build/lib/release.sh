@@ -257,10 +257,6 @@ function kube::release::package_server_tarballs() {
     local package_name
     package_name="${RELEASE_TARS}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
-
-    if [[ "${platform%/*}" = 'windows' ]]; then
-      kube::release::create_zip "${package_name%.tar.gz}.zip" "${release_stage}/.."
-    fi
   done
 }
 
@@ -588,7 +584,10 @@ function kube::release::create_zip() {
   local zipfile=$1
   local stagingdir=$2
 
-  # -X drops extra file attributes (uid/gid, timestamps beyond mtime) to keep
-  # the zip reproducible, mirroring --owner=0 --group=0 above for the tarball.
+  kube::log::status "Building zip: ${zipfile}"
+
+  # -X strips extra file attributes (uid/gid) so the archive is byte-consistent
+  # across builders. It does not normalize mtime, so the zip is not reproducible
+  # the way the tarball is; that is acceptable for a Windows convenience download.
   (cd "${stagingdir}" && zip -Xrq "${zipfile}" kubernetes)
 }
