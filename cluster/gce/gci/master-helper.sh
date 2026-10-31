@@ -118,6 +118,8 @@ function run-gcloud-command() {
 
 
 function create-master-instance-internal() {
+  require-master-image || return 1
+
   local gcloud="gcloud"
   local retries=5
   local sleep_sec=10

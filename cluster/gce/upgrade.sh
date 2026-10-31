@@ -77,6 +77,9 @@ function print-node-version-info() {
 }
 
 function upgrade-master() {
+  # Require a replacement image before deleting the existing master.
+  require-master-image || return 1
+
   local num_masters
   num_masters=$(get-master-replicas-count)
   if [[ "${num_masters}" -gt 1 ]]; then
