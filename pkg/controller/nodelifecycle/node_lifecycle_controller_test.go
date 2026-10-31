@@ -44,6 +44,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
@@ -996,7 +997,12 @@ func TestPodStatusChange(t *testing.T) {
 		podReasonUpdate := false
 		for _, action := range item.fakeNodeHandler.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" {
-				updateReason := action.(testcore.UpdateActionImpl).GetObject().(*v1.Pod).Status.Reason
+				pod := action.(testcore.UpdateActionImpl).GetObject().(*v1.Pod)
+				if pod.Status.Reason == "" && !podutil.IsPodReadyConditionTrue(pod.Status) {
+					// Update from MarkPodsNotReady, which only flips the Ready condition.
+					continue
+				}
+				updateReason := pod.Status.Reason
 				podReasonUpdate = true
 				if updateReason != item.expectedReason {
 					t.Errorf("expected pod status reason: %+v, got %+v for %+v", item.expectedReason, updateReason, item.description)
@@ -2127,6 +2133,68 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			},
 			expectedPodStatusUpdate: true,
 		},
+		// Node with ConditionUnknown on first observation after controller restart.
+		// Expect pod status update because the node is not Ready.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:   v1.NodeReady,
+									Status: v1.ConditionUnknown,
+									// Node status is Unknown (e.g., kubelet stopped posting).
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedPodStatusUpdate: true,
+		},
+		// Node with ConditionFalse on first observation after controller restart.
+		// Expect pod status update because the node is not Ready.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:   v1.NodeReady,
+									Status: v1.ConditionFalse,
+									// Node status is explicitly False (NotReady).
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedPodStatusUpdate: true,
+		},
 	}
 
 	tCtx := ktesting.Init(t)
@@ -2533,6 +2601,95 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 			}
 			if podStatusUpdates != item.expectedPodStatusUpdates {
 				t.Errorf("expect pod status updated to happen %d times, but got %d", item.expectedPodStatusUpdates, podStatusUpdates)
+			}
+		})
+	}
+}
+
+// TestMonitorNodeHealthMarkPodsNotReadyAfterRestart tests that pods are marked NotReady
+// when the controller starts with no saved health state and finds a node that is already NotReady.
+func TestMonitorNodeHealthMarkPodsNotReadyAfterRestart(t *testing.T) {
+	timeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	newNode := func(name string, status v1.ConditionStatus) *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				Labels: map[string]string{
+					v1.LabelTopologyRegion:          "region1",
+					v1.LabelTopologyZone:            "zone1",
+					v1.LabelFailureDomainBetaRegion: "region1",
+					v1.LabelFailureDomainBetaZone:   "zone1",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             status,
+						LastHeartbeatTime:  timeNow,
+						LastTransitionTime: timeNow,
+					},
+				},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		name        string
+		readyStatus v1.ConditionStatus
+	}{
+		// Node controller already set Ready to Unknown after kubelet heartbeats stopped.
+		{name: "node Ready condition Unknown", readyStatus: v1.ConditionUnknown},
+		{name: "node Ready condition False", readyStatus: v1.ConditionFalse},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// node0 went NotReady before the controller restarted; its pod is still Ready.
+			// node1 is healthy so the zone is not in full disruption.
+			pod := testutil.NewPod("pod0", "node0")
+			fakeNodeHandler := &testutil.FakeNodeHandler{
+				Existing:  []*v1.Node{newNode("node0", tc.readyStatus), newNode("node1", v1.ConditionTrue)},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*pod}}),
+			}
+
+			tCtx := ktesting.Init(t)
+			nodeController, err := newNodeLifecycleControllerFromClient(
+				tCtx,
+				fakeNodeHandler,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+				testNodeMonitorGracePeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorPeriod,
+			)
+			if err != nil {
+				t.Fatalf("Failed to create node controller: %v", err)
+			}
+			nodeController.now = func() metav1.Time { return timeNow }
+			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+
+			// A freshly started controller has an empty nodeHealthMap.
+			if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			podStatusUpdated := false
+			for _, action := range fakeNodeHandler.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					updatedPod := action.(testcore.UpdateActionImpl).GetObject().(*v1.Pod)
+					if !podutil.IsPodReadyConditionTrue(updatedPod.Status) {
+						podStatusUpdated = true
+					}
+				}
+			}
+			if !podStatusUpdated {
+				t.Errorf("expected pod on node with Ready=%s to be marked NotReady after controller restart", tc.readyStatus)
 			}
 		})
 	}
@@ -3613,21 +3770,27 @@ func TestNodeEventGeneration(t *testing.T) {
 	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(fakeRecorder.Events) != 1 {
-		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 1, fakeRecorder.Events)
+	if len(fakeRecorder.Events) != 2 {
+		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 2, fakeRecorder.Events)
 	}
-	if fakeRecorder.Events[0].Reason != "RegisteredNode" {
-		var reasons []string
-		for _, event := range fakeRecorder.Events {
-			reasons = append(reasons, event.Reason)
+	expectedReasons := []string{"RegisteredNode", "NodeNotReady"}
+	for i, event := range fakeRecorder.Events {
+		if event.Reason != expectedReasons[i] {
+			var reasons []string
+			for _, e := range fakeRecorder.Events {
+				reasons = append(reasons, e.Reason)
+			}
+			t.Fatalf("unexpected events generation: got %v, expected %v", strings.Join(reasons, ","), strings.Join(expectedReasons, ","))
 		}
-		t.Fatalf("unexpected events generation: %v", strings.Join(reasons, ","))
 	}
 	for _, event := range fakeRecorder.Events {
 		involvedObject := event.InvolvedObject
-		actualUID := string(involvedObject.UID)
-		if actualUID != "1234567890" {
-			t.Fatalf("unexpected event uid: %v", actualUID)
+		// Only check UID for Node events, not Pod events
+		if involvedObject.Kind == "Node" {
+			actualUID := string(involvedObject.UID)
+			if actualUID != "1234567890" {
+				t.Fatalf("unexpected event uid: %v", actualUID)
+			}
 		}
 	}
 }
@@ -3984,7 +4147,7 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 				probeTimestamp:           test.node.CreationTimestamp,
 				readyTransitionTimestamp: test.node.CreationTimestamp,
 			})
-			_, _, currentReadyCondition, err := nodeController.tryUpdateNodeHealth(tCtx, test.node)
+			_, _, currentReadyCondition, _, err := nodeController.tryUpdateNodeHealth(tCtx, test.node)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
