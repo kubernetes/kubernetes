@@ -1366,7 +1366,11 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		// To avoid breaking compatibility,
 		// we made corresponding changes on the client side to ensure that the create and patch behaviors are idempotent.
 		if patchV == nil {
-			delete(original, k)
+			// A null $deleteFromPrimitiveList directive value deletes no
+			// elements, not the whole field.
+			if !isDeleteList {
+				delete(original, k)
+			}
 			if mergeOptions.IgnoreUnmatchedNulls {
 				continue
 			}
