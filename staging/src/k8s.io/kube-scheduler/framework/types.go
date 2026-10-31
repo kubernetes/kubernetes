@@ -719,7 +719,6 @@ type PodGroupInfo interface {
 	GetPriority() int32
 	// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
 	// or the default policy (PreemptLowerPriority) if not set.
-	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
 	GetPreemptionPolicy() v1.PreemptionPolicy
 	// GetMinCount returns the minimum number of pods or child groups required
 	// to satisfy the group's scheduling policy requirements.
@@ -957,7 +956,6 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 
 // GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
 // or the default policy (PreemptLowerPriority) if not set.
-// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
 func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
