@@ -411,6 +411,20 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 				{Name: "succeed"},
 				{Name: "failed"},
 				{Name: "unknown"},
+				{Name: "removed-succeed"},
+				{Name: "removed-failed"},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:  "removed-succeed",
+					State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+				},
+				{
+					Name:  "removed-failed",
+					State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 1}},
+				},
 			},
 		},
 	}
@@ -457,11 +471,13 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 
 	// test policies
 	expected := map[string][]bool{
-		"no-history": {true, true, true},
-		"alive":      {false, false, false},
-		"succeed":    {false, false, true},
-		"failed":     {false, true, true},
-		"unknown":    {true, true, true},
+		"no-history":      {true, true, true},
+		"alive":           {false, false, false},
+		"succeed":         {false, false, true},
+		"failed":          {false, true, true},
+		"unknown":         {true, true, true},
+		"removed-succeed": {false, false, true},
+		"removed-failed":  {false, true, true},
 	}
 	for _, c := range pod.Spec.Containers {
 		for i, policy := range policies {
@@ -478,11 +494,13 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 	// test deleted pod
 	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	expected = map[string][]bool{
-		"no-history": {false, false, false},
-		"alive":      {false, false, false},
-		"succeed":    {false, false, false},
-		"failed":     {false, false, false},
-		"unknown":    {false, false, false},
+		"no-history":      {false, false, false},
+		"alive":           {false, false, false},
+		"succeed":         {false, false, false},
+		"failed":          {false, false, false},
+		"unknown":         {false, false, false},
+		"removed-succeed": {false, false, false},
+		"removed-failed":  {false, false, false},
 	}
 	for _, c := range pod.Spec.Containers {
 		for i, policy := range policies {

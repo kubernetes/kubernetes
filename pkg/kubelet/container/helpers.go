@@ -95,9 +95,23 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 	// Get latest container status.
 	status := podStatus.FindContainerStatusByName(container.Name)
 	// If the container was never started before, we should start it.
-	// NOTE(random-liu): If all historical containers were GC'd, we'll also return true here.
+	// NOTE(random-liu): If all historical containers were GC'd without a recorded
+	// termination, we'll also return true here.
 	if status == nil {
-		return true
+		// The runtime no longer has any record of the container. Fall back to
+		// the pod status: if the container already ran to completion, keep
+		// honoring the restart policy on the recorded exit code, so removing
+		// a terminated container from the runtime (e.g. by container GC)
+		// cannot re-run it against a policy that forbids restarts.
+		if apiStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); found && apiStatus.State.Terminated != nil {
+			status = &Status{
+				Name:     container.Name,
+				State:    ContainerStateExited,
+				ExitCode: int(apiStatus.State.Terminated.ExitCode),
+			}
+		} else {
+			return true
+		}
 	}
 	// Check whether container is running
 	if status.State == ContainerStateRunning {

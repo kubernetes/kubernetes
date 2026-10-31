@@ -1262,6 +1262,48 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
 		},
+		"don't restart successfully terminated container removed from runtime if RestartPolicy == Never": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+				// The termination is recorded in the pod status.
+				pod.Status.ContainerStatuses[0].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The runtime record of the first container is gone (e.g. GC'd).
+				status.ContainerStatuses = append(status.ContainerStatuses[:0], status.ContainerStatuses[1:]...)
+			},
+			actions: noAction,
+		},
+		"don't restart successfully terminated container removed from runtime if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+				pod.Status.ContainerStatuses[0].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses[:0], status.ContainerStatuses[1:]...)
+			},
+			actions: noAction,
+		},
+		"restart terminated container removed from runtime if RestartPolicy == Always": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				pod.Status.ContainerStatuses[0].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses[:0], status.ContainerStatuses[1:]...)
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
 		"restart failed containers if RestartPolicy == OnFailure": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
