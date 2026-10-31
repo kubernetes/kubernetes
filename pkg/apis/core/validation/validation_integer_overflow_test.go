@@ -107,7 +107,7 @@ func TestValidateContainerResourceRequirementsKeepsRoundedValues(t *testing.T) {
 	requirements := &core.ResourceRequirements{
 		Limits: core.ResourceList{core.ResourceName("example.com/device"): resource.MustParse("1.9999")},
 	}
-	if errs := ValidateContainerResourceRequirements(requirements, sets.New[string](), field.NewPath("resources"), PodValidationOptions{}); len(errs) > 0 {
+	if errs := ValidateContainerResourceRequirements(requirements, sets.New[string](), field.NewPath("resources"), PodValidationOptions{}, ""); len(errs) > 0 {
 		t.Errorf("a value the check has always accepted was rejected: %v", errs)
 	}
 }
