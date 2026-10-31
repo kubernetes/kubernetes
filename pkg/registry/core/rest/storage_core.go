@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -74,8 +75,9 @@ type Config struct {
 	Proxy    ProxyConfig
 	Services ServicesConfig
 
-	EndpointSliceGetter proxy.EndpointSliceGetter
-	Authorizer          authorizer.Authorizer
+	EndpointSliceGetter     proxy.EndpointSliceGetter
+	Authorizer              authorizer.Authorizer
+	DisabledPodSubresources sets.Set[string]
 }
 
 type ProxyConfig struct {
@@ -234,19 +236,27 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	if resource := "pods"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.Pod
-		storage[resource+"/attach"] = podStorage.Attach
-		storage[resource+"/status"] = podStorage.Status
-		storage[resource+"/log"] = podStorage.Log
-		storage[resource+"/exec"] = podStorage.Exec
-		storage[resource+"/portforward"] = podStorage.PortForward
-		storage[resource+"/proxy"] = podStorage.Proxy
-		storage[resource+"/binding"] = podStorage.Binding
-		if podStorage.Eviction != nil {
-			storage[resource+"/eviction"] = podStorage.Eviction
+
+		subresources := map[string]rest.Storage{
+			"attach":              podStorage.Attach,
+			"status":              podStorage.Status,
+			"log":                 podStorage.Log,
+			"exec":                podStorage.Exec,
+			"portforward":         podStorage.PortForward,
+			"proxy":               podStorage.Proxy,
+			"binding":             podStorage.Binding,
+			"ephemeralcontainers": podStorage.EphemeralContainers,
 		}
-		storage[resource+"/ephemeralcontainers"] = podStorage.EphemeralContainers
+		if podStorage.Eviction != nil {
+			subresources["eviction"] = podStorage.Eviction
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			storage[resource+"/resize"] = podStorage.Resize
+			subresources["resize"] = podStorage.Resize
+		}
+		for subresource, subresourceStorage := range subresources {
+			if !p.DisabledPodSubresources.Has(subresource) {
+				storage[resource+"/"+subresource] = subresourceStorage
+			}
 		}
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
