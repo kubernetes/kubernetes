@@ -33,6 +33,7 @@ type TestTypeApplyConfiguration struct {
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *TestTypeStatusApplyConfiguration `json:"status,omitempty"`
 	*TestEmbeddedTypeApplyConfiguration  `json:"embedded,omitempty"`
+	Shadowed                             *TestTypeWithShadowedFieldApplyConfiguration `json:"shadowed,omitempty"`
 }
 
 // TestType constructs a declarative configuration of the TestType type for use with
@@ -218,6 +219,14 @@ func (b *TestTypeApplyConfiguration) ensureTestEmbeddedTypeApplyConfigurationExi
 	if b.TestEmbeddedTypeApplyConfiguration == nil {
 		b.TestEmbeddedTypeApplyConfiguration = &TestEmbeddedTypeApplyConfiguration{}
 	}
+}
+
+// WithShadowed sets the Shadowed field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Shadowed field is set to the value of the last call.
+func (b *TestTypeApplyConfiguration) WithShadowed(value *TestTypeWithShadowedFieldApplyConfiguration) *TestTypeApplyConfiguration {
+	b.Shadowed = value
+	return b
 }
 
 // GetKind retrieves the value of the Kind field in the declarative configuration.
