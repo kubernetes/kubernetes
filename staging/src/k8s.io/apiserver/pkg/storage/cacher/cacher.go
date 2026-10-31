@@ -345,6 +345,9 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+
+	// stall is non-nil exactly when WatchCacheStallResume is enabled.
+	stall *cacherStall
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -457,6 +460,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacher.stall = newCacherStall(config.GroupResource, watchCache)
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
@@ -622,6 +628,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			return
 		}
 
+		if c.stall != nil {
+			watcher.stallMetrics = c.stall.metrics
+			// The initial interval covers every event up to this resourceVersion.
+			watcher.position = c.watchCache.resourceVersion
+		}
 		// Update watcher.forget function once we can compute it.
 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
 		if isSharding {
@@ -962,6 +973,14 @@ func (c *Cacher) dispatchEvents() {
 		// the non-empty error means that the stopCh was closed
 		return
 	}
+	var passC <-chan time.Time
+	var dispatcherHook chan func(syncPassFunc)
+	if c.stall != nil {
+		c.stall.passTimer = c.clock.NewTimer(syncPassPeriod)
+		c.stall.passTimer.Stop()
+		defer c.stall.passTimer.Stop()
+		dispatcherHook = c.stall.dispatcherHook
+	}
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -984,6 +1003,9 @@ func (c *Cacher) dispatchEvents() {
 				metrics.EventsCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
+			if c.stall != nil {
+				passC = c.syncAfterDispatch()
+			}
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			bookmarkEvent := &watchCacheEvent{
@@ -996,6 +1018,14 @@ func (c *Cacher) dispatchEvents() {
 				continue
 			}
 			c.dispatchEvent(bookmarkEvent)
+		case <-passC:
+			c.syncPass(c.clock.Now())
+			passC = c.armSyncTimer()
+		case fn := <-dispatcherHook:
+			fn(func() (int, int) {
+				defer func() { passC = c.armSyncTimer() }()
+				return c.syncPass(c.clock.Now())
+			})
 		case <-c.stopCh:
 			return
 		}
@@ -1034,6 +1064,10 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	if c.stall != nil {
+		c.dispatchNonblocking(event)
+		return
+	}
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,

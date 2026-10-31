@@ -18,14 +18,17 @@ package cacher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/utils/clock"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -102,6 +105,26 @@ type cacheWatcher struct {
 	selector                watchSelector
 	requestedWatchRV        uint64
 	requiredResourceVersion uint64
+
+	// The fields below serve the WatchCacheStallResume feature gate. Watch
+	// sets them before it registers the watcher; after that only the
+	// dispatcher goroutine writes them, unless noted otherwise.
+
+	// stallMetrics is non-nil exactly when the gate is on.
+	stallMetrics *metrics.StallResumeObservers
+	// position is the highest resourceVersion accounted for: every selected
+	// event at or below it is in the initial interval or was pushed to input.
+	position uint64
+	// unsynced marks a watcher the live path skips; sync passes serve it.
+	unsynced bool
+	// catchupEvents counts the events passes pushed since the last stall.
+	catchupEvents int
+	// live is set by the watcher goroutine after the initial events.
+	live atomic.Bool
+	// expired and expiredReason are set before input is closed; the watcher
+	// goroutine then sends a 410 after the backlog.
+	expired       bool
+	expiredReason string
 }
 
 func newCacheWatcher(
@@ -206,7 +229,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, metrics.TerminationReasonUnresponsive).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -496,6 +519,9 @@ func (c *cacheWatcher) process(ctx context.Context) {
 		select {
 		case item, ok := <-c.input:
 			if !ok {
+				if c.expired {
+					c.sendExpired(c.position, c.expiredReason)
+				}
 				return
 			}
 			switch {
@@ -508,6 +534,9 @@ func (c *cacheWatcher) process(ctx context.Context) {
 					return
 				}
 				if err := c.processInitialEvents(item.interval); err != nil {
+					if c.stallMetrics != nil && errors.Is(err, errCacheIntervalInvalidated) {
+						c.sendExpired(item.interval.resourceVersion, metrics.TerminationReasonResourceExpiredInitial)
+					}
 					return
 				}
 				resourceVersion = item.interval.resourceVersion
@@ -519,6 +548,7 @@ func (c *cacheWatcher) process(ctx context.Context) {
 				//   process, but we're leaving this to the tuning phase.
 				utilflowcontrol.WatchInitialized(ctx)
 				initialized = true
+				c.live.Store(true)
 			case item.event != nil:
 				if !initialized {
 					klog.ErrorS(nil, "Unexpected event before watch was initialized", "resource", c.groupResource, "identifier", c.identifier)
@@ -538,6 +568,28 @@ func (c *cacheWatcher) process(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// sendExpired sends one in-stream 410, as a direct etcd watch does on
+// compaction. It counts the termination only when the 410 is sent.
+func (c *cacheWatcher) sendExpired(position uint64, reason string) {
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+	klog.V(2).InfoS("Terminating watcher: position is no longer in the watch cache history",
+		"groupResource", c.groupResource, "identifier", c.identifier, "position", position, "reason", reason)
+	status := &apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", position)).ErrStatus
+	select {
+	case c.result <- watch.Event{Type: watch.Error, Object: status}:
+		if reason == metrics.TerminationReasonResourceExpiredInitial {
+			c.stallMetrics.TerminatedExpiredInitial.Inc()
+		} else {
+			c.stallMetrics.TerminatedExpired.Inc()
+		}
+	case <-c.done:
 	}
 }
 
@@ -583,7 +635,8 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 			// now, in order to be on the safe side and not break
 			// custom clients, the cost of it is something that we
 			// are fully accepting.
-			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+			// With the WatchCacheStallResume gate on, process sends that event.
+			klog.Warningf("couldn't retrieve watch event to serve: %v", err)
 			return err
 		}
 		if event.ResourceVersion < c.requiredResourceVersion || event.ResourceVersion < c.requestedWatchRV || event.ResourceVersion > cacheInterval.resourceVersion {
