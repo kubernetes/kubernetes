@@ -133,6 +133,8 @@ func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResour
 			return nil
 		}
 		if apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err) {
+			klog.Infof("retry %d, failed to update storage version for %v: %v", retry, gr, err)
+			retry++
 			time.Sleep(1 * time.Second)
 			continue
 		}
