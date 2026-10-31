@@ -159,7 +159,7 @@ const (
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
-	defaultGzipThresholdBytes = 128 * 1024
+	defaultGzipThresholdBytes = 1024
 	// Use the length of the first write to recognize streaming implementations.
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
