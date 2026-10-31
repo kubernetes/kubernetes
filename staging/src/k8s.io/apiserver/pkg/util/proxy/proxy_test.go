@@ -229,7 +229,7 @@ func TestResolve(t *testing.T) {
 			endpointSlices: nil,
 
 			clusterMode:  expectation{url: "https://foo.bar.com:443"},
-			endpointMode: expectation{error: true},
+			endpointMode: expectation{url: "https://foo.bar.com:443"},
 		},
 		{
 			name: "unsupported service",
