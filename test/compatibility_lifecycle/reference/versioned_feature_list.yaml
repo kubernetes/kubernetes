@@ -791,6 +791,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.37"
+- name: HPAConfigurableSyncPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: HPAConfigurableTolerance
   versionedSpecs:
   - default: false

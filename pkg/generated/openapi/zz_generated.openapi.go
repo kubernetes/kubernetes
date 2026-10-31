@@ -15005,6 +15005,13 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 							Format:      "int32",
 						},
 					},
+					"syncPeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "syncPeriodSeconds is the delay after a reconciliation completes before the next periodic reconciliation of this HPA is eligible to run. Other events may trigger reconciliation before the delay expires. When unset, the global --horizontal-pod-autoscaler-sync-period is used. A short period does not make metrics fresher; it is useful only when the metrics source updates its values at least as often. The value must be in the range [3, 3600]. Timing is best-effort.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"scaleTargetRef", "maxReplicas"},
 			},
@@ -16016,6 +16023,13 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 						SchemaProps: spec.SchemaProps{
 							Description: "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used.",
 							Ref:         ref(autoscalingv2.HorizontalPodAutoscalerBehavior{}.OpenAPIModelName()),
+						},
+					},
+					"syncPeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "syncPeriodSeconds is the delay after a reconciliation completes before the next periodic reconciliation of this HPA is eligible to run. Other events may trigger reconciliation before the delay expires. When unset, the global --horizontal-pod-autoscaler-sync-period is used. A short period does not make metrics fresher; it is useful only when the metrics source updates its values at least as often. The value must be in the range [3, 3600]. Timing is best-effort.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

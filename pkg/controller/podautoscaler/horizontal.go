@@ -116,6 +116,9 @@ type HorizontalController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	// requeues tracks pending periodic requeues to measure their delay.
+	requeues *requeueTracker
+
 	// Latest unstabilized recommendations for each autoscaler.
 	recommendations     map[string][]timestampedRecommendation
 	recommendationsLock sync.Mutex
@@ -179,6 +182,7 @@ func NewHorizontalController(
 				Name:   "horizontalpodautoscaler",
 			},
 		),
+		requeues:            newRequeueTracker(resyncPeriod),
 		mapper:              mapper,
 		recommendations:     map[string][]timestampedRecommendation{},
 		recommendationsLock: sync.Mutex{},
@@ -281,7 +285,10 @@ func (a *HorizontalController) enqueueRateLimited(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", obj, err))
 		return
 	}
-	a.queue.AddRateLimited(key)
+	// updateHPA also passes objects that are not HPAs. They get a nil HPA and
+	// stay on the global period of the rate limiter.
+	hpa, _ := obj.(*autoscalingv2.HorizontalPodAutoscaler)
+	a.addAfterSyncPeriod(key, hpa)
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
@@ -301,6 +308,8 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	if a.selectorTracker.PutIfAbsent(hpaKey.Namespace, hpaKey, labels.Nothing()) {
 		a.monitor.ObserveHPAAddition()
 	}
+
+	a.markEventDriven(key)
 
 	// Add the HPA to the queue for immediate processing. Deduplication is handled
 	// by the queue: if the key is already queued or being processed, this is a no-op.
@@ -351,6 +360,8 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer a.queue.Done(key)
 
+	a.observeRequeueDelay(ctx, key)
+
 	deleted, err := a.reconcileKey(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -365,7 +376,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	// removed from queue. If we didn't add request here then in this case one request would be dropped
 	// and HPA would process after 2 x resyncPeriod.
 	if !deleted {
-		a.queue.AddRateLimited(key)
+		a.requeueAfterSyncPeriod(key)
 	}
 
 	return true

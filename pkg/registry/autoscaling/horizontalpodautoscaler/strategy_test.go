@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -137,6 +139,99 @@ func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
 		t.Errorf("Expected tolerance field not wiped out, got nil")
+	}
+}
+
+func TestPrepareForCreateConfigurableSyncPeriod(t *testing.T) {
+	testCases := []struct {
+		name        string
+		gateEnabled bool
+		expected    *int32
+	}{
+		{
+			name:        "gate enabled keeps the field",
+			gateEnabled: true,
+			expected:    ptr.To[int32](30),
+		},
+		{
+			name:        "gate disabled drops the field",
+			gateEnabled: false,
+			expected:    nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableSyncPeriod, tc.gateEnabled)
+			hpa := prepareHPA(oneMinReplicas, withoutTolerance)
+			hpa.Spec.SyncPeriodSeconds = ptr.To[int32](30)
+
+			Strategy.PrepareForCreate(context.Background(), &hpa)
+			if diff := cmp.Diff(tc.expected, hpa.Spec.SyncPeriodSeconds); diff != "" {
+				t.Errorf("Unexpected syncPeriodSeconds (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPrepareForUpdateConfigurableSyncPeriod(t *testing.T) {
+	testCases := []struct {
+		name               string
+		gateEnabled        bool
+		oldValue           *int32
+		newValue           *int32
+		expected           *int32
+		expectedGeneration int64
+	}{
+		{
+			name:               "gate enabled allows setting the field",
+			gateEnabled:        true,
+			newValue:           ptr.To[int32](30),
+			expected:           ptr.To[int32](30),
+			expectedGeneration: 2,
+		},
+		{
+			name:               "gate disabled drops a new value without a generation bump",
+			gateEnabled:        false,
+			newValue:           ptr.To[int32](30),
+			expected:           nil,
+			expectedGeneration: 1,
+		},
+		{
+			name:               "gate disabled keeps changes to an existing value",
+			gateEnabled:        false,
+			oldValue:           ptr.To[int32](30),
+			newValue:           ptr.To[int32](60),
+			expected:           ptr.To[int32](60),
+			expectedGeneration: 2,
+		},
+		{
+			name:               "gate disabled allows clearing an existing value",
+			gateEnabled:        false,
+			oldValue:           ptr.To[int32](30),
+			newValue:           nil,
+			expected:           nil,
+			expectedGeneration: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableSyncPeriod, tc.gateEnabled)
+			oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+			oldHPA.Generation = 1
+			oldHPA.Spec.SyncPeriodSeconds = tc.oldValue
+			newHPA := oldHPA.DeepCopy()
+			newHPA.Spec.SyncPeriodSeconds = tc.newValue
+
+			Strategy.PrepareForUpdate(context.Background(), newHPA, &oldHPA)
+			if diff := cmp.Diff(tc.expected, newHPA.Spec.SyncPeriodSeconds); diff != "" {
+				t.Errorf("Unexpected syncPeriodSeconds (-want +got):\n%s", diff)
+			}
+			if newHPA.Generation != tc.expectedGeneration {
+				t.Errorf("Expected generation %d, got %d", tc.expectedGeneration, newHPA.Generation)
+			}
+		})
 	}
 }
 

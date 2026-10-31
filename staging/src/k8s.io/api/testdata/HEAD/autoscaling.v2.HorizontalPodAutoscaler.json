@@ -180,7 +180,8 @@
         ],
         "tolerance": "0"
       }
-    }
+    },
+    "syncPeriodSeconds": 6
   },
   "status": {
     "observedGeneration": 1,

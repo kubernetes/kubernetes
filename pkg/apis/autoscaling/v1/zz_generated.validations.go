@@ -298,6 +298,41 @@ func Validate_HorizontalPodAutoscalerSpec(
 	}
 
 	// field autoscalingv1.HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage has no validation
+
+	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.SyncPeriodSeconds
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 3600); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 3); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 {
+				return oldObj.SyncPeriodSeconds
+			})
+		errs = append(errs, fn(fldPath.Child("syncPeriodSeconds"), obj.SyncPeriodSeconds, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
