@@ -17,16 +17,30 @@ limitations under the License.
 package replace
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/openapi/openapitest"
 	"k8s.io/client-go/rest/fake"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/validation"
 )
 
 func TestReplaceObject(t *testing.T) {
@@ -247,4 +261,86 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	if buf.String() != "replicationcontroller/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+}
+
+func TestForceReplaceTypedList(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "services.json")
+	require.NoError(t, os.WriteFile(filename, []byte(`{
+		"apiVersion":"v1",
+		"kind":"ServiceList",
+		"items":[{"metadata":{"name":"frontend"},"spec":{"ports":[{"port":80}]}}]
+	}`), 0600))
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	tf.OpenAPISchemaFunc = func() (openapi.Resources, error) {
+		t.Fatal("unexpected fallback to OpenAPI v2")
+		return nil, nil
+	}
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "test"},
+		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+	}
+	var requests []string
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Namespace{})}, nil
+			case p == "/namespaces/test/services/frontend" && m == http.MethodDelete:
+				requests = append(requests, m)
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, service)}, nil
+			case p == "/namespaces/test/services/frontend" && m == http.MethodGet:
+				requests = append(requests, m)
+				notFound := apierrors.NewNotFound(schema.GroupResource{Resource: "services"}, "frontend")
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &notFound.ErrStatus)}, nil
+			case p == "/namespaces/test/services" && m == http.MethodPost:
+				requests = append(requests, m)
+				var created corev1.Service
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&created))
+				require.Equal(t, "Service", created.Kind)
+				require.Equal(t, "v1", created.APIVersion)
+				require.Equal(t, service.Name, created.Name)
+				require.Equal(t, service.Namespace, created.Namespace)
+				require.Equal(t, service.Spec.Ports, created.Spec.Ports)
+				require.Equal(t, metav1.FieldValidationStrict, req.URL.Query().Get("fieldValidation"))
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &created)}, nil
+			default:
+				t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, out, _ := genericiooptions.NewTestIOStreams()
+	o := NewReplaceOptions(streams)
+	o.Builder = tf.NewBuilder
+	o.Namespace = "test"
+	o.Recorder = genericclioptions.NoopRecorder{}
+	o.validationDirective = metav1.FieldValidationStrict
+	o.Schema = validation.NewParamVerifyingSchema(
+		validation.ConjunctiveSchema{validation.NewSchemaValidation(tf), validation.NoDoubleKeySchema{}},
+		resource.NewQueryParamVerifierV3(tf.FakeDynamicClient, openapitest.NewEmbeddedFileClient(), resource.QueryParamFieldValidation),
+		o.validationDirective,
+	)
+	o.DeleteOptions = &cmddelete.DeleteOptions{
+		FilenameOptions:   resource.FilenameOptions{Filenames: []string{filename}},
+		ForceDeletion:     true,
+		GracePeriod:       -1,
+		CascadingStrategy: metav1.DeletePropagationBackground,
+		Output:            "name",
+		IOStreams:         streams,
+	}
+	*o.PrintFlags.OutputFormat = "name"
+	printer, err := o.PrintFlags.ToPrinter()
+	require.NoError(t, err)
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, out)
+	}
+
+	require.NoError(t, o.forceReplace())
+	require.Equal(t, []string{http.MethodDelete, http.MethodGet, http.MethodPost}, requests)
+	require.Equal(t, "service/frontend\nservice/frontend\n", out.String())
 }
