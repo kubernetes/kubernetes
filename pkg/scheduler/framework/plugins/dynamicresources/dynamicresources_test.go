@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/ptr"
 )
@@ -1529,7 +1530,7 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 			return false, nil, nil
 		},
 	}
-	// failPatch makes PreBind fail when patching the Pod status.
+	// failPatch makes patching the Pod status fail.
 	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, nil, []*resourceapi.DeviceClass{deviceClassWithExtendResourceName}, nil, []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName}, feats, true, []cgotesting.Reactor{failFinalizerRemoval})
 	pod := podWithExtendedResourceName
 
@@ -1540,7 +1541,9 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 	status = testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName)
 	require.True(tCtx, status.IsSuccess(), "Reserve: %v", status.AsError())
 	status = testCtx.p.PreBind(tCtx, testCtx.state, pod, nodeName)
-	require.ErrorContains(tCtx, status.AsError(), "patch error", "PreBind")
+	require.True(tCtx, status.IsSuccess(), "PreBind: %v", status.AsError())
+	status = testCtx.flushPodStatusMutators(tCtx, pod)
+	require.ErrorContains(tCtx, status.AsError(), "patch error", "flush pod status")
 
 	state, err := getStateData(testCtx.state)
 	tCtx.ExpectNoError(err, "get state data")
@@ -2720,32 +2723,6 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postbind: result{
 					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
-				},
-			},
-			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
-				require.NoError(tCtx, err)
-				require.Equal(tCtx, 1, int(metric["success"]))
-			},
-		},
-		"extended-resource-name-with-resources-fail-patch": {
-			enableDRAExtendedResource: true,
-			failPatch:                 true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
-			want: want{
-				reserve: result{
-					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
-				},
-				prebind: result{
-					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
-					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
-				},
-				postbind: result{
-					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
@@ -4522,6 +4499,11 @@ func testPlugin(tCtx ktesting.TContext) {
 						assert.Equal(tCtx, &fwk.PreBindPreFlightResult{AllowParallel: true}, preBindPreFlightResult)
 					})
 					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
+					if preBindStatus.IsSuccess() {
+						if status := testCtx.flushPodStatusMutators(tCtx, tc.pod); status != nil {
+							preBindStatus = status
+						}
+					}
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
 						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
 					})
@@ -4735,6 +4717,32 @@ func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialOb
 	if diff := cmp.Diff(expected.inFlightClaims, actualInFlightClaims, ignoreFieldsInResourceClaims...); diff != "" {
 		tCtx.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
+}
+
+func (tc *testContext) flushPodStatusMutators(ctx context.Context, pod *v1.Pod) *fwk.Status {
+	data, err := tc.state.Read(framework.PodStatusMutatorsKey)
+	if err != nil || data == nil {
+		return nil
+	}
+	mutators, ok := data.(*framework.PodStatusMutators)
+	if !ok {
+		return nil
+	}
+	fns := mutators.Mutators()
+	if len(fns) == 0 {
+		return nil
+	}
+	baseStatus := pod.Status.DeepCopy()
+	targetStatus := pod.Status.DeepCopy()
+	for _, fn := range fns {
+		if err := fn(baseStatus, targetStatus); err != nil {
+			return fwk.AsStatus(err)
+		}
+	}
+	if err := schedutil.PatchPodStatus(ctx, tc.client, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+		return fwk.NewStatus(fwk.Unschedulable, err.Error())
+	}
+	return nil
 }
 
 func (tc *testContext) listAll(tCtx ktesting.TContext) (objects []metav1.Object) {

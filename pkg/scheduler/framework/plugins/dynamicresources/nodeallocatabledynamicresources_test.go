@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 
 	fwk "k8s.io/kube-scheduler/framework"
@@ -1604,7 +1605,23 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					return true, nil, tt.setPatchError
 				})
 			}
-			status := pl.patchNodeAllocatableResourceClaimStatus(ctx, podToUpdate, tt.finalPodNodeAllocatableClaimStatus, tt.extendedClaim)
+			state := framework.NewCycleState()
+			status := pl.patchNodeAllocatableResourceClaimStatus(ctx, state, podToUpdate, tt.finalPodNodeAllocatableClaimStatus, tt.extendedClaim)
+			if status == nil {
+				if data, err := state.Read(framework.PodStatusMutatorsKey); err == nil && data != nil {
+					mutators := data.(*framework.PodStatusMutators).Mutators()
+					baseStatus := podToUpdate.Status.DeepCopy()
+					targetStatus := podToUpdate.Status.DeepCopy()
+					for _, mutate := range mutators {
+						if err := mutate(baseStatus, targetStatus); err != nil {
+							t.Fatalf("mutator returned error: %v", err)
+						}
+					}
+					if err := schedutil.PatchPodStatus(ctx, fakeClient, podToUpdate.Name, podToUpdate.Namespace, baseStatus, targetStatus); err != nil {
+						status = statusError(klog.TODO(), fmt.Errorf("updating pod %s/%s NodeAllocatableResourceClaimStatuses: %w", podToUpdate.Namespace, podToUpdate.Name, err))
+					}
+				}
+			}
 
 			if tt.wantStatus != nil && status != nil {
 				if tt.wantStatus.Code() != status.Code() {
@@ -2378,5 +2395,126 @@ func TestReplaceSpecialClaimNameInStatus(t *testing.T) {
 				t.Errorf("replaceSpecialClaimNameInStatus() diff (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestAggregatedPodStatusMutatorsForDRA(t *testing.T) {
+	ctx := context.Background()
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test-pod",
+			UID:       "test-uid",
+		},
+		Status: v1.PodStatus{
+			NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "claim-1",
+					Containers:        []string{"c1"},
+					Mapping: []v1.NodeAllocatableMappedResources{{
+						Name:     v1.ResourceCPU,
+						Quantity: new(resource.MustParse("1")),
+					}},
+				},
+			},
+		},
+	}
+
+	var patchCount int
+	var capturedPatches []string
+	fakeClient := fake.NewSimpleClientset(pod)
+	fakeClient.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patchAction := action.(clienttesting.PatchAction)
+		if patchAction.GetSubresource() == "status" {
+			patchCount++
+			capturedPatches = append(capturedPatches, string(patchAction.GetPatch()))
+		}
+		return true, pod, nil
+	})
+
+	pl := &DynamicResources{
+		clientset: fakeClient,
+		fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
+	}
+
+	state := framework.NewCycleState()
+	// Pre-populate PodStatusMutatorsKey as scheduleOne does
+	state.Write(framework.PodStatusMutatorsKey, framework.NewPodStatusMutators())
+
+	// 1. Add mutator from extended dynamic resources
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "extended-claim-1",
+			Namespace: "default",
+		},
+	}
+	internalState := &stateData{
+		nodeAllocations: map[string]nodeAllocation{
+			"node-1": {
+				containerResourceRequestMappings: []v1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: "c1",
+						ResourceName:  "example.com/gpu",
+						RequestName:   "req-1",
+					},
+				},
+			},
+		},
+	}
+	err := pl.patchPodExtendedResourceClaimStatus(ctx, state, pod, claim, "node-1", internalState)
+	if err != nil {
+		t.Fatalf("patchPodExtendedResourceClaimStatus returned error: %v", err)
+	}
+
+	// 2. Add mutator from node allocatable dynamic resources
+	computedStatus := cloneNodeAllocatableResourceClaimStatuses(pod.Status.NodeAllocatableResourceClaimStatuses)
+	status := pl.patchNodeAllocatableResourceClaimStatus(ctx, state, pod, computedStatus, nil)
+	if status != nil {
+		t.Fatalf("patchNodeAllocatableResourceClaimStatus returned status error: %v", status.AsError())
+	}
+
+	// 3. Verify mutators are registered in CycleState
+	data, err := state.Read(framework.PodStatusMutatorsKey)
+	if err != nil || data == nil {
+		t.Fatalf("failed to read PodStatusMutatorsKey from CycleState: %v", err)
+	}
+	mutators := data.(*framework.PodStatusMutators).Mutators()
+	if len(mutators) != 2 {
+		t.Fatalf("expected 2 registered mutators, got %d", len(mutators))
+	}
+
+	// 4. Simulate scheduler flushing the aggregated status patch
+	baseStatus := pod.Status.DeepCopy()
+	targetStatus := pod.Status.DeepCopy()
+	for _, fn := range mutators {
+		if err := fn(baseStatus, targetStatus); err != nil {
+			t.Fatalf("mutator failed: %v", err)
+		}
+	}
+
+	// Verify mutator effects
+	if targetStatus.ExtendedResourceClaimStatus == nil || targetStatus.ExtendedResourceClaimStatus.ResourceClaimName != "extended-claim-1" {
+		t.Errorf("targetStatus does not have expected ExtendedResourceClaimStatus: %+v", targetStatus.ExtendedResourceClaimStatus)
+	}
+	if baseStatus.NodeAllocatableResourceClaimStatuses != nil {
+		t.Errorf("baseStatus should have cleared NodeAllocatableResourceClaimStatuses, got: %+v", baseStatus.NodeAllocatableResourceClaimStatuses)
+	}
+	if len(targetStatus.NodeAllocatableResourceClaimStatuses) != 1 {
+		t.Errorf("targetStatus does not have expected NodeAllocatableResourceClaimStatuses: %+v", targetStatus.NodeAllocatableResourceClaimStatuses)
+	}
+
+	// 5. Send single PatchPodStatus call
+	if err := schedutil.PatchPodStatus(ctx, fakeClient, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+		t.Fatalf("PatchPodStatus failed: %v", err)
+	}
+
+	if patchCount != 1 {
+		t.Errorf("expected exactly 1 status patch action, got %d", patchCount)
+	}
+	if len(capturedPatches) == 1 {
+		p := capturedPatches[0]
+		if !strings.Contains(p, "extended-claim-1") || !strings.Contains(p, "claim-1") {
+			t.Errorf("aggregated patch does not contain both extended and node allocatable statuses: %s", p)
+		}
 	}
 }

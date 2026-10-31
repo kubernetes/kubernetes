@@ -38,7 +38,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // ExtractPodNodeAllocatableResourceClaimStatus returns a copy of the node-allocatable
@@ -652,7 +651,7 @@ func replaceSpecialClaimNameInStatus(extendedClaim *resourceapi.ResourceClaim, s
 	}
 }
 
-func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod, nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
+func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
 
 	if len(nodeAllocatableClaimStatus) == 0 {
 		return nil
@@ -677,15 +676,13 @@ func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.
 	// allocations match.
 	replaceSpecialClaimNameInStatus(extendedClaim, nodeAllocatableClaimStatus)
 
-	baseStatus.NodeAllocatableResourceClaimStatuses = nil
-
-	targetStatus := pod.Status.DeepCopy()
-
-	targetStatus.NodeAllocatableResourceClaimStatuses = nodeAllocatableClaimStatus
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
-		return statusError(logger, fmt.Errorf("updating pod %s/%s NodeAllocatableResourceClaimStatuses: %w", pod.Namespace, pod.Name, err))
+	if err := framework.AddPodStatusMutator(cs, func(baseStatus, targetStatus *v1.PodStatus) error {
+		baseStatus.NodeAllocatableResourceClaimStatuses = nil
+		targetStatus.NodeAllocatableResourceClaimStatuses = nodeAllocatableClaimStatus
+		return nil
+	}); err != nil {
+		return statusError(logger, fmt.Errorf("registering pod status mutator for NodeAllocatableResourceClaimStatuses: %w", err))
 	}
-	logger.V(5).Info("Patched pod status with NodeAllocatableResourceClaimStatuses", "pod", klog.KObj(pod), "status", targetStatus.NodeAllocatableResourceClaimStatuses)
 
 	return nil
 }

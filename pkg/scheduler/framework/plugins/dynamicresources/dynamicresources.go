@@ -1658,7 +1658,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	for index, claim := range state.claims.all() {
 		if !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
-			claim, successCleanup, err := pl.bindClaim(ctx, state, index, pod, nodeName)
+			claim, successCleanup, err := pl.bindClaim(ctx, cs, state, index, pod, nodeName)
 			if err != nil {
 				return statusError(logger, err)
 			}
@@ -1675,7 +1675,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		nodeAllocations, ok := state.nodeAllocations[nodeName]
 		if ok && len(nodeAllocations.nodeAllocatableResourceClaimStatuses) > 0 {
-			if status := pl.patchNodeAllocatableResourceClaimStatus(ctx, pod, nodeAllocations.nodeAllocatableResourceClaimStatuses, state.claims.extendedResourceClaim()); status != nil {
+			if status := pl.patchNodeAllocatableResourceClaimStatus(ctx, cs, pod, nodeAllocations.nodeAllocatableResourceClaimStatuses, state.claims.extendedResourceClaim()); status != nil {
 				return status
 			}
 		}
@@ -1778,7 +1778,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // and reservation are recorded. This finishes the work started in Reserve.
 // Returns the updated claim, a function which (if not nil) should run when the
 // pod has been successfully bound, and an error if one occurred.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, cs fwk.CycleState, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	binding := state.claims.getBinding(index, pod)
@@ -1943,7 +1943,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Patch the pod status with the new information about the generated
 	// special resource claim.
 	if isExtendedResourceClaim {
-		err := pl.patchPodExtendedResourceClaimStatus(ctx, pod, claim, nodeName, state)
+		err := pl.patchPodExtendedResourceClaimStatus(ctx, cs, pod, claim, nodeName, state)
 		if err != nil {
 			return nil, nil, err
 		}
