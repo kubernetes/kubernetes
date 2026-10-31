@@ -103,9 +103,6 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ImageGCLowThresholdPercent >= kc.ImageGCHighThresholdPercent {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageGCLowThresholdPercent (--image-gc-low-threshold) %v must be less than imageGCHighThresholdPercent (--image-gc-high-threshold) %v", kc.ImageGCLowThresholdPercent, kc.ImageGCHighThresholdPercent))
 	}
-	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
-	}
 	if len(kc.DefaultPodSysctls) > 0 {
 		if !localFeatureGate.Enabled(features.DefaultPodSysctls) {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: DefaultPodSysctls feature gate is required for Kubelet configuration option defaultPodSysctls"))
