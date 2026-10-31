@@ -133,12 +133,16 @@ func SavePreference(pref *v1.Preference, kubercFile string, out io.Writer) error
 	if err != nil {
 		return fmt.Errorf("failed to write kuberc file: %w", err)
 	}
+	defer file.Close() // nolint:errcheck
 
 	const mediaType = runtime.ContentTypeYAML
 	yamlInfo, _ := runtime.SerializerInfoForMediaType(scheme.StrictCodecs.SupportedMediaTypes(), mediaType)
 	encoder := scheme.StrictCodecs.EncoderForVersion(yamlInfo.Serializer, v1.SchemeGroupVersion)
 	if err := encoder.Encode(pref, file); err != nil {
 		return fmt.Errorf("failed to marshal preferences: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close kuberc file %s: %w", kubercFile, err)
 	}
 
 	fmt.Fprintf(out, "Updated %s\n", kubercFile) // nolint:errcheck
