@@ -24,15 +24,12 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $preemptorPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-0
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $gangCpuRequest
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      collectMetrics: true
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: $gangCpuRequest
 
   workloads:
   - name: 2Nodes_1PreemptorGang_2Pods_Evicting_10InitPods
@@ -109,16 +106,13 @@
     templateParams:
       podsPerGroup: $podsPerGroup
       priority: 1000
-  - opcode: createPods
-    countParam: $lowPriorityGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-1
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $lowPriorityCpuRequest
-      hostPortBase: 8000
-      priority: 1000
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: $lowPriorityCpuRequest
+        hostPortBase: 8000
+        priority: 1000
   - opcode: createPodGroups
     countParam: $highPriorityGroups
     namespace: gang-preempt-0
@@ -126,17 +120,14 @@
     templateParams:
       podsPerGroup: $podsPerGroup
       priority: 10000
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $highPriorityGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-0
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $highPriorityCpuRequest
-      hostPortBase: 9000
-      priority: 10000
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      collectMetrics: true
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: $highPriorityCpuRequest
+        hostPortBase: 9000
+        priority: 10000
 
   workloads:
   - name: 2Nodes_1PreemptorGang_2Pods_Evicting_2LowPriorityGangs
@@ -252,14 +243,10 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $preemptorPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-0
-    podTemplatePath: templates/pod-gang-affinity.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      collectMetrics: true
+      podTemplatePath: templates/pod-gang-affinity.yaml
 
   workloads:
   - name: 2Nodes_1PreemptorGang_2Pods_Evicting_10InitPods
@@ -340,16 +327,13 @@
     templateParams:
       podsPerGroup: $podsPerGroup
       priority: 10000
-  - opcode: createPods
-    collectMetrics: true
-    countParam: $preemptorPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-0
-    podTemplatePath: templates/gang-pod-with-topology-spreading.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $gangCpuRequest
-      priority: 10000
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      collectMetrics: true
+      podTemplatePath: templates/gang-pod-with-topology-spreading.yaml
+      templateParams:
+        cpuRequest: $gangCpuRequest
+        priority: 10000
   workloads:
   - name: 3Nodes_1PreemptorGang_3Pods_Evicting_12InitPods
     labels: [short, integration-test]
@@ -395,16 +379,13 @@
       podsPerGroup: $trainingPodsPerGroup
       priority: $trainingPriority|10000
       disruptionMode: $disruptionMode
-  - opcode: createPods
-    countParam: $trainingGroups
-    countMultiplierParam: $trainingPodsPerGroup
-    namespace: gang-preempt-1
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $trainingPodsPerGroup
-      cpuRequest: 2800m
-      hostPortBase: 8000
-      priority: $trainingPriority|10000
+    podsPerGroupParam: $trainingPodsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: 2800m
+        hostPortBase: 8000
+        priority: $trainingPriority|10000
   # Large Batch (Low Priority 100): ~20% of cluster
   - opcode: createPodGroups
     countParam: $largeBatchGroups
@@ -414,16 +395,13 @@
       podsPerGroup: $largeBatchPodsPerGroup
       priority: 100
       disruptionMode: $disruptionMode
-  - opcode: createPods
-    countParam: $largeBatchGroups
-    countMultiplierParam: $largeBatchPodsPerGroup
-    namespace: gang-preempt-2
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $largeBatchPodsPerGroup
-      cpuRequest: 2800m
-      hostPortBase: 8000
-      priority: 100
+    podsPerGroupParam: $largeBatchPodsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: 2800m
+        hostPortBase: 8000
+        priority: 100
   # Small Batch (Low Priority 100): ~10% of cluster
   - opcode: createPodGroups
     countParam: $smallBatchGroups
@@ -433,16 +411,13 @@
       podsPerGroup: $smallBatchPodsPerGroup
       priority: 100
       disruptionMode: $disruptionMode
-  - opcode: createPods
-    countParam: $smallBatchGroups
-    countMultiplierParam: $smallBatchPodsPerGroup
-    namespace: gang-preempt-3
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $smallBatchPodsPerGroup
-      cpuRequest: 2800m
-      hostPortBase: 8000
-      priority: 100
+    podsPerGroupParam: $smallBatchPodsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: 2800m
+        hostPortBase: 8000
+        priority: 100
   # Hero Workload (High Priority 1000000): 50% of cluster
   - opcode: createPodGroups
     countParam: $heroGroups

@@ -26,15 +26,11 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       minCount: $podsPerGroup
-  - opcode: createPods
-    # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
-    countParam: $initPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: tas-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
+      podTemplatePath: templates/pod.yaml
+      collectMetrics: true
   workloads:
   - name: 10Nodes_5Racks_3Groups
     labels: [integration-test, short]
@@ -196,14 +192,10 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       minCount: $podsPerGroup
-  - opcode: createPods
-    countParam: $initPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: tas-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/pod.yaml
+      collectMetrics: true
   workloads:
   - name: 10Nodes_5Racks_3Groups
     labels: [integration-test, short]
@@ -277,14 +269,10 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       minCount: $podsPerGroup
-  - opcode: createPods
-    countParam: $initPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: tas-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/pod.yaml
+      collectMetrics: true
   workloads:
   - name: 10Nodes_5Racks_3Groups
     labels: [integration-test, short]
@@ -335,21 +323,18 @@
     countParam: $initPodGroups
     namespace: tas-ns-0
     templatePath: templates/podgroup.yaml
-  - opcode: createPods
-    # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
-    countParam: $initPodGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: tas-ns-0
-    podTemplatePath: templates/pod.yaml
-    collectMetrics: true
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      # Because pods are created in parallel and Basic pod groups do not wait for minCount,
-      # initial scheduling with NodeResourcesFit (MostAllocated placement scoring) can lock
-      # more groups into a single rack before their remaining pods arrive than that rack can
-      # eventually fit, leaving the remaining pods unschedulable indefinitely once the rack fills up.
-      # Ensure a single 100-node rack (4 CPU/node) can fit all pods in the largest workload (10k >= 9k pods).
-      cpuRequest: 40m
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → group-0, pods 3-5 → group-1, etc.).
+      podTemplatePath: templates/pod.yaml
+      collectMetrics: true
+      templateParams:
+        # Because pods are created in parallel and Basic pod groups do not wait for minCount,
+        # initial scheduling with NodeResourcesFit (MostAllocated placement scoring) can lock
+        # more groups into a single rack before their remaining pods arrive than that rack can
+        # eventually fit, leaving the remaining pods unschedulable indefinitely once the rack fills up.
+        # Ensure a single 100-node rack (4 CPU/node) can fit all pods in the largest workload (10k >= 9k pods).
+        cpuRequest: 40m
   workloads:
   - name: 10Nodes_5Racks_3Groups
     labels: [integration-test, short]

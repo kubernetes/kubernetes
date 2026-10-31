@@ -253,17 +253,13 @@
       minCount: $podsPerGroup
       priority: 1000
       disruptionMode: $disruptionMode
-
-  - opcode: createPods
-    countParam: $lowPriorityGroups
-    countMultiplierParam: $podsPerGroup
-    namespace: gang-preempt-1
-    podTemplatePath: templates/gang-pod.yaml
-    templateParams:
-      podsPerGroup: $podsPerGroup
-      cpuRequest: $lowPriorityCpuRequest
-      priority: 1000
-      disruptionMode: $disruptionMode
+    podsPerGroupParam: $podsPerGroup
+    createPodsOp:
+      podTemplatePath: templates/gang-pod.yaml
+      templateParams:
+        cpuRequest: $lowPriorityCpuRequest
+        priority: 1000
+        disruptionMode: $disruptionMode
 
   - opcode: barrier
     stageRequirement: Scheduled
