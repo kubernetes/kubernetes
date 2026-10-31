@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/dump"
 )
@@ -106,19 +105,19 @@ func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
 	}
 }
 
-func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.Set[string], error) {
+func GetServicesToUpdate(serviceIndexer cache.Indexer, key *PodProjectionKey) (sets.Set[string], error) {
 	if key == nil {
 		return nil, nil
 	}
 
-	services, err := getServicesForPod(serviceLister, key.Namespace, key.Labels)
+	services, err := getServicesForPod(serviceIndexer, key.Namespace, key.Labels)
 	if err != nil {
 		return nil, err
 	}
 
 	// If the pod's labels changed in an update event, we'll need to consider all the affected services.
 	if key.OldLabels != nil {
-		oldServices, err := getServicesForPod(serviceLister, key.Namespace, key.OldLabels)
+		oldServices, err := getServicesForPod(serviceIndexer, key.Namespace, key.OldLabels)
 		if err != nil {
 			return nil, err
 		}
@@ -130,28 +129,76 @@ func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjecti
 }
 
 // getServicesForPod returns a set of services matching the given pod's namespace and labels (via service selector).
-func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.Set[string], error) {
-	services, err := serviceLister.Services(namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
+func getServicesForPod(serviceIndexer cache.Indexer, namespace string, podLabels labels.Set) (sets.Set[string], error) {
 	set := sets.Set[string]{}
-	for _, service := range services {
-		if service.Spec.Selector == nil {
-			// If the service has a nil selector this means selectors match nothing, not everything.
-			continue
+	addMatching := func(indexKey string) error {
+		candidates, err := serviceIndexer.ByIndex(ServiceSelectorIndex, indexKey)
+		if err != nil {
+			return err
 		}
-
-		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(podLabels) {
+		for _, obj := range candidates {
+			service, ok := obj.(*v1.Service)
+			if !ok || !labels.ValidatedSetSelector(service.Spec.Selector).Matches(podLabels) {
+				continue
+			}
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			set.Insert(key)
 		}
+		return nil
+	}
+
+	if err := addMatching(selectAllIndexKey(namespace)); err != nil {
+		return nil, err
+	}
+	for k, v := range podLabels {
+		if err := addMatching(serviceSelectorIndexKey(namespace, k, v)); err != nil {
+			return nil, err
+		}
 	}
 	return set, nil
+}
+
+// ServiceSelectorIndex is the name of the Service index added by AddServiceSelectorIndexer.
+const ServiceSelectorIndex = "endpointslice.k8s.io/service-selector"
+
+// AddServiceSelectorIndexer adds ServiceSelectorIndex to serviceInformer unless it is already registered.
+func AddServiceSelectorIndexer(serviceInformer cache.SharedIndexInformer) error {
+	if _, exists := serviceInformer.GetIndexer().GetIndexers()[ServiceSelectorIndex]; exists {
+		return nil
+	}
+	return serviceInformer.AddIndexers(cache.Indexers{ServiceSelectorIndex: ServiceSelectorIndexFunc})
+}
+
+// ServiceSelectorIndexFunc indexes a Service under only the selector requirement with the smallest
+// key: a Service selects a pod only if the pod has every requirement as a label, so looking up the
+// pod's labels still finds it. Empty selectors select every pod and use a namespace-wide key.
+func ServiceSelectorIndexFunc(obj interface{}) ([]string, error) {
+	service, ok := obj.(*v1.Service)
+	if !ok || service.Spec.Selector == nil {
+		return []string{}, nil
+	}
+	if len(service.Spec.Selector) == 0 {
+		return []string{selectAllIndexKey(service.Namespace)}, nil
+	}
+
+	var minKey string
+	for k := range service.Spec.Selector {
+		if minKey == "" || k < minKey {
+			minKey = k
+		}
+	}
+	return []string{serviceSelectorIndexKey(service.Namespace, minKey, service.Spec.Selector[minKey])}, nil
+}
+
+func serviceSelectorIndexKey(namespace, labelKey, labelValue string) string {
+	return namespace + "/" + labelKey + "=" + labelValue
+}
+
+func selectAllIndexKey(namespace string) string {
+	return namespace + "/"
 }
 
 // PortMapKey is used to uniquely identify groups of endpoint ports.

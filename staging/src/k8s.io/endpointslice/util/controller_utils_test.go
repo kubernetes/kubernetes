@@ -22,12 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
@@ -392,9 +394,10 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 			expect: sets.New[string](),
 		},
 	}
+	serviceIndexer := newServiceSelectorIndexer(t, fakeInformerFactory)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(test.pod, nil))
+			services, err := GetServicesToUpdate(serviceIndexer, GetPodUpdateProjectionKey(test.pod, nil))
 			if err != nil {
 				t.Errorf("Error from cache.GetServicesToUpdate: %v", err)
 			} else if !services.Equal(test.expect) {
@@ -405,43 +408,224 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 }
 
 func BenchmarkGetPodServicesToUpdate(b *testing.B) {
-	// init fake service informer.
-	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
-	for i := 0; i < 1000; i++ {
-		service := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("service-%d", i),
-				Namespace: "test",
-			},
-			Spec: v1.ServiceSpec{
-				Selector: map[string]string{
-					"app": fmt.Sprintf("test-%d", i),
-				},
-			},
-		}
-		fakeInformerFactory.Core().V1().Services().Informer().GetStore().Add(service)
-	}
+	for _, numServices := range []int{100, 1000, 10000, 65000} {
+		b.Run(fmt.Sprintf("services=%d", numServices), func(b *testing.B) {
+			// init fake service informer.
+			fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
+			for i := 0; i < numServices; i++ {
+				service := &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("service-%d", i),
+						Namespace: "test",
+					},
+					Spec: v1.ServiceSpec{
+						Selector: map[string]string{
+							"app": fmt.Sprintf("test-%d", i),
+						},
+					},
+				}
+				fakeInformerFactory.Core().V1().Services().Informer().GetStore().Add(service)
+			}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "test-pod-0",
-			Labels: map[string]string{
-				"app": "test-0",
-			},
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-pod-0",
+					Labels: map[string]string{
+						"app": "test-0",
+					},
+				},
+			}
+
+			expect := sets.NewString("test/service-0")
+			serviceIndexer := newServiceSelectorIndexer(b, fakeInformerFactory)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				services, err := GetServicesToUpdate(serviceIndexer, GetPodUpdateProjectionKey(pod, nil))
+				if err != nil {
+					b.Fatalf("Error from GetServicesToUpdate(): %v", err)
+				}
+				if len(services) != len(expect) {
+					b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
+				}
+			}
+		})
+	}
+}
+
+func newSelectorService(namespace, name string, selector map[string]string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
+		Spec:       v1.ServiceSpec{Selector: selector},
+	}
+}
+
+func newServiceIndexer(tb testing.TB, services ...*v1.Service) cache.Indexer {
+	tb.Helper()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{ServiceSelectorIndex: ServiceSelectorIndexFunc})
+	for _, service := range services {
+		if err := indexer.Add(service); err != nil {
+			tb.Fatalf("Failed to add service %s/%s: %v", service.Namespace, service.Name, err)
+		}
+	}
+	return indexer
+}
+
+func newServiceSelectorIndexer(tb testing.TB, informerFactory informers.SharedInformerFactory) cache.Indexer {
+	tb.Helper()
+	serviceInformer := informerFactory.Core().V1().Services().Informer()
+	if err := AddServiceSelectorIndexer(serviceInformer); err != nil {
+		tb.Fatalf("Failed to add Service selector index: %v", err)
+	}
+	return serviceInformer.GetIndexer()
+}
+
+func TestServiceSelectorIndexFunc(t *testing.T) {
+	testCases := []struct {
+		name     string
+		obj      interface{}
+		expected []string
+	}{
+		{
+			name:     "not a service",
+			obj:      &v1.Pod{},
+			expected: []string{},
+		},
+		{
+			name:     "nil selector selects nothing",
+			obj:      newSelectorService("ns", "svc", nil),
+			expected: []string{},
+		},
+		{
+			name:     "empty selector selects every pod in the namespace",
+			obj:      newSelectorService("ns", "svc", map[string]string{}),
+			expected: []string{"ns/"},
+		},
+		{
+			name:     "single requirement",
+			obj:      newSelectorService("ns", "svc", map[string]string{"app": "foo"}),
+			expected: []string{"ns/app=foo"},
+		},
+		{
+			name:     "multiple requirements use the smallest key",
+			obj:      newSelectorService("ns", "svc", map[string]string{"tier": "web", "app": "foo", "env": "prod"}),
+			expected: []string{"ns/app=foo"},
+		},
+		{
+			name:     "prefixed label key",
+			obj:      newSelectorService("ns", "svc", map[string]string{"example.com/app": "foo"}),
+			expected: []string{"ns/example.com/app=foo"},
 		},
 	}
 
-	expect := sets.NewString("test/service-0")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(pod, nil))
-		if err != nil {
-			b.Fatalf("Error from GetServicesToUpdate(): %v", err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ServiceSelectorIndexFunc(tc.obj)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("Unexpected index values (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGetServicesToUpdate(t *testing.T) {
+	indexer := newServiceIndexer(t,
+		newSelectorService("test", "app-foo", map[string]string{"app": "foo"}),
+		newSelectorService("test", "app-foo-tier-web", map[string]string{"app": "foo", "tier": "web"}),
+		newSelectorService("test", "app-foo-env-prod", map[string]string{"app": "foo", "env": "prod"}),
+		newSelectorService("test", "tier-web", map[string]string{"tier": "web"}),
+		newSelectorService("test", "app-bar", map[string]string{"app": "bar"}),
+		newSelectorService("test", "nil-selector", nil),
+		newSelectorService("test", "empty-selector", map[string]string{}),
+		newSelectorService("other", "app-foo", map[string]string{"app": "foo"}),
+	)
+
+	testCases := []struct {
+		name     string
+		key      *PodProjectionKey
+		expected sets.Set[string]
+	}{
+		{
+			name:     "nil key",
+			key:      nil,
+			expected: nil,
+		},
+		{
+			name: "pod matching selectors with one and two requirements",
+			key:  &PodProjectionKey{Namespace: "test", Labels: map[string]string{"app": "foo", "tier": "web"}},
+			expected: sets.New("test/app-foo", "test/app-foo-tier-web", "test/tier-web",
+				"test/empty-selector"),
+		},
+		{
+			name: "pod matching every requirement of a multi-requirement selector",
+			key:  &PodProjectionKey{Namespace: "test", Labels: map[string]string{"app": "foo", "env": "prod", "tier": "web"}},
+			expected: sets.New("test/app-foo", "test/app-foo-tier-web", "test/app-foo-env-prod",
+				"test/tier-web", "test/empty-selector"),
+		},
+		{
+			name:     "pod with only the non-smallest requirement of a selector",
+			key:      &PodProjectionKey{Namespace: "test", Labels: map[string]string{"env": "prod"}},
+			expected: sets.New("test/empty-selector"),
+		},
+		{
+			name:     "pod without labels",
+			key:      &PodProjectionKey{Namespace: "test"},
+			expected: sets.New("test/empty-selector"),
+		},
+		{
+			name:     "pod in another namespace",
+			key:      &PodProjectionKey{Namespace: "other", Labels: map[string]string{"app": "foo", "tier": "web"}},
+			expected: sets.New("other/app-foo"),
+		},
+		{
+			name: "labels changed without pod change",
+			key: &PodProjectionKey{
+				Namespace: "test",
+				Labels:    map[string]string{"app": "bar"},
+				OldLabels: map[string]string{"app": "foo"},
+			},
+			expected: sets.New("test/app-foo", "test/app-bar"),
+		},
+		{
+			name: "labels and pod changed",
+			key: &PodProjectionKey{
+				Namespace:  "test",
+				Labels:     map[string]string{"app": "bar"},
+				OldLabels:  map[string]string{"app": "foo"},
+				PodChanged: true,
+			},
+			expected: sets.New("test/app-foo", "test/app-bar", "test/empty-selector"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			services, err := GetServicesToUpdate(indexer, tc.key)
+			if err != nil {
+				t.Fatalf("Unexpected error from GetServicesToUpdate(): %v", err)
+			}
+			if diff := cmp.Diff(tc.expected, services); diff != "" {
+				t.Errorf("Unexpected services (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestAddServiceSelectorIndexer(t *testing.T) {
+	serviceInformer := informers.NewSharedInformerFactory(&fake.Clientset{}, 0).Core().V1().Services().Informer()
+
+	// Registering twice, as two controllers sharing the informer do, must not fail.
+	for range 2 {
+		if err := AddServiceSelectorIndexer(serviceInformer); err != nil {
+			t.Fatalf("Unexpected error from AddServiceSelectorIndexer(): %v", err)
 		}
-		if len(services) != len(expect) {
-			b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
-		}
+	}
+	if _, exists := serviceInformer.GetIndexer().GetIndexers()[ServiceSelectorIndex]; !exists {
+		t.Errorf("Expected index %q to be registered", ServiceSelectorIndex)
 	}
 }
 
