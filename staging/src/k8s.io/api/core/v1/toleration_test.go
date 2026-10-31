@@ -16,13 +16,9 @@ limitations under the License.
 
 package v1
 
-import (
-	"k8s.io/klog/v2/ktesting"
-	"testing"
-)
+import "testing"
 
 func TestTolerationToleratesTaint(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description                                string
 		toleration                                 Toleration
@@ -248,20 +244,24 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		if tolerated := tc.toleration.ToleratesTaint(logger, &tc.taint, tc.enableTaintTolerationComparisonOperatorsFG); tc.expectTolerated != tolerated {
+		tolerated, err := tc.toleration.ToleratesTaint(&tc.taint, tc.enableTaintTolerationComparisonOperatorsFG)
+		if (err != nil) != tc.expectError {
+			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectError, err)
+		}
+		if tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
 		}
 	}
 }
 
 func TestCompareNumericValues(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description    string
 		tolerationVal  string
 		taintVal       string
 		operator       TolerationOperator
 		expectedResult bool
+		expectError    bool
 	}{
 		// Valid Gt operator cases
 		{
@@ -365,6 +365,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "100",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid toleration value (empty string), expect false",
@@ -372,6 +373,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "100",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid toleration value (leading zero), expect false",
@@ -379,6 +381,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "200",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid toleration value (plus sign), expect false",
@@ -386,6 +389,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "200",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid toleration value (floating point), expect false",
@@ -393,6 +397,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "200",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid toleration value (just minus sign), expect false",
@@ -400,6 +405,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "100",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 
 		// Invalid taint values - should return false
@@ -409,6 +415,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "xyz",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid taint value (empty string), expect false",
@@ -416,6 +423,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Gt operator - invalid taint value (leading zero), expect false",
@@ -423,6 +431,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "0200",
 			operator:       TolerationOpGt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Lt operator - invalid taint value (plus sign), expect false",
@@ -430,6 +439,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       "+200",
 			operator:       TolerationOpLt,
 			expectedResult: false,
+			expectError:    true,
 		},
 		{
 			description:    "Lt operator - invalid taint value (spaces), expect false",
@@ -437,6 +447,7 @@ func TestCompareNumericValues(t *testing.T) {
 			taintVal:       " 200 ",
 			operator:       TolerationOpLt,
 			expectedResult: false,
+			expectError:    true,
 		},
 
 		// Invalid operator - should return false
@@ -490,7 +501,10 @@ func TestCompareNumericValues(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result := compareNumericValues(logger, tc.tolerationVal, tc.taintVal, tc.operator)
+			result, err := compareNumericValues(tc.tolerationVal, tc.taintVal, tc.operator)
+			if (err != nil) != tc.expectError {
+				t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectError, err)
+			}
 			if result != tc.expectedResult {
 				t.Errorf("[%s] expected %v, got %v: tolerationVal=%q, taintVal=%q, operator=%v",
 					tc.description, tc.expectedResult, result, tc.tolerationVal, tc.taintVal, tc.operator)
