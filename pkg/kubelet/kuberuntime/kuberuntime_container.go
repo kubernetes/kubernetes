@@ -52,6 +52,7 @@ import (
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -451,6 +452,20 @@ func actuatedContainerResources(pod *v1.Pod, container *v1.Container) v1.Resourc
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
 	return containerResources
+}
+
+// getActuatedContainer returns the spec a container of the given type was last started with, if
+// recorded. It is only used with DynamicContainers, for containers removed from the pod spec.
+func (m *kubeGenericRuntimeManager) getActuatedContainer(podUID kubetypes.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return nil, false
+	}
+	c, ok := m.actuatedState.GetContainer(podUID, containerName, containerType)
+	// A record written by an older kubelet holds only resources, and has no image.
+	if !ok || c.Image == "" {
+		return nil, false
+	}
+	return c, true
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
@@ -883,17 +898,25 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	logger := klog.FromContext(ctx)
 	var containerSpec *v1.Container
 	if pod != nil {
-		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
-			return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q",
-				containerName, containerID.String(), format.Pod(pod), message)
+		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
+		if containerSpec == nil {
+			// The container may have been removed from the pod spec, which only regular containers
+			// can be; use the spec it was started with, if recorded.
+			containerSpec, _ = m.getActuatedContainer(pod.UID, containerName, podutil.Containers)
 		}
-	} else {
-		// Restore necessary information if one of the specs is nil.
+	}
+	if containerSpec == nil {
+		// The pod may be unknown, or the container spec wasn't recorded; fall back to the specs
+		// recorded in the container labels.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
 		if err != nil {
 			return err
 		}
-		pod, containerSpec = restoredPod, restoredContainer
+		// Prefer the live pod when available since it carries the current grace period and deletion state.
+		if pod == nil {
+			pod = restoredPod
+		}
+		containerSpec = restoredContainer
 	}
 
 	// From this point, pod and container must be non-nil.
@@ -956,12 +979,12 @@ func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context
 		}
 	}
 	var termOrdering *terminationOrdering
-	if types.HasRestartableInitContainer(pod) {
+	if orderingPod := m.terminationOrderingPod(pod); types.HasRestartableInitContainer(orderingPod) {
 		var runningContainerNames []string
 		for _, container := range runningPod.Containers {
 			runningContainerNames = append(runningContainerNames, container.Name)
 		}
-		termOrdering = newTerminationOrdering(pod, runningContainerNames)
+		termOrdering = newTerminationOrdering(orderingPod, runningContainerNames)
 	}
 	return m.killContainers(ctx, pod, containersToKill, gracePeriodOverride, termOrdering)
 }
@@ -996,6 +1019,21 @@ func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.
 		syncResults = append(syncResults, containerResult)
 	}
 	return syncResults
+}
+
+// terminationOrderingPod returns the pod to order the termination of its containers by. With
+// DynamicContainers, that's the actuated pod, because it still has the running containers that
+// were removed from the pod spec. Without a complete actuated pod, e.g. for a pod that was already
+// terminating when the kubelet was upgraded, it falls back to pod. Such a pod has no removed
+// containers, since removals only happen in pods the kubelet synced.
+func (m *kubeGenericRuntimeManager) terminationOrderingPod(pod *v1.Pod) *v1.Pod {
+	if pod == nil || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return pod
+	}
+	if actuated, ok := m.actuatedState.GetPod(pod.UID); ok && !state.IsMigratedFromV1(actuated) {
+		return actuated
+	}
+	return pod
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init
